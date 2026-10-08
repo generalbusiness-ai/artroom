@@ -368,6 +368,14 @@ test("registered original Git dispatch fences suspended discovery at the real sc
     });
     expect(await inspect((store) => [store.sending("0:0", 1)?.sent, store.originalDispatch("0:0", 1)])).toEqual([null, null]);
     expect(host.sent).toHaveLength(0); // No missing-input legacy fallback.
+    // Bounded phase labels distinguish the same existing waits; no timeout,
+    // retry, extra RPC or native-cause conclusion is introduced.
+    const phase = async <T>(name: string, ask: () => Promise<T>): Promise<T> => {
+      console.info("executor witness phase", name, "start");
+      const value = await ask();
+      console.info("executor witness phase", name, "done");
+      return value;
+    };
     const runSuspendedOriginal = async () => {
       evidenceAvailable = true;
       let resume!: () => void;
@@ -402,11 +410,11 @@ test("registered original Git dispatch fences suspended discovery at the real sc
         const completion = { physicallyCompleted, portCompletions, bindingGuardDenied };
         console.info("scripted original port completion before eviction", completion);
         expect(completion).toEqual({ physicallyCompleted: true, portCompletions: 1, bindingGuardDenied: true });
-        await pass;
+        await phase("original-pass", () => pass);
         expect(host.sent).toHaveLength(0); // Control must fail by actual POST count.
-        const owned = await inspect((store) => store.originalDispatch("0:0", 1));
+        const owned = await phase("closed-owner-snapshot", () => inspect((store) => store.originalDispatch("0:0", 1)));
         expect([owned?.closure, owned?.consumed]).toEqual([close.closure, null]);
-        const beforeRestart = await destination.entries();
+        const beforeRestart = await phase("history-before-restart", () => destination.entries());
         const unknown = beforeRestart.find((entry) => entry.input.type === "outcome" && entry.input.operation === "0:0");
         expect(unknown?.input).toMatchObject({ result: "unknown", evidence: { basis: "none" } });
         // Only serializable snapshots leave this helper. Physical completion
@@ -416,19 +424,22 @@ test("registered original Git dispatch fences suspended discovery at the real sc
         resume();
         host.beforeReceiveAdvertisement = null;
         portCompleted = null;
+        console.info("executor witness phase", "helper-finally-gate-cleared", "done");
       }
     };
-    const { beforeRestart, owned } = await runSuspendedOriginal();
+    const { beforeRestart, owned } = await phase("helper", runSuspendedOriginal);
     // Actual local object eviction preserves storage; this does not prove
     // drainage of a deployed release or provider exclusion.
-    await destination.restart();
-    await (destination.stub as unknown as { effect(): Promise<number> }).effect();
-    expect([host.sent.length, await destination.entries(), await inspect((store) => store.originalDispatch("0:0", 1))]).toEqual([0, beforeRestart, owned]);
+    await phase("eviction", () => destination.restart());
+    await phase("post-eviction-effect", () => (destination.stub as unknown as { effect(): Promise<number> }).effect());
+    const afterRestart = await phase("post-eviction-history", () => destination.entries());
+    const afterOwner = await phase("post-eviction-owner-snapshot", () => inspect((store) => store.originalDispatch("0:0", 1)));
+    expect([host.sent.length, afterRestart, afterOwner]).toEqual([0, beforeRestart, owned]);
     // Local generation cannot roll back or delete the earlier closed owner.
     const current = activeContext!;
     generation = 2;
-    expect(await inspect((store) => [store.acceptDispatchGeneration({ ...current, generation: 2, tuple: dispatchId("test-tuple", 2) }), store.acceptDispatchGeneration(current)])).toEqual([true, false]);
-    expect(await inspect((store) => store.originalDispatch("0:0", 1))).toEqual(owned);
+    expect(await phase("generation-check", () => inspect((store) => [store.acceptDispatchGeneration({ ...current, generation: 2, tuple: dispatchId("test-tuple", 2) }), store.acceptDispatchGeneration(current)]))).toEqual([true, false]);
+    expect(await phase("final-owner-snapshot", () => inspect((store) => store.originalDispatch("0:0", 1)))).toEqual(owned);
   } finally {
     net.hold = oldHold;
     if (G) platformDispatch.delete(G.name);

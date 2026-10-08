@@ -1,0 +1,62 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-executor-prep
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase helper start
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+scripted original port completion before eviction {
+  physicallyCompleted: true,
+  portCompletions: 1,
+  bindingGuardDenied: true
+}
+executor witness phase original-pass start
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase original-pass done
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase closed-owner-snapshot start
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase closed-owner-snapshot done
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase history-before-restart start
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase history-before-restart done
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase helper-finally-gate-cleared done
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase helper done
+
+stdout | test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+executor witness phase eviction start
+
+ ❯ |scope| test/github-founding.test.ts (2 tests | 1 failed | 1 skipped) 5008ms
+   × registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart 5007ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |scope| test/github-founding.test.ts > registered original Git dispatch fences suspended discovery at the real scope, retains unknown duties, and never adopts an old nonce after restart
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/github-founding.test.ts:294:1
+    292| // smart HTTP preparation and terminal consumption are the actual code…
+    293| // shows no production tuple, old-release drain, coordinator retiremen…
+    294| test("registered original Git dispatch fences suspended discovery at t…
+       | ^
+    295|   const { paul } = keys;
+    296|   const kp = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 skipped (2)
+   Start at  04:31:24
+   Duration  6.05s (transform 404ms, setup 0ms, import 863ms, tests 5.01s, environment 0ms)
+
