@@ -35,7 +35,7 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
@@ -55,6 +55,9 @@ export interface EffectRequest {
   scope: ScopeRef; operation: OperationId; attempt: number;
   owner: CapabilityName | PlatformDefinition; kind: string;
   origin: Sealed;
+  /** Internal ledger bookkeeping, read back after this exact attempt's
+   * durable mark. It grants no authority and is not caller-selected over RPC. */
+  sentAt?: Timestamp;
 }
 
 /**
@@ -367,7 +370,9 @@ export class Operations {
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,
       // and records `unknown`.
       store.markSent(id, attempt, timeOf(now), now + this.#bounds.dispatchSeconds * 1000);
-      const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
+      const marked = store.sending(id, attempt);
+      if (!marked || marked.operation !== id || marked.attempt !== attempt || marked.sent === null) throw new Error("original attempt has no durable sent mark");
+      const request: EffectRequest = { scope: scope.at, operation: id, attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash }, sentAt: marked.sent };
       work.push(() => this.#send(row, request, now));
     }
     await this.#wake(now);
@@ -462,7 +467,9 @@ export class Operations {
       const scope = this.#store.scope();
       const origin = this.#store.stored(Number(row.operation.split(":")[0]));
       if (!operation || !scope || !origin || !this.#scope.pinned()?.definition || !this.#scope.owners()?.rules(operation.owner, operation.kind) || !recovery?.accepts(operation.owner, operation.kind)) return null;
-      const request: EffectRequest = { scope: scope.at, operation: row.operation, attempt: row.attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash } };
+      const marked = this.#store.sending(row.operation, row.attempt);
+      if (!marked || marked.operation !== row.operation || marked.attempt !== row.attempt || marked.sent === null) return null;
+      const request: EffectRequest = { scope: scope.at, operation: row.operation, attempt: row.attempt, owner: operation.owner, kind: operation.kind, origin: { entry: JSON.parse(origin.bytes) as Entry, hash: origin.hash }, sentAt: marked.sent };
       return { request, read: () => recovery.read(request) };
     } catch (failure) {
       report(this.#diagnoses, "outside-recovery-failed", operation ? `${operation.owner}:${operation.kind}` : "owner", failure);
