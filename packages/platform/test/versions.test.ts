@@ -10,16 +10,16 @@ import { rita } from "./support-founding.ts";
 // judged and replayed by it for as long as it exists; this package serves every version that it has shipped; a new scope is founded
 // on the newest. Plain functions: the rules are called with what a judge would give them, and no scope is run.
 
-/** The digest of each version's data, in the definition's own domain. The six of version 1 are those of the data that main shipped. */
+/** The digest of each version's data, in the definition's own domain. Version 1 matches actual main1eed91aa, including gate1 definition-byte places. */
 const DIGESTS: Readonly<Record<string, string>> = {
   "platform:inbox@1": "sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748",
   "platform:register@1": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:register@2": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
-  "platform:directory@1": "sha256:d24a8e644cc52debe30bab479f2903a4e634e50b4401fb1cfa78d4f331b1c7d5",
+  "platform:directory@1": "sha256:5463d69af0b876502c25e643160ae71cbcbafa55608082486cd9893969d9197b",
   "platform:directory@2": "sha256:053ec528406d1de077992d80f405f846940fb3c2c44f9206263e18329e1d58f6",
   "platform:membership@1": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
   "platform:membership@2": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
-  "platform:rules@1": "sha256:c8eb84eba8150a3228ba7ddaed0a5a29ce62c7d5cc0ab0132226e8c4a7e6859b",
+  "platform:rules@1": "sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471",
   "platform:rules@2": "sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471",
   "platform:destination@1": "sha256:8876db18e301991a2d8d936191598998c9b1ec9aef5ed71e4e75d08651327743",
   "platform:destination@2": "sha256:2caf58557aaf561be0696ee232f4b333d0cfb68962caec710989bc0f3ddfacc1",

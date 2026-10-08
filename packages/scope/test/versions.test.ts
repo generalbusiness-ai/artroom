@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 import type { Intent, PlatformDefinition, Seed } from "@generalbusiness/artroom-contract";
-import { factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
-import { keys } from "@generalbusiness/artroom-derive/testing";
+import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent } from "@generalbusiness/artroom-bytes";
+import { keys, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { firstExtents, foundingObjects, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { foundingPublication } from "./publication.ts";
+import { reader } from "./support.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 
 const { paul } = keys;
@@ -70,6 +71,23 @@ describe("a room founded on version 1 of every definition, on the code that ship
     expect(published.answer).toBe("accepted");
     const retained = (await rules.entries()).at(-1)!.input;
     expect(retained.type === "act" ? retained.authority.map((grant) => grant.fresh.observation.definition) : null).toEqual(["platform:membership@1"]);
+
+    // Actual main1eed's @1 input/retention behavior survives the version split.
+    const definitionBytes = canonicalize(ticketDefinition.declared);
+    const activation = await rules.intent(rita, "activate", { fields: { digest: ticketDefinition.digest, name: ticketDefinition.declared.name } });
+    const beforeActivation = (await rules.summary()).at;
+    expect(await rules.stub.submit(activation, [])).toMatchObject({ answer: "refused", reason: "bad-field" });
+    expect((await rules.summary()).at).toEqual(beforeActivation);
+    expect(await rules.stub.submit(activation, [], { values: [definitionBytes] })).toMatchObject({ answer: "accepted" });
+    const retainedDefinition = await rules.stub.retained(reader, "definition", ticketDefinition.digest);
+    expect(retainedDefinition.ok ? retainedDefinition.value.bytes : null).toBe(definitionBytes);
+    // Both native lane-opening acts require their stated bytes; a missing
+    // value is bad-field before any dependency guard or creation duty.
+    const beforeOpening = (await D.summary()).at;
+    for (const [kind, fields] of [["open-issue", { conditions: [] }], ["open-pr", { draft: false }]] as const) {
+      expect(await D.act(rita, kind, { fields: { definition: ticketDefinition.digest, title: "Native byte place", ...fields } })).toMatchObject({ answer: "refused", reason: "bad-field" });
+      expect((await D.summary()).at).toEqual(beforeOpening);
+    }
 
     // Every history replays consistent with the package that ships version 2, which serves version 1 as it shipped.
     const options = { mode: "replay", grants: "proven" } as const;

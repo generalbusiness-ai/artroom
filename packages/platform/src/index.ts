@@ -99,11 +99,12 @@ export interface Platform {
  * shipped, by its pinned name (the planner's decision of 2026-10-07: a
  * changed definition carries a new version, and a scope is judged and
  * replayed by the version that its genesis pinned, for as long as it
- * exists). Version 1 of each is as it shipped first. Version 2 of the
- * register, the directory, membership, the rules scope and the destination
- * holds the changes of the I5 demo: the place of a definition's bytes on
- * the acts that name one, the destination's act `read-token` and the role
- * row that grants it, and a founding commit with a README. The inbox has
+ * exists). Version 1 here preserves actual main1eed91aa's supported data,
+ * including the definition-byte places gate1 shipped. This table does not
+ * establish original historical admission/source chronology. Version 2 of
+ * the register, directory, membership, rules and destination keeps the I5
+ * child cohort, version-named observations, the destination's read-token
+ * and its role row, and a founding commit with a README. The inbox has
  * one version. A version that is not listed here is one that this package
  * cannot run.
  */

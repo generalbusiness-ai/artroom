@@ -1,5 +1,13 @@
 # I5: definition versions, and a founding README, delivery
 
+Current candidate amendment (2026-10-08): planner
+`158be2c4800db1753af32e60674591ff17464cde` supersedes the earlier baseline
+choice for @1. Sections1–6 retain the cloud delivery record; they do not
+establish original chronology or describe current main1eed's input contract.
+For this candidate, every configured @1 declaration is exactly actual main
+`1eed91aacac56649ac0b75c0652215b0418eeff8`, including gate1's definition-byte
+places. See section8 for the exact comparison and focused behavior evidence.
+
 2026-10-07. Branch `claude/definition-versions-readme-to67yk` (the name
 this session may push; the brief's local name was
 `i5-definition-versions`), on top of `origin/planner/i5-demo-host` at
@@ -224,3 +232,75 @@ complete-proof claim was made. The one final integrated gate belongs to Root.
 
 Original focused output SHA-256: a30cd7d2a6a075a80c00f223d5d4ac21f8f034c7719a9ddc862ac0700edce02a.
 Original type output SHA-256: 7164e781f55f730d5b11f99c10513168239de3ff338d0315651cb93b32fe3130.
+
+
+## 8. F1: preserve actual main's supported @1 definitions
+
+Under existing request862 and changes-requested review
+`376aa53064b8adae9b330d5d655f5fb019b6b168`, both that full review and planner
+`158be2c4800db1753af32e60674591ff17464cde` were read through builder in the
+explicit repository workroom. The isolated repair starts at
+`68be1ffeb3d64094232ec7f8e4373629f8527c07`; it changes no shared landing tree.
+The planner amends the earlier pre-gate1 @1 choice, not the identities of
+recorded genesis or old duties.
+
+Directory@1 again states the definition-domain value place on both open-issue
+and open-pr, with actual main's definitionBytes bound. Rules@1 again states
+that place on activate.digest. Both read and retain supplied definition bytes
+through the existing evaluator. The earlier assertion that @1 reads none and
+can only answer dependency-unavailable is not this candidate's supported
+contract. @2 keeps its newer child cohort, standing/observation identities,
+read-token behavior and founding README. All five @2 declaration byte bodies
+compare equal to the incoming candidate; no @2 pin was changed.
+
+The full configured @1 table was compared as complete canonical bytes with
+actual main1eed, not by an older source prefix or guessed deployment:
+
+| Definition | Exact main1eed/current @1 digest |
+|---|---|
+| register | sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6 |
+| directory | sha256:5463d69af0b876502c25e643160ae71cbcbafa55608082486cd9893969d9197b |
+| membership | sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831 |
+| rules | sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471 |
+| destination | sha256:8876db18e301991a2d8d936191598998c9b1ec9aef5ed71e4e75d08651327743 |
+| inbox | sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748 |
+
+All six canonical bodies are byte-equal. The native ledger and exact canonical
+payloads are retained in `/tmp/artroom-f1-evidence`; global contract/bytes/derive
+files have no delta from main1eed. The platform pin witness updates only the
+two formerly stale @1 literals; @2 literals and existing assertions remain.
+The existing real @1 versions scenario now shows missing activation bytes
+refused bad-field without head movement, the SAME signed activation accepted
+with its bytes and exact retained definition, and missing bytes on both lane
+opening acts refused bad-field without head movement. Its original @1 grant,
+empty founding tree, unknown read-token, replay and wrong-@2-code mismatch
+assertions remain. Git host and readers retain their labelled fixture limits.
+
+One focused batch passed 41 tests in four files (1.80 seconds):
+
+```sh
+./node_modules/.bin/vitest run --project platform --project scope packages/platform/test/versions.test.ts packages/platform/test/directory.test.ts packages/platform/test/rules-scope.test.ts packages/scope/test/versions.test.ts
+npm run typecheck --workspace @generalbusiness/artroom-platform --workspace @generalbusiness/artroom-scope
+```
+
+Platform and scope source/test/Node-helper typechecks passed. One narrow
+control removed only activate's restored value place: the unchanged native
+scenario failed its expected bad-field assertion with dependency-unavailable.
+The helper reported DISTINGUISHES and restored the source. No other suite or
+matrix, package install, gate, cloud/provider or main operation ran.
+Original outputs and SHA-256 hashes:
+
+| File in /tmp/artroom-f1-evidence | SHA-256 |
+|---|---|
+| focused.log | aa5631e88fa4d69bd986720aacfbf9fc533c920b6a0841bda5a51ec08c3320c5 |
+| types.log | 8988147af473bdbaab3ece05b4354b6a4ecbdac64ba7add32a576f99af0e3d0b |
+| control-native-value.log | 5882c0802a5f77a3b011ce1b9c7be30fcfc9228063d2bf19e3616681d1e4cd00 |
+| native-ledger.json | e0add6510ff170dbdb151dd2c644aa782f88572594d12c9e199956ecf782c8b1 |
+
+This verifies supported current-main bytes and fresh behavior, not which
+original release admitted an older scope. Colliding historical @1 source,
+original executable/admission and complete legacy history correspondence stay
+owed. No history/genesis rewrite, silent repin, new historical dispatch or
+fresh@2 compatibility shortcut was used. Original operation/provider/custody,
+late/unknown answers and cleanup duties remain unchanged. Root owns the one
+combined final gate and independent successor review.

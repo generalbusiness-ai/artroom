@@ -73,8 +73,8 @@ export { DIRECTORY };
 /**
  * The versions of the directory that this package serves, each with the
  * definitions of the three scopes that its genesis creates. Version 2
- * founds them on the second version of each, and its acts `open-issue` and
- * `open-pr` state the place of a definition's bytes.
+ * founds them on the second version of each. Both versions retain the
+ * definition-byte places shipped by actual main at1eed91aa.
  */
 export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefinition; rules: PlatformDefinition; destination: PlatformDefinition }>> = {
   "platform:directory@1": { membership: "platform:membership@1", rules: "platform:rules@1", destination: "platform:destination@1" },
@@ -107,24 +107,15 @@ export const SEEN = ["title", "state", "draft", "merge", "labels", "assignees"] 
 /** The fields of the two acts that open a lane, beside those of the lane's own genesis, as version 1 states them. */
 const opening1 = {
   // The definition under which the lane is created: a digest that the rules scope holds as `active`.
-  definition: { type: "digest", required: true },
+  // Actual main1eed already shipped this value place for both lane-opening acts.
+  definition: { type: "digest", required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } },
   title: { ...NAME, required: true },
   // A detached text, which travels beside the intent and reaches the lane by its digest.
   body: { type: "text", max: 65536, detached: true, required: false },
 } as const;
 
-/**
- * The same fields, as version 2 states them. The definition's bytes come
- * beside the intent at a stated place, in the domain of a definition, so
- * that the runtime reads them for the guard `definition-active` and the
- * entry retains them for the lane it creates (the contract's section 6.2,
- * revision 19). Under version 1 the runtime reads no bytes for the field,
- * and the guard answers `dependency-unavailable`.
- */
-const opening2 = {
-  ...opening1,
-  definition: { type: "digest", required: true, value: { domain: DEFINITION_DOMAIN, max: PROPOSED_BOUNDS.definitionBytes } },
-} as const;
+/** Version 2 uses the same supported definition-byte input/retention contract. */
+const opening2 = opening1;
 
 /** `open-issue` and `open-pr`: an act that opens a `lane` row and sends the one `create` of a lane under the digest that the field `definition` names. */
 const opens = (kind: "issue" | "pr", opening: typeof opening1 | typeof opening2): PlatformData["acts"][string] => ({
@@ -373,11 +364,11 @@ export const directory: PlatformData = {
 };
 
 /**
- * `platform:directory@2`: version 1 with two changes. Its genesis creates
+ * `platform:directory@2`: version 1 with the newer child cohort. Its genesis creates
  * membership under `platform:membership@2` (the rules scope and the
  * destination follow from `SIBLINGS_OF`, by the rules of the two send
- * marks), and the field `definition` of `open-issue` and `open-pr` states
- * the place of the definition's bytes (`opening2`).
+ * marks), and sends the founder handle for the destination's README.
+ * Both versions preserve actual main's definition-byte places.
  */
 const establish1 = directory.acts["establish"]!;
 export const directory2: PlatformData = {
