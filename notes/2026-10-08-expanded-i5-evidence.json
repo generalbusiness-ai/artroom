@@ -1,18 +1,18 @@
 {
   "purpose": "Delivery metadata, not authority, readiness or independent Source approval",
   "gate": {
-    "head": "97184fa975e8782abb1d0263eae31b8f461accea",
-    "tree": "df1b4a5c08b4d8d17a60779cdf6213c9417acdb4",
+    "head": "4db66d8f9534926c4167d57df2aef307794a784f",
+    "tree": "9369c4ef66e4bd81fa69dd1a3b22fc1332198c23",
     "reported_exit": 0,
     "vitest_files_passed": 133,
     "vitest_passed": 844,
     "opt_in_recorders_skipped": 2,
     "active_source_passed": 6,
-    "runtime_diagnostic": "None emitted in the complete current raw test log; earlier timeout/native causes remain unexplained, not claimed fixed"
+    "runtime_diagnostic": "None emitted in the complete current raw test log; earlier native/timeout causes remain unexplained"
   },
-  "evidence_head_before_this_note": "97184fa975e8782abb1d0263eae31b8f461accea",
-  "package_tree": "a3d17df29254ac3e65cabeae93e70f54b54577db",
-  "gated_package_tree": "a3d17df29254ac3e65cabeae93e70f54b54577db",
+  "evidence_head_before_this_note": "4db66d8f9534926c4167d57df2aef307794a784f",
+  "package_tree": "079d37fb03d0fc8ba05ffffac68ef4ce73173361",
+  "gated_package_tree": "079d37fb03d0fc8ba05ffffac68ef4ce73173361",
   "changes_since_gate_before_this_note": [
     "notes/2026-10-08-expanded-i5-delivery.md"
   ],
@@ -307,6 +307,66 @@
       "path": "/tmp/artroom-site-versions-f4-control.log",
       "bytes": 2489,
       "sha256": "0e12342f97f90c2a76a7b189d95d74c024f79e7a14f1ff41c651c78fba0fc21d"
+    },
+    {
+      "path": "/tmp/artroom-expanded-merge-residue-gate.log",
+      "bytes": 503,
+      "sha256": "0f4b741372607177c3e50c4570c1a1cba462628e0086dd1830f0e22688da56e9"
+    },
+    {
+      "path": "/tmp/artroom-expanded-merge-residue-assets.log",
+      "bytes": 218,
+      "sha256": "a5ca0357a7ef43b8b379f4ae702b707f323797002ab48ea60e7ebf4e530a919e"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/typecheck.log",
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    {
+      "path": "/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb/test.log",
+      "bytes": 1079,
+      "sha256": "2d31442851f35cdb3d4209e15b7d7a01117e1a0547cfd508a01d6b23e8b12272"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/focused.log",
+      "bytes": 2453,
+      "sha256": "7d68fe7b20cb51b41c89d13a0f270dc046073a17af381ef2c8b5899b497f5a43"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/focused-final.log",
+      "bytes": 225,
+      "sha256": "0e424d4ba2f296362a35e9bfe2265f4cc4b7b1d30d078c46dbf7c4329733bf87"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/cli-types.log",
+      "bytes": 137,
+      "sha256": "b071fdcd2a1b9f41028faa45b00336ae371e0f884cc193f14edfaf8c03d0b11f"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/scope-types.log",
+      "bytes": 151,
+      "sha256": "4df6218037a0d03e53f31b1b9e167db9e850ff75810f379cc9c2e0e16ae594e1"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/preservation.json",
+      "bytes": 113,
+      "sha256": "fbe772032989f19f834486dff3271054e0fa439e5dc79b4de3ccf533cd65532c"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/source-hashes.json",
+      "bytes": 560,
+      "sha256": "f37fb468d9265a8833371cb789da762a3392d651bbce4235c27439969f81af2b"
+    },
+    {
+      "path": "/tmp/artroom-merge-tail-guidance-evidence/log-hashes.json",
+      "bytes": 355,
+      "sha256": "ec930523389bb7142cc5af5a8659573bbb14e5962b7a2232d4b45c88da1ccf25"
     }
   ],
   "limits": [
@@ -339,6 +399,16 @@
       "opt_in_recorders_skipped": 2,
       "active_source_passed": 6,
       "runtime_diagnostic": "None emitted in the complete current raw test log; earlier uncaught timeout/cancellation diagnostic remains unexplained, not claimed fixed"
+    },
+    {
+      "head": "97184fa975e8782abb1d0263eae31b8f461accea",
+      "tree": "df1b4a5c08b4d8d17a60779cdf6213c9417acdb4",
+      "reported_exit": 0,
+      "vitest_files_passed": 133,
+      "vitest_passed": 844,
+      "opt_in_recorders_skipped": 2,
+      "active_source_passed": 6,
+      "runtime_diagnostic": "None emitted in the complete current raw test log; earlier timeout/native causes remain unexplained, not claimed fixed"
     }
   ],
   "interrupted_gate": {
@@ -363,5 +433,17 @@
       "c485e9056412739f87207654554b35aa305bb09e"
     ],
     "scope": "All six corrections plus residual versions F4; current-source evidence, not historical/provider/browser proof"
+  },
+  "bounded_residues": {
+    "review": "db2cf178c71d7d1482a9d6f56289957670e74ffb",
+    "decision": "a049e753f488c7ae47a12e2ba1a630bc92271dc5",
+    "comparison": "05d6df004e86fe2f1c75d67b9046a09ac372f6b9",
+    "commits": [
+      "68fbbb12c6f5d14da07dc7fc3206b86b42d84b76",
+      "62bec463bcd6c7fe634dda44df8184299b5cb680",
+      "4db66d8f9534926c4167d57df2aef307794a784f"
+    ],
+    "scope": "Category-specific merge tail and factual Page guide; accepted receipt, bounded observation and known proposal unchanged",
+    "timing": "Builder resumed14:17 Eastern;14:15 target missed; actual filing/landing requires its own evidence"
   }
 }

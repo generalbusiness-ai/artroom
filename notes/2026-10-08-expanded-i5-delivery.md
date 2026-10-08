@@ -496,3 +496,20 @@ combined source; parity passes without a rebuild, as recorded in
 `/tmp/artroom-expanded-merge-residue-assets.log`. A source-correct ordinary
 gate at the composed head and one targeted successor review against 05d6
 remain required. Earlier results and all original risks/duties stay retained.
+
+The ordinary gate for those residues ran at clean
+`4db66d8f9534926c4167d57df2aef307794a784f`, tree
+`9369c4ef66e4bd81fa69dd1a3b22fc1332198c23`. All phases and the command
+exit zero: whitespace 0.1 seconds; types 4.8 elapsed/15.6 CPU seconds;
+tests 60.0 elapsed/89.7 CPU seconds. Vitest reports 844 tests passed and
+two opt-in recorders skipped, across 133 passed files and one skipped
+recorder file. All six active-source checks pass. Complete phase logs were
+read through EOF and emit no uncaught diagnostic in this invocation.
+Raw gate: `/tmp/artroom-expanded-merge-residue-gate.log`; phases:
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.Vb1RwIJpyb`.
+
+The filing successor changes only this note and the evidence JSON after
+that gate. Product/test/configuration/generated asset identity is retained.
+The actual refile time, independent targeted review, requester judgment and
+witnessed landing remain unproven until recorded. The prior gate outputs and
+unexplained native/timeout risks remain retained; no deferred duty is closed.
