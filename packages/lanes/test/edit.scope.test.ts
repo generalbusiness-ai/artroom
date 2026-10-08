@@ -318,5 +318,41 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
       expect(outcome.lines.join("\n")).not.toMatch(/No answer|Nothing was written|TEST private transport detail/);
       mergeSeq = accepted.seq;
     }
+
+    // SCRIPTED nonaccepted merge answers, not native unknown/conflict proof.
+    // Both callers must keep category guidance without inventing a waiting
+    // state or inviting a newly signed merge. Existing refusals above remain.
+    let category: "mismatch" | "unavailable" = "mismatch";
+    let mergeRequests = 0;
+    let proposedFact: FactRef | null = null;
+    const categorised = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      const asked = init?.method === "POST" && path.endsWith("/acts") ? JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string } } } : null;
+      if (asked?.signed?.intent?.kind === "merge") {
+        mergeRequests++;
+        return Response.json({ answer: category, reason: category === "mismatch" ? "idempotency-mismatch" : "busy" });
+      }
+      const response = await routed(url, init);
+      if (asked?.signed?.intent?.kind === "propose-file") {
+        const answer = await response.clone().json() as { answer: string; receipt?: { fact: FactRef } };
+        if (answer.answer === "accepted") proposedFact = answer.receipt!.fact;
+      }
+      return response;
+    }) as unknown as Fetch;
+    const conflict = await command({ ...rita, fetch: categorised }, ["merge", badLane]);
+    expect([conflict.code, conflict.lines.length, mergeRequests]).toEqual([1, 1, 1]);
+    expect(conflict.lines[0]).toMatch(/^Mismatch: idempotency-mismatch\./);
+    expect(conflict.lines[0]).toContain("before another mutation");
+    category = "unavailable";
+    const unconfirmed = await command({ ...rita, fetch: categorised }, ["edit", "../outside.md", "--file", "readme.md"]);
+    expect(proposedFact).not.toBeNull();
+    const proposal = proposedFact as unknown as FactRef;
+    expect([unconfirmed.code, unconfirmed.lines.length, mergeRequests]).toEqual([1, 2, 2]);
+    expect(unconfirmed.lines[0]).toBe(`Proposed ../outside.md (${files["readme.md"]!.length} bytes) as change ${proposal.at.scope}, version ${proposal.seq}.`);
+    expect(unconfirmed.lines[1]).toMatch(/^Unavailable: busy\. Outcome unknown; no acceptance is confirmed\./);
+    expect(unconfirmed.lines[1]).toContain("same original signed envelope");
+    for (const text of [conflict.lines.join("\n"), unconfirmed.lines.join("\n")]) expect(text).not.toMatch(/The change .* waits|When it may be merged, run: artroom merge/);
+    expect((await new Platform(proposal.at.scope).entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "propose-file")).toHaveLength(1);
+    await pause([badLane, proposal.at.scope, G.name]);
   }
 }
