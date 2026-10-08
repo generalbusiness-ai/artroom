@@ -6,6 +6,7 @@
  */
 import { BlockParser } from "./blocks.ts";
 import { plainText, renderHtml, type RenderOptions } from "./html.ts";
+import type { Node } from "./node.ts";
 
 export type { RenderOptions } from "./html.ts";
 export { EXTENSIONS, type Extension } from "./node.ts";
@@ -16,8 +17,8 @@ export interface Rendered {
   title: string | null;
 }
 
-export function renderMarkdown(source: string, options: RenderOptions = {}): Rendered {
-  const doc = new BlockParser(options.extensions).parse(source);
+/** The plain text of the first heading of the highest level in a parsed document, or null when it has none. */
+function firstTitle(doc: Node): string | null {
   let title: string | null = null;
   let level = 7;
   for (const node of doc.walk()) {
@@ -26,5 +27,13 @@ export function renderMarkdown(source: string, options: RenderOptions = {}): Ren
       title = plainText(node).trim();
     }
   }
-  return { html: renderHtml(doc, options), title: title === "" ? null : title };
+  return title === "" ? null : title;
 }
+
+export function renderMarkdown(source: string, options: RenderOptions = {}): Rendered {
+  const doc = new BlockParser(options.extensions).parse(source);
+  return { html: renderHtml(doc, options), title: firstTitle(doc) };
+}
+
+/** A page's title, as `renderMarkdown` gives it, with no HTML written: for a folder's listing. */
+export const titleOf = (source: string): string | null => firstTitle(new BlockParser().parse(source));
