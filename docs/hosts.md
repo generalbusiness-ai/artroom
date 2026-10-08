@@ -51,6 +51,8 @@ What it needs:
   | `credentialIdentity` | `adapter-attempt`. |
 
   A missing, malformed or extra field turns the port off.
+  A namespace other than `artroom-demo` also turns it off before any service
+  call; the binding supplies that one namespace.
 
 What it does:
 
@@ -61,6 +63,10 @@ What it does:
   `creation:<name>`, and the register owes a `revoke-credential`
   operation. The token's plaintext is kept privately in the register's
   storage until that revocation is confirmed. It is never in a history.
+  A cleanup handle is reported only when that exact plaintext is durably
+  held. If custody and immediate revocation both fail, the result is unknown.
+  The creation's reported remote must match the configured host, namespace
+  and name before any creation metadata is confirmed.
 - **Refusals.** A taken name is a refusal with `nameExists: true`. Other
   errors that the service states changed nothing are refusals with
   `nameExists: false`. Any other failure is no answer: the outcome stays
@@ -68,11 +74,17 @@ What it does:
   follows. No request is sent twice.
 - **Deletion.** One delete, by the exact name that the creation answered.
   The repository's ID is its name.
-- **Writes.** A destination mints one write token for each write, for 15
-  minutes, and records its expiry as the service reports it. The one push
-  goes through the same receive-pack client and checks as GitHub's.
-- **Reads.** Each read mints a read token for 2 minutes and revokes it
-  after the read. The port checks that the service reports the expected
+- **Writes.** A destination requests one write token for each write, with
+  a 900-second TTL, and records its expiry as the service reports it. The
+  one push goes through the same receive-pack client and checks as GitHub's.
+- **Member read tokens.** A member mint requests the granted lifetime once.
+  Its reply must explicitly state read scope and a valid reported ISO
+  expiry; the port does not derive an expiry from the requested lifetime.
+- **Reads.** Each read requests a read token with a 120-second TTL and
+  revokes it after the read. Token replies must state the requested scope
+  and a valid ISO expiry; no expiry is inferred from the TTL. A failed
+  revocation remains unconfirmed, and the service's reported expiry is
+  its assertion. The port checks that the service reports the expected
   remote URL for the name before it reads.
 
 What a person sees as the remote:

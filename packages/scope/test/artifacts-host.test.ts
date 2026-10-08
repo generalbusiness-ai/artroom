@@ -58,8 +58,8 @@ const receiveAdvertisement = (refs: Record<string, string>) => {
   return response(`${pkt("# service=git-receive-pack\n")}0000${lines.length ? lines.join("") : pkt(`${"0".repeat(40)} capabilities^{}\0report-status delete-refs\n`)}0000`, "application/x-git-receive-pack-advertisement");
 };
 
-function provider(s: ReturnType<typeof service>, fetch: (request: Request) => Promise<Response> = async () => { throw new Error("no fetch scripted"); }, repositoryOf: () => typeof repository | null = () => repository) {
-  return new ArtifactsProvider({ binding: s.ns, host: "artifacts", namespace: NAMESPACE, service: SERVICE, maxBytes: 1024 * 1024, fetch, credentialHandle: async () => "adapter:local-handle", creation: s.custody, repositoryOf });
+function provider(s: ReturnType<typeof service>, fetch: (request: Request) => Promise<Response> = async () => { throw new Error("no fetch scripted"); }, repositoryOf: () => typeof repository | null = () => repository, creation = s.custody) {
+  return new ArtifactsProvider({ binding: s.ns, host: "artifacts", namespace: NAMESPACE, service: SERVICE, maxBytes: 1024 * 1024, fetch, credentialHandle: async () => "adapter:local-handle", creation, repositoryOf });
 }
 
 // Invariant: a creation is one call; its write token is revoked at once, and
@@ -87,6 +87,9 @@ test("scripted binding: a creation revokes its write token at once or reports it
   expect(s.calls).toEqual(["get repo-2", "revokeToken repo-2 creation-plaintext"]);
   expect(await p.revokeCredential("creation:repo-2")).toBeNull();
   expect(s.calls).toHaveLength(2);
+  s.script.revoke = () => false;
+  expect(await p.revokeCredential("creation:repo-3")).toEqual({ revoked: false, credential: "creation:repo-3" });
+  expect(s.held.get("creation:repo-3")?.plaintext).toBe("creation-plaintext");
   s.script.revoke = () => { throw new Error("connection reset"); };
   expect(await p.revokeCredential("creation:repo-3")).toBeNull();
   expect(s.held.get("creation:repo-3")?.plaintext).toBe("creation-plaintext");
@@ -105,6 +108,30 @@ test("scripted binding: a creation revokes its write token at once or reports it
   s.script.create = (name) => ({ name: `${name}-other`, remote: "", token: "creation-plaintext" });
   expect(await p.createRepository("lost-3")).toBeNull();
   expect(s.calls).toEqual(["create taken-1", "create bad-1", "create lost-1", "create lost-2", "create lost-3"]);
+
+  // Wrong remote: revoke the returned token, but record no confirmed metadata.
+  s.calls.length = 0;
+  s.script.create = (name) => ({ name, remote: "https://elsewhere.invalid/repo.git", token: "creation-plaintext" });
+  s.script.revoke = () => true;
+  expect(await p.createRepository("wrong-remote")).toBeNull();
+  expect(s.calls).toEqual(["create wrong-remote", "get wrong-remote", "revokeToken wrong-remote creation-plaintext"]);
+
+  // Failed durable custody cannot produce a cleanup handle with no secret.
+  s.calls.length = 0;
+  s.script.create = (name) => ({ name, remote: `https://${SERVICE}/git/${NAMESPACE}/${name}.git`, token: "creation-plaintext" });
+  const failedCustody = provider(s, undefined, undefined, { ...s.custody, hold: () => { throw new Error("storage failed"); } });
+  s.script.revoke = () => false;
+  expect(await failedCustody.createRepository("custody-failed")).toBeNull();
+  expect(s.held.has("creation:custody-failed")).toBe(false);
+  // A silent failed hold or a conflicting retained token is no custody
+  // for this creation, even though hold did not throw.
+  const noCustody = provider(s, undefined, undefined, { ...s.custody, hold: () => {} });
+  expect(await noCustody.createRepository("custody-missing")).toBeNull();
+  s.held.set("creation:custody-conflict", { name: "custody-conflict", plaintext: "another-token" });
+  expect(await p.createRepository("custody-conflict")).toBeNull();
+  // Immediate confirmed revocation needs no retained cleanup handle.
+  s.script.revoke = () => true;
+  expect(await failedCustody.createRepository("custody-revoked")).toEqual({ created: true, name: "custody-revoked", id: "custody-revoked" });
 
   s.calls.length = 0;
   expect(await p.deleteRepository("repo-1", "repo-1")).toEqual({ deleted: true, id: "repo-1" });
@@ -165,6 +192,21 @@ test("scripted smart HTTP: ref, format and objects read with a read token minted
   expect(s.calls).toEqual([]);
   expect(requests.length).toBe(atRequests);
   expect(atRequests).toBeGreaterThan(before);
+
+  // A malformed token reply sends no HTTP, and its usable plaintext is
+  // revoked even when its scope or reported expiry is unacceptable.
+  s.script.remote = (name) => `https://${SERVICE}/git/${NAMESPACE}/${name}.git`;
+  for (const token of [
+    { plaintext: "bad-read-token", scope: "write", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-read-token", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-read-token", scope: "read" },
+    { plaintext: "bad-read-token", scope: "read", expiresAt: "2026-02-30T13:15:00Z" },
+  ]) {
+    s.script.token = () => token;
+    expect(await p.ref(repository, "refs/heads/main").then(() => "answered", () => "failed")).toBe("failed");
+    expect(s.calls.at(-1)).toBe("revokeToken repo-1 bad-read-token");
+  }
+  expect(requests.length).toBe(atRequests);
 });
 
 // Invariant: a mint is one write token with the service's expiry; the one
@@ -221,4 +263,44 @@ test("scripted mint and send: one write token with the service's expiry, one pus
   expect(await p.mint(repository, binding)).toEqual({ minted: false });
   s.script.token = () => { throw new Error("connection reset"); };
   expect(await p.mint(repository, binding).then(() => "answered", () => "failed")).toBe("failed");
+  for (const token of [
+    { plaintext: "bad-write-token", scope: "read", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-write-token", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-write-token", scope: "write", expiresAt: "2026-02-30T13:15:00Z" },
+    { plaintext: "bad-write-token", scope: "write" },
+  ]) {
+    s.script.token = () => token;
+    expect(await p.mint(repository, binding).then(() => "answered", () => "failed")).toBe("failed");
+  }
+});
+
+// Invariant: mintRead sends the requested lifetime once and accepts only an
+// explicit read scope and the service's valid reported ISO expiry.
+test("scripted mintRead requires explicit read scope and an actual ISO expiry, with no inferred TTL", async () => {
+  const s = service();
+  const p = provider(s);
+  const request = { handle: "adapter:member-read", seconds: 3600 };
+  expect(await p.mintRead(repository, request)).toEqual({ id: request.handle, ends: "2026-10-07T13:15:00Z", plaintext: "read-plaintext-1" });
+  expect(s.calls).toEqual(["get repo-1", "createToken repo-1 read 3600"]);
+  for (const token of [
+    { plaintext: "bad-read-token", scope: "write", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-read-token", expiresAt: "2026-10-07T13:15:00Z" },
+    { plaintext: "bad-read-token", scope: "read" },
+    { plaintext: "bad-read-token", scope: "read", expiresAt: 1791378900000 },
+    { plaintext: "bad-read-token", scope: "read", expiresAt: "October 7, 2026" },
+    { plaintext: "bad-read-token", scope: "read", expiresAt: "2026-02-30T13:15:00Z" },
+  ]) {
+    s.calls.length = 0;
+    s.script.token = () => token;
+    expect(await p.mintRead(repository, request).then(() => "answered", () => "failed")).toBe("failed");
+    expect(s.calls).toEqual(["get repo-1", "createToken repo-1 read 3600"]);
+  }
+  // Stated refusal and loss remain distinct; neither is retried.
+  s.script.token = () => { throw refused("INVALID_TTL"); };
+  expect(await p.mintRead(repository, request)).toEqual({ minted: false });
+  s.script.token = () => { throw new Error("connection reset"); };
+  expect(await p.mintRead(repository, request).then(() => "answered", () => "failed")).toBe("failed");
+  s.calls.length = 0;
+  expect(await p.mintRead({ ...repository, namespace: "other" }, request).then(() => "answered", () => "failed")).toBe("failed");
+  expect(s.calls).toEqual([]);
 });

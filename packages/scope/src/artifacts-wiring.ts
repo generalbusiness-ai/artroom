@@ -20,6 +20,8 @@ import { RegisterHost } from "./register-host.ts";
 
 /** The host that a register records, at install, for this service. */
 export const ARTIFACTS_HOST = "artifacts";
+/** Must match the one namespace of the deployed ARTIFACTS binding. */
+export const ARTIFACTS_NAMESPACE = "artroom-demo";
 
 export interface ArtifactsBindings {
   /** Nonsecret JSON; every field is explicit: `{ registerScope, namespace, host, maxBytes, credentialIdentity: "adapter-attempt" }`. Precompute the install's register scope ID and pin it here. */
@@ -76,7 +78,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
   try {
     const config = configuration(env.ARTIFACTS_CONFIG);
     const namespaceBinding = binding(env.ARTIFACTS);
-    if (!config || !namespaceBinding) return NO_OUTSIDE;
+    if (!config || config.namespace !== ARTIFACTS_NAMESPACE || !namespaceBinding) return NO_OUTSIDE;
     const host = ARTIFACTS_HOST;
     const namespace = config.namespace;
     const current = () => { const scope = given.scope()?.at; return scope ? canonicalize(scope) : null; };
