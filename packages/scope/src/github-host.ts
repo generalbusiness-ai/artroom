@@ -10,7 +10,7 @@ import { canonicalize, hex, utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder, valueDigest } from "@generalbusiness/artroom-derive";
 import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, SNAPSHOT_BOUNDS, Reader, objectId, refName, type GitSource, type ReadBounds, type StoredObject } from "@generalbusiness/artroom-git";
-import { GitHubApp, type GitHubAppOptions, type GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
+import { GitHubApp, type GitHubAppOptions, type GitHubInstallationToken, type GitHubRepository } from "@generalbusiness/artroom-git/github";
 import { SmartHttpGit, type RawGitObject, type SmartHttpOptions } from "@generalbusiness/artroom-git/http";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import type { DestinationBinding, DestinationInspection, DestinationProvider, DestinationRepository } from "./destination-host.ts";
@@ -40,6 +40,13 @@ const numericId = (value: string): number => {
   if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(id) || String(id) !== value) return bad();
   return id;
 };
+/** Shared exact stable-ID check after the bounded account-aware lookup.
+ * Missing/unavailable identity is uncertainty; no post-lookup fence is claimed. */
+export async function requireGitHubRepositoryIdentity(lookup: (name: string, plaintext?: string) => Promise<GitHubRepository | null>, repository: Pick<DestinationRepository, "name" | "id">, plaintext?: string): Promise<void> {
+  const id = numericId(repository.id);
+  const seen = await lookup(repository.name, plaintext);
+  if (seen === null || seen.id !== id) return bad();
+}
 const handle = (value: string): string => {
   if (typeof value !== "string" || value.length === 0 || utf8(value).length > 256 || /[\u0000-\u001f\u007f]/.test(value)) return bad();
   return value;
@@ -167,8 +174,7 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     const plaintext = await this.#options.readCredential({ ...repository });
     // Lookup validates the configured account and the recorded stable ID.
     // A missing/unexposed lookup is uncertainty, never an absent Git object.
-    const seen = await this.#app.repository(repository.name, plaintext);
-    if (seen === null || seen.id !== numericId(repository.id)) return bad();
+    await requireGitHubRepositoryIdentity((name, token) => this.#app.repository(name, token), repository, plaintext);
     return new SmartHttpSource({ ...this.#transport(remote), ...(plaintext === undefined ? {} : { authorization: gitAuthorization(plaintext) }) });
   }
 }

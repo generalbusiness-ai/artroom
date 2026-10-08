@@ -415,3 +415,43 @@ note.
 **For the redeploy:** request `/site/<directory>/HEAD/` again and read
 `x-site-step` from the answer and the `site <step>:` line from the
 Worker's log.
+
+
+## F2: bind GitHub Site acquisition to its recorded stable ID
+
+Under request `86206b5595fa55a7d84821a74e200aabc0fa837e`, reviewer
+`376aa53064b8adae9b330d5d655f5fb019b6b168` and planner decision
+`158be2c4800db1753af32e60674591ff17464cde`, this repair starts at
+`68be1ffeb3d64094232ec7f8e4373629f8527c07`. It corrects the GitHub
+identity omission described in section 4 above; the earlier delivery/run
+records remain historical.
+
+Site acquisition now uses the same exact numeric-ID validator as
+GitHubProvider. Its bounded REST lookup and account/repository decoder are
+shared with GitHubApp through a read-only export. The configured account
+login, numeric ID and type, repository name/URLs and recorded repository ID
+must match before the Site exposes a Git source. Missing/unexposed,
+mismatching or unavailable identity fails closed at `info`. A missing
+lookup is uncertainty, not proof that a repository does not exist.
+
+Public reads still use no token; private reads use the existing
+GITHUB_READ_TOKEN, with Bearer for REST and Basic for Git. The read-only
+lookup requires no App signing key, JWT or new credential. No mint,
+mutating request, public policy or host-routing change is introduced.
+
+One focused invocation passes 24 tests across five files: the original
+GitHub REST/provider/wiring witnesses, the existing site-route witnesses
+and one compact scripted Site-adapter identity witness. Git source/test
+types and final Scope source/test/Node fixture types pass. Initial Scope
+types caught explicit undefined in an optional test binding; the fixture
+now omits that binding. Bypassing only the shared stable-ID comparison
+makes the Site witness fail because a replacement source is exposed;
+the source is restored. Exact commands/source pairs/raw logs/control are
+retained in `/tmp/artroom-site-repository-identity-evidence.json`.
+
+The lookup and Git acquisition remain separate requests. This is no atomic
+post-lookup identity fence, observed provider incident, live GitHub proof,
+new admission proof or closure of the existing public/member/publication,
+historical source, custody/cleanup or capacity obligations. No gate or
+provider/cloud/browser run was made for this isolated repair; Root owns
+the combined final gate and filing.

@@ -19,6 +19,8 @@ import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
 import { isOf } from "@generalbusiness/artroom-platform";
 import type { GitSource } from "@generalbusiness/artroom-git";
+import { githubRepository, type GitHubAccount } from "@generalbusiness/artroom-git/github";
+import { requireGitHubRepositoryIdentity } from "../github-host.ts";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import { READ_TTL, type ArtifactsNamespace } from "../artifacts-host.ts";
 import { ARTIFACTS_HOST, type ArtifactsBindings } from "../artifacts-wiring.ts";
@@ -181,7 +183,10 @@ export function readerOf(env: SiteEnv, room: Room, fetch?: (request: Request) =>
     if (!publicReads && (typeof token !== "string" || !/^[A-Za-z0-9_.-]{1,4096}$/.test(token))) return null;
     const remote = `https://github.com/${repository.namespace}/${repository.name}.git`;
     const authorization = publicReads ? undefined : `Basic ${btoa(`x-access-token:${token!}`)}`;
-    return async () => ({ ...transport(remote, config.maxBytes, authorization), secrets: publicReads ? [] : [token!], close: async () => {} });
+    return async () => {
+      await step("info", () => requireGitHubRepositoryIdentity((name, plaintext) => githubRepository({ account: config["account"] as unknown as GitHubAccount, fetch: send }, name, plaintext), repository, publicReads ? undefined : token!));
+      return { ...transport(remote, config.maxBytes, authorization), secrets: publicReads ? [] : [token!], close: async () => {} };
+    };
   }
   return null;
 }
