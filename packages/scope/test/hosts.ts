@@ -103,6 +103,7 @@ export class Hub {
   readonly refs = new Map<string, string>();
   readonly objects = new Map<string, DecodedObject>();
   readonly minted: string[] = [];
+  readonly mintedPermissions: string[] = [];
   readonly revoked = new Set<string>();
   readonly pushes: { ref: string; old: string; commit: string }[] = [];
   #repository() {
@@ -125,10 +126,13 @@ export class Hub {
         return json(this.#repository(), 201);
       }
       if (request.method === "POST" && url.pathname === "/app/installations/99/access_tokens") {
-        expect(await request.json()).toEqual({ repository_ids: [71], permissions: { contents: "write" } });
+        const body = await request.json() as { repository_ids: number[]; permissions: { contents: string } };
+        expect(body.repository_ids).toEqual([71]);
+        expect(body.permissions).toEqual({ contents: expect.stringMatching(/^(read|write)$/) });
         const token = `ghs_edit_fixture_${this.minted.length + 1}`;
         this.minted.push(token);
-        return json({ token, expires_at: timeOf(timeMs(net.clock.now)! + 3600_000), repository_selection: "selected", permissions: { contents: "write", metadata: "read" }, repositories: [this.#repository()] }, 201);
+        this.mintedPermissions.push(body.permissions.contents);
+        return json({ token, expires_at: timeOf(timeMs(net.clock.now)! + 3600_000), repository_selection: "selected", permissions: { contents: body.permissions.contents, metadata: "read" }, repositories: [this.#repository()] }, 201);
       }
       if (request.method === "DELETE" && url.pathname === "/installation/token") {
         this.revoked.add(request.headers.get("authorization")!.slice("Bearer ".length));

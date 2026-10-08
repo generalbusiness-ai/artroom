@@ -20,7 +20,7 @@ import { createInterface } from "node:readline/promises";
 import { fileStore } from "../packages/cli/src/files.ts";
 import { nodeGit } from "../packages/cli/src/git.ts";
 import type { Context, Outcome } from "../packages/cli/src/commands.ts";
-import { FILES, rehearse, transcript, type Person, type Stage, type Taken } from "./demo/rehearse.ts";
+import { FILES, registerSetting, rehearse, transcript, type Person, type Stage, type Taken } from "./demo/rehearse.ts";
 import { keepCaptureObservations, observeCaptures } from "./demo/capture-context.ts";
 
 const USAGE = "Usage: scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> --scratch <empty directory> --out <directory> [--name <room>] [--setting-set]";
@@ -87,13 +87,14 @@ async function main(argv: readonly string[]): Promise<number> {
     service: given.service, host: given.host, namespace: given.namespace, name: given.name,
     person: (who: Person) => (people[who] = { store: fileStore(join(given.scratch, who)), git: nodeGit(), read }),
     pin: async (register) => {
-      if (given.settingSet) return `The operator's setting: --setting-set was given, so the runner did not wait for registerScope ${register}.`;
-      process.stdout.write(`\nSet registerScope to ${register} in the Git host's setting (docs/deploy.md), then press Enter.\n`);
+      const setting = registerSetting(given.host);
+      if (given.settingSet) return `--setting-set was given: the runner did not wait for ${setting} = ${register}. It did not inspect the deployment's setting.`;
+      process.stdout.write(`\nSet ${setting} to ${register} (docs/deploy.md), then press Enter. Preserve the other settings and secrets; finish before the plan's printed expiry.\n`);
       const asked = createInterface({ input: process.stdin, output: process.stdout });
       const waited = Date.now();
       await asked.question("");
       asked.close();
-      return `The operator set registerScope to ${register}; the runner waited ${Math.round((Date.now() - waited) / 1000)} seconds for Enter.`;
+      return `The operator confirmed ${setting} = ${register} by pressing Enter after ${Math.round((Date.now() - waited) / 1000)} seconds. The runner did not inspect the deployment's setting.`;
     },
     get: async (url) => {
       try {
