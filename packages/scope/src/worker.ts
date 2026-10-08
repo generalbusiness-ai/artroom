@@ -304,10 +304,22 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * authority.
  */
 export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings & ArtifactsBindings, fetch?: (request: Request) => Promise<Response>): Outside {
-  const hosts = new Map<string, Outside>();
-  if (env.GITHUB_APP_CONFIG) hosts.set("github.com", gitHubOutside(given, sql, env, fetch));
-  if (env.ARTIFACTS_CONFIG) hosts.set(ARTIFACTS_HOST, artifactsOutside(given, sql, env, fetch));
-  const pick = (): Outside => hosts.get(recordedHost(given) ?? "") ?? NO_OUTSIDE;
+  // The settings are read from the environment at every call, and a host's wiring is made again only when one of its values
+  // changed. So a setting that appears in this object's life takes effect at its next call, with no restart.
+  const wired = new Map<string, { values: readonly unknown[]; outside: Outside }>();
+  const wiring = (host: string, values: readonly unknown[], make: () => Outside): Outside => {
+    const last = wired.get(host);
+    if (last && last.values.length === values.length && last.values.every((value, i) => value === values[i])) return last.outside;
+    const outside = make();
+    wired.set(host, { values, outside });
+    return outside;
+  };
+  const pick = (): Outside => {
+    const host = recordedHost(given);
+    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS], () => gitHubOutside(given, sql, env, fetch));
+    if (host === ARTIFACTS_HOST && env.ARTIFACTS_CONFIG) return wiring(host, [env.ARTIFACTS_CONFIG, env.ARTIFACTS], () => artifactsOutside(given, sql, env, fetch));
+    return NO_OUTSIDE;
+  };
   return {
     accepts: (owner, kind) => pick().accepts(owner, kind),
     send: (request) => pick().send(request),
@@ -346,7 +358,8 @@ export function sessionWiring(sessions: () => Sessions | null): Required<Pick<Wi
  * the one that its authority reads, and against the scope's own clock. A
  * membership scope also issues sessions. Explicit configuration of GitHub or
  * of the hosting's own Git service (`ARTIFACTS_CONFIG`) enables the outside
- * factory (`outsideOf`); with neither, outside effects remain unsent.
+ * factory (`outsideOf`), which reads them at each call; with neither, outside
+ * effects remain unsent.
  *
  * With no secret bound, or a short one, the session configuration is null
  * at every use: no session is issued, none is accepted, and no reader may
@@ -359,7 +372,8 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
     return {
       ports: namespace(this.scopes()),
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
-      ...(this.env.GITHUB_APP_CONFIG || this.env.ARTIFACTS_CONFIG ? { outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env) } : {}),
+      // Wired whether or not a host is configured now: `outsideOf` reads the settings at each call, and with neither it sends nothing.
+      outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env),
       ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT)),
     };
   }

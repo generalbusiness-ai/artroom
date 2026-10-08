@@ -272,3 +272,21 @@ test("each wiring serves only its own recorded host, and the Worker's outside ro
     expect([fetched.length, s.calls.length]).toEqual([1, 3]);
   });
 });
+
+// Invariant: the Worker's outside port reads its setting at each call, so a
+// setting that appears in an object's life takes effect at the next call;
+// one that is removed stops it.
+test("the Worker's outside port reads the setting at each call: a register refused with no setting is accepted once the setting appears, with no new port, and refused again once it is removed", async () => {
+  const storage = await found();
+  await storage.inside(async (state) => {
+    const s = service();
+    const f = registerFixture("artifacts", NAMESPACE);
+    const env: ArtifactsBindings = { ARTIFACTS: s.ns };
+    const outside = outsideOf(f.given, state.storage.sql, env);
+    expect(outside.accepts(REGISTER, "create-repository")).toBe(false);
+    env.ARTIFACTS_CONFIG = artifactsEnv(f.register.at.scope, s.ns).ARTIFACTS_CONFIG;
+    expect(outside.accepts(REGISTER, "create-repository")).toBe(true);
+    delete env.ARTIFACTS_CONFIG;
+    expect([outside.accepts(REGISTER, "create-repository"), s.calls]).toEqual([false, []]);
+  });
+});
