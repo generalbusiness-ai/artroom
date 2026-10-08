@@ -90,3 +90,30 @@ test("conflicting mint identities cannot replace custody; expiry and rejected cu
     after: { ...credential, plaintext: null, state: "live" }, reply: { id: credential.id, ends: credential.ends },
   });
 });
+
+// Invariant: a private handle take is scope-local, live, strictly unexpired,
+// and removes its plaintext before any second take; historical reply survives.
+// All mint identities and judgments below are scripted; SQLite is real.
+test("one-time custody take erases only its exact live scope handle and preserves metadata through expiry and restart", async () => {
+  const scope = await found();
+  const first = minted("1:0");
+  const expired = { ...minted("2:0"), id: "expired-token" };
+  await scope.inside((state) => {
+    const store = new CredentialStore(state.storage.sql, () => scope.at);
+    store.put(first); store.put(expired);
+    expect(store.take(first.id, START)).toBeNull(); // Held is not a judgment.
+    expect(store.held(first.id)?.plaintext).toBe(first.plaintext);
+    store.judged(first.mint, 1, first); store.judged(expired.mint, 1, expired);
+    const other = new CredentialStore(state.storage.sql, () => ({ ...scope.at, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never }));
+    expect([other.held(first.id), other.take(first.id, START)]).toEqual([null, null]);
+    expect(store.take(first.id, at(59))).toEqual({ ...first, state: "live" });
+    expect(store.take(first.id, at(59))).toBeNull();
+    expect(store.put(first)).toBe("repeat");
+    expect(store.take(first.id, at(59))).toBeNull();
+    expect(store.take(expired.id, at(60))).toBeNull();
+    expect(store.held(expired.id)).toEqual({ ...expired, state: "live", plaintext: null });
+    expect(store.reply(first.mint, 1)).toEqual({ id: first.id, ends: first.ends });
+  });
+  await scope.restart();
+  expect(await scope.inside((state) => new CredentialStore(state.storage.sql, () => scope.at).take(first.id, START))).toBeNull();
+});

@@ -118,6 +118,8 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
   let repositoryId = 71;
   let cleanupId = 72;
   let mintRequest: Request | undefined;
+  let mintedPermission = "write";
+  let lostReadMint = false;
   const requests: { url: string; authorization: string | null; redirect: string }[] = [];
   const pkt = (text: string) => `${(text.length + 4).toString(16).padStart(4, "0")}${text}`;
   const scriptedRepository = () => ({ id: repositoryId, name: "repo", owner: { id: 17, login: "demo", type: "Organization" }, private: false, full_name: "demo/repo", html_url: "https://github.com/demo/repo", clone_url: "https://github.com/demo/repo.git" });
@@ -128,8 +130,9 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
       requests.push({ url: request.url, authorization: request.headers.get("authorization"), redirect: request.redirect });
       if (lost) throw new Error(token);
       if (request.url.endsWith("/app/installations/99/access_tokens")) {
+        if (lostReadMint) throw new Error(token);
         mintRequest = request;
-        return new Response(JSON.stringify({ token, expires_at: "2026-10-06T13:00:00Z", repository_selection: "selected", permissions: { contents: "write", metadata: "read" }, repositories: [scriptedRepository()] }), { status: 201, headers: { "content-type": "application/json" } });
+        return new Response(JSON.stringify({ token, expires_at: "2026-10-06T13:00:00Z", repository_selection: "selected", permissions: { contents: mintedPermission, metadata: "read" }, repositories: [scriptedRepository()] }), { status: 201, headers: { "content-type": "application/json" } });
       }
       if (new URL(request.url).hostname === "api.github.com") return new Response(JSON.stringify(scriptedRepository()), { headers: { "content-type": "application/json" } });
       return new Response(`${pkt("# service=git-upload-pack\n")}0000${pkt(`${"1".repeat(40)} refs/heads/main\0ofs-delta\n`)}0000`, { headers: { "content-type": "application/x-git-upload-pack-advertisement" } });
@@ -169,6 +172,23 @@ test("scripted GitHub provider creation loss and mismatched cleanup stay pending
   expect(mintRequest?.method).toBe("POST");
   expect(mintRequest?.url).toBe("https://api.github.com/app/installations/99/access_tokens");
   expect(await mintRequest!.json()).toEqual({ repository_ids: [71], permissions: { contents: "write" } });
+  mintedPermission = "read";
+  const tokenRequests = () => requests.filter((request) => request.url.endsWith("/app/installations/99/access_tokens")).length;
+  repositoryId = 72;
+  const beforeWrongRepository = { calls, mints: tokenRequests() };
+  const wrongRepository = await provider.mintRead(repository, { handle: "read:replaced", seconds: 7200 }).then(() => "answered", () => "pending");
+  expect({ result: wrongRepository, calls, mints: tokenRequests() }).toEqual({ result: "pending", calls: beforeWrongRepository.calls + 1, mints: beforeWrongRepository.mints });
+  repositoryId = 71;
+  const beforeReadMint = calls;
+  expect(await provider.mintRead(repository, { handle: "read:caller-owned", seconds: 7200 })).toEqual({ id: "read:caller-owned", ends: "2026-10-06T13:00:00Z", plaintext: token });
+  expect(calls).toBe(beforeReadMint + 2); // One identity GET precedes the one mint POST.
+  expect(await mintRequest!.clone().json()).toEqual({ repository_ids: [71], permissions: { contents: "read" } });
+  expect(provider.remote(repository)).toBe("https://github.com/demo/repo.git");
+  lostReadMint = true;
+  const beforeLostMint = { calls, mints: tokenRequests() };
+  const lostRead = await provider.mintRead(repository, { handle: "read:lost", seconds: 3600 }).then(() => "answered", () => "pending");
+  expect({ result: lostRead, calls, mints: tokenRequests() }).toEqual({ result: "pending", calls: beforeLostMint.calls + 2, mints: beforeLostMint.mints + 1 });
+  lostReadMint = false;
   const jwt = mintRequest!.headers.get("authorization")!.slice("Bearer ".length).split(".");
   const decode = (part: string) => atob(part.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(part.length / 4) * 4, "="));
   expect(JSON.parse(decode(jwt[0]!))).toEqual({ alg: "RS256", typ: "JWT" });

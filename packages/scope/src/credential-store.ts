@@ -157,6 +157,28 @@ export class CredentialStore {
     return credential?.state === "live" && credential.plaintext !== null && credential.plaintext !== "" && at !== null && ends !== null && at < ends ? credential : null;
   }
 
+  /** Explicit private lookup by handle, in this exact scope and incarnation. */
+  held(id: string): ScopePrivateCredential | null {
+    const scope = this.#scope();
+    if (scope === null) return null;
+    const row = this.#sql.exec("SELECT mint, attempt FROM private_credential WHERE scope = ? AND id = ?", scope, id).toArray()[0];
+    return row ? this.#read(scope, row["mint"] as OperationId, row["attempt"] as number) : null;
+  }
+
+  /** Synchronous compare-and-erase: only one take obtains a live plaintext.
+   * Expiry erases custody without claiming provider revocation. */
+  take(id: string, now: Timestamp): (ScopePrivateCredential & { plaintext: string }) | null {
+    const scope = this.#scope();
+    const at = timeMs(now);
+    if (scope === null || at === null) return null;
+    const row = this.#sql.exec("SELECT mint, attempt FROM private_credential WHERE scope = ? AND id = ?", scope, id).toArray()[0];
+    const credential = row ? this.#read(scope, row["mint"] as OperationId, row["attempt"] as number) : null;
+    if (credential?.state !== "live" || credential.plaintext === null || credential.plaintext === "") return null;
+    const erased = this.#sql.exec("UPDATE private_credential SET plaintext = NULL WHERE scope = ? AND id = ? AND state = 'live' AND plaintext = ? RETURNING id", scope, id, credential.plaintext).toArray();
+    const ends = timeMs(credential.ends);
+    return erased.length === 1 && ends !== null && at < ends ? { ...credential, plaintext: credential.plaintext } : null;
+  }
+
   /**
    * The caller has checked a mint's judgment. Only its exact confirmed live
    * metadata makes custody live. A rejected or mismatched judgment drops
