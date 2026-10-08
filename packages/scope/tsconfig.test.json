@@ -3,5 +3,6 @@
   "compilerOptions": {
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"]
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test", "vitest.config.ts"],
+  "exclude": ["test/support/local-clone-setup.ts", "test/support/local-clone-child.ts"]
 }
