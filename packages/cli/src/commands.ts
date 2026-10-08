@@ -651,6 +651,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
   const D = await handleOf(ctx, config, directory, reader);
   const register = ((await summaryOf(D)).items.find((item) => item.type === "repository")?.refs["register"] as ScopeRef | undefined)?.scope;
   const found = [...(register ? [{ kind: "register", scope: register }] : []), { kind: "directory", scope: directory }];
+  // From the directory on: each scope found is read in turn, and what its history creates is added at the end.
   for (let i = found.length - 1; i < found.length; i++) {
     const handle = await handleOf(ctx, config, found[i]!.scope, reader);
     for (let cursor: string | undefined, pages = 0; pages < 1000; pages++) {
@@ -902,6 +903,8 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
+    // The issue that the change closes is found before anything is signed.
+    const closes = options.closes === undefined ? null : await issueNamed(ctx, config, reader, options.closes);
     const change = await activeDefinition(ctx, config, reader, "change");
 
     // The change lane, opened by the directory.
@@ -928,8 +931,8 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const version = (await C.submit(proposed.signed, [], proposed.beside));
     if (version.answer !== "accepted") return answered(lane, version, "Proposed");
     const lines = [`Proposed ${path} (${bytes.length} bytes) as change ${lane}, version ${version.receipt.fact.seq}.`];
-    if (options.closes !== undefined) {
-      const linked = await linking(ctx, config, lane, reader, change.declared, options.closes);
+    if (closes !== null) {
+      const linked = await linking(ctx, config, lane, reader, change.declared, closes);
       if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines] };
       lines.push(...linked.lines);
     }
@@ -951,7 +954,7 @@ export function merge(ctx: Context, named: string, options: { closes?: string } 
     if (!read.ok) return failed(`Cannot read the definition of ${lane}: ${read.reason}.`);
     if (read.value.name !== "change") return usage(`${lane} is no change: its definition is ${read.value.name}.`);
     if (options.closes === undefined) return merging(ctx, config, lane, reader, read.value);
-    const linked = await linking(ctx, config, lane, reader, read.value, options.closes);
+    const linked = await linking(ctx, config, lane, reader, read.value, await issueNamed(ctx, config, reader, options.closes));
     if (linked.code !== 0) return linked;
     const outcome = await merging(ctx, config, lane, reader, read.value);
     return { ...outcome, lines: [...linked.lines, ...outcome.lines] };
@@ -1124,8 +1127,7 @@ export function issues(ctx: Context): Promise<Outcome> {
  * The change lane's `link-own` to an issue, by keyword: the link that the merge, once published, sends to the issue, which then
  * closes (plan 019, default 3). The lane takes it from the change's author only; the demo profile has no `link-any`.
  */
-async function linking(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition, named: string): Promise<Outcome> {
-  const issue = await issueNamed(ctx, config, reader, named);
+async function linking(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition, issue: Issue): Promise<Outcome> {
   const declaration = declared.acts["link-own"] ?? stop(failed(`The change ${lane} is under a definition with no act link-own.`));
   const fields = { issue: issue.ref, how: "keyword" } as Record<string, FieldValue>;
   const items = (await summaryOf(await handleOf(ctx, config, lane, reader))).items;

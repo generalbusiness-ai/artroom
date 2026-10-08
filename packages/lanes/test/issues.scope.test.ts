@@ -136,6 +136,9 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // una's edit says it closes issue 1. The change lane links it; una is a member and holds no change.merge, so her merge is refused
   // by name and the change waits, linked, with the issue open.
   const head0 = host.refs.get("refs/heads/main")!;
+  // An issue that is not listed is found before anything is signed: no change is opened.
+  const beforeEdit = (await D.summary()).at;
+  expect([await run(una, "edit", "guide/start.md", "--file", "start.md", "--closes", "9"), (await D.summary()).at]).toEqual([{ code: 2, lines: [`No issue 9 is listed in the directory ${D.name}. Run: artroom issues`] }, beforeEdit]);
   const edited = await run(una, "edit", "guide/start.md", "--file", "start.md", "--closes", "1");
   const lane = /as change (sc_\S+), version (\d+)\./.exec(edited.lines[0]!)!;
   expect(edited).toEqual({ code: 1, lines: [
