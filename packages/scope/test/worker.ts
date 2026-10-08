@@ -87,14 +87,54 @@ export const platformOutside = new Map<string, (given: OutsideGiven, sql: Pick<S
 /** Explicit test-only registration; each supplier states its scripted trust
  * boundary. Absence preserves the unregistered fixture's legacy contract. */
 export const platformDispatch = new Map<string, NonNullable<Wiring["dispatch"]>>();
+/** Selected diagnostic only. No promise, native context or capability is
+ * retained here. One installation selects one object life, not scheduling. */
+export interface WaitUntilCounts { label: "ScopeObject.waitUntil"; installations: number; restorations: number; unsupported: number; registrations: number; pending: number; fulfilled: number; rejected: number }
+export const platformWaitUntilObservations = new Map<string, WaitUntilCounts>();
+const RESTORE_OBSERVER = Symbol("restore test waitUntil observer");
+function observeWaitUntil(ctx: DurableObjectState, counts: WaitUntilCounts): () => void {
+  const own = Object.getOwnPropertyDescriptor(ctx, "waitUntil");
+  let descriptor = own;
+  for (let prototype = Object.getPrototypeOf(ctx); !descriptor && prototype; prototype = Object.getPrototypeOf(prototype)) descriptor = Object.getOwnPropertyDescriptor(prototype, "waitUntil");
+  const unsupported = (): never => { counts.unsupported++; throw new Error("waitUntil observer unsupported at native boundary"); };
+  if (!descriptor || "get" in descriptor || "set" in descriptor || typeof descriptor.value !== "function" || descriptor.writable !== true || (!own && !Object.isExtensible(ctx))) return unsupported();
+  const originalMethod = descriptor.value as DurableObjectState["waitUntil"];
+  const restore = () => {
+    let restored = false;
+    try { restored = own ? Reflect.defineProperty(ctx, "waitUntil", own) : Reflect.deleteProperty(ctx, "waitUntil"); }
+    catch { return unsupported(); }
+    if (!restored || ctx.waitUntil !== originalMethod) return unsupported();
+  };
+  const wrapper = function(this: DurableObjectState, promise: Promise<unknown>): void {
+    // Forward first: same native method, receiver, promise and return value.
+    const result = originalMethod.call(this, promise);
+    counts.registrations++; counts.pending++;
+    void promise.then(() => { counts.pending--; counts.fulfilled++; }, () => { counts.pending--; counts.rejected++; });
+    return result;
+  };
+  let installed = false;
+  try { installed = Reflect.defineProperty(ctx, "waitUntil", own ? { ...own, value: wrapper } : { value: wrapper, writable: true, configurable: true, enumerable: descriptor.enumerable === true }); }
+  catch { return unsupported(); }
+  if (!installed) return unsupported();
+  if (ctx.waitUntil !== wrapper || Object.getOwnPropertyDescriptor(ctx, "waitUntil")?.value !== wrapper) { restore(); return unsupported(); }
+  counts.installations++;
+  // This restoration closure belongs only to the native object's instance;
+  // it never enters the observation registry or leaves through an RPC.
+  return () => { restore(); counts.restorations++; };
+}
 /** The name of the test deployment, which a session's token names. */
 export const TEST_DEPLOYMENT = "artroom-scope-test";
 
 type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
 
 export class PlatformScope extends DeployedScope<PlatformEnv> {
+  declare [RESTORE_OBSERVER]?: () => void;
+  restoreWaitUntilObserver(): void { this[RESTORE_OBSERVER]?.(); delete this[RESTORE_OBSERVER]; }
   protected override scopes() { return this.env.PLATFORM; }
   protected override wiring(name: string | undefined): Wiring {
+    const observation = platformWaitUntilObservations.get(name ?? "");
+    if (observation?.unsupported) throw new Error("waitUntil observer unsupported at native boundary");
+    if (observation && observation.installations === 0) this[RESTORE_OBSERVER] = observeWaitUntil(this.ctx, observation);
     const deployed = super.wiring(name);
     const { resolver, definitions, transport } = deployed.ports as Required<NonNullable<Wiring["ports"]>>;
     // With a test secret the session configuration is the test's. With none it is the deployed one, from this Worker's bindings.

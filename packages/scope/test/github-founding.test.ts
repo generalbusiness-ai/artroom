@@ -13,7 +13,7 @@ import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
-import { TEST_DEPLOYMENT, platformDispatch, platformNet, platformOutside } from "./worker.ts";
+import { TEST_DEPLOYMENT, platformDispatch, platformNet, platformOutside, platformWaitUntilObservations, type PlatformScope } from "./worker.ts";
 import { CredentialStore } from "../src/credential-store.ts";
 import { destinationMint, destinationSends } from "@generalbusiness/artroom-platform";
 
@@ -368,6 +368,7 @@ test("registered original Git dispatch fences suspended discovery at the real sc
     });
     expect(await inspect((store) => [store.sending("0:0", 1)?.sent, store.originalDispatch("0:0", 1)])).toEqual([null, null]);
     expect(host.sent).toHaveLength(0); // No missing-input legacy fallback.
+    platformWaitUntilObservations.set(destination.name, { label: "ScopeObject.waitUntil", installations: 0, restorations: 0, unsupported: 0, registrations: 0, pending: 0, fulfilled: 0, rejected: 0 });
     // Bounded phase labels distinguish the same existing waits; no timeout,
     // retry, extra RPC or native-cause conclusion is introduced.
     const phase = async <T>(name: string, ask: () => Promise<T>): Promise<T> => {
@@ -428,6 +429,16 @@ test("registered original Git dispatch fences suspended discovery at the real sc
       }
     };
     const { beforeRestart, owned } = await phase("helper", runSuspendedOriginal);
+    const nativeObservation = await phase("native-waitUntil-alarm-snapshot", () => runInDurableObject(destination.object, async (instance, state) => {
+      try {
+        const alarm = await state.storage.getAlarm();
+        return { counts: { ...platformWaitUntilObservations.get(destination.name)! }, alarm, nativeNow: Date.now(), scriptedNow: net.clock.now };
+      } finally { (instance as PlatformScope).restoreWaitUntilObserver(); }
+    }));
+    console.info("executor native waitUntil/alarm observation", nativeObservation);
+    expect(nativeObservation.counts.installations).toBe(1);
+    expect(nativeObservation.counts.unsupported).toBe(0);
+    expect(platformWaitUntilObservations.get(destination.name)?.restorations).toBe(1);
     // Actual local object eviction preserves storage; this does not prove
     // drainage of a deployed release or provider exclusion.
     await phase("eviction", () => destination.restart());
@@ -442,7 +453,11 @@ test("registered original Git dispatch fences suspended discovery at the real sc
     expect(await phase("final-owner-snapshot", () => inspect((store) => store.originalDispatch("0:0", 1)))).toEqual(owned);
   } finally {
     net.hold = oldHold;
-    if (G) platformDispatch.delete(G.name);
+    if (G) {
+      const observation = platformWaitUntilObservations.get(G.name);
+      if (observation?.installations === 1 && observation.restorations === 0) await runInDurableObject(G.object, (instance) => (instance as PlatformScope).restoreWaitUntilObserver());
+      platformDispatch.delete(G.name); platformWaitUntilObservations.delete(G.name);
+    }
     for (const name of names) platformOutside.delete(name);
   }
 });
