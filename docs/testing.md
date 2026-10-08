@@ -368,10 +368,14 @@ story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.
 
 The page's story, `packages/page/test/story.scope.test.ts`, runs from the
-root inside the `scope` project too, on the lanes' room fixture. Its reads
-and acts are the page's own data functions over the Worker's HTTP routes;
-the Git host and the changed set are labelled stand-ins in the file. The
-`page` project is its Node test of the states of a change.
+root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
+founded by the command line over the Worker's HTTP routes, with the real
+read sessions under a TEST SECRET, and the site route for addresses under
+`/site/`; the Git host (`OwnGit` under the production wiring of the hosting
+own Git service) and the scheduler are labelled stand-ins there. Its reads
+and acts are the page's own data functions. The `page` project is its Node
+tests: the states of a change, and that the scope Worker's page module
+(`packages/scope/src/page-assets.ts`) is the page's build of its source.
 `record.scope.test.ts` is no test of a property: it runs only with
 `PAGE_RECORD=1`, and `packages/page/test/screens.mjs` uses what it prints
 to take the page's screenshots in Chromium. That script needs

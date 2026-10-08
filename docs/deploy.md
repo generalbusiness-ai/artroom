@@ -76,6 +76,13 @@ an installation token cannot do; use the user's own fine-grained token.
 When `publicReads` is true and the repositories are public, the Worker
 reads them with no token, and `GITHUB_READ_TOKEN` is not needed.
 
+## The page
+
+The scope Worker serves the room's page at `/page/` from
+`packages/scope/src/page-assets.ts`, which is committed and which the
+page package's build writes (`docs/page.md`). Deploying the Worker
+deploys the page; it needs no binding, setting or secret of its own.
+
 ## What is never written down
 
 The values of `SESSION_SECRET`, `GITHUB_APP_PRIVATE_KEY`,
