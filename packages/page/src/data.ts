@@ -276,9 +276,9 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
 
 /**
  * One version of a change. A one-file version (`propose-file`) names its
- * `file`: the path, the digest and size of its bytes, and `page`, the
- * address of that path on the room's published site. The site serves the
- * published branch, so the page shows the file once a merge is published.
+ * `file`: the path, the digest and size of its bytes. Its legacy `page`
+ * address points at the latest published branch, not this immutable version;
+ * the Version screen does not offer it as a rendered-page link.
  */
 export interface Manifest {
   id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;

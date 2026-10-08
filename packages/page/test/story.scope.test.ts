@@ -84,7 +84,8 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     expect(change.manifests.map((m) => m.file)).toEqual([{ path: "README.md", digest: expect.stringMatching(/^sha256:/), size: 37, page: `${SERVICE}/site/${d.D.name}/HEAD/README.md` }]);
     expect([change.merges.map((m) => [m.state, m.commit, m.publication?.state])]).toEqual([[["published", head1, "published"]]]);
     expect(changeStates(change).map((s) => s.state)).toEqual(["publication confirmed", ...change.merges[0]!.publication!.operations.map(() => "effect confirmed")]);
-    // The published file, read back through the site route at the address the page links to.
+    // The latest published file, read back through the HEAD site route;
+    // this is not an immutable Version preview or a receipt-eligibility proof.
     const shown = await loadSite(forUna, "README.md");
     expect([shown.address, shown.status, shown.text]).toEqual([siteAddress(forUna, "README.md"), 200, expect.stringContaining('<h1 id="the-handbook">The handbook</h1>\n<p>Written by the room.</p>')]);
 

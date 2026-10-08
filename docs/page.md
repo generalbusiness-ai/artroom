@@ -87,12 +87,19 @@ membership.
 |---|---|
 | `#/` | The room's issues and changes: the directory's index rows, each with its lane's own state. |
 | `#/issue/<scope>` | One issue: number, title, state and close reason, who opened it, assignees, conditions, body and comments. |
-| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, the file's path, size and digest and a link to its rendered page on the site; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. |
-| The site | The room screen links to the published site, `/site/<directory>/HEAD/`, and a one-file version links to its path there. The site serves the published branch, so the file appears there once the merge is published. |
+| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, the file's path, size and digest and its recorded publication commit after publication; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. |
+| The site | The room and change screens offer separate "Latest published site" navigation to `/site/<directory>/HEAD/`. This follows the latest published branch, not a particular version. |
 | `#/rules` | The rules of this room, as the rules scope holds them: the revision, the approvals the lanes count, the extents with their classes, approvals, approvers, checks and paths, whether the single-controller exception is declared, required checks, labels and the active definitions. It says who may change them: the members whose role holds `rules.publish`. |
 
 Every screen shows who the page acts as: the member's handle and role, or
 that the key is no active member's.
+
+The Version screen offers no rendered link for an invalid or unpublished
+path. For a published version it shows the full recorded publication commit
+and says that rendering this version is not available yet. This branch's
+site route accepts `HEAD` and named branches/tags, and has no immutable
+publication selector. A future immutable link needs the site owner's
+publication-eligible route; a bare commit address is not substituted here.
 
 **What you may do here.** Under the room, each issue, each change and the rules, the page
 lists the acts of that scope's definition that the signed-in member may
@@ -156,3 +163,9 @@ Worker's page module, `states.test.ts` the states of a change, and
 `packages/scope/test/page-route.test.ts` the `/page/` route.
 `packages/page/test/screens.mjs` takes the screenshots in
 `packages/page/test/screenshots`.
+
+`packages/page/test/version-view.mjs` runs the actual DOM view in a local
+browser with views made by hand: invalid/unpublished versions have no
+rendered link, a published version shows its recorded commit, and latest
+site navigation is separate. It uses the same scratch browser tooling as
+`settings.mjs` and makes no service or provider request.

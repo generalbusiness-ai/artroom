@@ -12,6 +12,7 @@
  * | `actsPanel` | The acts the caller may sign now on the scope shown, each a form whose button signs and sends it, and the scope's answer. |
  */
 
+import { editPath } from "@generalbusiness/artroom-platform";
 import type { Answer } from "@generalbusiness/artroom-contract";
 import { siteAddress, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
@@ -49,7 +50,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   ]);
   return h("main", {},
     h("h1", {}, "Room"), whoLine(room),
-    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room"), " · ", h("a", { href: siteAddress(room, "") }, "The published site")),
+    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room"), " · ", h("a", { href: siteAddress(room, "") }, "Latest published site")),
     section("Issues", table(["Number", "Title", "State", ""], rows("issue", lanes.issues))),
     section("Changes", table(["Number", "Title", "State", ""], rows("change", lanes.changes))),
     h("p", { class: "muted" }, `Directory ${room.directory}.`),
@@ -82,6 +83,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
   // The version that is current, or after a merge the latest one.
   const current = change.manifests.find((m) => m.state === "current") ?? change.manifests.at(-1) ?? null;
   const states = changeStates(change, last);
+  const published = change.merges.find((merge) => merge.state === "published" && merge.manifest === current?.id);
   const extents = change.rules?.extents ?? [];
   // Reviews by extent: the approvals of the current version that state each extent of the rules the lane holds.
   const byExtent = extents.map((extent) => {
@@ -92,6 +94,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     h("p", {}, h("a", { href: "#/" }, "Room")),
     h("h1", {}, `${or(change.title, "(no title)")} `, h("span", { class: "muted" }, `#${or(change.number, "?")}`)),
     whoLine(room),
+    h("p", {}, h("a", { href: siteAddress(room, "") }, "Latest published site")),
     h("dl", {}, field("State", state(change.state)), field("Opened by", or(change.author))),
     change.body ? h("p", { class: "body" }, change.body) : null,
     section("Where it stands", states.length === 0 ? h("p", { class: "muted" }, "No review is asked for, no merge is in progress and none has been refused.") :
@@ -101,7 +104,10 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       field("Base", h("code", {}, short(current.base))),
       current.file ? [
         field("File", h("code", {}, current.file.path)), field("Bytes", or(current.file.size)), field("Digest", h("code", {}, short(current.file.digest))),
-        field("Rendered page", h("span", {}, h("a", { href: current.file.page }, current.file.page), change.merges.some((m) => m.state === "published" && m.manifest === current.id) ? "" : h("span", { class: "muted" }, " (shows the published branch: this version once it is published)"))),
+        // HEAD is latest navigation, never an immutable version preview.
+        // This branch has no receipt-eligible immutable site selector.
+        field("Rendered page", editPath(current.file.path) === null ? "Not available for an invalid path." : published ? "Rendering this published version is not available yet." : "Not published."),
+        published?.commit ? field("Recorded publication commit", h("code", {}, published.commit)) : null,
       ] : [field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree)))],
     ) : h("p", { class: "muted" }, "No version is proposed yet."), change.manifests.length > 1 ? h("p", { class: "muted" }, `${change.manifests.length - 1} earlier version(s).`) : null),
     section("Reviews by extent",

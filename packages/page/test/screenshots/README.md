@@ -1,5 +1,11 @@
 # Screenshots of the page
 
+The delivery note attributes these retained images to source `7909bea2`,
+before the version-link repair. Their mutable
+HEAD version links are historical; they do not witness the current Version
+UI. The focused version-view witness is separate, and these images have not
+been retaken.
+
 Written by `node packages/page/test/screens.mjs`, which says how they are made: the page as the scope Worker serves it at
 `/page/`, in Chromium, answered with the test Worker's recorded answers in the demo story, after README.md is published and
 while AGENTS.md waits for the controller.

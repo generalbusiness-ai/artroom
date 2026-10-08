@@ -93,10 +93,10 @@ await paul.getByRole("heading", { name: "The rules of this room" }).waitFor();
 await paul.getByText("What you may do here").waitFor();
 await shot(paul, "rules");
 
-// The rendered page: the address that the change's "Rendered page" links to, as the site route answered it.
+// Latest-site navigation is separate from the version: this branch has no immutable publication selector.
 await paul.goto(`${record.service}/page/#/change/${record.readme}`);
 await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
-await paul.getByRole("link", { name: /\/site\// }).click();
+await paul.getByRole("link", { name: "Latest published site", exact: true }).click();
 await paul.getByRole("heading", { name: "The handbook" }).waitFor();
 await shot(paul, "site-readme");
 
@@ -106,9 +106,9 @@ for (const [name, size] of sizes) if (size > MOST) throw new Error(`${name}.png 
 const shows = {
   issue: "Signed in as @una (who joined on the page with an invitation link): the issue she opened through the page, paul's comment, and the acts she may sign on it.",
   "change-refused": "Signed in as @paul: the change that AGENTS.md is, waiting for the rules extent's approval (policy not met), its one-file version, the merge the destination refused (rules-not-met:rules), and paul's own review refused by the lane, author-cannot-review.",
-  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version with path, size and digest, and the link to the rendered page (the top 1,500 pixels).",
+  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version with path, size and digest, its recorded publication commit and separate latest-site navigation (the top 1,500 pixels).",
   rules: "Signed in as @paul: the rules of this room, who may change them, and that paul may sign no act that changes them.",
-  "site-readme": "README.md as the site route renders it from the published branch, reached by the change's link.",
+  "site-readme": "README.md as the site route renders it from the published branch, reached by latest-site navigation.",
 };
 writeFileSync(join(out, "README.md"), [
   "# Screenshots of the page",
