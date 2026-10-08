@@ -18,6 +18,8 @@ const reader = "a test reader";
 // profile; a member's one-file change that says it closes the issue is published by the room's merge, and the merge closes the
 // issue; `artroom issues` lists the issue closed; and `artroom verify --all` replays every scope of the room consistent, one line
 // for each. An act the lane reserves to others is refused by name, and nothing is written.
+// An accepted edit proposal keeps its original lane/version when optional
+// linking loses a required read; no proposal, link or merge is automatically retried.
 //
 // | Part | Is |
 // |---|---|
@@ -188,6 +190,42 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   for (const line of lines) expect(line).toMatch(/^[a-z]+ sc_[a-z2-7]+, entry \d+: consistent\.$/);
   expect(lines.filter((line) => line.includes(I.name) || line.includes(J.name) || line.includes(lane[1]!) || line.includes(lane2))).toHaveLength(4);
   expect(verified.lines.at(-1)).toBe("All consistent: 12 scopes.");
+  // Read/transport boundary STAND-IN after one real accepted proposal.
+  // Every mutation still reaches the real Worker; only the subsequent
+  // linking summary read is lost. The original --closes positive flow above
+  // remains intact, and this command must keep its known lane/version.
+  let proposed: { at: { scope: ScopeId }; seq: number } | null = null;
+  let proposals = 0; let links = 0; let merges = 0;
+  const unavailableLink = (async (url: string, init?: RequestInit) => {
+    const path = new URL(url).pathname;
+    if (proposed && path === `/v1/scopes/${proposed.at.scope}`) throw new Error("TEST private linking transport detail");
+    const response = await routed(url, init);
+    if (init?.method === "POST" && path.endsWith("/acts")) {
+      const asked = JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string } } };
+      const kind = asked.signed?.intent?.kind;
+      if (kind === "link-own") links++;
+      if (kind === "merge") merges++;
+      if (kind === "propose-file") {
+        proposals++;
+        const answer = await response.clone().json() as { answer: string; receipt: { fact: NonNullable<typeof proposed> } };
+        if (answer.answer === "accepted") proposed = answer.receipt.fact;
+      }
+    }
+    return response;
+  }) as unknown as Fetch;
+  const stopped = await command({ ...una, fetch: unavailableLink }, ["edit", "guide/start.md", "--file", "start.md", "--closes", "1"]);
+  expect(proposed).not.toBeNull();
+  const original = proposed as unknown as { at: { scope: ScopeId }; seq: number };
+  expect([stopped.code, stopped.lines, proposals, links, merges]).toEqual([1, [
+    `Proposed guide/start.md (${files["start.md"]!.length} bytes) as change ${original.at.scope}, version ${original.seq}.`,
+    "Linking could not be confirmed: a required request or reply was unavailable.",
+    `Inspect artroom show ${original.at.scope}:${original.seq} and artroom log ${original.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+  ], 1, 0, 0]);
+  expect(stopped.lines.join("\n")).not.toContain("TEST private linking transport detail");
+  const recorded = await new Platform(original.at.scope).entries();
+  expect(recorded.filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "propose-file")).toHaveLength(1);
+  expect(recorded.some((entry) => entry.input.type === "act" && ["link-own", "merge"].includes(entry.input.signed.intent.kind))).toBe(false);
+
   // Nothing is left to deliver when the test ends: each scope's sends are carried, so no pass of this room runs into a later test.
-  await pause(lines.map((line) => line.split(" ")[1]!.replace(/,$/, "")));
+  await pause([...lines.map((line) => line.split(" ")[1]!.replace(/,$/, "")), original.at.scope]);
 }

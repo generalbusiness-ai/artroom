@@ -281,3 +281,42 @@ them, and source is restored. `preservation.json` records exact donor and
 unchanged-region comparisons. No gate, cloud, package install, new design or
 whole old command transplant occurred. Final integrated gate and exact-head
 Source review remain owed.
+
+
+## Accepted proposal retained when optional linking stops
+
+This narrow correction continues expanded request
+`86206b5595fa55a7d84821a74e200aabc0fa837e` from
+`aab13e05b747d7a027c52a7b231b412a95548d9c`, following the full planner
+assertion `c6257b52bb58fc710123fab19af66a78b30d666e`. It is no new promise
+or design, and does not change the root landing worktree.
+
+After propose-file is accepted, edit now converts supported optional-linking
+failures within that phase. It retains the original Proposed lane/version
+line, the failure outcome and guidance to inspect that recorded proposal and
+its lane before another edit, link or merge. Transport failures use a fixed
+linking-unconfirmed diagnostic, rather than arbitrary transport/provider text
+or generic resend advice. Existing Stop/SourceError handling and unexpected
+error propagation remain; returned linking failures also retain the known
+proposal. No rollback, no-write or safe-resubmit claim is made. Optional link
+conditions remain outside the earlier expressly qualified workflow preflight.
+
+The existing issue workflow keeps all original positive edit --closes,
+merge --closes, policy, issue and twelve-scope replay assertions. One extra
+same-room tail admits a real proposal through HTTP, then scripts loss of the
+subsequent linking summary read. It asserts one proposal, no link/merge
+submission, the original lane/version, inspection guidance and no raw private
+fault text. The actual new lane history contains one proposal. Final scheduler
+cleanup includes the original scopes and that lane. The host and scheduler
+remain their existing labelled stand-ins; no provider or new room matrix runs.
+
+Initial and final focused issues files both passed (one test each); the final
+run after cleanup adjustment took 4.19 seconds. CLI and scope Worker/Node types
+passed. Original logs are `/tmp/artroom-edit-link-result-evidence/focused.log`,
+`focused-final.log`, `cli-types.log` and `scope-types.log`. The former-source
+control restores raw linking and fails by assertion: only a generic transport
+error remains, losing the accepted proposal and exposing the scripted private
+fault. `control.log` retains that evidence, and product source was restored.
+Exact source/log hashes and unchanged-region comparisons are retained there.
+No gate, full suite, cloud, source approval or request closure is claimed;
+Root owns the complete candidate's final verification and review.

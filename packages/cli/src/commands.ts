@@ -1308,8 +1308,19 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     if (version.answer !== "accepted") return answered(lane, version, "Proposed");
     const lines = [`Proposed ${path} (${bytes.length} bytes) as change ${lane}, version ${version.receipt.fact.seq}.`];
     if (closes !== null) {
-      const linked = await linking(ctx, config, lane, reader, change.declared, closes);
-      if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines] };
+      const linked = await run(async () => {
+        try { return await linking(ctx, config, lane, reader, change.declared, closes); }
+        catch (error) {
+          // A linking request/reply may be lost after the proposal was
+          // admitted. Preserve that result without repeating raw errors or
+          // suggesting that a freshly signed mutation is a safe recovery.
+          if (error instanceof TransportError) return failed("Linking could not be confirmed: a required request or reply was unavailable.");
+          throw error;
+        }
+      });
+      if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
+        `Inspect artroom show ${lane}:${version.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+      ] };
       lines.push(...linked.lines);
     }
     const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
