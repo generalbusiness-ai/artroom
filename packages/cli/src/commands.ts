@@ -1371,7 +1371,10 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   const { signed, beside } = await C.intent(signer, "merge" as never, { on: null, fields, expected: expectedOf(declared.acts["merge"] as unknown as ActShape, items, null, fields) } as never, signing(ctx));
   const answer = await C.submit(signed, [], beside);
   const again = `When it may be merged, run: artroom merge ${lane}`;
-  if (answer.answer !== "accepted") return { ...answered(lane, answer, "Merged"), lines: [...answered(lane, answer, "Merged").lines, `The change ${lane} waits, at version ${version.id}. ${again}`] };
+  if (answer.answer !== "accepted") {
+    const result = answered(lane, answer, "Merged");
+    return answer.answer === "refused" ? { ...result, lines: [...result.lines, `The change ${lane} waits, at version ${version.id}. ${again}`] } : result;
+  }
   const seq = answer.receipt.fact.seq;
   let next = seq + 1;
   const unknown = (reason: string): Outcome => failed(

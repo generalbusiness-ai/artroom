@@ -320,3 +320,31 @@ fault. `control.log` retains that evidence, and product source was restored.
 Exact source/log hashes and unchanged-region comparisons are retained there.
 No gate, full suite, cloud, source approval or request closure is claimed;
 Root owns the complete candidate's final verification and review.
+
+
+## Merge tail follows the actual nonaccepted category
+
+Under existing request `86206b5595fa55a7d84821a74e200aabc0fa837e`, this
+isolated correction starts at `05d6df004e86fe2f1c75d67b9046a09ac372f6b9`.
+Complete review `db2cf178c71d7d1482a9d6f56289957670e74ffb` and planner
+`a049e753f488c7ae47a12e2ba1a630bc92271dc5` were read as builder.
+
+Only a factual merge refusal retains the later-merge/waiting tail. Unavailable
+and mismatch return their actual category, inspection and original-envelope
+guidance without inventing a waiting state or inviting a newly signed merge.
+Accepted receipts, bounded one-entry observation and edit's accepted proposal
+remain unchanged. No persistence or retry mechanism is added.
+
+The existing edit workflow preserves all original host, refusal, head and
+receipt assertions. One compact tail scripts mismatch for merge and unavailable
+for edit's shared merging path; it checks original proposal retention, one
+request per call and absence of the waiting/new-merge invitation. The proposal
+is really admitted through HTTP, but the nonaccepted answers are scripted;
+no native unknown or duplicate-mutation proof is claimed. Cleanup includes
+the new lane. Final focused edit file passed both tests in 4.71 seconds; CLI
+and scope Worker/Node types passed. Logs are
+`/tmp/artroom-merge-tail-guidance-evidence/focused-final.log`, `cli-types.log`
+and `scope-types.log`. The initial `focused.log` retains a bad test regex escape,
+corrected to an exact fixture-derived line assertion. Exact hashes and source
+preservation are retained there. No gate, matrix, cloud, root-candidate edit,
+new task or promise occurred; Root owns final composition and verification.
