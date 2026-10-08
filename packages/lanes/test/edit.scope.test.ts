@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, test } from "vitest";
-import type { Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import type { DeclaredDefinition, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, foundingObjects, platform } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -75,8 +75,23 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     }
     await settle(...nodes);
   };
+  // An older valid change definition has no one-file proposal. Another
+  // valid definition has that name but carries detached content, unlike the
+  // command's signed-text protocol. Neither supports this edit workflow.
+  const legacy = structuredClone(changeDemo) as DeclaredDefinition;
+  delete legacy.acts["propose-file"];
+  const detached = structuredClone(changeDemo) as DeclaredDefinition;
+  detached.acts["propose-file"]!.fields["content"] = { type: "text", max: 65536, detached: true, required: true };
+  // Harmless metadata and explicit default targets are compatible:
+  // support is not an exact-row catalog.
+  const extended = structuredClone(changeDemo) as DeclaredDefinition;
+  extended.items["manifest"]!.values["commandNote"] = { fixed: true, required: false, of: { type: "text", max: 32 } };
+  extended.acts["propose-file"]!.effects = [...extended.acts["propose-file"]!.effects.map((effect) => ({ ...effect, of: "on" as const })), { value: { slot: "commandNote", from: { const: "metadata" } } }];
   const files: Record<string, Uint8Array> = {
     "change-demo.json": utf8(canonicalize(changeDemo)),
+    "legacy.json": utf8(canonicalize(legacy)),
+    "detached.json": utf8(canonicalize(detached)),
+    "extended.json": utf8(canonicalize(extended)),
     "readme.md": utf8("# The handbook\n\nWritten by the room.\n"),
     "readme-2.md": utf8("# The handbook, again\n"),
     "agents.md": utf8("# Agents\n\nAsk before you push.\n"),
@@ -121,6 +136,18 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // Before the activation there is no change to open: nothing is signed.
   const none = await run(rita, "edit", "README.md", "--file", "readme.md");
   expect([none.code, none.lines[0]]).toEqual([1, expect.stringMatching(/^The rules scope sc_\S+ holds no change definition active\. An admin activates one: artroom act activate/)]);
+  // The real rules scope validates and activates these definitions. Local
+  // preflight must refuse before the directory opens any partial lane.
+  for (const [name, definition] of [["legacy.json", legacy], ["detached.json", detached]] as const) {
+    ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(definition)}`, "--set", "name=change", "--value", name));
+    const beforeEdit = (await D.summary()).at;
+    // Catch only here so the control disabling preflight distinguishes the
+    // original thrown path and partial lane by an assertion, not an error.
+    const unsupported = await run(rita, "edit", "README.md", "--file", "readme.md").catch((error: unknown) => ({ code: 1, lines: [String(error)] }));
+    expect([unsupported.code, unsupported.lines[0], (await D.summary()).at]).toEqual([
+      1, expect.stringMatching(/^Unsupported edit: the active change definition sha256:\S+ .* No change was opened\.$/), beforeEdit,
+    ]);
+  }
   ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"));
 
   // A file that is no UTF-8 text is not carried: nothing is signed.
@@ -144,6 +171,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect([shown.status, shown.body]).toEqual([200, expect.stringContaining('<h1 id="the-handbook">The handbook</h1>\n<p>Written by the room.</p>')]);
 
   // A second edit of the same path replaces the file.
+  ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(extended)}`, "--set", "name=change", "--value", "extended.json"));
   ok(await run(rita, "edit", "README.md", "--file", "readme-2.md", "--title", "Retitle the handbook"));
   const head2 = host.refs.get("refs/heads/main")!;
   expect((await git.commit(head2)).parents).toEqual([head1]);

@@ -128,6 +128,24 @@ function named(types: Readonly<Record<string, FieldType & { required: boolean }>
   return Object.fromEntries(out);
 }
 
+/** Check one declared act's input without signing or reading a scope.
+ * Uses the same item, field and presented-fact checks as the declared handle.
+ * It checks no guard, grant or state. */
+export function shapeDeclaredAct<D extends DeclaredDefinition, K extends Kind<D>>(definition: D, kind: K, asked: AskedOf<D, K>): { on: number | null; fields: Record<string, FieldValue>; beside: Beside } {
+  const act = own(definition.acts, kind);
+  if (!act || kind === definition.genesis) throw new ShapeError(kind, "is not an act kind that an intent to this scope may name");
+  const given = asked as { on?: number | null; expected?: Record<string, number>; fields?: Record<string, unknown>; presented?: Record<string, unknown> };
+  // Section 6.4: an act that opens an item, and a comment on no item, name none. Every other act is on one item.
+  const on = given.on ?? null;
+  const needs = act.step !== "open" && act.on !== null;
+  if (needs ? !isLocalId(on) : on !== null) throw new ShapeError("on", needs ? "is the local ID of the item this act is on" : "is not given: this act is on no existing item");
+  const texts = new Set<string>();
+  const fields = named(act.fields, given.fields ?? {}, "fields", texts);
+  const presents = Object.fromEntries(Object.entries(act.presents ?? {}).map(([name, p]) => [name, { type: "fact", kind: p.kind, under: p.under, required: p.required } as const]));
+  const presented = named(presents, given.presented ?? {}, "presented", texts) as Record<string, FactRef>;
+  return { on, fields, beside: { ...(texts.size > 0 ? { texts: [...texts] } : {}), ...(Object.keys(presented).length > 0 ? { presented } : {}) } };
+}
+
 // ---------------------------------------------------------------- the handle
 
 export class DeclaredHandle<D extends DeclaredDefinition> {
@@ -146,19 +164,10 @@ export class DeclaredHandle<D extends DeclaredDefinition> {
    * the act is presented. No guard is checked.
    */
   async intent<K extends Kind<D>>(signer: Signer, kind: K, asked: AskedOf<D, K>, signing: Signing = {}): Promise<Signed> {
-    const act = own(this.definition.acts, kind);
-    if (!act || kind === this.definition.genesis) throw new ShapeError(kind, "is not an act kind that an intent to this scope may name");
-    const given = asked as { on?: number | null; expected?: Record<string, number>; fields?: Record<string, unknown>; presented?: Record<string, unknown> };
-    // Section 6.4: an act that opens an item, and a comment on no item, name none. Every other act is on one item.
-    const on = given.on ?? null;
-    const needs = act.step !== "open" && act.on !== null;
-    if (needs ? !isLocalId(on) : on !== null) throw new ShapeError("on", needs ? "is the local ID of the item this act is on" : "is not given: this act is on no existing item");
-    const texts = new Set<string>();
-    const fields = named(act.fields, given.fields ?? {}, "fields", texts);
-    const presents = Object.fromEntries(Object.entries(act.presents ?? {}).map(([name, p]) => [name, { type: "fact", kind: p.kind, under: p.under, required: p.required } as const]));
-    const presented = named(presents, given.presented ?? {}, "presented", texts) as Record<string, FactRef>;
+    const { on, fields, beside } = shapeDeclaredAct(this.definition, kind, asked);
+    const given = asked as { expected?: Record<string, number> };
     const signed = await signedIntent(signer, { to: this.at, kind, on, expected: given.expected ?? {}, fields }, signing);
-    return { signed, beside: { ...(texts.size > 0 ? { texts: [...texts] } : {}), ...(Object.keys(presented).length > 0 ? { presented } : {}) } };
+    return { signed, beside };
   }
 
   /** Submit a signed intent with the grants it is presented under and what travels beside it. A retry sends all three again, unchanged. */
