@@ -12,7 +12,7 @@ import { defineConfig } from "vitest/config";
  *
  * The lane scenarios on real scopes, `packages/lanes/test/*.scope.test.ts`,
  * run here inside the `scope` project: the same Worker, loaded once. A
- * second project in the Workers runtime pool added 0.7 seconds to this run,
+ * second project in the Workers runtime pool historically added 0.7 seconds to this run,
  * and the files in the one project add 0.2 (observed, three runs each, on a
  * shared machine). The scope package does not name them: this file does.
  * `packages/lanes/vitest.scope.config.ts` runs them alone, in a Worker of
@@ -20,6 +20,10 @@ import { defineConfig } from "vitest/config";
  * `packages/cli/test/*.scope.test.ts`, and the page's story,
  * `packages/page/test/*.scope.test.ts`, run here the same way, and have no
  * Worker of their own.
+ *
+ * The post-sent local-denial witness has its own `scope-denial` Worker
+ * runtime after `scope`. This isolates the observed unsafe-abort interaction
+ * with later Operations tests; each witness still runs once in this process.
  */
 const project = (name: string, dir: string, config: string, group: number, more: string[] = [], options: object = {}) =>
   ({ extends: `./packages/${dir}/${config}`, test: { name, root: `./packages/${dir}`, ...(more.length > 0 ? { include: ["test/**/*.test.ts", ...more] } : {}), sequence: { groupOrder: group }, ...options } });
@@ -34,11 +38,12 @@ export default defineConfig({
       project("checkers", "checkers", "vitest.config.ts", 0),
       project("replay", "replay", "vitest.config.ts", 0),
       project("client", "client", "vitest.config.ts", 0),
-      project("scope", "scope", "vitest.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"], {
+      project("scope", "scope", "vitest.worker.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"], {
         // The page's recorder for its screenshots runs only when asked: `PAGE_RECORD=1` (packages/page/test/screens.mjs). So does
         // the demo runner's recorder for its captures: `DEMO_RECORD=1` (scripts/demo-captures.ts --recorded).
         provide: { pageRecord: process.env["PAGE_RECORD"] === "1", demoRecord: process.env["DEMO_RECORD"] === "1" },
       }),
+      project("scope-denial", "scope", "vitest.denial.config.ts", 2),
       project("lanes", "lanes", "vitest.config.ts", 0),
       project("cli", "cli", "vitest.config.ts", 0),
       project("page", "page", "vitest.config.ts", 0),

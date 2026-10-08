@@ -231,3 +231,37 @@ focused T20 check passes one test; Worker-test types pass. Logs:
 `/tmp/artroom-expanded-operations-t20-types-final.log`. The initial optional
 field type error and intermediate checks are retained. No production logic,
 T2/T19 assertion or timeout changes; this does not resolve the native crash.
+
+
+## Faithful isolation of the native abort interaction
+
+From `4247cb50ab963df0cfbd915eac9f3d4cf36b2b0b`, the post-sent
+local-denial witness moves into `operation-denial.test.ts` and its own
+`scope-denial` Worker project. Its complete test body and T19's native
+global-abort body/assertions are byte-preserved. One shared opening helper
+keeps the original real turn, SQLite and alarm fixture. No production
+source, producer, skip, timeout, storage mode or native flag changes.
+
+The package entrypoint now runs both projects in one Vitest process;
+the root entrypoint does likewise, with the denial file excluded only from
+the ordinary Scope pool. Every witness runs once. The dedicated denial
+project uses the same Worker/wrangler SQLite classes and starts no clone
+fixture/server. It adds one runtime startup; no current full-gate overhead
+or capacity claim follows from the focused duration.
+
+One affected package invocation passes all eleven witnesses across two
+projects/files, with no skips (3.44 seconds). Root list-only enumeration
+finds the same eleven names exactly once, ten in `scope` and one in
+`scope-denial`; no second witness run. Scope source/test/Node setup types,
+including every new config, pass. Initial types found the unused `Entry`
+import left by extraction; that type-only import was removed and final
+types pass. Exact raw logs, source-body hashes, entrypoint enumeration and
+workspace-import correspondence are retained in
+`/tmp/artroom-operations-runtime-isolation-evidence.json`.
+
+This is an infrastructure isolation of the observed T2-to-T19 unsafe-abort
+interaction. It does not fix the native helper bug. Captured frames locate
+IncomingRequest task cancellation through `abortAllDurableObjects`, but
+do not identify the actor or context. Mixed-cohort/physical-drain proof,
+the final combined gate, exact-head Source review and actual acceptance
+remain owed. No passing whole-gate, provider or new deployment claim.
