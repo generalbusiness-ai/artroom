@@ -52,7 +52,7 @@ function recordingGit(): Git & { runs: { args: readonly string[]; env: Readonly<
 // | git | A STAND-IN: a function that records its arguments and environment. Node's runner over a stand-in `git` script on the PATH is `git.test.ts`. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations driver and the dispatchers, as a deployment's alarms would. |
 describe("artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
-  test("remote prints the host's form; a member reads the destination with her session before any act there; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
+  test("remote prints the host's form; a member reads the destination with her session before any act there and after the claim window; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
     net.hold = net.deaf = null;
     platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     platformNet.sessions = true;
@@ -107,6 +107,10 @@ async function story(): Promise<void> {
   platformOutside.set(G.name, (given, sql) => onlyMintRead(artifactsOutside(given, sql, { ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: HOST, maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }), ARTIFACTS: service.ns })));
   await G.restart();
   destinations.push(G);
+  // The first destination read and clone happen after the claim's signed-read
+  // window, with no destination act or membership observation to bootstrap them.
+  expect((await G.entries()).some((entry) => entry.input.type === "act")).toBe(false);
+  net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
   try {
     // remote: the branch item's record. The service's hostname is the deployment's setting, which no scope records: it is marked.
     expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, `Remote URL: https://<service host>/git/${NAMESPACE}/${name.name}.git (the service host is the deployment's setting; artroom clone prints it whole)`] });
