@@ -13,29 +13,50 @@
  *
  * | Function | Reads |
  * |---|---|
- * | `openRoom` | The directory's repository item, for membership, the rules scope and the destination; the caller's standing in membership. |
+ * | `placeOf` | Nothing: the room's directory and membership, from an invitation link or the command line's config file. |
+ * | `joinRoom` | Signs membership's `join` with an invitation link, which enrols the page's key. |
+ * | `openRoom` | A read session from membership; the directory's repository item, for the rules scope and the destination; the caller's standing in membership. |
  * | `listLanes` | The directory's index rows, one for each lane, with each lane's own state. |
  * | `loadIssue` | An issue lane: its intent, assignees, state and comments. |
- * | `loadChange` | A change lane: its proposal, versions, reviews by extent, review requests, checks, links and merges, the rules it holds, and for each merge the destination's publication and its outside operations. |
+ * | `loadChange` | A change lane: its proposal, versions (a one-file version's path, digest and size), reviews by extent, review requests, checks, links and merges, the rules it holds, and for each merge the destination's publication and its outside operations. |
  * | `loadRules` | The rules scope: the rules of the room, the active definitions, and which members may change the rules. |
+ * | `loadSite` | One page of the room's published site, as the site route answers it. |
  * | `actsOn` | The acts of a scope's definition that the caller may sign now. |
- * | `act` | Signs and sends one act, and reads the head before and after. |
+ * | `act` | Signs and sends one act, with a definition's bytes beside it where a field states their place, and reads the head before and after. |
+ *
+ * **Who reads.** Every read presents a read session that membership
+ * issued to the caller's key, renewed when it has ended. Where membership
+ * refuses one (a key that is no active member's, or a deployment with no
+ * session secret), each read the client can sign goes as a signed read by
+ * the caller's key, and the scope decides: it answers only where that key
+ * signed an entry within the window of an intent. A read that is refused
+ * is shown as its reason.
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, keyIdOfSecret, timeOf } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, type Fetch, type Signing } from "@generalbusiness/artroom-client";
-import { describe, expectedOf, heldActs, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { LATE, b64url, keyIdOfSecret, takeBytes, timeOf } from "@generalbusiness/artroom-bytes";
+import {
+  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+} from "@generalbusiness/artroom-client";
+import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
+import { DEFINITION_DOMAIN, MEMBERSHIP, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
   service: string;
   secret: Uint8Array;
   fetch?: Fetch;
-  /** The clock that intents are signed by, in milliseconds. */
+  /** The clock that intents and reads are signed by, in milliseconds. */
   now?: () => number;
 }
+
+/**
+ * Where a room is: its directory, and its membership scope with the
+ * incarnation that a session request names. A key that is not yet a
+ * member reads neither, so the page is told both: by an invitation link,
+ * or by the command line's config file.
+ */
+export interface Place { directory: ScopeId; membership: ScopeRef }
 
 /** A room as the page has opened it: the four scopes it reads, and the caller's key and standing. */
 export interface Room {
@@ -47,8 +68,10 @@ export interface Room {
   key: KeyId;
   /** The caller's role and actions in membership, or null when the key is no active member's. */
   me: Standing | null;
-  /** The read session the caller presents, or null when membership gave none. */
-  reader: string | null;
+  /** The read session the caller presents, or null when membership gave none; then reads are signed reads. */
+  reader: ReadSession | null;
+  /** Why membership gave no session, or null when it gave one. */
+  unsessioned: string | null;
   /** Definitions read so far, by digest: a lane's definition is read once. */
   definitions: Map<string, DeclaredDefinition>;
 }
@@ -58,8 +81,20 @@ export class Unreadable extends Error {
   override readonly name = "Unreadable";
 }
 
-const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle =>
-  new ScopeHandle(httpTransport(room.session.service, room.session.fetch ? { fetch: room.session.fetch } : {}), scope, room.reader);
+const nowOf = (session: Session): number => session.now?.() ?? Date.now();
+const transportOf = (session: Session): Transport =>
+  signedReads(httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {}), secretSigner(session.secret), session.now ? { now: session.now } : {});
+
+/** A handle on one scope that presents the caller's session, or signs each read where there is none. */
+const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => new ScopeHandle(transportOf(room.session), scope, room.reader?.reader() ?? null);
+
+/** Renews the caller's session when it has ended, or will within ten seconds. A room that membership gave no session stays on signed reads. */
+async function fresh(room: Room): Promise<void> {
+  if (!room.reader || !room.reader.endedBy(timeOf(nowOf(room.session) + 10_000))) return;
+  const asked = await readerFor(room.session, room.membership);
+  room.reader = asked.session;
+  room.unsessioned = asked.why;
+}
 
 async function summaryOf(handle: ScopeHandle): Promise<{ summary: Summary; at: Head }> {
   const read = await handle.summary();
@@ -94,35 +129,82 @@ const scopeOf = (ref: FieldValue | null | undefined): ScopeId | null => (ref && 
 
 // ---------------------------------------------------------------- the room
 
+const isScopeRef = (v: unknown): v is ScopeRef =>
+  typeof v === "object" && v !== null && typeof (v as ScopeRef).scope === "string" && typeof (v as ScopeRef).inc === "string" && typeof (v as ScopeRef).kind === "string";
+
 /**
- * Opens the room that `directory` founds. The directory is read without a
- * session: membership's reference, which a session request names, is known
- * only from the directory. Then the page asks membership for a read session
- * signed by the caller's key, and presents it to every later read. With no
- * session, the page reads without one, and each scope decides.
+ * The room that a text names: an invitation link from `artroom invite`, or
+ * the command line's config file (`config.json`), whose `repository` names
+ * the directory and membership. Null when the text is neither. The link's
+ * secret is not kept here: `joinRoom` reads it from the link.
  */
-export async function openRoom(session: Session, directory: ScopeId): Promise<Room> {
+export function placeOf(typed: string): Place | null {
+  const trimmed = typed.trim();
+  if (trimmed.startsWith(LINK)) {
+    const link = linkOf(trimmed);
+    return link ? { directory: link.repository.directory.scope, membership: link.repository.membership } : null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as { repository?: { directory?: unknown; membership?: unknown } };
+    const repository = parsed.repository ?? (parsed as { directory?: unknown; membership?: unknown });
+    return isScopeRef(repository.directory) && isScopeRef(repository.membership) ? { directory: repository.directory.scope, membership: repository.membership } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enrols the page's key in the room an invitation link names: membership's
+ * `join`, with the invitation's number and secret, signed by the key. Its
+ * fields are read from membership's version that the link names, as
+ * `artroom join` reads them. The answer is membership's.
+ */
+export async function joinRoom(session: Session, typed: string): Promise<{ place: Place; answer: Answer }> {
+  const link = linkOf(typed.trim());
+  if (!link) throw new Unreadable("That is not an invitation link from artroom invite.");
+  const supplied = platform(link.definition ?? MEMBERSHIP);
+  if (!supplied) throw new Unreadable(`The invitation is in ${link.definition}, which this page does not know.`);
+  const shape = supplied.data as unknown as DefinitionShape;
+  const fields = { invitation: link.invitation, secret: link.secret };
+  const signing: Signing = session.now ? { now: session.now() } : {};
+  // A new key reads nothing in membership before the join, and `join` names its member by a mark, which has no key in `expected`.
+  const signed = await signedIntent(secretSigner(session.secret), { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  const answer = await new ScopeHandle(transportOf(session), link.repository.membership.scope, null).submit(signed);
+  return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, answer };
+}
+
+/**
+ * Opens the room at `place`. The page asks membership for a read session
+ * signed for by the caller's key, and presents it to every read; where
+ * membership refuses one, the reads are signed reads. Then it reads the
+ * directory's repository item for the rules scope and the destination, and
+ * the caller's standing in membership.
+ */
+export async function openRoom(session: Session, place: Place): Promise<Room> {
   const key = keyIdOfSecret(session.secret);
-  const { summary } = await summaryOf(handleOf({ session, reader: null }, directory));
+  const asked = await readerFor(session, place.membership);
+  const room: Room = { session, directory: place.directory, membership: place.membership, rules: "" as ScopeId, destination: "" as ScopeId, key, me: null, reader: asked.session, unsessioned: asked.why, definitions: new Map() };
+  const { summary } = await summaryOf(handleOf(room, place.directory));
   const repository = summary.items.find((item) => item.type === "repository");
-  const M = repository?.refs["membership"] as ScopeRef | undefined;
+  const M = repository?.refs["membership"];
   const rules = scopeOf(repository?.refs["rules"]);
   const destination = scopeOf(repository?.refs["destination"]);
-  if (!repository || !M || !rules || !destination) throw new Unreadable(`The directory ${directory} names no membership, rules scope and destination yet.`);
-  const room: Room = { session, directory, membership: M, rules, destination, key, me: null, reader: await readerFor(session, M), definitions: new Map() };
-  room.me = standing((await summaryOf(handleOf(room, M.scope))).summary.items, key);
+  if (!repository || !isScopeRef(M) || !rules || !destination) throw new Unreadable(`The directory ${place.directory} names no membership, rules scope and destination yet.`);
+  if (M.scope !== place.membership.scope || M.inc !== place.membership.inc) throw new Unreadable(`The directory ${place.directory} names another membership scope than ${place.membership.scope}.`);
+  room.rules = rules;
+  room.destination = destination;
+  room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
   return room;
 }
 
-/** A read session from membership, signed for by the caller's key, or null when membership gives none. */
-async function readerFor(session: Session, membership: ScopeRef): Promise<string | null> {
-  const now = session.now?.() ?? Date.now();
-  const asked = sessionRequest(membership, session.secret, timeOf(Math.floor(now / 1000) * 1000 + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
+/** A read session from membership, signed for by the caller's key, or why membership gave none. A request that got no reply is `no-reply`. */
+async function readerFor(session: Session, membership: ScopeRef): Promise<{ session: ReadSession | null; why: string | null }> {
+  const asked = sessionRequest(membership, session.secret, timeOf(Math.floor(nowOf(session) / 1000) * 1000 + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
   try {
     const answer = await requestSession(session.service, membership.scope, asked, session.fetch ? { fetch: session.fetch } : {});
-    return answer.ok ? answer.session.reader() : null;
+    return answer.ok ? { session: answer.session, why: null } : { session: null, why: answer.reason };
   } catch {
-    return null;
+    return { session: null, why: "no-reply" };
   }
 }
 
@@ -131,6 +213,7 @@ export interface LaneRow { scope: ScopeId; number: number | null; kind: "issue" 
 
 /** The room's issues and changes: the directory's index rows, in number order, each with its lane's own state. */
 export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; changes: LaneRow[] }> {
+  await fresh(room);
   const { summary } = await summaryOf(handleOf(room, room.directory));
   const rows: LaneRow[] = [];
   for (const item of summary.items.filter((i) => i.type === "lane")) {
@@ -173,6 +256,7 @@ export interface IssueView {
 
 /** An issue lane: its intent item, its comments, and the head it was read at. */
 export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> {
+  await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
@@ -187,7 +271,16 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   };
 }
 
-export interface Manifest { id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null }
+/**
+ * One version of a change. A one-file version (`propose-file`) names its
+ * `file`: the path, the digest and size of its bytes, and `page`, the
+ * address of that path on the room's published site. The site serves the
+ * published branch, so the page shows the file once a merge is published.
+ */
+export interface Manifest {
+  id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
+  file: { path: string; digest: string | null; size: number | null; page: string } | null;
+}
 export interface Review { id: number; state: string; reviewer: string | null; manifest: number | null; verdict: string | null; extent: string | null }
 export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null }
 export interface Job { id: number; state: string; name: string | null; manifest: number | null }
@@ -215,6 +308,7 @@ const localId = (value: FieldValue | null | undefined): number | null => (typeof
  * records its result.
  */
 export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView> {
+  await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
@@ -230,6 +324,9 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
     manifests: (await all("manifest")).map((m) => ({
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
+      file: typeof m.values["path"] === "string" ? {
+        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]),
+      } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
     requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]) })),
@@ -299,6 +396,30 @@ export function operationsOf(entries: readonly Entry[]): (Operation & { for: num
   return [...found.values()];
 }
 
+// ---------------------------------------------------------------- the published site
+
+/** The address of a path on the room's published site: the site route, on the published branch (`HEAD`). */
+export function siteAddress(room: Pick<Room, "session" | "directory">, path: string): string {
+  return `${room.session.service.replace(/\/+$/, "")}/site/${room.directory}/HEAD/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/** What the site route answered for one path: its status and its text. A refusal's text is its reason and a sentence. */
+export interface SitePage { address: string; status: number; text: string }
+
+/** The most bytes of a site page that the page reads: the site route's own bound on one file. */
+const SITE_BYTES = 1024 * 1024 + 64 * 1024;
+
+/** One page of the room's published site, as the site route answers it. The site is public to whoever has the directory's ID: no session is presented. */
+export async function loadSite(room: Pick<Room, "session" | "directory">, path: string): Promise<SitePage> {
+  const address = siteAddress(room, path);
+  const send = room.session.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
+  if (!send) throw new Unreadable("This runtime has no fetch.");
+  const response = await send(address, { method: "GET" });
+  const bytes = response.body ? await takeBytes(response.body, SITE_BYTES, AbortSignal.timeout(30_000)) : new Uint8Array(0);
+  if (bytes === null || bytes === LATE) throw new Unreadable(`The site's answer for ${path} is longer than this page reads, or did not come within 30 seconds.`);
+  return { address, status: response.status, text: new TextDecoder().decode(bytes) };
+}
+
 // ---------------------------------------------------------------- the rules
 
 export interface RulesView {
@@ -314,6 +435,7 @@ export interface RulesView {
 
 /** The rules of the room, as the rules scope holds them, and the members who may change them. */
 export async function loadRules(room: Room): Promise<RulesView> {
+  await fresh(room);
   const handle = handleOf(room, room.rules);
   const { summary, at } = await summaryOf(handle);
   const rules = summary.items.find((item) => item.type === "rules");
@@ -343,7 +465,48 @@ export function holdersOf(items: readonly Item[], action: string): string[] {
 // ---------------------------------------------------------------- acts
 
 /** One act the caller may sign now, as the page offers it: its fields, by declared type, and one line made from its declaration. */
-export interface Offered { kind: string; step: ActShape["step"]; on: string | null; line: string; fields: { name: string; type: string; required: boolean }[] }
+/**
+ * One act the caller may sign now, as the page offers it: its fields, by declared type, and one line made from its declaration. A
+ * field whose value is a definition's bytes, by their digest, lists as `choices` the definitions the rules scope holds active.
+ */
+export interface Offered {
+  kind: string; step: ActShape["step"]; on: string | null; line: string;
+  fields: { name: string; type: string; required: boolean; choices?: { label: string; value: string }[] }[];
+}
+
+/** The byte domain of a field's stated value place, or null when it states none: its bytes travel beside the act, named by their digest. */
+const domainOf = (field: unknown): string | null => {
+  const value = (field as { value?: { domain?: unknown } } | null)?.value;
+  return typeof value?.domain === "string" ? value.domain : null;
+};
+
+/** The definitions the rules scope holds active, latest first: a choice for a field that takes a definition's bytes. */
+async function activeDefinitions(room: Room): Promise<{ label: string; value: string }[]> {
+  const { summary } = await summaryOf(handleOf(room, room.rules));
+  return summary.items.filter((item) => item.type === "definition" && item.state === "active").sort((a, b) => b.id - a.id)
+    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]) }));
+}
+
+/**
+ * The bytes of each value that the act's fields name at a stated place. A
+ * definition's bytes are read from the rules scope, which retains them when
+ * it activates the definition, and must hash to the digest; the scope
+ * checks that again. The page has no other source of bytes.
+ */
+async function valuesOf(room: Room, act: ActShape, fields: Record<string, FieldValue>): Promise<string[]> {
+  const values: string[] = [];
+  for (const [name, field] of Object.entries(act.fields)) {
+    const domain = domainOf(field);
+    const digest = fields[name];
+    if (domain === null || typeof digest !== "string") continue;
+    if (domain !== DEFINITION_DOMAIN) throw new Unreadable(`The field ${name} takes a value in ${domain}, which this page cannot supply.`);
+    // A value in the domain of a definition is kept as a definition, and read by that kind (as `artroom edit` reads it).
+    const kept = await transportOf(room.session).retained(room.rules, room.reader?.reader() ?? null, "definition", digest as Digest);
+    if (!kept.ok) throw new Unreadable(`Cannot read the definition ${digest} from the rules scope: ${kept.reason}. Nothing was signed.`);
+    values.push(kept.value.bytes);
+  }
+  return values;
+}
 
 /** A scope's definition, as the page reads it: a platform one from the platform package, a lane's as the scope retains it. */
 async function shapeOf(room: Room, handle: ScopeHandle, summary: Summary): Promise<{ shape: DefinitionShape; declared: DeclaredDefinition | null }> {
@@ -360,13 +523,15 @@ async function shapeOf(room: Room, handle: ScopeHandle, summary: Summary): Promi
  * an action the caller's role does not hold.
  */
 export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offered[]; hidden: number }> {
+  await fresh(room);
   const handle = handleOf(room, scope);
   const { shape } = await shapeOf(room, handle, (await summaryOf(handle)).summary);
   const { acts, hidden } = heldActs(shape, room.me);
+  const definitions = acts.some(([, a]) => Object.values(a.fields).some((f) => domainOf(f) === DEFINITION_DOMAIN)) ? await activeDefinitions(room) : [];
   return {
     acts: acts.map(([kind, a]) => ({
       kind, step: a.step, on: a.on, line: describe(kind, a),
-      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true })),
+      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions } : {}) })),
     })),
     hidden,
   };
@@ -387,6 +552,7 @@ export interface Acted { answer: Answer; before: Head; after: Head }
  * shape before it signs and carries detached texts beside the intent.
  */
 export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}): Promise<Acted> {
+  await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at: before } = await summaryOf(handle);
   const { shape, declared } = await shapeOf(room, handle, summary);
@@ -395,6 +561,7 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
   const fields = asked.fields ?? {};
   const on = asked.on ?? null;
   const expected = expectedOf(declaration, summary.items, on, fields);
+  const values = await valuesOf(room, declaration, fields);
   const signer = secretSigner(room.session.secret);
   const signing: Signing = room.session.now ? { now: room.session.now() } : {};
   let answer: Answer;
@@ -402,9 +569,9 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     const typed = await declaredHandle(handle, declared);
     if (!typed.ok) throw new Unreadable(`Cannot act on ${scope}: ${typed.reason}.`);
     const { signed, beside } = await typed.handle.intent(signer, kind as never, { on, fields, expected } as never, signing);
-    answer = await typed.handle.submit(signed, [], beside);
+    answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
   } else {
-    answer = await handle.submit(await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing));
+    answer = await handle.submit(await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing), [], values.length > 0 ? { values } : {});
   }
   return { answer, before, after: (await summaryOf(handle)).at };
 }

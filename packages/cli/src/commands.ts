@@ -397,8 +397,9 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
 
 /** What an invitation link carries. Its secret is the invitation's, which `join` presents once; it is no signing key. */
 /** `definition`: the version of membership that the invitation is in. A link made before it was carried names none. */
-interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string; definition?: string }
-const LINK = "artroom-invite:";
+/** What an invitation link holds: the service, the repository's scopes, the invitation and its secret, the handle, and membership's version. */
+export interface Link { v: 1; service: string; repository: Omit<Repository, "inbox">; invitation: number; secret: string; handle: string; definition?: string }
+export const LINK = "artroom-invite:";
 
 /**
  * `artroom invite <member> --role <role>`: membership's `invite-member`. The
@@ -431,7 +432,8 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
   });
 }
 
-function linkOf(text: string): Link | null {
+/** The invitation that a link from `artroom invite` holds, or null when the text is no such link. */
+export function linkOf(text: string): Link | null {
   if (!text.startsWith(LINK)) return null;
   try {
     const bytes = unb64url(text.slice(LINK.length));

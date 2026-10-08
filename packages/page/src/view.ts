@@ -13,7 +13,7 @@
  */
 
 import type { Answer } from "@generalbusiness/artroom-contract";
-import type { Acted, ChangeView, IssueView, LaneRow, Offered, Room, RulesView } from "./data.ts";
+import { siteAddress, type Acted, type ChangeView, type IssueView, type LaneRow, type Offered, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 
 type Child = Node | string | null | undefined | false;
@@ -37,7 +37,8 @@ const table = (head: string[], rows: Child[][]): HTMLElement =>
 
 /** Who the page acts as: the caller's handle and role in membership, or that the key is no active member's. */
 export function whoLine(room: Room): HTMLElement {
-  return h("p", { class: "who" }, room.me ? `Signed in as ${room.me.handle} (${room.me.role}), key ${short(room.key)}.` : `Key ${short(room.key)} is no active member's key in this room. You can read; the scopes will refuse your acts.`);
+  const how = room.reader ? "Reads present a read session from membership." : `Membership gave no read session (${room.unsessioned ?? "none"}): each read is signed by your key, and a scope answers only where your key signed an entry in the last few minutes.`;
+  return h("p", { class: "who" }, room.me ? `Signed in as ${room.me.handle} (${room.me.role}), key ${short(room.key)}. ` : `Key ${short(room.key)} is no active member's key in this room; the scopes will refuse your acts. `, h("span", { class: "muted" }, how));
 }
 
 // ---------------------------------------------------------------- the room
@@ -48,7 +49,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   ]);
   return h("main", {},
     h("h1", {}, "Room"), whoLine(room),
-    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room")),
+    h("p", {}, h("a", { href: "#/rules" }, "The rules of this room"), " · ", h("a", { href: siteAddress(room, "") }, "The published site")),
     section("Issues", table(["Number", "Title", "State", ""], rows("issue", lanes.issues))),
     section("Changes", table(["Number", "Title", "State", ""], rows("change", lanes.changes))),
     h("p", { class: "muted" }, `Directory ${room.directory}.`),
@@ -78,7 +79,8 @@ export function issueScreen(room: Room, issue: IssueView): HTMLElement {
 // ---------------------------------------------------------------- a change
 
 export function changeScreen(room: Room, change: ChangeView, last: Answer | null): HTMLElement {
-  const current = change.manifests.find((m) => m.state === "current") ?? null;
+  // The version that is current, or after a merge the latest one.
+  const current = change.manifests.find((m) => m.state === "current") ?? change.manifests.at(-1) ?? null;
   const states = changeStates(change, last);
   const extents = change.rules?.extents ?? [];
   // Reviews by extent: the approvals of the current version that state each extent of the rules the lane holds.
@@ -95,8 +97,12 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     section("Where it stands", states.length === 0 ? h("p", { class: "muted" }, "No review is asked for, no merge is in progress and none has been refused.") :
       h("ul", { class: "states" }, states.map((s) => h("li", {}, h("strong", {}, s.state), `: ${s.detail}`)))),
     section("Version", current ? h("dl", {},
-      field("Version", `item ${current.id}${current.complete === false ? ", not complete" : ""}`), field("Integrated by", or(current.integrator)), field("Authors", list(current.authors)),
-      field("Base", h("code", {}, short(current.base))), field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree))),
+      field("Version", h("span", {}, `item ${current.id}${current.complete === false ? ", not complete" : ""} `, state(current.state))), field("Integrated by", or(current.integrator)), field("Authors", list(current.authors)),
+      field("Base", h("code", {}, short(current.base))),
+      current.file ? [
+        field("File", h("code", {}, current.file.path)), field("Bytes", or(current.file.size)), field("Digest", h("code", {}, short(current.file.digest))),
+        field("Rendered page", h("a", { href: current.file.page }, current.file.page), change.merges.some((m) => m.state === "published" && m.manifest === current.id) ? "" : h("span", { class: "muted" }, " (shows the published branch: this version once it is published)")),
+      ] : [field("Integration commit", h("code", {}, short(current.integration))), field("Tree", h("code", {}, short(current.tree)))],
     ) : h("p", { class: "muted" }, "No version is proposed yet."), change.manifests.length > 1 ? h("p", { class: "muted" }, `${change.manifests.length - 1} earlier version(s).`) : null),
     section("Reviews by extent",
       change.rules ? h("p", { class: "muted" }, `The rules this lane holds, from update ${or(change.rules.revision)} of the rules scope: ${or(change.rules.approvals)} approval(s) in the lane's own count. The destination judges each merge on the rules it observes then.`) : h("p", { class: "muted" }, "This lane holds no rules yet: it has not asked the rules scope."),
@@ -162,7 +168,9 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: (k
     offered.acts.length === 0 ? h("p", { class: "muted" }, "Your role holds no act of this definition.") : offered.acts.map((a) => {
       const form = h("form", { "data-act": a.kind },
         a.step === "transition" ? h("label", {}, "On item ", h("input", { name: "on", inputmode: "numeric", value: "0" })) : null,
-        a.fields.map((f) => h("label", {}, `${f.name} (${f.type}${f.required ? "" : ", optional"}) `, h("input", { name: `field:${f.name}`, "data-type": f.type }))),
+        a.fields.map((f) => h("label", {}, `${f.name} (${f.type}${f.required ? "" : ", optional"}) `, f.choices
+          ? h("select", { name: `field:${f.name}`, "data-type": f.type }, f.choices.length === 0 ? h("option", { value: "" }, "the rules scope holds no definition active") : f.choices.map((c) => h("option", { value: c.value }, c.label)))
+          : h("input", { name: `field:${f.name}`, "data-type": f.type }))),
         h("button", { type: "submit" }, `Sign and send ${a.kind}`),
       );
       form.addEventListener("submit", (event) => {
