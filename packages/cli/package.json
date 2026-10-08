@@ -1,7 +1,7 @@
 {
   "name": "@generalbusiness/artroom-cli",
   "version": "0.1.0-dev.1",
-  "description": "The artroom command for the new model: install, claim, invite, join, acts, act, log, show and verify, as thin functions over a scope service's HTTP routes and a signing key.",
+  "description": "The artroom command for the new model: install, claim, invite, join, acts, act, log, show, verify, remote, clone, edit, merge, issue and issues, as thin functions over a scope service's HTTP routes and a signing key.",
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
