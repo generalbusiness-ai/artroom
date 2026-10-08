@@ -19,19 +19,21 @@
  * | `acts` | The acts of a scope's definition, with the ones the caller's role holds. |
  * | `act` | One act of any kind, through the client's declared handle for a declared definition, or as a signed intent for a platform one. |
  * | `log`, `show` | The scope's history, and one entry, over the read routes. |
- * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. |
+ * | `verify` | The replay verifier over the read routes: with the caller's session, and by signed reads where the session is refused. With `--all`, every scope of the room, one line each. |
  * | `remote` | The repository's host, namespace, name and remote URL, from the destination's branch item. |
  * | `clone` | Signs the destination's `read-token`, waits for its outcome, reads the read token once, and runs `git clone` with it in an `Authorization` header that git reads from its environment. The token is never an argument and never printed. |
  * | `edit` | Opens a change through the directory under the change definition that the rules scope holds active, proposes one file as its only version (`propose-file`), and merges it as `merge` does. The room, not the person, writes the repository. |
- * | `merge` | Signs `merge` of a change's current version, and waits until the room has published it or refused it. |
+ * | `merge` | Signs `merge` of a change's current version, and waits until the room has published it or refused it. `edit` and `merge` take `--closes <issue>`: the lane's `link-own` first. |
+ * | `issue`, `issues` | `open` is the directory's `open-issue`; `comment`, `assign` and `close` are the issue lane's own acts. `issues` lists each issue as its lane has it. |
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, Seed, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FieldValue, Founded, Item, KeyId, OperationId, PlatformDefinition, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, definitionDigest, digestBytes, intentDigest, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, TransportError, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
 import { DIRECTORY_OF, MEMBERSHIP, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, isOf, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { Config, Repository, Store } from "./store.ts";
@@ -269,6 +271,13 @@ async function waitFor<T>(ctx: Context, waiting: () => readonly ScopeId[], read:
 /** The scope's summary once it is `active`: created and confirmed. */
 const active = async (handle: ScopeHandle): Promise<Summary | null> => {
   const read = await handle.summary();
+  return read.ok && read.value.status === "active" ? read.value : null;
+};
+
+/** A lane's summary once it is `active`; a stop once its genesis is refused, which no wait changes. */
+const laneActive = async (handle: ScopeHandle, opened: string): Promise<Summary | null> => {
+  const read = await handle.summary();
+  if (read.ok && read.value.status === "refused") return stop(failed(`The lane ${handle.scope} refused its creation by ${opened}; nothing else was written there.`));
   return read.ok && read.value.status === "active" ? read.value : null;
 };
 
@@ -606,17 +615,87 @@ function sessionFirst(session: HistorySource, signed: HistorySource): HistorySou
   };
 }
 
-export function verify(ctx: Context, named: string | undefined): Promise<Outcome> {
+/**
+ * The code of the lanes' two capability versions, `hold@1` and `git-read@1`, with the numbers of `hold@1` that the runtime runs
+ * (`CAPABILITY_CODE` and `HOLD_VERSION` of the scope package's `ports.ts`). It is derive's code: pure functions, which let the
+ * verifier derive a lane's entries again.
+ */
+const CAPABILITIES = capabilitiesOf(holdCapability({ tokensPerHold: TOKENS_FLOOR, rootRetentionSeconds: null }), gitRead());
+
+/** The replay of one scope's history over the read routes: with the caller's session first, then by signed reads. */
+async function replayOf(ctx: Context, config: Config, reader: string | null, scope: ScopeId) {
+  const options = ctx.fetch ? { fetch: ctx.fetch } : {};
+  const signed = httpSource(config.service, { ...options, reader: signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
+  const source = reader === null ? signed : sessionFirst(httpSource(config.service, { ...options, reader }), signed);
+  return replay(source, { mode: "replay", scope, platform, grants: "proven", capabilities: CAPABILITIES, owners: CAPABILITIES });
+}
+
+export function verify(ctx: Context, named: string | undefined, options: { all?: boolean } = {}): Promise<Outcome> {
+  if (options.all) return named === undefined ? verifyAll(ctx) : Promise.resolve(usage("verify --all takes no scope: it verifies every scope of the room."));
   return run(async () => {
     const config = await configOf(ctx);
     const scope = scopeNamed(config, named);
-    const reader = await readerOf(ctx, config);
-    const options = ctx.fetch ? { fetch: ctx.fetch } : {};
-    const signed = httpSource(config.service, { ...options, reader: signedLogReader(secretSigner(await signerOf(ctx, config)), readSigning(ctx)) });
-    const source = reader === null ? signed : sessionFirst(httpSource(config.service, { ...options, reader }), signed);
-    const { report, why } = await replay(source, { mode: "replay", scope, platform, grants: "proven" });
+    const { report, why } = await replayOf(ctx, config, await readerOf(ctx, config), scope);
     const lines = render(report, why).split("\n").filter((line) => line.length > 0);
     return report.result === "consistent" ? done(...lines) : failed(...lines);
+  });
+}
+
+/**
+ * The scopes of the room: the register, the directory, and every scope that the directory created and each of those created, in
+ * the order of their histories. A scope is found by the creation that its creator's entry sends; the register's other creations
+ * are other rooms', and are not followed.
+ */
+async function roomScopes(ctx: Context, config: Config, reader: string | null): Promise<{ kind: string; scope: ScopeId }[]> {
+  const directory = config.repository!.directory.scope;
+  const D = await handleOf(ctx, config, directory, reader);
+  const register = ((await summaryOf(D)).items.find((item) => item.type === "repository")?.refs["register"] as ScopeRef | undefined)?.scope;
+  const found = [...(register ? [{ kind: "register", scope: register }] : []), { kind: "directory", scope: directory }];
+  for (let i = found.length - 1; i < found.length; i++) {
+    const handle = await handleOf(ctx, config, found[i]!.scope, reader);
+    for (let cursor: string | undefined, pages = 0; pages < 1000; pages++) {
+      const page = await handle.history(cursor);
+      if (!page.ok) return stop(failed(`Cannot read the history of ${handle.scope}: ${page.reason}.`));
+      for (const { entry } of page.value) {
+        for (const send of entry.sends) {
+          if (!("creator" in send.to)) continue;
+          const seed = send.to as Seed;
+          const scope = scopeIdOf(seed);
+          if (!found.some((f) => f.scope === scope)) found.push({ kind: seed.kind, scope });
+        }
+      }
+      if (page.next === undefined) break;
+      cursor = page.next;
+    }
+  }
+  return found;
+}
+
+/**
+ * `artroom verify --all`: the replay of the register and of every scope of the room, one line for each: its kind, its ID, the
+ * entry the replay reached and the result. The last line is "All consistent" or the first finding. A history that cannot be read
+ * is a finding.
+ */
+function verifyAll(ctx: Context): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    if (!config.repository) return usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>.");
+    const reader = await readerOf(ctx, config);
+    const lines: string[] = [];
+    let first: string | null = null;
+    const scopes = await roomScopes(ctx, config, reader);
+    for (const { kind, scope } of scopes) {
+      try {
+        const { report, why } = await replayOf(ctx, config, reader, scope);
+        lines.push(`${kind} ${scope}, entry ${report.target.seq}: ${report.result}.`);
+        if (report.result !== "consistent") first ??= `First finding: ${kind} ${scope} is ${report.result}${why ? `: ${why}` : ""}.`;
+      } catch (error) {
+        if (!(error instanceof SourceError)) throw error;
+        lines.push(`${kind} ${scope}: not read.`);
+        first ??= `First finding: ${kind} ${scope}: ${error.message}.`;
+      }
+    }
+    return first === null ? done(...lines, `All consistent: ${scopes.length} scopes.`) : failed(...lines, first);
   });
 }
 
@@ -775,17 +854,17 @@ type Effects = Entry["effects"];
 const stateOf = (effects: Effects, item: number): string | null => { const found = effects.find((e) => e.effect === "state" && e.item === item); return found?.effect === "state" ? found.state : null; };
 const valueOf_ = (effects: Effects, item: number, slot: string): unknown => { const found = effects.find((e) => e.effect === "value" && e.item === item && e.slot === slot); return found?.effect === "value" ? found.value : undefined; };
 
-/** The change definition that the rules scope holds active, and its canonical bytes, which the rules scope retains. The latest activation wins. */
-async function changeDefinition(ctx: Context, config: Config, reader: string | null): Promise<{ digest: Digest; bytes: string; declared: DeclaredDefinition }> {
+/** The lane definition of that name that the rules scope holds active, and its canonical bytes, which the rules scope retains. The latest activation wins. */
+async function activeDefinition(ctx: Context, config: Config, reader: string | null, name: "change" | "issue"): Promise<{ digest: Digest; bytes: string; declared: DeclaredDefinition }> {
   const repository = config.repository!;
   const R = await handleOf(ctx, config, repository.rules, reader);
-  const active = (await summaryOf(R)).items.filter((item) => item.type === "definition" && item.state === "active" && item.values["name"] === "change").sort((a, b) => b.id - a.id)[0];
+  const active = (await summaryOf(R)).items.filter((item) => item.type === "definition" && item.state === "active" && item.values["name"] === name).sort((a, b) => b.id - a.id)[0];
   const digest = active?.values["digest"] as Digest | undefined;
-  if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no change definition active. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=change --value <definition file>.`));
+  if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no ${name} definition active. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=${name} --value <definition file>.`));
   const transport = signedReads(transportOf(ctx, config.service), secretSigner(await signerOf(ctx, config)), readSigning(ctx));
   // A value in the domain of a definition is kept as a definition (`core.ts`), and read by that kind.
   const kept = await transport.retained(repository.rules, reader, "definition", digest);
-  if (!kept.ok) return stop(failed(`Cannot read the change definition ${digest} from the rules scope: ${kept.reason}.`));
+  if (!kept.ok) return stop(failed(`Cannot read the ${name} definition ${digest} from the rules scope: ${kept.reason}.`));
   try {
     const declared = parseStrict(kept.value.bytes) as DeclaredDefinition;
     if (definitionDigest(declared) === digest) return { digest, bytes: kept.value.bytes, declared };
@@ -807,12 +886,13 @@ async function laneOf(ctx: Context, config: Config, lane: ScopeId, reader: strin
  *    beside the act. The command waits for the lane.
  * 3. The lane's `ask-rules`, and the wait for the rules scope's answer: a merge is judged on the lane's copy of the rules.
  * 4. `propose-file`, on the destination's head: the path, the digest and size of the bytes, and the bytes.
- * 5. `merge`, and the wait for the room's answer, as `artroom merge` does.
+ * 5. With `--closes <issue>`, the lane's `link-own` to that issue, as `artroom merge --closes` signs it.
+ * 6. `merge`, and the wait for the room's answer, as `artroom merge` does.
  *
  * The command judges nothing: the lane, the rules and the destination do. A refusal is printed as it came, with what was written
  * before it, so that the change can be merged later.
  */
-export function edit(ctx: Context, path: string, options: { file?: string; title?: string } = {}): Promise<Outcome> {
+export function edit(ctx: Context, path: string, options: { file?: string; title?: string; closes?: string } = {}): Promise<Outcome> {
   return run(async () => {
     if (options.file === undefined) return usage("edit needs --file <local file>: the bytes to write at the path.");
     const bytes = await fileOf(ctx, options.file);
@@ -822,7 +902,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
-    const change = await changeDefinition(ctx, config, reader);
+    const change = await activeDefinition(ctx, config, reader, "change");
 
     // The change lane, opened by the directory.
     const D = await handleOf(ctx, config, repository.directory.scope, reader);
@@ -832,7 +912,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;
     const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed(`Entry ${D.scope}:${opened} opens no lane.`));
     const L = await handleOf(ctx, config, lane, reader);
-    await waitFor(ctx, () => [D.scope, lane], () => active(L), `the change ${lane}`);
+    await waitFor(ctx, () => [D.scope, lane], () => laneActive(L, `${D.scope}:${opened}`), `the change ${lane}`);
     const C = await laneOf(ctx, config, lane, reader, change.declared);
 
     // The lane's copy of the rules.
@@ -848,13 +928,21 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const version = (await C.submit(proposed.signed, [], proposed.beside));
     if (version.answer !== "accepted") return answered(lane, version, "Proposed");
     const lines = [`Proposed ${path} (${bytes.length} bytes) as change ${lane}, version ${version.receipt.fact.seq}.`];
+    if (options.closes !== undefined) {
+      const linked = await linking(ctx, config, lane, reader, change.declared, options.closes);
+      if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines] };
+      lines.push(...linked.lines);
+    }
     const outcome = await merging(ctx, config, lane, reader, change.declared);
     return { ...outcome, lines: [...lines, ...outcome.lines] };
   });
 }
 
-/** `artroom merge <change>`: `merge` of the change's current version, and the wait for the room's answer. */
-export function merge(ctx: Context, named: string): Promise<Outcome> {
+/**
+ * `artroom merge <change> [--closes <issue>]`: `merge` of the change's current version, and the wait for the room's answer. With
+ * `--closes`, the lane's `link-own` to that issue first: the merge that publishes the change then closes the issue.
+ */
+export function merge(ctx: Context, named: string, options: { closes?: string } = {}): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const lane = scopeNamed(config, named);
@@ -862,7 +950,11 @@ export function merge(ctx: Context, named: string): Promise<Outcome> {
     const read = await (await handleOf(ctx, config, lane, reader)).definition();
     if (!read.ok) return failed(`Cannot read the definition of ${lane}: ${read.reason}.`);
     if (read.value.name !== "change") return usage(`${lane} is no change: its definition is ${read.value.name}.`);
-    return merging(ctx, config, lane, reader, read.value);
+    if (options.closes === undefined) return merging(ctx, config, lane, reader, read.value);
+    const linked = await linking(ctx, config, lane, reader, read.value, options.closes);
+    if (linked.code !== 0) return linked;
+    const outcome = await merging(ctx, config, lane, reader, read.value);
+    return { ...outcome, lines: [...linked.lines, ...outcome.lines] };
   });
 }
 
@@ -902,4 +994,145 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
     `Published: commit ${String(commit)}, by the merge ${lane}:${seq}.`,
     ...(typeof path === "string" ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${path.split("/").map(encodeURIComponent).join("/")}`] : []),
   );
+}
+
+// ---------------------------------------------------------------- issues, and the link that closes one
+
+/** An issue of the room, as its own lane has it now. The directory's row gives its lane and its number. */
+interface Issue { lane: ScopeId; ref: ScopeRef; number: number | null; title: string; state: string; reason: string | null; opener: string | null; assignees: string[] }
+
+const memberOf = (party: unknown): string | null => (party && typeof party === "object" && typeof (party as { member?: unknown }).member === "string" ? (party as { member: string }).member : null);
+
+/**
+ * The issues of the room, oldest first: each row of the directory whose kind is `issue`, read in its own lane. The lane is read and
+ * not the row, because the directory's row is an index that the lane's own acts update, and a merge that closes the issue sends
+ * the directory nothing (the `closes` handler of the issue lane has no send). A row whose lane is not created yet is left out.
+ */
+async function issuesOf(ctx: Context, config: Config, reader: string | null): Promise<Issue[]> {
+  const D = await handleOf(ctx, config, config.repository!.directory.scope, reader);
+  const rows = (await summaryOf(D)).items.filter((item) => item.type === "lane" && item.values["kind"] === "issue").sort((a, b) => a.id - b.id);
+  const issues: Issue[] = [];
+  for (const row of rows) {
+    const lane = (row.refs["scope"] as ScopeRef | undefined)?.scope;
+    if (!lane) continue;
+    const summary = await summaryOf(await handleOf(ctx, config, lane, reader));
+    const intent = summary.items.find((item) => item.type === "intent");
+    if (!intent) continue;
+    const assignees = intent.parties["assignees"];
+    issues.push({
+      lane, ref: summary.scope, number: typeof intent.values["number"] === "number" ? intent.values["number"] : null,
+      title: String(intent.values["title"] ?? ""), state: intent.state,
+      reason: typeof intent.values["closeReason"] === "string" ? intent.values["closeReason"] : null,
+      opener: memberOf(intent.parties["requester"]),
+      assignees: (Array.isArray(assignees) ? assignees : []).map(memberOf).filter((m): m is string => m !== null),
+    });
+  }
+  return issues;
+}
+
+/** An issue by its number (`3` or `#3`) or its lane's scope ID. */
+async function issueNamed(ctx: Context, config: Config, reader: string | null, named: string): Promise<Issue> {
+  const issues = await issuesOf(ctx, config, reader);
+  const number = /^#?(\d+)$/.exec(named);
+  const found = number ? issues.find((issue) => issue.number === Number(number[1])) : issues.find((issue) => issue.lane === named);
+  return found ?? stop(usage(`No issue ${named} is listed in the directory ${config.repository!.directory.scope}. Run: artroom issues`));
+}
+
+/**
+ * One act of an issue's own lane, under the definition that the lane runs, signed through the client's declared handle. `choose`
+ * gives the act, its item and its fields from the issue as it is now and the caller's handle. The lane judges it.
+ */
+function issueAct(ctx: Context, named: string, choose: (issue: Issue, handle: string | undefined, membership: ScopeRef) => { kind: string; on: number | null; fields: Record<string, unknown> }, took: string): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const reader = await readerOf(ctx, config);
+    const issue = await issueNamed(ctx, config, reader, named);
+    const L = await handleOf(ctx, config, issue.lane, reader);
+    const read = await L.definition();
+    if (!read.ok) return failed(`Cannot read the definition of ${issue.lane}: ${read.reason}.`);
+    const { kind, on, fields } = choose(issue, config.handle, repository.membership);
+    const declaration = read.value.acts[kind] ?? stop(failed(`The issue ${issue.lane} is under ${read.value.name}, which has no act ${kind}.`));
+    const items = (await summaryOf(L)).items;
+    const I = await laneOf(ctx, config, issue.lane, reader, read.value);
+    const signer = secretSigner(await signerOf(ctx, config));
+    const { signed, beside } = await I.intent(signer, kind as never, { on, fields, expected: expectedOf(declaration as unknown as ActShape, items, on, fields as Record<string, FieldValue>) } as never, signing(ctx));
+    return answered(issue.lane, await I.submit(signed, [], beside), took);
+  });
+}
+
+/**
+ * `artroom issue open --title <text> [--body <text>]`: the directory's `open-issue`, under the issue definition that the rules
+ * scope holds active, whose bytes go beside the act; the directory creates the issue's lane, and the command waits for it. The
+ * issue's one condition is its title: the lane's genesis refuses an empty list of conditions, `required-unset`, and the command
+ * has no flag for them (the delivery note's gap 1).
+ */
+export function issueOpen(ctx: Context, options: { title?: string; body?: string } = {}): Promise<Outcome> {
+  return run(async () => {
+    if (options.title === undefined) return usage("issue open needs --title <text>.");
+    const config = await configOf(ctx);
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const signer = secretSigner(await signerOf(ctx, config));
+    const reader = await readerOf(ctx, config);
+    const issue = await activeDefinition(ctx, config, reader, "issue");
+    const D = await handleOf(ctx, config, repository.directory.scope, reader);
+    const summary = await summaryOf(D);
+    const shape = (await definitionOf(D, summary)).shape;
+    // The body is a detached text: the intent holds its digest, and the text travels beside it.
+    const fields = { definition: issue.digest, title: options.title, ...(options.body !== undefined ? { body: textDigest(options.body) } : {}), conditions: [options.title] };
+    const signed = await signedIntent(signer, { to: repository.directory, kind: "open-issue", fields, expected: expectedOf(shape.acts["open-issue"]!, summary.items, null, fields) }, signing(ctx));
+    const opened = accepted(await D.submit(signed, [], { values: [issue.bytes], ...(options.body !== undefined ? { texts: [options.body] } : {}) }), D.scope, "Opened").receipt.fact.seq;
+    const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed(`Entry ${D.scope}:${opened} opens no lane.`));
+    const L = await handleOf(ctx, config, lane, reader);
+    const created = await waitFor(ctx, () => [D.scope, lane], () => laneActive(L, `${D.scope}:${opened}`), `the issue ${lane}`);
+    const number = created.items.find((item) => item.type === "intent")?.values["number"];
+    return done(`Opened issue #${String(number)}: ${options.title}. Its lane is ${lane}.`);
+  });
+}
+
+/** `artroom issue comment <issue> <text>`: the issue lane's `comment`. Any member may comment. */
+export function issueComment(ctx: Context, named: string, text: string): Promise<Outcome> {
+  return issueAct(ctx, named, () => ({ kind: "comment", on: null, fields: { body: text } }), "Commented");
+}
+
+/** `artroom issue assign <issue> <@member>`: the issue lane's `assign`, which sets the one assignee. It needs `issue.triage`. */
+export function issueAssign(ctx: Context, named: string, member: string): Promise<Outcome> {
+  return issueAct(ctx, named, (_, __, membership) => ({ kind: "assign", on: 0, fields: { assignees: [{ membership, member }] } }), "Assigned");
+}
+
+/**
+ * `artroom issue close <issue>`: `close-own` when the caller opened the issue, and otherwise `close-any`, which needs
+ * `issue.triage`. The reason is `completed`. The demo profile has no rule that lets an assignee close an issue.
+ */
+export function issueClose(ctx: Context, named: string): Promise<Outcome> {
+  return issueAct(ctx, named, (issue, handle) => ({ kind: issue.opener !== null && issue.opener === handle ? "close-own" : "close-any", on: 0, fields: { reason: "completed" } }), "Closed");
+}
+
+/** `artroom issues`: every issue of the room, oldest first, with its number, state, title, assignees and lane. */
+export function issues(ctx: Context): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    if (!config.repository) return usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>.");
+    const all = await issuesOf(ctx, config, await readerOf(ctx, config));
+    if (all.length === 0) return done("No issues.");
+    const lines = all.map((issue) => `#${issue.number ?? "?"}  ${issue.state}${issue.reason ? ` (${issue.reason})` : ""}  ${issue.title}${issue.assignees.length > 0 ? `; assigned to ${issue.assignees.join(", ")}` : ""}; lane ${issue.lane}`);
+    return done(...lines, `${all.length} issues, ${all.filter((issue) => issue.state === "open").length} open.`);
+  });
+}
+
+/**
+ * The change lane's `link-own` to an issue, by keyword: the link that the merge, once published, sends to the issue, which then
+ * closes (plan 019, default 3). The lane takes it from the change's author only; the demo profile has no `link-any`.
+ */
+async function linking(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition, named: string): Promise<Outcome> {
+  const issue = await issueNamed(ctx, config, reader, named);
+  const declaration = declared.acts["link-own"] ?? stop(failed(`The change ${lane} is under a definition with no act link-own.`));
+  const fields = { issue: issue.ref, how: "keyword" } as Record<string, FieldValue>;
+  const items = (await summaryOf(await handleOf(ctx, config, lane, reader))).items;
+  const C = await laneOf(ctx, config, lane, reader, declared);
+  const signer = secretSigner(await signerOf(ctx, config));
+  const { signed, beside } = await C.intent(signer, "link-own" as never, { on: null, fields, expected: expectedOf(declaration as unknown as ActShape, items, null, fields) } as never, signing(ctx));
+  const answer = await C.submit(signed, [], beside);
+  if (answer.answer !== "accepted") return answered(lane, answer, "Linked");
+  return done(`Linked: when it is published, the change ${lane} closes issue #${issue.number ?? "?"} (${issue.lane}).`);
 }
