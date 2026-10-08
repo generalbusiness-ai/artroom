@@ -158,6 +158,16 @@ shots, one test with the recorder skipped. Logs and limits are in the related
 install/story notes and `/tmp/artroom-expanded-demo-contract-focused.log`.
 These are focused test outcomes, not a corrected passing gate.
 
+The omitted completed edit preflight is restored from `bf396524` as
+`3e66b83a`: actual activated workflow input/effect checks and literal
+destination@2 support precede lane creation; the destination protocol and
+current head are reread after preparation. Current linking and recovery stay
+intact. Existing edit and declared-client tests pass, and both early-guard
+controls fail the intended no-partial-lane assertion. These are local support
+checks, not grants or historical proof. The shared client validator extraction
+requires refreshed generated page assets; rebuilding them and their isolated
+parity check passed in `/tmp/artroom-expanded-edit-page-{build,assets}.log`.
+
 The completed clone receipt/opening/full-fact and outcome identity checks,
 bounded cancellable waiter and typed one-time credential parser are restored
 around the current CLI features. The actual local Git witness and its owned
