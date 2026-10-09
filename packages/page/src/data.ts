@@ -223,7 +223,7 @@ export async function openRoom(session: Session, place: Place): Promise<Room> {
   room.rules = rules;
   room.destination = destination;
   const recordedRepository = repository.values["repository"];
-  if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository.name === "string") room.name = recordedRepository.name;
+  if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository["name"] === "string") room.name = recordedRepository["name"];
   room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
   return room;
 }
