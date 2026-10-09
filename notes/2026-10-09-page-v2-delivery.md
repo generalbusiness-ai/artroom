@@ -95,7 +95,21 @@ The capture source identities are not relabelled as this later source.
 
 ## Final gate and review
 
-One final gate, complete independent Source review and landing are still owed.
-No final gate has run for this candidate yet. Existing runtime diagnostic and
-dependency warnings from the GitHub gate remain separate subjects; they are
-not a clean-runtime claim for this delivery.
+One gate ran at clean source `592cd04115edf7ce6b22a50604b052b9afe144ee`,
+tree `1ceb369ffaf1bb4267a86e647fb7de836de5c586`. All phases exited 0:
+872 Vitest tests passed, two opt-in recorders were skipped, and six
+active-source checks passed. Types took 4.9 seconds elapsed and 16.0 CPU;
+tests took 73.6 elapsed and 105.6 CPU. These are printed phase costs, not
+a separately measured whole-process time. Installation was skipped because
+the gate recognized the current locked installation. Whitespace passed.
+
+Root read the complete raw test and type logs. The current test log contains
+no uncaught canceler diagnostic. This does not identify or repair the earlier
+diagnostic; A4's negative isolation result and dependency warnings remain
+separate. Raw gate output is `/tmp/artroom-page-v2-gate.log`; phase logs are
+in `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.azGmMU9FdF`.
+
+Planner's local-label display correction `59a6744c` arrived after this gate
+started. That small source follow-up requires focused verification and exact
+delta attribution; the gate is not relabelled as its later head. Complete
+independent Source review and landing remain owed.
