@@ -8,9 +8,10 @@ import { assignedTurn, countingView, proposal, same, type Control, type Counting
 import type { ActorIdentity, Completion, PreparedEnvelope, Reporter, ReportOutcome, CustodyLock, PendingStore } from "./voice-controller.ts";
 
 export interface CommandStore {load():Promise<{kind:string;envelope:PreparedEnvelope}|null>;save(value:{kind:string;envelope:PreparedEnvelope}):Promise<void>;clear():Promise<void>}
+export type CommandOutcome=ReportOutcome|{readonly status:"blocked";readonly reason:string};
 export interface StageGateway extends Reporter {
   observe(emit:(state:ObservationState<Summary>,view?:CountingView)=>void):Observation;
-  command(kind:Control):Promise<ReportOutcome>;
+  command(kind:Control):Promise<CommandOutcome>;
   checkCommand():Promise<ReportOutcome|null>;
   pendingCommand():string|null;
   restoreCommand():Promise<void>;
@@ -33,7 +34,7 @@ export function nativeGateway(identity:ActorIdentity,secret:Uint8Array,options:{
     if(!followed.ok||followed.entry.input.type!=="act"||canonicalize(followed.entry.input.signed)!==canonicalize(envelope.signed))return{status:"unknown",reason:"The original recorded request could not be verified."};
     observer?.refresh();return{status:"recorded"};
   };
-  const send=async(envelope:PreparedEnvelope):Promise<ReportOutcome>=>{try{exact(envelope);const answer=await handle().submit(envelope.signed,envelope.grants,envelope.beside);current();if(answer.answer==="accepted")return verified(answer.receipt,envelope);if(answer.answer==="refused"){observer?.refresh();return{status:"refused",reason:"The scope refused this proposal."};}return{status:"unknown",reason:"No acceptance is confirmed. The original request is retained."};}catch{return{status:"unknown",reason:"The original request has no verified answer."};}};
+  const send=async(envelope:PreparedEnvelope):Promise<ReportOutcome>=>{try{exact(envelope);const answer=await handle().submit(envelope.signed,envelope.grants,envelope.beside);current();if(answer.answer==="accepted")return verified(answer.receipt,envelope);if(answer.answer==="refused"){observer?.refresh();return{status:"unknown",reason:"A refusal reply cannot prove this exact request was not recorded. Check the retained original request."};}return{status:"unknown",reason:"No acceptance is confirmed. The original request is retained."};}catch{return{status:"unknown",reason:"The original request has no verified answer."};}};
   const reconcile=async(envelope:PreparedEnvelope):Promise<ReportOutcome>=>{try{exact(envelope);const answer=await handle().settle(envelope.signed);current();return answer.ok?verified(answer.value,envelope):{status:"unknown",reason:"The original request remains unresolved."};}catch{return{status:"unknown",reason:"The original request remains unresolved."};}};
   const prepare=async(kind:Control|"spoken",completion?:Completion):Promise<PreparedEnvelope>=>{
     current();if(!view||!fresh)throw new Error("A current counting snapshot is required.");
@@ -51,7 +52,7 @@ export function nativeGateway(identity:ActorIdentity,secret:Uint8Array,options:{
     },
     async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("spoken",completion);},
     submit:send,reconcile,
-    async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"refused",reason:"This action is unavailable in the current scope state."};}try{await options.commandStore.save({kind,envelope});}catch{return{status:"unknown",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await send(envelope);if(result.status!=="unknown"){await options.commandStore.clear();pending=null;observer?.refresh();}return result;});},
+    async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{await options.commandStore.save({kind,envelope});}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await send(envelope);if(result.status!=="unknown"){await options.commandStore.clear();pending=null;observer?.refresh();}return result;});},
     async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;return null;}pending=held.kind;const result=await reconcile(held.envelope);if(result.status==="recorded"){await options.commandStore.clear();pending=null;observer?.refresh();}return result;});},
     pendingCommand:()=>pending,
     async restoreCommand(){const held=await options.commandStore.load();current();pending=held?.kind??null;},
