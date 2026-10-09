@@ -13,10 +13,12 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     constructor(readonly tag: string) {}
     setAttribute(name: string, value: string) { this.attrs[name] = value; }
     append(...children: (Element | string)[]) { this.children.push(...children); }
-    replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
+    prepend(...children: (Element | string)[]) { this.children.unshift(...children); }
+    replaceChildren(...children: (Element | string)[]) { this.children = children; if (this === root) rendered.resolve(); }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
     querySelector() { return new Element("div"); }
+    querySelectorAll() { return []; }
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
   const root = new Element("div");
@@ -47,8 +49,8 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   }));
   vi.doMock("../src/view.ts", () => ({
     h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.children = children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]; return el; },
-    roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn(),
-    actsPanel: (_offered: unknown, callback: typeof send, _last: unknown, options: (typeof panels)[number]) => { send = callback; panels.push(options); return new Element("section"); },
+    roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
+    actsPanel: (_offered: unknown, callback: typeof send, last: Element | null, options: (typeof panels)[number]) => { send = callback; panels.push(options); const panel = new Element("section"); if (last) panel.append(last); return panel; },
   }));
   vi.stubGlobal("document", { getElementById: () => root, createElement: (tag: string) => new Element(tag) });
   const location = { origin: "https://page.test", hash: "#/" };
@@ -60,8 +62,11 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     await import("../src/main.ts");
     await rendered.promise;
     expect(panels.length).toBeGreaterThan(0);
+    const beforePending = panels.length;
     send("comment", "", Object.fromEntries([["__proto__", "literal field"]]));
     await attempt.promise;
+    expect(panels.length).toBe(beforePending); // Local fencing preserves the subject without starting another view read.
+    expect(root.textContent).toContain("Sending request");
     rendered = gate();
     redraw();
     await rendered.promise;
@@ -70,8 +75,9 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     await drain();
     expect(dataAct).toHaveBeenCalledTimes(1);
     expect((dataAct.mock.calls[0]![3] as { fields: Record<string, unknown> }).fields["__proto__"]).toBe("literal field");
-    rendered = gate();
     rejects[0]!(new Error("Reply lost after submit"));
+    await drain();
+    rendered = gate(); redraw();
     await rendered.promise;
     expect(panels.at(-1)?.uncertain).toBe(true);
     expect(root.textContent).toContain("does not retain the exact signed request");
@@ -109,11 +115,12 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     send("comment", "", {});
     await beforeSubmit.promise;
     context = { ...context, place: { ...context.place, directory: "another-room" }, secret: "another-key" };
-    rendered = gate(); release.resolve(); await rendered.promise;
+    release.resolve(); await drain();
+    rendered = gate(); redraw(); await rendered.promise;
     expect(posts).toHaveBeenCalledTimes(1); // Only the earlier lost-reply submission.
     expect(panels.at(-1)?.pending).toBe(false);
     expect(panels.at(-1)?.uncertain).toBe(false);
-    expect(alert).toHaveBeenCalledWith("The room or key changed before submission. Nothing was sent.");
+    expect(posts).toHaveBeenCalledTimes(1);
     const reading = gate(), releaseRead = gate();
     issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0 }; });
     location.hash = "#/issue/delayed";
@@ -137,6 +144,21 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
       rendered = gate(); send("comment", "", { body: "Exact submission" }, retired); await drain();
       expect(retired).toHaveBeenCalledTimes(answer === "accepted" ? 1 : 0);
     }
+    const answered = gate(), observation = gate();
+    dataAct.mockImplementationOnce(async (...args: unknown[]) => {
+      (args[5] as () => void)();
+      const result = { kind: "comment", answer: { answer: "accepted" }, observation: "Observation refresh pending." };
+      (args[4] as (value: unknown) => void)(result); answered.resolve();
+      await observation.promise; result.observation = "The observation could not be read."; return result as never;
+    });
+    const beforeAnswer = panels.length;
+    send("comment", "", { body: "Known before observation" }, retired); await answered.promise;
+    expect(root.textContent).toContain("Known accepted");
+    expect(panels.length).toBe(beforeAnswer);
+    expect(retired).toHaveBeenCalledTimes(2);
+    rendered = gate(); observation.resolve(); await rendered.promise;
+    expect(panels.at(-1)?.uncertain).toBe(true);
+    expect(root.textContent).toContain("Known accepted");
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion

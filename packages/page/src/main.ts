@@ -216,6 +216,15 @@ interface PanelOptions {
 }
 async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}, options: PanelOptions = {}): Promise<HTMLElement> {
   const association = actAssociation(room, scope);
+  const capturedRoute = location.hash;
+  const capturedDrawing = drawing;
+  let answerHost: HTMLElement | null = null;
+  const activeView = () => capturedDrawing === drawing && location.hash === capturedRoute && currentContext();
+  const showLocally = (message: HTMLElement, blocked = true) => {
+    if (!activeView()) return;
+    answerHost?.replaceChildren(message);
+    if (blocked) for (const control of root().querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+  };
   const currentContext = () => {
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
@@ -224,7 +233,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
-    void draw(); // Every form on this scope is fenced, including after navigation and redraw.
+    showLocally(h("p", { role: "status" }, "Sending request"));
     void (async () => {
       try {
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
@@ -233,16 +242,21 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
-        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); if (known.answer.answer === "accepted") accepted?.(); }, () => {
+        const result = await act(room, scope, kind, { on: target, fields }, (known) => {
+          lastActs.set(association, known); sending.answered(association);
+          showLocally(answerLine(known));
+          if (known.answer.answer === "accepted") accepted?.();
+        }, () => {
           if (!currentContext()) throw new Error("The room or key changed before submission. Nothing was sent.");
           sending.submitting(association);
         });
         lastActs.set(association, result);
       } catch (error) {
         sending.failed(association);
-        if (sending.get(association)?.state !== "unknown") alert(error instanceof Error ? error.message : String(error));
+        if (sending.get(association)?.state === "unknown") showLocally(unknownRequest(kind));
+        else if (activeView()) showLocally(h("p", { role: "status" }, error instanceof Error ? error.message : String(error)), false);
       }
-      await draw();
+      if (activeView()) await draw();
     })();
   };
   const offered = options.offered ?? await actsOn(room, scope);
@@ -254,6 +268,8 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const represented = options.tasks?.(offered, send, taskContext) ?? [];
   const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind) && !represented.includes(act.kind)) };
   const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...taskContext, primary: [] });
+  answerHost = h("div", { class: "request-answer", "aria-live": "polite" });
+  panel.prepend(answerHost);
   if (options.customForm) panel.append(options.customForm(send, pending || !!uncertain, association));
   if (fence?.state === "unknown") panel.append(unknownRequest(fence.kind));
   return panel;
@@ -438,8 +454,10 @@ async function draw(focus = false): Promise<void> {
       if (current?.file && typeof current.file.content === "string") {
         const capturedHash = location.hash;
         const capturedContext = settingsContext(kept);
-        screen.querySelector('[data-action-slot="edit"]')?.append(retainedEditor(room, change, {
-          current: () => location.hash === capturedHash && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext,
+        const priorMutation = lastActs.get(actAssociation(loaded, change.scope));
+        const mutationUnsettled = () => !!sending.get(actAssociation(loaded, change.scope)) || !!priorMutation && (priorMutation.answer.answer === "unavailable" || priorMutation.answer.answer === "mismatch" || priorMutation.observation !== null);
+        screen.querySelector('[data-action-slot="edit"]')?.append(mutationUnsettled() ? h("p", { class: "muted" }, "The current request must be confirmed before proposing an edit.") : retainedEditor(room, change, {
+          current: () => location.hash === capturedHash && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext && !mutationUnsettled(),
           recorded: (lane) => { location.hash = `#/change/${lane}`; },
         }));
       }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { taskForm } from "../src/tasks.ts";
+import { createIssue, taskForm } from "../src/tasks.ts";
 import type { Offered } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -11,6 +11,12 @@ class Element {
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
+  removeAttribute(name: string) { this.attrs.delete(name); }
+  showModal() {} close() {} remove() {} focus() {}
+  querySelector<T>(selector: string): T | null {
+    const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
+    return (name ? this.all().find((node) => node.name === name) : this.all().find((node) => ["input", "textarea", "button"].includes(node.tag))) as T ?? null;
+  }
   hasAttribute(name: string) { return this.attrs.has(name); }
   append(...children: (Element | string)[]) { this.children.push(...children); }
   addEventListener(name: string, listener: (event: { preventDefault(): void }) => void) {
@@ -170,4 +176,18 @@ test("a Merge task uses the exact observed manifest and selected issue reports w
   expect(ready.all().filter((node) => node.tag === "label")).toEqual([]);
   expect(ready.all().filter((node) => node.tag === "input").map((node) => node.attrs.get("type"))).toEqual(["hidden", "hidden"]);
   ready.event("submit"); expect(sent[0]).toEqual(["merge", "", { manifest: "12", reports }]);
+});
+
+test("Create issue asks for title and description and intentionally uses the title as its native condition", () => {
+  const body = new Element("body");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: (tag: string) => new Element(tag), body } });
+  const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "authenticated-definition" }] }, { name: "title", type: "text", required: true }, { name: "body", type: "text", required: false }, { name: "conditions", type: "list", required: true }] };
+  const sent: unknown[] = [];
+  const create = asElement(createIssue(open, (...args) => sent.push(args), {})); create.event("click");
+  const form = body.all().find((node) => node.tag === "form")!;
+  expect(form.all().filter((node) => node.tag === "label").map((node) => node.textContent)).toEqual(["Title", "Description"]);
+  form.all().find((node) => node.name === "field:title")!.value = "Fix the handbook";
+  form.all().find((node) => node.name === "field:body")!.value = "The introduction is missing.";
+  form.event("submit");
+  expect((sent[0] as unknown[]).slice(0, 3)).toEqual(["open-issue", "", { definition: "authenticated-definition", title: "Fix the handbook", body: "The introduction is missing.", conditions: '["Fix the handbook"]' }]);
 });

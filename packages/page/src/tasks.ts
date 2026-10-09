@@ -2,6 +2,7 @@
 import type { ChangeView, Offered, Room } from "./data.ts";
 import { actionForm, type ActionContext, type Send } from "./actions.ts";
 import { h } from "./view.ts";
+import { issueTaskValues } from "./task-values.ts";
 
 function missingFields(act: Offered, context: ActionContext, fields: readonly string[]): string[] {
   const fixed = context.defaults?.[act.kind];
@@ -30,19 +31,19 @@ export function taskForm(act: Offered, send: Send, context: ActionContext, field
 
 /** A native dialog wraps the supported task form; no generic protocol fields appear. */
 export function createIssue(act: Offered, send: Send, context: ActionContext): HTMLElement {
-  const missing = missingFields(act, context, ["title", "body", "conditions"]);
+  // The existing CLI intentionally uses the entered title as the issue's
+  // condition. The form does the same, without claiming a native default.
+  const taskAct = { ...act, fields: act.fields.filter((field) => field.name !== "conditions") };
+  const missing = missingFields(taskAct, context, ["title", "body"]);
   if (missing.length) return h("p", { class: "muted", role: "status" }, `Create issue is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from the room's active issue definition.`);
   const button = h("button", { type: "button", class: "primary" }, "Create issue");
   if (context.uncertain || context.pending) button.setAttribute("disabled", "");
   button.addEventListener("click", () => {
     let dialog!: HTMLDialogElement;
     const submit: Send = (kind, on, typed, accepted) => {
-      const conditions = (typed["conditions"] ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
-      send(kind, on, { ...typed, conditions: JSON.stringify(conditions) }, () => { accepted?.(); dialog.close(); dialog.remove(); button.focus(); });
+      send(kind, on, issueTaskValues(typed), () => { accepted?.(); dialog.close(); dialog.remove(); button.focus(); });
     };
-    const form = taskForm(act, submit, context, ["title", "body", "conditions"], "Create issue");
-    const conditions = form.querySelector<HTMLTextAreaElement>('[name="field:conditions"]');
-    if (conditions) { conditions.removeAttribute("required"); conditions.setAttribute("placeholder", "One condition per line; leave blank for no conditions"); }
+    const form = taskForm(taskAct, submit, context, ["title", "body"], "Create issue");
     const close = h("button", { type: "button" }, "Cancel");
     dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, close) as HTMLDialogElement;
     close.addEventListener("click", () => { dialog.close(); dialog.remove(); button.focus(); });
