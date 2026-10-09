@@ -695,8 +695,8 @@ const ownEntry = (own: Own, seq: number) => {
  * their opening (section 12.1.5, "What an operation is for"; entry ER6). No
  * slot lists them, and the folded state gives an operation by its ID
  * alone. So they are found from the entries that open one: the entry at
- * `reservedAt`, whose outcome of `judge` opened the first push; and an act
- * `resend` on the publication. The search reads this scope's own entries
+ * `reservedAt`, whose outcome of `judge` opened the first push; an @3 staging/check
+ * outcome held for this publication; and an act `resend` on the publication. The search reads this scope's own entries
  * from `reservedAt` to the entry that is written (I3 deltas, entry FA5).
  */
 function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: Item, before: number): Operation[] {
@@ -705,7 +705,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && input.kind === "check-judge"));
+    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
     if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
