@@ -164,6 +164,11 @@ export async function receive(host: { refs: Map<string, string>; objects: Map<st
   const [old, commit, ref] = [match![1]!, match![2]!, match![3]!];
   const result = (line: string) => new Response(join(pkt("unpack ok\n"), pkt(line), utf8("0000")), { headers: { "content-type": "application/x-git-receive-pack-result" } });
   if ((host.refs.get(ref) ?? ZERO_ID) !== old) return result(`ng ${ref} stale\n`);
+  if (commit === ZERO_ID) {
+    host.refs.delete(ref);
+    host.pushes.push({ ref, old, commit });
+    return result(`ok ${ref}\n`);
+  }
   for (const object of await decodePack(body.subarray(size + 4), { maxBytes: MAX_BYTES })) host.objects.set(object.id, object);
   host.pushes.push({ ref, old, commit });
   host.refs.set(ref, commit);

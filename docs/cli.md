@@ -313,9 +313,12 @@ one `propose-manifest` that freezes all paths, entry references and byte
 digests on the published base. The destination builds their shared tree
 at reservation and records it before any required check. A check request
 reads that reservation tree; publication waits for every required check's
-authentic pass. The checker reads a signed, job-bound readonly snapshot
-of the reservation; it does not need the unpublished commit to exist at
-the host, and that read stages no public ref. While a check is owed, the command prints the change and
+authentic pass. The destination stages the recorded integration on the canonical host
+under `refs/artroom/reservations/<reservation id>` before it reports the
+reservation to the lane. The checker reads that reservation and fetches
+its exact ref, then checks its integration ID, tree and first parent. A
+missing or mismatched stage gives `reservation-stage-missing` or
+`reservation-stage-mismatch` and starts no run. While a check is owed, the command prints the change and
 reserved tree. A published result prints the room's commit. A policy
 refusal prints its name and the merge command to run after approval.
 
@@ -336,7 +339,13 @@ A retry may be requested while checks are pending. If publication has
 started, the fence is refused as `publication-started`; the old job and
 any unresolved send remain recorded. Delayed results count only for the
 destination's acknowledged generation. Cancellation before a push and the
-recorded check deadline release an unchecked reservation.
+recorded check deadline release logical publication availability. A staged
+ref remains a separate cleanup duty. Publication moves the branch by its
+recorded compare-and-swap; deletion of the reservation ref and revocation
+of its tokens must settle before the destination’s publication is final.
+Unknown staging or deletion remains recorded and is never inferred from
+a read alone. Expiry currently retains `cleanup-aborted`; its explicit
+`resend` cleanup trigger is awaiting the owner’s disposition (`f1b87a0b`).
 
 Binary content, deletion and rename support remain in the later R5 work.
 The demonstration uses two text files.

@@ -19,6 +19,7 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
   next.items["source"] = { ...clone(prior.items["manifest"]!), max: 64,
     states: { collected: { final: false }, selected: { final: true } }, initial: "collected" };
   next.items["manifest"]!.refs["operation"] = { fixed: false, required: false, to: { type: "fact", kind: ["merge"], under: "change" } };
+  next.items["manifest"]!.values["reservationRef"] = { fixed: false, required: false, of: { type: "text", max: 128 } };
   next.items["manifest"]!.values["files"] = { fixed: true, required: false, of: files };
   next.items["manifest"]!.values["tree"]!.fixed = false;
   next.items["manifest"]!.values["integration"]!.fixed = false;
@@ -76,9 +77,11 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
   next.items["merge"]!.values["checkDeadline"] = { fixed: false, required: false, of: { type: "time" } };
   next.timed["merge-checks-deadline"] = { on: "merge", states: ["committed"], deadline: "checkDeadline", effects: [{ state: "refused" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } }], attention: [] };
   const publication = next.receives["publication"]!;
+  publication.fields["reservationRef"] = { type: "text", max: 128, required: false };
   publication.fields["checkDeadline"] = { type: "time", required: false };
   publication.fields["tree"] = { type: "tree", required: false };
   publication.effects = [...publication.effects,
+    { value: { slot: "reservationRef", from: { field: "reservationRef" } }, of: "also.manifest", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
     { value: { slot: "checkDeadline", from: { field: "checkDeadline" } }, of: "also.merge", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
     { value: { slot: "tree", from: { field: "tree" } }, of: "also.manifest", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
     { value: { slot: "integration", from: { field: "commit" } }, of: "also.manifest", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },

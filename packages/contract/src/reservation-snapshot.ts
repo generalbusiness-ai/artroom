@@ -10,6 +10,8 @@ export interface ReservationSnapshot {
   base: string;
   commit: string;
   tree: string;
+  ref: string;
+  remote: string;
   objects: readonly { id: string; type: "blob" | "tree" | "commit"; data: Uint8Array }[];
 }
 export interface ReservationSnapshotAsk { job: FactRef }

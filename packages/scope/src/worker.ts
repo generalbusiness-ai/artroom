@@ -99,7 +99,7 @@ export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: Durable
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
-  reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null>;
+  reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
   prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
@@ -124,7 +124,7 @@ const MISSING = { ok: false, reason: "not-found" } as const;
 
 /** The contract's operations, and the four that sessions and the operator's lists add. None of the four writes an entry. */
 export interface Api extends ScopeApi {
-  reservationSnapshot(scope: string, asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null>;
+  reservationSnapshot(scope: string, asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   session(scope: string, asked: unknown): Promise<SessionAnswer>;
   /** The body is the reader's side of the stream (`relay`): cancelling it releases the scope's subscription at once. */
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
@@ -268,6 +268,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
     if (what === "reservation-snapshot") {
       const snapshot = await scopes.reservationSnapshot(scope, given["signed"] as SignedIntent);
+      if (snapshot && "refused" in snapshot) return new Response(JSON.stringify(snapshot), { status: 409, headers: { "content-type": "application/json", "cache-control": "no-store" } });
       return new Response(JSON.stringify(snapshot ? { ...snapshot, objects: snapshot.objects.map((object) => ({ ...object, data: b64url(object.data) })) } : { error: "forbidden" }), { status: snapshot ? 200 : 403, headers: { "content-type": "application/json", "cache-control": "no-store" } });
     }
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);

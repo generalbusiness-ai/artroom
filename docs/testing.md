@@ -285,10 +285,11 @@ records two signed file entries and a frozen manifest, reserves the shared
 tree before a required check, refuses a wrong source digest and wrong job
 tree, and publishes only after a configured checker member signs a pass.
 The destination replays from its retained inputs. The actual CheckerService
-reads a signed, job-bound snapshot over the Worker route, validates the recorded reservation and its object closure,
+reads a signed, job-bound reservation read over the Worker route, validates the recorded reservation and its object closure,
 and signs the result that the lane admits. Its durable storage and runner
 are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
-the same object-overlay boundary with actual private Git checkout and a
+both object-overlay verification and exact reservation-ref fetching with
+actual private Git checkout and a
 configured step that reads both files. No container platform or deployed
 checker service is established by these witnesses. A held outside answer
 shows that a retry fence invalidates the old result even when the old

@@ -378,7 +378,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return item?.type === "job" ? { state: item.state, decidedBy: entry ? { at: scope.at, seq: deciding as number, hash: entry.hash } : null } : null;
   }
   /** Authenticated by the signed job-read request and current configured checker. */
-  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null> {
+  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> {
     this.#first();
     try { return await this.#outside.snapshot?.(asked) ?? null; } catch { return null; }
   }

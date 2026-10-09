@@ -78,10 +78,12 @@ export interface Job {
   commit: ObjectId;
   base: ObjectId;
   snapshot?: ReservationSnapshot;
+  ref?: string;
+  remote?: string;
 }
 
 export type NotAJob =
-  | "bad-notice" | "no-entry" | "not-this-entry" | "not-a-request-check" | "not-a-change-lane" | "not-activated" | "not-as-given" | "no-manifest";
+  | "bad-notice" | "no-entry" | "not-this-entry" | "not-a-request-check" | "not-a-change-lane" | "not-activated" | "not-as-given" | "no-manifest" | "reservation-stage-missing" | "reservation-stage-mismatch";
 
 export type Origin = { job: Job } | { not: NotAJob };
 
@@ -165,5 +167,5 @@ function reservationOrigin(notice: Notice, job: Sealed["entry"], manifest: Seale
     const bytes = utf8(fields["content"]);
     if (bytes.length !== fields["size"] || digestBytes(bytes) !== file.digest) return { not: "no-manifest" };
   }
-  return { job: { lane: notice.lane, fact: notice.job, name: notice.name, tree: notice.tree, configuration, deadline, commit, base, snapshot } };
+  return { job: { lane: notice.lane, fact: notice.job, name: notice.name, tree: notice.tree, configuration, deadline, commit, base, snapshot, ref: snapshot.ref, remote: snapshot.remote } };
 }

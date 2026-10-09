@@ -82,7 +82,7 @@ import type { JobRecord, Outcomes } from "./store.ts";
  * one member"; I3 deltas, entry EW15). No notice and no lane names it.
  */
 export interface Scopes {
-  reservationSnapshot?(lane: ScopeRef, signed: SignedIntent): Promise<ReservationSnapshot | null>;
+  reservationSnapshot?(lane: ScopeRef, signed: SignedIntent): Promise<ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   /** The lane's entry at that position, with the hash that the lane serves for it. Null: the lane has none. */
   entry(lane: ScopeRef, seq: number): Promise<Sealed | null>;
   /** The definition that the lane pins. */
@@ -182,7 +182,9 @@ export class CheckerService {
       let reservation: ReservationSnapshot | null = previous?.reservation ?? null;
       if (listManifest && !reservation && scopes.reservationSnapshot) {
         const asked = await signJobRead(this.#o.signer, { lane: notice.lane, fact: notice.job }, this.#signing());
-        reservation = await scopes.reservationSnapshot(notice.lane, asked);
+        const answer = await scopes.reservationSnapshot(notice.lane, asked);
+        if (answer && "refused" in answer) return { did: "nothing", why: answer.refused };
+        reservation = answer;
       }
       if (listManifest && (!reservation || !await verifyReservationObjects(reservation))) return { did: "nothing", why: "no-manifest" };
       const origin = originOf(notice, { ...(reservation ? { reservation } : {}), entry, pinned, activated, manifest });

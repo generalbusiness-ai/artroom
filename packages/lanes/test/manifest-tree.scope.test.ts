@@ -146,6 +146,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const manifest = await L.item(version);
   expect([manifest.values["tree"], manifest.values["integration"], host.refs.get("refs/heads/main")]).toEqual([expect.stringMatching(/^[0-9a-f]{40}$/), expect.stringMatching(/^[0-9a-f]{40}$/), first]);
   expect(proposed.lines[1]).toMatch(/^Reserved: merge/);
+  const reservationRef = manifest.values["reservationRef"] as string;
+  expect([reservationRef, host.refs.get(reservationRef)]).toEqual([expect.stringMatching(/^refs\/artroom\/reservations\/[0-9a-f]{64}$/), manifest.values["integration"]]);
   const requested = ok(await run(founder, "act", "request-check", "--on", lane, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
   await pause([lane, repository.destination]);
@@ -154,8 +156,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   expect([badTree.code, badTree.lines[0], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("not-this-job"), first]);
   const checkerSecret = (await checker.store.secret((await checker.store.config())!.key))!;
   const checkerKey = keyIdOfSecret(checkerSecret);
-  const Gsnapshot = { reservationSnapshot: async (asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null> => {
+  const Gsnapshot = { reservationSnapshot: async (asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> => {
     const response = await routed(`${SERVICE}/v1/scopes/${G.name}/reservation-snapshot`, { method: "POST", headers: { "content-type": "application/json" }, body: canonicalize({ signed: asked }) });
+    if (response.status === 409) return await response.json() as { refused: "reservation-stage-missing" | "reservation-stage-mismatch" };
     if (response.status !== 200) return null;
     const value = await response.json() as Omit<import("@generalbusiness/artroom-contract").ReservationSnapshot, "objects"> & { objects: { id: string; type: "blob" | "tree" | "commit"; data: string }[] };
     return { ...value, objects: value.objects.map((object) => ({ ...object, data: unb64url(object.data)! })) };
@@ -187,8 +190,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   expect(await Gsnapshot.reservationSnapshot(readAsk)).toBeNull();
   slowFinalKey = false;
   net.clock.now = beforeSlow;
-  if (snapshot) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
-  if (snapshot) {
+  if (snapshot && !("refused" in snapshot)) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
+  if (snapshot && !("refused" in snapshot)) {
     expect(await verifyReservationObjects(snapshot)).toBe(true);
     const corrupt = { ...snapshot, objects: snapshot.objects.map((object, n) => n === 0 ? { ...object, data: Uint8Array.from([...object.data, 0]) } : object) };
     expect(await verifyReservationObjects(corrupt)).toBe(false);
@@ -197,6 +200,14 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const otherChecker = person();
   const otherInvitation = ok(await run(founder, "invite", "@other-checker", "--role", "checker")).lines[1]!.split(": ")[1]!;
   ok(await run(otherChecker, "join", otherInvitation));
+  const savedStage = host.refs.get(reservationRef)!;
+  host.refs.delete(reservationRef);
+  expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "reservation-stage-missing" });
+  expect(runs).toBe(0);
+  host.refs.set(reservationRef, first);
+  expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "reservation-stage-mismatch" });
+  expect(runs).toBe(0);
+  host.refs.set(reservationRef, savedStage);
   const wrongKey = (await otherChecker.store.secret((await otherChecker.store.config())!.key))!;
   const wrongAsk = await signJobRead({ key: keyIdOfSecret(wrongKey), sign: (bytes) => sign(wrongKey, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   expect(await Gsnapshot.reservationSnapshot(wrongAsk)).toBeNull();
@@ -204,12 +215,13 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   expect([delivered, runs, prepares]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "kept" }, 1, 0]);
   refuseSnapshot = true;
   const resumed = await new CheckerService(serviceOptions).deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string });
-  expect([resumed, runs, snapshots]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: false, lane: "admitted" }, 1, 1]);
+  expect([resumed, runs, snapshots]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: false, lane: "admitted" }, 1, 3]);
   expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "closed" });
   expect(runs).toBe(1);
   await pause([lane, repository.destination]);
   const published = host.refs.get("refs/heads/main")!;
   expect(published).not.toBe(first);
+  expect(host.refs.has(reservationRef)).toBe(false);
   const git = readerOf(host); const commit = await git.commit(published);
   expect(commit.tree).toBe(manifest.values["tree"]);
   expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "docs", "one.md"]);
@@ -231,6 +243,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const failMatch = /as change (sc_\S+), version (\d+)\./.exec(failing.lines[0]!)!;
   const failLane = new Platform(failMatch[1] as ScopeId), failVersion = Number(failMatch[2]);
   const failManifest = await failLane.item(failVersion);
+  const failRef = failManifest.values["reservationRef"] as string;
   const failRequested = ok(await run(founder, "act", "request-check", "--on", failLane.name, "--set", `manifest=${failVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   await pause([failLane.name, repository.destination]);
   const failJob = Number(/entry \S+:(\d+),/.exec(failRequested.lines[0]!)![1]);
@@ -239,6 +252,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   expect([(await G.item(0)).refs["slot"] ?? null, host.refs.get("refs/heads/main")]).toEqual([null, lastPublished]);
   const failMerge = (await failLane.summary()).value.items.find((item) => item.type === "merge");
   expect(failMerge).toBeUndefined();
+  expect(host.refs.has(failRef)).toBe(false);
   expect((await failLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-failed"))).toBe(true);
   // A pass whose delivery waits while its job is superseded counts for none.
   const replacing = ok(await run(founder, "propose", "replacement"));
@@ -295,10 +309,12 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const cancelled = ok(await run(founder, "propose", "cancel"));
   const cancelMatch = /as change (sc_\S+), version (\d+)\./.exec(cancelled.lines[0]!)!;
   const cancelLane = new Platform(cancelMatch[1] as ScopeId);
+  const cancelRef = (await cancelLane.summary()).value.items.find((item) => item.type === "manifest")!.values["reservationRef"] as string;
   const cancelMerge = (await cancelLane.summary()).value.items.find((item) => item.type === "merge")!;
   ok(await run(founder, "act", "cancel-merge", "--on", cancelLane.name, "--target", String(cancelMerge.id)));
   await pause([cancelLane.name, repository.destination]);
   expect([(await G.item(0)).refs["slot"] ?? null, host.refs.get("refs/heads/main")]).toEqual([null, lastPublished]);
+  expect(host.refs.has(cancelRef)).toBe(false);
   // No response at the recorded deadline ends both sides. The next reserve
   // reclaims the final slot before it opens another judge; no push was sent.
   const expired = ok(await run(founder, "propose", "expired"));
@@ -311,6 +327,12 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   expect((await expireLane.summary()).value.items.some((item) => item.type === "merge")).toBe(false);
   expect((await expireLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-timeout"))).toBe(true);
   expect(expireMerge.values["checkDeadline"]).toBe(net.clock.now);
+  const expiredPublication = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "cleanup-aborted" && item.values["reason"] === "required-check-timeout")!;
+  const expiredRef = (await expireLane.summary()).value.items.find((item) => item.type === "manifest")!.values["reservationRef"] as string;
+  expect(host.refs.has(expiredRef)).toBe(true);
+  ok(await run(founder, "act", "resend", "--on", "destination", "--target", String(expiredPublication.id)));
+  await pause([repository.destination]);
+  expect(host.refs.has(expiredRef)).toBe(false);
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   // A second reservation cannot be disclosed to a compromised checker key.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
