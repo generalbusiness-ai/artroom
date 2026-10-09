@@ -3,7 +3,7 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, remote, show, verify, type Context, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
@@ -22,6 +22,7 @@ export const USAGE = [
   "  artroom remote",
   "  artroom clone [<directory>] [--hours 1]",
   "  artroom edit <path> --file <local file> [--title <text>] [--closes <issue>]",
+  "  artroom propose <branch> [--title <text>]",
   "  artroom merge <change> [--closes <issue>]",
   "  artroom issue open --title <text> [--body <text>]",
   "  artroom issue comment <issue> <text>",
@@ -57,7 +58,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -88,6 +89,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
     case "remote": return first === undefined ? remote(ctx) : { code: 2, lines: ["remote takes no argument.", USAGE] };
     case "clone": return clone(ctx, first, { ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "edit": return first === undefined ? needs("a path in the repository") : edit(ctx, first, { ...(flag("file") !== undefined ? { file: flag("file")! } : {}), ...(flag("title") !== undefined ? { title: flag("title")! } : {}), ...(flag("closes") !== undefined ? { closes: flag("closes")! } : {}) });
+    case "propose": return first === undefined ? needs("a local branch") : propose(ctx, first, { ...(flag("title") !== undefined ? { title: flag("title")! } : {}) });
     case "merge": return first === undefined ? needs("a change") : merge(ctx, first, { ...(flag("closes") !== undefined ? { closes: flag("closes")! } : {}) });
     case "issues": return first === undefined ? issues(ctx) : { code: 2, lines: ["issues takes no argument.", USAGE] };
     default: return verify(ctx, first, { ...(flag("all") ? { all: true } : {}) });

@@ -13,7 +13,9 @@ import { change } from "./change.ts";
 import { issue } from "./issue.ts";
 
 export { issue, change };
+export { change3, changeDemo3 } from "./change3.ts";
 export { issueDemo, changeDemo } from "./demo.ts";
+export { MANIFEST_DIGESTS } from "./digests3.ts";
 export { DEMO_DIGESTS, DIGESTS, LANE_FORMS } from "./digests.ts";
 export type { LaneDefinition } from "./shared.ts";
 

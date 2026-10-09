@@ -26,11 +26,11 @@
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
-import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, type ReservationRead, type Statement } from "./reservation.ts";
+import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
-import { isExtents } from "./extents.ts";
-import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane } from "./destination-reading.ts";
-import { editCommit, foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { isExtents, classify } from "./extents.ts";
+import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane, sourcesOf, manifestFiles } from "./destination-reading.ts";
+import { editCommit, editPath, manifestCommit, foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 import { isOf, pinnedBy, pinnedOf } from "./versions.ts";
 
 /**
@@ -538,6 +538,43 @@ export const destination2: PlatformData = {
   },
 };
 
+/** Manifest-list publication with a reservation tree before required checks.
+ * Older destination data and rules remain pinned to their versions. */
+export const destination3: PlatformData = {
+  ...destination2,
+  items: { ...destination2.items,
+    publication: { ...destination2.items["publication"]!, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32 }, decisions: { withdraw: 1, checked: 32 } }, values: {
+      ...destination2.items["publication"]!.values,
+      tree: { fixed: false, required: false, of: { type: "tree" } },
+      checked: { fixed: false, required: true, default: false, of: { type: "bool" } },
+      requiredChecks: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
+      passes: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
+    } },
+  },
+  outcomes: { ...destination2.outcomes,
+    "check-judge": { code: "check-judge", row: "P19", attempts: 1, origin: "opening", most: { effects: 6, operations: ["push", "mint"] }, observes: [
+      { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "wait" },
+    ] },
+  },
+  receives: { ...destination2.receives,
+    reserve: { ...destination2.receives["reserve"]!, fields: {
+      ...destination2.receives["reserve"]!.fields,
+      sources: { type: "list", max: 64, required: false, of: { type: "record", of: {
+        path: { type: "text", max: 1024, required: true },
+        entry: { type: "fact", kind: ["propose-file"], under: "change", required: true },
+        digest: { type: "digest", required: true },
+      } } },
+    } },
+    checked: { message: "checked", class: "tell", from: FROM_LANE, opens: null,
+      also: { publication: { code: "checked-publication", row: "P15", item: "publication", index: "operation", key: "operation" } },
+      bound: { of: "also.publication", where: [{ equals: { a: { sender: true }, b: { slot: "lane", of: "also.publication" } } }] },
+      fields: { operation: { ...OPERATION, required: true }, result: { type: "fact", kind: ["check"], under: "change", required: true }, job: { type: "fact", kind: ["request-check"], under: "change", required: true } },
+      guards: [{ code: "checked-bound", row: "P18" }],
+      effects: [{ code: "open-check-judge", row: "P16" }], sends: [], attention: [],
+    },
+  },
+};
+
 // ---------------------------------------------------------------- reading the destination's state
 
 
@@ -636,8 +673,9 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const about = seq === from || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
-    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push));
+    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && input.kind === "check-judge"));
+    const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
+    if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
   return found;
 }
@@ -741,6 +779,7 @@ export function targetOf(state: Pick<StateView, "item" | "page">, own: Own, writ
   const { input, effects } = ownEntry(own, at);
   if (write.kind === DESTINATION_KINDS.receipt) return receiptAt(state, input.type === "act" ? input.signed.intent.fields["receipt"] : at);
   if (input.type === "act") return publicationAt(state, input.signed.intent.on);
+  if (write.owner === "platform:destination@3" && (input.type === "delivery" || input.type === "outcome")) return publicationAt(state, write.for);
   const change = effects.find((effect) => effect.effect === "state" && effect.state === "reserved");
   return change?.effect === "state" ? publicationAt(state, change.item) : null;
 }
@@ -881,7 +920,7 @@ export function revokedToken(state: Pick<StateView, "operation" | "item">, own: 
  * gives none, and the update then holds no member `rules` (I3 deltas,
  * entry FA8).
  */
-interface Update { publication: Item; state: string; outcome: "committed" | "unknown" | "published" | "refused" | "aborted"; commit?: string; reason?: string; rules?: number | null }
+interface Update { tree?: string; publication: Item; state: string; outcome: "committed" | "unknown" | "published" | "refused" | "aborted"; commit?: string; reason?: string; rules?: number | null }
 
 /** What the rule of an outcome yields: the effects, the operations that the entry opens, and the update, when the table says "the update". */
 interface Decided { effects: readonly RuleEffect[]; opens: readonly Opening[]; update: Update | null }
@@ -900,7 +939,7 @@ function updateRequest({ own, resolved }: RuleGiven, update: Update): RuleReques
   const [lane, operation] = [publication.refs["lane"], publication.refs["operation"]];
   if (!isScopeRef(lane) || !isFactRef(operation) || publication.opened === null) throw new Error("an update is of a publication that holds its lane and its operation");
   const rules = update.rules === undefined ? rulesObserved(own, publication.values["reservedAt"]) : update.rules;
-  const detail: Record<string, FieldValue> = { operation: operation as FactRef & FieldValue, outcome, ...(commit === undefined ? {} : { commit }), ...(reason === undefined ? {} : { reason }), ...(rules === null ? {} : { rules }) };
+  const detail: Record<string, FieldValue> = { operation: operation as FactRef & FieldValue, outcome, ...(commit === undefined ? {} : { commit }), ...(reason === undefined ? {} : { reason }), ...(rules === null ? {} : { rules }), ...(update.tree === undefined ? {} : { tree: update.tree }) };
   return { to: lane, message: { class: "request", type: "relate", body: { name: "publication", item: { at: resolved.at, seq: publication.id, hash: publication.opened }, state, detail } } };
 }
 
@@ -1190,6 +1229,21 @@ export interface LaneRead {
 /** The reader of a lane's entries for one reservation. Null: they are not at hand, or no reader is written. */
 export type Reads = (given: RuleGiven, publication: Item, statement: Statement) => LaneRead | null;
 
+const READ_LIST: Reads = (given, publication, statement) => {
+  const manifest = given.uses.find((use) => use.fact.hash === statement.manifest.hash)?.entry;
+  if (!manifest || !sourcesOf(manifest) || manifest.input.type !== "act") return null;
+  const base = manifest.input.signed.intent.fields["base"];
+  if (typeof base !== "string") return null;
+  return { sound: true, manifest: { base, integration: typeof publication.values["integration"] === "string" ? publication.values["integration"] : null,
+    tree: typeof publication.values["tree"] === "string" ? publication.values["tree"] : null, complete: true, authors: manifestAuthors(manifest) },
+    verdicts: statement.verdicts.map((verdict) => {
+      const review = given.uses.find((use) => use.fact.hash === verdict.review.hash)?.entry;
+      const fields = review?.input.type === "act" ? review.input.signed.intent.fields : null;
+      return { sound: !!fields && fields["manifest"] === statement.manifest.seq && fields["verdict"] === verdict.verdict,
+        key: review?.input.type === "act" ? review.input.signed.intent.actor : null };
+    }), checks: {} };
+};
+
 const READ_LANE: Reads = (given, _publication, statement) => {
   const seen = given.observed({ asked: "rules" })?.observation;
   return readLane(given, statement, seen && "subject" in seen && seen.subject === "rules" ? seen : null);
@@ -1317,12 +1371,12 @@ function reportCommits({ uses }: Pick<RuleGiven, "uses">, statement: Statement):
  * `evidence-invalid`. Undefined: the manifest's entry, or the entry of a
  * named report, is not at hand.
  */
-function reportsBound(given: Pick<RuleGiven, "uses">, statement: Statement): readonly string[] | null | undefined {
+function reportsBound(given: Pick<RuleGiven, "uses" | "own">, statement: Statement): readonly string[] | null | undefined {
   const manifest = given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry;
   const commits = reportCommits(given, statement);
   if (!manifest || commits === undefined) return undefined;
   // i5 edit: a one-file manifest selects no report.
-  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE ? [] : manifest.input.signed.intent.fields["selected"];
+  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (pinnedOf(given.own) === "platform:destination@3" && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
   if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
   const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
   return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
@@ -1342,7 +1396,7 @@ function reportsBound(given: Pick<RuleGiven, "uses">, statement: Statement): rea
  *   exception was used; the `push` operation with 3 attempts, its attempt
  *   1, and that attempt's `mint`; and the update `committed`.
  */
-const judgeDecides = (reads: Reads): Decides => (given) => {
+const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
   const { state, own, input, resolved, time } = given;
   const branch = branchOf(state);
   const publication = publicationAt(state, branch?.refs["judging"]);
@@ -1361,6 +1415,15 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
   const statement = statementOf(own, publication);
   // i5 edit: a one-file manifest, read from its entry in `uses`. Its path is judged before what the evidence lacks.
   const file = fileOf(given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry);
+  const listed = given.uses.find((used) => used.fact.hash === statement.manifest.hash)?.entry;
+  if (list && listed) {
+    const files = manifestFiles(listed, given.uses);
+    const refused = !files || files.some((file) => !fileSound(file)) ? "source-mismatch" : files.some((file) => editPath(file.path) === null) ? "path-invalid" : null;
+    if (refused) {
+      const next = andNext(given, state, { judging: true, ended: publication.id }, true);
+      return { effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: refused }, ...next.effects], opens: next.opens, update: { publication, state: "not-reserved", outcome: "refused", reason: refused } };
+    }
+  }
   const asked = { recorded: typeof head === "string" ? head : null, evidence, statement, time, file };
   // First from the evidence and this scope's own records. Only where that does not decide are `observed` and `uses` read.
   let [read, judged] = [null as ReservationRead | null, judgeReservation({ ...asked, read: null })];
@@ -1373,7 +1436,20 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
       const commit = editCommit(format, resolved.at.scope, time, evidence.tree!, read.manifest.base, read.manifest.file.path, statement.operation);
       read = { ...read, manifest: { ...read.manifest, tree: evidence.tree, integration: commit.id } };
     }
-    judged = judgeReservation({ ...asked, read });
+    if (list && read !== null) {
+      const manifestEntry = given.uses.find((use) => use.fact.hash === statement.manifest.hash)?.entry;
+      const sources = sourcesOf(manifestEntry);
+      const files = manifestEntry ? manifestFiles(manifestEntry, given.uses) : null;
+      if (!sources || !files || files.some((file) => !fileSound(file))) {
+        judged = { reserved: false, reason: "source-mismatch" };
+      } else {
+        const commit = manifestCommit(formatOf(evidence.tree)!, resolved.at.scope, time, evidence.tree!, read.manifest.base, statement.operation);
+        read = { ...read, manifest: { ...read.manifest, integration: commit.id, tree: evidence.tree } };
+        const withoutChecks = { ...read.rules!, content: { ...read.rules!.content, checks: [] } } as ReservationRead["rules"];
+        const policy = { ...read, rules: withoutChecks, extents: read.extents?.map((extent) => ({ ...extent, checks: [] })) ?? null };
+        judged = judgeReservation({ ...asked, read: policy });
+      }
+    } else judged = judgeReservation({ ...asked, read });
   }
   if (judged.reserved === null) throw new Error("what observed and uses say of this reservation is not at hand");
   const rules = read?.rules?.revision ?? null;
@@ -1385,14 +1461,22 @@ const judgeDecides = (reads: Reads): Decides => (given) => {
       update: { publication, state: "not-reserved", outcome: "refused", reason: judged.reason, rules },
     };
   }
+  const requiredChecks = list && read?.rules?.content.asked === "rules" ? [...new Set([
+    ...read.rules.content.checks.filter((check) => check.required).map((check) => check.name),
+    ...(read.extents && evidence.changes && !("over" in evidence.changes) ? (() => {
+      const touched = new Set(classify(read.extents!, evidence.changes.paths, evidence.changes.links, evidence.changes.unreadable).touched.map((row) => row.extent));
+      return read.extents!.filter((extent) => touched.has(extent.name)).flatMap((extent) => extent.checks);
+    })() : []),
+  ])] : [];
   return {
     effects: [
       { effect: "state", item: publication.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: publication.id }, { effect: "ref", item: branch.id, slot: "judging", to: null },
       { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
       ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
+      ...(list ? [{ effect: "value", item: publication.id, slot: "tree", value: evidence.tree! } as const, ...(requiredChecks.length ? [{ effect: "value", item: publication.id, slot: "requiredChecks", value: requiredChecks } as const] : [])] : []),
     ],
-    opens: [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
-    update: { publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
+    opens: list && requiredChecks.length > 0 ? [] : [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
+    update: { ...(list ? { tree: evidence.tree! } : {}), publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
   };
 };
 
@@ -1968,3 +2052,85 @@ export function destinationRulesWith(reads: Reads, version: 1 | 2 = 2): Rules {
 export const destinationRules: Rules = destinationRulesWith(READ_LANE, 1);
 /** The rules of `platform:destination@2`. */
 export const destinationRules2: Rules = destinationRulesWith(READ_LANE, 2);
+
+/** Rules for manifest-list destinations. Reservation records the exact tree;
+ * authentic results on its jobs open publication only when every check passed. */
+export const destinationRules3: Rules = (() => {
+  const listJudge = judgeDecides(READ_LIST, true);
+  const oldJudge = judgeDecides(READ_LANE);
+  const judge: Decides = (given, operation) => {
+    const publication = publicationAt(given.state, branchOf(given.state)?.refs["judging"]);
+    const statement = publication ? statementOf(given.own, publication) : null;
+    const manifest = statement ? given.uses.find((use) => use.fact.hash === statement.manifest.hash)?.entry : null;
+    return sourcesOf(manifest) ? listJudge(given, operation) : oldJudge(given, operation);
+  };
+  const rules: Rules = { ...destinationRulesWith(READ_LIST, 2), judge: judgeRule(judge),
+    "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }),
+    "checked-publication": { place: "also", bind: (items) => items[0]?.id ?? null },
+    "checked-bound": { place: "guard", refusals: ["not-the-reservation", "not-this-check"], run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication");
+      if (!publication || publication.state !== "reserved" || given.input.type !== "delivery" || !isScopeRef(publication.refs["lane"]) || canonicalize(given.input.from.at) !== canonicalize(publication.refs["lane"])) return { holds: false, name: "not-the-reservation" };
+      const result = given.uses.find((use) => use.fact.hash === (given.resolved.fields["result"] as FactRef).hash)?.entry;
+      const job = given.uses.find((use) => use.fact.hash === (given.resolved.fields["job"] as FactRef).hash)?.entry;
+      const fields = result?.input.type === "act" ? result.input.signed.intent.fields : null;
+      const opened = job?.input.type === "act" ? job.input.signed.intent.fields : null;
+      const manifest = publication.refs["manifest"] as FactRef;
+      const grant = result?.input.type === "act" ? result.input.authority.find((authority) => authority.actions.includes("change.check")) : null;
+      const reserved = typeof publication.values["reservedAt"] === "number" ? given.own(publication.values["reservedAt"])?.entry : null;
+      const observation = reserved?.input.type === "outcome" ? reserved.input.observed?.map((use) => use.observation).find((seen) => "subject" in seen && seen.subject === "rules") : null;
+      const configured = observation && "content" in observation && observation.content.asked === "rules" ? observation.content.checks.find((check) => check.name === opened?.["name"]) : null;
+      const authentic = !!fields && !!opened && !!configured && job!.at.scope === manifest.at.scope && job!.at.inc === manifest.at.inc && opened["manifest"] === manifest.seq
+        && fields["job"] === job!.seq && fields["tree"] === publication.values["tree"] && fields["configuration"] === configured.configuration
+        && opened["configuration"] === configured.configuration && fields["outcome"] === "passed" && grant?.subject.member === configured.checker
+        && result!.effects.some((effect) => effect.effect === "state" && effect.item === job!.seq && effect.state === "passed");
+      return authentic ? { holds: true } : { holds: false, name: "not-this-check" };
+    } },
+    "checked-result": { place: "effect", most: 6, run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication")!;
+      const job = given.uses.find((use) => use.fact.hash === (given.resolved.fields["job"] as FactRef).hash)!.entry;
+      const name = job.input.type === "act" ? job.input.signed.intent.fields["name"] as string : "";
+      const passes = [...new Set([...((publication.values["passes"] ?? []) as string[]), name])];
+      const required = (publication.values["requiredChecks"] ?? []) as string[];
+      const ready = publication.values["checked"] !== true && required.every((check) => passes.includes(check));
+      return [{ effect: "value", item: publication.id, slot: "passes", value: passes }, ...(ready ? [
+        { effect: "value", item: publication.id, slot: "checked", value: true } as const,
+        ...opened(given, 0, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id),
+        ...opened(given, 1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id),
+      ] : [])];
+    } },
+  };
+  const checked = rules["checked-result"]!;
+  return { ...rules,
+    "open-check-judge": { place: "effect", most: 2, run: (given) => opened(given, 0, "check-judge", 1, given.resolved.subjects.get("also.publication")!.id) },
+    "check-judge": { place: "outcome", rules: {
+      selects: false, read: false, most: { effects: 6, requests: 0, operations: 2 }, retries: () => false,
+      wellFormed: (result, evidence) => result === "confirmed" && isObject(evidence.body) && Object.keys(evidence.body).length === 0,
+      unknown: () => ({}),
+      subjects: (given, _operation) => {
+        const result = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "check")?.entry;
+        return result?.input.type === "act" ? [result.input.signed.intent.actor] : [];
+      },
+      derives: (given, operation) => {
+        const opening = given.own(Number(operation.id.split(":")[0]))!.entry;
+        const held = opening.effects.find((effect) => effect.effect === "operation" && effect.kind === "check-judge");
+        const publication = held?.effect === "operation" && typeof held.for === "number" ? given.state.item(held.for) : null;
+        if (!publication || publication.state !== "reserved") return { effects: [], sends: [], opens: [] };
+        const message = opening.input.type === "delivery" && opening.input.message.class === "request" && opening.input.message.type === "tell" ? opening.input.message.body as { fields: Record<string, FieldValue> } : null;
+        if (!message) throw new Error("a check judge has its checked delivery");
+        const resultFact = isFactRef(message.fields["result"]) ? message.fields["result"] : opening.input.type === "delivery" ? opening.input.from : null;
+        const fields = { ...message.fields, result: resultFact } as Record<string, FieldValue>;
+        const result = given.uses.find((use) => use.fact.hash === resultFact?.hash)?.entry;
+        const key = result?.input.type === "act" ? result.input.signed.intent.actor : null;
+        const observation = key ? given.observed({ key })?.observation : null;
+        if (!observation || "subject" in observation || observation.keyState === "compromised") return { effects: [], sends: [], opens: [] };
+        const forwarded = { ...given, resolved: { ...given.resolved, fields, subjects: new Map([["also.publication", publication]]) } };
+        if (checked.place !== "effect") throw new Error("checked result has its effect rule");
+        const effects = checked.run(forwarded);
+        const begins = effects.filter((effect) => effect.effect === "operation");
+        return { effects: effects.filter((effect) => effect.effect !== "operation" && effect.effect !== "attempt"), sends: [],
+          opens: begins.flatMap((effect) => effect.effect === "operation" ? [{ owner: effect.owner, kind: effect.kind, attempts: effect.attempts, for: publication.id }] : []) };
+
+      },
+    } },
+  };
+})();

@@ -11,11 +11,11 @@
  */
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
-import { DESTINATION, destination, destination2, destinationMembership, destinationRules, destinationRules2, destinationRulesScope } from "./destination.ts";
+import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membershipRules, standingOf } from "./membership.ts";
-import { DIRECTORY, REGISTER, register, registerRules } from "./register.ts";
-import { directory, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
+import { register, registerRules } from "./register.ts";
+import { directory, directory2, directory3, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
 import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScopeRules } from "./rules-scope.ts";
@@ -27,8 +27,8 @@ export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, d
 export { DEFINITION_DOMAIN, DIRECTORY, IMPORT_ATTEMPTS, SEEN, SIBLINGS_OF, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_ATTEMPTS, DESTINATION_KINDS, READ_TOKEN_HOURS, destinationMembership, destinationRulesScope, destinationReceipt, firstHeadCommit, foundingOf, revokedToken } from "./destination.ts";
 export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
-export { EDIT_PATH_BYTES, editCommit, editObjects, editPath } from "./destination-objects.ts";
-export { PROPOSE_FILE, fileOf } from "./destination-reading.ts";
+export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree, manifestCommit } from "./destination-objects.ts";
+export { PROPOSE_FILE, fileOf, sourcesOf, manifestFiles } from "./destination-reading.ts";
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
@@ -112,19 +112,22 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   "platform:inbox@1": { data: inbox, rules: inboxRules },
   "platform:register@1": { data: register, rules: registerRules },
   "platform:register@2": { data: register, rules: registerRules },
+  "platform:register@3": { data: register, rules: registerRules },
   "platform:directory@1": { data: directory, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
   "platform:directory@2": { data: directory2, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
+  "platform:directory@3": { data: directory3, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
   "platform:membership@1": { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, MEMBERSHIP_1) },
   "platform:membership@2": { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, MEMBERSHIP) },
   "platform:rules@1": { data: rulesScope, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE_1), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:rules@2": { data: rulesScope2, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:destination@1": { data: destination, rules: destinationRules, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
+  "platform:destination@3": { data: destination3, rules: destinationRules3, membership: destinationMembership, rulesScope: destinationRulesScope },
 };
 
 /** The newest version of each platform definition, by name without the version: the one under which a new scope is founded. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {
-  "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": REGISTER, "platform:directory": DIRECTORY, "platform:rules": RULES_SCOPE, "platform:destination": DESTINATION,
+  "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": "platform:register@3", "platform:directory": "platform:directory@3", "platform:rules": RULES_SCOPE, "platform:destination": "platform:destination@3",
 };
 
 /** The data of the newest version of each platform definition, by name without the version. */

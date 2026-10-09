@@ -10,7 +10,7 @@
 import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editPath, fileOf, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
@@ -73,7 +73,7 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && (Object.values(DESTINATION_KINDS) as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge"] as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
     accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
@@ -129,6 +129,7 @@ export class DestinationHost implements Outside {
       const context = this.#bound(request);
       if (!context) return null;
       const { operation, repository, ref } = context;
+      if (operation.kind === "check-judge") return answer("confirmed", {});
       if (operation.kind === DESTINATION_KINDS.mintRead) {
         const hours = this.#hours(operation);
         if (hours === null) return null;
@@ -162,6 +163,8 @@ export class DestinationHost implements Outside {
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
       if (operation.kind === DESTINATION_KINDS.judge) {
+        const list = this.#list(this.#judging());
+        if (list) return await this.#inspectList(repository, ref, list);
         const edit = this.#edit(this.#judging());
         if (edit) return await this.#inspectEdit(repository, ref, edit);
         const inspection = this.#inspection(repository, ref);
@@ -317,7 +320,16 @@ export class DestinationHost implements Outside {
       const tree = evidence?.tree;
       if (!objectId(tree)) return null;
       expectedTree = tree;
+      const list = target ? this.#list(target) : null;
       const edit = target ? this.#edit(target) : null;
+      if (list) {
+        const time = typeof reservedAt === "number" ? own(reservedAt)?.entry.time : undefined;
+        if (time === undefined || list.base !== head) return null;
+        const base = await this.#options.provider.objects(repository, list.base);
+        const built = this.#buildList(format, base, list, time);
+        if (!built || built.commit !== commit || built.tree !== tree) return null;
+        objects = [...new Map([...base, ...built.objects].map((object) => [object.id, object])).values()];
+      } else
       if (edit) {
         // A one-file manifest: the objects that the reservation's tree and commit name, built again on the base's closure.
         const time = typeof reservedAt === "number" ? own(reservedAt)?.entry.time : undefined;
@@ -405,6 +417,37 @@ export class DestinationHost implements Outside {
     const branch = destinationBranch(this.#given.state)?.values["head"];
     const reply = await inspectGit(new Reader(source, READ_BOUNDS), { repository, ref, recorded: objectId(branch) ? branch : null, base: edit.base, integration: built.commit, tree: built.tree, reports: [] });
     return isRecordedJudgeEvidence(reply.evidence) ? { ...answer("confirmed", reply.evidence), ...(reply.retain === undefined ? {} : { retain: reply.retain }) } : null;
+  }
+  #list(publication: Item | null): { files: readonly EditFile[]; base: string; operation: FactRef } | null {
+    const reserve = publication ? this.#given.own(publication.id)?.entry : null;
+    if (!publication || !reserve) return null;
+    const statement = destinationStatement(this.#given.own, publication);
+    const manifest = this.#fact(reserve, statement.manifest);
+    if (!manifest || !sourcesOf(manifest) || manifest.input.type !== "act") return null;
+    const uses = reserve.uses.flatMap((use) => { const entry = this.#fact(reserve, use.fact); return entry ? [{ fact: use.fact, entry }] : []; });
+    const files = manifestFiles(manifest, uses);
+    const base = manifest.input.signed.intent.fields["base"];
+    return objectId(base) ? { files: files ?? [], base, operation: statement.operation } : null;
+  }
+  #buildList(format: ObjectFormat, base: readonly DestinationObject[], list: { files: readonly EditFile[]; base: string; operation: FactRef }, time: Entry["time"]) {
+    const scope = this.#given.scope();
+    if (!scope || list.files.some((file) => !fileSound(file))) return null;
+    const objects = new Map(base.map((object) => [object.id, object]));
+    const tree = editTree(format, (id) => objects.get(id) ?? null, list.base, list.files.map((file) => ({ path: file.path, bytes: utf8(file.content) })));
+    if (!tree) return null;
+    const commit = manifestCommit(format, scope.at.scope, time, tree.tree, list.base, list.operation);
+    return { tree: tree.tree, commit: commit.id, objects: [...tree.objects, commit] };
+  }
+  async #inspectList(repository: DestinationRepository, ref: string, list: { files: readonly EditFile[]; base: string; operation: FactRef }): Promise<EffectAnswer | null> {
+    const head = await this.#options.provider.ref(repository, ref);
+    const base = await this.#options.provider.objects(repository, list.base);
+    const built = this.#buildList(await this.#options.provider.format(repository), base, list, this.#given.clock.read());
+    if (!built) return answer("confirmed", { head, present: false, tree: null, firstParent: null, ancestors: [], changes: null });
+    const objects = new Map([...base, ...built.objects].map((object) => [object.id, object]));
+    const source: GitSource = { object: async (id) => { const object = objects.get(id); return object ? { type: object.kind, size: object.body.length, data: object.body } : null; },
+      ref: async () => head, refs: async () => [] };
+    const reply = await inspectGit(new Reader(source, READ_BOUNDS), { repository, ref, recorded: head, base: list.base, integration: built.commit, tree: built.tree, reports: [] });
+    return { ...answer("confirmed", reply.evidence), ...(reply.retain ? { retain: reply.retain } : {}) };
   }
   #inspection(repository: DestinationRepository, ref: string): DestinationInspection | null {
     const branch = destinationBranch(this.#given.state);

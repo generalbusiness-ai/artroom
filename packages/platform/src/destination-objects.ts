@@ -94,6 +94,14 @@ export function editCommit(format: ObjectFormat, scope: ScopeId, time: Timestamp
   return object(format, "commit", utf8(`tree ${tree}\nparent ${parent}\nauthor ${identity}\ncommitter ${identity}\n\nWrite ${path}.\n\noperation ${text}\n`));
 }
 
+/** A room publication of one frozen manifest tree. */
+export function manifestCommit(format: ObjectFormat, scope: ScopeId, time: Timestamp, tree: string, parent: string, operation: FactRef): DestinationObject {
+  const [millis, text] = [timeMs(time), factText(operation)];
+  if (millis === null || text === null) throw new Error("a manifest commit needs its recorded time and operation");
+  const identity = `artroom <${scope}@artroom.invalid> ${Math.floor(millis / 1000)} +0000`;
+  return object(format, "commit", utf8(`tree ${tree}\nparent ${parent}\nauthor ${identity}\ncommitter ${identity}\n\nPublish manifest.\n\noperation ${text}\n`));
+}
+
 const TREE_MODE = "40000";
 const FILE_MODES: readonly string[] = ["100644", "100755"];
 interface TreeRow { mode: string; name: Uint8Array; id: string }

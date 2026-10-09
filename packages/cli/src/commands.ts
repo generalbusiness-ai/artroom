@@ -34,8 +34,10 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, REGISTER, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
+const NEW_REGISTER = NEWEST["platform:register"]!;
+
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
 import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
 import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
@@ -72,7 +74,10 @@ export interface Context {
  * One run of `git`: its arguments, and the environment it adds. The answer is its exit code, or null when there is no `git` to
  * run. `env` is how a secret reaches git: as configuration that git reads from its environment, never as an argument.
  */
-export interface Git { run(args: readonly string[], env: Readonly<Record<string, string>>): Promise<number | null> }
+export interface Git {
+  run(args: readonly string[], env: Readonly<Record<string, string>>): Promise<number | null>;
+  files?(base: string, branch: string): Promise<{ ok: true; tip: string; files: readonly { path: string; bytes: Uint8Array }[] } | { ok: false; reason: string }>;
+}
 
 /** What a command ends with: its exit code, and the lines it prints. 0: done. 1: refused, unavailable or not found. 2: not a command this can run. */
 export interface Outcome { code: 0 | 1 | 2; lines: string[] }
@@ -180,7 +185,7 @@ export interface ActShape {
   step: "open" | "transition" | "comment";
   on: string | null;
   grant: string | { code: string; grant?: string };
-  also: Record<string, { item: string; one?: true; by?: string; code?: string }>;
+  also: Record<string, { item: string; one?: true; by?: string; code?: string; via?: { slot: string; of: string } }>
   fields: Record<string, { type?: string; code?: string; required?: boolean }>;
 }
 export interface DefinitionShape { name: string; genesis: string; acts: Record<string, ActShape> }
@@ -223,10 +228,22 @@ export function expectedOf(act: ActShape, items: readonly Item[], target: number
     const at = revision(target);
     if (at !== undefined) expected["on"] = at;
   }
+  const bound = new Map<string, Item | null>();
+  const subject = (name: string): Item | null => {
+    if (bound.has(name)) return bound.get(name)!;
+    if (name === "on") return items.find((item) => item.id === target) ?? null;
+    const rule = act.also[name.replace(/^also\./, "")];
+    if (!rule || rule.code !== undefined) return null;
+    bound.set(name, null);
+    const via = rule.via ? subject(rule.via.of)?.refs[rule.via.slot] : undefined;
+    const id = typeof via === "number" ? via : via && typeof via === "object" && "seq" in via ? (via as FactRef).seq : undefined;
+    const item = rule.one ? items.find((item) => item.type === rule.item) : rule.by !== undefined && typeof fields[rule.by] === "number" ? items.find((item) => item.id === fields[rule.by!]) : items.find((item) => item.id === id);
+    bound.set(name, item ?? null); return item ?? null;
+  };
   for (const [name, rule] of Object.entries(act.also)) {
     if (rule.code !== undefined) continue;
-    const at = rule.one ? items.find((item) => item.type === rule.item)?.revision : rule.by !== undefined && typeof fields[rule.by] === "number" ? revision(fields[rule.by] as number) : undefined;
-    if (at !== undefined) expected[name] = at;
+    const item = subject(name);
+    if (item) expected[name] = item.revision;
   }
   return expected;
 }
@@ -316,10 +333,10 @@ export function install(ctx: Context, service: string, options: { host?: string;
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed, key } = await installing(ctx, options, signing(ctx));
-    const { answer } = await found(transportOf(ctx, service), signed, REGISTER);
+    const { answer } = await found(transportOf(ctx, service), signed, NEW_REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
     await ctx.store.save({ v: 1, service, key: "operator", register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one founder key.`);
+    return done(`Installed: register ${receipt.fact.at.scope}, under ${NEW_REGISTER}.`, `The operator key ${key} is kept in the config directory, readable only by you. It is the one founder key.`);
   });
 }
 
@@ -359,11 +376,11 @@ export function planInstall(ctx: Context, service: string, options: { host?: str
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
-    const register = registerIdOf(signed, REGISTER);
-    await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: REGISTER, founding: signed, register } });
+    const register = registerIdOf(signed, NEW_REGISTER);
+    await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: NEW_REGISTER, founding: signed, register } });
     const { host, namespace } = signed.intent.fields as { host: string; namespace: string };
     return done(
-      `Planned: register ${register}, under ${REGISTER}, on host ${host}, namespace ${namespace}. The seed's time is ${signed.intent.notAfter}.`,
+      `Planned: register ${register}, under ${NEW_REGISTER}, on host ${host}, namespace ${namespace}. The seed's time is ${signed.intent.notAfter}.`,
       `Set registerScope to ${register} in the Worker's host setting, then run artroom install --planned before ${signed.intent.notAfter}.`,
     );
   });
@@ -1283,9 +1300,14 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     // The issue that the change closes is found before anything is signed.
     const closes = options.closes === undefined ? null : await issueNamed(ctx, config, reader, options.closes);
     const change = await activeDefinition(ctx, config, reader, "change");
-    if (!supportsEdit(change.declared, path, content, bytes)) return failed(`Unsupported edit: the active change definition ${change.digest} does not support this command's ask-rules, one-file manifest and merge inputs and effects. No change was opened.`);
+    if (change.declared.acts["propose-file"]?.on !== "source" && !supportsEdit(change.declared, path, content, bytes)) return failed(`Unsupported edit: the active change definition ${change.digest} does not support this command's ask-rules, one-file manifest and merge inputs and effects. No change was opened.`);
     const destination = await destinationOf(ctx, config);
-    if (destination.summary.definition !== "platform:destination@2") return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
+    if (destination.summary.definition === "platform:destination@3" && change.declared.acts["propose-file"]?.on === "source") {
+      const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
+      if (typeof base !== "string") return failed("Cannot edit: no-published-head.");
+      return proposingFiles(ctx, config, base, [{ path, bytes }], options.title ?? `Edit ${path}`, { edit: true, ...(closes ? { closes } : {}) });
+    }
+    if (! ["platform:destination@2", "platform:destination@3"].includes(destination.summary.definition)) return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
 
     // The change lane, opened by the directory.
     const D = await handleOf(ctx, config, repository.directory.scope, reader);
@@ -1306,7 +1328,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     // The one version: the file on the published head. Lane/rules awaits
     // may advance it; the earlier protocol check is not a frozen head.
     const currentDestination = await destinationOf(ctx, config);
-    if (currentDestination.summary.definition !== "platform:destination@2") return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
+    if (! ["platform:destination@2", "platform:destination@3"].includes(currentDestination.summary.definition)) return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
     const head = currentDestination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof head !== "string") return failed(`The destination ${repository.destination} has no published head yet.`);
     const file = { base: head, path, digest: digestBytes(bytes), size: bytes.length, content };
@@ -1333,6 +1355,67 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
     return { ...outcome, lines: [...lines, ...outcome.lines] };
   });
+}
+
+/** Propose the supported changed UTF-8 files of a local branch. */
+export function propose(ctx: Context, branch: string, options: { title?: string } = {}): Promise<Outcome> {
+  return run(async () => {
+    if (!ctx.git?.files) return failed("Cannot propose: git-unavailable.");
+    const config = await configOf(ctx);
+    const destination = await destinationOf(ctx, config);
+    if (destination.summary.definition !== "platform:destination@3") return failed("Cannot propose: version-mismatch. This room has no manifest-list destination.");
+    const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
+    if (typeof base !== "string") return failed("Cannot propose: no-published-head.");
+    const captured = await ctx.git.files(base, branch);
+    if (!captured.ok) return failed(`Cannot propose: ${captured.reason}.`);
+    return proposingFiles(ctx, config, base, captured.files, options.title ?? `Propose ${branch}`);
+  });
+}
+
+async function proposingFiles(ctx: Context, config: Config, base: string, files: readonly { path: string; bytes: Uint8Array }[], title: string, options: { edit?: boolean; closes?: Issue } = {}): Promise<Outcome> {
+  const repository = config.repository!;
+  const reader = await readerOf(ctx, config);
+  const change = await activeDefinition(ctx, config, reader, "change");
+  if (change.declared.acts["propose-file"]?.on !== "source" || change.declared.acts["propose-manifest"]?.fields["files"]?.type !== "list") return failed("Cannot propose: version-mismatch. Activate the manifest-list change definition for this room.");
+  if (files.length === 0 || files.length > 64) return failed(`Cannot propose: ${files.length === 0 ? "no-changed-paths" : "too-many-paths"}.`);
+  const contents = files.map((file) => ({ ...file, content: textOf(file.bytes, file.path) }));
+  for (const file of contents) {
+    if (file.bytes.length > EDIT_BYTES) return failed("Cannot propose: file-too-large.");
+    shapeDeclaredAct(change.declared, "propose-file", { on: null, fields: { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content } });
+  }
+  const signer = secretSigner(await signerOf(ctx, config));
+  const D = await handleOf(ctx, config, repository.directory.scope, reader);
+  const shape = (await definitionOf(D, await summaryOf(D))).shape;
+  const fields = { definition: change.digest, title, draft: false };
+  const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
+  const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;
+  const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed("The directory opened no change lane."));
+  const L = await handleOf(ctx, config, lane, reader);
+  await waitFor(ctx, () => [D.scope, lane], () => laneActive(L, `${D.scope}:${opened}`), `the change ${lane}`);
+  const C = await laneOf(ctx, config, lane, reader, change.declared);
+  const ask = await C.intent(signer, "ask-rules" as never, { on: 0, fields: {}, expected: expectedOf(change.declared.acts["ask-rules"] as unknown as ActShape, (await summaryOf(L)).items, 0, {}) } as never, signing(ctx));
+  accepted(await C.submit(ask.signed, [], ask.beside), lane, "Asked");
+  await waitFor(ctx, () => [lane, repository.rules], async () => (await summaryOf(L)).items.some((item) => item.type === "rules" && typeof item.values["revision"] === "number") ? true : null, `the rules of ${lane}`);
+  const sources: { path: string; entry: FactRef; digest: Digest }[] = [];
+  for (const file of contents) {
+    const fields = { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content };
+    const made = await C.intent(signer, "propose-file" as never, { on: null, fields, expected: expectedOf(change.declared.acts["propose-file"] as unknown as ActShape, (await summaryOf(L)).items, null, fields) } as never, signing(ctx));
+    const answer = await C.submit(made.signed, [], made.beside);
+    if (answer.answer !== "accepted") return answered(lane, answer, "Proposed");
+    sources.push({ path: file.path, entry: answer.receipt.fact, digest: fields.digest });
+  }
+  const manifest = { base, files: sources };
+  const made = await C.intent(signer, "propose-manifest" as never, { on: null, fields: manifest, expected: expectedOf(change.declared.acts["propose-manifest"] as unknown as ActShape, (await summaryOf(L)).items, null, manifest) } as never, signing(ctx));
+  const answer = await C.submit(made.signed, [], made.beside);
+  if (answer.answer !== "accepted") return answered(lane, answer, "Proposed");
+  if (options.closes) {
+    const linked = await linking(ctx, config, lane, reader, change.declared, options.closes);
+    if (linked.code !== 0) return linked;
+  }
+  const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
+  const proposal = options.edit ? `Proposed ${files[0]!.path} (${files[0]!.bytes.length} bytes) as change ${lane}, version ${answer.receipt.fact.seq}.` : `Proposed ${files.length} files as change ${lane}, version ${answer.receipt.fact.seq}.`;
+  const page = options.edit && outcome.code === 0 && outcome.lines[0]?.startsWith("Published:") ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${files[0]!.path.split("/").map(encodeURIComponent).join("/")}`] : [];
+  return { ...outcome, lines: [proposal, ...outcome.lines, ...page] };
 }
 
 /**
@@ -1389,6 +1472,11 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
       next++;
       const state = stateOf(read.value.entry.effects, seq);
       if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
+      if (state === "committed" && declared.acts["propose-file"]?.on === "source") {
+        const rules = (await summaryOf(L)).items.find((item) => item.type === "rules");
+        const checks = rules?.values["checks"] as { required: boolean }[] | undefined;
+        if (checks?.some((check) => check.required)) return { state, effects: read.value.entry.effects };
+      }
       // An unrelated entry still consumes this pass. Retain next and yield
       // to the existing tries/pause policy instead of an unbounded scan.
       return null;
@@ -1404,6 +1492,10 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
     return unknown("observation-error");
   }
   const reason = valueOf_(ended.effects, seq, "reason");
+  if (ended.state === "committed") {
+    const current = (await summaryOf(L)).items.find((item) => item.id === version.id);
+    return done(`Reserved: merge ${lane}:${seq}, tree ${String(current?.values["tree"])}. Required checks must pass before publication.`);
+  }
   if (ended.state !== "published") return failed(`Not published: the merge ${lane}:${seq} is ${ended.state}${typeof reason === "string" ? `, ${reason}` : ""}. The change ${lane} stays open at version ${version.id}. ${again}`);
   const commit = valueOf_(ended.effects, seq, "commit");
   const path = version.values["path"];
