@@ -30,7 +30,7 @@
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
 import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, ShapeError, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
@@ -1393,9 +1393,23 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
   if (change.declared.acts["propose-file"]?.on !== "source" || change.declared.acts["propose-manifest"]?.fields["files"]?.type !== "list") return failed("Cannot propose: version-mismatch. Activate the manifest-list change definition for this room.");
   if (files.length === 0 || files.length > 64) return failed(`Cannot propose: ${files.length === 0 ? "no-changed-paths" : "too-many-paths"}.`);
   const contents = files.map((file) => ({ ...file, content: textOf(file.bytes, file.path) }));
-  for (const file of contents) {
-    if (file.bytes.length > EDIT_BYTES) return failed("Cannot propose: file-too-large.");
-    shapeDeclaredAct(change.declared, "propose-file", { on: null, fields: { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content } });
+  if (contents.some(file => file.bytes.length > EDIT_BYTES)) return failed("Cannot propose: file-too-large.");
+  // Check this command's complete local input contract before creating work.
+  // This reference is ONLY a syntax operand for future source fields. It is
+  // never signed/submitted or treated as an admitted fact/authority proof.
+  const syntaxOnlyRef = { at: repository.directory, seq: 0, hash: change.digest };
+  try {
+    const acts = change.declared.acts;
+    if (acts["ask-rules"]?.step !== "transition" || acts["ask-rules"].on !== "proposal"
+      || acts["propose-file"]?.step !== "open" || acts["propose-manifest"]?.step !== "open" || acts["propose-manifest"].on !== "manifest"
+      || acts["merge"]?.step !== "open" || acts["merge"].on !== "merge") throw new ShapeError("workflow", "has incompatible act steps/items");
+    shapeDeclaredAct(change.declared, "ask-rules", { on: 0, fields: {} });
+    for (const file of contents) shapeDeclaredAct(change.declared, "propose-file", { on: null, fields: { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content } });
+    shapeDeclaredAct(change.declared, "propose-manifest", { on: null, fields: { base, files: contents.map(file => ({ path: file.path, entry: syntaxOnlyRef, digest: digestBytes(file.bytes) })) } });
+    shapeDeclaredAct(change.declared, "merge", { on: null, fields: { manifest: 0, reports: [] } });
+    if (options.closes) shapeDeclaredAct(change.declared, "link-own", { on: null, fields: { issue: options.closes.ref, how: "keyword" } });
+  } catch {
+    return failed("Cannot propose: unsupported-workflow. This command's required act inputs do not fit the active definition; no change was opened.");
   }
   const signer = secretSigner(await signerOf(ctx, config));
   const D = await handleOf(ctx, config, repository.directory.scope, reader);
@@ -1469,8 +1483,9 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
   } catch (error) {
     if (error instanceof Stop) return partial(error.outcome);
     if (error instanceof TransportError) return partial(failed("The current request or read could not be confirmed; known earlier work remains recorded."));
-    if (error instanceof SourceError) return partial(failed(error.message));
-    throw error;
+    if (error instanceof ShapeError) return partial(failed("The local workflow input could not be shaped; known earlier work remains recorded."));
+    if (error instanceof SourceError) return partial(failed(`The recorded source could not be read${typeof error.reason === "string" && Object.hasOwn(READ_REFUSALS, error.reason) ? `: ${error.reason}` : ""}; known earlier work remains recorded.`));
+    return partial(failed("The workflow could not continue locally; known earlier work remains recorded."));
   }
 }
 
@@ -1520,7 +1535,7 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
     `Accepted merge: ${lane}:${seq}, version ${version.id}, fact ${canonicalize(answer.receipt.fact)}.`,
     `Observation unknown: ${reason}. Inspect artroom show ${lane}:${seq} and artroom log ${lane} before requesting another merge; do not resubmit this merge to recover observation.`,
   );
-  let ended: { state: string; effects: Effects };
+  let ended: { state: string; effects: Effects; reservationTree?: string };
   try {
     const observed = await waitFor(ctx, () => [lane, repository.destination], async () => {
       const read = await L.entry(next);
@@ -1529,9 +1544,13 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
       const state = stateOf(read.value.entry.effects, seq);
       if (state === "published" || state === "refused" || state === "aborted") return { state, effects: read.value.entry.effects };
       if (state === "committed" && declared.acts["propose-file"]?.on === "source") {
-        const rules = (await summaryOf(L)).items.find((item) => item.type === "rules");
+        const current = await summaryOf(L);
+        const rules = current.items.find((item) => item.type === "rules");
         const checks = rules?.values["checks"] as { required: boolean }[] | undefined;
-        if (checks?.some((check) => check.required)) return { state, effects: read.value.entry.effects };
+        if (checks?.some((check) => check.required)) {
+          const tree = current.items.find(item => item.id === version.id)?.values["tree"];
+          return typeof tree === "string" ? { state, effects: read.value.entry.effects, reservationTree: tree } : { unknown: "reservation-data-unavailable" };
+        }
       }
       // An unrelated entry still consumes this pass. Retain next and yield
       // to the existing tries/pause policy instead of an unbounded scan.
@@ -1549,8 +1568,7 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   }
   const reason = valueOf_(ended.effects, seq, "reason");
   if (ended.state === "committed") {
-    const current = (await summaryOf(L)).items.find((item) => item.id === version.id);
-    return done(`Reserved: merge ${lane}:${seq}, tree ${String(current?.values["tree"])}. Required checks must pass before publication.`);
+    return done(`Reserved: merge ${lane}:${seq}, tree ${ended.reservationTree}. Required checks must pass before publication.`);
   }
   if (ended.state !== "published") return failed(`Not published: the merge ${lane}:${seq} is ${ended.state}${typeof reason === "string" ? `, ${reason}` : ""}. The change ${lane} stays open at version ${version.id}. ${again}`);
   const commit = valueOf_(ended.effects, seq, "commit");

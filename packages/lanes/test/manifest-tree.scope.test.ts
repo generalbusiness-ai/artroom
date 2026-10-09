@@ -1,12 +1,12 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test } from "vitest";
-import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type FactRef, type ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
-import { valueDigest } from "@generalbusiness/artroom-derive";
+import { validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
@@ -126,7 +126,13 @@ test("eligible resend opens recovery and late receipt-token outcomes settle the 
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, undefined, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read", receiptRecoveryOnly = false): Promise<void> {
+test("a valid custom required rules input is activated natively but stops the fixed CLI before opening any change (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, "custom-required"); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
@@ -279,6 +285,24 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   if (proposalFault) {
     files["docs/two.md"] = utf8("# Second source\n");
     ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    if (proposalFault === "custom-required") {
+      // Generic activation legitimately accepts this complete custom schema.
+      // The fixed CLI cannot provide its new input, so it must stop BEFORE
+      // opening a lane; no deletion of a referenced row makes the fixture bad.
+      const custom = structuredClone(changeDemo3);
+      custom.acts["ask-rules"]!.fields["requiredNote"] = { type: "text", max: 32, required: true };
+      expect(validateDefinition(custom, PROPOSED_BOUNDS).ok).toBe(true);
+      files["custom.json"] = utf8(canonicalize(custom));
+      ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(custom)}`, "--set", "name=change", "--value", "custom.json"));
+      const D = new Platform(repository.directory.scope), before = (await D.summary()).at;
+      let posts = 0;
+      const watched = (async (url: string, init?: RequestInit) => { if (init?.method === "POST" && new URL(url).pathname.endsWith("/acts")) posts++; return routed(url, init); }) as unknown as Fetch;
+      founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
+      const result = await command({ ...founder, fetch: watched }, ["propose", "custom-input"]);
+      expect([result.code, result.lines[0], posts, (await D.summary()).at]).toEqual([1, expect.stringContaining("unsupported-workflow"), 0, before]);
+      expect(host.refs.get("refs/heads/main")).toBe(first);
+      return;
+    }
     ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
     const accepted: { kind: string; path?: string; fact: FactRef }[] = [];
     let sourceRequests = 0;
