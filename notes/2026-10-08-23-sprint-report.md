@@ -5,8 +5,9 @@ Each one ends with a report on main that tells a user's story about
 capability that is on main and works, and says what did not land. This
 report covers 15:00 to 23:00 on 2026-10-08 Eastern. The previous report
 landed as `9341c76a` at 14:37 and was updated as `16d7ba44` at 15:40
-when the expanded candidate landed. Main at the boundary is `6afa0377`
-unless updated below.
+when the expanded candidate landed. Main at the boundary is `31584fd9`: the v2 design
+documents landed at 22:05 and the offline and sync design at 22:19,
+after this report was first written.
 
 Everything marked "observed run" was run on the shared machine, Node
 v26.10.0, against the deployment at the account's standard hostname,
@@ -17,9 +18,12 @@ wall clock. Workroom states are the planner's account, not in git.
 
 ## Summary
 
-Five landings on main and one in the jam repository, measured from the
+Six landings on main and one in the jam repository, measured from the
 15:00 report's update `16d7ba44` to `6afa0377` (git diff stat): 30
-files, 5,990 insertions, 167 deletions, in 12 commits.
+files, 5,990 insertions, 167 deletions, in 12 commits; then the v2
+design documents at `4ab8f849` and the offline and sync design note at
+`31584fd9` (`notes/2026-10-09-offline-and-sync-design.md`, the R5 model
+for after the 14th, reviewed as a design).
 
 - **The expanded candidate** itself, `7bb3a641`, pushed at 15:30 (its
   story and size are in the 15:00 report's update).
@@ -134,6 +138,7 @@ flowchart LR
 | Plan 027, the usability review | `60e83222` | 19:07 | The review, handoffs and samples as documents; no implementation |
 | Developer start page and docs index | `3b468cd0` | 19:24 | `docs/start.md`: nouns, verbs, invariants, then validate, pin, scenarios, found |
 | Demo runner on GitHub | `6afa0377` | 21:26 | `--host github.com` plays the same shots; shot 13's lines observed; the gate's intermittent timeout diagnostic named, not hidden |
+| Offline and sync design (R5 items 2 and 3) | `31584fd9` | 22:19 | The outbox, background sync and refusal-as-rollback model as a reviewed design note, for the plan after the 14th |
 | The jam | jam repository `2de9235` | 19:11 | J0, J2, the rockstar lead, the mood phrase; the empty-theme crash and the lost final onset fixed; the J0 harness binds results to phrases and states its trust scope |
 
 Decisions recorded this sprint, all on the cadence act or the request
@@ -153,8 +158,9 @@ sync design (`47923460`), the timeout diagnostic (`45405ec5`).
 
 ## What did not land and why
 
-- **The v2 design documents** were filed at 21:24 (`ca193768`) and are
-  under the checker's document review at the boundary.
+- **The v2 design documents** landed at 22:05 as `4ab8f849` (approved
+  `49e7dae7`), after this report was first written: the design review,
+  the refined design page, screens, concepts and checks under plan 027.
 - **Propose from a branch** is in progress: the reservation's staging on
   the host is written (`9218fb70`); its review is due Saturday noon.
 - **The v2 page** was commissioned at 21:25; builder names the day it
@@ -185,7 +191,7 @@ Recorded in the workroom under the cadence act `c514748f`.
   it: land the v2 documents on approval; propose-from-branch
   (`b8c5a3c8`) toward Saturday 12:00; then the tier in order: the paced
   runner, selected publication, Markdown completeness, the
-  service-origin removal, the timeout diagnostic, the offline design.
+  service-origin removal, the timeout diagnostic.
   Never idle a subagent on a planner question: take the next item and
   ask in the thread.
 - **Checker.** The v2 documents tonight; the v2 page candidate ahead of
