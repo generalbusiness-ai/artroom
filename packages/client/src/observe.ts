@@ -42,9 +42,9 @@ async function bounded<T>(run:(signal:Expiry)=>Promise<T>, parent:Expiry, second
   const elapsed=new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>{abandoned=true;own.abort();reject(new ObservationFailure("unavailable","read-timeout"));},seconds*1000);});
   try{if(parent.aborted)throw new Stopped();const pending = run(own.signal);void pending.then(value=>{if(abandoned)dispose?.(value);},()=>undefined);return await Promise.race([pending,abort,elapsed]);}
   catch(error){abandoned=true;throw error;}
-  finally{parent.removeEventListener("abort",stopped);clearTimeout(timeout);}
+  finally{parent.removeEventListener("abort",stopped);if(timeout!==undefined)clearTimeout(timeout);}
 }
-function delay(milliseconds:number,signal:Expiry):Promise<void>{return new Promise((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>|undefined;const stop=()=>{clearTimeout(timer);signal.removeEventListener("abort",stop);reject(new Stopped());};signal.addEventListener("abort",stop);if(signal.aborted)return stop();timer=setTimeout(()=>{signal.removeEventListener("abort",stop);resolve();},milliseconds);});}
+function delay(milliseconds:number,signal:Expiry):Promise<void>{return new Promise((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>|undefined;const stop=()=>{if(timer!==undefined)clearTimeout(timer);signal.removeEventListener("abort",stop);reject(new Stopped());};signal.addEventListener("abort",stop);if(signal.aborted)return stop();timer=setTimeout(()=>{signal.removeEventListener("abort",stop);resolve();},milliseconds);});}
 
 export function observeScope<T>(options:ObservationOptions<T>):Observation{
   const context=JSON.parse(canonicalize(options.context)) as ObservationContext;
@@ -113,7 +113,7 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
       }catch(error){
         if(error instanceof Stopped){if(!usable())break;failures++;}
         else{const failure=error instanceof ObservationFailure?error:new ObservationFailure("unavailable","observation-transport-failed");emit({status:failure.status,reason:failure.reason,...retained()});if(["forbidden","unsupported","error"].includes(failure.status))break;failures++;}
-      }finally{active.abort();if(openedBody?.ok&&!readerOwned) { try { void openedBody.body.getReader().cancel().catch(()=>undefined); } catch { /* Iterator owns a locked native body and observes active.abort. */ } }clearTimeout(renewal);lifetime.signal.removeEventListener("abort",lifeAbort);refreshAgain=undefined;}
+      }finally{active.abort();if(openedBody?.ok&&!readerOwned) { try { void openedBody.body.getReader().cancel().catch(()=>undefined); } catch { /* Iterator owns a locked native body and observes active.abort. */ } }if(renewal!==undefined)clearTimeout(renewal);lifetime.signal.removeEventListener("abort",lifeAbort);refreshAgain=undefined;}
       if(usable()){try{await bounded(signal=>options.reconnectDelay?.(failures,signal)??delay(Math.min(5000,500*2**Math.min(failures-1,4)),signal),lifetime.signal,seconds);}catch{break;}}
     }
     if(!options.current()&&!cancelled)cancel();
