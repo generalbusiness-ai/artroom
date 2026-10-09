@@ -1,0 +1,15 @@
+{
+  "head": "fb2432dea91f13c3811d2ab1b1d07b7b276b50f8",
+  "tree": "61af8c19f53b07b5b1e53c6464cdf76c05db7d3e",
+  "source_only": true,
+  "files": {
+    "review.md": {
+      "bytes": 10125,
+      "sha256": "48ec457a2742644ce7747e5c7b6e3f63c5749137337d0b492988b1986a98e4ea"
+    },
+    "read-inventory.json": {
+      "bytes": 13123,
+      "sha256": "a3d2cdf068778294debaf614e9dcdebeaf276fb7bee30edb37b13ca91dfea057"
+    }
+  }
+}
