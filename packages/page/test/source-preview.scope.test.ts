@@ -11,12 +11,15 @@ test("exact retained proposal source survives later publication; missing and tam
   let failure: "none" | "missing" | "tampered" | "resealed" = "none";
   let entryReads = 0;
   let siteReads = 0;
-  const d = await demo((fetch) => async (url, init) => {
+  const d = await demo((fetch, owner) => async (url, init) => {
     if (new URL(url).pathname.startsWith("/site/")) siteReads++;
     const response = await fetch(url, init);
     if (!new URL(url).pathname.includes("/entries/")) return response;
     entryReads++;
-    if (failure === "missing") return new Response(JSON.stringify({ ok: false, reason: "not-found" }));
+    if (failure === "missing") {
+      await owner.required(async () => { await response.body?.getReader().cancel(); });
+      return new Response(JSON.stringify({ ok: false, reason: "not-found" }));
+    }
     if (failure === "none") return response;
     const bytes = response.body ? await takeBytes(response.body, 256 * 1024, AbortSignal.timeout(30_000)) : null;
     if (!(bytes instanceof Uint8Array)) throw new Error("The source-entry witness received no whole reply.");
@@ -26,7 +29,7 @@ test("exact retained proposal source survives later publication; missing and tam
       if (failure === "resealed") read.value.hash = entryHash(read.value.entry);
     }
     return new Response(JSON.stringify(read));
-  });
+  }, null, { editorOnly: true });
   try {
     const room = await openRoom(d.as(await d.secretOf(d.rita)), placeOf(JSON.stringify(d.config))!);
     expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Original source")).code).toBe(0);
