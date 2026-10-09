@@ -73,3 +73,29 @@ private device recovery and full manual/IA obligations remain. The bounded
 history-scan scalability finding and focused P3 documentation/test-wiring
 corrections stay explicit follow-ups, not closed by these repairs. No new
 counting/durability runtime or external provider action is included.
+
+## Exact final gate failed
+
+Planner `c92c3071` authorized one ordinary gate at exact
+`676f23d1794cb2fa4d7c52b5287933a808dcf653`, tree
+`cbc5660678f7ea3087d2044bd820b52aacc7324a`. It ended exit 1.
+Whitespace passed; types passed in 5.4 s / 17.3 CPU. Tests took 408.6 s /
+451.7 CPU: 968 passed, four failed, two skipped across 163 files.
+Three native cases timed out at their original five-second deadline:
+manifest T3, Page task-data's first native case, and Site native @3 publication.
+Links T5b refused an offer as expired at judged entry 2. The log also records
+cross-Durable-Object RefcountedCanceler at Vitest's timeout abort path; it does
+not establish the causal owner or a leak. Active-source's six checks did not
+execute after Vitest failed in the npm test && chain.
+
+Root read the complete 3,058-byte gate wrapper and 6,109-byte raw test report.
+Gate `/tmp/artroom-correctness-676-gate.log` SHA-256
+`f3bf91f75167a2a65407eba0aa53b40de83c0cfb12ed02bbde83f51ecd3f1b7d`;
+raw test `tmp.27zGIpDg2u/test.log` SHA-256
+`73e4d66dac76cac8c64175af007238f1439d65f770c2a812a788148a0feba5a6`.
+Full phase/path identities are in
+`/tmp/artroom-correctness-676-gate-evidence.json`, durable result `64b72466`.
+The worktree was clean before and after. No unchanged retry, timeout increase,
+suite omission, deployment or landing follows. A new bounded failure plan and
+owner decision are required; focused repair passes remain separate evidence.
+This prose successor changes no production or test bytes from the failed head.
