@@ -307,3 +307,52 @@ Raw focused logs: `/tmp/artroom-manifest-expiry-43ca-scope.log` SHA-256
 Root read these complete logs and both complete assertion-control logs.
 Metadata and earlier-source evidence retain their own exact identities;
 none is relabelled as a final gate or hosted-provider observation.
+
+## Gate failures and concrete repairs
+
+The gate at `7b95bbfeb49e550d8bcceca6de08b9c234aa8189`, tree
+`d3a5079117e02f5cf6f51084350bf510681846a9`, failed: eleven tests failed,
+920 passed and two recorders skipped. Whitespace and typechecks passed.
+The test phase took 189.4 seconds elapsed and 229.6 CPU. Cohort fixtures still
+expected older pins, the version inventory omitted the three shipped @3
+versions, and Page assets needed regeneration after composed dependencies.
+The Page story also exposed a real projection defect: cleaned destination
+publication was labelled in progress. That was repaired without inferring
+publication from cleanup; the recorded merge remains the publication proof.
+
+CLI fixture commit `8bfd6e19` preserves wrong-version refusal and resolves
+its provider stand-in seed through the actual register version. Page commit
+`11f71b29` updates native claim fixtures and treats cleaned as completion,
+while owed/deleted/unknown cleanup stays live. Focused native and state tests
+pass, with direct wrong-pin and false-progress controls. Two timed-out files
+pass unchanged in isolation; no timeout was increased and no load cause is
+proved. Root regenerated assets and their parity witness passed.
+
+The repaired gate at `856907f7eb7ce80906ae7e1c1126f5b7d97b2d29`, tree
+`e8e69f0ae9b09600f9a1dd9c11b11f51b152e73f`, also failed: one CLI story
+exceeded five seconds and emitted the RefcountedCanceler diagnostic; 930
+passed and two recorders skipped. Whitespace/typechecks passed. Test cost was
+247.2 elapsed and 287.5 CPU, printed phase figures. Root fully read its raw
+small test and type logs. `/tmp/artroom-manifest-repaired-gate.log` SHA-256
+`800d8e226aebf4d2fe1c1c9e5ec4d55478f373209e7f745f1bbddaf28550348b`;
+raw phase directory `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.mZ8vNYWNEH`.
+Raw test SHA-256 `943f5565d42f4c87d02b11f23e2f11b4f4fdb4744f1009cf2332270762244f5a`.
+The same-head unchanged CLI story passed in isolation in 612 ms. That is a
+separate result, not a passing whole gate or a cause for the timeout.
+
+Because npm test stops after Vitest failure, its active-source checks had not
+run. A separate run found two test placement exceptions. Commits `c4e1f4e87`
+and `d909cefb4` move the timed platform witness into platform and allow only
+the two named native checker test paths. No production dependency is added.
+The moved witness and types pass; all six active-source checks pass separately.
+No whole gate is relabelled as this later structural repair.
+
+Exact pending planner judgments are gate risk
+`git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f496c7320d3eaa8838306fb98a9728d2c633a7b7`
+and snapshot history floor
+`git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ed2303e984a53c2f59c84140574b93e265459a87`.
+Neither disposition has arrived at this checkpoint. The first gate's raw log
+contains generated asset bodies: Root read the authored failure blocks and
+headers; those generated payload lines receive no complete-read credit.
+The failed gates, canceler diagnostic, hosted proposal observation and final
+review/landing obligations remain retained.
