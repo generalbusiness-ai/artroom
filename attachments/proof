@@ -1,0 +1,174 @@
+{
+  "authorization": "bebe7510d7ad32e82aadc78d01e9aab2678be3e1",
+  "before": {
+    "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+    "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:10:25.402439+00:00",
+    "load": [
+      1.22412109375,
+      1.55859375,
+      1.81884765625
+    ]
+  },
+  "source_bindings": {
+    "scope": "/private/tmp/artroom-correctness-composed/packages/scope",
+    "cli": "/private/tmp/artroom-correctness-composed/packages/cli",
+    "page": "/private/tmp/artroom-correctness-composed/packages/page",
+    "lanes": "/private/tmp/artroom-correctness-composed/packages/lanes",
+    "bytes": "/private/tmp/artroom-correctness-composed/packages/bytes",
+    "contract": "/private/tmp/artroom-correctness-composed/packages/contract",
+    "derive": "/private/tmp/artroom-correctness-composed/packages/derive",
+    "platform": "/private/tmp/artroom-correctness-composed/packages/platform",
+    "client": "/private/tmp/artroom-correctness-composed/packages/client"
+  },
+  "compiler_entry": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+  "barrier": "Root confirmed F1v7 terminal/no active processes, all owners idle or source-only; exact source/stamp/bindings verified",
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/scope/tsconfig.test.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.37244254094548523,
+      "user_seconds": 1.608936,
+      "system_seconds": 0.167797,
+      "cpu_seconds": 1.776733,
+      "log": "/tmp/artroom-critical-cca558-checks/1-scope-tsconfig.test.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": {
+        "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+        "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:10:25.832791+00:00",
+        "load": [
+          1.22412109375,
+          1.55859375,
+          1.81884765625
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/page/tsconfig.scope.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.2938259579241276,
+      "user_seconds": 1.0472740000000003,
+      "system_seconds": 0.09024499999999999,
+      "cpu_seconds": 1.1375190000000002,
+      "log": "/tmp/artroom-critical-cca558-checks/2-page-tsconfig.scope.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": {
+        "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+        "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:10:26.185144+00:00",
+        "load": [
+          1.22412109375,
+          1.55859375,
+          1.81884765625
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/lanes/tsconfig.scope.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.3416340840049088,
+      "user_seconds": 1.437004,
+      "system_seconds": 0.13115899999999997,
+      "cpu_seconds": 1.5681629999999998,
+      "log": "/tmp/artroom-critical-cca558-checks/3-lanes-tsconfig.scope.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": {
+        "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+        "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:10:26.586724+00:00",
+        "load": [
+          1.22412109375,
+          1.55859375,
+          1.81884765625
+        ]
+      }
+    }
+  ],
+  "types_result": "passed",
+  "config": {
+    "path": "/tmp/artroom-critical-cca558-checks/affected-native.config.mjs",
+    "bytes": 3802,
+    "sha256": "d055b2584f7082ef261c60aff4d57851dbdfff68f8a29744488085209acb8381",
+    "copy": "byte-for-byte from frozen inertrecipe"
+  },
+  "discovery": {
+    "argv": [
+      "node",
+      "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+      "list",
+      "--config",
+      "/tmp/artroom-critical-cca558-checks/affected-native.config.mjs",
+      "--json"
+    ],
+    "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+    "exit": 0,
+    "wall_seconds": 2.1175703330663964,
+    "user_seconds": 2.2485549999999996,
+    "system_seconds": 0.31698799999999994,
+    "cpu_seconds": 2.5655429999999995,
+    "log": "/tmp/artroom-critical-cca558-checks/discovery.log",
+    "bytes": 24723,
+    "sha256": "e993dca2b22726bf938eb16f472098cd434df752d9a20034022b78e4dbaf8580",
+    "after": {
+      "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+      "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+      "status": "",
+      "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "utc": "2026-10-09T21:10:28.762106+00:00",
+      "load": [
+        1.22412109375,
+        1.55859375,
+        1.81884765625
+      ]
+    }
+  },
+  "after": {
+    "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+    "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:10:28.791658+00:00",
+    "load": [
+      1.22412109375,
+      1.55859375,
+      1.81884765625
+    ]
+  },
+  "runtime_body": "not run; actual complete discovery needs root full review and separate body GO"
+}
