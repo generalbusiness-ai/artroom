@@ -165,6 +165,15 @@ has its own enrollment identity. Matching accepted receipts remain inspectable.
 A narrow peer re-read confirms that binding; seven composed affected checks
 and both Page typechecks pass, including generated-asset parity.
 
+Known accepted Join recovery is presented separately from that custody fence.
+Returning to the original selected room and key can inspect a late acceptance
+for a different membership and typed joining key, then explicitly select its
+captured settings without another Join. That presentation map never blocks
+an unrelated enrollment. The strengthened witness uses distinct memberships,
+incarnations and keys and proves exact-duplicate blocking, legitimate new
+enrollment, and retained late-answer selection. Restoring the incorrect
+UI-context mutation guard fails its assertion.
+
 Nonblocking review follow-up: a successfully accepted generic comment draft
 currently remains editable after redraw. Clearing only the completed draft,
 without removing unsent, refused, unknown or newer edits, remains UX work;
