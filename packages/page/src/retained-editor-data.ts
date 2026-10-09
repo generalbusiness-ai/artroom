@@ -1,18 +1,21 @@
 /** One loaded-Page text proposal task. No automatic merge, durable outbox or replacement signature. */
-import type { Answer, Beside, DeclaredDefinition, Digest, FactRef, FieldValue, Grant, Head, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, digestBytes, entryHash, scopeIdOf, utf8, verifySignedIntent, wellFormed } from "@generalbusiness/artroom-bytes";
+import type { Answer, Beside, DeclaredDefinition, Digest, FactRef, FieldValue, Grant, Head, KeyId, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, digestBytes, entryHash, isFactRef, scopeIdOf, utf8, verifySignedIntent, wellFormed } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, httpTransport, secretSigner, shapeDeclaredAct, signedIntent, signedReads } from "@generalbusiness/artroom-client";
 import { expectedOf, heldActs, type DefinitionShape } from "@generalbusiness/artroom-cli";
 import { editPath, fileSound, platform } from "@generalbusiness/artroom-platform";
+import { knownLIST1 } from "./source-support.ts";
 import { actAssociation, openRoom, Unreadable, type ChangeView, type Room } from "./data.ts";
 
-export interface EditSource { scope: ScopeRef; manifest: number; opened: Digest; base: string; path: string; digest: Digest; size: number; content: string }
+export interface EditSource { definition: string; manifestFact: FactRef; sourceFact: FactRef; scope: ScopeRef; manifest: number; opened: Digest; base: string; path: string; digest: Digest; size: number; content: string }
 export interface EditDraft { title: string; path: string; content: string }
-export interface EditStep { kind: "open-pr" | "ask-rules" | "propose-file"; target: ScopeRef; signed: SignedIntent; grants: readonly Grant[]; beside: Beside; attempted: boolean; answer?: Answer; receiptVerified?: boolean }
+export interface EditStep { kind: "open-pr" | "ask-rules" | "propose-file" | "propose-manifest"; target: ScopeRef; signed: SignedIntent; grants: readonly Grant[]; beside: Beside; attempted: boolean; answer?: Answer; receiptVerified?: boolean }
 export interface EditTask {
   association: string; source: EditSource; draft: Readonly<EditDraft>; base: string; definition: Digest; definitionBytes: string; declared: DeclaredDefinition;
+  context: { service: string; directory: ScopeRef; membership: ScopeRef; key: KeyId; rules: ScopeId; destination: ScopeId };
+  workflow: "legacy" | "list1"; collectedSource?: FactRef;
   steps: EditStep[]; lane?: ScopeId; proposal?: number; version?: FactRef; directory: ScopeRef;
-  state: "prepared" | "waiting-lane" | "waiting-rules" | "unknown" | "refused" | "recorded" | "stopped";
+  state: "prepared" | "waiting-lane" | "waiting-rules" | "source-recorded" | "unknown" | "refused" | "recorded" | "stopped";
   message: string; busy: boolean;
 }
 export interface EditOptions { current(): boolean; changed?(): void; pause?(scopes: readonly string[]): Promise<void> }
@@ -31,20 +34,37 @@ export function editFields(draft: EditDraft, base: string): Record<string, Field
 
 /** Authenticate the original retained entry, not the current Git branch or rendered HTML. */
 export async function readEditSource(room: Room, change: ChangeView, manifest: number): Promise<EditSource> {
-  const h = handle(room, change.scope); const s = await summary(h);
-  const selected = change.manifests.find(i => i.id === manifest);
-  const item = s.value.items.find(i => i.type === "manifest" && i.id === manifest);
-  if (!selected?.file || typeof selected.file.content !== "string" || !item || selected.file.path !== item.values["path"] || selected.file.digest !== item.values["digest"] || selected.file.size !== item.values["size"] || selected.base !== item.values["base"]) throw new Unreadable("The selected source changed or is unavailable. Choose it again explicitly.");
-  const r = await h.entry(manifest);
-  if (!r.ok || !r.complete || r.next !== undefined) throw new Unreadable("The selected source entry could not be read completely.");
-  const { entry, hash } = r.value; const input = entry.input;
-  if (entry.seq !== manifest || canonicalize(entry.at) !== canonicalize(s.value.scope) || entryHash(entry) !== hash || item.opened !== hash || !entry.effects.some(e => e.effect === "open" && e.type === "manifest" && e.item === manifest)
-    || input.type !== "act" || input.signed.intent.kind !== "propose-file" || !verifySignedIntent(input.signed) || canonicalize(input.signed.intent.to) !== canonicalize(s.value.scope)) throw new Unreadable("The selected source identity could not be verified.");
+  const h = handle(room, change.scope), state = await summary(h);
+  const selected = change.manifests.find(value => value.id === manifest);
+  const item = state.value.items.find(value => value.type === "manifest" && value.id === manifest);
+  if (!selected?.file || typeof selected.file.content !== "string" || !item || selected.base !== item.values["base"]) throw new Unreadable("The selected source changed or is unavailable. Choose it again explicitly.");
+  const read = await h.entry(manifest);
+  if (!read.ok || !read.complete || read.next !== undefined) throw new Unreadable("The selected source entry could not be read completely.");
+  const { entry, hash } = read.value, input = entry.input;
+  if (entry.seq !== manifest || canonicalize(entry.at) !== canonicalize(state.value.scope) || entryHash(entry) !== hash || item.opened !== hash || !entry.effects.some(effect => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest) || input.type !== "act" || !verifySignedIntent(input.signed) || canonicalize(input.signed.intent.to) !== canonicalize(state.value.scope)) throw new Unreadable("The selected source identity could not be verified.");
   const author = input.authority.length === 1 ? input.authority[0] : null;
-  if (!author || author.key !== input.signed.intent.actor || canonicalize(author.subject) !== canonicalize(item.parties["integrator"]) || !Array.isArray(item.parties["authors"]) || !item.parties["authors"].some(m => canonicalize(m) === canonicalize(author.subject))) throw new Unreadable("The source author binding could not be verified.");
-  const { base, path, digest, size, content } = input.signed.intent.fields;
-  if (typeof base !== "string" || typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || path !== item.values["path"] || digest !== item.values["digest"] || size !== item.values["size"] || base !== item.values["base"] || content !== selected.file.content || !fileSound({ path, digest, size, content })) throw new Unreadable("The retained source bytes do not match this version.");
-  return { scope: s.value.scope, manifest, opened: hash, base, path, digest: digest as Digest, size, content };
+  if (!author || author.key !== input.signed.intent.actor || canonicalize(author.subject) !== canonicalize(item.parties["integrator"]) || !Array.isArray(item.parties["authors"]) || !item.parties["authors"].some(member => canonicalize(member) === canonicalize(author.subject))) throw new Unreadable("The source author binding could not be verified.");
+  const manifestFact: FactRef = { at: state.value.scope, seq: manifest, hash };
+  let sourceFact = manifestFact, sourceItem = item, sourceInput = input;
+  if (input.signed.intent.kind === "propose-manifest") {
+    const definition = await h.definition();
+    if (!definition.ok || !definition.complete || definition.next !== undefined || !knownLIST1(definition.value, state.value.definition)) throw new Unreadable("The source declaration is not a supported one-file LIST1 version.");
+    const files = input.signed.intent.fields["files"], folded = item.values["files"];
+    if (!Array.isArray(files) || files.length !== 1 || !Array.isArray(folded) || folded.length !== 1) throw new Unreadable("Editing requires exactly one frozen source file.");
+    const row = files[0], held = folded[0];
+    if (!row || typeof row !== "object" || Array.isArray(row) || !isFactRef(row["entry"]) || !held || typeof held !== "object" || Array.isArray(held) || canonicalize(row["entry"].at) !== canonicalize(state.value.scope) || held["entry"] !== row["entry"].seq || held["path"] !== row["path"] || held["digest"] !== row["digest"] || input.signed.intent.fields["base"] !== item.values["base"]) throw new Unreadable("The frozen source reference is inconsistent.");
+    sourceFact = row["entry"];
+    const source = state.value.items.find(value => value.type === "source" && value.id === sourceFact.seq), sourceRead = await h.entry(sourceFact.seq);
+    if (!source || !sourceRead.ok || !sourceRead.complete || sourceRead.next !== undefined) throw new Unreadable("The frozen source entry is unavailable.");
+    const sourceEntry = sourceRead.value.entry, sourceHash = sourceRead.value.hash;
+    if (sourceEntry.seq !== sourceFact.seq || canonicalize(sourceEntry.at) !== canonicalize(sourceFact.at) || sourceHash !== sourceFact.hash || entryHash(sourceEntry) !== sourceHash || source.opened !== sourceHash || !sourceEntry.effects.some(effect => effect.effect === "open" && effect.type === "source" && effect.item === sourceFact.seq) || sourceEntry.input.type !== "act" || sourceEntry.input.signed.intent.kind !== "propose-file" || !verifySignedIntent(sourceEntry.input.signed) || canonicalize(sourceEntry.input.signed.intent.to) !== canonicalize(state.value.scope) || sourceEntry.input.signed.intent.actor !== input.signed.intent.actor) throw new Unreadable("The frozen source identity could not be verified.");
+    const grant = sourceEntry.input.authority.length === 1 ? sourceEntry.input.authority[0] : null;
+    if (!grant || grant.key !== sourceEntry.input.signed.intent.actor || canonicalize(grant.subject) !== canonicalize(author.subject) || canonicalize(grant.subject) !== canonicalize(source.parties["integrator"]) || !Array.isArray(source.parties["authors"]) || !source.parties["authors"].some(member => canonicalize(member) === canonicalize(grant.subject)) || source.values["path"] !== row["path"] || source.values["digest"] !== row["digest"] || source.values["base"] !== item.values["base"]) throw new Unreadable("The frozen source author or file reference changed.");
+    sourceItem = source; sourceInput = sourceEntry.input;
+  } else if (input.signed.intent.kind !== "propose-file") throw new Unreadable("The selected opening is not a supported retained-text version.");
+  const { base, path, digest, size, content } = sourceInput.signed.intent.fields;
+  if (typeof base !== "string" || typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || path !== sourceItem.values["path"] || digest !== sourceItem.values["digest"] || size !== sourceItem.values["size"] || base !== sourceItem.values["base"] || path !== selected.file.path || digest !== selected.file.digest || size !== selected.file.size || base !== selected.base || content !== selected.file.content || !fileSound({ path, digest, size, content })) throw new Unreadable("The retained source bytes do not match this version.");
+  return { definition: state.value.definition, manifestFact, sourceFact, scope: state.value.scope, manifest, opened: hash, base, path, digest: digest as Digest, size, content };
 }
 
 function supports(declared: DeclaredDefinition, fields: Record<string, FieldValue>): boolean {
@@ -60,28 +80,32 @@ function supports(declared: DeclaredDefinition, fields: Record<string, FieldValu
   } catch { return false; }
 }
 async function currentRoom(room: Room, options: EditOptions): Promise<Room> { check(options); const fresh = await openRoom(room.session, { directory: room.directory, membership: room.membership }); check(options); if (fresh.rules !== room.rules || fresh.destination !== room.destination || fresh.me?.handle !== room.me?.handle || fresh.key !== room.key) throw new Unreadable("The room identity changed. Nothing new was sent."); return fresh; }
-async function head(room: Room): Promise<string> { const s = await summary(handle(room, room.destination)); if (!["platform:destination@2", "platform:destination@3"].includes(s.value.definition)) throw new Unreadable("This destination does not support the one-file text workflow."); const h = s.value.items.find(i => i.type === "branch")?.values["head"]; if (typeof h !== "string") throw new Unreadable("The room has no recorded published head."); return h; }
+async function head(room: Room, list1 = false): Promise<string> { const s = await summary(handle(room, room.destination)); if (!["platform:destination@2", "platform:destination@3"].includes(s.value.definition) || list1 && s.value.definition !== "platform:destination@3") throw new Unreadable("This destination does not support the one-file text workflow."); const h = s.value.items.find(i => i.type === "branch")?.values["head"]; if (typeof h !== "string") throw new Unreadable("The room has no recorded published head."); return h; }
 export async function prepareEdit(room: Room, change: ChangeView, manifest: number, draft: EditDraft, options: EditOptions): Promise<EditTask> {
   const captured = Object.freeze({ ...draft });
   editFields(captured, "0".repeat(40)); const fresh = await currentRoom(room, options);
   if (!fresh.me?.actions.includes("change.open") || !fresh.me.actions.includes("change.propose")) throw new Unreadable("Your current member does not hold permission to open and propose a change.");
-  const source = await readEditSource(fresh, change, manifest); check(options);
+  const source = freeze(await readEditSource(fresh, change, manifest)); check(options);
   const R = handle(fresh, fresh.rules); const rs = await summary(R);
   const active = rs.value.items.filter(i => i.type === "definition" && i.state === "active" && i.values["name"] === "change").sort((a,b) => b.id-a.id)[0];
   const digest = active?.values["digest"]; if (typeof digest !== "string") throw new Unreadable("No change definition is active.");
   const kept = await signedReads(httpTransport(fresh.session.service, fresh.session.fetch ? { fetch: fresh.session.fetch } : {}), secretSigner(fresh.session.secret), fresh.session.now ? { now: fresh.session.now } : {}).retained(fresh.rules, fresh.reader?.reader() ?? null, "definition", digest as Digest); if (!kept.ok) throw new Unreadable("The active change definition could not be read.");
   const declared = JSON.parse(kept.value.bytes) as DeclaredDefinition; if (canonicalize(declared) !== kept.value.bytes || definitionDigest(declared) !== digest) throw new Unreadable("The active definition bytes do not match their digest.");
-  const base = await head(fresh); check(options); if (!supports(declared, editFields(captured, base))) throw new Unreadable("The active change definition does not support this bounded text workflow.");
+  const workflow = knownLIST1(declared, digest) ? "list1" : "legacy";
+  const base = await head(fresh, workflow === "list1"); check(options);
+  if (workflow === "legacy" && !supports(declared, editFields(captured, base))) throw new Unreadable("The active change definition does not support this bounded text workflow.");
+  shapeDeclaredAct(declared, "propose-file", { on: null, fields: editFields(captured, base) });
   const D = await summary(handle(fresh, fresh.directory));
   const directoryShape = platform(D.value.definition)?.data as unknown as DefinitionShape | undefined;
   if (!directoryShape || !heldActs(directoryShape, fresh.me).acts.some(([kind]) => kind === "open-pr")) throw new Unreadable("The directory does not offer the supported native change opening.");
   shapeDeclaredAct(platform(D.value.definition)!.data as unknown as DeclaredDefinition, "open-pr", { on: null, fields: { definition: digest, title: captured.title, draft: false, body: "Source reference" } } as never);
-  return { association: actAssociation(room, change.scope), source, draft: captured, base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
+  return { association: actAssociation(room, change.scope), source, draft: captured, base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, workflow, context: freeze({ service: fresh.session.service.replace(/\/+$/, ""), directory: D.value.scope, membership: fresh.membership, key: fresh.key, rules: fresh.rules, destination: fresh.destination }), directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
 }
 
 async function taskRoom(room: Room, task: EditTask, options: EditOptions): Promise<Room> {
   if (task.association !== actAssociation(room, task.source.scope.scope)) throw new Unreadable("This task belongs to another room/member/key context.");
   const fresh = await currentRoom(room, options);
+  if (fresh.session.service.replace(/\/+$/, "") !== task.context.service || canonicalize(fresh.membership) !== canonicalize(task.context.membership) || fresh.key !== task.context.key || fresh.rules !== task.context.rules || fresh.destination !== task.context.destination) throw new Unreadable("The original room/key/rules/destination binding changed. Nothing new was sent.");
   const directory = await summary(handle(fresh, fresh.directory)); check(options);
   if (canonicalize(directory.value.scope) !== canonicalize(task.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
   const rules = await summary(handle(fresh, fresh.rules)); check(options);
@@ -89,9 +113,28 @@ async function taskRoom(room: Room, task: EditTask, options: EditOptions): Promi
   return fresh;
 }
 
+/** Only the one accepted source of this task may enter its manifest. */
+async function verifiedCollectedSource(room: Room, task: EditTask): Promise<FactRef> {
+  const fact = task.collectedSource;
+  if (!task.lane || !fact || !knownLIST1(task.declared, task.definition)) throw new Unreadable("The confirmed one-file source is unavailable.");
+  const h = handle(room, task.lane), state = await summary(h);
+  if (state.value.definition !== task.definition || canonicalize(state.value.scope) !== canonicalize(fact.at)) throw new Unreadable("The source lane identity changed.");
+  const collected = state.value.items.filter(item => item.type === "source" && item.state === "collected");
+  if (collected.length !== 1 || collected[0]!.id !== fact.seq) throw new Unreadable("Another collected source conflicts with this one-file task. Nothing was frozen.");
+  if (state.value.items.some(item => item.type === "manifest")) throw new Unreadable("This collection already has a manifest. Nothing new was frozen.");
+  const item = collected[0]!, read = await h.entry(fact.seq);
+  if (!read.ok || !read.complete || read.next !== undefined) throw new Unreadable("The accepted source entry could not be verified.");
+  const { entry, hash } = read.value, input = entry.input;
+  const original = task.steps.find(step => step.kind === "propose-file");
+  if (entry.seq !== fact.seq || hash !== fact.hash || entryHash(entry) !== hash || item.opened !== hash || canonicalize(entry.at) !== canonicalize(fact.at) || input.type !== "act" || input.signed.intent.kind !== "propose-file" || !verifySignedIntent(input.signed) || !original || canonicalize(input.signed) !== canonicalize(original.signed) || !entry.effects.some(effect => effect.effect === "open" && effect.type === "source" && effect.item === fact.seq)) throw new Unreadable("The accepted source identity does not match the original request.");
+  const fields = editFields(task.draft, task.base), grant = input.authority.length === 1 ? input.authority[0] : null;
+  if (!grant || grant.key !== input.signed.intent.actor || canonicalize(grant.subject) !== canonicalize(item.parties["integrator"]) || !Array.isArray(item.parties["authors"]) || !item.parties["authors"].some(author => canonicalize(author) === canonicalize(grant.subject)) || ["base", "path", "digest", "size", "content"].some(name => input.signed.intent.fields[name] !== fields[name]) || ["base", "path", "digest", "size"].some(name => item.values[name] !== fields[name])) throw new Unreadable("The source author or exact file bytes changed. Nothing was frozen.");
+  return fact;
+}
+
 async function sendStep(room: Room, task: EditTask, kind: EditStep["kind"], target: ScopeId, on: number | null, fields: Record<string, FieldValue>, options: EditOptions): Promise<boolean> {
   const fresh = await taskRoom(room, task, options);
-  if (await head(fresh) !== task.base) throw new Unreadable("The published base moved. Keep this task and compare/reconfirm before a new proposal; nothing new was sent.");
+  if (await head(fresh, task.workflow === "list1") !== task.base) throw new Unreadable("The published base moved. Keep this task and compare/reconfirm before a new proposal; nothing new was sent.");
   check(options); const h = handle(fresh, target); const s = await summary(h); check(options);
   if (kind === "open-pr" && canonicalize(s.value.scope) !== canonicalize(task.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
   const supplied = platform(s.value.definition);
@@ -113,7 +156,8 @@ async function sendStep(room: Room, task: EditTask, kind: EditStep["kind"], targ
   const step: EditStep = { kind, target: s.value.scope, signed: freeze(JSON.parse(JSON.stringify(signed)) as SignedIntent), grants: freeze([]), beside: freeze(JSON.parse(JSON.stringify(beside)) as Beside), attempted: false };
   task.steps.push(step); options.changed?.();
   const current = await taskRoom(room, task, options);
-  if (await head(current) !== task.base) throw new Unreadable("The published base moved before submission. Nothing new was sent.");
+  if (await head(current, task.workflow === "list1") !== task.base) throw new Unreadable("The published base moved before submission. Nothing new was sent.");
+  if (kind === "propose-manifest") await verifiedCollectedSource(current, task);
   check(options); step.attempted = true; options.changed?.();
   try { step.answer = await h.submit(step.signed, step.grants, step.beside); }
   catch { task.state = "unknown"; task.message = `${kind}: outcome unknown. The original request is kept in this loaded Page. No next step was sent.`; options.changed?.(); return false; }
@@ -162,7 +206,16 @@ export async function continueEdit(room: Room, task: EditTask, options: EditOpti
       if (!await sendStep(room, task, "propose-file", task.lane, null, editFields(task.draft, task.base), options)) return;
     }
     const proposed = task.steps.find(s => s.kind === "propose-file")!;
-    if (proposed.answer?.answer === "accepted" && proposed.receiptVerified) { task.version = proposed.answer.receipt.fact; task.state = "recorded"; task.message = `Proposal recorded in ${task.lane}, version ${task.version.seq}. Not published. The original source/history is unchanged.`; }
+    if (proposed.answer?.answer !== "accepted" || !proposed.receiptVerified) return;
+    if (task.workflow === "legacy") { task.version = proposed.answer.receipt.fact; task.state = "recorded"; task.message = `Proposal recorded in ${task.lane}, version ${task.version.seq}. Not published. The original source/history is unchanged.`; return; }
+    task.collectedSource = proposed.answer.receipt.fact; task.state = "source-recorded";
+    task.message = "Source recorded. It is not a version until its one-file manifest is confirmed."; options.changed?.();
+    const source = await verifiedCollectedSource(room, task);
+    if (!task.steps.some(step => step.kind === "propose-manifest")) {
+      if (!await sendStep(room, task, "propose-manifest", task.lane, null, { base: task.base, files: [{ path: task.draft.path, entry: source, digest: editFields(task.draft, task.base)["digest"]! }] }, options)) return;
+    }
+    const frozen = task.steps.find(step => step.kind === "propose-manifest")!;
+    if (frozen.answer?.answer === "accepted" && frozen.receiptVerified) { task.version = frozen.answer.receipt.fact; task.state = "recorded"; task.message = `One-file manifest recorded in ${task.lane}, version ${task.version.seq}. Not published. The original source/history is unchanged.`; }
   } catch (error) { task.state = task.steps.some(s => s.attempted && (!s.answer || s.answer.answer === "unavailable" || s.answer.answer === "mismatch" || s.answer.answer === "accepted" && !s.receiptVerified)) ? "unknown" : "stopped"; task.message = `${error instanceof Error ? error.message : "The task could not continue."} Earlier accepted steps and the draft are retained.`; }
   finally { task.busy = false; options.changed?.(); }
 }
@@ -180,7 +233,8 @@ export async function checkEditRequest(room: Room, task: EditTask, options: Edit
     const verified = await handle(room, step.target.scope).followReceipt(result.value);
     if (!verified.ok || verified.entry.input.type !== "act" || canonicalize(verified.entry.input.signed) !== canonicalize(step.signed)) { task.message = "The acceptance could not be verified; the task stays unknown."; return; }
     step.receiptVerified = true;
-    if (step.kind === "propose-file") { task.version = result.value.fact; task.state = "recorded"; task.message = "Proposal recorded. Not published; the original source remains unchanged."; }
+    if (step.kind === "propose-manifest" || step.kind === "propose-file" && task.workflow === "legacy") { task.version = result.value.fact; task.state = "recorded"; task.message = "Proposal recorded. Not published; the original source remains unchanged."; }
+    else if (step.kind === "propose-file") { task.collectedSource = result.value.fact; task.state = "source-recorded"; task.message = "Original source recorded. Continue verifies it before freezing the one-file manifest."; }
     else { task.state = step.kind === "open-pr" ? "waiting-lane" : "waiting-rules"; task.message = "Original request recorded. Continue reads its progress before the next unsent step."; }
   } catch { task.message = "The original request could not be checked. It stays unresolved; no replacement was signed."; }
   finally { task.busy = false; options.changed?.(); }
