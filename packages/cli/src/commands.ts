@@ -1408,14 +1408,24 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
   const made = await C.intent(signer, "propose-manifest" as never, { on: null, fields: manifest, expected: expectedOf(change.declared.acts["propose-manifest"] as unknown as ActShape, (await summaryOf(L)).items, null, manifest) } as never, signing(ctx));
   const answer = await C.submit(made.signed, [], made.beside);
   if (answer.answer !== "accepted") return answered(lane, answer, "Proposed");
+  const proposal = options.edit ? `Proposed ${files[0]!.path} (${files[0]!.bytes.length} bytes) as change ${lane}, version ${answer.receipt.fact.seq}.` : `Proposed ${files.length} files as change ${lane}, version ${answer.receipt.fact.seq}.`;
+  const lines = [proposal];
   if (options.closes) {
-    const linked = await linking(ctx, config, lane, reader, change.declared, options.closes);
-    if (linked.code !== 0) return linked;
+    const linked = await run(async () => {
+      try { return await linking(ctx, config, lane, reader, change.declared, options.closes!); }
+      catch (error) {
+        if (error instanceof TransportError) return failed("Linking could not be confirmed: a required request or reply was unavailable.");
+        throw error;
+      }
+    });
+    if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
+      `Inspect artroom show ${lane}:${answer.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+    ] };
+    lines.push(...linked.lines);
   }
   const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
-  const proposal = options.edit ? `Proposed ${files[0]!.path} (${files[0]!.bytes.length} bytes) as change ${lane}, version ${answer.receipt.fact.seq}.` : `Proposed ${files.length} files as change ${lane}, version ${answer.receipt.fact.seq}.`;
   const page = options.edit && outcome.code === 0 && outcome.lines[0]?.startsWith("Published:") ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${files[0]!.path.split("/").map(encodeURIComponent).join("/")}`] : [];
-  return { ...outcome, lines: [proposal, ...outcome.lines, ...page] };
+  return { ...outcome, lines: [...lines, ...outcome.lines, ...page] };
 }
 
 /**

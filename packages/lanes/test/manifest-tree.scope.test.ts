@@ -1,6 +1,6 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform } from "@generalbusiness/artroom-platform";
@@ -15,7 +15,7 @@ import { env } from "cloudflare:workers";
 import { ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { command, memoryStore, expectedOf, type ActShape, type Context, type Outcome } from "../../cli/src/index.ts";
-import { changeDemo3 } from "../src/index.ts";
+import { changeDemo3, issueDemo } from "../src/index.ts";
 
 
 // The actual CheckerService reads its signed job-bound reservation snapshot
@@ -62,7 +62,13 @@ test("artroom edit uses a one-element reservation tree as the real checker servi
   try { await story(ownHost(), wired, false, false, false, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false): Promise<void> {
+test.each(["summary", "request", "reply", "unavailable", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, linkFault); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted"): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -114,6 +120,52 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
   const first = host.refs.get("refs/heads/main")!;
+  if (linkFault) {
+    files["issue-demo.json"] = utf8(canonicalize(issueDemo));
+    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    for (const [name, definition, file] of [["issue", issueDemo, "issue-demo.json"], ["change", changeDemo3, "change3.json"]] as const) ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(definition)}`, "--set", `name=${name}`, "--value", file));
+    ok(await run(founder, "issue", "open", "--title", "A page is missing"));
+    let manifest: FactRef | null = null;
+    let sources = 0, links = 0, merges = 0;
+    const faultFetch = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      if (manifest && linkFault === "summary" && path === `/v1/scopes/${manifest.at.scope}`) throw new Error("TEST private linking transport detail");
+      const kind = init?.method === "POST" && path.endsWith("/acts") ? (JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string } } }).signed?.intent?.kind : undefined;
+      if (kind === "propose-file") sources++;
+      if (kind === "merge") merges++;
+      if (kind === "link-own") {
+        links++;
+        if (linkFault === "request") throw new Error("TEST private linking transport detail");
+        if (linkFault === "unavailable") return Response.json({ answer: "unavailable", reason: "busy" });
+      }
+      const response = await routed(url, init);
+      if (kind === "propose-manifest") {
+        const answer = await response.clone().json() as { answer: string; receipt?: { fact: FactRef } };
+        if (answer.answer === "accepted") manifest = answer.receipt!.fact;
+      }
+      if (kind === "link-own" && linkFault === "reply") throw new Error("TEST private linking transport detail");
+      return response;
+    }) as unknown as Fetch;
+    const result = await command({ ...founder, fetch: faultFetch }, ["edit", "one.md", "--file", "one.md", "--closes", "1"]);
+    expect(manifest).not.toBeNull();
+    const recorded = manifest as unknown as FactRef;
+    expect(result.lines[0]).toBe(`Proposed one.md (${files["one.md"]!.length} bytes) as change ${recorded.at.scope}, version ${recorded.seq}.`);
+    const entries = await new Platform(recorded.at.scope).entries();
+    const acts = entries.filter((entry) => entry.input.type === "act").map((entry) => entry.input.type === "act" ? entry.input.signed.intent.kind : "");
+    expect([sources, acts.filter((kind) => kind === "propose-file").length, acts.filter((kind) => kind === "propose-manifest").length]).toEqual([1, 1, 1]);
+    if (linkFault === "accepted") {
+      expect([result.code, links, merges]).toEqual([0, 1, 1]);
+      expect(result.lines[1]).toMatch(/^Linked: when it is published,/);
+      expect(result.lines[2]).toMatch(/^Published: commit/);
+    } else {
+      expect([result.code, links, merges, acts.filter((kind) => kind === "link-own").length, host.refs.get("refs/heads/main")]).toEqual([1, linkFault === "summary" ? 0 : 1, 0, linkFault === "reply" ? 1 : 0, first]);
+      expect(result.lines[1]).toMatch(linkFault === "unavailable" ? /^Unavailable: busy\./ : /^Linking could not be confirmed: a required request or reply was unavailable\.$/);
+      expect(result.lines.at(-1)).toBe(`Inspect artroom show ${recorded.at.scope}:${recorded.seq} and artroom log ${recorded.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`);
+      expect(acts).not.toContain("merge");
+    }
+    expect(result.lines.join("\n")).not.toContain("TEST private linking transport detail");
+    return;
+  }
   if (unknownDeleteOnly) {
     ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
     ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
