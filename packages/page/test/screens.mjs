@@ -74,7 +74,7 @@ async function as(person, { width = 1024, height = 800, colorScheme = "light" } 
     const answer = path ? record.answers[`POST ${path}`] : null;
     let body = null;
     try { body = answer ? JSON.parse(answer.body) : null; } catch { /* HTML/script responses are not a refusal. */ }
-    const refusal = body?.answer ?? body;
+    const refusal = body && typeof body.answer === "object" ? body.answer : body;
     if (answer?.status === 422 && refusal?.answer === "refused" && refusal?.name === "author-cannot-review" && /^Failed to load resource: the server responded with a status of 422/.test(message.text())) {
       expectedNetworkRefusals.push({ text: message.text(), url: location.url, status: answer.status, refusal });
     } else consoleErrors.push({ text: message.text(), location });
