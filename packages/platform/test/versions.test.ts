@@ -12,9 +12,9 @@ import { rita } from "./support-founding.ts";
 /** The digest of each version's data, in the definition's own domain. Version 1 matches actual main1eed91aa, including gate1 definition-byte places. */
 const DIGESTS: Readonly<Record<string, string>> = {
   "platform:register@5": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
-  "platform:directory@5": "sha256:2acf2eec42f6f2adca2339706e4c5c64dc0a0b5a6d4d4679566e8c0a8317e6a9",
+  "platform:directory@5": "sha256:db86423258d5de0df43956187460d5ade0d3e878371c24d89c33ecd51c2b1bd5",
   "platform:membership@4": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
-  "platform:rules@3": "sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471",
+  "platform:rules@3": "sha256:e9ed7ebe04bf66f1dd7c2b39a43d55b5e3b71317d5e3e3cf1a96dd16b2804ed5",
   "platform:inbox@1": "sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748",
   "platform:register@1": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:register@2": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",

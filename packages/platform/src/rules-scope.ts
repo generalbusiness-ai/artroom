@@ -55,7 +55,7 @@
 import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
-import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
+import { definitionClosure, definitionDependencies } from "./definition-input.ts";
 import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
@@ -669,6 +669,14 @@ export const rulesScopeRules3: Rules = {
   ...rulesScopeRules,
   "definition-bytes": {
     place: "guard", refusals: ["unsupported-definition"],
-    run: (given) => definitionBytes(given, RULE_PROFILES),
+    run: (given) => {
+      const checked = definitionClosure(given, "digest");
+      if (checked.result === "unavailable") return { holds: null, reason: "dependency-unavailable" };
+      return checked.result === "ready" && checked.root.name === given.resolved.fields["name"]
+        ? { holds: true } : { holds: false, name: "unsupported-definition", code: "unsupported-definition" };
+    },
   },
 };
+
+/** Version 3 adds explicit closure places; versions 1 and 2 retain their exact data. */
+export const rulesScope3: PlatformData = { ...rulesScope2, acts: { ...rulesScope2.acts, activate: { ...rulesScope2.acts["activate"]!, fields: { ...rulesScope2.acts["activate"]!.fields, ...definitionDependencies } } } };

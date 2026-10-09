@@ -21,7 +21,7 @@ import { DIRECTORY, REGISTER, register, registerRules } from "./register.ts";
 import { directory, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
+import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, directory2, destination, destination2 };
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
@@ -116,7 +116,7 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   [APPLICATION_COHORT.register]: { data: register, rules: registerRules },
   [APPLICATION_COHORT.directory]: { data: directory5, rules: directoryRules5, membership: directoryMembership, rulesScope: directoryRulesScope },
   [APPLICATION_COHORT.membership]: { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, APPLICATION_COHORT.membership) },
-  [APPLICATION_COHORT.rules]: { data: rulesScope2, rules: rulesScopeRules3, observed: (state, asked) => rulesAnswer(state, asked, APPLICATION_COHORT.rules), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
+  [APPLICATION_COHORT.rules]: { data: rulesScope3, rules: rulesScopeRules3, observed: (state, asked) => rulesAnswer(state, asked, APPLICATION_COHORT.rules), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:register@1": { data: register, rules: registerRules },
   "platform:register@2": { data: register, rules: registerRules },
   "platform:directory@1": { data: directory, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
