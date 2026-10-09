@@ -1,0 +1,58 @@
+{
+  "head": "ab9b499fc221149dcb6825edb7dd2c2e9976d999",
+  "tree": "6bb461e515dd6f445d9ab8b82f893a719de69cbf",
+  "release": "306a17eeb3c3914131676d3449cdc59706a51695",
+  "discovery": {
+    "release": "306a17eeb3c3914131676d3449cdc59706a51695",
+    "argv": [
+      "node",
+      "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+      "list",
+      "--config",
+      "/tmp/artroom-initial-node-repair-packet/node.config.mjs",
+      "--json"
+    ],
+    "cwd": "/private/tmp/artroom-initial-gate-disposition",
+    "exit": 0,
+    "elapsed": 0.7326540829380974,
+    "cpu": 0.91072,
+    "log_sha256": "79b461d6869f619804ddc928057daca5dc1aef80bb135e7be4e60c2e6ceb41a1"
+  },
+  "body": {
+    "release": "306a17eeb3c3914131676d3449cdc59706a51695",
+    "argv": [
+      "node",
+      "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+      "run",
+      "--config",
+      "/tmp/artroom-initial-node-repair-packet/node.config.mjs",
+      "--reporter",
+      "verbose",
+      "--bail=1"
+    ],
+    "cwd": "/private/tmp/artroom-initial-gate-disposition",
+    "exit": 0,
+    "elapsed": 0.7259162919363007,
+    "cpu": 1.228281,
+    "log_sha256": "5afd9f5589cbcafab2a0d37679167db6ec2f5314d41995f41cee1f785b26e086"
+  },
+  "actual_titles": [
+    "the rules definition validates whole with the platform option; its marks are those of the note's table, each with its rule, so the package's rules run it; without any one of them they do not",
+    "the genesis opens the rules with the branch, the directory and membership's scope ID, and the other values at their defaults; the scope records that ID and no incarnation; a provisional rules scope admits no act",
+    "keep-configuration keeps a configuration whose bytes beside the intent hash to the digest and whose image is a content digest; other bytes, bytes past the bound and an image that is a tag are each refused configuration-mismatch",
+    "publish sets the rules when each check's configuration is kept and each checker is observed as an active member with the role checker; the entry retains exactly the observations read; a missing observation leaves the act not completed",
+    "activate opens an active definition when its bytes and its whole named closure are beside the intent, validate and state the name; without one of them the act is not completed; bytes that do not validate, another name and a platform name are each refused unsupported-definition",
+    "rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0 and the result at ordinal 1; before a first publish the update and the scope give the three extents of the first definition, and after one the extents that it stated, without their patterns in the update",
+    "publish keeps the extents that it states, whole, and the scope holds them; a list outside the bounds of an extent is refused bad-field; one without the fixed minimum of the rules extent, without exactly one extent that has no pattern, or with a check that the act does not hold is refused by name",
+    "the declaration of the single-controller exception is false from the genesis, a publish sets it, and a publish that does not state it withdraws it; the record of an observation of the rules takes the declaration, and takes no extents",
+    "a rules scope answers an observation from its folded state at its head: the revision is 0 and the values are the genesis's before a publish, and the position of the last publish after one; asked as definitions it lists the active ones in the order of their IDs; a provisional scope, another incarnation and a request for a key are answered nothing",
+    "the scope Worker's page module is the page's build of this source: run npm run build --workspace @generalbusiness/artroom-page when this fails"
+  ],
+  "passed": 10,
+  "failed": 0,
+  "skipped": 0,
+  "source": "unchanged clean ab9",
+  "generated": "hash only exact parity passed",
+  "unused_plan": "two-case proposal remains inert; latest306 explicitly selected original10",
+  "native": "seven prior failures still pending disposition; no native run/gate authorized"
+}

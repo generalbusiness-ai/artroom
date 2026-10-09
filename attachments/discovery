@@ -1,0 +1,52 @@
+[
+  {
+    "name": "the rules definition validates whole with the platform option; its marks are those of the note's table, each with its rule, so the package's rules run it; without any one of them they do not",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "the genesis opens the rules with the branch, the directory and membership's scope ID, and the other values at their defaults; the scope records that ID and no incarnation; a provisional rules scope admits no act",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "keep-configuration keeps a configuration whose bytes beside the intent hash to the digest and whose image is a content digest; other bytes, bytes past the bound and an image that is a tag are each refused configuration-mismatch",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "publish sets the rules when each check's configuration is kept and each checker is observed as an active member with the role checker; the entry retains exactly the observations read; a missing observation leaves the act not completed",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "activate opens an active definition when its bytes and its whole named closure are beside the intent, validate and state the name; without one of them the act is not completed; bytes that do not validate, another name and a platform name are each refused unsupported-definition",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "rules-wanted from a lane is applied by one entry that changes nothing: the rules update to the sender at ordinal 0 and the result at ordinal 1; before a first publish the update and the scope give the three extents of the first definition, and after one the extents that it stated, without their patterns in the update",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "publish keeps the extents that it states, whole, and the scope holds them; a list outside the bounds of an extent is refused bad-field; one without the fixed minimum of the rules extent, without exactly one extent that has no pattern, or with a check that the act does not hold is refused by name",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "the declaration of the single-controller exception is false from the genesis, a publish sets it, and a publish that does not state it withdraws it; the record of an observation of the rules takes the declaration, and takes no extents",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "a rules scope answers an observation from its folded state at its head: the revision is 0 and the values are the genesis's before a publish, and the position of the last publish after one; asked as definitions it lists the active ones in the order of their IDs; a provisional scope, another incarnation and a request for a key are answered nothing",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/platform/test/rules-scope.test.ts",
+    "projectName": "node-platform"
+  },
+  {
+    "name": "the scope Worker's page module is the page's build of this source: run npm run build --workspace @generalbusiness/artroom-page when this fails",
+    "file": "/private/tmp/artroom-initial-gate-disposition/packages/page/test/assets.test.ts",
+    "projectName": "node-page"
+  }
+]
