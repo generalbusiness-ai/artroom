@@ -1,6 +1,6 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type FactRef, type ScopeId } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/artroom-platform";
@@ -670,10 +670,21 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   } };
   let runs = 0, prepares = 0, snapshots = 0;
   let loseSubmit = true, refuseSnapshot = false;
+  // Native opening records are immutable. Keep only this scenario's two
+  // records; current standing, snapshot, keys, generations and refs stay fresh.
+  const [jobEntry, manifestEntry] = await L.sealed().then(entries => [entries[job], entries[version]] as const);
+  if (!jobEntry || !manifestEntry) expect.fail("The native checker job and manifest openings must both be present.");
+  const sameOpeningScope = (scope: ScopeRef): boolean => scope.scope === jobEntry.entry.at.scope && scope.inc === jobEntry.entry.at.inc && scope.kind === jobEntry.entry.at.kind;
+  if (jobEntry.entry.seq !== job || manifestEntry.entry.seq !== version || jobEntry.entry.at.scope !== L.name || jobEntry.entry.at.kind !== "lane" || !sameOpeningScope(manifestEntry.entry.at)) expect.fail("The native checker openings must match their exact lane and sequences.");
   const serviceOptions: ConstructorParameters<typeof CheckerService>[0] = {
     signer: { key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, outcomes: new Outcomes(new MemoryDurable()), clock: now, random: (length) => crypto.getRandomValues(new Uint8Array(length)),
     scopes: {
-      entry: async (_scope, seq) => (await L.sealed())[seq] ?? null,
+      // Unsupported full scope/seq is no-entry at this test-only port.
+      entry: async (scope, seq) => {
+        if (!sameOpeningScope(scope)) return null;
+        const opening = seq === job ? jobEntry : seq === version ? manifestEntry : null;
+        return opening ? structuredClone(opening) : null;
+      },
       pinned: async () => definitionDigest(changeDemo3), activated: async () => ({ name: "change", state: "active" }),
       configuration: async () => canonicalize(checkConfig),
       reservationSnapshot: async (_scope, asked) => { snapshots++; return refuseSnapshot ? null : Gsnapshot.reservationSnapshot(asked); },
@@ -685,7 +696,6 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     runner: { find: async () => null, run: async (ask) => { runs++; expect(ask.job.snapshot?.tree).toBe(manifest.values["tree"]); expect(ask.job.snapshot?.sources).toHaveLength(oneFileOnly ? 1 : 2); return { started: true, image: checkConfig.image, environment: [], checkout: true, steps: [{ status: 0, line: "ok" }], end: "complete" }; } },
   };
   const service = new CheckerService(serviceOptions);
-  const jobEntry = (await L.sealed())[job]!;
   const jobFact = factRefOf(jobEntry.entry);
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   const snapshot = await Gsnapshot.reservationSnapshot(readAsk);
@@ -695,7 +705,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(snapshot.sources).toHaveLength(1);
     expect(snapshot.sources[0]!.entry.input).toMatchObject({ type: "act", signed: { intent: { kind: "propose-file", fields: { path: "one.md", digest: digestBytes(files["one.md"]!) } } } });
     expect(await verifyReservationObjects(snapshot)).toBe(true);
-    expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
+    expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
     loseSubmit = false;
     expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
     expect([runs, prepares, snapshots]).toEqual([1, 0, 1]);
@@ -727,12 +737,12 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await Gsnapshot.reservationSnapshot(readAsk)).toBeNull();
   slowFinalKey = false;
   net.clock.now = beforeSlow;
-  if (snapshot && !("refused" in snapshot)) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
+  if (snapshot && !("refused" in snapshot)) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
   if (snapshot && !("refused" in snapshot)) {
     expect(await verifyReservationObjects(snapshot)).toBe(true);
     const corrupt = { ...snapshot, objects: snapshot.objects.map((object, n) => n === 0 ? { ...object, data: Uint8Array.from([...object.data, 0]) } : object) };
     expect(await verifyReservationObjects(corrupt)).toBe(false);
-    expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: corrupt })).toEqual({ not: "no-manifest" });
+    expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: corrupt })).toEqual({ not: "no-manifest" });
   }
   const otherChecker = person();
   const otherInvitation = ok(await run(founder, "invite", "@other-checker", "--role", "checker")).lines[1]!.split(": ")[1]!;
