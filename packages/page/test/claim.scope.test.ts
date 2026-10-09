@@ -89,16 +89,16 @@ test("the browser's native claim survives lost founding and enrollment replies w
     d.lifetime.cleanup(() => release());
     let unavailableSettlement = false;
     let lose: "before-found" | "after-seat" | null = null;
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
       d.lifetime.active();
       const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? (JSON.parse(init.body) as { signed?: SignedIntent }).signed : undefined;
       if (signed) sent.push(structuredClone(signed));
       if (new URL(url).pathname.endsWith("/settle") && unavailableSettlement) return Response.json({ ok: false, reason: "unavailable" });
       if (signed?.intent.kind === "found" && lose === "before-found") { lose = null; entered(); await released; d.lifetime.active(); throw new Error("loss before delivery"); }
-      const response = await (d.fetch as unknown as typeof globalThis.fetch)(url, init);
-      if (signed?.intent.kind === "seat" && lose === "after-seat") { lose = null; await d.lifetime.wait(async () => { await response.body?.cancel(); }); throw new Error("loss after accepted seat"); }
+      const response = await d.fetch(url, init);
+      if (signed?.intent.kind === "seat" && lose === "after-seat") { lose = null; await d.lifetime.wait(async () => { await response.body?.getReader().cancel(); }); throw new Error("loss after accepted seat"); }
       return response;
-    }) as unknown as Fetch;
+    };
     const session = { ...d.session, fetch };
     const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks() };
     const kinds = () => sent.map((signed) => signed.intent.kind);
@@ -201,12 +201,12 @@ test("a changed Page context stops queued and prepared native claims before deli
     };
     let reads = 0;
     const sent: SignedIntent[] = [];
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
       d.lifetime.active();
       reads++;
       if (new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string") sent.push(structuredClone(JSON.parse(init.body).signed));
       return d.fetch(url, init);
-    }) as unknown as Fetch;
+    };
     const session = { ...d.session, fetch };
     const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks(), current: () => selected };
     let release!: () => void;
@@ -265,13 +265,13 @@ test("explicit new creates another native directory while exact operation resume
     const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { d.lifetime.active(); values.set(key, value); } };
     let loseFound = true;
     const sent: SignedIntent[] = [];
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
       d.lifetime.active();
       const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? JSON.parse(init.body).signed as SignedIntent : undefined;
       if (signed) sent.push(structuredClone(signed));
       if (signed?.intent.kind === "found" && loseFound) { loseFound = false; throw new Error("scripted loss before found"); }
       return d.fetch(url, init);
-    }) as unknown as Fetch;
+    };
     const session = { ...d.session, fetch };
     const options = { pause: d.pause, tries: 16, locks: testLocks() };
     expect(claimStatus(session, configured, storage)).toBeNull();
