@@ -8,10 +8,9 @@
  * | `#/issue/<scope>` | One issue, and the acts the caller may sign on it. |
  * | `#/change/<scope>` | One change, with its states, and the acts the caller may sign on it. |
  * | `#/rules` | The rules of this room, and the acts the caller may sign on the rules scope. |
- * | `#/settings` | The base URL, the room and the key; joining a room with an invitation link. |
+ * | `#/settings` | The room and the key; joining a room with an invitation link. |
  *
- * The page is served by the scope Worker at `/page/`, so the base URL is
- * the page's own origin unless Settings names another.
+ * The page is served by the scope Worker at `/page/` and reads that Worker.
  *
  * The key is a 32-byte Ed25519 secret, kept in this browser's local storage
  * under `artroom-page`, as unpadded base64url. It is never shown: only its
@@ -21,19 +20,23 @@
 
 import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, pageService, Unreadable, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
 let roomDraft = "";
-/** What this browser keeps: the base URL, the room (no secret of it) and the key. */
-interface Settings { service: string; place: Place | null; secret: string }
+/** What this browser keeps: the room (no secret of it) and the key. */
+interface Settings { place: Place | null; secret: string }
+let ignoredSavedAddress = false;
 
 function settings(): Settings | null {
+  ignoredSavedAddress = false;
   try {
-    const kept = JSON.parse(localStorage.getItem(KEPT) ?? "null") as Settings | null;
-    return kept && typeof kept.service === "string" && typeof kept.secret === "string" ? { ...kept, place: kept.place ?? null } : null;
+    const kept = JSON.parse(localStorage.getItem(KEPT) ?? "null") as (Settings & { service?: unknown }) | null;
+    // Migration only: an obsolete saved address never chooses where this page reads or signs.
+    ignoredSavedAddress = !!kept && Object.hasOwn(kept, "service");
+    return kept && typeof kept.secret === "string" ? { place: kept.place ?? null, secret: kept.secret } : null;
   } catch {
     return null;
   }
@@ -48,10 +51,9 @@ function keep(kept: Settings): void {
 }
 
 const sessionOf = (kept: Settings): Session => {
-  const service = pageService(kept.service, location.origin);
   const secret = unb64url(kept.secret);
   if (!secret || secret.length !== 32) throw new Error("The key kept in this browser is not a 32-byte secret. Set a key in Settings.");
-  return { service, secret };
+  return { service: location.origin, secret };
 };
 
 const root = (): HTMLElement => document.getElementById("page")!;
@@ -65,7 +67,7 @@ let opened: { key: string; room: Room } | null = null;
 const lastActs = new Map<string, Acted>();
 
 async function roomOf(kept: Settings, place: Place): Promise<Room> {
-  const id = `${kept.service} ${place.directory} ${kept.secret}`;
+  const id = `${location.origin} ${place.directory} ${kept.secret}`;
   if (opened?.key === id) return opened.room;
   opened = { key: id, room: await openRoom(sessionOf(kept), place) };
   return opened.room;
@@ -95,13 +97,12 @@ async function panelFor(room: Room, scope: ScopeId): Promise<HTMLElement> {
 
 function settingsScreen(): HTMLElement {
   const kept = settings();
-  const service = h("input", { name: "service", value: kept?.service ?? "", placeholder: `${location.origin} (this page's own)` });
   const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
   const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
   const said = h("p", { class: "answer", role: "status", hidden: "" });
   const tell = (good: boolean, text: string) => { said.textContent = text; said.className = `answer ${good ? "ok" : "bad"}`; said.removeAttribute("hidden"); };
+  if (ignoredSavedAddress) tell(false, "The saved connection address is ignored. This page reads the Worker that serves it. Your room and key are kept; save these settings to continue.");
   const form = h("form", {},
-    h("label", {}, "Base URL of this page's scope service ", service),
     h("label", {}, "Room ", room),
     h("label", {}, "Key ", secret),
     h("button", { type: "submit" }, "Keep in this browser"),
@@ -109,13 +110,10 @@ function settingsScreen(): HTMLElement {
     h("button", { type: "button", id: "join" }, "Join with the invitation link"),
   );
   const read = (newSecret: string | null): Settings | null => {
-    let base: string;
-    try { base = pageService((service as HTMLInputElement).value, location.origin); }
-    catch (error) { tell(false, error instanceof Unreadable ? error.message : "Invalid service URL."); return null; }
     const typed = (room as HTMLTextAreaElement).value.trim();
     const place = typed ? placeOf(typed) : kept?.place ?? null;
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
-    return { service: base, place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
+    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
   };
   const save = (next: Settings) => { keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened = null; location.hash = "#/"; };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
@@ -139,7 +137,6 @@ function settingsScreen(): HTMLElement {
     h("p", {}, key && key.length === 32 ? `This browser keeps key ${keyIdOfSecret(key)}.` : "This browser keeps no key yet."),
     h("p", {}, kept?.place ? `The room: directory ${kept.place.directory}, membership ${kept.place.membership.scope}.` : "No room is set yet."),
     h("p", { class: "muted" }, "A key is a member's once membership enrols it. With an invitation link from artroom invite, make a new key here and join with the link; or paste the key that the command line keeps in keys/device.key with its config.json. The page shows a key ID, never the key."),
-    h("p", { class: "muted" }, "This page uses its own service origin. Cross-origin service configuration is not supported."),
     said, form);
 }
 
@@ -147,7 +144,7 @@ async function draw(): Promise<void> {
   const show = showFor(++drawing);
   const path = location.hash.replace(/^#/, "") || "/";
   const kept = settings();
-  if (path === "/settings" || !kept || !kept.place) return show(settingsScreen());
+  if (path === "/settings" || !kept || !kept.place || ignoredSavedAddress) return show(settingsScreen());
   try {
     const room = await roomOf(kept, kept.place);
     const [, kind, scope] = path.split("/") as [string, string?, string?];

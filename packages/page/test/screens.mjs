@@ -54,7 +54,7 @@ async function as(person) {
     }
     return route.fulfill({ status: answer.status, headers: answer.headers, body: answer.body });
   });
-  await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { service: "", place: record.place, secret: record.people[person] });
+  await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { place: record.place, secret: record.people[person] });
   return context.newPage();
 }
 /** A screenshot of the whole page, or of its top `height` pixels. */

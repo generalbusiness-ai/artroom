@@ -81,17 +81,6 @@ export class Unreadable extends Error {
   override readonly name = "Unreadable";
 }
 
-/** Browser Settings only: the served page has no reviewed cross-origin boundary.
- * This does not change the data client's explicit service or scripted transport. */
-export function pageService(typed: string, pageOrigin: string): string {
-  const service = typed.trim() || pageOrigin;
-  let url: URL;
-  try { url = new URL(service); }
-  catch { throw new Unreadable("Invalid service URL. Use this page's service URL or leave it empty."); }
-  if (url.origin !== pageOrigin) throw new Unreadable("Unsupported service origin: cross-origin service configuration is not available. Open the page on that service instead.");
-  return service;
-}
-
 const nowOf = (session: Session): number => session.now?.() ?? Date.now();
 const transportOf = (session: Session): Transport =>
   signedReads(httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {}), secretSigner(session.secret), session.now ? { now: session.now } : {});
