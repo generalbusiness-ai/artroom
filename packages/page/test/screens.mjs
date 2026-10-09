@@ -143,13 +143,22 @@ if (await issueDialog.locator('input:not([type="hidden"]),textarea').count() !==
 await issueDialog.locator('[name="field:title"]').fill("Capture draft only");
 await issueDialog.locator('[name="field:body"]').fill("No recorded mutation is submitted.");
 await shot(una, "create-issue-desktop");
+const dialogFocusSteps = [];
 for (let turn = 0; turn < 5; turn++) {
   await una.keyboard.press("Tab");
-  if (!await issueDialog.evaluate(element => element.contains(document.activeElement))) throw new Error("Create issue keyboard focus escaped its dialog.");
+  const focus = await issueDialog.evaluate(element => ({ inDialog: element.contains(document.activeElement), body: document.activeElement === document.body, tag: document.activeElement?.tagName }));
+  dialogFocusSteps.push(focus);
+  // Native Chromium may expose BODY while focus moves through browser chrome.
+  // It must not focus another app control, and the next Tab must return inside.
+  if (!focus.inDialog && !focus.body) throw new Error("Create issue focused a background app control.");
+  if (turn && dialogFocusSteps[turn - 1].body && !focus.inDialog) throw new Error("Create issue native keyboard cycle did not return to the dialog.");
 }
+if (!dialogFocusSteps.at(-1).inDialog) throw new Error("Create issue keyboard cycle ended outside the dialog.");
+const backgroundFocus = await create.evaluate(element => { element.focus(); return document.activeElement === element; });
+if (backgroundFocus) throw new Error("Create issue background controls are focusable during its native modal.");
 await una.keyboard.press("Escape");
 if (await issueDialog.count() !== 0 || !await create.evaluate(element => document.activeElement === element)) throw new Error("Create issue Escape/focus return failed.");
-keyboardChecks.push({ flow: "Create issue", escapeCloses: true, returnsFocus: true, tabContained: true, submitted: false });
+keyboardChecks.push({ flow: "Create issue", escapeCloses: true, returnsFocus: true, nativeFocusSteps: dialogFocusSteps, backgroundInert: true, nativeCycleReturns: true, submitted: false });
 const query = una.getByRole("searchbox", { name: "Search issues", exact: true });
 await query.fill("handbook");
 await una.getByRole("button", { name: "All", exact: true }).click();
