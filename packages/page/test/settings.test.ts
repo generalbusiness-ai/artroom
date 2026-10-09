@@ -33,13 +33,14 @@ test("Settings ignores a legacy service origin with a message before requests an
   const membership = { kind: "membership", scope: `sc_${"b".repeat(51)}a`, inc: newIncarnation(new Uint8Array(16).fill(2)) };
   const legacy = JSON.stringify({ service: "https://another.test", place: { directory: `sc_${"a".repeat(52)}`, membership }, secret: b64url(new Uint8Array(32).fill(7)) });
   let saved = legacy;
+  let storageFailure: "none" | "throw" | "drop" = "none";
   let redraw!: () => void;
   let requested!: () => void;
   const firstRequest = new Promise<void>((resolve) => { requested = resolve; });
   const fetch = vi.fn((_address: string) => { requested(); throw new Error("Scripted unavailable service"); });
   vi.stubGlobal("document", { createElement: (tag: string) => new Element(tag), getElementById: () => root });
   vi.stubGlobal("location", location);
-  vi.stubGlobal("localStorage", { getItem: () => saved, setItem: (_key: string, value: string) => { saved = value; } });
+  vi.stubGlobal("localStorage", { getItem: () => saved, setItem: (_key: string, value: string) => { if (storageFailure === "throw") throw new Error("Storage full"); if (storageFailure !== "drop") saved = value; } });
   vi.stubGlobal("window", { addEventListener: (_name: string, handler: () => void) => { redraw = handler; } });
   vi.stubGlobal("fetch", fetch);
   try {
@@ -61,6 +62,30 @@ test("Settings ignores a legacy service origin with a message before requests an
     expect(root.textContent).toContain("This browser keeps key");
     expect(root.find((element) => element.attrs["name"] === "service")).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
+    // Failed persistence cannot navigate or replace the selected device key.
+    // Exercise both explicit failure and a storage adapter that drops writes.
+    const previous = saved;
+    const replacement = b64url(new Uint8Array(32).fill(8));
+    const roomText = root.find((element) => element.attrs["name"] === "room")!;
+    roomText.value = "an unfinished invitation";
+    roomText.fire("input");
+    root.find((element) => element.attrs["name"] === "secret")!.value = replacement;
+    roomText.value = ""; // Keep the existing room while attempting the key change.
+    storageFailure = "throw";
+    root.find((element) => element.tag === "form")!.fire("submit");
+    expect(saved).toBe(previous);
+    expect(location.hash).toBe("#/settings");
+    expect(root.textContent).toContain("could not save the settings");
+    storageFailure = "drop";
+    root.find((element) => element.attrs["id"] === "new-key")!.fire("click");
+    expect(saved).toBe(previous);
+    expect(location.hash).toBe("#/settings");
+    expect(root.textContent).toContain("existing key remains selected");
+    redraw();
+    expect(root.find((element) => element.attrs["name"] === "room")!.textContent).toContain("an unfinished invitation");
+    expect(JSON.parse(saved)).toEqual({ place, secret });
+    expect(fetch).not.toHaveBeenCalled();
+    storageFailure = "none";
     // The first real session request after migration uses the page's Worker,
     // even if a stale address is injected into the saved data again.
     saved = JSON.stringify({ place, secret, service: "https://another.test" });
