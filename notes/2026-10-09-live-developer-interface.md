@@ -807,4 +807,3 @@ settlement. Their limits are explicit: no historical message-delivery stream,
 no joint Room head, no instant cross-scope revocation, no generation survival
 from an open socket, and no transport-selected durability. These limits do
 not remove the full browser/workspace/device or test-economy obligations.
-
