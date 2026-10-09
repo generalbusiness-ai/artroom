@@ -99,3 +99,23 @@ The worktree was clean before and after. No unchanged retry, timeout increase,
 suite omission, deployment or landing follows. A new bounded failure plan and
 owner decision are required; focused repair passes remain separate evidence.
 This prose successor changes no production or test bytes from the failed head.
+
+## Bounded Graph fixture transport successor
+
+Planner `2d239b76` authorized ordinary Graph fixture founding through the
+existing genuine api(env.NET), preserving native storage, seed/full-reference/
+definition binding and every clock/authority/dispatch/deadline. One dedicated
+SELF/HTTP witness retains detached README plus issue/change definition closure
+and actual child creation/confirmation. Dedicated Scope wire tests and explicit
+lane over(http) remain. This is test economy, not a timeout/expired-act fix.
+
+Exact source `068fc92b94df462e776c6edc2a9d13ec6cc5122d`, tree
+`b54fd1fcaf56ae3a675ee52dc8ac3a61a3278560`, passed the authorized two-test
+selection (manifest T3 plus dedicated wire office): 782 ms tests, Vitest 1.94 s,
+wall 2.53 s, CPU 3.12 s; no filtered tests. Wire asserts one SELF crossing/status
+201, exact text and both actual child pins. Missing README control fails by an
+accepted-versus-refused assertion; source restored exact and clean. Types and
+whitespace passed. Evidence `/tmp/artroom-graph-transport-evidence/evidence.json`.
+No old paired workload, per-stage timing, global savings or gate cause is
+inferred. The failed 676 gate remains failed; clock-lifetime patch preparation
+and any next execution retain planner disposition and independent review.
