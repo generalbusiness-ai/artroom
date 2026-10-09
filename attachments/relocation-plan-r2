@@ -1,0 +1,57 @@
+# Restore the lanes test boundary — source-only plan
+
+Exact source: 677e7b3904d1d08ae51b6cc7166b1008487ff97a/tree 3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9, clean pushed composed candidate. Under critical request b8c5a3c8d9a8f4b9c34d8609b9e779ceef86419a. No implementation or execution is released by this assignment.
+
+The current active-source check has six results: five pass, one fails. Its actual forbidden-import list is exactly CLI proposal-outcomes, Scope Site clock lifetime, and Scope Site native@3 publication. The complete log and checker source were read. The previous 18 native cases passed at exact 677; no final gate has passed. Restore the source boundary rather than exempting these files or weakening the checker.
+
+## Exact minimal moves
+
+1. packages/cli/test/proposal-outcomes.test.ts → packages/lanes/test/cli-proposal-outcomes.test.ts.
+   Keep all 189 lines of the scripted HTTP/CLI witness body, all assertions and labels. Change only import paths: changeDemo3 from local ../src/index.ts (or unchanged package self export), command/memoryStore/Context from ../../cli/src/index.ts. The moved file is a Node witness, NOT *.scope.test.ts. The expected expanded count is ELEVEN: link 3 + custom 1 + local callback 1 + merge 2 + partial 4. Three test.each declarations plus two direct tests expand to 11; actual discovery must confirm before body execution. It is not 12 and remains scripted, not native authority.
+2. packages/scope/test/site-clock-lifetime.test.ts → packages/lanes/test/site-clock-lifetime.scope.test.ts.
+   Keep all 34 body lines/title/default 5000 ms/nativeGate sequence. Scope Gate/net import becomes ../../scope/src/testing.ts; graph/onCode/actors becomes ./support/graph.ts; site lifetime becomes ../../scope/test/support/site-fixture-lifetime.ts. Keep same native graph and existing lifetime helper; no fixture copy.
+3. packages/scope/test/site-native3-publication.test.ts → packages/lanes/test/site-native3-publication.scope.test.ts.
+   Keep all 97 body lines/title/default 5000 ms/two actual publications/checker configuration/unapproved reservation/+1800 alarm/native SQL snapshots/Site status assertions. Move Scope imports by path: ../../scope/src/testing.ts, ../../scope/test/support/site-fixture-lifetime.ts, ../../scope/test/hosts.ts, ../../scope/test/repository.ts, ../../scope/src/site/route.ts. changeDemo3 may use local ../src/index.ts. Actual cli import becomes ../../cli/src/index.ts, following existing lanes native tests. Preserve real native admission and pool interfaces, not a copied stand-in.
+
+Those are three Git renames with import-only deltas. Add one comment path correction in packages/lanes/test/manifest-tree.scope.test.ts77, pointing its existing Node-counterpart note to cli-proposal-outcomes.test.ts. Update docs/testing.md's lanes Node paragraph currently claiming only four pins tests, since Node lanes now ALSO contains these 11 scripted CLI outcomes. Add concise placement note for the two native Site scenarios/lifetime model and the remaining scope-owned shared helper. Dated historical delivery notes/evidence keep original paths/heads and are not rewritten as current pass claims.
+
+## Runtime configuration and dependency audit
+
+NO root Vitest or package Vitest edits are required. Root project lanes uses packages/lanes/vitest.config.ts include test/**/*.test.ts, exclude **/*.scope.test.ts: moved proposal runs once in Node with threads, removed CLI source stops running in CLI project. Root scope includes ../lanes/test/**/*.scope.test.ts: renamed native cases run once in the SAME existing scope Worker project, replacing their old Scope entries. Scope native include loses removed files; no duplicate include. Root gate count/body scope is unchanged after pure relocation.
+
+Package lanes test script runs Node config then native vitest.scope.config.ts, which already includes all *.scope.test.ts. Dedicated package native runtime uses lanes support/worker re-exporting same Scope NetScope/PlatformScope, existing NET/PLATFORM SQLite bindings and API service. Site uses PLATFORM; clock model uses NET. Environment declarations include needed bindings. Root native runtime continues full Scope worker config. No namespace/authority/class substitution, compatibility flag, project pool, globalSetup, ordergroup, maxWorkers or deadline edits. Package Scope-only test command appropriately stops owning these two lane-dependent cases; they are now lanes' package tests.
+
+No dependency/lockfile changes. Lanes already has contract/bytes/client/derive/platform/replay/scope as development/test imports, and its existing native tests import actual CLI source by relative ../../cli/src/index.ts rather than adding a forbidden upward dependency. The Node proposal can use that same source boundary. Existing lanes tsconfig.test.json already uses types:[node], skipLibCheck:true, and follows imported source; Node global Response and encoders are provided by pinned Node types as they were in CLI's original Node compiler. DO NOT preemptively add a dedicated typeconfig or DOM lib based on speculation. If a later exact compiler check reveals a real typing issue, retain errors and propose the smallest new compiler choice before edits; no trial runs here.
+
+## Compiler coverage
+
+The author must verify unchanged semantic bodies and each resolved import after moving. Owner-controlled minimal affected compiler commands at new frozen head (TWO commands only):
+
+node node_modules/typescript/bin/tsc -p packages/lanes/tsconfig.test.json
+node node_modules/typescript/bin/tsc -p packages/lanes/tsconfig.scope.json
+
+Lanes Node now owns CLI proposal and its actual imported CLI/client source; Lanes scope now owns the two native cases and their graph/Scope helper closures. These are the only TWO affected compiler environments adding changed source. No config include/extends/compilerOptions change is proposed.
+
+CLI Node and Scope test roots only lose the old test files. Their recursive includes are generic directories/globs, not explicit old filenames. Tracked active source/config/docs search for all three old filenames returns only the manifest-tree comment at line 77; no module imports/re-exports/dynamic imports or explicit tsconfig paths refer to them. The changed counterpart comment is not a compiler dependency. The moved tests import shared helpers, but none of those shared helper files changes; removing a consumer cannot add changed source to a retained compiler closure. Therefore repeating CLI Node or Scope test compiler commands solely to cover a removal is not justified. Scope source, CLI scope and Page scope likewise gain no source path from this relocation. Keep their complete final gate coverage unchanged and do not transfer any prior compile as a new-head result.
+
+Exact evidence: packages/cli/tsconfig.test.json extends its unchanged base, include:[src,test,vitest.config.ts], exclude:[test/**/*.scope.test.ts]. packages/scope/tsconfig.test.json includes src/test/vitest*.config.ts and excludes only local clone Node setup/child. Lanes tsconfig.test.json includes src/test/vitest.config.ts and excludes native *.scope.test.ts/test/support, with existing Node types and skipLibCheck. Lanes tsconfig.scope.json includes src/test/**/*.scope.test.ts/test/support/vitest.scope.config.ts under Worker types. The Node destination matches the Node include and not native include; the two .scope destinations match native include and are excluded from Node. All four actual files were read completely and pinned in source-map.json.
+
+Future author must recheck these no-inbound-import/generic-include facts after the actual rename. If an actual explicit dependency/config edit is discovered, stop and amend scope before widening checks. The existing package typecheck scripts retain all commands; the focused plan selects only Lanes Node + Lanes Scope, not a package script that runs unrelated compilers. No trial compiler or TypeScript listFiles discovery ran to derive this plan.
+
+## Consumer search and remaining artifacts
+
+Tracked active source/config/docs search found ONE explicit old path reference: manifest-tree.scope.test.ts77. No test imports any of these three test files. Site lifetime helper has only the two existing witnesses as consumers; after moves it stays Scope-owned and is imported downward by lanes. Graph/hosts/repository/native Worker APIs are unchanged. Root/package glob and typeinclude references are configuration consumers, not explicit filenames.
+
+scripts/measure-tests.sh already times lanes Node and lanes-scope separately and Scope package tests; after moves the Node witness cost shifts CLI→lanes, Site cases Scope→lanes-scope. Do not edit or run this measurement script or compare old package duration totals as speedup. Root gate still runs each once. scripts/control.mjs selects package cwd/config from arguments: historical Scope controls remain old evidence; any newly commissioned Site control now names lanes and vitest.scope.config.ts, Node proposal control names lanes/vitest.config.ts. No control is proposed or run for a relocation.
+
+External frozen nine/23-file selection recipes and ledgers reference old native paths. They remain immutable historical records; do not rewrite past 18 pass/discovery. Any new head verification recipe uses NEW lanes native paths plus exact head/tree/cwd/importguards. Root Source inventory/final gate must include all renames, docs/comment deltas. No published report's original image/evidence bytes change.
+
+## Minimal future verification
+
+After source-only GO, author isolated branch and push clean complete rename diff, per-file before/after import-only/body/assertion/title comparison, resolved import map, and current source inventory. Owner chooses compiler step then discovery conditional. No test/runtime/active-source/gate command is released now.
+
+Node: ONE new-lanes-file discovery expected 11 expanded unchanged titles, environment Node/threads, then one file body run if owner GO. Do not use native config for it or assert native facts from it. Native: ONE exact two new-lanes-file discovery, expected two unchanged full titles, original 5000 ms/retry 0, ROOT scope Worker project or frozen external config extending the root Scope native config, canonical Scope cwd. This proves relocation at the actual gate pool without rerunning 18 already-passed cases. Both relocated Site bodies remain required; native@3 previous 677 pass alone does not transfer to moved head; clock model also needs current location. Do not run entire lanes package native suite or all Scope to make a count.
+
+Existing six active-source checks must run once at new head after authorized affected checks; they must all pass with checker byte unchanged. No test exception, lane fixture copy, moved code shim left in old package or deleted acceptance. Complete exact composed gate is still required once before formal Source review, at final head after relocation and all source corrections. No mutation/control/benchmark/native warmup/timeout increase/suite omission/provider/browser/audio/install.
+
+The relocation itself changes ownership/selection of witnesses, not runtime authority or their acceptance. Prior native 18 PASS/source checker FAIL remain exact 677; current Source/final gate/landing remain incomplete until the new evidence is actually run and reviewed.

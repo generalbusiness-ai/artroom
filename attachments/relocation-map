@@ -1,0 +1,62 @@
+{
+  "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+  "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+  "changes": [
+    {
+      "old": "packages/cli/test/proposal-outcomes.test.ts",
+      "new": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "runtime_before": "cli Node project",
+      "runtime_after": "lanes Node project",
+      "count_from_source": 11,
+      "titles": [
+        "CLI linking link-summary retains known proposal and stops before merge (HTTP STAND-IN)",
+        "CLI linking link-request retains known proposal and stops before merge (HTTP STAND-IN)",
+        "CLI linking link-unavailable retains known proposal and stops before merge (HTTP STAND-IN)",
+        "a valid custom required rules input refuses the fixed CLI workflow before opening (HTTP STAND-IN)",
+        "a local callback failure retains known opening/rules locators without exposing its text or signing the next step (HTTP STAND-IN)",
+        "an accepted merge keeps the protected reservation observation after merge-final-read (HTTP STAND-IN)",
+        "an accepted merge keeps the protected reservation observation after merge-read-error (HTTP STAND-IN)",
+        "CLI partial proposal source-unavailable retains known work and stops the next phase (HTTP STAND-IN)",
+        "CLI partial proposal source-refused retains known work and stops the next phase (HTTP STAND-IN)",
+        "CLI partial proposal source-mismatch retains known work and stops the next phase (HTTP STAND-IN)",
+        "CLI partial proposal rules-read retains known work and stops the next phase (HTTP STAND-IN)"
+      ]
+    },
+    {
+      "old": "packages/scope/test/site-clock-lifetime.test.ts",
+      "new": "packages/lanes/test/site-clock-lifetime.scope.test.ts",
+      "runtime_before": "root scope native project and packageScope",
+      "runtime_after": "SAMEroot scope native project and packageLanesScope",
+      "count_from_source": 1,
+      "title": "a released Site continuation cannot advance the shared clock past a new native offer deadline"
+    },
+    {
+      "old": "packages/scope/test/site-native3-publication.test.ts",
+      "new": "packages/lanes/test/site-native3-publication.scope.test.ts",
+      "runtime_before": "root scope native project and packageScope",
+      "runtime_after": "SAMEroot scope native project and packageLanesScope",
+      "count_from_source": 1,
+      "title": "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it"
+    }
+  ],
+  "active_explicit_path_consumer": [
+    "packages/lanes/test/manifest-tree.scope.test.ts line77 Nodecounterpartcomment"
+  ],
+  "configuration_consumers_unchanged": [
+    "vitest.config.ts lanesNode/scopeNative globs",
+    "packages/cli/vitest.config.ts Nodeinclude losingoldfile",
+    "packages/scope/vitest.worker.config.ts losingoldnativefiles",
+    "packages/lanes/vitest.config.ts recursiveNodeinclude/excludescope",
+    "packages/lanes/vitest.scope.config.ts nativelaneinclude",
+    "packages/cli/tsconfig.test.json",
+    "packages/scope/tsconfig.test.json",
+    "packages/lanes/tsconfig.test.json",
+    "packages/lanes/tsconfig.scope.json",
+    "scripts/measure-tests.sh packageboundaries",
+    "scripts/control.mjs explicitpackagecwdargument"
+  ],
+  "docs_change": [
+    "docs/testing.md lanesNodeonly4pinclaim plusSitecaseplacement"
+  ],
+  "qualification": "STATIC source expansion and grep/glob audit only; no discovery/runtime/import/typecheck. Node11/native2 mustactualdiscover."
+}

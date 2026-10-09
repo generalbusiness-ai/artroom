@@ -1,0 +1,17 @@
+{
+  "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+  "proposed_only_commands": [
+    "node node_modules/typescript/bin/tsc -p packages/lanes/tsconfig.test.json",
+    "node node_modules/typescript/bin/tsc -p packages/lanes/tsconfig.scope.json"
+  ],
+  "no_inbound_explicit_imports": true,
+  "literal_old_filename_search_only_result": "packages/lanes/test/manifest-tree.scope.test.ts:77 comment",
+  "config_changes_proposed": false,
+  "removing_roots_not_repeated": [
+    "packages/cli/tsconfig.test.json",
+    "packages/scope/tsconfig.test.json"
+  ],
+  "reason": "Generic recursive includes lose tests; retained source/helper closures unchanged; no dangling explicit filenames/imports",
+  "final_gate": "All package compiler/runtime/checker coverage unchanged, still owed",
+  "execution": "No compiler/tests/discovery/runtime/source edits"
+}
