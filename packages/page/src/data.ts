@@ -184,10 +184,15 @@ function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeo
 /** Enrollment custody follows the actual target and signing key, independently
  * of whichever room the Page currently selects. Another invitation does not
  * settle an unknown enrollment under that same identity. */
+export function enrollmentAssociation(session: Session, membership: ScopeRef): string {
+  if (!fullScopeRef(membership) || membership.kind !== "membership") throw new Unreadable("Enrollment requires a complete membership reference.");
+  return canonicalize([session.service.replace(/\/+$/, ""), membership, keyIdOfSecret(session.secret)]);
+}
+
 export function joinAssociation(session: Session, typed: string): string {
   const link = linkOf(typed.trim());
   if (!link || !admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
-  return canonicalize([session.service.replace(/\/+$/, ""), link.repository.membership, keyIdOfSecret(session.secret)]);
+  return enrollmentAssociation(session, link.repository.membership);
 }
 
 /**
