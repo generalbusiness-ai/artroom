@@ -97,7 +97,9 @@ test("explicit supporting cohort establishes Counting with native authority and 
 
     const secret = "native-member-invitation-fixture-32-bytes";
     const invitation = await M.did(rita, "invite-member", { fields: { handle: "@sam", role: "member", inviteHash: textDigest(secret), inviteEnds: soon(60) } });
-    await M.did(sam, "join", { fields: { invitation, secret } });
+    // This key joins the actual @sam invitation; sam stays the recovery key.
+    const invitedPeer = keys.vic;
+    await M.did(invitedPeer, "join", { fields: { invitation, secret } });
     const bytes = canonicalize(counting);
     expect(await Q.stub.submit(await Q.intent(rita, "activate", { fields: { digest: COUNTING_DEFINITION, name: "counting" } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
     // Made-up container checks the generic native closure and a legitimate
@@ -116,7 +118,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     const containerFields = { definition: containerDigest, values: canonicalize({ target: 7, peer: { membership, member: "@sam" } }), execution: "recorded-do" };
     expect(await D.stub.submit(await ask(containerFields), [], { values: [containerBytes] })).toMatchObject({ answer: "unavailable" });
     expect((await D.stub.submit(await ask({ ...containerFields, dependency1: COUNTING_DEFINITION }), [], { values: [containerBytes] })).answer).toBe("refused");
-    expect(await D.stub.submit(await ask(fields, sam), [], { values: [bytes] })).toMatchObject({ answer: "refused", reason: "unauthorized" });
+    expect(await D.stub.submit(await ask(fields, invitedPeer), [], { values: [bytes] })).toMatchObject({ answer: "refused", reason: "unauthorized" });
     expect((await D.stub.submit(await ask({ ...fields, membership: { ...membership, member: "@sam" } }), [], { values: [bytes] })).answer).toBe("refused");
     for (const values of ['{"target":0}', canonicalize({ target: 7, opener: { membership, member: "@sam" } }), "x".repeat(APPLICATION_VALUES_BYTES + 1)]) {
       expect((await D.stub.submit(await ask({ ...fields, values }), [], { values: [bytes] })).answer).toBe("refused");
