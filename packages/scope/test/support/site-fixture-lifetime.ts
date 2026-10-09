@@ -1,9 +1,10 @@
+import { beginSessionFixture } from "../session-settings.ts";
 /** Site test settings only. Native objects keep the same clock reference. */
 import { onTestFinished } from "vitest";
 import { b64url, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { net } from "../../src/testing.ts";
-import { platformNet, platformOutside } from "../worker.ts";
+import { platformOutside } from "../worker.ts";
 
 type Factory = NonNullable<ReturnType<typeof platformOutside.get>>;
 const retired = new WeakSet<Factory>();
@@ -13,7 +14,7 @@ export function siteFixtureLifetime() {
   // This prevents cleanup from ever restoring a released Site owner.
   currentRelease?.();
   const clock = net.clock;
-  const before = { hold: net.hold, deaf: net.deaf, secret: platformNet.secret, sessions: platformNet.sessions, inspector: platformNet.inspector };
+  const before = { hold: net.hold, deaf: net.deaf };
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const inspector = "a test reader";
   let released = false;
@@ -21,9 +22,10 @@ export function siteFixtureLifetime() {
   const deaf: NonNullable<typeof net.deaf> = () => false;
   const wired = new Map<ScopeId, { previous: Factory | undefined; installed: Factory }>();
   net.hold = hold; net.deaf = deaf;
-  platformNet.secret = secret; platformNet.sessions = true; platformNet.inspector = inspector;
+  const sessionOwner = beginSessionFixture({ secret, sessions: true, inspector });
   const active = () => {
-    if (released || net.clock !== clock || net.hold !== hold || net.deaf !== deaf || platformNet.secret !== secret || !platformNet.sessions || platformNet.inspector !== inspector) throw new Error("Site fixture lifetime ended before its continuation completed.");
+    sessionOwner.active();
+    if (released || net.clock !== clock || net.hold !== hold || net.deaf !== deaf) throw new Error("Site fixture lifetime ended before its continuation completed.");
   };
   const release = () => {
     if (released) return;
@@ -33,11 +35,7 @@ export function siteFixtureLifetime() {
     // native objects retain this reference and may have sealed at the advance.
     if (net.hold === hold) net.hold = before.hold;
     if (net.deaf === deaf) net.deaf = before.deaf;
-    if (platformNet.secret === secret) {
-      platformNet.secret = before.secret;
-      if (platformNet.sessions === true) platformNet.sessions = before.sessions;
-      if (platformNet.inspector === inspector) platformNet.inspector = before.inspector;
-    }
+    sessionOwner.close();
     for (const [name, record] of wired) {
       retired.add(record.installed);
       if (platformOutside.get(name) !== record.installed) continue;

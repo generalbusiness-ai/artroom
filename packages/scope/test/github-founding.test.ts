@@ -1,5 +1,5 @@
 import { runInDurableObject } from "cloudflare:test";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
@@ -13,6 +13,7 @@ import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
+import { beginSessionFixture } from "./session-settings.ts";
 import { TEST_DEPLOYMENT, platformNet, platformOutside } from "./worker.ts";
 
 const ACCOUNT = { id: 285042784, login: "generalbusiness-ai", type: "Organization" } as const;
@@ -135,6 +136,8 @@ class ScriptedGitHub {
 // below use actual membership-issued sessions. No lane, source publication or
 // actual GitHub runs.
 test("real PLATFORM founding through production GitHub factory writes exact first head and receipt with private revoked custody; upstream is scripted", async () => {
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: false, inspector: reader });
+  onTestFinished(owner.close);
   const { paul } = keys;
   const keypair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keypair.privateKey) as ArrayBuffer);
@@ -154,10 +157,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
   };
   const priorHold = net.hold;
   const priorDeaf = net.deaf;
-  const priorSessions = { sessions: platformNet.sessions, secret: platformNet.secret, inspector: platformNet.inspector };
   try {
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.inspector = reader; // Labelled fixture inspector, never native session authority.
     net.deaf = null;
     net.hold = (envelope) => {
       // Install a name-bound test factory before real namespace delivery
@@ -245,13 +245,14 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
     expect(await recordedMembership()).toEqual({ scope: (await membership.at()).scope, inc: null, kind: "membership" });
     const seat = await membership.did(rita, "seat", { expected: await membership.expected({ roster: 0 }) });
     await membership.did(rita, "first-key", { fields: { member: seat }, expected: await membership.expected({ roster: 0, member: seat }) });
-    platformNet.sessions = true;
+    owner.configure({ sessions: true });
     const issued = await requestSession("https://scopes.test", membership.name, sessionRequest(await membership.at(), rita.secret, soon(60), "github-founding-session"), { fetch: routed as unknown as Fetch });
     expect(issued.ok).toBe(true);
     if (!issued.ok) expect.fail(`no native session: ${issued.reason}`);
     const native = issued.session.reader();
     const retainedUse = genesis.uses[0]!;
     const nativeReads = async () => {
+      owner.active();
       const history = await G.stub.history(native);
       expect(history.ok && history.value.map(({ entry }) => entry)).toEqual(beforeRestart.entries);
       const retained = await G.stub.retained(native, "entry", retainedUse.content);
@@ -277,7 +278,7 @@ test("real PLATFORM founding through production GitHub factory writes exact firs
   } finally {
     net.hold = priorHold;
     net.deaf = priorDeaf;
-    Object.assign(platformNet, priorSessions);
+    owner.close();
     for (const name of wired) platformOutside.delete(name);
   }
 });

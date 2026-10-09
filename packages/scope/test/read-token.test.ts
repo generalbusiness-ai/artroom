@@ -1,5 +1,5 @@
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, onTestFinished, test } from "vitest";
 import type { Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedLogReader, type Fetch } from "@generalbusiness/artroom-client";
@@ -15,7 +15,8 @@ import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { Platform, rita, routed, sam, settle, una, vic } from "./repository.ts";
 import { reader } from "./support.ts";
-import { platformNet, platformOutside } from "./worker.ts";
+import { beginSessionFixture } from "./session-settings.ts";
+import { platformOutside } from "./worker.ts";
 
 const { paul } = keys;
 const SERVICE = "https://scopes.test";
@@ -60,6 +61,8 @@ const onlyMintRead = (port: Outside): Outside => ({ ...port, accepts: (owner, ki
 // | The clock | The scripted clock of the namespace. No test waits on the wall clock. |
 describe("a member's read token on real scopes (the planner's decision for I5). The Git hosts are STAND-INs", () => {
   test("a member mints a read token and reads it once; a second read, another member's session, a read with no session and a read at its end are each forbidden; a key that is no member's is refused; the plaintext is in no entry and is gone from custody; the destination verifies consistent", async () => {
+    const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
+    onTestFinished(owner.close);
     net.hold = net.deaf = null;
     const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
     // A register on the hosting's own Git service, and a claim whose creation the stand-in answers.
@@ -95,24 +98,24 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
     await G.restart();
     const drive = async () => { while ((await (G.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ } };
 
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
     try {
       const membership: ScopeRef = await M.at();
       const sessionOf = async (who: typeof una): Promise<string> => {
+        owner.active();
         const answer = await requestSession(SERVICE, membership.scope, sessionRequest(membership, who.secret, soon(60), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch });
         if (!answer.ok) throw new Error(`no session: ${answer.reason}`);
         return answer.session.reader();
       };
       const readToken = async (who: typeof una, hours: number) => {
+        owner.active();
         const answer = await G.act(who, "read-token", { on: 0, expected: await G.expected({ on: 0 }), fields: { hours } });
         if (answer.answer !== "accepted") return answer;
         await drive();
         const outcome = (await G.entries()).find((entry) => entry.input.type === "outcome" && entry.input.operation === `${answer.receipt.fact.seq}:0`)!;
         return { answer, outcome, handle: (outcome.input as { evidence: { body: { token: string; ends: string } } }).evidence.body };
       };
-      const credential = (handle: string, session: string | null) => routed(`${SERVICE}/v1/scopes/${G.name}/credential/${encodeURIComponent(handle)}`, session === null ? {} : { headers: { authorization: session } });
+      const credential = (handle: string, session: string | null) => owner.required(() => routed(`${SERVICE}/v1/scopes/${G.name}/credential/${encodeURIComponent(handle)}`, session === null ? {} : { headers: { authorization: session } }));
 
       // A key that is no member's signs nothing here: refused, and nothing is written.
       const before = (await G.summary()).at;
@@ -162,9 +165,7 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
       expect(await runInDurableObject(G.object, (_instance, state: DurableObjectState) => state.storage.sql.exec("SELECT plaintext FROM private_credential WHERE id = ?", late.handle.token).toArray())).toEqual([{ plaintext: null }]);
 
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
       platformOutside.delete(G.name);
     }
   });

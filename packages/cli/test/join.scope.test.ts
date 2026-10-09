@@ -1,9 +1,9 @@
-import { expect, test } from "vitest";
+import { expect, test, onTestFinished } from "vitest";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, factRefOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { secretSigner, signedIntent, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { office, Platform, rita, routed, settle } from "../../scope/test/repository.ts";
 import { command, memoryStore, type Context } from "../src/index.ts";
 
@@ -16,9 +16,8 @@ import { command, memoryStore, type Context } from "../src/index.ts";
 test("join retries its exact private envelope after accepted reply loss and inbox wait failure across restart; saved facts and links cannot substitute another enrollment", async () => {
   const clock = net.clock.now;
   net.hold = net.deaf = null;
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  platformNet.sessions = true;
-  platformNet.inspector = "a test reader";
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: "a test reader" });
+  onTestFinished(owner.close);
   try {
     const { O, M } = await office();
     const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
@@ -117,9 +116,7 @@ test("join retries its exact private envelope after accepted reply loss and inbo
     expect(finished.lines.join("\n")).not.toContain(invitationSecret);
     expect(sent.every((signed) => signed.intent.notAfter === saved.intent.notAfter)).toBe(true);
   } finally {
-    platformNet.secret = null;
-    platformNet.sessions = false;
-    platformNet.inspector = null;
+    owner.close();
     net.clock.now = clock;
   }
 });

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -7,7 +7,8 @@ import { firstExtents, foundingObjects, platform } from "@generalbusiness/artroo
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { site } from "../../scope/src/site/route.ts";
 import type { SiteEnv } from "../../scope/src/site/host.ts";
 import { gitHub, ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
@@ -36,16 +37,13 @@ describe("artroom edit on real scopes, through the production wiring of each Git
   for (const [label, made] of [["the hosting's own Git service", async () => ownHost()], ["GitHub", gitHub]] as const) {
     test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async () => {
       net.hold = net.deaf = null;
-      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      platformNet.sessions = true;
-      platformNet.inspector = reader;
+      const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+      onTestFinished(owner.close);
       const wired = new Set<ScopeId>();
       try {
         await story(await made(), wired);
       } finally {
-        platformNet.secret = null;
-        platformNet.sessions = false;
-        platformNet.inspector = null;
+        owner.close();
         net.hold = null;
         for (const name of wired) platformOutside.delete(name);
       }

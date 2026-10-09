@@ -1,11 +1,12 @@
-import { expect, test } from "vitest";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { expect, onTestFinished, test } from "vitest";
 import type { ScopeId, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, scopeIdOf, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { claimRoom, claimStatus, type ClaimOptions, type ClaimStorage } from "../src/claim.ts";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { command, memoryStore, type Context } from "@generalbusiness/artroom-cli";
 import { reader } from "../../scope/test/support.ts";
 import { OwnGit, ownHost } from "../../scope/test/hosts.ts";
@@ -15,9 +16,8 @@ import type { ClaimLocks } from "../src/claim.ts";
 
 async function registerFixture() {
   net.hold = net.deaf = null;
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  platformNet.sessions = true;
-  platformNet.inspector = reader;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const host = ownHost();
   // STAND-IN namespace: each repository uses the existing OwnGit fixture;
   // a register can create more than one repository in this namespace.
@@ -34,23 +34,25 @@ async function registerFixture() {
   };
   const wired = new Set<ScopeId>();
   let R: Platform;
-  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => artifactsOutside(given, sql, { ...host.bindings(R.name), ARTIFACTS: namespace }, hostFetch)); };
+  const wire = (name: ScopeId) => { owner.active(); wired.add(name); platformOutside.set(name, (given, sql) => artifactsOutside(given, sql, { ...host.bindings(R.name), ARTIFACTS: namespace }, hostFetch)); };
   const pause = async (waiting: readonly ScopeId[] = []) => {
+    owner.active();
     const nodes = [R, ...waiting.filter((name) => name !== R.name).map((name) => new Platform(name))];
     for (let pass = 0; pass < 64; pass++) {
       let made = 0;
-      for (const node of nodes) { while (await (node.stub as unknown as { effect(): Promise<number> }).effect() > 0) made++; made += await node.stub.dispatch(); }
+      for (const node of nodes) { while (await owner.required(() => (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++; made += await owner.required(() => node.stub.dispatch()); }
       if (!made) break;
     }
-    await settle(...nodes);
+    await owner.required(() => settle(...nodes));
   };
-  const ctx: Context = { store: memoryStore(), fetch: routed as unknown as Fetch, now: () => timeMs(net.clock.now)!, pause };
-  expect((await command(ctx, ["install", "https://scopes.test", "--host", host.host, "--namespace", host.namespace])).code).toBe(0);
-  const config = (await ctx.store.config())!;
-  R = new Platform(config.register!.scope); wire(R.name); await R.restart();
+  const fetch: Fetch = (url, init) => owner.required(() => routed(url, init));
+  const ctx: Context = { store: memoryStore(), fetch, now: () => { owner.active(); return timeMs(net.clock.now)!; }, pause };
+  expect((await owner.required(() => command(ctx, ["install", "https://scopes.test", "--host", host.host, "--namespace", host.namespace]))).code).toBe(0);
+  const config = (await owner.required(() => ctx.store.config()))!;
+  R = new Platform(config.register!.scope); wire(R.name); await owner.required(() => R.restart());
   net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
-  const secret = (await ctx.store.secret(config.key))!;
-  return { config, pause, fetch: routed as unknown as Fetch, secret, session: { service: "https://scopes.test", secret, now: ctx.now! }, done: () => { for (const name of wired) platformOutside.delete(name); platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; } };
+  const secret = (await owner.required(() => ctx.store.secret(config.key)))!;
+  return { config, pause, fetch, secret, session: { service: "https://scopes.test", secret, now: ctx.now! }, done: () => { for (const name of wired) platformOutside.delete(name); owner.close(); net.hold = null; } };
 }
 // Test stand-in for Web Locks: queues every caller sharing the same lock name.
 function testLocks(): ClaimLocks {

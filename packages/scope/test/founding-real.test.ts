@@ -1,5 +1,5 @@
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, onTestFinished, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
@@ -15,7 +15,7 @@ import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
-import { platformNet } from "./worker.ts";
+import { beginSessionChild, beginSessionFixture } from "./session-settings.ts";
 
 const { paul } = keys;
 const SERVICE = "https://scopes.test";
@@ -50,6 +50,8 @@ function lacking(named: string): string[] {
 // | Who may install | Nothing checks it: that is the installation design's (N5). paul signs the `install`. |
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
   test("an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check", async () => {
+    const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
+    onTestFinished(owner.close);
     net.hold = net.deaf = null;
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
@@ -136,11 +138,11 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // register's summary and the directory's genesis and summary. The readers are the real read sessions, under a TEST SECRET, which
     // refuse the same read with no header. The install's key signed nothing in the directory, and may not read it. From the
     // directory's repository item the founder learns membership's reference, which its session request below names.
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
+    const signedPhase = beginSessionChild(owner, { secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true });
     let learned: ScopeRef | null = null;
     try {
       const signedGet = async <T>(node: Platform, path: string, read: SignedReadName, arg: string, who = rita): Promise<{ status: number; body: Read<T> }> => {
+        signedPhase.active();
         const response = await routed(`${SERVICE}/v1/scopes/${node.name}${path}`, { headers: { authorization: await signedReader(secretSigner(who.secret), node.name, read, arg, { now: () => Date.parse(net.clock.now) }) } });
         return { status: response.status, body: await response.json() };
       };
@@ -152,8 +154,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       ]).toEqual([403, 200, 200, 200, "genesis", 200, 403]);
       learned = directorySummary.body.ok ? directorySummary.body.value.items.find((item) => item.type === "repository")!.refs["membership"] as ScopeRef : null;
     } finally {
-      platformNet.sessions = false;
-      platformNet.secret = null;
+      signedPhase.close();
     }
     expect(learned).toEqual(membership);
 
@@ -202,8 +203,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // answered at the rules scope shows what that scope records, as its own store holds it.
     // Age every founding history past the 900-second signed bootstrap window.
     net.clock.now = soon(901);
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    const real = async <T>(run: () => Promise<T>): Promise<T> => { platformNet.sessions = true; try { return await run(); } finally { platformNet.sessions = false; } };
+    owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))) });
+    const real = <T>(run: () => Promise<T>): Promise<T> => owner.required(run);
     const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
@@ -245,7 +246,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     await rulesScope!.restart();
     net.clock.now = soon(10);
     expect(await reads(rulesScope!)).toBe(200);
-    platformNet.secret = null;
+    owner.configure({ secret: null });
     expect(await publish(3)).toMatchObject({ answer: "accepted" });
     expect([proof(await rulesScope!.last()).observation.of, proof(await rulesScope!.last()).use, (await rulesScope!.item(0)).values["approvals"]]).toEqual([membership, "fresh", 3]);
     // After each `publish` the revision of the answer is the position of that entry, also after the restart, and its head is the

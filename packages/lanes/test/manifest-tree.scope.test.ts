@@ -1,5 +1,5 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
-import { inject, expect, test } from "vitest";
+import { inject, expect, test, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
@@ -8,7 +8,8 @@ import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
 import { snapshotReaderOf } from "../../scope/src/worker.ts";
 import { env } from "cloudflare:workers";
@@ -33,104 +34,134 @@ import { room as legacyRoom, rita as legacyFounder } from "./support/room.ts";
 const SERVICE = "https://scopes.test";
 const reader = "a test reader";
 test("a manifest-list reservation records both files before the configured checker passes; no branch push occurs before that pass (real scopes, STAND-IN Git host and scheduler)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("a retry fence after publication starts is refused without superseding the live job or forgetting the unknown send (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("a lost staging answer keeps its recorded reservation and starts no check or publication (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("an unknown reservation deletion retains the live publication cleanup duty and cannot be resent from ref absence alone (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("artroom edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // CLI category formatting/pre-send routing lives at the cheaper HTTP boundary
 // in cli/test/proposal-outcomes.test.ts; keep actual acceptance and lost reply.
 test.each(["reply", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, linkFault); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("a refused publication push retains and settles its staged-ref cleanup instead of finalizing an orphan (real scopes; host refusal and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // Expiry records the bounded cleanup in the real timed turn; a host refusal
 // leaves a named live obligation after precisely three attempts, without resend.
 test.each(["ref", "token", "token-unknown"] as const)("expired reservations retain named owed %s cleanup after three refusals (real scopes; host and scheduler STAND-INs)", async (resource) => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, resource); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("unknown staging and exhausted token cleanup retain independent duties across late original and earlier deletion answers (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, true, false, false, false, undefined, "token"); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("an unknown cleanup mint remains named after confirmed ref deletion until its exact late mint and revoke settle (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("confirmed ref removal survives an older refused deletion while token custody remains owed (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, true, false, false, undefined, "token-unknown"); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // Native admission refuses an empty list without closing collection, and
 // the same lane can still collect a source and accept a nonempty manifest.
 test.each(["production", "demo"] as const)("%s manifest admission rejects zero sources before freezing and accepts a nonempty counterpart (real scopes; host and scheduler STAND-INs)", async (profile) => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, profile); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // A collected source and a frozen manifest are different admitted work. The
 // other response/read categories are CLI HTTP stand-ins, not native evidence.
 test.each(["source-reply", "manifest-reply"] as const)("interrupted manifest proposal retains known partial work after %s (real scopes; transport fault, host and scheduler STAND-INs)", async (fault) => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, fault); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // The receipt token is held by publication even though it uses the receipt's
 // token slot. Native operations are independently answered; Git is a STAND-IN.
 test("eligible resend opens recovery and late receipt-token outcomes settle the publication holder (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, undefined, true); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("a valid custom required rules input is activated natively but stops the fixed CLI before opening any change (real scopes; host and scheduler STAND-INs)", async () => {
-  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, "custom-required"); }
-  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
@@ -929,16 +960,17 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
 }
 
 test("a native version-2 room refuses branch list proposals before local Git capture", async () => {
+  const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
+  onTestFinished(owner.close);
   const old = await legacyRoom();
   expect((await old.G.summary()).value.reservationExpiry).toBeUndefined();
   const directory = await old.D.at(), membership = await old.M.at();
-  platformNet.inspector = reader;
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true;
+  owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
   try {
     const store = memoryStore(); await store.keep("founder", legacyFounder.secret);
     await store.save({ v: 1, service: SERVICE, key: "founder", repository: { directory, membership, rules: old.rules.name, destination: old.G.name } });
     let reads = 0;
     const outcome = await command({ store, fetch: ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch, now: () => timeMs(net.clock.now)!, git: { run: async () => 0, files: async () => { reads++; return { ok: false, reason: "should-not-read" }; } } }, ["propose", "topic"]);
     expect([outcome.code, outcome.lines[0], reads, (await old.G.summary()).value.definition]).toEqual([1, "Cannot propose: version-mismatch. This room has no manifest-list destination.", 0, "platform:destination@2"]);
-  } finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; }
+  } finally { owner.close(); }
 });
