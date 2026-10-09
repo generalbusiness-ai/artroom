@@ -1,0 +1,1391 @@
+{
+  "source": "4a905af8e6ef71811e7892dc39f3132774597ee3",
+  "sourceTree": "bbeea6ad62aa95d58465a52499e9717bb5dfed26",
+  "playwrightVersion": "1.63.0",
+  "browserVersion": "153.0.8010.12",
+  "executablePath": "/Users/hughpyle/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+  "fallback": "Browser plugin not available",
+  "layoutChecks": [
+    {
+      "name": "issues-desktop",
+      "url": "https://scopes.test/page/#/",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:conditions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue",
+      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:reason",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:claims",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commit",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:evidence",
+          "fontSize": 16
+        },
+        {
+          "name": "field:summary",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-refused",
+      "url": "https://scopes.test/page/#/change/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:thread",
+          "fontSize": 16
+        },
+        {
+          "name": "field:reports",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-refused-record",
+      "url": "https://scopes.test/page/#/change/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:thread",
+          "fontSize": 16
+        },
+        {
+          "name": "field:reports",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-published",
+      "url": "https://scopes.test/page/#/change/sc_2thrpgvxqkclsst3obdbvuyphkl3ymq4si3r6phzzkvt55akq6va",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:thread",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
+          "fontSize": 16
+        },
+        {
+          "name": "field:reports",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-source-preview",
+      "url": "https://scopes.test/page/#/change/sc_2thrpgvxqkclsst3obdbvuyphkl3ymq4si3r6phzzkvt55akq6va",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:thread",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
+          "fontSize": 16
+        },
+        {
+          "name": "field:reports",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "rules",
+      "url": "https://scopes.test/page/#/rules",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Rules",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": []
+    },
+    {
+      "name": "site-readme",
+      "url": "https://scopes.test/site/sc_dbxy2x7rlfmdntsm6l2kre5lseidywjcqo6no4vstkziwakmajia/HEAD/",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "The handbook",
+      "origin": "https://scopes.test",
+      "pathname": "/site/sc_dbxy2x7rlfmdntsm6l2kre5lseidywjcqo6no4vstkziwakmajia/HEAD/",
+      "meaningful": true,
+      "selectedNavigation": null,
+      "roomSwitches": 0,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": []
+    },
+    {
+      "name": "issues-mobile",
+      "url": "https://scopes.test/page/#/",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:conditions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue-mobile",
+      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:reason",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:claims",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commit",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:evidence",
+          "fontSize": 16
+        },
+        {
+          "name": "field:summary",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issues-narrow",
+      "url": "https://scopes.test/page/#/",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:conditions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue-narrow",
+      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": [
+        {
+          "name": "field:reason",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:mentions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:replyTo",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:claims",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commit",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:evidence",
+          "fontSize": 16
+        },
+        {
+          "name": "field:summary",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "rules-mobile-dark",
+      "url": "https://scopes.test/page/#/rules",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Rules",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "controls": []
+    }
+  ],
+  "consoleErrors": [],
+  "expectedNetworkRefusals": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+      "url": "https://scopes.test/v1/scopes/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq/acts",
+      "status": 422,
+      "refusal": {
+        "answer": "refused",
+        "reason": "guard-failed",
+        "name": "author-cannot-review",
+        "judgedAt": {
+          "hash": "sha256:25548e5dcd4aaf6d31b6116a07832f8a657813b7e797e7f9476782b70bff544b",
+          "seq": 8
+        }
+      }
+    }
+  ],
+  "unanswered": [],
+  "previewChecks": [
+    {
+      "selectedVersion": "Version 5 · README.md",
+      "path": "README.md",
+      "exactContent": true,
+      "extraRequests": 0
+    }
+  ]
+}

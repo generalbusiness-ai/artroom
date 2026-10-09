@@ -34,12 +34,12 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, entryHash, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { DEFINITION_DOMAIN, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -65,6 +65,8 @@ export interface Room {
   membership: ScopeRef;
   rules: ScopeId;
   destination: ScopeId;
+  /** The repository name already recorded by the directory; no claimed display name is inferred. */
+  name?: string;
   key: KeyId;
   /** The caller's role and actions in membership, or null when the key is no active member's. */
   me: Standing | null;
@@ -79,17 +81,6 @@ export interface Room {
 /** A read that failed: the page shows this text and nothing else about the thing it could not read. */
 export class Unreadable extends Error {
   override readonly name = "Unreadable";
-}
-
-/** Browser Settings only: the served page has no reviewed cross-origin boundary.
- * This does not change the data client's explicit service or scripted transport. */
-export function pageService(typed: string, pageOrigin: string): string {
-  const service = typed.trim() || pageOrigin;
-  let url: URL;
-  try { url = new URL(service); }
-  catch { throw new Unreadable("Invalid service URL. Use this page's service URL or leave it empty."); }
-  if (url.origin !== pageOrigin) throw new Unreadable("Unsupported service origin: cross-origin service configuration is not available. Open the page on that service instead.");
-  return service;
 }
 
 const nowOf = (session: Session): number => session.now?.() ?? Date.now();
@@ -190,6 +181,20 @@ function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeo
     && platform(link.definition)?.data.name === "platform:membership";
 }
 
+/** Enrollment custody follows the actual target and signing key, independently
+ * of whichever room the Page currently selects. Another invitation does not
+ * settle an unknown enrollment under that same identity. */
+export function enrollmentAssociation(session: Session, membership: ScopeRef): string {
+  if (!fullScopeRef(membership) || membership.kind !== "membership") throw new Unreadable("Enrollment requires a complete membership reference.");
+  return canonicalize([session.service.replace(/\/+$/, ""), membership, keyIdOfSecret(session.secret)]);
+}
+
+export function joinAssociation(session: Session, typed: string): string {
+  const link = linkOf(typed.trim());
+  if (!link || !admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
+  return enrollmentAssociation(session, link.repository.membership);
+}
+
 /**
  * Attempts to enrol the page's key in the room an invitation link names: membership's
  * `join`, with the invitation's number and secret, signed by the key. Its
@@ -197,7 +202,7 @@ function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeo
  * The hint is not proven provenance; the answer is membership's. This direct
  * request has no CLI-style saved enrollment envelope or durable recovery.
  */
-export async function joinRoom(session: Session, typed: string): Promise<{ place: Place; answer: Answer }> {
+export async function joinRoom(session: Session, typed: string, submitting?: () => void): Promise<{ place: Place; answer: Answer }> {
   const link = linkOf(typed.trim());
   if (!link) throw new Unreadable("That is not an invitation link from artroom invite.");
   if (!admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
@@ -207,6 +212,7 @@ export async function joinRoom(session: Session, typed: string): Promise<{ place
   const signing: Signing = session.now ? { now: session.now() } : {};
   // A new key reads nothing in membership before the join, and `join` names its member by a mark, which has no key in `expected`.
   const signed = await signedIntent(secretSigner(session.secret), { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  submitting?.();
   const answer = await new ScopeHandle(transportOf(session), link.repository.membership.scope, null).submit(signed);
   return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, answer };
 }
@@ -231,6 +237,8 @@ export async function openRoom(session: Session, place: Place): Promise<Room> {
   if (M.scope !== place.membership.scope || M.inc !== place.membership.inc) throw new Unreadable(`The directory ${place.directory} names another membership scope than ${place.membership.scope}.`);
   room.rules = rules;
   room.destination = destination;
+  const recordedRepository = repository.values["repository"];
+  if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository["name"] === "string") room.name = recordedRepository["name"];
   room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
   return room;
 }
@@ -291,6 +299,8 @@ const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Prom
   Promise.all((await itemsOf(handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
 
 export interface IssueView {
+  /** The actual intent item used by transitions. */
+  intent?: number;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
   requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
@@ -306,7 +316,7 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
-    scope, definition: summary.definition, head: at,
+    scope, definition: summary.definition, head: at, intent: intent.id,
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
     state: intent.state, closeReason: text(intent.values["closeReason"]), requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
     conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
@@ -321,7 +331,9 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
  */
 export interface Manifest {
   id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
-  file: { path: string; digest: string | null; size: number | null; page: string } | null;
+  file: { path: string; digest: string | null; size: number | null; page: string;
+    /** Exact retained proposal text, verified for the selected version; null when unavailable. Never read from HEAD. */
+    content?: string | null } | null;
 }
 export interface Review { id: number; state: string; reviewer: string | null; manifest: number | null; verdict: string | null; extent: string | null }
 export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null }
@@ -336,12 +348,35 @@ export interface Publication { id: number; state: string; reason: string | null;
 export interface Merge { id: number; state: string; manifest: number | null; reason: string | null; commit: string | null; publication: Publication | null }
 
 export interface ChangeView {
+  /** The actual proposal item used by transitions. */
+  proposal?: number;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
 }
 
 const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
+
+/** Item IDs are their opening entry positions (contract 4.1). Read just that
+ * authenticated entry and bind its signed bytes to the selected manifest.
+ * A missing, redacted or inconsistent source offers no preview. */
+async function manifestContent(handle: ScopeHandle, scope: Summary["scope"], manifest: Item): Promise<string | null> {
+  try {
+    const read = await handle.entry(manifest.id);
+    if (!read.ok || !read.complete || read.next !== undefined) return null;
+    const { entry, hash } = read.value;
+    if (entry.seq !== manifest.id || canonicalize(entry.at) !== canonicalize(scope) || entryHash(entry) !== hash || hash !== manifest.opened) return null;
+    if (!entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id)) return null;
+    const input = entry.input;
+    if (input.type !== "act" || input.signed.intent.kind !== "propose-file" || !verifySignedIntent(input.signed) || canonicalize(input.signed.intent.to) !== canonicalize(scope)) return null;
+    const author = input.authority.length === 1 ? input.authority[0] : null;
+    const authors = manifest.parties["authors"];
+    if (!author || author.key !== input.signed.intent.actor || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(authors) || !authors.some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { path, digest, size, content } = input.signed.intent.fields;
+    if (typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || path !== manifest.values["path"] || digest !== manifest.values["digest"] || size !== manifest.values["size"] || !fileSound({ path, digest, size, content })) return null;
+    return content;
+  } catch { return null; }
+}
 
 /**
  * A change lane, and for each of its merges the destination's publication
@@ -360,14 +395,17 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   if (!proposal) throw new Unreadable(`${scope} holds no proposal.`);
   const rulesItem = summary.items.find((item) => item.type === "rules");
   const publications = await publicationsOf(room, scope);
+  const manifests = await all("manifest");
+  const selected = manifests.find((m) => m.state === "current") ?? manifests.at(-1);
+  const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
   return {
-    scope, definition: summary.definition, head: at,
+    scope, definition: summary.definition, head: at, proposal: proposal.id,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
-    manifests: (await all("manifest")).map((m) => ({
+    manifests: manifests.map((m) => ({
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
       file: typeof m.values["path"] === "string" ? {
-        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]),
+        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]), ...(m === selected ? { content } : {}),
       } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
@@ -456,11 +494,13 @@ export async function loadSite(room: Pick<Room, "session" | "directory">, path: 
 // ---------------------------------------------------------------- the rules
 
 export interface RulesView {
+  /** The actual rules item, used by publish transitions. */
+  item?: number;
   scope: ScopeId; head: Head;
   /** The position of the last `publish` in the rules scope's history: the revision of the rules. Null before the first. */
   revision: number | null;
   approvals: number | null; ownerMayReview: boolean | null; singleControllerException: boolean | null;
-  checks: { name: string; required: boolean; checker?: unknown }[]; labels: string[]; extents: Extent[] | null;
+  checks: { name: string; required: boolean; checker?: unknown; configuration?: string }[]; labels: string[]; extents: Extent[] | null;
   definitions: { name: string; digest: string; state: string }[];
   /** The members whose role holds `rules.publish`, the action a change of the rules needs. */
   controllers: string[];
@@ -476,7 +516,7 @@ export async function loadRules(room: Room): Promise<RulesView> {
   // The slot holds the position of the last `publish` in this scope's history: the revision of the rules (`revisionOf`).
   const published = rules.refs["published"];
   return {
-    scope: room.rules, head: at, revision: typeof published === "number" ? published : null,
+    scope: room.rules, item: rules.id, head: at, revision: typeof published === "number" ? published : null,
     approvals: localId(rules.values["approvals"]), ownerMayReview: typeof rules.values["ownerMayReview"] === "boolean" ? rules.values["ownerMayReview"] : null,
     singleControllerException: typeof rules.values["singleControllerException"] === "boolean" ? rules.values["singleControllerException"] : null,
     checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
@@ -514,10 +554,10 @@ const domainOf = (field: unknown): string | null => {
 };
 
 /** The definitions the rules scope holds active, latest first: a choice for a field that takes a definition's bytes. */
-async function activeDefinitions(room: Room): Promise<{ label: string; value: string }[]> {
+async function activeDefinitions(room: Room): Promise<{ label: string; value: string; name: string }[]> {
   const { summary } = await summaryOf(handleOf(room, room.rules));
   return summary.items.filter((item) => item.type === "definition" && item.state === "active").sort((a, b) => b.id - a.id)
-    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]) }));
+    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]), name: String(item.values["name"]) }));
 }
 
 /**
@@ -564,7 +604,7 @@ export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offere
   return {
     acts: acts.map(([kind, a]) => ({
       kind, step: a.step, on: a.on, line: describe(kind, a),
-      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions } : {}) })),
+      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions.filter((definition) => kind !== "open-issue" && kind !== "open-pr" || definition.name === (kind === "open-issue" ? "issue" : "change")) } : f.type === "enum" && Array.isArray((f as { of?: unknown }).of) ? { choices: ((f as { of: string[] }).of).map((value) => ({ label: value.replace(/-/g, " "), value })) } : {}) })),
     })),
     hidden,
   };
@@ -591,7 +631,7 @@ export function actAssociation(room: Pick<Room, "session" | "directory" | "membe
  * act goes through the client's declared handle, which checks each field's
  * shape before it signs and carries detached texts beside the intent.
  */
-export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void): Promise<Acted> {
+export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void, submitting?: () => void): Promise<Acted> {
   await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at: before } = await summaryOf(handle);
@@ -609,9 +649,12 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     const typed = await declaredHandle(handle, declared);
     if (!typed.ok) throw new Unreadable(`Cannot act on ${scope}: ${typed.reason}.`);
     const { signed, beside } = await typed.handle.intent(signer, kind as never, { on, fields, expected } as never, signing);
+    submitting?.();
     answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
   } else {
-    answer = await handle.submit(await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing), [], values.length > 0 ? { values } : {});
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing);
+    submitting?.();
+    answer = await handle.submit(signed, [], values.length > 0 ? { values } : {});
   }
   const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
   received?.(result); // Preserve the real answer before any awaited refresh.

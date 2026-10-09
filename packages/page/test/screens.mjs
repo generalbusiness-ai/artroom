@@ -24,7 +24,9 @@ const out = join(page, "test/screenshots");
 const MOST = 300 * 1024;
 
 if (!process.env.PLAYWRIGHT_CORE) throw new Error("Set PLAYWRIGHT_CORE to a directory that holds playwright-core, installed outside this checkout.");
-const { chromium } = createRequire(join(process.env.PLAYWRIGHT_CORE, "package.json"))("playwright-core");
+const playwrightRequire = createRequire(join(process.env.PLAYWRIGHT_CORE, "package.json"));
+const { chromium } = playwrightRequire("playwright-core");
+const playwrightVersion = playwrightRequire("playwright-core/package.json").version;
 const browserPath = process.env.CHROMIUM ?? join(process.env.PLAYWRIGHT_BROWSERS_PATH ?? "/opt/pw-browsers", "chromium-1194/chrome-linux/chrome");
 
 execFileSync("npm", ["run", "build"], { cwd: page, stdio: "inherit" });
@@ -36,13 +38,22 @@ if (parts.length === 0 || !/^PAGE-RECORD end$/m.test(log)) throw new Error("The 
 const record = JSON.parse(Buffer.from(parts.join(""), "base64url").toString("utf8"));
 
 const browser = await chromium.launch({ executablePath: browserPath });
+const browserVersion = browser.version();
 const unanswered = [];
 const sizes = [];
+const consoleErrors = [];
+const expectedNetworkRefusals = [];
+const layoutChecks = [];
+const contexts = [];
+const previewChecks = [];
+const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
 mkdirSync(out, { recursive: true });
 
 /** A browser context signed in as one person: the page's settings kept as the page keeps them, every request answered from the record. */
-async function as(person) {
-  const context = await browser.newContext({ viewport: { width: 1000, height: 800 }, deviceScaleFactor: 1, colorScheme: "light" });
+async function as(person, { width = 1024, height = 800, colorScheme = "light" } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, colorScheme });
+  contexts.push(context);
   await context.route(`${record.service}/**`, (route) => {
     const request = route.request();
     const path = request.url().slice(record.service.length);
@@ -54,64 +65,177 @@ async function as(person) {
     }
     return route.fulfill({ status: answer.status, headers: answer.headers, body: answer.body });
   });
-  await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { service: "", place: record.place, secret: record.people[person] });
-  return context.newPage();
+  await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { place: record.place, secret: record.people[person] });
+  const tab = await context.newPage();
+  const requests = [];
+  tab.on("request", (request) => requests.push({ method: request.method(), url: request.url() }));
+  tab.recordedRequests = requests;
+  tab.on("pageerror", (error) => consoleErrors.push(error.message));
+  tab.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const location = message.location();
+    const path = location.url?.startsWith(record.service) ? location.url.slice(record.service.length) : null;
+    const answer = path ? record.answers[`POST ${path}`] : null;
+    let body = null;
+    try { body = answer ? JSON.parse(answer.body) : null; } catch { /* HTML/script responses are not a refusal. */ }
+    const refusal = body && typeof body.answer === "object" ? body.answer : body;
+    if (answer?.status === 422 && refusal?.answer === "refused" && refusal?.name === "author-cannot-review" && /^Failed to load resource: the server responded with a status of 422/.test(message.text())) {
+      expectedNetworkRefusals.push({ text: message.text(), url: location.url, status: answer.status, refusal });
+    } else consoleErrors.push({ text: message.text(), location });
+  });
+  return tab;
 }
 /** A screenshot of the whole page, or of its top `height` pixels. */
 const shot = async (tab, name, height = null) => {
   const file = join(out, `${name}.png`);
-  await tab.screenshot({ path: file, ...(height ? { clip: { x: 0, y: 0, width: 1000, height } } : { fullPage: true }) });
+  const viewport = tab.viewportSize();
+  const check = await tab.evaluate(() => ({
+    title: document.title,
+    origin: location.origin,
+    pathname: location.pathname,
+    meaningful: document.querySelector("main")?.textContent?.trim().length > 0,
+    selectedNavigation: document.querySelector('nav [aria-current="page"]')?.textContent?.trim() ?? null,
+    roomSwitches: [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0).length,
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    overlay: !!document.querySelector("vite-error-overlay, nextjs-portal"),
+    controls: [...document.querySelectorAll("input:not([type=hidden]), textarea, select")]
+      .filter((element) => element.getBoundingClientRect().width > 0)
+      .map((element) => ({ name: element.getAttribute("name"), fontSize: parseFloat(getComputedStyle(element).fontSize) })),
+  }));
+  if (check.origin !== new URL(record.service).origin || !(check.pathname === "/page/" || check.pathname.startsWith("/site/"))) throw new Error(`${name}: document left the recorded service routes.`);
+  if (check.pathname === "/page/" && check.title !== "Artroom") throw new Error(`${name}: unexpected page title ${check.title}.`);
+  if (!check.meaningful || check.overlay || check.horizontalOverflow) throw new Error(`${name}: invalid rendered layout ${JSON.stringify(check)}`);
+  if (viewport.width <= 390 && check.controls.some((control) => control.fontSize < 16)) throw new Error(`${name}: editable phone text is smaller than 16px.`);
+  layoutChecks.push({ name, url: tab.url(), viewport, ...check });
+  const expectedNavigation = name.startsWith("issues") || name.startsWith("issue") ? "Issues" : name.startsWith("change") ? "Changes" : name.startsWith("rules") ? "Rules" : null;
+  if (expectedNavigation && (check.selectedNavigation !== expectedNavigation || check.roomSwitches !== 1)) throw new Error(`${name}: duplicate room identity or wrong selected destination.`);
+  await tab.screenshot({ path: file, ...(height ? { clip: { x: 0, y: 0, width: viewport.width, height } } : { fullPage: true }) });
   sizes.push([name, statSync(file).size]);
 };
 
 const una = await as("una");
+await una.goto(`${record.service}/page/#/`);
+await una.getByRole("heading", { name: "Issues", exact: true }).waitFor({ state: "attached" });
+await una.getByRole("link", { name: /The handbook is empty/ }).waitFor();
+await shot(una, "issues-desktop");
 await una.goto(`${record.service}/page/#/issue/${record.issue}`);
 await una.getByRole("heading", { name: /The handbook is empty/ }).waitFor();
-await una.getByText("What you may do here").waitFor();
+
 await shot(una, "issue");
+const comment = una.locator('form[data-act="comment"]');
+const commentDetails = una.locator("details", { has: comment }).last();
+await commentDetails.locator("summary").first().click();
+const draftText = "A local draft that is not submitted.";
+await comment.locator('[name="field:body"]').fill(draftText);
+await una.goto(`${record.service}/page/#/`);
+await una.getByRole("heading", { name: "Issues", exact: true }).waitFor({ state: "attached" });
+await una.getByRole("link", { name: /The handbook is empty/ }).click();
+await una.getByRole("heading", { name: /The handbook is empty/ }).waitFor();
+await una.locator("details", { has: una.locator('form[data-act="comment"]') }).last().locator("summary").first().click();
+if (await una.locator('form[data-act="comment"] [name="field:body"]').inputValue() !== draftText) throw new Error("Comment draft was lost during room navigation.");
 
 const paul = await as("paul");
 await paul.goto(`${record.service}/page/#/change/${record.agents}`);
 await paul.getByRole("heading", { name: /Rules for agents/ }).waitFor();
-await paul.getByText("What you may do here").waitFor();
+
 const review = paul.locator('form[data-act="review-verdict"]');
-await paul.locator("details", { has: review }).locator("summary").click();
-await review.locator('input[name="field:manifest"]').fill(String(record.manifest));
-await review.locator('input[name="field:verdict"]').fill("approve");
-await review.locator('input[name="field:extent"]').fill("rules");
+// Own-author review is offered only in the inspection surface. This still
+// submits the real recorded signed act and displays its guard refusal.
+const reviewDetails = paul.locator("details", { has: review });
+await reviewDetails.first().locator("summary").first().click();
+const nestedReview = reviewDetails.last();
+if (await nestedReview.evaluate((element) => !element.open)) await nestedReview.locator("summary").first().click();
+const manifest = review.locator('[name="field:manifest"]');
+if (await manifest.getAttribute("type") !== "hidden") await manifest.fill(String(record.manifest));
+else if (await manifest.inputValue() !== String(record.manifest)) throw new Error("Review form names another version.");
+const verdict = review.locator('[name="field:verdict"]');
+if (await verdict.evaluate((element) => element.tagName === "SELECT")) await verdict.selectOption("approve");
+else await verdict.fill("approve");
+const extent = review.locator('[name="field:extent"]');
+if (await extent.evaluate((element) => element.tagName === "SELECT")) await extent.selectOption("rules");
+else if (await extent.getAttribute("type") !== "hidden") await extent.fill("rules");
+else if (await extent.inputValue() !== "rules") throw new Error("Review form names another extent.");
 await review.getByRole("button").click();
+const lastRequest = paul.locator("details.action-record");
+await lastRequest.waitFor();
+await lastRequest.locator("summary").click();
 await paul.getByRole("status").filter({ hasText: "Known answer for review-verdict" })
   .filter({ hasText: /Refused:.*author-cannot-review/ }).waitFor();
 await shot(paul, "change-refused");
+await paul.getByText("Inspect change record", { exact: true }).click();
+await paul.getByText(/rules-not-met:rules/).first().waitFor();
+await shot(paul, "change-refused-record");
 
 await paul.goto(`${record.service}/page/#/change/${record.readme}`);
 await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
-await paul.getByText("What you may do here").waitFor();
-await shot(paul, "change-published", 1500);
+
+await shot(paul, "change-published");
+const sourcePreview = paul.locator("details.source-preview");
+const selectedVersion = await sourcePreview.locator(".version-label").textContent();
+const currentVersion = (await paul.locator(".detail-meta").textContent())?.match(/Version (\d+)/)?.[1];
+if (!currentVersion || selectedVersion !== `Version ${currentVersion} · README.md`) throw new Error("Source preview did not preserve its selected version and file.");
+const requestCountBeforePreview = paul.recordedRequests.length;
+await sourcePreview.locator("summary").click();
+const sourceCode = await sourcePreview.locator("pre code").textContent();
+if (sourceCode !== "# The handbook\n\nWritten by the room.\n") throw new Error("Source preview did not show the retained selected-version bytes.");
+if (paul.recordedRequests.length !== requestCountBeforePreview) throw new Error("Opening source preview performed another network read.");
+previewChecks.push({ selectedVersion, path: "README.md", exactContent: true, extraRequests: 0 });
+await shot(paul, "change-source-preview");
 
 await paul.goto(`${record.service}/page/#/rules`);
-await paul.getByRole("heading", { name: "The rules of this room" }).waitFor();
-await paul.getByText("What you may do here").waitFor();
+await paul.getByRole("heading", { name: "Rules", exact: true }).waitFor();
+
 await shot(paul, "rules");
 
 // Latest-site navigation is separate from the recorded version. It makes
 // no immutable-preview claim; the current view explicitly refuses one.
 await paul.goto(`${record.service}/page/#/change/${record.readme}`);
 await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
-await paul.getByText("Rendering this published version is not available yet.", { exact: true }).waitFor();
-await paul.getByRole("link", { name: "Latest published site", exact: true }).click();
+await paul.getByRole("link", { name: "Pages", exact: true }).filter({ visible: true }).click();
 await paul.getByRole("heading", { name: "The handbook" }).waitFor();
 await shot(paul, "site-readme");
 
+// Same room and native recorded answers at phone and narrow widths. No
+// sample state or provider outcome is substituted for the responsive view.
+for (const width of [390, 320]) {
+  const phone = await as("una", { width, height: 844 });
+  await phone.goto(`${record.service}/page/#/`);
+  await phone.getByRole("heading", { name: "Issues", exact: true }).waitFor({ state: "attached" });
+  await phone.getByRole("link", { name: /The handbook is empty/ }).waitFor();
+  await shot(phone, width === 390 ? "issues-mobile" : "issues-narrow");
+  await phone.getByRole("link", { name: /The handbook is empty/ }).click();
+  await phone.getByRole("heading", { name: /The handbook is empty/ }).waitFor();
+  await shot(phone, width === 390 ? "issue-mobile" : "issue-narrow");
+}
+const dark = await as("paul", { width: 390, height: 844, colorScheme: "dark" });
+await dark.goto(`${record.service}/page/#/rules`);
+await dark.getByRole("heading", { name: "Rules", exact: true }).waitFor();
+await shot(dark, "rules-mobile-dark");
+
+for (const context of contexts) await context.close();
 await browser.close();
+if (consoleErrors.length > 0) throw new Error(`Browser errors: ${JSON.stringify(consoleErrors)}`);
+writeFileSync(join(out, "checks.json"), `${JSON.stringify({
+  source, sourceTree, playwrightVersion, browserVersion,
+  executablePath: browserPath, fallback: "Browser plugin not available", layoutChecks,
+  consoleErrors, expectedNetworkRefusals, unanswered, previewChecks,
+}, null, 2)}\n`);
 if (unanswered.length > 0) throw new Error(`The browser asked for what the recorder did not read: ${unanswered.join("; ")}`);
 for (const [name, size] of sizes) if (size > MOST) throw new Error(`${name}.png is ${size} bytes, over ${MOST}.`);
 const shows = {
+  "issues-desktop": "The actual room’s Issues list at 1024 CSS pixels, from recorded native room answers.",
   issue: "Signed in as @una (who joined on the page with an invitation link): the issue she opened through the page, paul's comment, and the acts she may sign on it.",
   "change-refused": "Signed in as @paul: the change that AGENTS.md is, waiting for the rules extent's approval (policy not met), its one-file version, the merge the destination refused (rules-not-met:rules), and paul's own review refused by the lane, author-cannot-review.",
-  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version and recorded publication commit; immutable version rendering is unavailable, with separate latest-site navigation (the top 1,500 pixels).",
+  "change-refused-record": "The same refusal with Inspect change record expanded, retaining native policy refusal and outside operation history separately from the main condition.",
+  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version and recorded publication commit; retained source preview is bound to its selected version; Pages remains separate latest-site navigation.",
+  "change-source-preview": "The selected README.md version’s authenticated retained source text, opened locally without an additional network read; this is not a rendered GitHub-Flavored Markdown or HEAD preview.",
   rules: "Signed in as @paul: the rules of this room, who may change them, and that paul may sign no act that changes them.",
-  "site-readme": "README.md as the site route renders the latest published branch, reached by the separate Latest published site link; this is not an immutable version preview.",
+  "site-readme": "README.md as the site route renders the latest published branch, reached by the separate Pages navigation; this is not an immutable version preview.",
+  "issues-mobile": "The room’s Issues list at 390 CSS pixels, from the same recorded native room answers.",
+  "issues-narrow": "The same Issues list at 320 CSS pixels, checked for horizontal overflow.",
+  "issue-mobile": "The recorded issue opened from its list at 390 CSS pixels.",
+  "issue-narrow": "The recorded issue opened from its list at 320 CSS pixels.",
+  "rules-mobile-dark": "The same recorded room rules at 390 CSS pixels with a dark color scheme.",
 };
 writeFileSync(join(out, "README.md"), [
   "# Screenshots of the page",
@@ -120,10 +244,28 @@ writeFileSync(join(out, "README.md"), [
   "`/page/`, in Chromium, answered with the test Worker's recorded answers in the demo story, after README.md is published and",
   "while AGENTS.md waits for the controller.",
   "These files describe this recorder invocation only; they do not establish a live deployment or immutable version preview.",
+  `Source at invocation: \`${source}\`; tree \`${sourceTree}\`. Uncommitted shared source, if present, is not described as that committed tree.`,
+  `Environment: Playwright ${playwrightVersion}, Chromium ${browserVersion}; desktop 1024px, phones 390px and 320px, dark Rules. Browser plugin not available.`,
+  "The flow under test is: recorded room → issue/list navigation → native refused own-review → confirmed change → latest Pages navigation.",
   "",
   "| File | Shows | Bytes |",
   "|---|---|---:|",
   ...sizes.map(([name, size]) => `| \`${name}.png\` | ${shows[name]} | ${size} |`),
+  "",
+  "## Design-rule witness map",
+  "",
+  "This map names the evidence available from this recorder. It does not extend the test Worker's stand-ins into live-provider acceptance.",
+  "",
+  "| Rule | Recorder evidence and limit |",
+  "|---|---|",
+  "| 1. One default home | issues-desktop/mobile and change-published: visible room switch and selected navigation; inspect record carries deeper native facts. `view.test.ts` “ordinary screens omit empty record panels” and “issue and rules keep their subject once” cover DOM duplication; visual inspection is still required. |",
+  "| 2. Controls explain actions | issue and change-refused: real action controls; the own-review submission exercises Review change. `actions.test.ts` “review submits the exact observed version and typed controls once” covers the submitted subject and inspection fallback. |",
+  "| 3. Consistent outcome language | change-published comes from the recorded lane/destination publication, not an internal operation success. change-refused retains the native guard refusal. `view.test.ts` “one current condition follows the selected version” rejects internal-operation and older-version success. |",
+  "| 4. Requirements at decisions | change-refused exercises the actual author-cannot-review answer. `actions.test.ts` “unknown submission offers only a read refresh” blocks mutations in an unknown result; this recorder does not invent a native unknown outcome. |",
+  "| 5. Content over notices | issue records Paul’s real comment and the actual room’s issue; visual inspection checks presentation. `view.test.ts` “ordinary screens omit empty record panels” covers empty metadata. Native creation and rule-save interactions are outside this recorder. |",
+  "| 6. Real affordances | Pages is separate latest navigation. No exact-version Open page is shown because immutable selected-version rendering is unsupported in this source. `actions.test.ts` “a single eligible choice is fixed” covers removal of a false picker. |",
+  "| 7. Preserve subject | Review form is checked against the recorded manifest and rules extent before sending. Published/source-preview screenshots identify and check the selected recorded version and retained content, opening without new network reads; latest Pages makes no immutable claim. `shell.test.ts` “a late read from the previous room cannot replace the active room” and the comment-draft navigation interaction cover scope preservation. |",
+  "| 8. Designed narrow layouts | issues/issue at 390px and 320px, dark Rules at 390px; checks.json records overflow and editable-text checks. Touch target and keyboard checks remain separate. |",
   "",
 ].join("\n"));
 console.log(sizes.map(([name, size]) => `${name}.png ${size} bytes`).join("\n"));
