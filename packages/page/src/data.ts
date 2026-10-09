@@ -188,7 +188,7 @@ function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeo
  * The hint is not proven provenance; the answer is membership's. This direct
  * request has no CLI-style saved enrollment envelope or durable recovery.
  */
-export async function joinRoom(session: Session, typed: string): Promise<{ place: Place; answer: Answer }> {
+export async function joinRoom(session: Session, typed: string, submitting?: () => void): Promise<{ place: Place; answer: Answer }> {
   const link = linkOf(typed.trim());
   if (!link) throw new Unreadable("That is not an invitation link from artroom invite.");
   if (!admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
@@ -198,6 +198,7 @@ export async function joinRoom(session: Session, typed: string): Promise<{ place
   const signing: Signing = session.now ? { now: session.now() } : {};
   // A new key reads nothing in membership before the join, and `join` names its member by a mark, which has no key in `expected`.
   const signed = await signedIntent(secretSigner(session.secret), { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  submitting?.();
   const answer = await new ScopeHandle(transportOf(session), link.repository.membership.scope, null).submit(signed);
   return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, answer };
 }
