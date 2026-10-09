@@ -1,0 +1,94 @@
+# Native Page tasks and retained text editing
+
+Work in progress under primary-task request `12cc35cd`, promise `e2803da6`,
+and editor request `bc78fa68`, promise `39a31779`. Planner amendments `2028c8f5`,
+`561fce0b` and `d3f96a4e` govern local response feedback, the one-file LIST1
+freeze step and exact source proof identity. This note is not a Source approval,
+passing coordinated gate, hosted acceptance or landing.
+
+Create issue opens a Title/Description dialog and uses the title as its native
+completion condition, matching the CLI. Comments appear with the conversation.
+One offered change action is prominent; Inspect retains other actions. Technical
+defaults use the actual current manifest, selected ISSUE-report facts in native
+order, held review extents and authenticated eligible members. Missing facts
+remain unavailable. A checker job is never substituted for a selected report.
+
+Submission preserves the visible subject and fences controls locally. The
+received native answer appears before optional observation refresh; admission,
+observation failure and downstream publication remain separate. Draft retirement
+clears only the exact accepted comment draft. Query/filter state survives
+detail/back and refresh, separated by origin, directory, full membership, key
+and list kind. The bounded preference store evicts no unresolved task records.
+
+The retained editor creates a new proposal from verified text, with explicit
+target, sampled published base and lossless UTF-8 digest/size. Comparison is
+unavailable; changing the path leaves the old file. It retains each original
+signed step before POST, stops after unknown delivery, and reconciles only the
+original request. It does not auto-review, merge, close, rename or rebase.
+Recovery state lasts only while the Page remains loaded. Full durable recovery,
+literal base reader/diff and exact rendered result remain owned dependencies.
+
+Legacy one-file declarations use three native steps. Destination@3's actual
+legacy fallback is supported alongside @2; unknown pins remain refused.
+Planner `561fce0b` also commissions the actual LIST1 declaration's separate
+source collection and fourth manifest freeze. A source receipt alone is not a
+version. That editor source is still being completed at this checkpoint.
+LIST1 preview `caa40c9a` already authenticates the single frozen full source
+reference against the folded local sequence, source opening hash/incarnation,
+signature/actor, base/path/digest/UTF-8 size and actual known declaration pins.
+Multiple files have no one-file preview; unavailable source never falls back
+to Site or HEAD.
+
+Focused native evidence retained:
+
+- `5d269362`: Create Description, comment, author review request, distinct
+  eligible source approval and authorized Merge to actual publication, using
+  the same task defaults as the primary forms. One test passed, 721 ms test time
+  and 1.87 s total; `/tmp/artroom-page-primary-task-native.log`.
+- `4feaaf70`: ordered ISSUE facts remain unchanged after later reports/checker
+  jobs; source-only optional selection is verified empty, malformed selection
+  and unreadable choices are unavailable. Detached Description is admitted
+  and read back. Three tests passed in 3.25 s. Order and missing side-text
+  controls failed directly; metadata `/tmp/artroom-page-task-data-evidence.json`.
+- `7d093d9e`: two native editor witnesses on destination@3 with the legacy
+  declaration, including exact new proposal text and preserved old source/head,
+  passed in 3.01 s. The first added inspector read was forbidden; the fixture
+  was corrected to the actual member session, without widening read authority.
+- `caa40c9a`: one native LIST1 frozen-source projection witness passed in 1.70 s;
+  missing, altered, resealed and wrong-incarnation/hash replies offer no source.
+  The first hash omission control survived a signature guard and earns no
+  distinguishing credit. A strengthened wrong-hash control failed directly.
+- `b2184729`: native Rules publish preserves marked `extents` for scope judgment
+  while ordinary fields retain SDK shaping and detached text side data. Rules
+  readback and Description both pass; dropping marked fields gives a native
+  bad-field refusal. One selected test passed in 1.85 s; all Page typechecks pass.
+
+Authority/rules/Git peers in the graph witness and Git host, scheduler and clock
+in the Page demo are labelled stand-ins. These runs exercise native scopes and
+authenticated reads; they do not establish provider or cold-browser acceptance.
+The strengthened immediate-answer omission control fails a unique held answer,
+not an older accepted line. Initial surviving controls are disclosed.
+
+Browser playback passed at source `3d8757a69339c3b0d9d5a1b4fbdca298efdc5919`,
+tree `ef60c604288e0460745df33f07fee6ba7f8bb41f`, Playwright 1.63.0 and Chromium
+153.0.8010.12. Desktop 1024, 390/320 narrow layouts, dark Rules and 200% CSS
+layout zoom cover the dialog, inline draft, primary review, editor preparation,
+list back/refresh and native dialog keyboard/Escape/focus behavior. Console
+errors and unanswered requests were zero. Root inspected the narrow dialog,
+primary review and prepared editor screenshots. Capture metadata records the
+actual @3 destination and legacy declaration.
+
+These responses are recorded native answers. POST playback is keyed by route
+and does not verify or re-admit the browser's signature/body. Editor preparation
+sends no act; no proposal is confirmed by playback. CSS zoom is not physical
+browser zoom or assistive-technology acceptance. Earlier capture failures were
+retained: the @2-only editor guard, an unauthorized metadata inspector read,
+native Chromium's temporary BODY focus at window chrome, and a missing cold
+lane-definition recording caused by a warm cache. Each received a concrete
+source or recorder correction; no native outcome was fabricated. Final current
+captures/assets and one coordinated gate remain owed after the last source fix.
+
+First-use request `d01aa495` remains separate. Its exact preset assurance review
+and native setup witness do not complete invitation/reload custody, operator
+provisioning, release, two-device or hosted first-use acceptance. Shared names
+and named Site versions likewise await their own exact contracts and adoption.
