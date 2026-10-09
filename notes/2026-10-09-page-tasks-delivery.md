@@ -32,7 +32,7 @@ Legacy one-file declarations use three native steps. Destination@3's actual
 legacy fallback is supported alongside @2; unknown pins remain refused.
 Planner `561fce0b` also commissions the actual LIST1 declaration's separate
 source collection and fourth manifest freeze. A source receipt alone is not a
-version. That editor source is still being completed at this checkpoint.
+version. Source `520383b4` implements that fourth step and exact source proof DTO.
 LIST1 preview `caa40c9a` already authenticates the single frozen full source
 reference against the folded local sequence, source opening hash/incarnation,
 signature/actor, base/path/digest/UTF-8 size and actual known declaration pins.
@@ -62,6 +62,15 @@ Focused native evidence retained:
   while ordinary fields retain SDK shaping and detached text side data. Rules
   readback and Description both pass; dropping marked fields gives a native
   bad-field refusal. One selected test passed in 1.85 s; all Page typechecks pass.
+- `520383b4`: four native LIST1 editor cases passed in 4.24 s: a member's
+  BOM/CRLF text produces four verified receipts and a separate frozen version;
+  an extra source stops before freeze; unknown source with not-found remains
+  fenced until its original delivery; unknown accepted freeze settles the
+  original request and terminal continuation is a no-op. Source and manifest
+  facts, original base and new sampled base remain distinct. The extra-source
+  preflight omission control signed a fourth attempt that native sameSet
+  refused, distinguishing the client's no-POST promise without claiming a
+  backend bypass. Exact source was restored; all Page typechecks passed.
 
 Authority/rules/Git peers in the graph witness and Git host, scheduler and clock
 in the Page demo are labelled stand-ins. These runs exercise native scopes and
@@ -85,8 +94,10 @@ browser zoom or assistive-technology acceptance. Earlier capture failures were
 retained: the @2-only editor guard, an unauthorized metadata inspector read,
 native Chromium's temporary BODY focus at window chrome, and a missing cold
 lane-definition recording caused by a warm cache. Each received a concrete
-source or recorder correction; no native outcome was fabricated. Final current
-captures/assets and one coordinated gate remain owed after the last source fix.
+source or recorder correction; no native outcome was fabricated. Later affected
+editor captures use final served assets with the earlier native GET record,
+reporting those two source identities separately. Unaffected dialog/review/list
+captures are reused. One coordinated final gate remains owed.
 
 First-use request `d01aa495` remains separate. Its exact preset assurance review
 and native setup witness do not complete invitation/reload custody, operator

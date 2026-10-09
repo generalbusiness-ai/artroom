@@ -189,10 +189,11 @@ that the room's records show, with the record it comes from:
 
 - **General source authoring.** The retained editor supports one bounded
   UTF-8 text file under a compatible manifest-producing declaration. It does
-  not supply packs, multiple files, deletes, renames or binary edits. The new
-  LIST1 source-producing declaration needs a separate manifest-freeze step;
-  the current editor refuses that shape. Generic inspection forms are not a
-  substitute for that missing task workflow.
+  not supply packs, multiple files, deletes, renames or binary edits. The known
+  LIST1 source-producing declaration records one source, then freezes exactly
+  that source in a separate manifest step. Another collected source stops the
+  one-file task. A source receipt alone is not a proposed version. Unsupported
+  declaration pins remain unavailable.
 - **Activating a definition.** The rules scope's `activate` needs the
   definition's bytes, which no scope holds before the activation; use
   `artroom act activate --value`.
