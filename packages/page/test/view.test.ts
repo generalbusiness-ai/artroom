@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
+import type { Answer } from "@generalbusiness/artroom-contract";
 import type { ChangeView, Room } from "../src/data.ts";
 import { changeCondition, changeScreen, issueScreen, rulesScreen } from "../src/view.ts";
 
@@ -24,7 +25,7 @@ const view = (over: Partial<ChangeView> = {}): ChangeView => ({
 }) as ChangeView;
 const merge = (over: Partial<ChangeView["merges"][number]> = {}): ChangeView["merges"][number] => ({ id: 15, state: "unknown", manifest: 12, reason: null, commit: null,
   publication: { id: 16, state: "unresolved", reason: null, operations: [{ id: "17:0", kind: "push", attempts: ["confirmed"] }] }, ...over });
-const render = (change: ChangeView): Element => { vi.stubGlobal("document", document); return changeScreen(room, change, null) as unknown as Element; };
+const render = (change: ChangeView, last: Answer | null = null, kind?: string): Element => { vi.stubGlobal("document", document); return changeScreen(room, change, last, kind) as unknown as Element; };
 
 test("one current condition follows the selected version, never an internally confirmed operation or an older version", () => {
   expect(changeCondition(view({ merges: [merge()] }))).toBe("Awaiting confirmation");
@@ -57,4 +58,18 @@ test("issue and rules keep their subject once and move authority detail into ins
   const rules = rulesScreen(room, { scope: "sc_rules", head, revision: 3, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: [{ name: "protected", class: "rules", approvals: 1, approver: "rules.publish", checks: [], patterns: ["AGENTS.md"] }], definitions: [], controllers: ["@controller"] } as never) as unknown as Element;
   expect(rules.textContent.match(/AGENTS.md/g)).toHaveLength(1);
   expect(rules.all("details")[0]!.textContent).toContain("rules.publish");
+});
+
+// A refused or unsettled comment is request evidence, not the lifecycle of a merge.
+test("last comment outcomes do not become the change's current merge condition", () => {
+  for (const answer of [
+    { answer: "refused", reason: "dependency-unavailable" },
+    { answer: "refused", reason: "guard-failed", name: "approvals-needed" },
+    { answer: "unavailable", reason: "busy" },
+  ] as Answer[]) {
+    const screen = render(view(), answer, "comment");
+    expect(screen.all("span").find((e) => e.attributes["class"]?.includes("condition"))?.textContent).toBe("Open");
+    expect(screen.all("details")[0]!.textContent).not.toContain("The lane refused the merge");
+  }
+  expect(changeCondition(view(), { answer: "unavailable", reason: "busy" } as Answer, "merge")).toBe("Authority unavailable");
 });

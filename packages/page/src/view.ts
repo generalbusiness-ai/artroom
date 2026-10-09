@@ -75,11 +75,11 @@ export function issueScreen(room: Room, issue: IssueView): HTMLElement {
 }
 
 /** The main condition belongs to the selected version; outside effects never imply a merge. */
-export function changeCondition(change: ChangeView, last: Answer | null = null): string {
+export function changeCondition(change: ChangeView, last: Answer | null = null, lastActKind?: string): string {
   const current = change.manifests.find((m) => m.state === "current") ?? change.manifests.at(-1) ?? null;
   const latest = change.merges.filter((m) => m.manifest === current?.id).reduce<ChangeView["merges"][number] | null>((a, b) => !a || b.id > a.id ? b : a, null);
   if (latest?.state === "published") return "Merged";
-  const states = changeStates({ requests: change.requests, merges: latest ? [latest] : [] }, last);
+  const states = changeStates({ requests: change.requests, merges: latest ? [latest] : [] }, lastActKind === "merge" ? last : null);
   if (states.some((s) => s.state === "unavailable authority")) return "Authority unavailable";
   if (states.some((s) => s.state === "publication in progress")) return "Awaiting confirmation";
   if (current?.file && editPath(current.file.path) === null) return "Invalid path";
@@ -90,10 +90,10 @@ export function changeCondition(change: ChangeView, last: Answer | null = null):
   return "Open";
 }
 
-export function changeScreen(room: Room, change: ChangeView, last: Answer | null): HTMLElement {
+export function changeScreen(room: Room, change: ChangeView, last: Answer | null, lastActKind?: string): HTMLElement {
   const current = change.manifests.find((m) => m.state === "current") ?? change.manifests.at(-1) ?? null;
   const published = change.merges.find((m) => m.state === "published" && m.manifest === current?.id);
-  const states = changeStates(change, last);
+  const states = changeStates(change, lastActKind === "merge" ? last : null);
   const extents = change.rules?.extents ?? [];
   const reviews = extents.map((extent) => {
     const approving = change.reviews.filter((r) => r.manifest === current?.id && r.state === "submitted" && r.verdict === "approve" && r.extent === extent.name);
@@ -104,7 +104,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     h("p", { class: "muted" }, editPath(current.file.path) === null ? "Choose a file path inside this room." : published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null))),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null))),
     version,
     extents.length ? section("Review requirements", table(["Extent", "Approvals of this version", "Role", "By"], reviews)) : null,
     change.jobs.length ? section("Checks", table(["Job", "Name", "Version", "State"], change.jobs.map((j) => [String(j.id), or(j.name), or(j.manifest), j.state]))) : null,
