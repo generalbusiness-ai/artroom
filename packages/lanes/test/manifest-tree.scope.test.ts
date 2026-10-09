@@ -56,7 +56,13 @@ test("an unknown reservation deletion retains the live publication cleanup duty 
   try { await story(ownHost(), wired, false, false, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false): Promise<void> {
+test("artroom edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -175,7 +181,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const row = { path: "one.md", entry: factRefOf(sourceEntry), digest: digestBytes(files["one.md"]!) };
   const mismatch = await run(founder, "act", "propose-manifest", "--on", controlLane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([{ ...row, digest: `sha256:${"e".repeat(64)}` }])}`);
   expect([mismatch.code, mismatch.lines[0]]).toEqual([1, expect.stringContaining("source-mismatch")]);
-  const proposed = await run(founder, "propose", "topic");
+  const proposed = oneFileOnly ? await run(founder, "edit", "one.md", "--file", "one.md") : await run(founder, "propose", "topic");
   ok(proposed);
   const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
   const [lane, version] = [matched[1]!, Number(matched[2])];
@@ -214,7 +220,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       submit: async (_scope, signed) => { if (loseSubmit) { loseSubmit = false; throw new Error("reply unavailable"); } return L.stub.submit(signed, []); },
     },
     // Runner boundary STAND-IN here; actual object checkout is tested in checkers/runner.test.ts.
-    runner: { find: async () => null, run: async (ask) => { runs++; expect(ask.job.snapshot?.tree).toBe(manifest.values["tree"]); expect(ask.job.snapshot?.sources).toHaveLength(2); return { started: true, image: checkConfig.image, environment: [], checkout: true, steps: [{ status: 0, line: "ok" }], end: "complete" }; } },
+    runner: { find: async () => null, run: async (ask) => { runs++; expect(ask.job.snapshot?.tree).toBe(manifest.values["tree"]); expect(ask.job.snapshot?.sources).toHaveLength(oneFileOnly ? 1 : 2); return { started: true, image: checkConfig.image, environment: [], checkout: true, steps: [{ status: 0, line: "ok" }], end: "complete" }; } },
   };
   const service = new CheckerService(serviceOptions);
   const jobEntry = (await L.sealed())[job]!;
@@ -262,7 +268,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(host.refs.has(reservationRef)).toBe(false);
   const git = readerOf(host); const commit = await git.commit(published);
   expect(commit.tree).toBe(manifest.values["tree"]);
-  expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "docs", "one.md"]);
+  expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(oneFileOnly ? ["README.md", "one.md"] : ["README.md", "docs", "one.md"]);
+  if (oneFileOnly) return;
   // The same command also waits for a publication when no check is owed.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
