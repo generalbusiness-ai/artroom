@@ -181,6 +181,15 @@ function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeo
     && platform(link.definition)?.data.name === "platform:membership";
 }
 
+/** Enrollment custody follows the actual target and signing key, independently
+ * of whichever room the Page currently selects. Another invitation does not
+ * settle an unknown enrollment under that same identity. */
+export function joinAssociation(session: Session, typed: string): string {
+  const link = linkOf(typed.trim());
+  if (!link || !admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
+  return canonicalize([session.service.replace(/\/+$/, ""), link.repository.membership, keyIdOfSecret(session.secret)]);
+}
+
 /**
  * Attempts to enrol the page's key in the room an invitation link names: membership's
  * `join`, with the invitation's number and secret, signed by the key. Its
