@@ -286,7 +286,7 @@ export const isItem = (v: unknown): v is Item => item(v);
 const summary = record({
   scope: scopeRef, status: among(STATUS), definition: isDefinitionName, time: isTime, items: listOf(item),
   counts: listOf((c) => Array.isArray(c) && c.length === 3 && text(c[0]) && text(c[1]) && isLocalId(c[2])),
-});
+}, { reservationExpiry: (v) => record({ clock: is("available"), time: isTime, expired: listOf(isLocalId) })(v) || record({ clock: is("unavailable") })(v) });
 export const isSummary = (v: unknown): v is Summary => summary(v);
 const duty = record({
   duty: isDutyId, to: (v) => scopeRef(v) || seed(v), class: among(CLASS), held: flag, attempts: listOf(record({ at: isTime, answer: among(DISPATCHED) })), acknowledged: orNull(factRef),

@@ -65,6 +65,10 @@ export interface Item {
 export interface Summary {
   scope: ScopeRef; status: Status; definition: Digest | PlatformDefinition; time: Timestamp;
   items: readonly Item[];                                                    // live, by ID
+  /** Destination@3 write-free expiry at this read's head. `time` is the
+   * current clock, distinct from the last sealed entry's Summary.time.
+   * Behind or unavailable clock reports no expired IDs. */
+  reservationExpiry?: { clock: "available"; time: Timestamp; expired: readonly number[] } | { clock: "unavailable" };
   counts: readonly (readonly [type: string, state: string, n: number])[];    // every type and state of the definition, by type, then state
 }
 
