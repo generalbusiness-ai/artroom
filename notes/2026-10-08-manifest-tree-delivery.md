@@ -58,8 +58,12 @@ deployment image, container, fresh authority or provider acceptance follows.
 Peer review found a remaining custody defect: cancellation after a staging
 send with an unknown answer can finalize the publication without retaining
 cleanup, even when the provider wrote the ref. The source owner is repairing
-that path with a real-Scope witness. This candidate must not be gated or filed
-as complete before that repair is integrated.
+that path with a real-Scope witness. Exhausted refused publication pushes
+also finalize without staged-ref cleanup. A separate command recovery fix
+must preserve the accepted proposal locator when linking loses an answer.
+Snapshot reads must bind to the destination's current job generation as well
+as the lane's requested state. This candidate must not be gated or filed as
+complete before those repairs are integrated.
 
 The planner must judge the expired reservation's explicit cleanup trigger
 (`f1b87a0b017aa745ed85f77f4ed3154d36d59eb7`), the historical one-file-form
