@@ -1,6 +1,11 @@
 {
-  "source": "4a905af8e6ef71811e7892dc39f3132774597ee3",
-  "sourceTree": "bbeea6ad62aa95d58465a52499e9717bb5dfed26",
+  "source": "3d8757a69339c3b0d9d5a1b4fbdca298efdc5919",
+  "sourceTree": "ef60c604288e0460745df33f07fee6ba7f8bb41f",
+  "fixture": {
+    "destinationDefinition": "platform:destination@3",
+    "changeDefinition": "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+    "workflow": "legacy one-file manifest on current CLI cohort; no manifest-list proposal"
+  },
   "playwrightVersion": "1.63.0",
   "browserVersion": "153.0.8010.12",
   "executablePath": "/Users/hughpyle/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
@@ -21,21 +26,39 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": null,
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:conditions",
           "fontSize": 16
         },
         {
@@ -65,8 +88,8 @@
       ]
     },
     {
-      "name": "issue",
-      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "name": "create-issue-desktop",
+      "url": "https://scopes.test/page/#/",
       "viewport": {
         "width": 1024,
         "height": 800
@@ -79,6 +102,144 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Cancel",
+          "height": 44
+        }
+      ],
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue",
+      "url": "https://scopes.test/page/#/issue/sc_ts4mieycwz55wn7jy56f3azg5vsypjb7tpq76zdx5hn3hnqvempa",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to issue list",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "accept-report",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Reopen",
+          "height": 44
+        },
+        {
+          "label": "report",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:reason",
@@ -86,22 +247,6 @@
         },
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -122,6 +267,14 @@
         },
         {
           "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -167,8 +320,8 @@
       ]
     },
     {
-      "name": "change-refused",
-      "url": "https://scopes.test/page/#/change/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq",
+      "name": "change-primary-review",
+      "url": "https://scopes.test/page/#/change/sc_pdkj7us3wsnwlxpey33xowoephkbnn6txtdntyydhn3vafyfibga",
       "viewport": {
         "width": 1024,
         "height": 800
@@ -181,31 +334,89 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "Propose an edit",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:thread",
-          "fontSize": 16
-        },
-        {
-          "name": "field:reports",
-          "fontSize": 16
-        },
-        {
-          "name": "field:requested",
-          "fontSize": 16
-        },
         {
           "name": "field:body",
           "fontSize": 16
@@ -219,11 +430,7 @@
           "fontSize": 16
         },
         {
-          "name": "field:earlier",
-          "fontSize": 16
-        },
-        {
-          "name": "field:request",
+          "name": "field:body",
           "fontSize": 16
         },
         {
@@ -360,6 +567,282 @@
         },
         {
           "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-refused",
+      "url": "https://scopes.test/page/#/change/sc_pdkj7us3wsnwlxpey33xowoephkbnn6txtdntyydhn3vafyfibga",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "Propose an edit",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
+      "controls": [
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
+          "fontSize": 16
+        },
+        {
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
           "fontSize": 16
         },
         {
@@ -374,7 +857,7 @@
     },
     {
       "name": "change-refused-record",
-      "url": "https://scopes.test/page/#/change/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq",
+      "url": "https://scopes.test/page/#/change/sc_pdkj7us3wsnwlxpey33xowoephkbnn6txtdntyydhn3vafyfibga",
       "viewport": {
         "width": 1024,
         "height": 800
@@ -387,49 +870,91 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "Propose an edit",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:thread",
-          "fontSize": 16
-        },
-        {
-          "name": "field:reports",
-          "fontSize": 16
-        },
-        {
-          "name": "field:requested",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:extent",
-          "fontSize": 16
-        },
-        {
-          "name": "field:verdict",
-          "fontSize": 16
-        },
-        {
-          "name": "field:earlier",
-          "fontSize": 16
-        },
-        {
-          "name": "field:request",
           "fontSize": 16
         },
         {
@@ -569,6 +1094,30 @@
           "fontSize": 16
         },
         {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
           "name": "field:commitment",
           "fontSize": 16
         },
@@ -580,7 +1129,7 @@
     },
     {
       "name": "change-published",
-      "url": "https://scopes.test/page/#/change/sc_2thrpgvxqkclsst3obdbvuyphkl3ymq4si3r6phzzkvt55akq6va",
+      "url": "https://scopes.test/page/#/change/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
       "viewport": {
         "width": 1024,
         "height": 800
@@ -593,21 +1142,91 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Propose an edit",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:thread",
           "fontSize": 16
         },
         {
@@ -648,10 +1267,6 @@
         },
         {
           "name": "field:issue",
-          "fontSize": 16
-        },
-        {
-          "name": "field:reports",
           "fontSize": 16
         },
         {
@@ -786,7 +1401,7 @@
     },
     {
       "name": "change-source-preview",
-      "url": "https://scopes.test/page/#/change/sc_2thrpgvxqkclsst3obdbvuyphkl3ymq4si3r6phzzkvt55akq6va",
+      "url": "https://scopes.test/page/#/change/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
       "viewport": {
         "width": 1024,
         "height": 800
@@ -799,21 +1414,91 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Propose an edit",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:thread",
           "fontSize": 16
         },
         {
@@ -857,7 +1542,291 @@
           "fontSize": 16
         },
         {
-          "name": "field:reports",
+          "name": "field:offeree",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:content",
+          "fontSize": 16
+        },
+        {
+          "name": "field:digest",
+          "fontSize": 16
+        },
+        {
+          "name": "field:path",
+          "fontSize": 16
+        },
+        {
+          "name": "field:size",
+          "fontSize": 16
+        },
+        {
+          "name": "field:base",
+          "fontSize": 16
+        },
+        {
+          "name": "field:complete",
+          "fontSize": 16
+        },
+        {
+          "name": "field:decisions",
+          "fontSize": 16
+        },
+        {
+          "name": "field:foreignHold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:goal",
+          "fontSize": 16
+        },
+        {
+          "name": "field:hold",
+          "fontSize": 16
+        },
+        {
+          "name": "field:instance",
+          "fontSize": 16
+        },
+        {
+          "name": "field:integration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:plan",
+          "fontSize": 16
+        },
+        {
+          "name": "field:previous",
+          "fontSize": 16
+        },
+        {
+          "name": "field:selected",
+          "fontSize": 16
+        },
+        {
+          "name": "field:tree",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:configuration",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:name",
+          "fontSize": 16
+        },
+        {
+          "name": "field:requested",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:earlier",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        },
+        {
+          "name": "field:request",
+          "fontSize": 16
+        },
+        {
+          "name": "field:verdict",
+          "fontSize": 16
+        },
+        {
+          "name": "field:commitment",
+          "fontSize": 16
+        },
+        {
+          "name": "field:extent",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "change-editor-prepared",
+      "url": "https://scopes.test/page/#/change/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Changes",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to change list",
+          "height": 44
+        },
+        {
+          "label": "Confirm new proposal",
+          "height": 62
+        },
+        {
+          "label": "Back to edit",
+          "height": 62
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "ask-rules",
+          "height": 44
+        },
+        {
+          "label": "Cancel merge",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "link-own",
+          "height": 44
+        },
+        {
+          "label": "Merge change",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "propose-manifest",
+          "height": 44
+        },
+        {
+          "label": "Ready for review",
+          "height": 44
+        },
+        {
+          "label": "release-hold",
+          "height": 44
+        },
+        {
+          "label": "request-check",
+          "height": 44
+        },
+        {
+          "label": "Request review",
+          "height": 44
+        },
+        {
+          "label": "Review change",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "on",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:labels",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:how",
+          "fontSize": 16
+        },
+        {
+          "name": "field:issue",
           "fontSize": 16
         },
         {
@@ -1005,23 +1974,30 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        }
+      ],
       "controls": []
     },
     {
       "name": "site-readme",
-      "url": "https://scopes.test/site/sc_dbxy2x7rlfmdntsm6l2kre5lseidywjcqo6no4vstkziwakmajia/HEAD/",
+      "url": "https://scopes.test/site/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga/HEAD/",
       "viewport": {
         "width": 1024,
         "height": 800
       },
       "title": "The handbook",
       "origin": "https://scopes.test",
-      "pathname": "/site/sc_dbxy2x7rlfmdntsm6l2kre5lseidywjcqo6no4vstkziwakmajia/HEAD/",
+      "pathname": "/site/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga/HEAD/",
       "meaningful": true,
       "selectedNavigation": null,
       "roomSwitches": 0,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [],
       "controls": []
     },
     {
@@ -1039,21 +2015,39 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": null,
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:conditions",
           "fontSize": 16
         },
         {
@@ -1083,8 +2077,8 @@
       ]
     },
     {
-      "name": "issue-mobile",
-      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "name": "create-issue-mobile",
+      "url": "https://scopes.test/page/#/",
       "viewport": {
         "width": 390,
         "height": 844
@@ -1097,6 +2091,144 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Cancel",
+          "height": 44
+        }
+      ],
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue-mobile",
+      "url": "https://scopes.test/page/#/issue/sc_ts4mieycwz55wn7jy56f3azg5vsypjb7tpq76zdx5hn3hnqvempa",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to issue list",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "accept-report",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Reopen",
+          "height": 44
+        },
+        {
+          "label": "report",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:reason",
@@ -1104,22 +2236,6 @@
         },
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -1140,6 +2256,14 @@
         },
         {
           "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -1199,21 +2323,39 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": null,
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:conditions",
           "fontSize": 16
         },
         {
@@ -1243,8 +2385,8 @@
       ]
     },
     {
-      "name": "issue-narrow",
-      "url": "https://scopes.test/page/#/issue/sc_vnfqo4vj3qormw6njyr3haas3lqprgl3bjaadwmr4qbybeyqcqoa",
+      "name": "create-issue-narrow",
+      "url": "https://scopes.test/page/#/",
       "viewport": {
         "width": 320,
         "height": 844
@@ -1257,6 +2399,144 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Open",
+          "height": 44
+        },
+        {
+          "label": "Closed",
+          "height": 44
+        },
+        {
+          "label": "All",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Propose change",
+          "height": 44
+        },
+        {
+          "label": "open-task",
+          "height": 44
+        },
+        {
+          "label": "Create issue",
+          "height": 44
+        },
+        {
+          "label": "Cancel",
+          "height": 44
+        }
+      ],
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        }
+      ]
+    },
+    {
+      "name": "issue-narrow",
+      "url": "https://scopes.test/page/#/issue/sc_ts4mieycwz55wn7jy56f3azg5vsypjb7tpq76zdx5hn3hnqvempa",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        },
+        {
+          "label": "Back to issue list",
+          "height": 44
+        },
+        {
+          "label": "Close",
+          "height": 44
+        },
+        {
+          "label": "Comment",
+          "height": 44
+        },
+        {
+          "label": "accept",
+          "height": 44
+        },
+        {
+          "label": "accept-report",
+          "height": 44
+        },
+        {
+          "label": "Save changes",
+          "height": 44
+        },
+        {
+          "label": "offer",
+          "height": 44
+        },
+        {
+          "label": "Reopen",
+          "height": 44
+        },
+        {
+          "label": "report",
+          "height": 44
+        },
+        {
+          "label": "take-hold",
+          "height": 44
+        }
+      ],
       "controls": [
         {
           "name": "field:reason",
@@ -1264,22 +2544,6 @@
         },
         {
           "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:mentions",
-          "fontSize": 16
-        },
-        {
-          "name": "field:replyTo",
-          "fontSize": 16
-        },
-        {
-          "name": "field:body",
-          "fontSize": 16
-        },
-        {
-          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -1300,6 +2564,14 @@
         },
         {
           "name": "field:terms",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
           "fontSize": 16
         },
         {
@@ -1359,21 +2631,103 @@
       "roomSwitches": 1,
       "horizontalOverflow": false,
       "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 44
+        }
+      ],
       "controls": []
+    },
+    {
+      "name": "issues-layout-zoom-200",
+      "url": "https://scopes.test/page/#/",
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "pathname": "/page/",
+      "meaningful": true,
+      "selectedNavigation": "Issues",
+      "roomSwitches": 1,
+      "horizontalOverflow": false,
+      "overlay": false,
+      "touchTargets": [
+        {
+          "label": "Room settings: exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga-1",
+          "height": 88
+        },
+        {
+          "label": "Open",
+          "height": 88
+        },
+        {
+          "label": "Closed",
+          "height": 88
+        },
+        {
+          "label": "All",
+          "height": 88
+        },
+        {
+          "label": "Create issue",
+          "height": 88
+        },
+        {
+          "label": "Propose change",
+          "height": 88
+        },
+        {
+          "label": "open-task",
+          "height": 88
+        }
+      ],
+      "controls": [
+        {
+          "name": null,
+          "fontSize": 16
+        },
+        {
+          "name": "field:title",
+          "fontSize": 16
+        },
+        {
+          "name": "field:body",
+          "fontSize": 16
+        },
+        {
+          "name": "field:draft",
+          "fontSize": 16
+        },
+        {
+          "name": "field:worker",
+          "fontSize": 16
+        },
+        {
+          "name": "field:controller",
+          "fontSize": 16
+        },
+        {
+          "name": "field:lane",
+          "fontSize": 16
+        }
+      ]
     }
   ],
   "consoleErrors": [],
   "expectedNetworkRefusals": [
     {
       "text": "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
-      "url": "https://scopes.test/v1/scopes/sc_zqkckpdpd4aq6khowggygmwjhxcezzsqbqstcsdxfccvep6eoffq/acts",
+      "url": "https://scopes.test/v1/scopes/sc_pdkj7us3wsnwlxpey33xowoephkbnn6txtdntyydhn3vafyfibga/acts",
       "status": 422,
       "refusal": {
         "answer": "refused",
         "reason": "guard-failed",
         "name": "author-cannot-review",
         "judgedAt": {
-          "hash": "sha256:25548e5dcd4aaf6d31b6116a07832f8a657813b7e797e7f9476782b70bff544b",
+          "hash": "sha256:44f35009e469feb9560af7fd458439aad3bdffc7f5105dc20c1ad4fba9d22c1c",
           "seq": 8
         }
       }
@@ -1387,5 +2741,77 @@
       "exactContent": true,
       "extraRequests": 0
     }
-  ]
+  ],
+  "taskChecks": [
+    {
+      "task": "Review change",
+      "role": "recorded admin nonauthor",
+      "inlinePrimary": true,
+      "exactManifest": 5,
+      "submitted": false
+    },
+    {
+      "task": "Prepare retained-text proposal",
+      "originalSource": "Version 5 · README.md",
+      "target": "docs/capture.md",
+      "comparisonUnavailable": true,
+      "overwriteWarning": true,
+      "oldPathRetained": true,
+      "loadedPageRecoveryOnly": true,
+      "mutationPosts": 0,
+      "confirmed": false
+    }
+  ],
+  "navigationChecks": [
+    {
+      "kind": "issue",
+      "query": "handbook",
+      "filter": "all",
+      "back": true,
+      "refresh": true
+    }
+  ],
+  "keyboardChecks": [
+    {
+      "flow": "Create issue",
+      "escapeCloses": true,
+      "returnsFocus": true,
+      "nativeFocusSteps": [
+        {
+          "inDialog": true,
+          "body": false,
+          "tag": "BUTTON"
+        },
+        {
+          "inDialog": true,
+          "body": false,
+          "tag": "BUTTON"
+        },
+        {
+          "inDialog": false,
+          "body": true,
+          "tag": "BODY"
+        },
+        {
+          "inDialog": true,
+          "body": false,
+          "tag": "INPUT"
+        },
+        {
+          "inDialog": true,
+          "body": false,
+          "tag": "TEXTAREA"
+        }
+      ],
+      "backgroundInert": true,
+      "nativeCycleReturns": true,
+      "submitted": false
+    },
+    {
+      "flow": "Issues",
+      "layoutZoom": "200% CSS",
+      "physicalBrowserZoom": false
+    }
+  ],
+  "playbackBoundary": "Recorded native replies; POST replay is keyed by route and does not verify the browser intent/signature or re-admit it"
 }
