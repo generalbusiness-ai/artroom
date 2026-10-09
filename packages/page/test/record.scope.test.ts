@@ -1,6 +1,7 @@
 import { expect, inject, test } from "vitest";
 import { b64url } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { act, actsOn, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, type Room } from "../src/index.ts";
@@ -92,8 +93,11 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     // The page itself, as the deployed Worker's one entry serves it.
     for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
 
+    const destination = await new ScopeHandle(signedReads(httpTransport(SERVICE, { fetch: seen.session.fetch! }), secretSigner(seen.session.secret), { now: seen.session.now! }), seen.destination, seen.reader?.reader() ?? null).summary();
+    expect(destination.ok).toBe(true);
+    if (!destination.ok) throw new Error("The capture actor could not read its destination.");
     const record = {
-      service: SERVICE, place, issue, readme, agents, manifest, fixture: { destinationDefinition: (await d.G.summary()).value.definition, changeDefinition: selected.definition, workflow: "legacy one-file manifest on current CLI cohort; no manifest-list proposal" }, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
+      service: SERVICE, place, issue, readme, agents, manifest, fixture: { destinationDefinition: destination.value.definition, changeDefinition: selected.definition, workflow: "legacy one-file manifest on current CLI cohort; no manifest-list proposal" }, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
     };
     recording = null;
     // In lines of at most 64 KiB, which the test runner prints whole.
