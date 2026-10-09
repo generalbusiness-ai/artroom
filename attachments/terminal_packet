@@ -1,0 +1,108 @@
+{
+  "timestamp_utc": "2026-10-09T20:27:23.160121+00:00",
+  "authorization": "b0a7b152ab876b91b1a477e1de43b84e141931f7",
+  "command": "/usr/bin/time -lp node ../../node_modules/vitest/vitest.mjs run test/application-establish.test.ts --config /tmp/artroom-f1-native-selection-v4/vitest.config.mjs > /tmp/artroom-f1-native-selection-v4/run.log 2>&1",
+  "cwd": "/tmp/artroom-application-establish/packages/scope",
+  "real_cwd": "/private/tmp/artroom-application-establish/packages/scope",
+  "source_head_before": "bbca6048c4b4f0bd28a26210a987d6a0f8cf6660",
+  "source_tree_before": "7660969e335c120586f5681a79515c33f8acddb4",
+  "status_before": "",
+  "configuration_sha256": "4bb0395b1c4c5d92886aed22a748dc1a408a8b8a9a82f8e951a67cbec7a8efda",
+  "timestamp_terminal_utc": "2026-10-09T20:27:25.415135+00:00",
+  "terminal_exit": 1,
+  "source_head_after": "bbca6048c4b4f0bd28a26210a987d6a0f8cf6660",
+  "source_tree_after": "7660969e335c120586f5681a79515c33f8acddb4",
+  "status_after": "",
+  "log_bytes": 5317,
+  "log_sha256": "23d38e8b8513e754f2eded5fa6ce49732ee1b5b8b9042591fba058de74cfeb9d",
+  "real_seconds": 2.19,
+  "user_seconds": 2.2,
+  "sys_seconds": 0.42,
+  "cpu_seconds": 2.62,
+  "selection": {
+    "files": 1,
+    "cases": 1,
+    "failed": 1,
+    "passed": 0,
+    "test_body_ms": 148,
+    "vitest_duration_seconds": 1.36,
+    "timeout_ms": 5000
+  },
+  "failure": {
+    "file": "packages/scope/test/application-establish.test.ts",
+    "line": 100,
+    "stage": "membership join",
+    "answer": "refused",
+    "reason": "bad-intent",
+    "form": "thrown did-helper error, not timeout"
+  },
+  "passed_before_failure": [
+    "register founding and real directory creation",
+    "three unique real supporting-cohort sibling creation/pin assertions",
+    "membership seat and first-key",
+    "actual membership4 read-session issuance",
+    "authenticated destination read returns HTTP200",
+    "native invite-member admission"
+  ],
+  "unreached": [
+    "Counting activation",
+    "application schema/authority/closure controls",
+    "SQL retention rollback",
+    "direct application creation and marker/membership assertions",
+    "same signed intent unknown/restart recovery",
+    "explicit Initialize grant and paused board",
+    "nested creation marker/session read/Initialize",
+    "retained complete closure",
+    "D/C/A/nested replay"
+  ],
+  "source_disposition": {
+    "fixture_secret_utf8_bytes": 24,
+    "native_minimum_bytes": 32,
+    "check": "packages/scope/src/limits.ts:194-197 #sound requires utf8(secret).length >= INVITATION_SECRET_BYTES; :58-59 minimum32; :169-173 failure returns bad-intent before submit",
+    "qualification": "Source-backed sufficient rejection condition. No runtime trace proves exclusive branch/cause, and no acceptance claim beyond reached assertions."
+  },
+  "qualifications": [
+    "Exactly one authorized native run; no retry, edits, type run, discovery rerun, control or gate",
+    "Same two non-fatal optional dependency warnings retained",
+    "Exact source head/tree clean before/after",
+    "Native process terminal; no Vitest/workerd remaining at post-run process observation",
+    "No formal Source, gate, landing, hosted or complete F1 acceptance"
+  ],
+  "attachments": {
+    "source-packet.md": {
+      "path": "/tmp/artroom-f1-native-selection-v4/source-packet.md",
+      "bytes": 8493,
+      "sha256": "2c99a7aaec86b0d06869bb282b3902add92f4a9882ff2bd21f215dd7cf452ac0"
+    },
+    "vitest.config.mjs": {
+      "path": "/tmp/artroom-f1-native-selection-v4/vitest.config.mjs",
+      "bytes": 1957,
+      "sha256": "4bb0395b1c4c5d92886aed22a748dc1a408a8b8a9a82f8e951a67cbec7a8efda"
+    },
+    "discovery.json": {
+      "path": "/tmp/artroom-f1-native-selection-v4/discovery.json",
+      "bytes": 315,
+      "sha256": "1f9fb60e4f69d33f6cc2fd81d8b622b7220ed8446040a86c437efede8b05bed2"
+    },
+    "discovery-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v4/discovery-proof.json",
+      "bytes": 1552,
+      "sha256": "fd88c9bd95d35cb8a4c0d0199d2dad1218d22db3d61d7b5048d040a4ee81053f"
+    },
+    "native-before.json": {
+      "path": "/tmp/artroom-f1-native-selection-v4/native-before.json",
+      "bytes": 740,
+      "sha256": "5e9d248c497080a7f33bcb4a95af1c63949f3b008a3b6c970962d65c7973fb4a"
+    },
+    "native-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v4/native-proof.json",
+      "bytes": 1180,
+      "sha256": "8f3e10b1d53f2d8787afaed2a073ee13e984aad85dabc60294f53ff547737b4d"
+    },
+    "run.log": {
+      "path": "/tmp/artroom-f1-native-selection-v4/run.log",
+      "bytes": 5317,
+      "sha256": "23d38e8b8513e754f2eded5fa6ce49732ee1b5b8b9042591fba058de74cfeb9d"
+    }
+  }
+}
