@@ -167,7 +167,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   expect(again, JSON.stringify(safeDiagnostic)).toEqual({ code: 1, lines: ["No answer: The accepted reply names another register definition; its exact saved request remains pending."] });
   expect([watchedGet && !watched.unavailable, safeDiagnostic.complete, safeDiagnostic.released, safeDiagnostic.ownerCurrent]).toEqual([true, true, true, true]);
   expect(safeDiagnostic.records.every(record => record.phase !== "unmarked")).toBe(true);
-  expect(safeDiagnostic.records.some(record => record.phase === "final-summary" && (record.stage === "local-summary-eligible" || record.stage === "genesis-root-summary-eligible"))).toBe(true);
+  expect(safeDiagnostic.records.filter(record => record.phase === "final-summary" && (record.stage === "local-summary-eligible" || record.stage === "genesis-root-summary-eligible" || record.stage === "genesis-root-summary-ineligible" || record.stage === "request-refused")).map(record => record.stage)).toEqual([expect.stringMatching(/^(local-summary-eligible|genesis-root-summary-eligible)$/)]);
   expect(requestedPaths.slice(beforeMismatch).every((path) => path.startsWith(`/v1/scopes/${R.name}`))).toBe(true);
   const second = (await configOf())!.claim!;
   expect([(await founds()).length, second.intent === pending.claim!.intent, second.found!.accepted, host.sent.length]).toEqual([2, false, undefined, 0]);
