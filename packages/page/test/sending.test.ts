@@ -4,6 +4,8 @@ import { expect, test, vi } from "vitest";
 // No browser, native scope or transport runs; the submit-phase callback is
 // the boundary under test, including navigation while the reply is pending.
 test("the shell fences the whole scope during a submit and keeps a lost reply read-only after redraw", async () => {
+  const gate = () => { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; };
+  let rendered = gate();
   class Element {
     children: (Element | string)[] = [];
     attrs: Record<string, string> = {};
@@ -11,7 +13,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     constructor(readonly tag: string) {}
     setAttribute(name: string, value: string) { this.attrs[name] = value; }
     append(...children: (Element | string)[]) { this.children.push(...children); }
-    replaceChildren(...children: (Element | string)[]) { this.children = children; }
+    replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
@@ -22,14 +24,16 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>) => void;
   const panels: { pending?: boolean; uncertain?: boolean }[] = [];
-  let lose!: (error: Error) => void;
-  let submitted!: () => void;
-  const attempt = new Promise<void>((resolve) => { submitted = resolve; });
+  const rejects: ((error: Error) => void)[] = [];
+  const attempt = gate();
   const dataAct = vi.fn(async (...args: unknown[]) => {
     (args[5] as () => void)();
-    submitted();
-    return new Promise<never>((_resolve, reject) => { lose = reject; });
+    attempt.resolve();
+    return new Promise<never>((_resolve, reject) => { rejects.push(reject); });
   });
+  // The scripted reads are resolved promises. Drain their finite microtask
+  // chain before checking that a forbidden callback created no second act.
+  const drain = async () => { for (let turn = 0; turn < 20; turn++) await Promise.resolve(); };
   vi.doMock("@generalbusiness/artroom-bytes", () => ({ b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key" }));
   vi.doMock("../src/data.ts", () => ({
     act: dataAct, actAssociation: () => "room/member/scope", actsOn: async () => ({ acts: [{ kind: "comment", fields: [] }], hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
@@ -47,23 +51,38 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   vi.stubGlobal("window", { addEventListener: (_name: string, callback: () => void) => { redraw = callback; } });
   try {
     await import("../src/main.ts");
-    await vi.waitFor(() => expect(panels.length).toBeGreaterThan(0));
+    await rendered.promise;
+    expect(panels.length).toBeGreaterThan(0);
     send("comment", "", Object.fromEntries([["__proto__", "literal field"]]));
-    await attempt;
+    await attempt.promise;
+    rendered = gate();
     redraw();
-    await vi.waitFor(() => expect(panels.at(-1)?.pending).toBe(true));
+    await rendered.promise;
+    expect(panels.at(-1)?.pending).toBe(true);
     send("comment", "", {});
+    await drain();
     expect(dataAct).toHaveBeenCalledTimes(1);
     expect((dataAct.mock.calls[0]![3] as { fields: Record<string, unknown> }).fields["__proto__"]).toBe("literal field");
-    lose(new Error("Reply lost after submit"));
-    await vi.waitFor(() => expect(panels.at(-1)?.uncertain).toBe(true));
+    rendered = gate();
+    rejects[0]!(new Error("Reply lost after submit"));
+    await rendered.promise;
+    expect(panels.at(-1)?.uncertain).toBe(true);
     expect(root.textContent).toContain("does not retain the exact signed request");
     const beforeRedraw = panels.length;
+    rendered = gate();
     redraw();
-    await vi.waitFor(() => { expect(panels.length).toBeGreaterThan(beforeRedraw); expect(panels.at(-1)?.pending).toBe(false); });
+    await rendered.promise;
+    expect(panels.length).toBeGreaterThan(beforeRedraw);
+    expect(panels.at(-1)?.pending).toBe(false);
     send("comment", "", {});
+    await drain();
     expect(dataAct).toHaveBeenCalledTimes(1);
   } finally {
+    // Controls may admit forbidden extra attempts. Reject and drain every
+    // one while its DOM remains installed, so a distinguishing assertion
+    // never leaves a redraw running after the globals are restored.
+    for (const reject of rejects) reject(new Error("End of scripted attempt"));
+    await drain();
     vi.unstubAllGlobals();
     vi.doUnmock("../src/data.ts"); vi.doUnmock("../src/view.ts"); vi.doUnmock("@generalbusiness/artroom-bytes");
   }
