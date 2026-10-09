@@ -19,7 +19,7 @@
  */
 
 import type { Answer, FieldValue, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { b64url, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
@@ -33,7 +33,16 @@ const KEPT = "artroom-page";
 let roomDraft = "";
 let roomDraftContext = "";
 /** What this browser keeps: the room (no secret of it) and the key. */
-interface Settings { place: Place | null; secret: string; register?: ScopeRef }
+interface LocalLabel { text: string; place: Place; register?: ScopeRef }
+interface Settings { place: Place | null; secret: string; register?: ScopeRef; label?: LocalLabel }
+function labelFor(value: unknown, place: Place | null, register?: ScopeRef): LocalLabel | undefined {
+  if (!value || typeof value !== "object" || !place) return undefined;
+  const label = value as LocalLabel;
+  return typeof label.text === "string" && label.text.trim().length > 0 && label.text.length <= 256
+    && label.place?.directory === place.directory && isScopeRef(label.place?.membership)
+    && canonicalize(label.place.membership) === canonicalize(place.membership)
+    && canonicalize(label.register ?? null) === canonicalize(register ?? null) ? label : undefined;
+}
 let ignoredSavedAddress = false;
 
 function settings(): Settings | null {
@@ -42,7 +51,11 @@ function settings(): Settings | null {
     const kept = JSON.parse(localStorage.getItem(KEPT) ?? "null") as (Settings & { service?: unknown }) | null;
     // Migration only: an obsolete saved address never chooses where this page reads or signs.
     ignoredSavedAddress = !!kept && Object.hasOwn(kept, "service");
-    return kept && typeof kept.secret === "string" ? { place: kept.place ?? null, secret: kept.secret, ...(isScopeRef(kept.register) && kept.register.kind === "register" ? { register: kept.register } : {}) } : null;
+    if (!kept || typeof kept.secret !== "string") return null;
+    const place = kept.place ?? null;
+    const register = isScopeRef(kept.register) && kept.register.kind === "register" ? kept.register : undefined;
+    const label = labelFor(kept.label, place, register);
+    return { place, secret: kept.secret, ...(register ? { register } : {}), ...(label ? { label } : {}) };
   } catch {
     return null;
   }
@@ -97,9 +110,11 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const offer = claimOffer;
   const kept = settings();
   const directory = room?.directory ?? kept?.place?.directory;
-  const name = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
+  const recordedName = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
+  const local = kept?.label?.text;
+  const name = local || recordedName;
   const account = room?.me?.handle || "Your key";
-  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}` }, h("span", { class: "room-name" }, name), h("span", { "aria-hidden": "true" }, "⌄"));
+  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}` }, h("span", { class: "room-name" }, h("span", local ? { title: "Local room label" } : {}, name), local ? h("span", { class: "room-recorded-name", title: "Recorded repository name" }, recordedName) : null), h("span", { "aria-hidden": "true" }, "⌄"));
   const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}` }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
     ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) =>
@@ -145,7 +160,9 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
         const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle });
         if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
         if (result.repository) {
-          if (!keep({ ...kept, place: { directory: result.repository.directory.scope, membership: result.repository.membership } })) {
+          const place = { directory: result.repository.directory.scope, membership: result.repository.membership };
+          const label: LocalLabel = { text: result.label, place, ...(kept.register ? { register: kept.register } : {}) };
+          if (!keep({ ...kept, place, label })) {
             message.textContent = `Creation is recorded, but this browser could not save the room settings. Directory ${result.repository.directory.scope}; membership ${result.repository.membership.scope}. Keep the private claim record. Resume creation to verify the original proof and try saving again.`;
             submit.textContent = "Resume creation";
             return;
@@ -239,7 +256,8 @@ function settingsScreen(): HTMLElement {
         register = parsed.register as ScopeRef | undefined;
       } catch { tell(false, "The config could not be read."); return null; }
     } else if (typed) register = undefined;
-    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}) };
+    const label = typed ? undefined : labelFor(kept?.label, place, register);
+    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}), ...(label ? { label } : {}) };
   };
   const save = (next: Settings) => {
     if (!keep(next)) { tell(false, "This browser could not save the settings. Your previous room and key remain selected."); return; }

@@ -22,7 +22,8 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   }
   const root = new Element("div");
   const register = { kind: "register", scope: "register", inc: "one" };
-  let settings = { place: { directory: "room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device", register };
+  let settings: { place: { directory: string; membership: { kind: string; scope: string; inc: string } }; secret: string; register: typeof register; label?: { text: string; place: { directory: string; membership: { kind: string; scope: string; inc: string } }; register: typeof register } } = { place: { directory: "room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device", register };
+  settings.label = { text: "Original local label", place: settings.place, register };
   let eligible = true, locked = true, failSave = false;
   let redraw!: () => void;
   let finish!: (value: unknown) => void;
@@ -48,7 +49,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     const input = dialog.find((element) => element.tag === "input")!; input.value = "Local intent";
     const form = dialog.find((element) => element.tag === "form")!;
     form.fire("submit"); await attempted.promise; form.fire("submit"); expect(claim).toHaveBeenCalledTimes(1);
-    finish({ repository: null, pending: true, outcome: { code: 1, lines: ["The original request remains pending"] } });
+    finish({ repository: null, label: "Local intent", pending: true, outcome: { code: 1, lines: ["The original request remains pending"] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
     expect(input.attrs["disabled"]).toBe("");
     expect(dialog.textContent).toContain("Resume creation");
@@ -56,9 +57,10 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(claim).toHaveBeenCalledTimes(2);
     expect(claim.mock.calls[1]).toEqual(claim.mock.calls[0]); // Same adapter/binding/label, no --again or new key.
     failSave = true;
-    finish({ repository: { directory: { scope: "created-room" }, membership: settings.place.membership }, pending: false, outcome: { code: 0, lines: [] } });
+    finish({ repository: { directory: { scope: "created-room" }, membership: settings.place.membership }, label: "Local intent", pending: false, outcome: { code: 0, lines: [] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
     expect(settings.place.directory).toBe("room");
+    expect(settings.label?.text).toBe("Original local label");
     expect(dialog.textContent).toContain("Creation is recorded, but this browser could not save");
     expect(dialog.textContent).toContain("created-room");
     expect(root.find((element) => element.tag === "dialog")).toBe(dialog);
@@ -67,9 +69,22 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     attempted = gate(); form.fire("submit"); await attempted.promise;
     expect(claim).toHaveBeenCalledTimes(3);
     settings = { ...settings, place: { ...settings.place, directory: "another-room" } };
-    finish({ repository: { directory: { scope: "new-room" }, membership: settings.place.membership }, pending: false, outcome: { code: 0, lines: [] } });
+    finish({ repository: { directory: { scope: "new-room" }, membership: settings.place.membership }, label: "Local intent", pending: false, outcome: { code: 0, lines: [] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
     expect(save).not.toHaveBeenCalled();
+    rendered = gate(); redraw(); await rendered.promise;
+    root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
+    const nextDialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    nextDialog.find((element) => element.tag === "input")!.value = "Useful local name";
+    attempted = gate(); nextDialog.find((element) => element.tag === "form")!.fire("submit"); await attempted.promise;
+    rendered = gate(); finish({ repository: { directory: { scope: "verified-room" }, membership: settings.place.membership }, label: "Useful local name", pending: false, outcome: { code: 0, lines: [] } }); await rendered.promise;
+    expect(settings.place.directory).toBe("verified-room");
+    expect(settings.label).toEqual({ text: "Useful local name", place: settings.place, register });
+    expect(root.textContent).toContain("Useful local name");
+    expect(root.textContent).toContain("Recorded repository");
+    settings = { ...settings, place: { ...settings.place, directory: "different-room" } };
+    rendered = gate(); redraw(); await rendered.promise;
+    expect(root.textContent).not.toContain("Useful local name");
     eligible = false; rendered = gate(); redraw(); await rendered.promise;
     expect(root.find((element) => element.tag === "button" && element.textContent === "Create room")).toBeUndefined();
     eligible = true; locked = false; rendered = gate(); redraw(); await rendered.promise;
