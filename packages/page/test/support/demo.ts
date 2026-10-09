@@ -64,8 +64,10 @@ interface FixtureOwner { released: boolean; previous: FixtureOwner | null; befor
 let fixtureOwner: FixtureOwner | null = null;
 const providerOwners = new WeakMap<NonNullable<ReturnType<typeof platformOutside.get>>, FixtureOwner>();
 
-/** Founds the room. `wrap` may stand between the page and the routes, as the recorder does. */
-export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = (f) => f, parent: SessionOwner | null = null): Promise<Demo> {
+/** Only the LIST1 editor opts in: it needs the founder, member invitation and change definition. */
+export interface DemoSetup { editorOnly?: true }
+/** Founds a fresh room. Full setup is the default; `wrap` may stand between the page and the routes. */
+export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = (f) => f, parent: SessionOwner | null = null, setup: DemoSetup = {}): Promise<Demo> {
   const before = { hold: net.hold, deaf: net.deaf, secret: platformNet.secret, sessions: platformNet.sessions };
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const sessionOwner = parent ? beginSessionChild(parent, { secret, sessions: true, inspector: null }) : beginSessionFixture({ secret, sessions: true, inspector: null });
@@ -160,20 +162,24 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     active();
     siteEnv = { SCOPES: env.PLATFORM, ...bindings() };
 
-    // paul, a maintainer, joins on the command line; una's invitation is left for the page.
-    const paulInvitation = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
-    active();
-    ok(await run(paul, "join", paulInvitation));
-    active();
+    // Full setup enrolls paul; both setups leave una's actual invitation for the page.
+    if (!setup.editorOnly) {
+      const paulInvitation = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
+      active();
+      ok(await run(paul, "join", paulInvitation));
+      active();
+    }
     const link = ok(await run(rita, "invite", "@una", "--role", "member")).lines[1]!.split(": ")[1]!;
     active();
 
     // The rules: the first extents, with no approval for the source extent; the rules extent asks one from the controller, rita.
-    // The demo profile's two definitions, activated with their bytes beside the act.
+    // Full setup activates both demo definitions; the editor needs only change.
     ok(await run(rita, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
     active();
-    ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"));
-    active();
+    if (!setup.editorOnly) {
+      ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"));
+      active();
+    }
     ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"));
     active();
 

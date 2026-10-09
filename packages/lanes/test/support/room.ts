@@ -238,7 +238,10 @@ export async function publicationOf(r: Room, C: { name: string }, merge: number)
  * destination's first head and receipt written; rita seated as the one
  * admin; una, vic and paul invited as members, each with an active key.
  */
-export async function room(): Promise<Room> {
+/** Fresh native enrollments; defaults retain all three members in their original order. */
+type RoomMember = "@una" | "@vic" | "@paul";
+export interface RoomSetup { roster?: readonly RoomMember[] }
+export async function room(setup: RoomSetup = {}): Promise<Room> {
   net.hold = net.deaf = null;
   const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
@@ -271,7 +274,9 @@ export async function room(): Promise<Room> {
   const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
   await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
   made.members["@rita"] = seat;
+  const roster: readonly RoomMember[] = setup.roster ?? ["@una", "@vic", "@paul"];
   for (const [who, handle] of [[una, "@una"], [vic, "@vic"], [paul, "@paul"]] as const) {
+    if (!roster.includes(handle)) continue;
     const secret = `the secret of the invitation of ${handle}, of 32 bytes or more`;
     const invitation = await M.did(rita, "invite-member", { fields: { handle, role: "member", inviteHash: textDigest(secret), inviteEnds: soon(3600) } });
     await M.did(who, "join", { fields: { invitation, secret } });

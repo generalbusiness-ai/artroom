@@ -10,7 +10,7 @@ import { demo } from "./support/demo.ts";
 // Native directory, membership, collection/freeze and exact signed receipts.
 // Git host, scheduler and clock are the demo's explicit stand-ins.
 async function fixture() {
-  const d = await demo();
+  const d = await demo(undefined, null, { editorOnly: true });
   expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Original editor source")).code).toBe(0);
   const secret = crypto.getRandomValues(new Uint8Array(32));
   expect((await joinRoom(d.as(secret), d.link)).answer.answer).toBe("accepted");

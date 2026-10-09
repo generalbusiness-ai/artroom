@@ -128,7 +128,7 @@ test("W3, a reviewer outside an extent counts for nothing there: an approval tha
 }, ROOM_MS);
 
 test("W4, the single-controller exception: rita, the one holder of rules.publish, authors a change to the rules extent; with the exception not declared it is refused, rules-not-met:rules; once the rules declare it the same change is reserved under the exception, and the publication's reason records it (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
-  const r = await room();
+  const r = await room({ roster: ["@una", "@paul"] });
   const I = await opened(r);
   const { C, manifest } = await proposed(r, I, rita, "@rita", []);
   // rita may not review her own change. paul's approval for the source extent meets the lane's count and nothing of `rules`.
@@ -145,7 +145,7 @@ test("W4, the single-controller exception: rita, the one holder of rules.publish
 }, ROOM_MS);
 
 test("W5, a required check: the rules require the check `unit`, run by a checker member of the real membership scope; the real lane opens the job and the checker's key decides it passed; the destination judges the merge with the retained job opening and decision and the checker key's current standing, and publishes; with the job only requested it refuses (STAND-IN: the Git host; SCRIPTED: the changed set; no runner: the checker's answer is signed by the test)", async () => {
-  const r = await room();
+  const r = await room({ roster: ["@una", "@paul"] });
   // A checker member, @check, with a key enrolled by an invitation of rita's; a configuration that the rules scope keeps.
   const checker = await r.M.did(rita, "add-member", { fields: { handle: "@check", kind: "checker" } });
   const secret = "the invitation of the required checker key";
