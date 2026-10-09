@@ -106,6 +106,15 @@ exit 0. No timeout, skip or warning was suppressed, and no whole suite
 was repeated to obtain a different log. Planner disposition was requested
 in `d2fa6fdd` before final Source filing or landing.
 
+Planner accepted this diagnostic risk for this filing and landing in
+`66861d6304cbd61075531db928353049f2fba7c2`. That is the current
+owner judgment; it does not identify the cause. Request `45405ec5`
+separately requires isolated test localization and a demonstrated fix.
+The locked install also reported six vulnerabilities (one low, five high)
+and four packages with install scripts outside `allowScripts`. These
+are retained tool warnings, without an advisory, reachability or
+exploitability assessment. No dependency fix or script approval was made.
+
 The gate output is `/tmp/artroom-demo-github-gate.log`, SHA-256
 `d831634f081f10c577c4f636f5decf307a280cae61b67c9b7e296408c4195025`.
 Raw phase logs are in
