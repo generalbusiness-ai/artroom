@@ -1,8 +1,8 @@
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, onTestFinished, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
@@ -12,10 +12,11 @@ import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
-import { outsideOf, wired } from "./outside.ts";
-import { Platform, rita, routed, sam, settle } from "./repository.ts";
+import { outsideOf } from "./outside.ts";
+import { Platform, rita, routed, sam } from "./repository.ts";
 import { reader } from "./support.ts";
 import { beginSessionChild, beginSessionFixture } from "./session-settings.ts";
+import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 const { paul } = keys;
 const SERVICE = "https://scopes.test";
@@ -51,15 +52,19 @@ function lacking(named: string): string[] {
 describe("a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN", () => {
   test("an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check", async () => {
     const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
-    onTestFinished(owner.close);
-    net.hold = net.deaf = null;
+    const lifetime = nativeFixtureLifetime(owner, { required: false });
+    const fetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
+    try {
     // Step 0: the register, by an `install` intent with `to: null`, under `platform:register@1`. Its seed has the kind `register` and
     // no creator, and the object's name is the seed's digest.
     const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
-    const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
+    const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     // STAND-IN: the Git host of this register. It is wired before the object is first reached.
     const host = outsideOf(R.name);
-    wired.set(R.name, () => ({ outside: host }));
+    lifetime.wire(R.name, () => ({ outside: {
+      accepts: () => { lifetime.active(); return host.accepts(); },
+      send: (request) => lifetime.wait(() => host.send(request)),
+    } }));
     expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
     const register = await R.at();
 
@@ -67,11 +72,12 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // directory's seed, and so its scope ID, and opens the creation of a repository, with attempt 1.
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const seed: Seed = { v: 1, kind: "directory", definition: DIRECTORY, creator: register, cause: intentDigest(found.intent), ordinal: 0 };
-    const D = new Platform(scopeIdOf(seed));
+    const D = lifetime.platform(scopeIdOf(seed));
     const creation: OperationId = "1:0";
     // What the host answers, which the test writes (section 12.1.1, case c). The reply to attempt 1 is lost: no answer comes. The
     // host's own answer to attempt 2 says created, under that attempt's own name, with the host's ID.
     const name = repositoryName(seedDigest(seed), 2);
+    lifetime.active();
     host.answer(creation, 1, null);
     host.answer(creation, 2, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: "repo-7" } } });
     const claimed: Answer = await R.stub.submit(found, []);
@@ -80,16 +86,16 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // Steps 2 to 7: the operations driver sends the one request of each attempt and records what came as an outcome entry, and the
     // dispatchers carry every message from there. Nothing is carried by the test. Attempt 1 is recorded `unknown`, with the body
     // that the register's rule states for an outcome that is not known, and its entry opens attempt 2, which is due after a delay.
-    const driven = async () => { while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ } };
+    const driven = () => effectFixture([R], lifetime.wait);
     await driven();
     expect((await R.last()).input).toMatchObject({ type: "outcome", attempt: 1, result: "unknown", evidence: { basis: "none", body: { name: repositoryName(seedDigest(seed), 1) } } });
-    net.clock.now = soon(PROPOSED_BOUNDS.dispatchRetrySeconds);
+    lifetime.advance(PROPOSED_BOUNDS.dispatchRetrySeconds * 1000);
     await driven();
-    await settle(R, D);
+    await dispatchFixture([R, D], lifetime.wait);
     const directory = await D.at();
     const sent = (await D.entries())[0]!.sends;
-    const [membershipScope, rulesScope, destination] = [1, 2, 3].map((n) => new Platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed)));
-    await settle(R, D, membershipScope!, rulesScope!, destination!);
+    const [membershipScope, rulesScope, destination] = [1, 2, 3].map((n) => lifetime.platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed)));
+    await dispatchFixture([R, D, membershipScope!, rulesScope!, destination!], lifetime.wait);
 
     // The register: one request of each attempt reached the host. The outcome of attempt 2 is selected, sets the claim's repository,
     // and sends the `create` of the directory. The directory's applied result makes the claim `active`, and the register confirms
@@ -143,13 +149,14 @@ describe("a founding on real scopes under the deployed class (authority note, se
     try {
       const signedGet = async <T>(node: Platform, path: string, read: SignedReadName, arg: string, who = rita): Promise<{ status: number; body: Read<T> }> => {
         signedPhase.active();
-        const response = await routed(`${SERVICE}/v1/scopes/${node.name}${path}`, { headers: { authorization: await signedReader(secretSigner(who.secret), node.name, read, arg, { now: () => Date.parse(net.clock.now) }) } });
-        return { status: response.status, body: await response.json() };
+        const authorization = await lifetime.waitFor(signedPhase, () => signedReader(secretSigner(who.secret), node.name, read, arg, { now: () => lifetime.nowFor(signedPhase) }));
+        const response = await lifetime.waitFor(signedPhase, () => routed(`${SERVICE}/v1/scopes/${node.name}${path}`, { headers: { authorization } }));
+        return { status: response.status, body: await lifetime.waitFor(signedPhase, () => response.json()) };
       };
       const genesis = await signedGet<Sealed>(D, "/entries/0", "entry", "0");
       const directorySummary = await signedGet<Summary>(D, "", "summary", "summary");
       expect([
-        (await routed(`${SERVICE}/v1/scopes/${D.name}`)).status, (await signedGet(R, "", "summary", "summary")).status, (await signedGet(R, "", "summary", "summary", paul)).status,
+        (await lifetime.waitFor(signedPhase, () => routed(`${SERVICE}/v1/scopes/${D.name}`))).status, (await signedGet(R, "", "summary", "summary")).status, (await signedGet(R, "", "summary", "summary", paul)).status,
         genesis.status, genesis.body.ok && genesis.body.value.entry.input.type, directorySummary.status, (await signedGet(D, "", "summary", "summary", paul)).status,
       ]).toEqual([403, 200, 200, 200, "genesis", 200, 403]);
       learned = directorySummary.body.ok ? directorySummary.body.value.items.find((item) => item.type === "repository")!.refs["membership"] as ScopeRef : null;
@@ -164,13 +171,18 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // STAND-IN: the destination's Git host. It answers with the exact ID that the package computes for the founding commit.
     const destinationHost = outsideOf(G.name);
     const firstHead = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf(r[1]!), { name, handle: "@rita", directory: D.name }).commit;
+    lifetime.active();
     destinationHost.answer("0:0" as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { send: "accepted", seen: firstHead } } });
     let driving = "mint";
-    wired.set(G.name, () => ({ outside: { accepts: (_owner, kind) => kind === driving, send: (request) => destinationHost.send(request) } }));
+    lifetime.wire(G.name, () => ({ outside: {
+      accepts: (_owner, kind) => { lifetime.active(); return kind === driving; },
+      send: (request) => lifetime.wait(() => destinationHost.send(request)),
+    } }));
     await G.restart();
     // The host stand-in gets its request context from the actual SQLite records, as a real port does. No answer is a rule.
     const drive = async (kind: string) => {
-      const answers = await runInDurableObject(G.object, (_instance, state) => {
+      const answers = await lifetime.wait(() => runInDurableObject(G.object, (_instance, state) => {
+        lifetime.active();
         const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
         const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
         return store.all().operations.filter((operation) => operation.kind === kind).flatMap((operation) => operation.attempts.filter((attempt) => attempt.outcomes.length === 0).map((attempt) => {
@@ -180,7 +192,8 @@ describe("a founding on real scopes under the deployed class (authority note, se
             : { send: "accepted", seen: kind === "first-head" ? firstHead : integration };
           return { operation: operation.id, attempt: attempt.attempt, body };
         }));
-      });
+      }));
+      lifetime.active();
       for (const answer of answers) destinationHost.answer(answer.operation, answer.attempt, { result: "confirmed", evidence: { basis: "own-answer", body: answer.body } });
       driving = kind;
       await G.restart();
@@ -192,7 +205,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     await drive("mint");
     await drive("receipt");
     await drive("revoke");
-    wired.delete(R.name);
+    lifetime.unWire(R.name);
 
     // Where the rules scope records its membership reference (authority note, revision 25, section 12.1; I3 deltas EM21, EQ7 and
     // EU6). rita takes her seat in membership, on the founding key, and so is an admin, who holds `rules.publish`.
@@ -202,10 +215,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // when it names the membership reference that the scope itself records, with its incarnation. So what a reader with it is
     // answered at the rules scope shows what that scope records, as its own store holds it.
     // Age every founding history past the 900-second signed bootstrap window.
-    net.clock.now = soon(901);
+    lifetime.advance(901_000);
     owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))) });
-    const real = <T>(run: () => Promise<T>): Promise<T> => owner.required(run);
-    const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch: routed as unknown as Fetch }));
+    const real = <T>(run: () => Promise<T>): Promise<T> => lifetime.wait(() => owner.required(run));
+    const issued = await real(async () => requestSession(SERVICE, membershipScope!.name, sessionRequest(learned!, rita.secret, soon(60), "founding-real"), { fetch }));
     if (!issued.ok) throw new Error(`no session: ${issued.reason}`);
     const reads = async (node: Platform) => (await real(() => routed(`${SERVICE}/v1/scopes/${node.name}`, { headers: { authorization: issued.session.reader() } }))).status;
     // Birth-session preparation permits the first read without retaining a
@@ -220,7 +233,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect((await real(() => routed(`${SERVICE}/v1/scopes/${rulesScope!.name}`, { headers: { authorization: invalidReader } }))).status).toBe(403);
     for (const node of [rulesScope!, D, G]) {
       const head = (await node.summary()).at;
-      const { report, why } = await real(() => verify(httpSource(SERVICE, { fetch: routed, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
+      const { report, why } = await real(() => verify(httpSource(SERVICE, { fetch, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
       expect([report.result, why]).toEqual(["consistent", null]);
     }
     const publish = async (approvals: number) => rulesScope!.act(rita, "publish", { on: 0, expected: await rulesScope!.expected({ on: 0 }), fields: { approvals, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals, checks: [] }) as never } });
@@ -244,7 +257,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // its store, reads again, and is answered by the same incarnation.
     expect(await reads(rulesScope!)).toBe(200);
     await rulesScope!.restart();
-    net.clock.now = soon(10);
+    lifetime.advance(10_000);
     expect(await reads(rulesScope!)).toBe(200);
     owner.configure({ secret: null });
     expect(await publish(3)).toMatchObject({ answer: "accepted" });
@@ -295,24 +308,35 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const tree = "d".repeat(40);
     const by = { membership, member: "@rita" } as const;
     const signed = (kind: string, fields: Intent["fields"]) => signIntent({ v: 1, to: otherLane, actor: rita.key, kind, on: null, expected: {}, fields, idempotencyKey: kind, notAfter: soon(60) }, rita.secret);
-    const manifest: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("propose-manifest", { base: firstHead, integration, tree, complete: true, selected: [] }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "party", item: 1, slot: "integrator", member: by }], sends: [] };
+    const manifest: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("propose-manifest", { base: firstHead, integration, tree, complete: true, selected: [] }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "party", item: 1, slot: "integrator", member: by }], sends: [] };
     const checkerAnswer = await membershipScope!.stub.observe({ of: membership, key: paul.key }) as Omit<Observation, "at">;
     expect(checkerAnswer).toMatchObject({ of: membership, head: (await membershipScope!.summary()).at, key: paul.key, keyState: "active", member: "@check", memberState: "active", role: "checker", actions: expect.arrayContaining(["change.check"]), within: { membership } });
-    const checkGrant = grantFrom({ observation: { ...checkerAnswer, at: net.clock.now }, read: { run: "scripted-source-check-read", n: 1 }, use: "fresh", prior: null });
-    const job: Entry = { v: 1, at: otherLane, seq: 2, prev: entryHash(manifest), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("request-check", { manifest: 1, name: "unit", configuration: digest }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "value", item: 2, slot: "tree", value: tree }], sends: [] };
-    const decision: Entry = { v: 1, at: otherLane, seq: 3, prev: entryHash(job), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: paul.key, kind: "check", on: null, expected: {}, fields: { job: 2, tree, configuration: digest, outcome: "passed" }, idempotencyKey: "scripted-check", notAfter: soon(60) }, paul.secret), authority: [checkGrant], presented: {} }, uses: [], prepared: [], effects: [{ effect: "state", item: 2, state: "passed" }], sends: [] };
+    const checkGrant = grantFrom({ observation: { ...checkerAnswer, at: timeOf(lifetime.now()) }, read: { run: "scripted-source-check-read", n: 1 }, use: "fresh", prior: null });
+    const job: Entry = { v: 1, at: otherLane, seq: 2, prev: entryHash(manifest), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("request-check", { manifest: 1, name: "unit", configuration: digest }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "value", item: 2, slot: "tree", value: tree }], sends: [] };
+    const decision: Entry = { v: 1, at: otherLane, seq: 3, prev: entryHash(job), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: paul.key, kind: "check", on: null, expected: {}, fields: { job: 2, tree, configuration: digest, outcome: "passed" }, idempotencyKey: "scripted-check", notAfter: soon(60) }, paul.secret), authority: [checkGrant], presented: {} }, uses: [], prepared: [], effects: [{ effect: "state", item: 2, state: "passed" }], sends: [] };
     const request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [{ job: factRefOf(job), name: "unit", state: "passed", decidedBy: factRefOf(decision) }], links: [], reports: [] } } } as const;
-    const merge: Entry = { v: 1, at: otherLane, seq: 4, prev: entryHash(decision), time: net.clock.now, clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
+    const merge: Entry = { v: 1, at: otherLane, seq: 4, prev: entryHash(decision), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
     const sourceFacts = [manifest, job, decision, merge];
-    for (const entry of sourceFacts) net.peers.set(entryHash(entry), { entry, under: "change" });
+    for (const entry of sourceFacts) {
+      lifetime.active();
+      const hash = entryHash(entry), previous = net.peers.get(hash), peer = { entry, under: "change" };
+      net.peers.set(hash, peer);
+      lifetime.cleanup(() => {
+        if (net.peers.get(hash) !== peer) return;
+        if (previous) net.peers.set(hash, previous);
+        else net.peers.delete(hash);
+      });
+    }
     expect(await G.stub.deliver({ to: branchScope, from: factRefOf(merge), n: 0, message: request })).toMatchObject({ answer: "recorded" });
+    lifetime.active();
     driving = "judge";
     const queued = await G.last();
     const publication = queued.seq;
-    const storedPublication = () => runInDurableObject(G.object, (_instance, state) => {
+    const storedPublication = () => lifetime.wait(() => runInDurableObject(G.object, (_instance, state) => {
+      lifetime.active();
       const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
       return { item: store.item(publication), held: store.holder(publication), operations: store.operationsFor(publication), owedReceipts: store.page("receipt", ["owed"], null, 130).items };
-    });
+    }));
     expect(await G.item(publication)).toMatchObject({ state: "queued", refs: { operation: factRefOf(merge), manifest: factRefOf(manifest), lane: otherLane } });
     expect(queued.uses.map((use) => use.fact.hash).sort()).toEqual(sourceFacts.map(entryHash).sort());
     for (const use of queued.uses) expect(await G.stub.retained(reader, "entry", use.content)).toMatchObject({ ok: true, value: { bytes: canonicalize(sourceFacts.find((entry) => entryHash(entry) === use.fact.hash)) } });
@@ -320,8 +344,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const judging = `${queued.seq}:0` as OperationId;
     const changes = { paths: ["src/a.ts"], links: [], unreadable: 0 };
     const changed = valueDigest(DESTINATION_CHANGED_SET.domain, changes);
+    lifetime.active();
     destinationHost.answer(judging, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { head: firstHead, present: true, tree, firstParent: firstHead, ancestors: [], changes: changed } }, retain: [{ kind: "value", domain: DESTINATION_CHANGED_SET.domain, digest: changed, bytes: canonicalize(changes) }] });
     // The judge is the only host request in this phase. Its following push and mint remain recorded until their phases.
+    lifetime.active();
     driving = "judge";
     await G.restart();
     await (G.stub as unknown as { effect(): Promise<number> }).effect();
@@ -358,7 +384,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(finished.operations.every((operation) => operation.attempts.every((attempt) => attempt.outcomes.length > 0))).toBe(true);
     const outbox = await G.stub.outbox(reader);
     expect(outbox.ok && outbox.value.filter((duty) => "scope" in duty.to && duty.to.scope === otherLane.scope).map((duty) => [duty.acknowledged, duty.result, duty.diagnosis])).toEqual([[null, null, null], [null, null, null], [null, null, null]]);
-    wired.delete(G.name);
+    lifetime.unWire(G.name);
 
     // A verifier reads the five histories as bytes and derives every entry again, with the platform package's data and rules: the
     // register's outcome entry with its creation, the directory's genesis under the fourth cause, the clause of the result, and
@@ -366,8 +392,9 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // Only the four scripted source facts are anchored (no membership or rules facts). Every actual founding, authority and destination history is replayed.
     const options = { mode: "replay", platform, grants: "proven", anchors: sourceFacts.map((entry) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) })) } as const;
     for (const node of [R, D, membershipScope!, rulesScope!, G]) {
-      const { report, why } = await verify(httpSource(SERVICE, { fetch: routed }), { ...options, scope: node.name, head: (await node.summary()).at });
+      const { report, why } = await lifetime.wait(async () => verify(httpSource(SERVICE, { fetch }), { ...options, scope: node.name, head: (await node.summary()).at }));
       expect([(await node.at()).kind, report.result, why]).toEqual([(await node.at()).kind, "consistent", null]);
     }
+    } finally { lifetime.release(); }
   });
 });

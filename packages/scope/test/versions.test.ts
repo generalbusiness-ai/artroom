@@ -4,12 +4,13 @@ import { canonicalize, factRefOf, intentDigest, scopeIdOf, seedDigest, signInten
 import { keys, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { firstExtents, foundingObjects, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
-import { outsideOf, wired } from "./outside.ts";
+import { outsideOf } from "./outside.ts";
 import { foundingPublication } from "./publication.ts";
 import { reader } from "./support.ts";
-import { Platform, rita, routed, sam, settle } from "./repository.ts";
+import { beginSessionFixture } from "./session-settings.ts";
+import { Platform, rita, routed, sam } from "./repository.ts";
+import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 const { paul } = keys;
 const SERVICE = "https://scopes.test";
@@ -25,29 +26,36 @@ const SERVICE = "https://scopes.test";
 // | The readers and the clock | The test readers and the scripted clock of the namespace. |
 describe("a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN", () => {
   test("a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code", async () => {
-    net.hold = net.deaf = null;
+    const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
+    const lifetime = nativeFixtureLifetime(owner, { required: false });
+    const fetch = (url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init));
+    try {
     const REGISTER_1: PlatformDefinition = "platform:register@1";
     const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "git.example", namespace: "artroom", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
-    const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER_1, creator: null, cause: intentDigest(install), ordinal: 0 }));
+    const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER_1, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
-    wired.set(R.name, () => ({ outside: host }));
+    lifetime.wire(R.name, () => ({ outside: {
+      accepts: () => { lifetime.active(); return host.accepts(); },
+      send: (request) => lifetime.wait(() => host.send(request)),
+    } }));
     expect((await R.stub.found(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     // Version 1 of the register seeds the directory under version 1.
     const seed: Seed = { v: 1, kind: "directory", definition: "platform:directory@1", creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
-    const D = new Platform(scopeIdOf(seed));
+    const D = lifetime.platform(scopeIdOf(seed));
+    lifetime.active();
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(seed), 1), id: "repo-1" } } });
     expect((await R.stub.submit(found, [])).answer).toBe("accepted");
-    while ((await (R.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
-    await settle(R, D);
+    await effectFixture([R], lifetime.wait);
+    await dispatchFixture([R, D], lifetime.wait);
     const sent = (await D.entries())[0]!.sends;
-    const [M, rules, G] = [1, 2, 3].map((n) => new Platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed))) as [Platform, Platform, Platform];
-    await settle(R, D, M, rules, G);
-    wired.delete(R.name);
+    const [M, rules, G] = [1, 2, 3].map((n) => lifetime.platform(scopeIdOf(sent.find((send) => send.n === n)!.to as Seed))) as [Platform, Platform, Platform];
+    await dispatchFixture([R, D, M, rules, G], lifetime.wait);
+    lifetime.unWire(R.name);
     const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
     await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
-    const inbox = new Platform(scopeIdOf((await M.entries())[seat]!.sends.find((send) => "definition" in send.to)!.to as Seed));
-    await settle(M, inbox);
+    const inbox = lifetime.platform(scopeIdOf((await M.entries())[seat]!.sends.find((send) => "definition" in send.to)!.to as Seed));
+    await dispatchFixture([M, inbox], lifetime.wait);
     const nodes = [R, D, M, rules, G, inbox];
     expect(await Promise.all(nodes.map(async (node) => (await node.summary()).value.definition))).toEqual([
       "platform:register@1", "platform:directory@1", "platform:membership@1", "platform:rules@1", "platform:destination@1", "platform:inbox@1",
@@ -56,7 +64,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
     expect((await M.item(0)).values["adminActions"]).not.toContain("destination.read-token");
 
     // The founding publication: the first head is version 1's founding commit, the empty tree, with no README.
-    await foundingPublication(G);
+    await foundingPublication(G, lifetime);
     const emptyTree = foundingObjects("sha1", G.name, (await G.entries())[0]!.time, factRefOf((await R.entries())[1]!));
     expect(await G.item(0)).toMatchObject({ state: "ready", values: { head: emptyTree.commit } });
 
@@ -92,13 +100,14 @@ describe("a room founded on version 1 of every definition, on the code that ship
     // Every history replays consistent with the package that ships version 2, which serves version 1 as it shipped.
     const options = { mode: "replay", grants: "proven" } as const;
     for (const node of nodes) {
-      const { report, why } = await verify(httpSource(SERVICE, { fetch: routed }), { ...options, platform, scope: node.name, head: (await node.summary()).at });
+      const { report, why } = await lifetime.wait(async () => verify(httpSource(SERVICE, { fetch }), { ...options, platform, scope: node.name, head: (await node.summary()).at }));
       expect([(await node.at()).kind, report.result, why]).toEqual([(await node.at()).kind, "consistent", null]);
     }
     // Control: the finding of 2026-10-07. A verifier that judges version 1 by version 2's code reports membership's history as a
     // mismatch: its genesis wrote version 1's first lists.
     const newestOnly = (named: string) => platform(named.replace(/@1$/, "@2"));
-    const { report } = await verify(httpSource(SERVICE, { fetch: routed }), { ...options, platform: newestOnly, scope: M.name, head: (await M.summary()).at });
+    const { report } = await lifetime.wait(async () => verify(httpSource(SERVICE, { fetch }), { ...options, platform: newestOnly, scope: M.name, head: (await M.summary()).at }));
     expect(report.result).toBe("mismatch");
+    } finally { lifetime.release(); }
   });
 });
