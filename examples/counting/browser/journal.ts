@@ -1,6 +1,7 @@
 /** Private attempt history; service judgments are not signed native receipts. */
 import type { Answer, Digest } from "@generalbusiness/artroom-contract";
-import { canonicalize, isFactRef, isGrant, isHead, isRecord, isSignedIntentShape, REFUSAL_REASONS, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isGrant, isHead, isRecord, isSignedIntentShape, REFUSAL_REASONS, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { counting } from "../definition.ts";
 import type { ActorIdentity, PendingReport, PreparedEnvelope } from "./voice-controller.ts";
 export const MAX_ATTEMPTS=8, SLOT_BYTES=64*1024;
 export type DispatchPhase="prepared"|"inflight"|"unknown"|"refused"|"recorded";
@@ -39,18 +40,16 @@ export function validEnvelope(value:unknown,identity:ActorIdentity):value is Pre
     if(!isRecord(value)||Object.keys(value).length!==3||!Object.hasOwn(value,"signed")||!Object.hasOwn(value,"grants")||!Object.hasOwn(value,"beside"))return false;
     const {signed,grants,beside}=value;
     if(!isSignedIntentShape(signed)||!verifySignedIntent(signed)||canonicalize(signed.intent.to)!==canonicalize(identity.scope)||signed.intent.actor!==identity.publicKey||!Array.isArray(grants)||!grants.every(isGrant)||!isRecord(beside))return false;
-    if(Object.keys(beside).some(key=>!["texts","values","presented"].includes(key)))return false;
-    for(const key of ["texts","values"]){if(Object.hasOwn(beside,key)&&(!Array.isArray(beside[key])||!(beside[key] as unknown[]).every(v=>typeof v==="string")))return false;}
-    if(Object.hasOwn(beside,"presented")&&(!isRecord(beside.presented)||!Object.values(beside.presented).every(isFactRef)))return false;
+    const act=Object.hasOwn(counting.acts,signed.intent.kind)?counting.acts[signed.intent.kind]:undefined;
+    // Current pinned Counting acts declare no detached text, value place or presented fact input.
+    // Reject even empty side keys; never strip a restored field to manufacture another request.
+    if(!act||Object.keys(beside).length!==0)return false;
     canonicalize(value);return true;
   }catch{return false;}
 }
 /** Explicit fields prevent restored Beside from replacing the original signed/grant values. */
 export function requestBody(envelope:PreparedEnvelope):string {
-  return JSON.stringify({signed:envelope.signed,grants:envelope.grants,
-    ...(Object.hasOwn(envelope.beside,"texts")?{texts:envelope.beside.texts}:{}),
-    ...(Object.hasOwn(envelope.beside,"values")?{values:envelope.beside.values}:{}),
-    ...(Object.hasOwn(envelope.beside,"presented")?{presented:envelope.beside.presented}:{})});
+  return JSON.stringify({signed:envelope.signed,grants:envelope.grants});
 }
 const closed=(value:unknown,required:readonly string[],optional:readonly string[]=[]):boolean=>isRecord(value)&&required.every(key=>Object.hasOwn(value,key))&&Object.keys(value).every(key=>required.includes(key)||optional.includes(key));
 export function validJournal(journal:AttemptJournal,identity:ActorIdentity,envelope:PreparedEnvelope):boolean {
@@ -70,9 +69,9 @@ export function validJournal(journal:AttemptJournal,identity:ActorIdentity,envel
 export function knownRefusal(journal:AttemptJournal|undefined,identity:ActorIdentity,envelope:PreparedEnvelope):boolean {
   return !!journal&&validJournal(journal,identity,envelope)&&activeAttempt(journal).phase==="refused";
 }
-/** Only a completely validated resolved history can leave the active slot. */
-export function terminalJournal(journal:AttemptJournal|undefined,identity:ActorIdentity,envelope:PreparedEnvelope):boolean {
-  return !!journal&&validJournal(journal,identity,envelope)&&journal.attempts.every(a=>a.phase==="refused"||a.phase==="recorded");
+/** Earlier valid attempts are known refused; a cached recorded tag is not receipt confirmation. */
+export function terminalJournal(journal:AttemptJournal|undefined,identity:ActorIdentity,envelope:PreparedEnvelope,receiptConfirmed=false):boolean {
+  return !!journal&&validJournal(journal,identity,envelope)&&(activeAttempt(journal).phase==="refused"||receiptConfirmed&&activeAttempt(journal).phase==="recorded");
 }
 
 /** Completion custody is local and must stay bound to the same full device identity. */
@@ -83,6 +82,15 @@ export function validReport(value:unknown,identity:ActorIdentity):value is Pendi
     if(typeof c.voiceId!=="string"||!c.voiceId||typeof c.completedAt!=="number"||!Number.isSafeInteger(c.completedAt)||c.completedAt<0||!isRecord(t)||!closed(t,["origin","deployment","scope","definition","membership","member","publicKey","generation","serial","N","expiresAt"]))return false;
     const {generation,serial,N,expiresAt,...context}=t;
     if(canonicalize(context)!==canonicalize(identity)||![generation,serial,N,expiresAt].every(v=>typeof v==="number"&&Number.isSafeInteger(v))||(generation as number)<0||(serial as number)<1||(N as number)<1||(expiresAt as number)<0||!validEnvelope(value.envelope,identity)||!fitsPending(identity,value))return false;
-    return !Object.hasOwn(value,"journal")||validJournal(value.journal as AttemptJournal,identity,value.envelope);
+    const intent=value.envelope.signed.intent;
+    if(intent.kind!=="spoken"||intent.fields["generation"]!==generation||intent.fields["serial"]!==serial||intent.fields["n"]!==N)return false;
+    if(!Object.hasOwn(value,"journal"))return true;
+    const journal=value.journal as AttemptJournal;
+    return validJournal(journal,identity,value.envelope)&&journal.attempts.every(a=>a.envelope.signed.intent.kind==="spoken"&&a.envelope.signed.intent.fields["generation"]===generation&&a.envelope.signed.intent.fields["serial"]===serial&&a.envelope.signed.intent.fields["n"]===N);
   }catch{return false;}
+}
+
+/** Definitely unsent FIRST dispatch is distinct from read-only recovery. */
+export function resumableJournal(journal:AttemptJournal|undefined,identity:ActorIdentity,envelope:PreparedEnvelope):boolean {
+  return !!journal&&validJournal(journal,identity,envelope)&&activeAttempt(journal).phase==="prepared";
 }

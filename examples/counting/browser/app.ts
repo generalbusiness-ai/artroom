@@ -15,7 +15,7 @@ export function mountCountingStage(root:HTMLElement,options:{speech:SpeechPort;c
   const check=async()=>{if(!device)return;const at=epoch;try{const result=await device.gateway.checkCommand();if(at!==epoch)return;if(result){command=result.status==="unknown"||result.status==="blocked"?result.reason??"Command remains unresolved.":undefined;}else await voice?.checkPending();}catch{if(at===epoch)command="The original request remains unresolved.";}if(at===epoch)render();};
   const checkReport=async()=>{if(!device)return;const at=epoch;try{await voice?.checkPending();}catch{ /* Retain blocked original custody. */ }if(at===epoch)render();};
   const disconnect=()=>{const held=device;epoch++;device=undefined;fresh=false;view=undefined;connection="Not connected";unsubscribe?.();unsubscribe=undefined;voice?.dispose();voice=undefined;held?.gateway.dispose();held?.dispose?.();observation?.cancel();observation=undefined;voiceState=undefined;command=undefined;commandBusy=false;render();};
-  const ui=stageView(root,{control:kind=>{void controls(kind);},arm:id=>{voice?.arm(id);},disarm:()=>voice?.disarm(),check:()=>{void check();},checkReport:()=>{void checkReport();},correct:()=>{void voice?.correctReport();},connect:options.connect,disconnect},options.speech);
+  const ui=stageView(root,{control:kind=>{void controls(kind);},arm:id=>{voice?.arm(id);},disarm:()=>voice?.disarm(),check:()=>{void check();},checkReport:()=>{void checkReport();},resumeReport:()=>{void voice?.resumePending();},correct:()=>{void voice?.correctReport();},connect:options.connect,disconnect},options.speech);
   render();
   return{
     async attach(next:MountedDevice){disconnect();const at=epoch;device=next;connection="Connecting";
