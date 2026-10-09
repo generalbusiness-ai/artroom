@@ -1,19 +1,22 @@
 // Fake-only custody witnesses: no browser speech, provider, microphone, Worker, or native scope.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { domainBytes, DOMAINS, keyIdOfSecret, newIncarnation, scopeIdOf, sign, textDigest } from "@generalbusiness/artroom-bytes";
+import { COUNTING_DEFINITION } from "../pin.ts";
 import { createVoiceController, type ActorIdentity, type Completion, type CustodyLock, type PendingReport,
   type PreparedEnvelope, type ReportOutcome, type SpeechPort, type TurnToken } from "./voice-controller.ts";
-import { activeAttempt, actURL, contextKey, envelopeKey, markActive, type RefusalJudgment } from "./journal.ts";
+import { activeAttempt, actURL, contextKey, envelopeKey, markActive, terminalJournal, type RefusalJudgment } from "./journal.ts";
 
-const scope = { scope: "sc_counting", inc: "in_one", kind: "task" } as const;
-const membership = { scope: "sc_members", inc: "in_members", kind: "membership" } as const;
+const secret = new Uint8Array(32).fill(61);
+const reference = (kind: ActorIdentity["scope"]["kind"]) => ({scope:scopeIdOf({v:1,kind,definition:COUNTING_DEFINITION,creator:null,cause:textDigest(`FAKE controller ${kind}`),ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(6)),kind});
+const scope = reference("lane"), membership = reference("membership");
 const identity: ActorIdentity = { origin: "https://example.invalid", deployment: "test-deployment", scope,
-  definition: "sha256:435d", membership, member: { membership, member: "@alice" }, publicKey: "key_alice" };
+  definition: COUNTING_DEFINITION, membership, member: { membership, member: "@alice" }, publicKey: keyIdOfSecret(secret) };
 const turn = (over: Partial<TurnToken> = {}): TurnToken => ({ ...identity, generation: 0, serial: 1, N: 1, expiresAt: 10_000, ...over });
-const envelope = (n: number): PreparedEnvelope => ({ signed: { sig: `fake-signature-${n}`, intent: {
-  v: 1, to: scope, actor: identity.publicKey, kind: "spoken", on: 1, expected: { on: n },
-  fields: { n: 1 }, idempotencyKey: `fake-${n}`, notAfter: "2099-01-01T00:00:00Z",
-} }, grants: [], beside: { values: [`retained-${n}`] } });
+const envelope = (n: number): PreparedEnvelope => {
+  const intent: PreparedEnvelope["signed"]["intent"] = {v:1,to:scope,actor:identity.publicKey,kind:"spoken",on:1,expected:{on:n},fields:{n:1},idempotencyKey:`fake-${n}`,notAfter:"2099-01-01T00:00:00Z"};
+  return {signed:{intent,sig:sign(secret,domainBytes(DOMAINS.intent,intent))},grants:[],beside:{values:[`retained-${n}`]}};
+};
 const drain = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
 function fixture(saved: PendingReport | null = null, shared?: { saved: PendingReport | null; lock: CustodyLock }, playedTokenLimit?: number) {
   const calls: { text: string; voiceId: string; end(): void; error(): void; canceled: boolean }[] = [];
@@ -28,19 +31,20 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
   } };
   const custody = shared ?? { saved, lock };
   let result: ReportOutcome = { status: "recorded" };
-  let failSave = false;
+  let failSave = false, failArchive = false;
   let owned = true;
   let clock = 100;
   let prepareWait: Promise<void> | null = null;
   let duringSubmit: (() => void) | null = null;
   let duringReconcile: (() => void) | null = null;
-  let roomReserved = true;
+  let roomReserved = true, obsolete = false;
   let preparedBytes: string | null = null;
+  const archives: PendingReport[] = [];
   let retainRefusalProof = true;
   let refreshObservation: (() => void) | null = null;
   const syntheticRefusal = (e: PreparedEnvelope): RefusalJudgment => ({
     answer: { answer: "refused", reason: "revision-moved", name: "synthetic fake service judgment",
-      judgedAt: { seq: 1, hash: "sha256:fake-head" } },
+      judgedAt: { seq: 1, hash: textDigest("FAKE service head") } },
     origin: identity.origin, url: actURL(identity), request: envelopeKey(e), context: contextKey(identity),
   });
   const persistOutcome = (e: PreparedEnvelope): void => {
@@ -70,6 +74,7 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
       load: async () => custody.saved,
       save: async p => { if (failSave) throw new Error("fake private storage failure"); custody.saved = p; },
       clear: async () => { custody.saved = null; },
+      archive: async p => { if(failArchive)throw new Error("FAKE archive quota full"); assert.deepEqual(custody.saved,p); archives.push(structuredClone(p)); custody.saved=null; },
     },
     reporter: {
       prepare: async c => { prepared.push(c); if (prepareWait) await prepareWait;
@@ -82,18 +87,20 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
         duringSubmit?.(); persistOutcome(e); return result;
       }),
       reconcile: async e => custody.lock.run(async () => { reconciled.push(e); duringReconcile?.(); persistOutcome(e); return result; }),
+      obsolete: () => obsolete,
       correctionReady: p => roomReserved && !!p.journal && p.journal.attempts.length < 8,
       refresh: async () => { refreshObservation?.(); },
     },
   });
   const observe = (t: TurnToken = turn()) => controller.observe({ fresh: true, authorized: true, turn: t });
-  return { controller, observe, calls, prepared, submitted, reconciled, custody,
-    result: (r: ReportOutcome) => { result = r; }, saveFails: () => { failSave = true; },
+  return { controller, observe, calls, prepared, submitted, reconciled, custody, archives,
+    result: (r: ReportOutcome) => { result = r; }, saveFails: () => { failSave = true; }, archiveFails: () => { failArchive=true; },
     loseView: () => { owned = false; }, time: (n: number) => { clock = n; },
     waitPrepare: (p: Promise<void>) => { prepareWait = p; },
     duringSubmit: (work: () => void) => { duringSubmit = work; },
     duringReconcile: (work: () => void) => { duringReconcile = work; },
     reserveRoom: (available: boolean) => { roomReserved = available; },
+    obsolete: (value:boolean) => { obsolete=value; },
     preparedBytes: (bytes: string) => { preparedBytes = bytes; },
     retainRefusalProof: (retain: boolean) => { retainRefusalProof = retain; },
     refreshObservation: (refresh: () => void) => { refreshObservation = refresh; } };
@@ -329,4 +336,32 @@ test("A same-envelope handoff cannot reparent the report to another retained com
   f.observe(turn({ generation: 1, serial: 2, N: 2 }));
   await f.controller.correctReport(); await f.controller.checkPending();
   assert.equal(f.prepared.length, 1); assert.equal(f.calls.length, 1); assert.equal(f.reconciled.length, 0);
+});
+
+// The whole resolved history must remain intact; a stale turn is never corrected onto its successor.
+test("Obsolete known terminal custody archives intact, while an unknown earlier history fences archive", async () => {
+  const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
+  const original=structuredClone(f.custody.saved!);
+  f.obsolete(true);f.observe(turn({generation:1,serial:2,N:2}));await drain();
+  assert.equal(terminalJournal(original.journal,identity,original.envelope),true);assert.deepEqual(f.archives,[original]);assert.equal(f.custody.saved,null);assert.equal(f.calls.length,1);assert.equal(f.controller.state().armed,false);assert.equal(f.prepared.length,1);
+  const g=fixture();g.result({status:"unknown"});await g.controller.ready;g.observe();g.controller.arm("fake");g.calls[0]!.end();await drain();
+  const unknown=structuredClone(g.custody.saved!);
+  g.custody.saved={...unknown,journal:{v:2,active:1,attempts:[unknown.journal!.attempts[0]!,original.journal!.attempts[0]!]}};
+  assert.equal(terminalJournal(g.custody.saved!.journal,identity,g.custody.saved!.envelope),false);
+  g.obsolete(true);g.observe(turn({generation:1,serial:2,N:2}));await drain();await g.controller.checkPending();
+  assert.equal(g.archives.length,0);assert.ok(g.custody.saved);assert.equal(g.calls.length,1);assert.equal(g.prepared.length,1);assert.notEqual(g.controller.state().pending,"refused");
+});
+
+test("Malformed restored refusal never becomes a known terminal UI classification", async () => {
+  const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
+  const original=f.custody.saved!,attempt=activeAttempt(original.journal!);
+  const malformed={...original,journal:{...original.journal!,attempts:[{...attempt,refusal:{...attempt.refusal!,answer:{...attempt.refusal!.answer,reason:"not-a-native-reason"}}}]}} as unknown as PendingReport;
+  const restored=fixture(malformed);await restored.controller.ready;restored.controller.observe({fresh:true,authorized:true});await restored.controller.checkPending();
+  assert.equal(restored.controller.state().phase,"blocked");assert.equal(restored.controller.state().pending,"unknown");assert.equal(restored.controller.state().correctionReady,false);assert.equal(restored.reconciled.length,0);assert.deepEqual(restored.custody.saved,malformed);
+});
+
+test("Archive quota failure preserves intact terminal custody and does not unblock new speech",async()=>{
+  const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
+  const original=structuredClone(f.custody.saved!);f.archiveFails();f.obsolete(true);f.observe(turn({generation:1,serial:2,N:2}));await drain();
+  assert.deepEqual(f.custody.saved,original);assert.equal(f.archives.length,0);assert.equal(f.controller.state().phase,"blocked");assert.equal(f.controller.arm("fake"),false);assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[1,1,1]);
 });
