@@ -19,11 +19,11 @@
  * 3. *The configuration.* Fetched from the rules scope by the job's digest,
  *    and read only when the bytes hash to it (`configuration.ts`).
  *    Otherwise no run: `check-error`, `configuration-unavailable`.
- * 4. *The read token.* The service asks the lane for the step `job-read`,
- *    with a request that it signed in step 2 and keeps. The lane mints the
- *    token. Its plaintext goes from the mint's answer to the runner's
- *    gateway, and is never given to this code or to the runner. With no
- *    token no runner starts.
+ * 4. *The read origin.* Manifest-list jobs use their signed, job-bound
+ *    reservation snapshot and its verified overlay. They need no minted
+ *    read token. Legacy jobs ask the lane for `job-read`, using the retained
+ *    signed request. The minted token's plaintext goes only to the runner's
+ *    gateway. With no token, a legacy runner cannot start.
  * 5. *The run.* One runner, for this job alone. Its input is `RunAsk`: the
  *    run's name, the job as read, and the configuration. No key, no token
  *    and no member of a notice is in it.

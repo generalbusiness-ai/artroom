@@ -15,7 +15,7 @@ import { env } from "cloudflare:workers";
 import { ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { command, memoryStore, expectedOf, type ActShape, type Context, type Outcome } from "../../cli/src/index.ts";
-import { changeDemo3, issueDemo } from "../src/index.ts";
+import { change3, changeDemo3, issueDemo } from "../src/index.ts";
 
 
 // The actual CheckerService reads its signed job-bound reservation snapshot
@@ -100,7 +100,16 @@ test("confirmed ref removal survives an older refused deletion while token custo
   try { await story(ownHost(), wired, false, false, true, false, false, undefined, "token-unknown"); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false): Promise<void> {
+// Native admission refuses an empty list without closing collection, and
+// the same lane can still collect a source and accept a nonempty manifest.
+test.each(["production", "demo"] as const)("%s manifest admission rejects zero sources before freezing and accepts a nonempty counterpart (real scopes; host and scheduler STAND-INs)", async (profile) => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, profile); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo"): Promise<void> {
+  const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -156,7 +165,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     await settle(...nodes);
   };
 
-  const files: Record<string, Uint8Array> = { "change3.json": utf8(canonicalize(changeDemo3)), "one.md": utf8("# One\n"), "two.md": utf8("# Two\n") };
+  const files: Record<string, Uint8Array> = { "change3.json": utf8(canonicalize(activeChange)), "one.md": utf8("# One\n"), "two.md": utf8("# Two\n") };
   const person = (): Context => ({ store: memoryStore(), fetch, now, pause, read: async (path) => files[path] ?? null });
   const founder = person(), checker = person();
   const run = (who: Context, ...argv: string[]) => command(who, argv);
@@ -253,8 +262,26 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const configuration = valueDigest(CONFIGURATION_DOMAIN, checkConfig);
   ok(await run(founder, "act", "keep-configuration", "--on", "rules", "--set", `digest=${configuration}`, "--set", "name=text", "--value", "config.json"));
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
-  ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+  ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+  if (nonemptyProfile) {
+    const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(activeChange)}`, "--set", "title=nonempty admission", "--set", "draft=false", "--value", "change3.json"));
+    const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
+    const D = new Platform(repository.directory.scope); await pause([D.name]);
+    const lane = await D.created(openSeq); await pause([lane.name]);
+    const empty = await run(founder, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", "files=[]");
+    expect([empty.code, empty.lines[0]]).toEqual([1, expect.stringContaining("empty-manifest")]);
+    expect((await lane.summary()).value.items.some((item) => item.type === "manifest")).toBe(false);
+    const source = ok(await run(founder, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
+    const sourceSeq = Number(/entry \S+:(\d+),/.exec(source.lines[0]!)![1]);
+    const row = { path: "one.md", entry: factRefOf((await lane.entries())[sourceSeq]!), digest: digestBytes(files["one.md"]!) };
+    ok(await run(founder, "act", "propose-manifest", "--on", lane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([row])}`));
+    const manifest = (await lane.summary()).value.items.find((item) => item.type === "manifest")!;
+    expect([manifest.state, manifest.values["complete"], manifest.values["files"]]).toEqual(["current", true, [{ ...row, entry: sourceSeq }]]);
+    const closed = await run(founder, "act", "propose-file", "--on", lane.name, "--set", `base=${first}`, "--set", "path=two.md", "--set", `digest=${digestBytes(files["two.md"]!)}`, "--set", `size=${files["two.md"]!.length}`, "--set", "content=# Two\n");
+    expect([closed.code, closed.lines[0]]).toEqual([1, expect.stringContaining("collection-closed")]);
+    return;
+  }
   if ((exhaustCleanup && !unknownStageOnly) || unknownMintOnly) {
     const proposed = ok(await run(founder, "propose", "cleanup-exhausted"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;

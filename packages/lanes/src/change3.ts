@@ -34,6 +34,7 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
     guards: [
       { state: ["draft", "open"], of: "also.proposal" }, { signer: ["author"], of: "also.proposal" },
       { none: { type: "manifest", states: ["current", "superseded"] }, reason: "one-manifest" },
+      { has: { list: { field: "files" }, as: "f", where: [] }, reason: "empty-manifest" },
       { distinct: { list: { field: "files" }, as: "f", key: { element: "f.path" } }, reason: "path-repeated" },
       { each: { list: { field: "files" }, as: "f", guards: [
         { fact: { element: "f.entry" } },
