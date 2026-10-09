@@ -172,3 +172,36 @@ The main path changes 13 initial-page reads to one, and the one-file path
 changes four to one. These are source-path counts, not sampled costs or
 paired savings. No global cache, whole-gate speedup or cause of the failed
 676 gate is claimed. No additional gate or unchanged retry ran.
+
+## Coordinated gate at 270ed0ee: failed
+
+Planner `1e0fca6f` authorized one gate at
+`270ed0ee1ba9b11c8e31a1e4302aa22a624cd3c8`, tree
+`b510a4bd87a3e5494973b567a063f2397bd2c272`. All other test, Worker,
+browser, audio and provider lanes were confirmed idle. The checkout was clean
+before and after; cached dependency lock stamp matched.
+
+Whitespace passed (0.1 s wall, 0.0 CPU); types passed (5.4 s wall, 17.1 CPU).
+Tests failed after 280.4 s wall and 321.5 CPU: 969 passed, five failed and
+two skipped across 165 files. Four cases timed out at their original five
+seconds: Page source-preview, Scope founding-real, Site immutable-publication
+and Scope legacy versions. The CLI story's unauthenticated register-read
+assertion expected HTTP 403 and received 200. No uncaught/canceler section
+appears in this run's log. The six active-source checks did not execute after
+Vitest failed. None of this establishes a causal owner or contamination path.
+
+Root read the complete wrapper, raw test report and phase measurements.
+Evidence: `/tmp/artroom-critical-270-gate-evidence.json`, SHA-256
+`66e84bc0d10d49325059af29fa0c62782dd1cf5af3d147351521c7277ab2c915`,
+durable result `8b719ee7`. Wrapper SHA-256
+`d02ae05cc34ba39b01506aa4e00fb10f7b465b342787a744037eb105b4b92db7`;
+raw test SHA-256
+`0637f2a66b30221e492dda4968302248643eeec27238c9694b242fbe1f9fef2e`.
+The mutable post-run duration cache was copied before another execution lane
+was released; it supplies no start order or attributed CPU.
+
+The observed test time differs from the earlier 408.6 s run; this is not a
+paired savings measurement or proof of the 10x goal. This gate remains failed.
+No retry, wider deadline, suite omission, approval, landing or deployment
+follows. A concrete failure disposition and new owner decision are required.
+This note update changes no source or test bytes from the failed head.
