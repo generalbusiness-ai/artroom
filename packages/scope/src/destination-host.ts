@@ -278,6 +278,8 @@ export class DestinationHost implements Outside {
     const check = recordedRules && "content" in recordedRules && recordedRules.content.asked === "rules" ? recordedRules.content.checks.find((check) => check.name === fields["name"] && check.configuration === fields["configuration"]) : null;
     const membership = branch?.values["membership"];
     if (!check || typeof membership !== "string") return null;
+    const generationFits = () => ((this.#given.state.item(publication.id)?.values["passes"] ?? []) as unknown as { name: string; job: FactRef }[]).some((row) => row.name === fields["name"] && canonicalize(row.job) === canonicalize(jobFact));
+    if (!generationFits()) return null;
     const readAt = timeMs(this.#given.clock.read());
     const standing = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; at?: unknown; controllerActive?: unknown } | null;
     if (!standing || standing.key !== intent.actor || standing.keyState !== "active" || standing.memberState !== "active" || standing.member !== check.checker || !Array.isArray(standing.actions) || !standing.actions.includes("change.check") || standing.controllerActive === false) return null;
@@ -306,7 +308,7 @@ export class DestinationHost implements Outside {
     const finalReadAt = timeMs(this.#given.clock.read());
     const currentKey = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; controllerActive?: unknown } | null;
     const completed = timeMs(this.#given.clock.read());
-    if (completed === null || finalReadAt === null || completed < finalReadAt || completed - finalReadAt > 10_000 || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
+    if (!generationFits() || completed === null || finalReadAt === null || completed < finalReadAt || completed - finalReadAt > 10_000 || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
       || !currentKey || currentKey.key !== intent.actor || currentKey.keyState !== "active" || currentKey.memberState !== "active" || currentKey.member !== check.checker || currentKey.controllerActive === false || !Array.isArray(currentKey.actions) || !currentKey.actions.includes("change.check")) return null;
     const sources = sourcesOf(manifest)!.map((row) => this.#fact(reserve!, row.entry)!);
     return { destination: scope.at, job: { entry: job, hash: entryHash(job) }, manifest: { entry: manifest, hash: entryHash(manifest) }, reservation,
