@@ -172,6 +172,20 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   blocked.git = { run: async () => 0, files: async () => ({ ok: true, tip: lastPublished, files: [{ path: "AGENTS.md", bytes: utf8("# Authority\n") }, { path: "five.md", bytes: utf8("# Five\n") }] }) };
   const refused = await run(blocked, "propose", "policy");
   expect([refused.code, refused.lines[1], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("rules-not-met:rules"), lastPublished]);
+  // A authentic failed check ends its reservation and leaves the branch unchanged.
+  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
+  const failing = ok(await run(founder, "propose", "failed"));
+  const failMatch = /as change (sc_\S+), version (\d+)\./.exec(failing.lines[0]!)!;
+  const failLane = new Platform(failMatch[1] as ScopeId), failVersion = Number(failMatch[2]);
+  const failManifest = await failLane.item(failVersion);
+  const failRequested = ok(await run(founder, "act", "request-check", "--on", failLane.name, "--set", `manifest=${failVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const failJob = Number(/entry \S+:(\d+),/.exec(failRequested.lines[0]!)![1]);
+  ok(await run(checker, "act", "check", "--on", failLane.name, "--set", `job=${failJob}`, "--set", `tree=${failManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=failed"));
+  await pause([failLane.name, repository.destination]);
+  expect([(await G.item(0)).refs["slot"] ?? null, host.refs.get("refs/heads/main")]).toEqual([null, lastPublished]);
+  const failMerge = (await failLane.summary()).value.items.find((item) => item.type === "merge");
+  expect(failMerge).toBeUndefined();
+  expect((await failLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-failed"))).toBe(true);
   // A second reservation cannot be disclosed to a compromised checker key.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   const held = ok(await run(founder, "propose", "held"));

@@ -68,6 +68,12 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
   check.also["manifest"] = { item: "manifest", via: { slot: "manifest", of: "also.job" } };
   check.sends = [{ tell: { to: { slot: "destination", of: "also.proposal" }, message: "checked",
     fields: { operation: { slot: "operation", of: "also.manifest" }, result: "self", job: { item: "also.job" } }, result: {} } }];
+  if (!next.acts["check-error"]) next.acts["check-error"] = clone(change.acts["check-error"]!);
+  if (next.acts["check-error"]) {
+    next.acts["check-error"]!.also["proposal"] = { item: "proposal", one: true };
+    next.acts["check-error"]!.also["manifest"] = { item: "manifest", via: { slot: "manifest", of: "also.job" } };
+    next.acts["check-error"]!.sends = clone(check.sends);
+  }
   return next;
 }
 

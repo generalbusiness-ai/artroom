@@ -12,6 +12,6 @@ test("manifest-list successors validate whole and pin exact bytes; the legacy fi
     expect(definitionDigest(value)).toBe(digest);
     expect(digest).not.toBe(definitionDigest(prior));
     expect(value.acts["propose-file"]!.fields).toEqual(prior.acts["propose-file"]!.fields);
-    expect(Object.keys(value.acts)).toEqual(Object.keys(prior.acts));
+    expect(Object.keys(value.acts).filter((kind) => kind !== "check-error")).toEqual(Object.keys(prior.acts).filter((kind) => kind !== "check-error"));
   }
 });

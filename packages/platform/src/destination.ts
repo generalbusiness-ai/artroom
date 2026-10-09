@@ -552,7 +552,7 @@ export const destination3: PlatformData = {
     } },
   },
   outcomes: { ...destination2.outcomes,
-    "check-judge": { code: "check-judge", row: "P19", attempts: 1, origin: "opening", most: { effects: 6, operations: ["push", "mint"] }, observes: [
+    "check-judge": { code: "check-judge", row: "P19", send: UPDATE, attempts: 1, origin: "opening", most: { effects: 6, operations: ["push", "mint"] }, observes: [
       { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "wait" },
     ] },
   },
@@ -568,7 +568,7 @@ export const destination3: PlatformData = {
     checked: { message: "checked", class: "tell", from: FROM_LANE, opens: null,
       also: { publication: { code: "checked-publication", row: "P15", item: "publication", index: "operation", key: "operation" } },
       bound: { of: "also.publication", where: [{ equals: { a: { sender: true }, b: { slot: "lane", of: "also.publication" } } }] },
-      fields: { operation: { ...OPERATION, required: true }, result: { type: "fact", kind: ["check"], under: "change", required: true }, job: { type: "fact", kind: ["request-check"], under: "change", required: true } },
+      fields: { operation: { ...OPERATION, required: true }, result: { type: "fact", kind: ["check", "check-error"], under: "change", required: true }, job: { type: "fact", kind: ["request-check"], under: "change", required: true } },
       guards: [{ code: "checked-bound", row: "P18" }],
       effects: [{ code: "open-check-judge", row: "P16" }], sends: [], attention: [],
     },
@@ -2081,8 +2081,8 @@ export const destinationRules3: Rules = (() => {
       const configured = observation && "content" in observation && observation.content.asked === "rules" ? observation.content.checks.find((check) => check.name === opened?.["name"]) : null;
       const authentic = !!fields && !!opened && !!configured && job!.at.scope === manifest.at.scope && job!.at.inc === manifest.at.inc && opened["manifest"] === manifest.seq
         && fields["job"] === job!.seq && fields["tree"] === publication.values["tree"] && fields["configuration"] === configured.configuration
-        && opened["configuration"] === configured.configuration && fields["outcome"] === "passed" && grant?.subject.member === configured.checker
-        && result!.effects.some((effect) => effect.effect === "state" && effect.item === job!.seq && effect.state === "passed");
+        && opened["configuration"] === configured.configuration && (fields["outcome"] === "passed" || fields["outcome"] === "failed" || typeof fields["reason"] === "string") && grant?.subject.member === configured.checker
+        && result!.effects.some((effect) => effect.effect === "state" && effect.item === job!.seq && (effect.state === "passed" || effect.state === "failed" || effect.state === "errored"));
       return authentic ? { holds: true } : { holds: false, name: "not-this-check" };
     } },
     "checked-result": { place: "effect", most: 6, run: (given) => {
@@ -2101,13 +2101,27 @@ export const destinationRules3: Rules = (() => {
   };
   const checked = rules["checked-result"]!;
   return { ...rules,
+    "publication-update": { place: "send", run: (given) => {
+      if (given.input.type !== "outcome" || given.input.kind !== "check-judge") {
+        const old = rules["publication-update"]!; return old.place === "send" ? old.run(given) : null;
+      }
+      const operation = given.state.operation(given.input.operation)!;
+      const opening = given.own(Number(operation.id.split(":")[0]))!.entry;
+      const held = opening.effects.find((effect) => effect.effect === "operation" && effect.kind === "check-judge");
+      const publication = held?.effect === "operation" && typeof held.for === "number" ? given.state.item(held.for) : null;
+      const result = given.uses.find((use) => use.entry.input.type === "act" && ["check", "check-error"].includes(use.entry.input.signed.intent.kind))?.entry;
+      const fields = result?.input.type === "act" ? result.input.signed.intent.fields : null;
+      const key = result?.input.type === "act" ? result.input.signed.intent.actor : null;
+      const seen = key ? given.observed({ key })?.observation : null;
+      return publication && publication.state === "reserved" && seen && !("subject" in seen) && seen.keyState !== "compromised" && fields?.["outcome"] !== "passed" ? updateRequest(given, { publication, state: "not-reserved", outcome: "refused", reason: "required-check-failed" }) : null;
+    } },
     "open-check-judge": { place: "effect", most: 2, run: (given) => opened(given, 0, "check-judge", 1, given.resolved.subjects.get("also.publication")!.id) },
     "check-judge": { place: "outcome", rules: {
-      selects: false, read: false, most: { effects: 6, requests: 0, operations: 2 }, retries: () => false,
+      selects: false, read: false, most: { effects: 6, requests: 1, operations: 2 }, retries: () => false,
       wellFormed: (result, evidence) => result === "confirmed" && isObject(evidence.body) && Object.keys(evidence.body).length === 0,
       unknown: () => ({}),
       subjects: (given, _operation) => {
-        const result = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "check")?.entry;
+        const result = given.uses.find((use) => use.entry.input.type === "act" && ["check", "check-error"].includes(use.entry.input.signed.intent.kind))?.entry;
         return result?.input.type === "act" ? [result.input.signed.intent.actor] : [];
       },
       derives: (given, operation) => {
@@ -2123,6 +2137,12 @@ export const destinationRules3: Rules = (() => {
         const key = result?.input.type === "act" ? result.input.signed.intent.actor : null;
         const observation = key ? given.observed({ key })?.observation : null;
         if (!observation || "subject" in observation || observation.keyState === "compromised") return { effects: [], sends: [], opens: [] };
+        const resultFields = result?.input.type === "act" ? result.input.signed.intent.fields : null;
+        if (resultFields?.["outcome"] !== "passed") {
+          const branch = branchOf(given.state)!;
+          const next = andNext(given, given.state, { slot: true, ended: publication.id });
+          return { effects: [{ effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "required-check-failed" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, ...next.effects], sends: [], opens: next.opens };
+        }
         const forwarded = { ...given, resolved: { ...given.resolved, fields, subjects: new Map([["also.publication", publication]]) } };
         if (checked.place !== "effect") throw new Error("checked result has its effect rule");
         const effects = checked.run(forwarded);
