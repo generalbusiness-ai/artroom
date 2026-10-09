@@ -184,7 +184,9 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // read routes with the caller's session, the lanes with the capability code; one line each, and the last line says all are consistent.
   const verified = await run(una, "verify", "--all");
   expect(verified.code, verified.lines.join("\n")).toBe(0);
-  const lines = verified.lines.slice(0, -1);
+  const lines = verified.lines.slice(0, -1).filter((line) => !line.startsWith("Cleanup status:"));
+  const cleanup = verified.lines.filter((line) => line.startsWith("Cleanup status:"));
+  expect(cleanup).toEqual([expect.stringMatching(new RegExp(`^Cleanup status: destination ${repository.destination}, entry \\d+: no reservation is recorded as cleanup-owed\\.$`))]);
   const kinds = lines.map((line) => line.split(" ")[0]);
   expect(kinds).toEqual(["register", "directory", "membership", "rules", "destination", "lane", "lane", "lane", "lane", "inbox", "inbox", "inbox"]);
   for (const line of lines) expect(line).toMatch(/^[a-z]+ sc_[a-z2-7]+, entry \d+: consistent\.$/);
