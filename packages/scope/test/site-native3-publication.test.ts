@@ -38,7 +38,7 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     }
     throw new Error("Native fixture scheduler exceeded its finite passes");
   };
-  const files = { "change3.json": utf8(canonicalize(changeDemo3)), "one.md": utf8("# First published\n\n[Self](README.md)\n"), "two.md": utf8("# Second published\n"), "check.json": utf8(canonicalize({ image: "fixture-image", steps: ["fixture-check"] })) };
+  const files = { "change3.json": utf8(canonicalize(changeDemo3)), "one.md": utf8("# First published\n\n[Self](README.md)\n"), "two.md": utf8("# Second published\n"), "check.json": utf8(canonicalize({ image: `sha256:${"7".repeat(64)}`, steps: [["fixture-check"]] })) };
   const ctx: Context = { store: memoryStore(), fetch: routed as never, now: () => timeMs(net.clock.now)!, pause, read: async name => files[name as keyof typeof files] ?? null };
   const run = (...argv: string[]) => command(ctx, argv);
   const ok = (answer: Outcome) => { expect(answer.code, answer.lines.join("\n")).toBe(0); return answer; };
