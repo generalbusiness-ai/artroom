@@ -4,6 +4,7 @@ import type { Fetch } from "@generalbusiness/artroom-client";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { act, actsOn, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, type Room } from "../src/index.ts";
+import { prepareEdit } from "../src/retained-editor-data.ts";
 import { SERVICE, demo } from "./support/demo.ts";
 
 declare module "vitest" {
@@ -45,6 +46,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     expect((await joinRoom(d.as(unas), d.link)).answer.answer).toBe("accepted");
     const forUna = await openRoom(d.as(unas), place);
     const pauls = await d.secretOf(d.paul);
+    const ritas = await d.secretOf(d.rita);
     const forPaul = await openRoom(d.as(pauls), place);
     expect((await act(forUna, d.D.name, "open-issue", { fields: { definition: DEMO_DIGESTS.issue, title: "The handbook is empty", conditions: ["README.md says what the room is for"] } })).answer.answer).toBe("accepted");
     await d.pause([d.D.name]);
@@ -60,6 +62,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     recording = new Map();
     const screens = async (room: Room) => {
       await listLanes(room);
+      await actsOn(room, d.D.name);
       await loadIssue(room, issue);
       await actsOn(room, issue);
       for (const change of [readme, agents]) {
@@ -69,8 +72,14 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
       await loadRules(room);
       await actsOn(room, d.rules.name);
     };
-    for (const secret of [unas, pauls]) await screens(await openRoom(d.as(secret), place));
+    for (const secret of [unas, pauls, ritas]) await screens(await openRoom(d.as(secret), place));
     const seen = await openRoom(d.as(pauls), place);
+    // The explicit native @2 fixture supports read-only editor preparation;
+    // this is not evidence that the @3 destination supports this editor.
+    // Read-only editor preparation records its original-source/authority/base
+    // reads. No browser proposal POST or native admission is fabricated.
+    const selected = await loadChange(seen, readme);
+    await prepareEdit(seen, selected, selected.manifests[0]!.id, { title: "Capture draft", path: "docs/capture.md", content: "# Capture draft\n" }, { current: () => true });
     expect((await act(seen, agents, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } })).answer).toMatchObject({ answer: "refused", name: "author-cannot-review" });
     await loadChange(seen, agents);
     await actsOn(seen, agents);
@@ -82,7 +91,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
 
     const record = {
-      service: SERVICE, place, issue, readme, agents, manifest, people: { una: b64url(unas), paul: b64url(pauls) }, answers: Object.fromEntries(recording),
+      service: SERVICE, place, issue, readme, agents, manifest, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
     };
     recording = null;
     // In lines of at most 64 KiB, which the test runner prints whole.
