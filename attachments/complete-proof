@@ -1,0 +1,160 @@
+{
+  "authorization": "2cba9a2f1cd33ccee84fea2a155014ef82f5e78b",
+  "before": {
+    "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+    "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+    "status": "",
+    "utc": "2026-10-09T22:54:23.702354+00:00",
+    "load": [
+      2.32958984375,
+      2.3896484375,
+      2.23193359375
+    ],
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+  },
+  "sole_runtime_before": [],
+  "workspace_bindings": {
+    "@generalbusiness/artroom-bytes": "/private/tmp/artroom-counting-stage-types/packages/bytes",
+    "@generalbusiness/artroom-checkers": "/private/tmp/artroom-counting-stage-types/packages/checkers",
+    "@generalbusiness/artroom-cli": "/private/tmp/artroom-counting-stage-types/packages/cli",
+    "@generalbusiness/artroom-client": "/private/tmp/artroom-counting-stage-types/packages/client",
+    "@generalbusiness/artroom-contract": "/private/tmp/artroom-counting-stage-types/packages/contract",
+    "@generalbusiness/artroom-derive": "/private/tmp/artroom-counting-stage-types/packages/derive",
+    "@generalbusiness/artroom-git": "/private/tmp/artroom-counting-stage-types/packages/git",
+    "@generalbusiness/artroom-lanes": "/private/tmp/artroom-counting-stage-types/packages/lanes",
+    "@generalbusiness/artroom-page": "/private/tmp/artroom-counting-stage-types/packages/page",
+    "@generalbusiness/artroom-platform": "/private/tmp/artroom-counting-stage-types/packages/platform",
+    "@generalbusiness/artroom-replay": "/private/tmp/artroom-counting-stage-types/packages/replay",
+    "@generalbusiness/artroom-scope": "/private/tmp/artroom-counting-stage-types/packages/scope"
+  },
+  "esbuild_version": "0.28.1",
+  "cache": "/private/tmp/artroom-demo-github-host/node_modules",
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "examples/counting/browser/tsconfig.json"
+      ],
+      "cwd": "/tmp/artroom-counting-stage-types",
+      "exit": 0,
+      "wall_seconds": 0.12697049998678267,
+      "cpu_seconds": 0.344446,
+      "log": "/tmp/artroom-u1-016-supplemental/browser-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:54:23.732987+00:00",
+        "load": [
+          2.32958984375,
+          2.3896484375,
+          2.23193359375
+        ],
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+      },
+      "after": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:54:23.893877+00:00",
+        "load": [
+          2.32958984375,
+          2.3896484375,
+          2.23193359375
+        ],
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+      }
+    },
+    {
+      "argv": [
+        "/tmp/artroom-counting-stage-types/node_modules/.bin/esbuild",
+        "examples/counting/browser/client.test.ts",
+        "examples/counting/browser/voice-controller.test.ts",
+        "examples/counting/browser/app.test.ts",
+        "--bundle",
+        "--platform=node",
+        "--format=esm",
+        "--outdir=/tmp/artroom-u1-016-supplemental/node",
+        "--out-extension:.js=.mjs",
+        "--metafile=/tmp/artroom-u1-016-supplemental/metafile.json",
+        "--alias:@generalbusiness/artroom-client=/tmp/artroom-counting-stage-types/packages/client/src/index.ts",
+        "--alias:@generalbusiness/artroom-bytes=/tmp/artroom-counting-stage-types/packages/bytes/src/index.ts",
+        "--alias:@generalbusiness/artroom-contract=/tmp/artroom-counting-stage-types/packages/contract/src/index.ts"
+      ],
+      "cwd": "/tmp/artroom-counting-stage-types",
+      "exit": 0,
+      "wall_seconds": 0.03768716601189226,
+      "cpu_seconds": 0.09586100000000003,
+      "log": "/tmp/artroom-u1-016-supplemental/bundle.log",
+      "bytes": 256,
+      "sha256": "b9b7422d558456fee9bb26c6cde8bac629190416fcde5ced6545a241e071b334",
+      "before": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:54:23.926888+00:00",
+        "load": [
+          2.32958984375,
+          2.3896484375,
+          2.23193359375
+        ],
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+      },
+      "after": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:54:23.997037+00:00",
+        "load": [
+          2.32958984375,
+          2.3896484375,
+          2.23193359375
+        ],
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-lp",
+        "node",
+        "--test",
+        "/private/tmp/artroom-u1-016-supplemental/node/client.test.mjs",
+        "/private/tmp/artroom-u1-016-supplemental/node/voice-controller.test.mjs",
+        "/private/tmp/artroom-u1-016-supplemental/node/app.test.mjs"
+      ],
+      "cwd": "/tmp/artroom-counting-stage-types",
+      "exit": 1,
+      "wall_seconds": 1.744688958977349,
+      "cpu_seconds": 2.5213769999999998,
+      "log": "/tmp/artroom-u1-016-supplemental/node-tests.log",
+      "bytes": 6252,
+      "sha256": "03dc50b3708c339820af7d0b8de056ce26700e0376f42199797178366dac92ec",
+      "before": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:55:22.490525+00:00"
+      },
+      "after": {
+        "head": "016d8e4f42e289a36f78549d946f224cbe125a32",
+        "tree": "ec4a897ee2e08594fc906972fc100b9170a6cdad",
+        "status": "",
+        "utc": "2026-10-09T22:55:24.268391+00:00"
+      }
+    }
+  ],
+  "Node_tests": "terminal",
+  "metafile": "bounded exact3 preflight passed; all58inputs verified",
+  "gate": "not run",
+  "status": "STOP: Node failed; no retry/gate"
+}
