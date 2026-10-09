@@ -94,6 +94,12 @@ test("an unknown cleanup mint remains named after confirmed ref deletion until i
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
+test("confirmed ref removal survives an older refused deletion while token custody remains owed (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, true, false, false, undefined, "token-unknown"); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
 async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
@@ -103,6 +109,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
   let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let pendingStage: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
+  let confirmedDelete: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
+  let lastDelete: { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let releaseMint = false;
   let pendingMint: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let earlierDelete: { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
@@ -125,6 +133,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       }
       if (refusePushOnly && request.kind === "push") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: host.refs.get("refs/heads/main")! } } };
       const answer = await outside.send(request);
+      if (unknownDeleteOnly && request.kind === "reservation-delete") { lastDelete = { request, late }; if (answer?.result === "confirmed") confirmedDelete = { request, answer, late }; }
       if (unknownMintOnly && request.kind === "mint" && answer && !pendingMint && destinationWrite(given.state, given.own, given.state.operation(request.operation)!)?.write.kind === "reservation-delete") { pendingMint = { request, answer, late }; return null; }
       if (unknownStageOnly && request.kind === "reservation-delete" && request.attempt === 1) earlierDelete = { request, late };
       if (unknownStageOnly && request.kind === "reservation-stage" && answer) pendingStage = { request, answer, late };
@@ -216,6 +225,22 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     const publication = (await G.summary()).value.items.find((item) => item.type === "publication")!;
     expect(publication.state).toBe("published");
     expect((await G.entries()).some((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete" && entry.input.result === "unknown")).toBe(true);
+    if (exhaustCleanup) {
+      for (let attempt = 0; attempt < 4; attempt++) { net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); await pause([repository.destination]); }
+      expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(3);
+      const held = confirmedDelete as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers };
+      expect(held.request.attempt).toBe(1);
+      expect(await runInDurableObject(G.object, () => held.late(held.request.operation, held.request.attempt, held.answer))).toMatchObject({ recorded: "written" });
+      expect((await G.item(publication.id)).values["cleanupReason"]).toEqual({ tokenReason: "reservation-token-unknown", tokenAttempts: 3, refRemoved: true });
+      const later = lastDelete as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers };
+      expect(later.request.attempt).toBe(3);
+      expect(await runInDurableObject(G.object, () => later.late(later.request.operation, later.request.attempt, { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: "failed" } } }))).toMatchObject({ recorded: "written" });
+      expect((await G.item(publication.id)).values["cleanupReason"]).toEqual({ tokenReason: "reservation-token-unknown", tokenAttempts: 3, refRemoved: true });
+      expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(3);
+      const verified = await run(founder, "verify", "--all");
+      expect(verified.lines.join("\n")).toContain("reservation-token-unknown; attempts 3");
+      expect(verified.lines.join("\n")).not.toContain("reservation-ref-unknown;");
+    }
     const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
     expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     return;

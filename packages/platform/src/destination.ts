@@ -2332,7 +2332,7 @@ export const destinationRules3: Rules = (() => {
         const heldUnknownStage = given.input.result === "confirmed" && !stageKnown;
         const exhausted = !removed && given.input.attempt === operation.most;
         const next = cleanupDuties(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
-        const ref = exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
+        const ref = cleanupDuties(target).refRemoved && !removed ? undefined : exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
         const unknownMint = cleanupMintUnknown(given, target);
         const effects: RuleEffect[] = [...token.effects, ...cleanupStatus(target, { ...(ref === undefined ? {} : { ref }), deletes: attempt + (next ? 1 : 0), ...(removed ? { removed: true } : ref ? { removed: false } : {}), ...(unknownMint ? { token: "reservation-token-unknown", tokenAttempts: 1 } : {}) })];
         return { effects, opens: [...token.opens, ...(next ? [opening(given, "mint", 1, target.id)] : [])], sends: [] };
