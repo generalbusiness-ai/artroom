@@ -54,7 +54,7 @@ export function retainedEditor(room: Room, change: ChangeView, options: Retained
       if (task.steps.length) controls.append(h("details", {}, h("summary", {}, "Inspect task results"), ...task.steps.map(step => h("p", {}, `${step.kind}: ${step.answer?.answer ?? (step.attempted ? "unknown" : "not sent")}${step.answer?.answer === "accepted" ? ` · recorded entry ${step.answer.receipt.fact.seq}` : ""}`))));
     }
     const form = h("form", {}, h("label", {}, "Proposal title", title), h("label", {}, "Target file path", path), h("label", {}, "Text", content),
-      h("p", { class: "muted" }, "Current file comparison is unavailable. This writes the target on the named published base and may overwrite existing content. Changing the path leaves the old file; it is not a rename."), message, controls);
+      task?.state === "prepared" ? null : h("p", { class: "muted" }, "Current file comparison is unavailable. This writes the target on the named published base and may overwrite existing content. Changing the path leaves the old file; it is not a rename."), message, controls);
     form.addEventListener("submit", event => { event.preventDefault(); if (record.preparing || record.task) return; record.preparing = true; record.message = "Reading the original source, authority and published base…"; draw(); void (async () => {
       try { record.task = await prepareEdit(room, change, selected.id, record.draft, { current: options.current }); }
       catch (error) { record.message = error instanceof Error ? error.message : "Preparation failed. Nothing was sent."; }

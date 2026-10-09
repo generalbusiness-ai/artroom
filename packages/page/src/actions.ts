@@ -116,7 +116,9 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
       input = element("input", { ...attrs, type: "text", value }) as HTMLInputElement;
     }
     controls.push(input);
-    const label = element("label", {}, labelOf(field.name), input);
+    const fieldLabel = field.name === "body" && act.kind === "comment" ? "Comment"
+      : field.name === "body" && act.kind === "review-verdict" ? "Review comment" : labelOf(field.name);
+    const label = element("label", {}, fieldLabel, input);
     if (primary && technical.has(field.name) && !field.required) advanced.push(label);
     else form.append(label);
   }
