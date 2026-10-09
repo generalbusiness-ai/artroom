@@ -56,3 +56,22 @@ test("head movement or incomplete pagination yields no cleanup absence claim, wh
   expect(old.finding).toBeNull();
   expect(old.lines).toEqual([]);
 });
+
+test("a write-free expiry projection reports pending cleanup before the next turn and never invents expiry without its clock", async () => {
+  const reservation: Item = { ...item(5, "reservation-ref"), state: "reserved", values: { checkDeadline: "2099-01-01T00:00:10Z" } };
+  const read = (expiry: Summary["reservationExpiry"]): Read<Summary> => { const got = summary(); return got.ok ? { ...got, value: { ...got.value, items: [reservation], ...(expiry ? { reservationExpiry: expiry } : {}) } } : got; };
+  for (const expiry of [{ clock: "available" as const, time: "2099-01-01T00:00:11Z" as const, expired: [5] }, { clock: "unavailable" as const }, undefined]) {
+    const result = await observeCleanup({ summary: async () => read(expiry), items: async () => ({ ok: true, complete: true, at: head, value: [] }) }, target);
+    if (expiry?.clock === "available") {
+      expect(result.lines[0]).toContain("Cleanup pending:"); expect(result.lines[0]).toContain("waits for the next act or alarm");
+      expect(result.finding).toContain("Cleanup pending");
+    } else {
+      expect(result.lines[0]).toContain("Cleanup clock unavailable:"); expect(result.lines[0]).toContain("recorded state reserved; no expiry claim");
+      expect(result.lines.join("\n")).not.toContain("expired by deadline");
+    }
+    expect(result.lines.join("\n")).not.toContain("Owed cleanup:");
+  }
+  const beforeDeadline = await observeCleanup({ summary: async () => read({ clock: "available", time: "2099-01-01T00:00:09Z", expired: [] }), items: async () => ({ ok: true, complete: true, at: head, value: [] }) }, target);
+  expect(beforeDeadline.finding).toBeNull();
+  expect(beforeDeadline.lines.join("\n")).not.toContain("Cleanup pending:");
+});
