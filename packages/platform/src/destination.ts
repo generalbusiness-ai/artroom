@@ -2147,7 +2147,13 @@ export const destinationRules3: Rules = (() => {
       const fields = result?.input.type === "act" ? result.input.signed.intent.fields : null;
       const key = result?.input.type === "act" ? result.input.signed.intent.actor : null;
       const seen = key ? given.observed({ key })?.observation : null;
-      return publication && publication.state === "reserved" && seen && !("subject" in seen) && seen.keyState !== "compromised" && fields?.["outcome"] !== "passed" ? updateRequest(given, { publication, state: "not-reserved", outcome: "refused", reason: "required-check-failed" }) : null;
+      if (!publication || publication.state !== "reserved" || !seen || "subject" in seen || seen.keyState === "compromised") return null;
+      if (fields?.["outcome"] !== "passed") return updateRequest(given, { publication, state: "not-reserved", outcome: "refused", reason: "required-check-failed" });
+      const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check")?.entry;
+      const name = job?.input.type === "act" ? job.input.signed.intent.fields["name"] : null;
+      const passes = [...((publication.values["passes"] ?? []) as string[]), name];
+      const complete = ((publication.values["requiredChecks"] ?? []) as string[]).every((check) => passes.includes(check));
+      return complete ? updateRequest(given, { publication, state: "reserved", outcome: "committed", tree: publication.values["tree"] as string, commit: publication.values["integration"] as string }) : null;
     } },
     "open-check-judge": { place: "effect", most: 2, run: (given) => opened(given, 0, "check-judge", 1, given.resolved.subjects.get("also.publication")!.id) },
     "check-judge": { place: "outcome", rules: {
