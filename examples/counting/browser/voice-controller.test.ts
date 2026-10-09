@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createVoiceController, type ActorIdentity, type Completion, type CustodyLock, type PendingReport,
   type PreparedEnvelope, type ReportOutcome, type SpeechPort, type TurnToken } from "./voice-controller.ts";
+import { activeAttempt, actURL, contextKey, envelopeKey, markActive, type RefusalJudgment } from "./journal.ts";
 
 const scope = { scope: "sc_counting", inc: "in_one", kind: "task" } as const;
 const membership = { scope: "sc_members", inc: "in_members", kind: "membership" } as const;
@@ -19,7 +20,13 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
   const prepared: Completion[] = [];
   const submitted: PreparedEnvelope[] = [];
   const reconciled: PreparedEnvelope[] = [];
-  const custody = shared ?? { saved, lock: { run: async <T>(work: () => Promise<T>) => work() } };
+  let lockTail = Promise.resolve();
+  const lock: CustodyLock = { run<T>(work: () => Promise<T>): Promise<T> {
+    const run = lockTail.then(work);
+    lockTail = run.then(() => undefined, () => undefined);
+    return run;
+  } };
+  const custody = shared ?? { saved, lock };
   let result: ReportOutcome = { status: "recorded" };
   let failSave = false;
   let owned = true;
@@ -27,6 +34,27 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
   let prepareWait: Promise<void> | null = null;
   let duringSubmit: (() => void) | null = null;
   let duringReconcile: (() => void) | null = null;
+  let roomReserved = true;
+  let preparedBytes: string | null = null;
+  let retainRefusalProof = true;
+  let refreshObservation: (() => void) | null = null;
+  const syntheticRefusal = (e: PreparedEnvelope): RefusalJudgment => ({
+    answer: { answer: "refused", reason: "revision-moved", name: "synthetic fake service judgment",
+      judgedAt: { seq: 1, hash: "sha256:fake-head" } },
+    origin: identity.origin, url: actURL(identity), request: envelopeKey(e), context: contextKey(identity),
+  });
+  const persistOutcome = (e: PreparedEnvelope): void => {
+    const saved = custody.saved;
+    if (!saved?.journal) return;
+    const phase = activeAttempt(saved.journal).phase;
+    let journal = saved.journal;
+    if (phase === "inflight") {
+      const phase = result.status === "refused" && !retainRefusalProof ? "unknown" : result.status;
+      journal = markActive(journal, phase, phase === "refused" ? syntheticRefusal(e) : undefined);
+    }
+    else if (phase === "unknown" && result.status === "recorded") journal = markActive(journal, "recorded");
+    custody.saved = { ...saved, journal, outcome: activeAttempt(journal).phase === "refused" ? "refused" : "unknown" };
+  };
   const speech: SpeechPort = {
     voices: () => [{ id: "fake", name: "Fake voice" }, { id: "second", name: "Second fake" }],
     play(text, voiceId, callbacks) {
@@ -44,9 +72,18 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
       clear: async () => { custody.saved = null; },
     },
     reporter: {
-      prepare: async c => { prepared.push(c); if (prepareWait) await prepareWait; return envelope(prepared.length); },
-      submit: async e => { assert.deepEqual(custody.saved?.envelope, e, "exact envelope is saved before POST"); submitted.push(e); duringSubmit?.(); return result; },
-      reconcile: async e => { reconciled.push(e); duringReconcile?.(); return result; },
+      prepare: async c => { prepared.push(c); if (prepareWait) await prepareWait;
+        const e = envelope(prepared.length); return preparedBytes === null ? e : { ...e, beside: { values: [preparedBytes] } }; },
+      submit: async e => custody.lock.run(async () => {
+        assert.deepEqual(custody.saved?.envelope, e, "exact envelope is saved before POST"); submitted.push(e);
+        const saved = custody.saved!;
+        assert.ok(saved.journal, "newly prepared reports have a journal");
+        custody.saved = { ...saved, journal: markActive(saved.journal, "inflight") };
+        duringSubmit?.(); persistOutcome(e); return result;
+      }),
+      reconcile: async e => custody.lock.run(async () => { reconciled.push(e); duringReconcile?.(); persistOutcome(e); return result; }),
+      correctionReady: p => roomReserved && !!p.journal && p.journal.attempts.length < 8,
+      refresh: async () => { refreshObservation?.(); },
     },
   });
   const observe = (t: TurnToken = turn()) => controller.observe({ fresh: true, authorized: true, turn: t });
@@ -55,7 +92,11 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     loseView: () => { owned = false; }, time: (n: number) => { clock = n; },
     waitPrepare: (p: Promise<void>) => { prepareWait = p; },
     duringSubmit: (work: () => void) => { duringSubmit = work; },
-    duringReconcile: (work: () => void) => { duringReconcile = work; } };
+    duringReconcile: (work: () => void) => { duringReconcile = work; },
+    reserveRoom: (available: boolean) => { roomReserved = available; },
+    preparedBytes: (bytes: string) => { preparedBytes = bytes; },
+    retainRefusalProof: (retain: boolean) => { retainRefusalProof = retain; },
+    refreshObservation: (refresh: () => void) => { refreshObservation = refresh; } };
 }
 
 test("Explicit Arm starts local speech once; duplicate end and snapshots cannot replay the same turn", async () => {
@@ -147,11 +188,15 @@ test("Known refusal can prepare a corrected successor using the same completion 
   const f = fixture(); f.result({ status: "refused", reason: "fake native refusal" }); await f.controller.ready;
   f.observe(); f.controller.arm("fake"); f.calls[0]!.end(); await drain();
   const original = f.custody.saved; assert.equal(original?.outcome, "refused");
+  assert.equal(activeAttempt(original!.journal!).phase, "refused");
   await f.controller.correctReport(); assert.equal(f.prepared.length, 1, "the pre-POST observation cannot authorize a correction");
   f.controller.observe({ fresh: false, authorized: true }); await f.controller.correctReport(); assert.equal(f.prepared.length, 1);
   f.observe(); f.result({ status: "unknown" }); await f.controller.correctReport();
   assert.deepEqual(f.prepared[1], f.prepared[0]); assert.equal(f.calls.length, 1);
   assert.notDeepEqual(f.custody.saved?.envelope, original?.envelope); assert.equal(f.submitted.length, 2);
+  assert.equal(f.custody.saved?.journal?.attempts.length, 2);
+  assert.deepEqual(f.custody.saved?.journal?.attempts[0], original?.journal?.attempts[0]);
+  assert.equal(activeAttempt(f.custody.saved!.journal!).phase, "unknown", "the dispatcher-owned unknown phase survives controller settlement");
 });
 
 test("Loaded pending custody must match the complete context and blocks replay after restart", async () => {
@@ -211,4 +256,77 @@ test("The played-token ceiling disarms new speech without discarding unresolved 
   f.result({ status: "recorded" }); await f.controller.checkPending();
   assert.equal(f.controller.state().phase, "blocked"); assert.equal(f.controller.state().armed, false);
   assert.equal(f.controller.arm("fake"), false); assert.equal(f.calls.length, 2);
+});
+
+test("Eight refused attempts retain the original history and prevent a ninth signature or speech replay", async () => {
+  const f = fixture(); f.result({ status: "refused" }); await f.controller.ready;
+  f.observe(); f.controller.arm("fake"); f.calls[0]!.end(); await drain();
+  const original = f.custody.saved!.journal!.attempts[0];
+  for (let attempt = 2; attempt <= 8; attempt++) {
+    f.observe(); assert.equal(f.controller.state().correctionReady, true);
+    await f.controller.correctReport();
+  }
+  const retained = JSON.stringify(f.custody.saved);
+  f.observe(); assert.equal(f.controller.state().correctionReady, false);
+  await f.controller.correctReport();
+  assert.equal(f.prepared.length, 8); assert.equal(f.submitted.length, 8); assert.equal(f.calls.length, 1);
+  assert.equal(f.custody.saved!.journal!.attempts.length, 8);
+  assert.deepEqual(f.custody.saved!.journal!.attempts[0], original);
+  assert.equal(JSON.stringify(f.custody.saved), retained);
+  assert.ok(f.custody.saved!.journal!.attempts.every(a => a.phase === "refused" && a.refusal));
+});
+
+test("Unavailable correction room blocks signing and an oversized prepared successor cannot replace refused history", async () => {
+  const f = fixture(); f.result({ status: "refused" }); await f.controller.ready;
+  f.observe(); f.controller.arm("fake"); f.calls[0]!.end(); await drain();
+  const retained = JSON.stringify(f.custody.saved);
+  f.reserveRoom(false); f.observe(); assert.equal(f.controller.state().correctionReady, false);
+  await f.controller.correctReport(); assert.equal(f.prepared.length, 1);
+  f.reserveRoom(true); f.observe(); assert.equal(f.controller.state().correctionReady, true);
+  f.preparedBytes("x".repeat(64 * 1024)); await f.controller.correctReport();
+  assert.equal(f.prepared.length, 2); assert.equal(f.submitted.length, 1);
+  assert.equal(JSON.stringify(f.custody.saved), retained); assert.equal(f.calls.length, 1);
+});
+
+test("A returned refused enum without retained service proof and a legacy refused slot stay unknown", async () => {
+  const f = fixture(); f.result({ status: "refused" }); f.retainRefusalProof(false);
+  await f.controller.ready; f.observe(); f.controller.arm("fake"); f.calls[0]!.end(); await drain();
+  f.observe(); assert.equal(f.controller.state().pending, "unknown"); assert.equal(f.controller.state().correctionReady, false);
+  await f.controller.correctReport(); assert.equal(f.prepared.length, 1);
+  const legacy = fixture({ completion: { turn: turn(), voiceId: "fake", completedAt: 100 },
+    envelope: envelope(1), outcome: "refused" });
+  legacy.result({ status: "refused" }); await legacy.controller.ready; legacy.observe();
+  await legacy.controller.checkPending(); await legacy.controller.correctReport();
+  assert.equal(legacy.controller.state().pending, "unknown"); assert.equal(legacy.controller.state().correctionReady, false);
+  assert.equal(legacy.prepared.length, 0); assert.equal(legacy.calls.length, 0);
+});
+
+test("Refusal refresh runs after stale fencing even when CURRENT arrived before the reporter returned", async () => {
+  const f = fixture(); f.result({ status: "refused" }); await f.controller.ready;
+  let refreshes = 0;
+  f.duringSubmit(() => f.observe());
+  f.refreshObservation(() => { refreshes++; f.observe(); });
+  f.observe(); f.controller.arm("fake"); f.calls[0]!.end(); await drain();
+  assert.equal(refreshes, 1); assert.equal(f.controller.state().correctionReady, true);
+  f.result({ status: "unknown" }); await f.controller.correctReport();
+  assert.equal(f.prepared.length, 2); assert.equal(f.calls.length, 1);
+});
+
+test("A same-envelope handoff cannot reparent the report to another retained completion", async () => {
+  const f = fixture(); await f.controller.ready; f.observe(); f.controller.arm("fake");
+  let submittedEnvelope: PreparedEnvelope | null = null;
+  f.duringSubmit(() => {
+    const saved = f.custody.saved!;
+    submittedEnvelope = saved.envelope;
+    f.custody.saved = { ...saved, completion: { ...saved.completion,
+      turn: { ...saved.completion.turn, generation: 1, serial: 2, N: 2 },
+      voiceId: "second", completedAt: saved.completion.completedAt + 1 } };
+  });
+  f.calls[0]!.end(); await drain();
+  assert.deepEqual(f.custody.saved?.envelope, submittedEnvelope);
+  assert.equal(f.controller.state().phase, "blocked");
+  assert.ok(f.custody.saved, "the returned recorded enum cannot clear reparented custody");
+  f.observe(turn({ generation: 1, serial: 2, N: 2 }));
+  await f.controller.correctReport(); await f.controller.checkPending();
+  assert.equal(f.prepared.length, 1); assert.equal(f.calls.length, 1); assert.equal(f.reconciled.length, 0);
 });

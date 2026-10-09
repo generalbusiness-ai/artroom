@@ -5,9 +5,11 @@ import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHead
 import { counting } from "../definition.ts";
 import { COUNTING_DEFINITION } from "../pin.ts";
 import { assignedTurn, countingView, proposal, same, type Control, type CountingView } from "./model.ts";
+import { appendPrepared, activeAttempt, envelopeKey, fitsPending, validJournal, type AttemptJournal } from "./journal.ts";
+import { attemptDispatcher, type TrustedActFetch } from "./dispatcher.ts";
 import type { ActorIdentity, Completion, PreparedEnvelope, Reporter, ReportOutcome, CustodyLock, PendingStore } from "./voice-controller.ts";
 
-export interface CommandStore {load():Promise<{kind:string;envelope:PreparedEnvelope}|null>;save(value:{kind:string;envelope:PreparedEnvelope}):Promise<void>;clear():Promise<void>}
+export interface CommandStore {load():Promise<{kind:string;envelope:PreparedEnvelope;journal?:AttemptJournal}|null>;save(value:{kind:string;envelope:PreparedEnvelope;journal?:AttemptJournal}):Promise<void>;clear():Promise<void>}
 export type CommandOutcome=ReportOutcome|{readonly status:"blocked";readonly reason:string};
 export interface StageGateway extends Reporter {
   observe(emit:(state:ObservationState<Summary>,view?:CountingView)=>void):Observation;
@@ -17,7 +19,9 @@ export interface StageGateway extends Reporter {
   restoreCommand():Promise<void>;
   dispose():void;
 }
-export function nativeGateway(identity:ActorIdentity,secret:Uint8Array,options:{current():boolean;lock:CustodyLock;voiceStore:PendingStore;commandStore:CommandStore;fetch?:Fetch;headFetch?:HeadStreamFetch}):StageGateway {
+export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options:{current():boolean;lock:CustodyLock;voiceStore:PendingStore;commandStore:CommandStore;fetch?:Fetch;headFetch?:HeadStreamFetch;actFetch?:TrustedActFetch}):StageGateway {
+  const identity=JSON.parse(JSON.stringify(configured)) as ActorIdentity;
+  const origin=new URL(identity.origin);if(origin.origin!==identity.origin||origin.pathname!=="/"||origin.search||origin.hash||origin.username||origin.password||!["https:","http:"].includes(origin.protocol))throw new Error("The configured service must be an exact trusted origin.");
   if(identity.definition!==COUNTING_DEFINITION||keyIdOfSecret(secret)!==identity.publicKey||!same(identity.member.membership,identity.membership))throw new Error("This enrolled device does not match the configured counting identity.");
   // Copies stay in this device's closure; no key/token reaches a URL or view.
   const ownSecret=Uint8Array.from(secret),signer=secretSigner(ownSecret);
@@ -34,12 +38,31 @@ export function nativeGateway(identity:ActorIdentity,secret:Uint8Array,options:{
     if(!followed.ok||followed.entry.input.type!=="act"||canonicalize(followed.entry.input.signed)!==canonicalize(envelope.signed))return{status:"unknown",reason:"The original recorded request could not be verified."};
     observer?.refresh();return{status:"recorded"};
   };
-  const send=async(envelope:PreparedEnvelope):Promise<ReportOutcome>=>{try{exact(envelope);const answer=await handle().submit(envelope.signed,envelope.grants,envelope.beside);current();if(answer.answer==="accepted")return verified(answer.receipt,envelope);if(answer.answer==="refused"){observer?.refresh();return{status:"unknown",reason:"A refusal reply cannot prove this exact request was not recorded. Check the retained original request."};}return{status:"unknown",reason:"No acceptance is confirmed. The original request is retained."};}catch{return{status:"unknown",reason:"The original request has no verified answer."};}};
-  const reconcile=async(envelope:PreparedEnvelope):Promise<ReportOutcome>=>{try{exact(envelope);const answer=await handle().settle(envelope.signed);current();return answer.ok?verified(answer.value,envelope):{status:"unknown",reason:"The original request remains unresolved."};}catch{return{status:"unknown",reason:"The original request remains unresolved."};}};
+  const trusted:TrustedActFetch|undefined=options.actFetch??(options.fetch?undefined:typeof globalThis.fetch==="function"?((url,init)=>fetch(url,{...init,signal:AbortSignal.any([init.signal,lifetime.signal])})):undefined);
+  const dispatcher=attemptDispatcher({identity,current:usable,...(trusted?{fetch:trusted}:{}),accepted:verified,settle:async envelope=>{exact(envelope);const answer=await handle().settle(envelope.signed);current();return answer.ok?{ok:true,receipt:answer.value}:{ok:false};},refresh:()=>observer?.refresh()});
+  const candidate=(kind:Control|"spoken",completion?:Completion)=>{if(!view||!fresh)throw new Error("A current counting snapshot is required.");const plan=proposal(view,identity,kind,completion),shaped=shapeDeclaredAct(counting,kind,{on:plan.on,fields:plan.fields});return{plan,shaped};};
+  const reservation=(report:import("./voice-controller.ts").PendingReport):boolean=>{
+    try{
+      current();if(!dispatcher.supported()||!report.journal||!validJournal(report.journal,identity,report.envelope)||activeAttempt(report.journal).phase!=="refused"||!["guard-failed","revision-moved"].includes(activeAttempt(report.journal).refusal!.answer.reason))return false;
+      const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,report.completion.turn))return false;
+      const {plan,shaped}=candidate("spoken",report.completion);
+      // Actual SDK fields have fixed-size22-char operation IDs,86-char signatures and20-char timestamps.
+      const envelope:PreparedEnvelope={signed:{intent:{v:1,to:identity.scope,actor:identity.publicKey,kind:"spoken",on:shaped.on??null,expected:plan.expected,fields:shaped.fields,idempotencyKey:"x".repeat(22),notAfter:"2099-01-01T00:00:00Z"},sig:"x".repeat(86)},grants:[],beside:shaped.beside};
+      const journal=appendPrepared(envelope,report.journal);
+      const next={...report,envelope,journal,outcome:"unknown" as const};
+      return fitsPending(identity,next);
+    }catch{return false;}
+  };
   const prepare=async(kind:Control|"spoken",completion?:Completion):Promise<PreparedEnvelope>=>{
-    current();if(!view||!fresh)throw new Error("A current counting snapshot is required.");
-    const plan=proposal(view,identity,kind,completion),shaped=shapeDeclaredAct(counting,kind,{on:plan.on,fields:plan.fields});
+    current();if(!dispatcher.supported())throw new Error("Trusted submit transport is unavailable.");
+    const {plan,shaped}=candidate(kind,completion);
     const signed=await signedIntent(signer,{to:identity.scope,kind,on:shaped.on,fields:shaped.fields,expected:plan.expected});current();return{signed,grants:[],beside:shaped.beside};
+  };
+  const clearCommand=async(envelope:PreparedEnvelope,result:ReportOutcome):Promise<ReportOutcome>=>{
+    if(result.status==="unknown")return result;
+    current();const retained=await options.commandStore.load();current();
+    if(!retained?.journal||envelopeKey(retained.envelope)!==envelopeKey(envelope)||!validJournal(retained.journal,identity,envelope)||activeAttempt(retained.journal).phase!==result.status)return{status:"unknown",reason:"The exact terminal command could not be recovered."};
+    await options.commandStore.clear();current();pending=null;observer?.refresh();return result;
   };
   return{
     observe(emit){
@@ -50,10 +73,12 @@ export function nativeGateway(identity:ActorIdentity,secret:Uint8Array,options:{
         emit:state=>{if(!usable())return;fresh=state.status==="current";if(fresh&&state.status==="current"){try{view=countingView(state.snapshot.value,identity.scope);}catch{view=undefined;fresh=false;emit({status:"error",reason:"The counting snapshot is invalid."});return;}}emit(state,view);},
       });return observer;
     },
-    async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("spoken",completion);},
-    submit:send,reconcile,
-    async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{await options.commandStore.save({kind,envelope});}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await send(envelope);if(result.status!=="unknown"){await options.commandStore.clear();pending=null;observer?.refresh();}return result;});},
-    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;return null;}pending=held.kind;const result=await reconcile(held.envelope);if(result.status==="recorded"){await options.commandStore.clear();pending=null;observer?.refresh();}return result;});},
+    correctionReady:reservation,refresh:()=>observer?.refresh(),
+    async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("spoken",completion);},
+    submit:envelope=>options.lock.run(()=>dispatcher.run(options.voiceStore,envelope)),
+    reconcile:envelope=>options.lock.run(()=>dispatcher.run(options.voiceStore,envelope)),
+    async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();await options.commandStore.save(held);}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await dispatcher.run(options.commandStore,envelope);return clearCommand(envelope,result);});},
+    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;return null;}pending=held.kind;const result=await dispatcher.run(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
     pendingCommand:()=>pending,
     async restoreCommand(){const held=await options.commandStore.load();current();pending=held?.kind??null;},
     dispose(){alive=false;lifetime.abort();observer?.cancel();session=null;view=undefined;ownSecret.fill(0);},

@@ -10,7 +10,7 @@ import { browserLock, privateCommandStore, privatePendingStore } from "./storage
 import type { ActorIdentity, SpeechPort } from "./voice-controller.ts";
 const NOW=Date.now(),DEPLOYMENT="fake-u1",ORIGIN="https://counting-fake.test";
 const reference=(name:string,kind:ScopeRef["kind"]):ScopeRef=>({scope:scopeIdOf({v:1,kind,definition:COUNTING_DEFINITION,creator:null,cause:textDigest(`fake ${name}`),ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(9)),kind});
-const S=reference("scope","task"),M=reference("membership","membership");
+const S=reference("scope","lane"),M=reference("membership","membership");
 const keys=[new Uint8Array(32).fill(41),new Uint8Array(32).fill(42),new Uint8Array(32).fill(43)];
 const members:MemberRef[]=["@ada","@beau","@cleo"].map(member=>({membership:M,member:member as MemberRef["member"]}));
 type FakeItem={-readonly [K in keyof Item]:Item[K]};
@@ -45,7 +45,7 @@ const fakeHeads:HeadStreamFetch=async(url,init)=>{if(init.redirect!=="error")thr
 let plays=0,cancels=0,callbacks:{end():void;error():void}|undefined;
 const speech:SpeechPort={voices:()=>[{id:"fake-1",name:"Voice 1"},{id:"fake-2",name:"Voice 2"},{id:"fake-3",name:"Voice 3"}],play:(_text,_id,events)=>{plays++;callbacks=events;return()=>{cancels++;};}};
 const identity:ActorIdentity={origin:ORIGIN,deployment:DEPLOYMENT,scope:S,definition:COUNTING_DEFINITION,membership:M,member:members[0]!,publicKey:keyIdOfSecret(keys[0]!)};
-const store=privatePendingStore(identity),lock=browserLock(identity),commands=privateCommandStore(identity),gateway=nativeGateway(identity,keys[0]!,{current:()=>active,lock,voiceStore:store,commandStore:commands,fetch:fakeFetch,headFetch:fakeHeads});
+const store=privatePendingStore(identity),lock=browserLock(identity),commands=privateCommandStore(identity),gateway=nativeGateway(identity,keys[0]!,{current:()=>active,lock,voiceStore:store,commandStore:commands,fetch:fakeFetch,headFetch:fakeHeads,actFetch:async(url,init)=>{const response=await fakeFetch(url,{...init,signal:init.signal as never});return{status:response.status,body:response.body,headers:new Headers({"content-type":"application/json"}),url,redirected:false};}});
 const app=mountCountingStage(document.querySelector<HTMLElement>("#counting")!,{speech,connect:()=>{},fake:true,now:()=>NOW});
 void app.attach({identity,speech,gateway,store,lock,current:()=>active,dispose:()=>{active=false;}});
 // Public test hooks expose only events/counters, never credentials/envelopes.
