@@ -1,0 +1,82 @@
+{
+  "consoleErrors": [],
+  "contrast": [
+    {
+      "theme": "light",
+      "label": "title",
+      "contrast": 17.2,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "label": "metadata",
+      "contrast": 5.59,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "label": "placeholder",
+      "contrast": 5.26,
+      "minimum": 4.5
+    },
+    {
+      "theme": "light",
+      "label": "input boundary",
+      "contrast": 3.41,
+      "minimum": 3
+    },
+    {
+      "theme": "light",
+      "label": "primary button",
+      "contrast": 6.9,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "label": "title",
+      "contrast": 15.9,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "label": "metadata",
+      "contrast": 9.19,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "label": "placeholder",
+      "contrast": 8.45,
+      "minimum": 4.5
+    },
+    {
+      "theme": "dark",
+      "label": "input boundary",
+      "contrast": 5.38,
+      "minimum": 3
+    },
+    {
+      "theme": "dark",
+      "label": "primary button",
+      "contrast": 9.04,
+      "minimum": 4.5
+    }
+  ],
+  "checks": [
+    "page identity",
+    "nonblank production fragment",
+    "own protected edit requires another reviewer",
+    "version-labelled exact page",
+    "list query retained on return",
+    "fresh-fixture concept screenshots",
+    "native-width desktop comparison capture"
+  ],
+  "captures": [
+    "screens/issues-desktop.png",
+    "screens/change-merged-desktop.png",
+    "screens/issues-mobile.png",
+    "screens/create-room-mobile.png",
+    "screens/invalid-path-mobile.png",
+    "screens/rules-mobile-dark.png"
+  ]
+}
