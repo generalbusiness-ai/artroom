@@ -60,6 +60,10 @@ test("the complete closure validates with actual rule grammar and canonical defi
 
 test("three then four members follow native join order; exact reports preserve sequence and reject stale or forged successors", async () => {
   const s = make(5), a = await joined(s, keys.una), b = await joined(s, keys.vic), c = await joined(s, keys.paul);
+  expect(s.grants().some(p => p.current && p.grant.key === keys.vic.key && p.grant.actions.includes("counting.control"))).toBe(true);
+  expect(await act(s, keys.vic, "start", startFields(s, a))).toMatchObject({result:"refused",reason:"guard-failed"});
+  expect(await act(s, keys.una, "join")).toMatchObject({result:"refused",reason:"guard-failed"});
+  expect(basis(s).map(p => p.id)).toEqual([a, b, c]);
   await wrote(act(s, keys.rita, "start", startFields(s, a)));
   const first = s.intent(keys.una, "spoken", { ...on(s, board(s).id,{next:b}), fields: spokenFields(s, b) });
   expect((await send(s, s.intent(keys.vic, "spoken", { ...on(s, board(s).id,{next:b}), fields: spokenFields(s, b) }))).result).toBe("refused");
@@ -72,6 +76,8 @@ test("three then four members follow native join order; exact reports preserve s
   const d = await joined(s, keys.sam);
   expect({ basis: board(s).values["basis"], number: board(s).values["number"], serial: board(s).values["serial"], speaker: board(s).parties["speaker"] }).toEqual(heldTurn);
   const good = spokenFields(s, c);
+  const forgedMembers = basis(s).map((row, i) => i === 0 ? { ...row, member: keys.rita.member } : row);
+  expect(await act(s, keys.vic, "spoken", { ...good, basis: forgedMembers })).toMatchObject({result:"refused",reason:"guard-failed"});
   expect((await act(s, keys.vic, "spoken", { ...good, basis: basis(s).reverse(), next: b })).result).toBe("refused");
   expect((await act(s, keys.vic, "spoken", { ...good, n: 3 })).result).toBe("refused");
   await wrote(act(s, keys.vic, "spoken", good));
@@ -98,6 +104,8 @@ test("departures cancel only the current turn, preserve the same number, and emp
   await wrote(act(s, keys.vic, "leave", leaveFields(s, b, d), b));
   expect([board(s).values["lastNumber"], board(s).values["number"], board(s).parties["speaker"]]).toEqual([1, 2, keys.sam.member]);
   expect((await act(s, keys.vic, "spoken", old)).result).toBe("refused");
+  expect(s.grants().some(p => p.current && p.grant.key === keys.vic.key && p.grant.actions.includes("counting.control"))).toBe(true);
+  expect(await act(s, keys.vic, "cancel-turn", { ...leaveFields(s, d, a), reason: "disconnect" }, d)).toMatchObject({result:"refused",reason:"guard-failed"});
   await wrote(act(s, keys.rita, "cancel-turn", { ...leaveFields(s, d, a), reason: "disconnect" }, d));
   expect([board(s).values["number"], board(s).parties["speaker"]]).toEqual([2, keys.una.member]);
   await wrote(act(s, keys.una, "leave", leaveFields(s, a), a));
@@ -123,6 +131,8 @@ test("the same completion can correct a known roster refusal; pause, reset and e
   await wrote(act(s, keys.rita, "pause", { nextSerial: Number(board(s).values["serial"]) + 1 }));
   await wrote(act(s, keys.rita, "start", startFields(s, b)));
   expect((await act(s, keys.vic, "spoken", late)).result).toBe("refused");
+  expect(s.grants().some(p => p.current && p.grant.key === keys.vic.key && p.grant.actions.includes("counting.control"))).toBe(true);
+  expect(await act(s, keys.vic, "reset", { generation: 1 })).toMatchObject({result:"refused",reason:"guard-failed"});
   await wrote(act(s, keys.rita, "reset", { generation: 1 }));
   await wrote(act(s, keys.rita, "start", startFields(s, a)));
   expect((await act(s, keys.una, "spoken", corrected)).result).toBe("refused");
