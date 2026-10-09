@@ -28,6 +28,7 @@ const render = (change: ChangeView): Element => { vi.stubGlobal("document", docu
 
 test("one current condition follows the selected version, never an internally confirmed operation or an older version", () => {
   expect(changeCondition(view({ merges: [merge()] }))).toBe("Awaiting confirmation");
+  expect(changeCondition(view(), { answer: "refused", reason: "unauthorized" } as never)).toBe("Open");
   expect(changeCondition(view({ merges: [merge({ state: "published", manifest: 11 })] }))).toBe("Open");
   const screen = render(view({ merges: [merge({ state: "published", commit: "exact-published-commit" })] }));
   expect(screen.all("span").filter((e) => e.attributes["class"]?.includes("condition")).map((e) => e.textContent)).toEqual(["Merged"]);

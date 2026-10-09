@@ -85,7 +85,7 @@ export function changeCondition(change: ChangeView, last: Answer | null = null):
   if (current?.file && editPath(current.file.path) === null) return "Invalid path";
   if (states.some((s) => s.state === "policy not met")) return "Needs review";
   if (states.some((s) => s.state === "waiting for a reviewer")) return "Waiting for review";
-  if (latest?.state === "refused" || last?.answer === "refused") return "Refused";
+  if (latest?.state === "refused") return "Refused";
   if (change.state === "cancelled" || change.state === "closed") return change.state === "closed" ? "Closed" : "Cancelled";
   return "Open";
 }
