@@ -80,6 +80,7 @@ export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefiniti
   "platform:directory@1": { membership: "platform:membership@1", rules: "platform:rules@1", destination: "platform:destination@1" },
   "platform:directory@2": { membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@2" },
   "platform:directory@3": { membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@3" },
+  "platform:directory@5": { membership: "platform:membership@4", rules: "platform:rules@3", destination: "platform:destination@2" },
 };
 
 /** The bound on the attempts of the import that a founding opens (section 12.1.2, the row `establish`; U9). */

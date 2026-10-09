@@ -47,6 +47,10 @@ export default defineConfig({
       project("lanes", "lanes", "vitest.config.ts", 0),
       project("cli", "cli", "vitest.config.ts", 0),
       project("page", "page", "vitest.config.ts", 0),
+      {
+        extends: "./examples/counting/vitest.config.ts",
+        test: { name: "counting", root: "./examples/counting", sequence: { groupOrder: 0 } },
+      },
     ],
   },
 });

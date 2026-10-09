@@ -7,7 +7,8 @@
  */
 
 import type { Digest, FactRef, FieldType, Guard, Input, Notify, Operand, Range, Seed, SelfMark, Send, SendForm, SendMark, SendSource, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { isSend } from "@generalbusiness/artroom-bytes";
+import { isDigest, isSend } from "@generalbusiness/artroom-bytes";
+import { creationContextOf, type CreationContext } from "./creation-context.ts";
 import type { Derived } from "./effects.ts";
 import { isLocalFact } from "./fields.ts";
 import { judgeGuards, readsUnbound, slotOf, type Judging } from "./guards.ts";
@@ -41,10 +42,10 @@ export function directoryOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "
  * creation, which the platform sets. A membership scope is its own. Null:
  * the genesis names none.
  *
- * No source puts that member in a `create` yet, and the scopes that are
- * created beside their membership scope fix its incarnation later
- * (authority note, section 3.3, the table of four rows). So this reads
- * what a genesis holds, and for most scopes of today that is nothing.
+ * Platform siblings created beside membership fix its incarnation later
+ * (authority note, section 3.3). Ordinary creations and the explicit versioned
+ * declared creation context carry a full reference in this authoritative body,
+ * separate from any domain field of the same name.
  */
 export function membershipOf(genesis: Pick<Extract<Input, { type: "genesis" }>, "message">, at: ScopeRef): ScopeRef | null {
   if (at.kind === "membership") return at;
@@ -106,18 +107,31 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
     return directory;
   };
 
+  // Genesis is not in own(0) until it seals. Later turns/replay already have
+  // that immutable input. Only declared non-membership scopes forward this
+  // opt-in; platform siblings and membership-self keep their old behavior.
+  const recordedContext = (): CreationContext => {
+    if (j.scope.at.kind === "membership") return { kind: "legacy" };
+    const genesis = j.self === 0 ? j.judged : j.own?.(0)?.entry.input;
+    return genesis?.type === "genesis" && isDigest(genesis.seed.definition)
+      ? creationContextOf(genesis.message?.body) : { kind: "legacy" };
+  };
+
   /**
    * Section 6.6, "`membership` in a `create`": the membership scope that this scope records, which the platform puts in every
    * `create`. A membership scope is its own, and every other scope reads it from its genesis entry (`membershipOf`). Null: the
    * scope records none, and its creations hold no such member. Undefined: its genesis entry cannot be read now.
    */
-  const recordedMembership = (): ScopeRef | null | undefined => {
+  const recordedMembership = (declared: boolean): ScopeRef | null | undefined => {
     if (j.scope.at.kind === "membership") return j.scope.at;
-    // A genesis records no membership reference while it is written: a directory's slot `repository.membership` is set later, by
+    // A legacy/platform genesis records no membership reference while it is written: a directory's slot `repository.membership` is set later, by
     // the clause `applied` of its own `create`. So a creation that a genesis sends holds no such member, and the scopes that are
     // created beside membership get its scope ID in a field (authority note, revision 25, section 12.1.2, "No member `membership`
-    // in these two creations").
-    if (j.self === 0) return null;
+    // in these two creations"). A marked declared genesis instead uses its verified incoming full reference.
+    if (j.self === 0) {
+      const context = recordedContext();
+      return declared && context.kind === "marked" ? context.membership : null;
+    }
     const genesis = j.own?.(0)?.entry.input;
     return genesis?.type === "genesis" ? membershipOf(genesis, j.scope.at) : undefined;
   };
@@ -246,9 +260,15 @@ export function deriveSends(j: Judging, forms: readonly SendForm[], working: Rea
       // Section 6.6: the body of a `create` is `{ fields, directory, membership }`. The membership scope is the one that the creating
       // scope records. A scope that records none creates without the member, so a creation of a scope that knows no membership
       // scope has the bytes it had. A membership scope itself is created without it.
-      const membership = form.create.kind === "membership" ? null : recordedMembership();
+      const membership = form.create.kind === "membership" ? null : recordedMembership(isDigest(definition));
       if (membership === undefined) return { ok: false, unavailable: "unavailable" };
-      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}), ...(membership ? { membership } : {}) } } });
+      const context = recordedContext();
+      if (context.kind === "invalid") return { ok: false, reason: "send-unresolved", detail: "invalid retained creationContext" };
+      // A marked declared provenance propagates through declared creations,
+      // never into a platform sibling or a membership creation. Ordinary
+      // legacy bodies remain byte-for-byte unchanged when the marker is absent.
+      const forward = membership && context.kind === "marked" && isDigest(definition) && form.create.kind !== "membership";
+      sends.push({ n: next(), to: seed, message: { class: "request", type: "create", body: { fields: fields(form.create.fields), ...(lanes ? { directory: lanes } : {}), ...(membership ? { membership } : {}), ...(forward ? { creationContext: { v: 1 } } : {}) } } });
     } else if ("tell" in form) {
       // Section 6.4: a send whose subject is unbound is not made.
       if (readsUnbound(reading(null), form.tell.to)) continue;
