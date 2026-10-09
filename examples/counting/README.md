@@ -89,12 +89,16 @@ authority windows, not claimed instantly across scopes.
 With dependencies already prepared, run only this example from the repository root:
 
 ```sh
-node node_modules/vitest/vitest.mjs run --config examples/counting/vitest.config.ts
+node node_modules/vitest/vitest.mjs run --project counting
 node node_modules/typescript/bin/tsc -p examples/counting/tsconfig.json
 ```
 
-The local config resolves workspace modules to this checkout and selects one
-Node file. It changes no root suite/dependency configuration. Two bounded
+The ordinary root test run includes the `counting` Node project in its existing
+Node phase; it selects exactly this one file. The root typecheck includes the
+example's existing type project after its workspace and script checks. All
+other projects remain present. The inherited local config resolves workspace
+modules to this checkout; focused verification has used the actual root
+selection above. No dependency or lockfile changes are needed. Two bounded
 semantic controls were checked: removing ordered roster enforcement accepts
 the wrong sequence; removing the reset-generation guard accepts a late old
 completion. Clean source was restored. No Worker, audio, provider, browser,
