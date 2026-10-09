@@ -1,0 +1,87 @@
+{
+  "request": "934a632a0505874dbcd2bf8f6961fc4a2b1247c7",
+  "promise": "808815b73d322e8b92af99e886d4a3c2b6b4f822",
+  "date": "2026-10-09",
+  "source_head": "f6d80b3996df7ad3e7d00feff88d48cf29877ddc",
+  "scope": "read-only bounded private browser Join contract",
+  "request_read": "FULL gs inspect -json",
+  "source_reads": [
+    {
+      "path": "packages/page/src/data.ts",
+      "sections": "185-220 actual enrollment identity/Join; 224-246 room readback"
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "sections": "310-358 accepted records/context/actual enrollment fence"
+    },
+    {
+      "path": "packages/page/src/shell.ts",
+      "sections": "37-57 memory ScopeSending"
+    },
+    {
+      "path": "packages/page/src/claim.ts",
+      "sections": "48-110 private origin/binding/storage; 162-187 mandatory lock/current guard"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "sections": "697-775 private exact Join retention/submit/settle/entry/inbox"
+    },
+    {
+      "path": "packages/cli/src/store.ts",
+      "sections": "PendingJoin private pointer/accepted fact"
+    },
+    {
+      "path": "packages/client/src/handle.ts",
+      "sections": "submit/settle/followReceipt"
+    },
+    {
+      "path": "packages/client/src/http.ts",
+      "sections": "54-97 unknown response/exact submission"
+    },
+    {
+      "path": "packages/platform/src/membership.ts",
+      "sections": "393-413 invitation authority and Join shape"
+    },
+    {
+      "path": "packages/contract/src/read.ts",
+      "sections": "Settlement=Read<Receipt>"
+    },
+    {
+      "path": "packages/cli/src/files.ts",
+      "sections": "29-77 exclusive owner-only private envelope storage"
+    },
+    {
+      "path": "packages/page/src/claim.ts",
+      "sections": "110-127 canonical aggregate write/readback"
+    }
+  ],
+  "retained_owners": [
+    "18815307e6c306d63766230ed7eb7ddbf94d1f21 C4",
+    "C5/C6 continuity/hosted acceptance",
+    "aa687 known answer discovery only"
+  ],
+  "frozen_artifacts": [
+    "Pages descriptor sha256:ca1a7c57dd905f0eedd1f1cdccc5e07222bf52138a669284878a09db688fda63",
+    "fbe18cbcc4f489017c9351007c5b655ad4ecaedf",
+    "791903fdb98ebfc9bc444db4932acf98ab76b38e"
+  ],
+  "execution": {
+    "source_changes": false,
+    "tests": false,
+    "runtime": false,
+    "provider": false,
+    "activation": false,
+    "protocol_adoption": false
+  },
+  "limitations": [
+    "Current Page has no durable exact Join recovery",
+    "Current Settlement not-found is not terminal absence",
+    "Proposed storage bounds/API require independent review before implementation",
+    "No whole-source/history review claimed"
+  ],
+  "handoff": {
+    "path": "/tmp/artroom-private-join-contract.md",
+    "bytes": 12077,
+    "sha256": "f43368516170fc5719f89db909c4a0041d866ca8979baaee10e06227ea7e5ecb"
+  }
+}
