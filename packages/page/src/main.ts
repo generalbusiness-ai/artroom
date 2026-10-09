@@ -24,6 +24,7 @@ import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChang
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, roomContext, routeOf, type Destination } from "./shell.ts";
 import type { ActionContext } from "./actions.ts";
+import { rulesEditor } from "./rules-editor.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
@@ -103,13 +104,20 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
-async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}): Promise<HTMLElement> {
+interface PanelOptions {
+  offered?: Awaited<ReturnType<typeof actsOn>>;
+  represented?: readonly string[];
+  customForm?: (send: (kind: string, on: string, typed: Record<string, string>) => void, blocked: boolean, draftKey: string) => HTMLElement;
+}
+async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}, options: PanelOptions = {}): Promise<HTMLElement> {
   const association = actAssociation(room, scope);
   const currentContext = () => {
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
   const send = (kind: string, on: string, typed: Record<string, string>) => {
+    const previous = lastActs.get(association);
+    if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
     void draw(); // Every form on this scope is fenced, including after navigation and redraw.
     void (async () => {
@@ -129,12 +137,14 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {})
       await draw();
     })();
   };
-  const offered = await actsOn(room, scope);
+  const offered = options.offered ?? await actsOn(room, scope);
   const last = lastActs.get(association);
   const fence = sending.get(association);
   const pending = !!fence && fence.state !== "unknown";
   const uncertain = fence?.state === "unknown" || context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
-  const panel = actsPanel(offered, send, last ? answerLine(last) : null, { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } });
+  const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind)) };
+  const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } });
+  if (options.customForm) panel.append(options.customForm(send, pending || !!uncertain, association));
   if (fence?.state === "unknown") panel.append(unknownRequest(fence.kind));
   return panel;
 }
@@ -221,9 +231,15 @@ async function draw(focus = false): Promise<void> {
       const primary = ["comment", "review-verdict", "merge", "request-review-own", "ready-own"].filter((kind) => !blockedKinds.includes(kind));
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
       const mergeAnswer = lastAct && ["merge", "cancel-merge"].includes(lastAct.kind) ? last(scope) : null;
-      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
+      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds })));
     }
-    if (destination === "rules") return show(...shell(destination, room, rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules, { primary: ["publish"] })));
+    if (destination === "rules") {
+      const rules = await loadRules(room);
+      const offered = await actsOn(room, room.rules);
+      const editable = rules.item !== undefined && offered.acts.some((act) => act.kind === "publish");
+      const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
+      return show(...shell(destination, room, rulesScreen(room, rules, editable), await panelFor(room, room.rules, {}, options)));
+    }
     return show(...shell(destination, room, roomScreen(room, await listLanes(room), destination === "changes" ? "change" : "issue"), await panelFor(loaded, loaded.directory, { primary: [destination === "changes" ? "open-pr" : "open-issue"] })));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
