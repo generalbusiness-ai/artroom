@@ -34,6 +34,7 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     const joined = await joinRoom(d.as(unas), d.link);
     expect([joined.answer.answer, joined.place]).toEqual(["accepted", place]);
     const forUna = await openRoom(d.as(unas), place);
+    expect(forUna.name).toBe(d.config.repository!.name);
     expect([forUna.me?.handle, forUna.me?.role, forUna.reader !== null, forUna.rules, forUna.destination]).toEqual(["@una", "member", true, d.rules.name, d.G.name]);
     // A second join with the same link is refused by membership, by name, and writes nothing.
     const again = await joinRoom(d.as(crypto.getRandomValues(new Uint8Array(32))), d.link);
@@ -62,7 +63,8 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     // una opens an issue through the page. The directory's `open-issue` takes the definition's bytes at a stated place: the page
     // offers the definitions the rules scope holds active, and sends the bytes it reads from the rules scope beside the act.
     const opening = (await actsOn(forUna, d.D.name)).acts.find((a) => a.kind === "open-issue")!;
-    expect(opening.fields.find((f) => f.name === "definition")?.choices?.map((c) => c.value)).toEqual([DEMO_DIGESTS.change, DEMO_DIGESTS.issue]);
+    expect(opening.fields.find((f) => f.name === "definition")?.choices?.map((c) => c.value)).toEqual([DEMO_DIGESTS.issue]);
+    expect((await actsOn(forUna, d.D.name)).acts.find((a) => a.kind === "open-pr")?.fields.find((f) => f.name === "definition")?.choices?.map((c) => c.value)).toEqual([DEMO_DIGESTS.change]);
     const filed = await act(forUna, d.D.name, "open-issue", { fields: { definition: DEMO_DIGESTS.issue, title: "The handbook is empty", conditions: ["README.md says what the room is for"] } });
     expect(filed.answer.answer, JSON.stringify(filed.answer)).toBe("accepted");
     await d.pause([d.D.name]);
@@ -74,7 +76,11 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     expect((await actsOn(forUna, issue!.scope)).acts.map((a) => a.kind)).not.toContain("assign");
     expect((await actsOn(forRita, issue!.scope)).acts.map((a) => a.kind)).toContain("assign");
     expect((await act(forPaul, issue!.scope, "comment", { fields: { body: "I will write it with artroom edit." } })).answer.answer).toBe("accepted");
-    expect(await loadIssue(forUna, issue!.scope)).toMatchObject({ number: 1, state: "open", requester: "@una", conditions: ["README.md says what the room is for"], comments: [{ author: "@paul", body: "I will write it with artroom edit." }] });
+    const loadedIssue = await loadIssue(forUna, issue!.scope);
+    expect(loadedIssue).toMatchObject({ number: 1, state: "open", requester: "@una", conditions: ["README.md says what the room is for"], comments: [{ author: "@paul", body: "I will write it with artroom edit." }] });
+    expect(loadedIssue.intent).toEqual(expect.any(Number));
+    const updatedIssue = await act(forUna, issue!.scope, "edit-own", { on: loadedIssue.intent!, fields: { title: "The handbook is empty" } });
+    expect(updatedIssue.answer.answer).toBe("accepted");
 
     // rita's `artroom edit README.md`: a source-only change, merged on her own act and published by the room.
     const edited = await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Write the handbook");
@@ -83,6 +89,7 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     const readme = (await listLanes(forUna)).changes.find((row) => row.title === "Write the handbook")!;
     expect(readme).toMatchObject({ kind: "pr", state: "merged" });
     let change = await loadChange(forUna, readme.scope);
+    expect(change.proposal).toEqual(expect.any(Number));
     expect(change.manifests.map((m) => m.file)).toEqual([{ path: "README.md", digest: expect.stringMatching(/^sha256:/), size: 37, page: `${SERVICE}/site/${d.D.name}/HEAD/README.md` }]);
     expect([change.merges.map((m) => [m.state, m.commit, m.publication?.state])]).toEqual([[["published", head1, "published"]]]);
     expect(changeStates(change).map((s) => s.state)).toEqual(["publication confirmed", ...change.merges[0]!.publication!.operations.map(() => "effect confirmed")]);

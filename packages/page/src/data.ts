@@ -284,6 +284,8 @@ const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Prom
   Promise.all((await itemsOf(handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
 
 export interface IssueView {
+  /** The actual intent item used by transitions. */
+  intent?: number;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
   requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
@@ -299,7 +301,7 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
-    scope, definition: summary.definition, head: at,
+    scope, definition: summary.definition, head: at, intent: intent.id,
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
     state: intent.state, closeReason: text(intent.values["closeReason"]), requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
     conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
@@ -329,6 +331,8 @@ export interface Publication { id: number; state: string; reason: string | null;
 export interface Merge { id: number; state: string; manifest: number | null; reason: string | null; commit: string | null; publication: Publication | null }
 
 export interface ChangeView {
+  /** The actual proposal item used by transitions. */
+  proposal?: number;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
@@ -354,7 +358,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const rulesItem = summary.items.find((item) => item.type === "rules");
   const publications = await publicationsOf(room, scope);
   return {
-    scope, definition: summary.definition, head: at,
+    scope, definition: summary.definition, head: at, proposal: proposal.id,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: (await all("manifest")).map((m) => ({
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
@@ -507,10 +511,10 @@ const domainOf = (field: unknown): string | null => {
 };
 
 /** The definitions the rules scope holds active, latest first: a choice for a field that takes a definition's bytes. */
-async function activeDefinitions(room: Room): Promise<{ label: string; value: string }[]> {
+async function activeDefinitions(room: Room): Promise<{ label: string; value: string; name: string }[]> {
   const { summary } = await summaryOf(handleOf(room, room.rules));
   return summary.items.filter((item) => item.type === "definition" && item.state === "active").sort((a, b) => b.id - a.id)
-    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]) }));
+    .map((item) => ({ label: `${String(item.values["name"])} (${String(item.values["digest"]).slice(0, 19)})`, value: String(item.values["digest"]), name: String(item.values["name"]) }));
 }
 
 /**
@@ -557,7 +561,7 @@ export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offere
   return {
     acts: acts.map(([kind, a]) => ({
       kind, step: a.step, on: a.on, line: describe(kind, a),
-      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions } : {}) })),
+      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions.filter((definition) => kind !== "open-issue" && kind !== "open-pr" || definition.name === (kind === "open-issue" ? "issue" : "change")) } : {}) })),
     })),
     hidden,
   };
