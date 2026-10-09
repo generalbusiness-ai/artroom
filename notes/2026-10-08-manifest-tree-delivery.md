@@ -33,8 +33,10 @@ The current composition is `842eae593eb829bbeea6ef872a650ee93123ad1f`,
 tree `8aecfc7ad4570c23abd9f2a1789f6ca6c806dd5d`. It incorporates A1's
 native immutable publication proof and actual @3 compatibility witness from
 `590c09d7`, and the fixture cleanup repair `3420940b`, `e6c4f243` and
-`d02e34f1`. Page task source and authenticated task data are still being
-composed; no new coordinated gate or deployment has run.
+`d02e34f1`. Page task source and authenticated task data are now composed
+through `5d269362` and `4feaaf70`, with rebuilt assets. No new coordinated
+gate or deployment has run. Planner `561fce0b` adds the bounded one-file LIST1
+editor freeze step and verified frozen-source preview; that source is in progress.
 
 A4's intended single preview trace accidentally selected 42 files and 148
 tests because inherited include arrays were merged. The process passed, but
@@ -61,6 +63,25 @@ This repairs setup-exception custody. It does not cancel an unresolved await,
 prove timeout ownership or establish that the failed gate's cause is fixed.
 Tokenless foreign writes of the same global values cannot be attributed;
 the helper's owner chain and unique secret protect its own overlapping calls.
+
+The primary Page task witness passed at `5d269362`: issue Title/Description
+and conversation comment, author request for review, a distinct eligible
+reviewer's approval of the exact source extent/version, and authorized Merge
+using the same task defaults to actual destination publication. Its one-test
+native log is `/tmp/artroom-page-primary-task-native.log` (1.87 s total,
+721 ms test time). Data `4feaaf70` passed three focused native tests, including
+ordered issue-report selection independent of later reports/checker jobs and
+detached Description readback; report-order and missing detached-text controls
+failed directly. Legacy source rendering and current browser captures remain
+distinct from the new LIST1 source/freeze workflow.
+
+The first current capture attempt at `f207f901` stopped before Chromium:
+the current CLI founded destination@3 while the legacy editor's head check
+admitted only @2. The fixture activates the legacy one-file declaration;
+@3's native legacy fallback supports it. The failure is retained in
+`/tmp/artroom-integrated-page-captures-f207-refusal.log`. Capture metadata now
+reports the actual destination/declaration instead of claiming an @2 cohort.
+No browser pass or new gate is inferred from this failed attempt.
 
 ## Historical documentation preparation
 
