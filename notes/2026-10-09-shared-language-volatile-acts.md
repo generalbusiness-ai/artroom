@@ -5,9 +5,13 @@ Request `f5b286d71a3243c809d152fd7cd95e6d945e4256`, promise
 `1fcb44a526683a7ebbfabbd02331773518c69e09`, preserves original
 `8a13f7b84eae5d2656a49352300fccf66696280f`.
 Artroom baseline `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`, tree
-`e3e9e0099bc097a0b1bebbed9c932608ffb2eb05`. Implementation may be scheduled
-at a convenient time after independent design review/adoption. This note
-commissions no source change, protocol deployment, provider or benchmark.
+`e3e9e0099bc097a0b1bebbed9c932608ffb2eb05`. Amended on the same date under
+durability infrastructure request `578edf653772749b5fa9b47f6782f6db4d0ab720`
+and planner promise `aa3d387b595f6cfe553ddb993cb9fd0043b10a3e`.
+That request commissions bounded implementation/planning; this amendment is its
+design/source-plan artifact, implements nothing and adopts no protocol. Keep
+the seven current correctness repairs and their coordinated gate ahead of
+runtime expansion. The original full volatile brief and all 14 sections remain.
 
 ## 1. Guarantees, goals and current foundations
 
@@ -57,6 +61,49 @@ This is a targeted source audit, not full runtime/deployment verification.
 Physical scope combining is out of scope. Persistent-state-only execution is
 not a prerequisite or additional initial mode.
 
+### The two establishment questions
+
+Person-facing policy asks only **What must survive?** and **Does confirmation
+wait for local application or JOURNAL COMMITMENT?** The application author and
+legitimate establishment authority limit the legal answers; a participant may
+choose only among those declared options. Discovery explains their actual
+barrier. It does not expose a collection of archive/publication switches.
+
+| Legal established contract | What must survive? | Confirmation barrier and present support |
+|---|---|---|
+| Live | Nothing: state/messages/dedup/timers may reset immediately. | Local application in G/N; Applied, no durable fact. Proposed executor/session/establishment support is still owed. |
+| Recorded, DO journal | Complete canonical acts, judgments and required evidence/pins, preserving native replay and custody duties. | Existing Core/SQLite journal commitment and its actual receipt/output gate. Reuse this working recorded path; generic application establishment is still owed. Optional later Git archive is not promised by this acknowledgment. |
+| Recorded, required Git/Artifacts custody | The complete declared journal/evidence closure in the exact required store, not merely a queue or current-state snapshot. | Final confirmation waits for verified required journal commitment. This capability is **UNSUPPORTED** until its actual backend, exact custody proof and recovery seam are delivered/adopted. It does not block the other two paths. |
+
+The third row is an alternative journal barrier, not a third user question or
+another initial volatile mode. A binding that requires it cannot quietly use
+the DO-only acknowledgment. If supported later, persist the exact operation,
+canonical bytes/digests, target/ref/predecessor and authorization before dispatch;
+separate local-pending, custody-unknown, confirmed and actual refusal. A timeout
+or lost reply retains the same operation and exact request for legitimate
+reconciliation; no fresh signature/ref write guesses success or abandons it.
+DO and Git are not an atomic transaction. A provisional local receipt may be
+shown as pending but is not the final confirmation of required external custody.
+
+Git may hold work product, definition/role source, a derived materialization,
+a signed canonical log or longitudinal archive. Name the role per dependency;
+do not confuse optional archival progress with actual destination publication
+and Merged. Retain the rule/authority versions and evidence that each judgment
+used. A materialization is disposable only if the retained complete journal and
+recipe reconstruct it. Current checkpoints do not license history purging, and
+replay starts at genesis; no contest checkpoint-deletion project is proposed.
+Gitless complete journals can support replay; snapshots alone cannot. Gitseq's
+Git-bound record identities are not implicitly replaced by this application
+envelope.
+
+Cloudflare documents that synchronous SQL execution can finish before write
+confirmation; the output gate delays outgoing responses until relevant writes
+confirm. Therefore local SQL timing is not the recorded acknowledgment latency.
+The proposed DO-journal adapter preserves that barrier; it never opts out with
+`allowUnconfirmed` to advertise recorded success.
+[SQLite/output gates](https://blog.cloudflare.com/sqlite-in-durable-objects/),
+[storage confirmation options](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/).
+
 ## 2. Shared definition language and three complete proposed applications
 
 **Choice proposed for adoption:** execution belongs to a declared **state
@@ -84,6 +131,73 @@ are not opaque chat topics. Routing may be colocated with the owning Scope objec
 merging physical scopes or histories. Existing scopes advertise live support
 only after explicit installation; missing support is unavailable, never an
 implicit downgrade of a recorded act.
+
+### Establishment is an owned generic dependency
+
+The region's execution binding is fixed when an application/act family is
+established; `definition.profile` still selects the rules language. A proposed
+common establishment descriptor binds canonical application/definition pins,
+legal execution/barrier choices, verified native membership/full scope identity,
+actor/session action policy, content address bindings and query/watch version.
+Validation rejects unsupported effects and a required unavailable barrier before
+establishing the family. Ordinary invocation cannot pass `ephemeral=true`, edit
+this binding or downgrade review/authority/publication. Changing it requires an
+authorized versioned establishment/migration, preserving old identities and
+outstanding requests; an old scope is not silently upgraded.
+
+Current `POST /v1/scopes`/`Core.found` accepts declared founding data and pins
+definition bytes, but `foundedKind` makes non-register direct founding a
+directory-kind scope. It does not supply arbitrary app-kind establishment or
+automatically attach verified room membership/action grants. Unmatched or absent
+recorded host wiring uses `NO_OUTSIDE`; bare production ports read no grant and
+permit no reader. An import UI, URI or choosing a profile cannot repair these
+boundaries. The first source slice must select and review the actual legal
+register/directory-owned establishment path, membership provenance and definition
+closure/read policy, rather than claim a working generic factory already exists.
+Reuse Core's canonical recorded commit, retained inputs, grants, expected
+revisions, due transitions and receipts; do not add app-specific logic to Core.
+
+Concrete proposed first path: an owned generic directory `establish-application`
+act on the existing signed `/v1/scopes/:directory/acts` route, default-admin with
+explicit legitimate delegation. The directory binds its verified membership and
+approved definition/closure/execution choice; the caller cannot inject another
+membership or weaken the family's legal profiles. A DO-journal app is a declared
+child scope through reviewed native creation; a live app installs its pinned
+region on an existing full host scope. Use existing content-scope kinds where
+legal; exact new act/grant/genesis binding and platform/cohort versions are owner
+decisions before execution, not hidden additions to existing pins. This path is
+**proposed and currently unsupported**, not a claim the direct custom found API
+already establishes a room-authorized app. The initial counting slice should keep `NO_OUTSIDE` deliberately
+unless a separately authorized recorded boundary is actually required.
+
+Counting companion `b855290c83c525d16b12ba7555df7c6b6fce0cf1`, promise
+`66c8baf9530fec97ef76d798b6b3d809487c6815`, owns its complete declaration,
+roster/turn/reset/Spoken semantics and any demonstrated generic declaration gap.
+Stable join order, native member identity and validated proposals come first;
+new arithmetic, sorting or key-projection effects are not mandatory and are not
+commissioned by this note. The counting owner's current reduction uses ordered
+`sameSet`, increasing native item IDs, exact member parties and independently
+guarded proposed number/serial/generation/next-item fields with existing copy
+effects. It needs no sorting, device-key projection or computed-effect extension;
+generic establishment and reusable SDK watch remain its identified shared gaps.
+That domain logic is not duplicated here. Its proposed
+Spoken/next-turn decision commits to the existing DO journal, with no Git push per
+number. Volatile connections observe/invalidate and request permitted acts; they
+cannot increment, choose a speaker or rewrite the durable roster. Shared work is
+only the generic establishment/session/SDK snapshot-watch seam. Counting does not
+wait for the volatile executor. Presence/messages require a working live executor
+and session boundary, but do not wait for a custodial Git backend.
+
+The current authenticated head stream plus complete native reads can form an
+invalidation-and-resnapshot adapter; a reusable SDK lifecycle, affected-view
+refresh and legal app establishment remain actual source gaps. The accepted
+planning handoffs `a4f7a082fe073ec1402cb205984fa04fb764a067` (head-aware query)
+and `394fd247be1899d811a38bb0bba791bc4a664643` (native Artifacts read feasibility)
+do not adopt their proposed public APIs, indexes or numeric budgets. Preserve
+full refs/heads, completeness, bounded reads, native authorization and current
+unknown-command custody. Native blob reuse remains conditional on deployed
+byte-fidelity/object-format and preallocation bounds; documentation or post-read
+size checks are not provider-memory proof or general canonical Git proof.
 
 Reusable syntax: item `many/max/states/initial/parties/refs/values`; act
 `step/on/also/fields/grant/guards/effects/sends/attention`; typed bounded text,
@@ -1106,10 +1220,52 @@ single ZERO-durability profile.
 
 ## 14. Bounded implementation plan and acceptance
 
-Planner may schedule these phases after adoption, at a convenient time. Existing
+Planner now sequences the smallest coherent slices for the contest deadline
+under the infrastructure request, after design adoption and current correctness/gate work. Existing
 contract/derive, Scope/session/authority, client/Page/MCP, C4/188153 private custody,
 read/URI/N1 and responsiveness/R4 owners resolve their existing seams. This note
 assigns no new runtime commission or generic relay project.
+
+### Contest source sequence and honest cut line
+
+The 14 October deadline is the planning constraint supplied by the requester.
+The following are decision windows, **not delivery estimates or unconditional
+promises**; planner owns disposition and the counting owner supplies its exact
+domain contract. Keep development/review/publication as one demonstrated app,
+counting as another, with live presence/messaging around existing scope contents.
+
+| Window (America/New_York) | Smallest useful generic slice and condition |
+|---|---|
+| Friday 9 October | Finish correctness and source/gate obligations first. Adopt exact establishment/authority/pin choice and counting dependencies. Prepare the shared typed discovery/confirmation descriptor and bounded authenticated snapshot/head-invalidation SDK adapter; reuse existing DO journal. No broad storage rewrite. |
+| Saturday 10 October, conditional | If the legal factory/session path, any demonstrated declaration gap and SDK synchronization are reviewed/runnable, prove a hosted three-actor counting slice alongside recorded work. Implement only the bounded live region/session/generation executor needed by adopted presence/messaging declarations. If blocked, report the exact gap and retain accurately discoverable unsupported live/custodial capabilities; do not substitute an unrelated external coordinator. |
+| Sunday 11 October, noon | Freeze the demonstrated source, pins, supported choices and client behavior; record cold/warm/reconnect/unknown/reset/authority evidence and remaining limitations. No late new backend requirement. |
+| Monday 12 October | Record the actual supported multiuser flows and measured confirmation/peer updates. Use real pending/recorded/publication states and disclosed stand-ins; a video is not custody/replay proof. Preserve time to correct failures before Wednesday's deadline. |
+
+Source ownership: contract/derive owners supply legal declarations/bindings and
+generic effect gaps; Scope/authority/C4 owners supply verified establishment,
+session, memory generation and actual confirmation barriers; client/Page/MCP
+and query/read owners supply one SDK observation lifecycle and progressive
+affected-view refresh. Counting owner supplies only its domain app. Existing
+operations/private-export/Git owners alone may later supply custodial commitment
+and exact recovery; if it is too costly, the source slice ends at an explicit
+unsupported seam. Each slice is reviewable; one final coordinated gate belongs
+to the integrated source, not concurrent whole-suite runs.
+
+Measure only a bounded same-deployment/connection comparison: volatile local
+application, DO-journal confirmation and small Git custody **if actually
+supported**; p50/p95, cold/warm, response-path steps and peer-visible update time.
+Artifacts exposes operation-duration percentiles with a `push` event filter;
+those metrics are not native journal/receipt or end-to-end peer measurements.
+[Official Artifacts metrics](https://developers.cloudflare.com/artifacts/observability/metrics/).
+Suggested targets from the request—ordinary peer update about 150ms p95 and
+simple recorded acknowledgment about 200ms p95—remain targets, not current
+guarantees. The older deployed spike's simple acts were about 68–73ms p50,
+83–90ms p90; its sub-resolution local SQL timing did not measure a single-digit
+production commitment barrier. The 8 October rehearsal's comment 0.6s,
+assignment 0.5s, merge 3.6s and full edit/link/publication 8.5s were individual whole
+workflows, not isolated provider writes or a controlled comparison with this
+source. See [spike limits](2026-10-01-spike-room-core.md); retained rehearsal
+transcript is external evidence. This amendment runs no new measurements.
 
 | Phase and dependency | Exact bounded work scope | Completion evidence |
 |---|---|---|
@@ -1143,6 +1299,9 @@ acceptance and cannot close existing identity/export/publication duties.
 | Cross-scope | Stale G/freshness/unreadable remote content does not apply a guessed current-version act or promise delivery/order. |
 | Exact promotion | Freeze excerpt, then mutate/reset live source before recorded admission; accepted native act retains those exact bytes, current authority and real receipt, or actual refusal. |
 | External effect exclusion | Live capabilities/sends/outside operations refuse statically; any separately adopted future mutation has durable custody before dispatch. |
+| Legal establishment/barrier | Disallowed caller downgrade and unverified membership fail; discovery reports actual support. DO journal keeps canonical acts/evidence/hash/replay. Unsupported required Git custody cannot yield final success from a local queue. |
+| Custody reconciliation, if adopted | Lost commit reply/restart retains exact operation/bytes/target and pending/unknown state; only authenticated required-store proof permits final acknowledgment, without changing work-product publication meaning. |
+| Demonstrated synchronization | Two authenticated peers automatically reconcile affected views with separate live/durable cursors; real unknown/reset/backpressure/current-grant failures remain visible and live traffic does not starve recorded turns. |
 
 Put pure grammar/identity/guard distinctions in contract/bytes/derive Node tests;
 real application ordering/reset/session/custody/handshake in the cheapest real
