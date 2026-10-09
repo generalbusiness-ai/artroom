@@ -280,6 +280,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const premature = await run(checker, "act", "check", "--on", raceLane.name, "--set", `job=${raceJ2}`, "--set", `tree=${raceManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
   expect([premature.code, premature.lines[0]]).toEqual([1, expect.stringContaining("job-not-active")]);
   net.hold = beforeFenceHold;
+  net.clock.now = timeOf(timeMs(net.clock.now)! + 2000);
   await pause([raceLane.name, repository.destination]);
   expect((await raceLane.item(raceJ2)).state).toBe("requested");
   const offered = await runInDurableObject(G.object, () => heldAnswer.late(heldAnswer.request.operation, heldAnswer.request.attempt, heldAnswer.answer));
