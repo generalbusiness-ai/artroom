@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import { textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
-import { act, actsOn, listLanes, loadChange, loadChangeSelection, loadIssue, openRoom, placeOf, type Room } from "../src/index.ts";
+import { firstExtents } from "@generalbusiness/artroom-platform";
+import { act, actsOn, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
 import { demo } from "./support/demo.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
 const oid = (c: string) => c.repeat(40);
@@ -97,6 +98,10 @@ test("native task data supplies active issue choices, detached Description, exac
   try {
     const room = await openRoom(d.as(await d.secretOf(d.rita)), placeOf(JSON.stringify(d.config))!);
     membershipPath = `/v1/scopes/${d.M.name}`;
+    const extents = firstExtents({ approvals: 0, checks: [] });
+    const publishedRules = await act(room, room.rules, "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: fieldValue(room, "code", JSON.stringify(extents)) } });
+    expect(publishedRules.answer.answer, JSON.stringify(publishedRules.answer)).toBe("accepted");
+    expect((await loadRules(room)).extents).toEqual(extents);
     const choices = (await actsOn(room, room.directory)).acts.find((a) => a.kind === "open-issue")!.fields.find((field) => field.name === "definition")!.choices!;
     expect(choices.map((choice) => choice.value)).toEqual([DEMO_DIGESTS.issue]);
     const created = await act(room, room.directory, "open-issue", { fields: { definition: choices[0]!.value, title: "Clear task", body: "A literal Description.", conditions: ["Clear task"] } });
