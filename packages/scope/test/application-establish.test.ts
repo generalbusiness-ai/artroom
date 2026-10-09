@@ -153,7 +153,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     expect((await D.item(accepted.receipt.fact.seq)).state).toBe("creating");
     expect((await C.stub.summary(reader)).ok).toBe(false);
     await settle(D, C);
-    await D.restart();
+    await lifetime.wait(() => D!.restart());
     expect(await D.stub.submit(signed, [], { values: [bytes] })).toEqual(accepted);
     expect((await D.stub.outbox(reader)).ok).toBe(true);
     lifetime.setHold(() => false);
