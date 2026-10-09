@@ -6,12 +6,14 @@ This note is not a completed delivery, gate result or deployment claim.
 
 ## Current handoff status
 
-Current code checkpoint is `d909cefb4545dcc4794d7d123e52397bbc12038e`, tree
-`f503bed5d4fd329b5818940fd216d624b30430b1`; `b461ea5e` changes this note only.
-The latest whole gate is the failed `856907f7` run: one CLI story timeout,
-RefcountedCanceler diagnostic, 930 passed and two recorders skipped. Its
-unchanged isolated story passed separately. Later test-boundary checks passed;
-no later whole-gate pass is claimed.
+Current code checkpoint is `679d7a96d9e25f1ff666969215e820bf91480ffc`, tree
+`264dfea43404cd2228c38faf4f3de5e597f08e8c`. Its coordinated gate failed:
+three five-second story timeouts and one legacy manifest not-staged refusal;
+927 passed and two recorders skipped. No canceler diagnostic occurred in that
+run. The authorized five-test ordered Scope cohort passed separately; it
+excludes only that short sequence, not longer pool accumulation or a cause.
+A4's next discriminating check remains proposed. Earlier856 failed-gate and
+isolated/structural results below retain their own heads.
 
 Planner `041deabaf0dbe27c8aa6c8084483111453326e3b` resolves the three
 owner matters. The snapshot must use the ordinary sealed-history floor;
@@ -403,3 +405,33 @@ The composition at `5a36fe6b5c3240325ae40aaaf303b8393b0e6b1a`, tree
 `2a20cb1fac2e3044575efa910a428d19281efd6f`, carries this source and the
 source-neutral Sprint14 report on main38b0. The next gate will name its own
 exact frozen commit and logs. No passing gate or hosted run is claimed yet.
+
+## Coordinated gate and bounded A4 check
+
+The `679d7a96` gate is FAILED, not waived: whitespace/typecheck exit0, tests
+exit1, 200.4 seconds elapsed and 241.0 CPU for the test phase. Root read the
+complete small raw test/type logs. Gate log
+`/tmp/artroom-manifest-coordinated-final-gate.log` SHA-256
+`9f16667d0fd9ebee97ac07230340675b1cd232984645141a7796947baee19613`;
+raw phase directory `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.j7ZVRV2fsh`;
+test SHA-256 `636b2d7bb51a159254e1c7cbac57b89821f2ae1691595b123f460369c1c4c993`.
+The active-source phase was not reached because Vitest failed.
+
+Under existing A4, one explicitly ordered five-test shared Scope-worker cohort
+ran at the same clean head without timeout changes or source mutations:
+legacy manifest T3, new configured-checker manifest, Page source preview,
+founding-real and CLI story. All five pass, with 25 filtered cases; 7.90 seconds
+Vitest duration and 8.49 process elapsed. No canceler diagnostic appears.
+Root read the full raw order/results/time logs. Evidence
+`/tmp/artroom-a4-bounded-next-check/evidence.json` identifies all files/hashes.
+Startup with zero tests and an interrupted earlier co-run receive no credit.
+The negative result excludes only this short order; it does not identify a
+pending call, cause or fix, or supply a passing gate. A4 record `15286f26`
+retains these limits. No further whole run or deployment has begun.
+
+Snapshot floor control's exact raw path is
+`/tmp/artroom-snapshot-history-floor-control.log`, SHA-256
+`5d4746deac8a131e881b67f605534ee23bcd8397f5c4cfb964cee491da874d4e`.
+The guards add no Scope effect. Existing provider ref/object/format reads may
+acquire read credentials and attempt revocation; snapshot serving is not a
+universal token-free or effect-free claim.

@@ -246,8 +246,9 @@ export class DestinationHost implements Outside {
 
   /** One readonly snapshot for the requested job's configured checker.
    * Public object bytes are read from the confirmed staged ref and checked
-   * against retained signed sources;
-   * nothing is staged, minted, pushed, or recorded by this read. */
+   * against retained signed sources. No Scope staging, publication mint,
+   * push or entry is opened by this read. Provider object reads may acquire
+   * read credentials and attempt revocation through their adapter. */
   async snapshot(asked: SignedIntent): Promise<ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> {
     const reader = this.#options.snapshotReader;
     const scope = this.#given.scope();
