@@ -149,6 +149,8 @@ extent-review and publication examples. This documentation change runs no
 new tests or hosted commands and claims no new fixture result.
 
 The [full manual ledger](ledger.md) retains installation, browser/agent,
-source-review, recovery, release and cold-reader obligations. This bounded
-guide is awaiting independent page review. It does not complete the approved
-manual's full first-change tutorial or its hosted 15-minute target.
+source-review, recovery, release and cold-reader obligations. The guide at
+`f17b259d4e6302e247ed24db827793ef796d0b71` received the independent draft
+review and publication recorded in [the ledger's history](ledger.md#review-and-publication-history).
+These revised bytes require a new review. The bounded guide does not complete
+the manual's full first-change tutorial or its hosted 15-minute target.

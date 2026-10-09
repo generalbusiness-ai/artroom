@@ -3,8 +3,10 @@
 New to the model? Read [What is Artroom?](manual/what-is-artroom.md),
 [the ten terms](manual/ten-terms.md), [Architecture in one page](manual/architecture.md),
 [The record](manual/record.md), and [The life of an act](manual/life-of-an-act.md).
-These complete source explanations are drafts awaiting independent page
-review and release acceptance; they do not close the full manual.
+These source drafts and the first-change guide received the exact historical
+review recorded in [the ledger](manual/ledger.md#review-and-publication-history).
+Revised bytes require their own review; full release and manual acceptance
+remain open.
 
 For the current command-line contribution path, read [Join a room and publish one text change](manual/first-change.md). Its release and recovery limits are stated at the top. The [full manual ledger](manual/ledger.md) retains the complete approved backlog.
 

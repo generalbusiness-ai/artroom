@@ -30,7 +30,7 @@ not manufacture the required evidence.
 ```mermaid
 flowchart TD
   D[Read pinned definition and subject] --> I[Build exact intent and required side inputs]
-  I --> S[Sign with enrolled device key]
+  I --> S[Sign with participant key]
   S --> V[Validate signature, fields and referenced facts]
   V --> A[Read authority and required observations]
   A --> T[Turn: drain deadlines and evaluate rules]
@@ -39,6 +39,10 @@ flowchart TD
   J -->|Refused or unavailable| R[Keep reason and original request]
   E --> M[Messages and outside work continue separately]
 ```
+
+A participant key need not already be enrolled for every action. Join checks
+the invitation and the fresh signing key; repository founding uses the
+register's founding policy. These specific rules do not grant ordinary member actions.
 
 ## Read before committing; judge in the transaction
 
