@@ -588,7 +588,7 @@ export function actAssociation(room: Pick<Room, "session" | "directory" | "membe
  * act goes through the client's declared handle, which checks each field's
  * shape before it signs and carries detached texts beside the intent.
  */
-export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void): Promise<Acted> {
+export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?: number | null; fields?: Record<string, FieldValue> } = {}, received?: (result: Acted) => void, submitting?: () => void): Promise<Acted> {
   await fresh(room);
   const handle = handleOf(room, scope);
   const { summary, at: before } = await summaryOf(handle);
@@ -606,9 +606,12 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     const typed = await declaredHandle(handle, declared);
     if (!typed.ok) throw new Unreadable(`Cannot act on ${scope}: ${typed.reason}.`);
     const { signed, beside } = await typed.handle.intent(signer, kind as never, { on, fields, expected } as never, signing);
+    submitting?.();
     answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
   } else {
-    answer = await handle.submit(await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing), [], values.length > 0 ? { values } : {});
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing);
+    submitting?.();
+    answer = await handle.submit(signed, [], values.length > 0 ? { values } : {});
   }
   const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
   received?.(result); // Preserve the real answer before any awaited refresh.
