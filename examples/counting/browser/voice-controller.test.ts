@@ -14,8 +14,8 @@ const identity: ActorIdentity = { origin: "https://example.invalid", deployment:
   definition: COUNTING_DEFINITION, membership, member: { membership, member: "@alice" }, publicKey: keyIdOfSecret(secret) };
 const turn = (over: Partial<TurnToken> = {}): TurnToken => ({ ...identity, generation: 0, serial: 1, N: 1, expiresAt: 10_000, ...over });
 const envelope = (n: number): PreparedEnvelope => {
-  const intent: PreparedEnvelope["signed"]["intent"] = {v:1,to:scope,actor:identity.publicKey,kind:"spoken",on:1,expected:{on:n},fields:{n:1},idempotencyKey:`fake-${n}`,notAfter:"2099-01-01T00:00:00Z"};
-  return {signed:{intent,sig:sign(secret,domainBytes(DOMAINS.intent,intent))},grants:[],beside:{values:[`retained-${n}`]}};
+  const intent: PreparedEnvelope["signed"]["intent"] = {v:1,to:scope,actor:identity.publicKey,kind:"spoken",on:1,expected:{on:n},fields:{generation:0,serial:1,n:1},idempotencyKey:`fake-${n}`,notAfter:"2099-01-01T00:00:00Z"};
+  return {signed:{intent,sig:sign(secret,domainBytes(DOMAINS.intent,intent))},grants:[],beside:{}};
 };
 const drain = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
 function fixture(saved: PendingReport | null = null, shared?: { saved: PendingReport | null; lock: CustodyLock }, playedTokenLimit?: number) {
@@ -53,7 +53,7 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     const phase = activeAttempt(saved.journal).phase;
     let journal = saved.journal;
     if (phase === "inflight") {
-      const phase = result.status === "refused" && !retainRefusalProof ? "unknown" : result.status;
+      const phase = result.status === "blocked" || result.status === "refused" && !retainRefusalProof ? "unknown" : result.status;
       journal = markActive(journal, phase, phase === "refused" ? syntheticRefusal(e) : undefined);
     }
     else if (phase === "unknown" && result.status === "recorded") journal = markActive(journal, "recorded");
@@ -74,19 +74,21 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
       load: async () => custody.saved,
       save: async p => { if (failSave) throw new Error("fake private storage failure"); custody.saved = p; },
       clear: async () => { custody.saved = null; },
-      archive: async p => { if(failArchive)throw new Error("FAKE archive quota full"); assert.deepEqual(custody.saved,p); archives.push(structuredClone(p)); custody.saved=null; },
+      archive: async (p,confirmed) => { assert.equal(terminalJournal(p.journal,identity,p.envelope,confirmed),true); if(failArchive)throw new Error("FAKE archive quota full"); assert.deepEqual(custody.saved,p); archives.push(structuredClone(p)); custody.saved=null; },
     },
     reporter: {
       prepare: async c => { prepared.push(c); if (prepareWait) await prepareWait;
-        const e = envelope(prepared.length); return preparedBytes === null ? e : { ...e, beside: { values: [preparedBytes] } }; },
+        const e=envelope(prepared.length),intent={...e.signed.intent,fields:{generation:c.turn.generation,serial:c.turn.serial,n:c.turn.N},...(preparedBytes===null?{}:{idempotencyKey:preparedBytes})};return{...e,signed:{intent,sig:sign(secret,domainBytes(DOMAINS.intent,intent))}}; },
       submit: async e => custody.lock.run(async () => {
         assert.deepEqual(custody.saved?.envelope, e, "exact envelope is saved before POST"); submitted.push(e);
         const saved = custody.saved!;
         assert.ok(saved.journal, "newly prepared reports have a journal");
         custody.saved = { ...saved, journal: markActive(saved.journal, "inflight") };
-        duringSubmit?.(); persistOutcome(e); return result;
+        duringSubmit?.(); persistOutcome(e); return{...result,custody:structuredClone(custody.saved!)};
       }),
-      reconcile: async e => custody.lock.run(async () => { reconciled.push(e); duringReconcile?.(); persistOutcome(e); return result; }),
+      resumeReady: p => !!p.journal && activeAttempt(p.journal).phase==="prepared",
+      resume: async e => custody.lock.run(async()=>{submitted.push(e);const saved=custody.saved!;custody.saved={...saved,journal:markActive(saved.journal!,"inflight")};persistOutcome(e);return{...result,custody:structuredClone(custody.saved!)};}),
+      reconcile: async e => custody.lock.run(async () => { reconciled.push(e); duringReconcile?.(); persistOutcome(e); return{...result,custody:structuredClone(custody.saved!)}; }),
       obsolete: () => obsolete,
       correctionReady: p => roomReserved && !!p.journal && p.journal.attempts.length < 8,
       refresh: async () => { refreshObservation?.(); },
@@ -140,7 +142,7 @@ test("A single arm permits fresh subsequent own turns, while Pause/Start fences 
 test("Complete context binding rejects key, full scope, membership, deployment, member, definition and origin changes", async () => {
   const wrong: Partial<TurnToken>[] = [
     { publicKey: "key_other" }, { scope: { ...scope, inc: "in_other" } },
-    { scope: { ...scope, kind: "lane" } }, { membership: { ...membership, inc: "in_other" } },
+    { scope: { ...scope, kind: "task" } }, { membership: { ...membership, inc: "in_other" } },
     { deployment: "another-deployment" }, { member: { membership, member: "@bob" } },
     { definition: "sha256:other" }, { origin: "https://other.invalid" },
   ];
@@ -339,17 +341,16 @@ test("A same-envelope handoff cannot reparent the report to another retained com
 });
 
 // The whole resolved history must remain intact; a stale turn is never corrected onto its successor.
-test("Obsolete known terminal custody archives intact, while an unknown earlier history fences archive", async () => {
+test("Obsolete known refusal archives intact, while a valid active unknown history fences archive", async () => {
   const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
   const original=structuredClone(f.custody.saved!);
   f.obsolete(true);f.observe(turn({generation:1,serial:2,N:2}));await drain();
   assert.equal(terminalJournal(original.journal,identity,original.envelope),true);assert.deepEqual(f.archives,[original]);assert.equal(f.custody.saved,null);assert.equal(f.calls.length,1);assert.equal(f.controller.state().armed,false);assert.equal(f.prepared.length,1);
   const g=fixture();g.result({status:"unknown"});await g.controller.ready;g.observe();g.controller.arm("fake");g.calls[0]!.end();await drain();
   const unknown=structuredClone(g.custody.saved!);
-  g.custody.saved={...unknown,journal:{v:2,active:1,attempts:[unknown.journal!.attempts[0]!,original.journal!.attempts[0]!]}};
   assert.equal(terminalJournal(g.custody.saved!.journal,identity,g.custody.saved!.envelope),false);
   g.obsolete(true);g.observe(turn({generation:1,serial:2,N:2}));await drain();await g.controller.checkPending();
-  assert.equal(g.archives.length,0);assert.ok(g.custody.saved);assert.equal(g.calls.length,1);assert.equal(g.prepared.length,1);assert.notEqual(g.controller.state().pending,"refused");
+  assert.equal(g.archives.length,0);assert.deepEqual(g.custody.saved,unknown);assert.equal(g.calls.length,1);assert.equal(g.prepared.length,1);assert.notEqual(g.controller.state().pending,"refused");
 });
 
 test("Malformed restored refusal never becomes a known terminal UI classification", async () => {
@@ -364,4 +365,19 @@ test("Archive quota failure preserves intact terminal custody and does not unblo
   const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
   const original=structuredClone(f.custody.saved!);f.archiveFails();f.obsolete(true);f.observe(turn({generation:1,serial:2,N:2}));await drain();
   assert.deepEqual(f.custody.saved,original);assert.equal(f.archives.length,0);assert.equal(f.controller.state().phase,"blocked");assert.equal(f.controller.arm("fake"),false);assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[1,1,1]);
+});
+
+test("Restored recorded phase without receipt confirmation remains unresolved and cannot clear or archive",async()=>{
+  const e=envelope(1),saved:PendingReport={completion:{turn:turn(),voiceId:"fake",completedAt:100},envelope:e,outcome:"unknown",journal:{v:2,active:0,attempts:[{envelope:e,phase:"recorded"}]}};
+  const f=fixture(saved);f.result({status:"unknown"});await f.controller.ready;f.obsolete(true);f.observe(turn({generation:1,serial:2,N:2}));await drain();await f.controller.checkPending();
+  assert.deepEqual(f.custody.saved,saved);assert.equal(f.archives.length,0);assert.equal(f.controller.state().pending,"unknown");assert.equal(f.calls.length,0);assert.equal(f.prepared.length,0);
+  f.result({status:"recorded"});await f.controller.checkPending();assert.equal(f.custody.saved,null);assert.deepEqual(f.archives,[saved]);
+});
+
+test("Check is read-only; explicit Resume dispatches only the exact prepared original without signing or speech",async()=>{
+  const e=envelope(1),saved:PendingReport={completion:{turn:turn(),voiceId:"fake",completedAt:100},envelope:e,outcome:"unknown",journal:{v:2,active:0,attempts:[{envelope:e,phase:"prepared"}]}};
+  const f=fixture(saved);f.result({status:"unknown"});await f.controller.ready;f.observe();await f.controller.checkPending();
+  assert.deepEqual(f.reconciled,[e]);assert.deepEqual(f.submitted,[]);await f.controller.resumePending();
+  assert.deepEqual(f.submitted,[e]);assert.equal(f.prepared.length,0);assert.equal(f.calls.length,0);assert.equal(activeAttempt(f.custody.saved!.journal!).phase,"unknown");
+  await f.controller.resumePending();assert.equal(f.submitted.length,1);
 });

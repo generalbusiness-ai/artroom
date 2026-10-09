@@ -64,10 +64,10 @@ test("FAKE wrong-route first response stays unknown; later refusal/head cannot s
   }finally{f.gateway.dispose();}
 });
 
-test("FAKE read-only checks never dispatch restored prepared, inflight or legacy envelopes",async()=>{
+test("FAKE restored prepared command first-dispatches identical bytes; restored inflight and legacy commands never POST",async()=>{
   const f=await fixture();let next:Awaited<ReturnType<typeof f.connect>>|undefined,peer:Awaited<ReturnType<typeof f.connect>>|undefined;try{
     f.fail("inflight");assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.counters().posts,0);const original=f.record()!.envelope;
-    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const results=await Promise.all([next.checkCommand(),peer.checkCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["unknown","unknown"]);assert.equal(f.counters().posts,0);assert.equal(canonicalize(f.record()!.envelope),canonicalize(original));
+    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const results=await Promise.all([next.checkCommand(),peer.checkCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["refused",null]);assert.equal(f.counters().posts,1);assert.equal(canonicalize(f.snapshots.at(-1)!.envelope),canonicalize(original));
   }finally{f.gateway.dispose();next?.dispose();peer?.dispose();}
   const lost=await fixture();let resumed:Awaited<ReturnType<typeof lost.connect>>|undefined;try{
     lost.lose();lost.fail("unknown");assert.equal((await lost.gateway.command("start")).status,"unknown");assert.equal(activeAttempt(lost.record()!.journal!).phase,"inflight");const original=lost.retained();
@@ -123,5 +123,16 @@ test("FAKE prepared structural mismatch blocks dispatcher before inflight and pr
     const dispatcher=attemptDispatcher({identity:f.identity,current:()=>true,fetch:async()=>{posts++;throw new Error("must not POST");},accepted:async()=>({status:"unknown"}),settle:async()=>{settles++;return{ok:false};},refresh(){}});
     const answer=await dispatcher.run({load:async()=>record,save:async next=>{writes++;record=next;}},malformed.envelope);
     assert.equal(answer.status,"blocked");assert.deepEqual([writes,posts,settles],[0,0,0]);assert.deepEqual(record,malformed);
+  }finally{f.gateway.dispose();}
+});
+
+
+test("FAKE read-only dispatcher Check leaves valid prepared custody unsent; original resume consumes it once",async()=>{
+  const f=await fixture();try{
+    f.fail("inflight");await f.gateway.command("start");let record=structuredClone(f.record()!),posts=0,writes=0,settles=0;
+    const dispatcher=attemptDispatcher({identity:f.identity,current:()=>true,fetch:async(url,init)=>{posts++;assert.deepEqual(JSON.parse(init.body),{signed:record.envelope.signed,grants:record.envelope.grants});return{status:422,url,redirected:false,headers:new Headers({"content-type":"application/json"}),body:Response.json({answer:"refused",reason:"guard-failed",judgedAt:{seq:1,hash:textDigest("FAKE resume head")}}).body};},accepted:async()=>({status:"unknown"}),settle:async()=>{settles++;return{ok:false};},refresh(){}});
+    const store={load:async()=>record,save:async(next:typeof record)=>{writes++;record=next;}};
+    const original=structuredClone(record);assert.equal((await dispatcher.check(store,record.envelope)).status,"unknown");assert.deepEqual(record,original);assert.deepEqual([posts,writes,settles],[0,0,1]);
+    assert.equal((await dispatcher.run(store,record.envelope)).status,"refused");assert.equal(posts,1);assert.equal(activeAttempt(record.journal!).phase,"refused");assert.equal((await dispatcher.run(store,record.envelope)).status,"refused");assert.equal(posts,1);
   }finally{f.gateway.dispose();}
 });

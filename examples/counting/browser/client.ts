@@ -5,7 +5,7 @@ import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHead
 import { counting } from "../definition.ts";
 import { COUNTING_DEFINITION } from "../pin.ts";
 import { assignedTurn, countingView, ownedParticipant, proposal, same, type Control, type CountingView } from "./model.ts";
-import { appendPrepared, activeAttempt, envelopeKey, fitsPending, validEnvelope, validJournal, type AttemptJournal } from "./journal.ts";
+import { appendPrepared, activeAttempt, envelopeKey, fitsPending, resumableJournal, validEnvelope, validReport, validJournal, type AttemptJournal } from "./journal.ts";
 import { attemptDispatcher, type TrustedActFetch } from "./dispatcher.ts";
 import type { ActorIdentity, Completion, PreparedEnvelope, Reporter, ReportOutcome, CustodyLock, PendingStore } from "./voice-controller.ts";
 
@@ -64,6 +64,11 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
     if(!retained?.journal||envelopeKey(retained.envelope)!==envelopeKey(envelope)||!validJournal(retained.journal,identity,envelope)||activeAttempt(retained.journal).phase!==result.status)return{status:"unknown",reason:"The exact terminal command could not be recovered."};
     await options.commandStore.clear();current();pending=null;observer?.refresh();return result;
   };
+  const dispatchReport=async(envelope:PreparedEnvelope,readOnly:boolean):Promise<ReportOutcome>=>options.lock.run(async()=>{
+    const result=await (readOnly?dispatcher.check(options.voiceStore,envelope):dispatcher.run(options.voiceStore,envelope));
+    current();const held=await options.voiceStore.load();current();
+    return held&&validReport(held,identity)&&envelopeKey(held.envelope)===envelopeKey(envelope)?{...result,custody:structuredClone(held)}:result;
+  });
   return{
     observe(emit){
       observer=observeScope<Summary>({context:{origin:identity.origin,deployment:identity.deployment,scope:identity.scope,definition:identity.definition,membership:identity.membership,member:identity.member.member,key:identity.publicKey},current:usable,
@@ -74,12 +79,14 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
       });return observer;
     },
     obsolete:completion=>{if(!usable()||!fresh||!view||!view.board)return false;const t=completion.turn,b=view.board,turn=assignedTurn(view,identity);return !ownedParticipant(view,identity)||b.generation!==t.generation||b.serial!==t.serial||b.lastNumber>=t.N||!!turn&&(turn.N!==t.N||turn.expiresAt!==t.expiresAt);},
+    resumeReady:report=>{const turn=view&&assignedTurn(view,identity);return usable()&&fresh&&!!view&&!!ownedParticipant(view,identity)&&!!turn&&Date.now()<turn.expiresAt&&same(turn,report.completion.turn)&&validReport(report,identity)&&resumableJournal(report.journal,identity,report.envelope);},
+    resume:envelope=>options.lock.run(async()=>{current();const held=await options.voiceStore.load();if(!fresh||!held||!validReport(held,identity)||!resumableJournal(held.journal,identity,envelope)||!view||!ownedParticipant(view,identity)||Date.now()>=held.completion.turn.expiresAt||!same(assignedTurn(view,identity),held.completion.turn))return{status:"blocked",reason:"The original report has no current definitely-unsent dispatch proof."};const result=await dispatcher.run(options.voiceStore,envelope);const after=await options.voiceStore.load();current();return after&&validReport(after,identity)&&envelopeKey(after.envelope)===envelopeKey(envelope)?{...result,custody:structuredClone(after)}:result;}),
     correctionReady:reservation,refresh:()=>observer?.refresh(),
     async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("spoken",completion);},
-    submit:envelope=>options.lock.run(()=>dispatcher.run(options.voiceStore,envelope)),
-    reconcile:envelope=>options.lock.run(()=>dispatcher.check(options.voiceStore,envelope)),
+    submit:envelope=>dispatchReport(envelope,false),
+    reconcile:envelope=>dispatchReport(envelope,true),
     async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();await options.commandStore.save(held);}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await dispatcher.run(options.commandStore,envelope);return clearCommand(envelope,result);});},
-    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;return null;}pending=held.kind;const result=await dispatcher.check(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
+    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;return null;}pending=held.kind;const result=await dispatcher.run(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
     pendingCommand:()=>pending,
     async restoreCommand(){const held=await options.commandStore.load();current();pending=held?.kind??null;},
     dispose(){alive=false;lifetime.abort();observer?.cancel();session=null;view=undefined;ownSecret.fill(0);},

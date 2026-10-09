@@ -17,9 +17,9 @@ function privateSlot<T>(identity:ActorIdentity,purpose:"voice"|"command") {
   return{
     load:()=>transact<T|null>("readonly",(store,set,reject)=>{const request=store.get(key);request.onsuccess=()=>{const record=request.result as {identity?:ActorIdentity;pending?:T}|undefined;if(!record)return set(null);try{if(canonicalize(record.identity)!==canonicalize(identity)||!record.pending||utf8(canonicalize(record)).length>MOST)return reject(new Error("The private pending identity is unavailable."));set(record.pending);}catch{reject(new Error("The private pending identity is unavailable."));}};}),
     save:async (pending:T)=>{const record={identity,pending};if(utf8(canonicalize(record)).length>MOST)throw new Error("The private pending record exceeds its bound.");await transact<void>("readwrite",(store,set,reject)=>{const count=store.count();count.onsuccess=()=>{const current=store.getKey(key);current.onsuccess=()=>{if(current.result===undefined&&count.result>=IDENTITIES){reject(new Error("Private pending identity capacity is full."));return;}store.put(record,key);set(undefined);};};});},
-    archive:async(pending:T)=>{
+    archive:async(pending:T,receiptConfirmed=false)=>{
       const candidate=pending as {envelope?:PreparedEnvelope;journal?:AttemptJournal};
-      if(!candidate.envelope||!terminalJournal(candidate.journal,identity,candidate.envelope))throw new Error("Only a fully resolved history can be archived.");
+      if(!candidate.envelope||!terminalJournal(candidate.journal,identity,candidate.envelope,receiptConfirmed))throw new Error("Only a fully resolved history can be archived.");
       // Same object store and transaction: commit an intact record before removing its active pointer.
       await transact<void>("readwrite",(store,set,reject)=>{
         const read=store.get(key);read.onsuccess=()=>{
@@ -30,7 +30,7 @@ function privateSlot<T>(identity:ActorIdentity,purpose:"voice"|"command") {
           const old=store.get(archiveKey);old.onsuccess=()=>{
             try {
             if(old.result!==undefined){if(canonicalize(old.result)!==canonicalize(record)){reject(new Error("The private archive does not match."));return;}store.delete(key);set(undefined);return;}
-            const count=store.count();count.onsuccess=()=>{if(count.result>=IDENTITIES){reject(new Error("Private terminal archive capacity is full."));return;}store.put(record,archiveKey);store.delete(key);set(undefined);};
+            const count=store.count();count.onsuccess=()=>{if(count.result>IDENTITIES){reject(new Error("Private terminal archive capacity is full."));return;}store.delete(key);store.put(record,archiveKey);set(undefined);};
             } catch { reject(new Error("The private archive does not match.")); }
           };
           } catch { reject(new Error("The exact terminal archive is unavailable.")); }
