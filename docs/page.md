@@ -121,6 +121,9 @@ submission and before selecting an accepted reply. A late accepted answer
 is kept in memory for its original context; Use joined room selects that
 known result with the original signing key and makes no new Join. Unknown
 Join outcomes remain read-only, with the same reload-recovery limitation.
+Enrollment custody follows the actual membership incarnation and signing key.
+Saving that room or changing the invitation does not release an unknown Join
+under the same identity.
 
 The Rules editor changes approval counts and preserves complete checks,
 extents, labels and exception values. Only an actually offered `publish`

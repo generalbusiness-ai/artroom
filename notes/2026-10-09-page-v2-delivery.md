@@ -155,6 +155,21 @@ encoding and asset checks and Page types pass; generic enrollment envelopes
 are still not durable across reload. This is a focused inherited-path repair,
 not a new outbox protocol or a repeated whole-suite gate.
 
+The review's second Join finding `c2c31406` is also repaired: enrollment
+custody is associated with configured origin, complete membership reference
+and the actual signing key, independently of the selected room. Saving or
+reselecting that target/key, or using another invitation for it, does not
+clear an unknown attempt. The focused handler witness shows no second POST
+after lost reply then Save of the same target/key. A different signing key
+has its own enrollment identity. Matching accepted receipts remain inspectable.
+A narrow peer re-read confirms that binding; seven composed affected checks
+and both Page typechecks pass, including generated-asset parity.
+
+Nonblocking review follow-up: a successfully accepted generic comment draft
+currently remains editable after redraw. Clearing only the completed draft,
+without removing unsent, refused, unknown or newer edits, remains UX work;
+no automatic retry or duplicate acceptance is claimed by that observation.
+
 A narrow peer read found and verified the repair of a late-draw label race.
 Final DOM publication checks the original room context; the displayed local
 label also matches the loaded directory and full membership reference. Its
