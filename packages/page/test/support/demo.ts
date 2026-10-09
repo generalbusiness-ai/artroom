@@ -113,8 +113,12 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
       for (let pass = 0; pass < 64; pass++) {
         let made = 0;
         for (const node of nodes) {
-          while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
-          active();
+          for (;;) {
+            const effects = await (node.stub as unknown as { effect(): Promise<number> }).effect();
+            active();
+            if (effects === 0) break;
+            made++;
+          }
           made += await node.stub.dispatch();
           active();
         }
@@ -133,7 +137,9 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
 
     ok(await run(rita, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
     active();
-    R = new Platform((await rita.store.config())!.register!.scope);
+    const installed = (await rita.store.config())!;
+    active();
+    R = new Platform(installed.register!.scope);
     wire(R.name);
     await R.restart();
     active();
@@ -143,6 +149,7 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
     ok(await run(rita, "claim", "demo", "--handle", "@rita"));
     active();
     const config = (await rita.store.config())!;
+    active();
     const repository = config.repository!;
     const [D, G, M, rules] = [new Platform(repository.directory.scope), new Platform(repository.destination), new Platform(repository.membership.scope), new Platform(repository.rules)];
     known.push(G);
@@ -151,7 +158,9 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
     siteEnv = { SCOPES: env.PLATFORM, ...bindings() };
 
     // paul, a maintainer, joins on the command line; una's invitation is left for the page.
-    ok(await run(paul, "join", ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!));
+    const paulInvitation = ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!;
+    active();
+    ok(await run(paul, "join", paulInvitation));
     active();
     const link = ok(await run(rita, "invite", "@una", "--role", "member")).lines[1]!.split(": ")[1]!;
     active();
