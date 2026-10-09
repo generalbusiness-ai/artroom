@@ -109,7 +109,7 @@ export class Reads {
     if (presentsSignedRead(reader)) {
       if (!this.#signed) return no("forbidden");
       // A read that a signed read cannot name has no argument here, and no request names it: it is refused by the check.
-      const checked = checkSignedRead(this.#signed, this.#store, reader as string, read, arg ?? "");
+      const checked = checkSignedRead(this.#signed.observe ? { ...this.#signed, phase: read === "summary" ? "final-summary" : "final-read" } : this.#signed, this.#store, reader as string, read, arg ?? "");
       if (!("key" in checked)) return no(checked.refused === false ? "forbidden" : checked.refused);
       limit = checked;
     } else {
