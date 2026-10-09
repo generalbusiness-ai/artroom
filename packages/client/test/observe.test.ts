@@ -104,3 +104,23 @@ test("same-turn abort before ignoring open resolution disposes its late body onc
  await started.promise;const before=states.length;current=false;observer.cancel();opening.resolve({ok:true,body});
  await observer.done;await drain();expect(cancels).toBe(1);expect(states).toHaveLength(before);
 });
+
+
+test("refresh requested by a public completion callback is handed off when the occupied slot clears",async()=>{
+ vi.useFakeTimers();const body=stream(),states:ObservationState<number>[]=[];let reads=0;let observer:ReturnType<typeof observeScope<number>>;
+ observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{const value=snapshot(++reads);return{ok:true,at:value.at,value,complete:true};},emit:state=>{states.push(state);if(state.status==="current"&&state.snapshot.value===1)queueMicrotask(()=>observer.refresh());}});
+ await drain();body.notice(1);await drain();await vi.advanceTimersByTimeAsync(0);await drain();expect(reads).toBe(2);expect(states.at(-1)).toEqual({status:"current",snapshot:snapshot(2)});observer.cancel();await observer.done;
+});
+
+test("synchronous reader cancellation failure cannot prevent local done when its pending read ignores shutdown",async()=>{
+ let first=true,cancels=0;const started=gate(),states:ObservationState<number>[]=[];
+ const body={getReader:()=>({read:()=>{if(first){first=false;return Promise.resolve({done:false,value:utf8(JSON.stringify({at:head(1)})+"\n")});}return new Promise<{done:boolean}>(()=>{});},cancel:()=>{cancels++;throw new Error("Upstream disposal unavailable");}})}as ByteStream;
+ const observer=observeScope<number>({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body}),snapshot:async()=>{started.resolve();return new Promise(()=>{});},emit:s=>states.push(s)});
+ await started.promise;observer.cancel();await observer.done;expect(cancels).toBe(1);expect(states.at(-1)).toEqual({status:"cancelled"});
+});
+
+test("a conflicting head notice at the retained snapshot sequence fails even when the previous notice is older",async()=>{
+ const body=stream(),current=gate(),states:ObservationState<number>[]=[];let reads=0;
+ const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{reads++;const value=snapshot(reads===1?5:6);return{ok:true,at:value.at,value,complete:true};},emit:state=>{states.push(state);if(state.status==="current")current.resolve();}});
+ await drain();body.notice(1);await current.promise;body.send(utf8(JSON.stringify({at:{seq:5,hash:"sha256:"+"9".repeat(64)}})+"\n"));await observer.done;expect(reads).toBe(1);expect(states.at(-1)).toEqual({status:"error",reason:"head-hash-conflict",retained:snapshot(5)});
+});

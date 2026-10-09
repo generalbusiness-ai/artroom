@@ -42,9 +42,9 @@ export async function openHttpHeadStream(origin: string, scope: ScopeRef, sessio
 /** Raw-byte bound before decode/parse. No whole-stream buffer or queued heads. */
 export async function* headLines(body: ByteStream, signal: Expiry): AsyncGenerator<Head> {
   const reader = body.getReader(); let pending: number[] = []; let stopped = false; let cancelled = false; let turnBytes = 0; let turnFrames = 0;
-  const cancel = () => { if (cancelled) return; cancelled = true; void reader.cancel().catch(() => undefined); };
+  const cancel = () => { if (cancelled) return; cancelled = true; try { void reader.cancel().catch(() => undefined); } catch { /* Local shutdown cannot depend on upstream disposal. */ } };
   let abort!: () => void;
-  const end = new Promise<{ done: true }>(resolve => { abort = () => { stopped = true; pending = []; cancel(); resolve({ done: true }); }; });
+  const end = new Promise<{ done: true }>(resolve => { abort = () => { stopped = true; pending = []; resolve({ done: true }); cancel(); }; });
   signal.addEventListener("abort", abort);
   try {
     for (;;) {

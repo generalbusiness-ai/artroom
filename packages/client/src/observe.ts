@@ -78,7 +78,7 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
         readerOwned=true;const first=await bounded(()=>lines.next(),active.signal,seconds);check(at);
         if(first.done)throw new ObservationFailure("unavailable","stream-ended-before-head");latest=first.value;
         let streamFailure:ObservationFailure|undefined;
-        const pump=(async()=>{try{for await(const notice of lines){check(at);if(latest&&notice.seq===latest.seq&&notice.hash!==latest.hash)throw new ObservationFailure("error","head-hash-conflict");if(!latest||notice.seq>latest.seq){latest=notice;refreshAgain?.();}}}catch(error){if(!(error instanceof Stopped)&&!active.signal.aborted)streamFailure=error instanceof ObservationFailure?error:new ObservationFailure("error","malformed-head-stream");}finally{streamAlive=false;active.abort();streamEnd();}})();
+        const pump=(async()=>{try{for await(const notice of lines){check(at);if(latest&&notice.seq===latest.seq&&notice.hash!==latest.hash||last&&notice.seq===last.at.seq&&notice.hash!==last.at.hash)throw new ObservationFailure("error","head-hash-conflict");if(!latest||notice.seq>latest.seq){latest=notice;refreshAgain?.();}}}catch(error){if(!(error instanceof Stopped)&&!active.signal.aborted)streamFailure=error instanceof ObservationFailure?error:new ObservationFailure("error","malformed-head-stream");}finally{streamAlive=false;active.abort();streamEnd();}})();
         const refresh=async()=>{
           if(refreshRunning){dirty=true;return;}refreshRunning=true;
           try{do{
@@ -95,7 +95,16 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
           }finally{refreshRunning=false;}
         };
         let pending:Promise<void>|undefined;let refreshFailure:ObservationFailure|undefined;
-        refreshAgain=()=>{dirty=true;if(!pending&&!refreshRunning){pending=refresh().catch(error=>{if(!(error instanceof Stopped))refreshFailure=error instanceof ObservationFailure?error:new ObservationFailure("unavailable","snapshot-read-failed");active.abort();streamEnd();}).finally(()=>{pending=undefined;});}};
+        refreshAgain=()=>{dirty=true;if(!pending&&!refreshRunning){pending=refresh().catch(error=>{if(!(error instanceof Stopped))refreshFailure=error instanceof ObservationFailure?error:new ObservationFailure("unavailable","snapshot-read-failed");active.abort();streamEnd();}).finally(()=>{
+          pending=undefined;
+          if(dirty&&streamAlive&&!active.signal.aborted&&usable()&&at===generation){
+            // Hand off completion-boundary invalidations after a task yield;
+            // they may arrive after refreshRunning clears but before this slot.
+            void delay(0,active.signal).then(()=>{
+              if(dirty&&streamAlive&&!active.signal.aborted&&usable()&&at===generation)refreshAgain?.();
+            },()=>undefined);
+          }
+        });}};
         refreshAgain();await connectionEnded;active.abort();await pump;await pending;refreshAgain=undefined;
         if(streamFailure)throw streamFailure;if(refreshFailure)throw refreshFailure;
         check(at);failures++;emit({status:"reconnecting",...retained()});
