@@ -344,7 +344,10 @@ ref remains a separate cleanup duty. Publication moves the branch by its
 recorded compare-and-swap; deletion of the reservation ref and revocation
 of its tokens must settle before the destination’s publication is final.
 Unknown staging or deletion remains recorded and is never inferred from
-a read alone. Expiry currently retains `cleanup-aborted`; its explicit
+a read alone. A staging mismatch that may leave a ref keeps a live
+`cleanup-aborted` duty; its branch slot can be reclaimed independently
+of that cleanup. A delete uses the recorded old integration ID and cannot
+remove another writer’s replacement ref. Expiry currently retains `cleanup-aborted`; its explicit
 `resend` cleanup trigger is awaiting the owner’s disposition (`f1b87a0b`).
 
 Binary content, deletion and rename support remain in the later R5 work.
