@@ -1,0 +1,122 @@
+{
+  "authorization": "939f7cfcefb51d1d282292c27a0ec3245bf13776",
+  "timestamp_utc": "2026-10-09T20:50:37.142881+00:00",
+  "command": "/usr/bin/time -lp node ../../node_modules/vitest/vitest.mjs run test/application-establish.test.ts --config /tmp/artroom-f1-native-selection-v6/vitest.config.mjs > /tmp/artroom-f1-native-selection-v6/run.log 2>&1",
+  "cwd": "/tmp/artroom-application-establish/packages/scope",
+  "source_head_before": "8a4bcf09218b86ce9fa4e5652b8cd4f5cd40bdbc",
+  "source_tree_before": "3a51f0027ea886f7e39785a994e8f586ee0d7945",
+  "status_before": "",
+  "configuration_sha256": "8891d09638112d7e6c7c50ce98d9a53e4f7b78db9c752d1743de07fb374ebc50",
+  "timestamp_terminal_utc": "2026-10-09T20:50:39.472666+00:00",
+  "terminal_exit": 1,
+  "source_head_after": "8a4bcf09218b86ce9fa4e5652b8cd4f5cd40bdbc",
+  "source_tree_after": "3a51f0027ea886f7e39785a994e8f586ee0d7945",
+  "status_after": "",
+  "log_bytes": 6480,
+  "log_sha256": "8c853a2bcaa875915e5d1deaadd7ecf5a6a6eaf112161d4263e29d983a81d5e5",
+  "real_seconds": 2.24,
+  "user_seconds": 2.48,
+  "sys_seconds": 0.34,
+  "cpu_seconds": 2.82,
+  "selection": {
+    "files": 1,
+    "cases": 1,
+    "failed": 1,
+    "passed": 0,
+    "file_tests_ms": 445,
+    "title_ms": 444,
+    "vitest_duration_seconds": 1.49,
+    "timeout_ms": 5000
+  },
+  "failure": {
+    "file": "packages/scope/test/application-establish.test.ts",
+    "line": 196,
+    "stage": "first D replay read",
+    "class": "SourceError",
+    "reason": "forbidden"
+  },
+  "separate_diagnostic": {
+    "printed": "uncaught exception; source=Uncaught(in promise)",
+    "reason": "fixture retention fault SQLITE_CONSTRAINT_TRIGGER",
+    "stack_boundary": "SqliteStore.retain / Turns.#seal / transaction",
+    "qualification": "Intentional trigger and rejects.toThrow plus later rollback assertions were reached, but uncaught diagnostic remains; no error-free acceptance or attribution beyond printed stack."
+  },
+  "passed_before_failure": [
+    "register/directory/nativecohort",
+    "actual native invited peer join",
+    "actual readsession issuance/authenticated destination HTTP200",
+    "Counting and complete container activation",
+    "application schema/authority/closure refusal cases",
+    "SQL fault rejects and entry/outbox/retained-input rollback assertions",
+    "no failed child created",
+    "direct application admission/seed/native marker/fullmembership/opener",
+    "exact retained definition",
+    "held unknown creation/restart/exact original signed retry receipt equality",
+    "created child/actual native configuration controller",
+    "Initialize denied before explicit grant",
+    "native admin set-actions/counting.control and Initialize paused board/nooutsideeffects",
+    "one application entry",
+    "complete container and nested creation marker/membership",
+    "authenticated nested HTTP200/explicit Initialize paused board",
+    "legitimate nonopener actual@sam MemberRef",
+    "all D/A retained closure bytes"
+  ],
+  "unreached": [
+    "D replay consistent assertion",
+    "C/A/nested replay reads and consistent assertions"
+  ],
+  "source_disposition": {
+    "current_call": "httpSource(SERVICE,{fetch:routed}) has no reader option",
+    "implementation": "replay/src/source.ts101-109 sends empty headers when options.reader undefined; string or ReaderFor option supported",
+    "qualification": "Missing HTTPcredential is a sufficient source condition compatible with actual forbidden read. No new source edit/reader choice authorized. Actual session+303s nested read200 already passed; session valid at that point. Four-node proven replays remain owed."
+  },
+  "qualifications": [
+    "ONE authorized native run; originalcase/5s; no retry/types/discovery/control/gate/sourceedit",
+    "Clean exactheadtree beforeafter; source/pins unchanged",
+    "Native terminal; post-run no Vitest/workerd process remains",
+    "Same two nonfatal optional import warnings retained",
+    "No formalSource/gate/landing/hosted/fullF1 acceptance"
+  ],
+  "attachments": {
+    "source-packet.md": {
+      "path": "/tmp/artroom-f1-native-selection-v6/source-packet.md",
+      "bytes": 1313,
+      "sha256": "409be08b0260d15fcd54581cbeb028318c6a35d6ff7c465c9748c42af75107e8"
+    },
+    "source-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v6/source-proof.json",
+      "bytes": 1160,
+      "sha256": "c0e0ddf9b04642f5abe60bab0489b325f599f7df3da143bc65f6e35dd79152ea"
+    },
+    "vitest.config.mjs": {
+      "path": "/tmp/artroom-f1-native-selection-v6/vitest.config.mjs",
+      "bytes": 1957,
+      "sha256": "8891d09638112d7e6c7c50ce98d9a53e4f7b78db9c752d1743de07fb374ebc50"
+    },
+    "discovery.json": {
+      "path": "/tmp/artroom-f1-native-selection-v6/discovery.json",
+      "bytes": 315,
+      "sha256": "1f9fb60e4f69d33f6cc2fd81d8b622b7220ed8446040a86c437efede8b05bed2"
+    },
+    "discovery-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v6/discovery-proof.json",
+      "bytes": 1509,
+      "sha256": "af4dc38069b1d2160e286e915a72922a989aec31b19b7222bd44ac5b4710617b"
+    },
+    "native-before.json": {
+      "path": "/tmp/artroom-f1-native-selection-v6/native-before.json",
+      "bytes": 665,
+      "sha256": "9727c468da0e78d053f7c0c1f7b02240769faf49665e49845551023c86608247"
+    },
+    "native-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v6/native-proof.json",
+      "bytes": 1106,
+      "sha256": "610484ce1154ea1fbabba1e2c206000ebcbf659c52d70aa0750540b50ee09754"
+    },
+    "run.log": {
+      "path": "/tmp/artroom-f1-native-selection-v6/run.log",
+      "bytes": 6480,
+      "sha256": "8c853a2bcaa875915e5d1deaadd7ecf5a6a6eaf112161d4263e29d983a81d5e5"
+    }
+  }
+}
