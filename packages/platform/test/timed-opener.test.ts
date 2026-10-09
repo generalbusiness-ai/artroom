@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { platform } from "@generalbusiness/artroom-platform";
-import { board } from "./fixtures-f.ts";
-import { validateDefinition } from "../src/index.ts";
+import { platform } from "../src/index.ts";
+import { board } from "../../derive/test/fixtures-f.ts";
+import { validateDefinition } from "@generalbusiness/artroom-derive";
 const destination3 = platform("platform:destination@3")!.data;
 
 // The platform opener is constant and bounded. An untrusted declared definition
