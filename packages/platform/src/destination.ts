@@ -2079,8 +2079,13 @@ export const destinationRules3: Rules = (() => {
       const reserved = typeof publication.values["reservedAt"] === "number" ? given.own(publication.values["reservedAt"])?.entry : null;
       const observation = reserved?.input.type === "outcome" ? reserved.input.observed?.map((use) => use.observation).find((seen) => "subject" in seen && seen.subject === "rules") : null;
       const configured = observation && "content" in observation && observation.content.asked === "rules" ? observation.content.checks.find((check) => check.name === opened?.["name"]) : null;
+      const historical = grant?.fresh?.observation;
       const authentic = !!fields && !!opened && !!configured && job!.at.scope === manifest.at.scope && job!.at.inc === manifest.at.inc && opened["manifest"] === manifest.seq
         && fields["job"] === job!.seq && fields["tree"] === publication.values["tree"] && fields["configuration"] === configured.configuration
+        && result!.at.scope === manifest.at.scope && result!.at.inc === manifest.at.inc
+        && job!.effects.some((effect) => effect.effect === "value" && effect.item === job!.seq && effect.slot === "tree" && effect.value === publication.values["tree"])
+        && historical !== undefined && !("subject" in historical) && historical.key === (result!.input.type === "act" ? result!.input.signed.intent.actor : null)
+        && historical.actions.includes("change.check") && canonicalize(historical.of) === canonicalize(grant?.subject.membership)
         && opened["configuration"] === configured.configuration && (fields["outcome"] === "passed" || fields["outcome"] === "failed" || typeof fields["reason"] === "string") && grant?.subject.member === configured.checker
         && result!.effects.some((effect) => effect.effect === "state" && effect.item === job!.seq && (effect.state === "passed" || effect.state === "failed" || effect.state === "errored"));
       return authentic ? { holds: true } : { holds: false, name: "not-this-check" };
