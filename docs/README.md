@@ -1,5 +1,7 @@
 # Documentation
 
+For the current command-line contribution path, read [Join a room and publish one text change](manual/first-change.md). Its release and recovery limits are stated at the top. The [full manual ledger](manual/ledger.md) retains the complete approved backlog.
+
 Start with [Write a room application](start.md): item types, acts,
 invariants, validation, pins, scenarios and founding.
 
