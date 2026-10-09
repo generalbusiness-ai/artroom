@@ -1,0 +1,1287 @@
+{
+  "classification": "No Browser/IAB surfaces available in CUA inventory; existing cached Playwright 1.63.0 + Chromium",
+  "layoutChecks": 99,
+  "snapshots": [
+    {
+      "view": "issues",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        701,
+        654,
+        654,
+        682
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        693,
+        640,
+        653
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        701,
+        654,
+        654,
+        682
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        678,
+        678
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        445,
+        398,
+        398,
+        426
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        299,
+        352,
+        365
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        445,
+        398,
+        398,
+        426
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 766,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        422,
+        422
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        413,
+        366,
+        366,
+        394
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        267,
+        320,
+        333
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        413,
+        366,
+        366,
+        394
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 736,
+      "theme": "light",
+      "scrollWidth": 734,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        390,
+        390
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        642,
+        642,
+        642,
+        642
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        642,
+        642,
+        642
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        642,
+        642,
+        642,
+        642
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 704,
+      "theme": "light",
+      "scrollWidth": 702,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        586,
+        586
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        506,
+        506,
+        506,
+        506
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        506,
+        506,
+        506
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        506,
+        506,
+        506,
+        506
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 568,
+      "theme": "light",
+      "scrollWidth": 566,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        450,
+        450
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        296,
+        296,
+        296,
+        296
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        296,
+        296,
+        296
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        296,
+        296,
+        296,
+        296
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 358,
+      "theme": "light",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        240,
+        240
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        258,
+        258,
+        258,
+        258
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        258,
+        258,
+        258
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        258,
+        258,
+        258,
+        258
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        202,
+        202
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        226,
+        226,
+        226,
+        226
+      ]
+    },
+    {
+      "view": "changes",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        226,
+        226,
+        226
+      ]
+    },
+    {
+      "view": "ready",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "review",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "merged",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pending",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        226,
+        226,
+        226,
+        226
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "empty",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "pages",
+      "width": 288,
+      "theme": "light",
+      "scrollWidth": 286,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        170,
+        170
+      ]
+    },
+    {
+      "view": "issues",
+      "width": 358,
+      "theme": "dark",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        296,
+        296,
+        296,
+        296
+      ]
+    },
+    {
+      "view": "merged",
+      "width": 358,
+      "theme": "dark",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "blocked",
+      "width": 358,
+      "theme": "dark",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "create",
+      "width": 358,
+      "theme": "dark",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        296,
+        296,
+        296,
+        296
+      ]
+    },
+    {
+      "view": "rules",
+      "width": 358,
+      "theme": "dark",
+      "scrollWidth": 356,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "issues",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        701,
+        654,
+        654,
+        682,
+        682
+      ]
+    },
+    {
+      "view": "merged",
+      "width": 1024,
+      "theme": "light",
+      "scrollWidth": 1022,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "issues",
+      "width": 390,
+      "theme": "light",
+      "scrollWidth": 388,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        328,
+        328,
+        328,
+        328,
+        328
+      ]
+    },
+    {
+      "view": "create",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": [
+        258,
+        258,
+        258,
+        258,
+        258
+      ]
+    },
+    {
+      "view": "blocked",
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 318,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    },
+    {
+      "view": "rules",
+      "width": 390,
+      "theme": "dark",
+      "scrollWidth": 388,
+      "outside": [],
+      "duplicateIds": [],
+      "names": 1,
+      "roomHeaders": 0,
+      "titleWidths": []
+    }
+  ],
+  "errors": [],
+  "captures": [
+    "screens/issues-desktop.png",
+    "screens/change-merged-desktop.png",
+    "screens/issues-mobile.png",
+    "screens/create-room-mobile.png",
+    "screens/invalid-path-mobile.png",
+    "screens/rules-mobile-dark.png"
+  ],
+  "interactions": [
+    "search/filter/clear",
+    "issue reopen",
+    "per-subject draft retention",
+    "comment submit",
+    "approve exact version",
+    "merge -> awaiting -> confirmed",
+    "exact page rendering and context-aware editor",
+    "path correction and draft preservation",
+    "rules review/save",
+    "phone modal focus return/trap",
+    "create room and scoped empty data",
+    "new issue belongs to new room",
+    "no inherited rules",
+    "collision error",
+    "tabs keyboard",
+    "44px phone targets",
+    "long room name"
+  ]
+}
