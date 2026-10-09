@@ -99,7 +99,7 @@ const sending = new ScopeSending();
 const joining = new ScopeSending();
 const joinAnswers = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
 /** Known replies remain discoverable where the person began joining; custody stays keyed by actual enrollment. */
-const joinRepliesByContext = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
+const joinRepliesByContext = new Map<string, Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>>();
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
@@ -215,7 +215,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
-  const send = (kind: string, on: string, typed: Record<string, string>) => {
+  const send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => {
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
@@ -228,7 +228,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
-        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); }, () => {
+        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); if (known.answer.answer === "accepted") accepted?.(); }, () => {
           if (!currentContext()) throw new Error("The room or key changed before submission. Nothing was sent.");
           sending.submitting(association);
         });
@@ -302,20 +302,21 @@ function settingsScreen(): HTMLElement {
   form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   const joinButton = form.querySelector("#join")!;
-  const previousRecord = joinRepliesByContext.get(selectedContext) ?? (joinKey ? joinAnswers.get(joinKey) : undefined);
-  const previousJoin = previousRecord?.result;
-  if (previousJoin?.answer.answer === "accepted") {
-    joinButton.setAttribute("disabled", "");
-    const select = h("button", { type: "button" }, "Use joined room");
+  const previousRecords = new Map(joinRepliesByContext.get(selectedContext));
+  if (joinKey && joinAnswers.has(joinKey)) previousRecords.set(joinKey, joinAnswers.get(joinKey)!);
+  const acceptedRecords = [...previousRecords.values()].filter((record) => record.result.answer.answer === "accepted");
+  if (joinKey && joinAnswers.get(joinKey)?.result.answer.answer === "accepted") joinButton.setAttribute("disabled", "");
+  for (const record of acceptedRecords) {
+    const select = h("button", { type: "button", "data-joined-directory": record.result.place.directory }, acceptedRecords.length === 1 ? "Use joined room" : `Use joined room ${record.result.place.directory}`);
     select.addEventListener("click", () => {
       if (settingsContext(settings() ?? { place: null, secret: "" }) !== selectedContext) return;
-      save({ ...previousRecord!.settings, place: previousJoin.place });
+      save({ ...record.settings, place: record.result.place });
     });
     form.append(select);
   }
   if (joinKey && joining.get(joinKey)) { joinButton.setAttribute("disabled", ""); tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room"); }
-  if (previousJoin) tell(previousJoin.answer.answer === "accepted", previousJoin.answer.answer === "accepted" ? `Joining was accepted by membership ${previousJoin.place.membership.scope}. The saved room was not changed after the settings context changed. Inspect that membership before choosing this room.` : `${nonacceptedAnswerText(previousJoin.answer)} Inspect membership ${previousJoin.place.membership.scope} and the original request.`);
-  if (previousJoin) form.append(h("details", { class: "inspection" }, h("summary", {}, "Inspect Join answer"), h("pre", {}, JSON.stringify(previousJoin.answer, null, 2))));
+  for (const record of previousRecords.values()) form.append(h("details", { class: "inspection" }, h("summary", {}, `Inspect Join answer: membership ${record.result.place.membership.scope}`), h("pre", {}, JSON.stringify(record.result.answer, null, 2))));
+  if (acceptedRecords.length) tell(true, `${acceptedRecords.length} accepted Join ${acceptedRecords.length === 1 ? "answer is" : "answers are"} kept. Select the matching joined room or inspect its receipt.`);
   const offeredJoin = () => {
     try {
       const typed = (room as HTMLTextAreaElement).value;
@@ -348,8 +349,12 @@ function settingsScreen(): HTMLElement {
           joining.submitting(enrollment);
         });
         const record = { result: joined, settings: next };
-        joinAnswers.set(enrollment, record);
-        if (joined.answer.answer !== "unavailable" && joined.answer.answer !== "mismatch") joinRepliesByContext.set(selectedContext, record);
+        if (joinAnswers.get(enrollment)?.result.answer.answer !== "accepted") joinAnswers.set(enrollment, record);
+        if (joined.answer.answer !== "unavailable" && joined.answer.answer !== "mismatch") {
+          const records = joinRepliesByContext.get(selectedContext) ?? new Map();
+          if (records.get(enrollment)?.result.answer.answer !== "accepted") records.set(enrollment, record);
+          joinRepliesByContext.set(selectedContext, records);
+        }
         if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(enrollment); else joining.answered(enrollment);
         if (!current() || screenDraw !== drawing) return;
         if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);

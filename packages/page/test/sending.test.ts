@@ -23,7 +23,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
   const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: null };
   let redraw!: () => void;
-  let send!: (kind: string, on: string, fields: Record<string, string>) => void;
+  let send!: (kind: string, on: string, fields: Record<string, string>, accepted?: () => void) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
   const rejects: ((error: Error) => void)[] = [];
   const posts = vi.fn();
@@ -123,6 +123,19 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(root.textContent).toContain("Newest local label");
     expect(root.textContent).toContain("Room est-room");
     expect(root.textContent).not.toContain("Room ther-roo");
+    context = { ...context, secret: "device" };
+    rendered = gate(); redraw(); await rendered.promise;
+    const retired = vi.fn();
+    for (const answer of ["refused", "accepted"] as const) {
+      dataAct.mockImplementationOnce(async (...args: unknown[]) => {
+        (args[5] as () => void)();
+        const result = { kind: "comment", answer: { answer }, observation: null };
+        (args[4] as (value: unknown) => void)(result);
+        return result as never;
+      });
+      rendered = gate(); send("comment", "", { body: "Exact submission" }, retired); await drain();
+      expect(retired).toHaveBeenCalledTimes(answer === "accepted" ? 1 : 0);
+    }
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion
