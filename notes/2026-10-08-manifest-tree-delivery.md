@@ -6,7 +6,7 @@ This note is not a completed delivery, gate result or deployment claim.
 
 ## Current handoff status
 
-The last coordinated gate ran at `679d7a96d9e25f1ff666969215e820bf91480ffc`, tree
+The earlier coordinated gate ran at `679d7a96d9e25f1ff666969215e820bf91480ffc`, tree
 `264dfea43404cd2228c38faf4f3de5e597f08e8c`. Its coordinated gate failed:
 three five-second story timeouts and one legacy manifest not-staged refusal;
 927 passed and two recorders skipped. No canceler diagnostic occurred in that
@@ -41,6 +41,11 @@ through `520383b4` and `caa40c9a`. Material source is frozen with generated
 assets `f3202602`; current delivery and final affected capture evidence follow
 in `notes/2026-10-09-page-tasks-delivery.md`. The next single coordinated gate
 will bind the complete committed candidate, not an earlier partial head.
+
+That gate ran at `1d7fa27359e25ad1cc5acd7f772fa3343555bc5a` and failed:
+954 passed, two skipped, one invalid scripted declaration fixture and five
+native story timeouts. Its exact evidence and remaining A4 decision are
+recorded in the Page task delivery note. No deployment or hosted run followed.
 
 A4's intended single preview trace accidentally selected 42 files and 148
 tests because inherited include arrays were merged. The process passed, but

@@ -105,6 +105,25 @@ passed; root inspected the final narrow image. `editor-final-checks.json`
 and its three public PNGs retain this bounded presentation evidence. One
 coordinated final gate remains owed.
 
+The coordinated gate at exact `1d7fa27359e25ad1cc5acd7f772fa3343555bc5a`,
+tree `4df9888a213840b6155fe80a5611dc588ed69bb8`, terminated exit 1. It reports
+954 passed, two skipped and six failures: the Node Join projection fixture's
+fake cached declaration now fails exact pin verification, plus five unchanged
+five-second native timeouts (CLI story, source preview, founding, immutable
+publication and legacy versions). Typecheck passed in 5.5 s/17.4 CPU s;
+test phase failed in 350.8 s/392.3 CPU s. No canceler diagnostic occurred.
+The setup cleanup repair did not eliminate these observed timeouts; their
+cause is still unresolved. Deployment and hosted execution remain held.
+
+Root read the complete small gate/test reports. Gate log
+`/tmp/artroom-integrated-1d7-gate.log` SHA-256
+`b64a1f34e4661ef9db78489b54e2546d1354b6b11fca8bf87a316100eb5e4b65`;
+raw test log `tmp.OrRAVRb2eL/test.log` under the gate's printed temporary
+directory, SHA-256 `9cfc040dfdd99b603556ff6f2289879f5831d23d09ddfcf254100a3b80681d6a`.
+The Node fixture has a separate focused correction; no new full gate follows
+without a bounded A4 plan and owner decision. This prose successor changes
+no source or test evidence at the failed head.
+
 First-use request `d01aa495` remains separate. Its exact preset assurance review
 and native setup witness do not complete invitation/reload custody, operator
 provisioning, release, two-device or hosted first-use acceptance. Shared names
