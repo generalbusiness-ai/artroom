@@ -65,6 +65,8 @@ export interface Room {
   membership: ScopeRef;
   rules: ScopeId;
   destination: ScopeId;
+  /** The repository name already recorded by the directory; no claimed display name is inferred. */
+  name?: string;
   key: KeyId;
   /** The caller's role and actions in membership, or null when the key is no active member's. */
   me: Standing | null;
@@ -220,6 +222,8 @@ export async function openRoom(session: Session, place: Place): Promise<Room> {
   if (M.scope !== place.membership.scope || M.inc !== place.membership.inc) throw new Unreadable(`The directory ${place.directory} names another membership scope than ${place.membership.scope}.`);
   room.rules = rules;
   room.destination = destination;
+  const recordedRepository = repository.values["repository"];
+  if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository.name === "string") room.name = recordedRepository.name;
   room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
   return room;
 }
