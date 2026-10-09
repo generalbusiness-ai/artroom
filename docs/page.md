@@ -1,6 +1,7 @@
 # The page
 
-The page is a small client for a room, for the demo story of plan 019. It
+The page uses the accepted [v2 design](../plans/027-artroom-usability/v2/design-review.md)
+for the demo story. It
 runs in a browser. It reads a room over the scope service's HTTP routes,
 and it signs acts with a key that the browser keeps. It judges nothing:
 whether an act takes effect is the scope's decision, and the page shows the
@@ -61,8 +62,8 @@ Open `<base URL>/page/` and go to Settings (`#/settings`). Give it:
 
 There are two ways to sign in:
 
-1. **Join on the page.** Paste the invitation link, press "Make a new
-   key", then "Join with the invitation link". The page signs membership's
+1. **Join on the page.** Paste the invitation link, press "Create key",
+   then "Join room". The page signs membership's
    `join` with the new key and the link's secret. Membership enrols the key
    as the invited member. The link is not kept. A link joins once; a
    second join with it is refused.
@@ -76,8 +77,8 @@ a new one before a read when the last one has ended. If membership gives
 no session (a key that is no active member's, or a deployment with no
 session secret), each read that can be signed goes as a signed read by the
 key, and the scope answers only where that key signed an entry in the
-window of an intent, about 15 minutes. Every screen says which of the two
-the page is using. The page then reads the directory's repository item for
+window of an intent, about 15 minutes. Record inspection says which read
+method the page is using. The page then reads the directory's repository item for
 the rules scope and the destination, and the member's standing in
 membership.
 
@@ -85,16 +86,17 @@ membership.
 
 | Address | Screen |
 |---|---|
-| `#/` | The room's issues and changes: the directory's index rows, each with its lane's own state. |
+| `#/` | Issues, with search and Open, Closed and All filters. Changes uses `#/?kind=change`. Each row keeps its lane's observed state. |
 | `#/issue/<scope>` | One issue: number, title, state and close reason, who opened it, assignees, conditions, body and comments. |
 | `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, its path, size and digest and any recorded publication commit; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. Immutable version rendering is unavailable. |
-| The site | The room and change screens offer separate **Latest published site** navigation to `/site/<directory>/HEAD/`. This shows the latest published branch, not an immutable preview of a recorded version. The original immutable-preview obligation remains owed. |
+| The site | Pages and **Open latest page** navigate to `/site/<directory>/HEAD/`. These show the latest branch, not an immutable rendered preview. Exact source preview verifies the selected retained signed proposal's subject, digest and size; rendered same-version links and assets remain separate work. |
 | `#/rules` | The rules of this room, as the rules scope holds them: the revision, the approvals the lanes count, the extents with their classes, approvals, approvers, checks and paths, whether the single-controller exception is declared, required checks, labels and the active definitions. It says who may change them: the members whose role holds `rules.publish`. |
 
-Every screen shows who the page acts as: the member's handle and role, or
-that the key is no active member's.
+The account control identifies the member. Record inspection retains the
+role, key and read-session evidence. The room switcher uses the recorded
+repository name; it does not invent a retained claim display name.
 
-**What you may do here.** Under the room, each issue, each change and the rules, the page
+**Actions.** Under the room, each issue, each change and the rules, the page
 lists the acts of that scope's definition that the signed-in member may
 sign now: each act whose grant action the member's role holds, and each act
 that a rule decides. It computes this the way `artroom acts` does, with the
@@ -106,6 +108,27 @@ reason and any guard name, unavailable, or mismatch. Before/after heads are
 separate observations; a refusal category alone does not show that the head
 stayed unchanged. A failed subsequent read keeps the known answer and reports
 observation unknown. Inspect the recorded result before another mutation.
+
+Ordinary forms use exact observed item and version defaults. Other forms
+remain under Inspect. A scope-bound in-memory fence blocks further signing
+while a request is pending, including after navigation. A lost submit reply
+keeps that scope read-only. Check status reads; it does not resubmit or treat
+a changed head as settlement. Generic submission does not retain its exact
+signed envelope across reload, so that recovery limit remains.
+
+The Rules editor changes approval counts and preserves complete checks,
+extents, labels and exception values. Only an actually offered `publish`
+action exposes it. Changes require before/after confirmation; cancellation
+and unchanged values sign nothing.
+
+When an explicitly supplied command-line config contains a full register
+reference, the page can read whether its current key may claim there.
+Create room appears only for an eligible key with a known member handle,
+Web Locks and dialog support. It never installs a register. Its private
+claim record retains exact founding and enrollment envelopes plus a separate
+recovery key before sending; Resume creation follows those same requests.
+The typed name is a local intent label. Native founding currently generates
+the repository name, which remains the displayed room identity.
 
 A value is read as `artroom act --set` reads it: a list or a record as
 JSON, a number for an item, `true` or `false`, and `@handle` for a member.
@@ -144,8 +167,6 @@ that the room's records show, with the record it comes from:
   publication's own outside operations.
 - **Live updates.** The page reads when a screen is drawn and after an
   act. It does not follow the scopes' streams.
-- **Editing the rules** is the generic form of `publish`, with the
-  extents as JSON. There is no rules editor.
 
 ## Tests
 
