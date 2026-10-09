@@ -1,0 +1,54 @@
+# U1 composed source check recipe: preparation-repair successor
+
+Source-only plan, not authorization or execution. U1 request197d4aac175f2c8582d58a8292ff9e8305f05630 / promise6694067f91de49473d471c97f8735e3909d323ef remains the owner. This supersedes the two-file selection in the original external plan without editing it.
+
+Frozen U1 successor eadb529facd19fa7a7c336da19edb1a9e2c0bd32, tree3a8fe002e7d80d1ec997f003a9551d522863173c, is clean/pushed on request/u1-preparation-repairs. The immutable body/delta packet is /tmp/artroom-u1-preparation-repairs-eadb-packet/packet.json, SHA256c113b68bcd565bae495054852c8cb7bf799f52a63dad755550174b9dba701f1e. Original d182 packet remains unchanged. No typecheck, build, test, discovery, browser, native, provider, audio or gate has run for this successor.
+
+## Composition before execution
+
+Use an isolated accepted clean base, actual C0 af33638b7dbc6d9128d3665f08fede3e300ebf5e and complete W1 owned source through45177075a8c2308063ee8b3d10059ac1761fa12e. C0's complete source includes its real definition/pin/test/README/type/root selection, not merely U1's three dependency copies. W1 must include its complete observe/head-stream implementation and exports, not merely the final correction. After actual C0 is composed, consume U1 authored6291c6e304305a84e79b951e15c9ec233aa4455c, f3bd3480b5fc3de3be52b05e01093baad046b43d, b4d8025a146bc844f10e5596d5bf750b107ef7c4, then d182cd5ee4f07ad28122bfa2bbc344294bcc1920 and eadb529facd19fa7a7c336da19edb1a9e2c0bd32. Do not consume dependency-copy3e96 as a second C0 implementation. Resolve actual conflicts explicitly and freeze exact composed head/tree/source manifests.
+
+No aliases may resolve an external worktree. Browser tsconfig's relative package source paths and bundler aliases point to THIS composed checkout. Preserve all existing normal gate projects; no root configuration/scripts/dependency/lock source changes are part of this initial recipe. F1 native establishment/enrollment/cohort and full counting acceptance remain separate obligations.
+
+## Exact supplemental selection after owner GO
+
+There are THREE Node entrypoints, exactly:
+
+- examples/counting/browser/client.test.ts
+- examples/counting/browser/voice-controller.test.ts
+- examples/counting/browser/app.test.ts
+
+The third file mounts actual app/view/controller over a fake DOM surface, gateway, memory custody and speech. It removes the joined participant through a published observation and checks the stable identity-owned original Check report remains reachable with no prepare, POST or speech. It is not actual browser/assistive-technology or native proof.
+
+Proposed separately captured steps from the composed repository root, STOP on any nonzero result:
+
+```sh
+task_u1_repo="$(pwd -P)"
+task_u1_evidence="$(mktemp -d /tmp/artroom-u1-composed.XXXXXX)"
+git rev-parse HEAD 'HEAD^{tree}' > "$task_u1_evidence/source.txt"
+git status --porcelain > "$task_u1_evidence/status.txt"
+node node_modules/typescript/bin/tsc -p examples/counting/browser/tsconfig.json > "$task_u1_evidence/types.log" 2>&1
+./node_modules/.bin/esbuild examples/counting/browser/client.test.ts examples/counting/browser/voice-controller.test.ts examples/counting/browser/app.test.ts --bundle --platform=node --format=esm --outdir="$task_u1_evidence/node" --out-extension:.js=.mjs --metafile="$task_u1_evidence/metafile.json" --alias:@generalbusiness/artroom-client="$task_u1_repo/packages/client/src/index.ts" --alias:@generalbusiness/artroom-bytes="$task_u1_repo/packages/bytes/src/index.ts" --alias:@generalbusiness/artroom-contract="$task_u1_repo/packages/contract/src/index.ts" > "$task_u1_evidence/build.log" 2>&1
+```
+
+Before Node starts, inspect the actual bounded metafile: require a regular file no larger than4MiB before reading/JSON parsing; inspect no more than10,000 input/output records. Normalize resolved paths; require exactly the three distinct source entrypoints above, one output each and no unexpected entryPoint. Require each expected .mjs output exists in the temporary node directory, no outside/symlink escape. Reject any source input resolved outside the composed checkout except existing dependency installation paths explicitly recorded against the reviewed lock/cache. Require actual W1 observe.ts/head-stream.ts/index.ts and client intent.ts, byte and contract sources resolved from the exact composed checkout, with C0 definition/pin and all three tests bound to their current Git blobs/SHA256. The metafile validates real bundler selection and dependency origin, not a hand-maintained expected count. Record the three output hashes and exact Node argv. Do not execute a source copy from /tmp/artroom-client-observe or an older SDK alias.
+
+Only after that preflight succeeds:
+
+```sh
+node --test "$task_u1_evidence/node/client.test.mjs" "$task_u1_evidence/node/voice-controller.test.mjs" "$task_u1_evidence/node/app.test.mjs" > "$task_u1_evidence/node.log" 2>&1
+```
+
+Existing locked esbuild0.28.1 is the proposed tool; no install/probe or unowned dependency fallback. Capture each command/head/tree/exit/time/cache/tool/concurrency and raw complete logs. Require actual named first-refusal gateway, Explicit Arm controller and roster-removal app cases once each, plus a terminal complete summary; a test count alone does not prove selection. Browser type include*.ts already includes app.test.ts; retain the frozen tsconfig rather than changing it to make a check pass. Before/after source must remain clean. All outputs stay outside the checkout.
+
+After successful supplemental checks and the exclusive owner decision, run the ONE normal npm run gate at the same exact composed head. Gate itself still does not select U1 browser Node/types without the separately commissioned permanent integration. File explicit supplemental evidence alongside the gate, with existing C0 counting/W1 client/all normal suites retained. Failure stops; no unchanged retry, timeout widening, sweep or scope reduction.
+
+## Changed source obligations and limits
+
+Repair coverage now includes malformed prepared envelope/Beside with zero inflight/POST, complete malformed-refusal classification, valid active-unknown archive fence, net archive quota policy, cached recorded phase remaining unresolved until fresh receipt/full-entry confirmation with exact complete raw custody handoff, and separate read-only Check versus exact definitely-unsent Resume. Resume requires fresh captured context/key/member/pin and exact original assigned token/deadline, all earlier attempts validated known refused; it never signs, prepares or speaks. Existing prepared command recovery remains distinct. Permanent IndexedDB atomicity/crash/abort/lock/reload/quota and real browser focus remain owed.
+
+The former malformed [unknown,refused] fixture fails validJournal before terminal archive and cannot distinguish removing terminal-only logic. The successor uses a valid single active unknown instead; redundant defenses may survive individual faults. No control result is claimed before authorized execution. The full-kind fake case is lane→task, an actual change.
+
+Oversized witness source assessment: idempotencyKey is contract text, not an OperationId; bytes/records.ts126 uses the wellFormed text predicate, with no fixed length ceiling. Its64KiB ASCII x string has a canonical form, and the fake fixture recomputes its Ed25519 signature over the changed intent with the same identity/full scope/kind/empty Beside and completion generation/serial/N. Therefore validEnvelope should not reject it as malformed. validReport calls fitsPending before completion binding; this record is necessarily larger than64KiB because the65536-character key alone consumes that many bytes plus JSON/envelope/completion/history overhead. It should reach the local byte-capacity refusal before save/POST, preserving old refusal history. This is static reasoning, not a checked pass, native admission or claim that a generated SDK operation ID has this size; SDK normally generates22 characters. If the future run fails earlier, retain the actual failure and correct the claim rather than treating this assessment as proof.
+
+Prior b4 fake/source results and earlier629 captures stay attributed to their exact heads, and external W1468 aliases do not prove current451 composition. No real HTTPS/native/IndexedDB/audio/provider/hosted/cross-device/full4073 acceptance is supplied here.
