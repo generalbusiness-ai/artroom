@@ -1,0 +1,37 @@
+{
+  "authorization": "921deb33066dbc81d20001654f4a4cc7051db503 SOURCE ONLY",
+  "head": "fb2432dea91f13c3811d2ab1b1d07b7b276b50f8",
+  "tree": "61af8c19f53b07b5b1e53c6464cdf76c05db7d3e",
+  "status": "",
+  "remote_branch_head": "fb2432dea91f13c3811d2ab1b1d07b7b276b50f8",
+  "changed_paths": [
+    "packages/scope/test/application-establish.test.ts"
+  ],
+  "execution": "NONE types/discovery/native/tests/control/gate",
+  "files": {
+    "source.diff": {
+      "bytes": 1269,
+      "sha256": "1aa473eaa4f4bbe4d56c3f9fb9383560c641b19fa72863b903a2b1dd6e9afd2e"
+    },
+    "assertion-preservation.json": {
+      "bytes": 6292,
+      "sha256": "6a11e104c42d4a09a962d9f91acb52b0f900779656f412a70aea616fbd5ff775"
+    },
+    "vitest.config.mjs": {
+      "bytes": 1957,
+      "sha256": "f24a1b66766654a6eb33fb5f2796115da024904e2705fd4649427164d845e32a"
+    },
+    "reader-authority-preflight.md": {
+      "bytes": 4251,
+      "sha256": "2b262753084b59bc718aa1127b32d557d1e82fd4b09fff11266db7ea7f2dafd3"
+    },
+    "sql-uncaught-source-disposition.md": {
+      "bytes": 5035,
+      "sha256": "c6f9fce91a7d22074fdc66998fc2a099d2e8ec81500c733be2c2efb072b49ffd"
+    },
+    "path-inventory.json": {
+      "bytes": 4295,
+      "sha256": "5f85c8194faf1be5ad3bba488b184213bb26484858e2a0cee70c1b08c9e1ebc1"
+    }
+  }
+}
