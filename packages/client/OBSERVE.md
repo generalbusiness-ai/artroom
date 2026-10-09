@@ -9,7 +9,11 @@ Supply a fixed `ObservationContext`: exact service origin, full scope and
 membership references, definition pin, member and key. `authenticate`
 obtains the caller's existing native read session; it must not enroll or
 replace that caller. `openHttpHeadStream` sends its token in Authorization,
-never in the URL. The current binding/MCP interfaces expose no equivalent
+never in the URL. Its stream-specific HeadStreamFetch requires supported
+redirect:error and response url/redirected/headers metadata; it rejects any
+redirect, changed response route or non-application/x-ndjson body before
+reading. The narrower ordinary Fetch type is not assumed to supply these
+guarantees. The current binding/MCP interfaces expose no equivalent
 stream, so they are unsupported unless an adapter actually supplies it.
 
 The `snapshot` callback is an adapter over actual authenticated reads.
@@ -36,7 +40,10 @@ reconnect reads current state and claims no missed-history replay.
 `current()` must remain true only for the application's captured context;
 call `cancel()` immediately when it changes. Checks after awaits and before
 emission reject late results; `refresh()` also detects a changed context.
-Cancel asks fetch/body to abort and resolves local waiting without depending
+A changed context suppresses ALL old UI emissions, including cancelled,
+so an old observer cannot clear a new renderer. Explicit cancel while the
+captured context remains current emits cancelled once. Cancel asks
+fetch/body to abort and resolves local waiting without depending
 on an upstream reader obeying cancellation. An ignoring callback may retain
 its own resources; the helper cannot physically drain it. No token/key is
 returned in observation states or diagnostic reasons.

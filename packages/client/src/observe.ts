@@ -55,7 +55,7 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
   const emit=(state:ObservationState<T>)=>{if(usable())options.emit(state);else cancel();};
   const retained=()=>last?{retained:last}:{};
   const check=(at:number)=>{if(!usable()||at!==generation)throw new Stopped();};
-  function cancel(){if(cancelled)return;cancelled=true;generation++;lifetime.abort();attempt?.abort();options.emit({status:"cancelled"});}
+  function cancel(){if(cancelled)return;cancelled=true;generation++;lifetime.abort();attempt?.abort();if(options.current())options.emit({status:"cancelled"});}
   const done=(async()=>{
     let failures=0;
     while(usable()){

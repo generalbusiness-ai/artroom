@@ -34,11 +34,11 @@ test("context cancellation rejects a late complete read and resolves despite an 
  const read=gate<ReturnType<typeof snapshot>>(),reading=gate(),states:ObservationState<number>[]=[];let current=true;let cancelled=0;
  const body={getReader:()=>({read:()=>{if(cancelled===0){cancelled=-1;return Promise.resolve({done:false,value:utf8(JSON.stringify({at:head(1)})+"\n")});}return new Promise<{done:boolean}>(()=>{});},cancel:async()=>{cancelled=1;}})} as ByteStream;
  const observer=observeScope({context,current:()=>current,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body}),snapshot:async()=>{reading.resolve();const value=await read.promise;return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s)});
- await reading.promise;current=false;observer.refresh();expect(states.at(-1)).toEqual({status:"cancelled"});observer.cancel();await observer.done;read.resolve(snapshot(2));await drain();expect(states.at(-1)).toEqual({status:"cancelled"});expect(states.some(s=>s.status==="current")).toBe(false);expect(cancelled).toBe(1);
+ await reading.promise;const before=states.length;current=false;observer.refresh();observer.cancel();await observer.done;read.resolve(snapshot(2));await drain();expect(states).toHaveLength(before);expect(states.some(s=>s.status==="current")).toBe(false);expect(cancelled).toBe(1);
 });
 
 test("HTTP opener uses header custody and reports unsupported without binding or signed-read fallback",async()=>{
- let url="",authorization="";const opened=await openHttpHeadStream(context.origin,scope,session(),new AbortController().signal,{fetch:async(u,init)=>{url=u;authorization=init?.headers?.["authorization"]??"";return{status:404,body:null};}});
+ let url="",authorization="";const opened=await openHttpHeadStream(context.origin,scope,session(),new AbortController().signal,{fetch:async(u,init)=>{url=u;authorization=init?.headers?.["authorization"]??"";return{status:404,body:null,headers:{get:()=>"application/json"},url:u,redirected:false};}});
  expect(opened).toEqual({ok:false,reason:"unsupported"});expect(url).toBe(`${context.origin}/v1/scopes/${scope.scope}/stream`);expect(url).not.toContain("token");expect(authorization).toBe("Session private-token");
 });
 
@@ -58,4 +58,20 @@ test("first head waiting has a bound and cancels its body rather than waiting in
  const body=stream(),states:ObservationState<number>[]=[];let observer:ReturnType<typeof observeScope<number>>;
  observer=observeScope<number>({context,current:()=>true,seconds:0.01,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{throw new Error("No head means no snapshot");},emit:s=>states.push(s),reconnectDelay:async()=>{observer.cancel();}});
  await drain();await vi.advanceTimersByTimeAsync(10);await observer.done;expect(states.some(s=>s.status==="unavailable"&&s.reason==="read-timeout")).toBe(true);expect(body.cancelled).toBe(1);
+});
+
+
+test("an old observer cannot clear a shared renderer after context switch, while explicit current cancellation emits once",async()=>{
+ const body=stream(),pending=gate<ReturnType<typeof snapshot>>(),started=gate();let current=true;let rendered="old";let emits=0;
+ const observer=observeScope({context,current:()=>current,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{started.resolve();const value=await pending.promise;return{ok:true,at:value.at,value,complete:true};},emit:state=>{emits++;rendered=state.status;}});
+ await drain();body.notice(1);await started.promise;current=false;rendered="new-context-view";const before=emits;observer.cancel();await observer.done;pending.resolve(snapshot(2));await drain();expect(rendered).toBe("new-context-view");expect(emits).toBe(before);expect(body.cancelled).toBe(1);
+ const statuses:ObservationState<number>[]=[];const second=observeScope<number>({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:false,reason:"unavailable"}),snapshot:async()=>{throw new Error("not reached");},emit:s=>statuses.push(s)});second.cancel();second.cancel();await second.done;expect(statuses.filter(s=>s.status==="cancelled")).toHaveLength(1);
+});
+
+test("HTTP stream opener requires exact response route, no redirect and native NDJSON media type before reading",async()=>{
+ for(const variant of["html","redirected","wrong-url"]){let cancels=0,reads=0;let policy="";
+  const body={getReader:()=>({read:async()=>{reads++;return{done:true};},cancel:async()=>{cancels++;}})} as ByteStream;
+  const opened=await openHttpHeadStream(context.origin,scope,session(),new AbortController().signal,{fetch:async(url,init)=>{policy=init.redirect;return{status:200,body,headers:{get:()=>variant==="html"?"text/html":"application/x-ndjson"},url:variant==="wrong-url"?url+"/another":url,redirected:variant==="redirected"};}});
+  expect(opened).toEqual({ok:false,reason:"unsupported"});expect(policy).toBe("error");expect(cancels).toBe(1);expect(reads).toBe(0);
+ }
 });
