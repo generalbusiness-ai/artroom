@@ -1,5 +1,17 @@
 # Screenshots of the page
 
+Final affected editor views are `editor-final-desktop.png`,
+`editor-final-narrow.png` and `editor-final-layout-zoom.png`.
+`editor-final-checks.json` records served Page source
+`f32026023adc8cfa98a9253a47af31b2c52ef1ba` and separately reused native
+response source `3d8757a69339c3b0d9d5a1b4fbdca298efdc5919`.
+Keyboard entry/preparation passed at 1024/320, with no act POST, unanswered
+response or browser error. The final assets include the LIST1 editor source,
+but these presentation checks use the earlier legacy declaration's recorded
+reads. Native LIST1 admission/freeze is covered by its separate scope witness.
+CSS enlargement is a layout check, not physical zoom or AT acceptance.
+Unchanged dialog/list/review captures below retain their original source.
+
 Written by `node packages/page/test/screens.mjs`, which says how they are made: the page as the scope Worker serves it at
 `/page/`, in Chromium, answered with the test Worker's recorded answers in the demo story, after README.md is published and
 while AGENTS.md waits for the controller.

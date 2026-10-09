@@ -1,0 +1,411 @@
+{
+  "servedSource": "f32026023adc8cfa98a9253a47af31b2c52ef1ba",
+  "servedTree": "a4550064261545fcdc1dc5794c2fff436848a494",
+  "servedAssets": {
+    "modulePath": "/tmp/artroom-manifest-composed/packages/scope/src/page-assets.ts",
+    "moduleSHA256": "3ecf8301b7013e9b995bcf17686600ed58d5d3c9aecdcad6dc02918493e853ad",
+    "htmlSHA256": "733e7911d876d00b5992cee64dbc8abbd47f957e839f8f33435bccdd677cbb61",
+    "jsSHA256": "4abf28646eb2e3e9403301efa947e7c49d5fe085d304745995a28fb1bbf3b9f6"
+  },
+  "nativeResponses": {
+    "source": "3d8757a69339c3b0d9d5a1b4fbdca298efdc5919",
+    "tree": "ef60c604288e0460745df33f07fee6ba7f8bb41f",
+    "recordSHA256": "4fa53d879722801a62b8ce6759234c08dcf93d7ab358a6b1a51a57b92beeec86",
+    "fixture": {
+      "destinationDefinition": "platform:destination@3",
+      "changeDefinition": "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+      "workflow": "legacy one-file manifest on current CLI cohort; no manifest-list proposal"
+    },
+    "reused": true
+  },
+  "proof": "Final asset presentation and zero-act preparation over earlier native responses; no newly executed native/provider/hosted acceptance. LIST1 native workflow is separate evidence.",
+  "playwright": "1.63.0",
+  "chromium": "153.0.8010.12",
+  "fallback": "Browser plugin not available; cached Playwright1.63 used",
+  "reports": [
+    {
+      "width": 1024,
+      "keyboardEntry": true,
+      "initialTitleFocus": true,
+      "keyboardPrepare": true,
+      "confirmationNotSubmitted": true,
+      "mutationPOSTs": 0,
+      "layout": {
+        "title": "Artroom",
+        "url": "https://scopes.test/page/#/change/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+        "meaningful": true,
+        "overlay": false,
+        "overflow": false,
+        "inputs": [
+          {
+            "label": "Proposal title",
+            "fontSize": 16,
+            "disabled": true
+          },
+          {
+            "label": "Target file path",
+            "fontSize": 16,
+            "disabled": true
+          },
+          {
+            "label": "Edited text",
+            "fontSize": 16,
+            "disabled": true
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Confirm new proposal",
+            "height": 62
+          },
+          {
+            "text": "Back to edit",
+            "height": 62
+          }
+        ]
+      },
+      "responses": [
+        {
+          "method": "POST",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a/sessions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/retained/definition/sha256%3Ad86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/proposal",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq/items/publication",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq/history",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/manifest",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/entries/5",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/review",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/review-request",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/job",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/link",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/merge",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/comment",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a/sessions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/entries/5",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_bj6ht3ud4sidqtzftyxjeyuhddm4cnith7lnbuvkdpbvesj4x6oq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_bj6ht3ud4sidqtzftyxjeyuhddm4cnith7lnbuvkdpbvesj4x6oq/retained/definition/sha256%3Ad86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        }
+      ],
+      "unanswered": [],
+      "errors": [],
+      "screenshot": "/tmp/artroom-final-editor-capture-copy/editor-prepared-1024.png"
+    },
+    {
+      "width": 320,
+      "keyboardEntry": true,
+      "initialTitleFocus": true,
+      "keyboardPrepare": true,
+      "confirmationNotSubmitted": true,
+      "mutationPOSTs": 0,
+      "layout": {
+        "title": "Artroom",
+        "url": "https://scopes.test/page/#/change/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+        "meaningful": true,
+        "overlay": false,
+        "overflow": false,
+        "inputs": [
+          {
+            "label": "Proposal title",
+            "fontSize": 16,
+            "disabled": true
+          },
+          {
+            "label": "Target file path",
+            "fontSize": 16,
+            "disabled": true
+          },
+          {
+            "label": "Edited text",
+            "fontSize": 16,
+            "disabled": true
+          }
+        ],
+        "buttons": [
+          {
+            "text": "Confirm new proposal",
+            "height": 44
+          },
+          {
+            "text": "Back to edit",
+            "height": 44
+          }
+        ]
+      },
+      "responses": [
+        {
+          "method": "POST",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a/sessions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/retained/definition/sha256%3Ad86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/proposal",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq/items/publication",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq/history",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/manifest",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/entries/5",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/review",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/review-request",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/job",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/link",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/merge",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/items/comment",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a/sessions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_wdz3fx27ysd5ftfqyfgmwqtpfi43ysntxxm53psw5ricy3k3le3a",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_lwl2ysee7ci2or5comzhybln3gkg5iexbjkx5n35tulwkskv3d2q/entries/5",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_bj6ht3ud4sidqtzftyxjeyuhddm4cnith7lnbuvkdpbvesj4x6oq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_bj6ht3ud4sidqtzftyxjeyuhddm4cnith7lnbuvkdpbvesj4x6oq/retained/definition/sha256%3Ad86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_2toxmlqnpa6irogfkyoyr3f4x5ax4yp2dvkn6jtkrqx6nyzfbxnq",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/v1/scopes/sc_exftjb4pu5z4tsnjrmj7slvtsq5skyxn5wue5yunh5lhlxpqibga",
+          "status": 200
+        }
+      ],
+      "unanswered": [],
+      "errors": [],
+      "screenshot": "/tmp/artroom-final-editor-capture-copy/editor-prepared-320.png"
+    }
+  ]
+}
