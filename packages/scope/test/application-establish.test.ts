@@ -95,7 +95,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     if (!issued.ok) throw new Error("the actual admin receives a read session");
     expect((await lifetime.wait(() => routed(`${SERVICE}/v1/scopes/${G.name}`, { headers: { authorization: issued.session.reader() } }))).status).toBe(200);
 
-    const secret = "native-member-invitation";
+    const secret = "native-member-invitation-fixture-32-bytes";
     const invitation = await M.did(rita, "invite-member", { fields: { handle: "@sam", role: "member", inviteHash: textDigest(secret), inviteEnds: soon(60) } });
     await M.did(sam, "join", { fields: { invitation, secret } });
     const bytes = canonicalize(counting);
