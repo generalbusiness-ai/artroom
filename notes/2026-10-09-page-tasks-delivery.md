@@ -97,7 +97,13 @@ lane-definition recording caused by a warm cache. Each received a concrete
 source or recorder correction; no native outcome was fabricated. Later affected
 editor captures use final served assets with the earlier native GET record,
 reporting those two source identities separately. Unaffected dialog/review/list
-captures are reused. One coordinated final gate remains owed.
+captures are reused. Final affected editor captures served source
+`f32026023adc8cfa98a9253a47af31b2c52ef1ba`, with native response provenance
+separately bound to `3d8757a6`. At 1024 and 320, keyboard entry/preparation,
+one comparison warning, no act POST, no unanswered reply and no browser error
+passed; root inspected the final narrow image. `editor-final-checks.json`
+and its three public PNGs retain this bounded presentation evidence. One
+coordinated final gate remains owed.
 
 First-use request `d01aa495` remains separate. Its exact preset assurance review
 and native setup witness do not complete invitation/reload custody, operator

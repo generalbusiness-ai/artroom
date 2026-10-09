@@ -36,7 +36,11 @@ native immutable publication proof and actual @3 compatibility witness from
 `d02e34f1`. Page task source and authenticated task data are now composed
 through `5d269362` and `4feaaf70`, with rebuilt assets. No new coordinated
 gate or deployment has run. Planner `561fce0b` adds the bounded one-file LIST1
-editor freeze step and verified frozen-source preview; that source is in progress.
+editor freeze step and verified frozen-source preview; both are now composed
+through `520383b4` and `caa40c9a`. Material source is frozen with generated
+assets `f3202602`; current delivery and final affected capture evidence follow
+in `notes/2026-10-09-page-tasks-delivery.md`. The next single coordinated gate
+will bind the complete committed candidate, not an earlier partial head.
 
 A4's intended single preview trace accidentally selected 42 files and 148
 tests because inherited include arrays were merged. The process passed, but
