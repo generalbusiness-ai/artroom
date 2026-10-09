@@ -109,11 +109,13 @@ no uncaught canceler diagnostic. This does not identify or repair the earlier
 diagnostic; A4's negative isolation result and dependency warnings remain
 separate. Raw gate output is `/tmp/artroom-page-v2-gate.log`; phase logs are
 in `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.azGmMU9FdF`.
+Gate SHA-256: `a874ac880f8eba9a27f8fa2a32f05261874437d9f550a0350ef9932a40c3afce`;
+raw test SHA-256: `58e94d7886a79f6d1045d6f4ba3f662265ca6467c639de966e1bc3ed0cec5984`.
 
 Planner's local-label display correction `59a6744c` arrived after this gate
 started. The follow-up changes the browser settings label binding, switcher
-presentation, its focused handler witness and rebuilt assets. Seven affected
-handler tests and Page source/test types pass. A focused 320px light/dark
+presentation, its focused handler witnesses and rebuilt assets. Eight affected
+checks, including generated-asset parity, and Page source/test types pass. A focused 320px light/dark
 browser observation retains both names in one switcher, verifies 16px editing
 and a 50px target, and rejects a label bound to another membership incarnation.
 It uses actor-bound native reads of an existing room and an explicitly seeded
@@ -121,3 +123,10 @@ private local label; no claim completion is fabricated. The after-gate evidence
 code adds one recorder mode and the native recorded-name field to its fixture.
 The gate is not relabelled as the later head. Complete
 independent Source review and landing remain owed.
+
+A narrow peer read found and verified the repair of a late-draw label race.
+Final DOM publication checks the original room context; the displayed local
+label also matches the loaded directory and full membership reference. Its
+deterministic witness prevents an old room's content from borrowing a newly
+selected room's label. The final follow-up was verified directly; no whole
+suite was repeated.
