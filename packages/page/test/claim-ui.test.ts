@@ -28,7 +28,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   let redraw!: () => void;
   let finish!: (value: unknown) => void;
   let attempted = gate();
-  const claim = vi.fn(() => { attempted.resolve(); return new Promise((resolve) => { finish = resolve; }); });
+  const claim = vi.fn((..._args: unknown[]) => { attempted.resolve(); return new Promise((resolve) => { finish = resolve; }); });
   vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value, keyIdOfSecret: () => "key" }));
   vi.doMock("../src/claim.ts", () => ({ allowedClaim: async () => { if (!eligible) throw new Error("Not founder"); return { register, definition: "platform:register@2" }; }, claimRoom: claim }));
   vi.doMock("../src/data.ts", () => ({
@@ -55,13 +55,14 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(dialog.textContent).toContain("Resume creation");
     attempted = gate(); form.fire("submit"); await attempted.promise;
     expect(claim).toHaveBeenCalledTimes(2);
-    expect(claim.mock.calls[1]).toEqual(claim.mock.calls[0]); // Same adapter/binding/label, no --again or new key.
+    expect(claim.mock.calls[1]!.slice(0, 4)).toEqual(claim.mock.calls[0]!.slice(0, 4)); // Same adapter/binding/label, no --again or new key.
+    expect((claim.mock.calls[1]![4] as { current(): boolean }).current()).toBe(true);
     failSave = true;
     finish({ repository: { directory: { scope: "created-room" }, membership: settings.place.membership }, label: "Local intent", pending: false, outcome: { code: 0, lines: [] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
     expect(settings.place.directory).toBe("room");
     expect(settings.label?.text).toBe("Original local label");
-    expect(dialog.textContent).toContain("Creation is recorded, but this browser could not save");
+    expect(dialog.textContent).toContain("storage of the room settings could not be verified");
     expect(dialog.textContent).toContain("created-room");
     expect(root.find((element) => element.tag === "dialog")).toBe(dialog);
     expect(save).toHaveBeenCalledTimes(1);
@@ -69,6 +70,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     attempted = gate(); form.fire("submit"); await attempted.promise;
     expect(claim).toHaveBeenCalledTimes(3);
     settings = { ...settings, place: { ...settings.place, directory: "another-room" } };
+    expect((claim.mock.calls[2]![4] as { current(): boolean }).current()).toBe(false);
     finish({ repository: { directory: { scope: "new-room" }, membership: settings.place.membership }, label: "Local intent", pending: false, outcome: { code: 0, lines: [] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
     expect(save).not.toHaveBeenCalled();
@@ -85,6 +87,21 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     settings = { ...settings, place: { ...settings.place, directory: "different-room" } };
     rendered = gate(); redraw(); await rendered.promise;
     expect(root.textContent).not.toContain("Useful local name");
+    const queued = gate(), releaseQueue = gate();
+    const posts = vi.fn();
+    claim.mockImplementationOnce(async (...args: unknown[]) => {
+      queued.resolve(); await releaseQueue.promise;
+      if (!(args[4] as { current(): boolean }).current()) throw new Error("The claim context changed before submission. Nothing was sent.");
+      posts();
+      return { repository: null, pending: true, label: "Queued local name", outcome: { code: 1, lines: [] } };
+    });
+    root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
+    const queuedDialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    queuedDialog.find((element) => element.tag === "input")!.value = "Queued local name";
+    queuedDialog.find((element) => element.tag === "form")!.fire("submit"); await queued.promise;
+    settings = { ...settings, secret: "another-device" };
+    releaseQueue.resolve(); for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    expect(posts).not.toHaveBeenCalled();
     eligible = false; rendered = gate(); redraw(); await rendered.promise;
     expect(root.find((element) => element.tag === "button" && element.textContent === "Create room")).toBeUndefined();
     eligible = true; locked = false; rendered = gate(); redraw(); await rendered.promise;

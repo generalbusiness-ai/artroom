@@ -33,14 +33,15 @@ test("Settings ignores a legacy service origin with a message before requests an
   const membership = { kind: "membership", scope: `sc_${"b".repeat(51)}a`, inc: newIncarnation(new Uint8Array(16).fill(2)) };
   const legacy = JSON.stringify({ service: "https://another.test", place: { directory: `sc_${"a".repeat(52)}`, membership }, secret: b64url(new Uint8Array(32).fill(7)) });
   let saved = legacy;
-  let storageFailure: "none" | "throw" | "drop" = "none";
+  let storageFailure: "none" | "throw" | "drop" | "readback" = "none";
+  let failReadback = false;
   let redraw!: () => void;
   let requested!: () => void;
   const firstRequest = new Promise<void>((resolve) => { requested = resolve; });
   const fetch = vi.fn((_address: string) => { requested(); throw new Error("Scripted unavailable service"); });
   vi.stubGlobal("document", { createElement: (tag: string) => new Element(tag), getElementById: () => root });
   vi.stubGlobal("location", location);
-  vi.stubGlobal("localStorage", { getItem: () => saved, setItem: (_key: string, value: string) => { if (storageFailure === "throw") throw new Error("Storage full"); if (storageFailure !== "drop") saved = value; } });
+  vi.stubGlobal("localStorage", { getItem: () => { if (failReadback) { failReadback = false; throw new Error("Readback unavailable"); } return saved; }, setItem: (_key: string, value: string) => { if (storageFailure === "throw") throw new Error("Storage full"); if (storageFailure !== "drop") saved = value; if (storageFailure === "readback") failReadback = true; } });
   vi.stubGlobal("window", { addEventListener: (_name: string, handler: () => void) => { redraw = handler; } });
   vi.stubGlobal("fetch", fetch);
   try {
@@ -75,16 +76,26 @@ test("Settings ignores a legacy service origin with a message before requests an
     root.find((element) => element.tag === "form")!.fire("submit");
     expect(saved).toBe(previous);
     expect(location.hash).toBe("#/settings");
-    expect(root.textContent).toContain("could not save the settings");
+    expect(root.textContent).toContain("settings could not be verified");
     storageFailure = "drop";
     root.find((element) => element.attrs["id"] === "new-key")!.fire("click");
     expect(saved).toBe(previous);
     expect(location.hash).toBe("#/settings");
-    expect(root.textContent).toContain("existing key remains selected");
+    expect(root.textContent).toContain("new key could not be verified");
     redraw();
     expect(root.find((element) => element.attrs["name"] === "room")!.textContent).toContain("an unfinished invitation");
     expect(JSON.parse(saved)).toEqual({ place, secret });
     expect(fetch).not.toHaveBeenCalled();
+    // A write can succeed even when its verification read fails. The message
+    // cannot promise that the old key is still selected in that case.
+    root.find((element) => element.attrs["name"] === "room")!.value = "";
+    root.find((element) => element.attrs["name"] === "secret")!.value = replacement;
+    storageFailure = "readback";
+    root.find((element) => element.tag === "form")!.fire("submit");
+    expect(JSON.parse(saved)).toEqual({ place, secret: replacement });
+    expect(location.hash).toBe("#/settings");
+    expect(root.textContent).toContain("Check the saved room and key before another action");
+    expect(root.textContent).not.toContain("previous room and key remain selected");
     storageFailure = "none";
     // The first real session request after migration uses the page's Worker,
     // even if a stale address is injected into the saved data again.

@@ -157,13 +157,13 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
     message.textContent = "Creating room"; message.removeAttribute("hidden");
     void (async () => {
       try {
-        const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle });
+        const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle, current: () => settingsContext(settings() ?? { place: null, secret: "" }) === binding });
         if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
         if (result.repository) {
           const place = { directory: result.repository.directory.scope, membership: result.repository.membership };
           const label: LocalLabel = { text: result.label, place, ...(kept.register ? { register: kept.register } : {}) };
           if (!keep({ ...kept, place, label })) {
-            message.textContent = `Creation is recorded, but this browser could not save the room settings. Directory ${result.repository.directory.scope}; membership ${result.repository.membership.scope}. Keep the private claim record. Resume creation to verify the original proof and try saving again.`;
+            message.textContent = `Creation is recorded, but storage of the room settings could not be verified. Check the saved room and key before another action. Directory ${result.repository.directory.scope}; membership ${result.repository.membership.scope}. Keep the private claim record. Resume creation to verify the original proof before trying to save again.`;
             submit.textContent = "Resume creation";
             return;
           }
@@ -172,7 +172,10 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
           message.textContent = result.outcome.lines.join(" "); submit.textContent = result.pending ? "Resume creation" : "Create room";
           if (result.pending) name.setAttribute("disabled", ""); else name.removeAttribute("disabled");
         }
-      } catch (error) { message.textContent = error instanceof Error ? error.message : "Creation could not be confirmed. Resume with the saved request."; submit.textContent = "Resume creation"; }
+      } catch (error) {
+        if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+        message.textContent = error instanceof Error ? error.message : "Creation could not be confirmed. Resume with the saved request."; submit.textContent = "Resume creation";
+      }
       finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
     })();
   });
@@ -260,7 +263,7 @@ function settingsScreen(): HTMLElement {
     return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}), ...(label ? { label } : {}) };
   };
   const save = (next: Settings) => {
-    if (!keep(next)) { tell(false, "This browser could not save the settings. Your previous room and key remain selected."); return; }
+    if (!keep(next)) { tell(false, "Storage of these settings could not be verified. Check the saved room and key before another action."); return; }
     roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
     const sameRoute = location.hash === "#/";
     location.hash = "#/";
@@ -268,7 +271,7 @@ function settingsScreen(): HTMLElement {
   };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
   room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "This browser could not save a new key. The existing key remains selected."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {
