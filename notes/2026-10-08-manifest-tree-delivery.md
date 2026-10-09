@@ -58,7 +58,8 @@ deployment image, container, fresh authority or provider acceptance follows.
 The planner must judge the expired reservation's explicit cleanup trigger
 (`f1b87a0b017aa745ed85f77f4ed3154d36d59eb7`), the historical one-file-form
 interpretation (`f001cfc222a2df5803491cc7ecd6584421c28846`) and the demo
-proposer's existing member-versus-maintainer authority (`aa0eef59`). The
+proposer's existing member-versus-maintainer authority
+(`aa0eef599d6e1e20b45885b4eb3ead5b44e67102`). The
 current optional technical demo uses a maintainer; it is not claimed to meet
 the request's explicit member-role scene.
 
