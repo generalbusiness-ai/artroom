@@ -22,10 +22,13 @@ import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contr
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { RoomOpening, roomContext, routeOf, type Destination } from "./shell.ts";
+import type { ActionContext } from "./actions.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
 let roomDraft = "";
+let roomDraftContext = "";
 /** What this browser keeps: the room (no secret of it) and the key. */
 interface Settings { place: Place | null; secret: string }
 let ignoredSavedAddress = false;
@@ -59,26 +62,54 @@ const sessionOf = (kept: Settings): Session => {
 const root = (): HTMLElement => document.getElementById("page")!;
 /** The number of the latest draw: a slower, earlier draw that ends after a later one shows nothing. */
 let drawing = 0;
-const showFor = (n: number) => (...children: HTMLElement[]) => { if (n === drawing) root().replaceChildren(...children); };
+const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
+  if (n !== drawing) return;
+  root().replaceChildren(...children);
+  if (focus) document.getElementById("page-main")?.focus?.();
+};
 
 
-let opened: { key: string; room: Room } | null = null;
+const opened = new RoomOpening<Room>();
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 
 async function roomOf(kept: Settings, place: Place): Promise<Room> {
-  const id = `${location.origin} ${place.directory} ${kept.secret}`;
-  if (opened?.key === id) return opened.room;
-  opened = { key: id, room: await openRoom(sessionOf(kept), place) };
-  return opened.room;
+  return opened.get(roomContext(location.origin, place, kept.secret), () => openRoom(sessionOf(kept), place));
+}
+
+/** Room and account labels come from the recorded read, never prototype fixtures. */
+function shell(destination: Destination, room: Room | null, ...content: HTMLElement[]): HTMLElement[] {
+  const kept = settings();
+  const directory = room?.directory ?? kept?.place?.directory;
+  const name = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
+  const account = room?.me?.handle || "Your key";
+  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}` }, h("span", { class: "room-name" }, name), h("span", { "aria-hidden": "true" }, "⌄"));
+  const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}` }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
+  const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
+    ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) =>
+      h("a", { class: "nav-item", href, ...(destination === kind ? { "aria-current": "page" } : {}) }, label)));
+  const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
+  skip.addEventListener("click", (event) => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
+  return [skip,
+    h("aside", { class: "rail" }, h("div", { class: "wordmark" }, "Artroom"), roomSwitch(), navigation(),
+      h("div", { class: "rail-bottom" }, h("a", { class: "nav-item", href: "#/settings", ...(destination === "settings" ? { "aria-current": "page" } : {}) }, "Settings"), accountControl())),
+    h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, roomSwitch(), accountControl()), navigation(true)),
+    h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
-async function panelFor(room: Room, scope: ScopeId): Promise<HTMLElement> {
+async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}): Promise<HTMLElement> {
+  const currentContext = () => {
+    const current = settings();
+    return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
+  };
   const send = (kind: string, on: string, typed: Record<string, string>) => {
     void (async () => {
       try {
+        if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         const offered = (await actsOn(room, scope)).acts.find((a) => a.kind === kind);
+        if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
+        if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
         const fields: Record<string, FieldValue> = {};
         for (const [name, text] of Object.entries(typed)) fields[name] = fieldValue(room, offered?.fields.find((f) => f.name === name)?.type ?? "text", text);
         const target = /^\d+$/.test(on) ? Number(on) : null;
@@ -92,11 +123,14 @@ async function panelFor(room: Room, scope: ScopeId): Promise<HTMLElement> {
     })();
   };
   const last = lastActs.get(actAssociation(room, scope));
-  return actsPanel(await actsOn(room, scope), send, last ? answerLine(last) : null);
+  const uncertain = context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
+  return actsPanel(await actsOn(room, scope), send, last ? answerLine(last) : null, { ...context, uncertain, draftKey: actAssociation(room, scope), refresh: () => { void draw(); } });
 }
 
 function settingsScreen(): HTMLElement {
   const kept = settings();
+  const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null]);
+  if (roomDraftContext !== context) { roomDraft = ""; roomDraftContext = context; }
   const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
   const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
   const said = h("p", { class: "answer", role: "status", hidden: "" });
@@ -105,9 +139,9 @@ function settingsScreen(): HTMLElement {
   const form = h("form", {},
     h("label", {}, "Room ", room),
     h("label", {}, "Key ", secret),
-    h("button", { type: "submit" }, "Keep in this browser"),
-    h("button", { type: "button", id: "new-key" }, "Make a new key"),
-    h("button", { type: "button", id: "join" }, "Join with the invitation link"),
+    h("button", { type: "submit", class: "primary" }, "Save settings"),
+    h("button", { type: "button", id: "new-key" }, "Create key"),
+    h("button", { type: "button", id: "join" }, "Join room"),
   );
   const read = (newSecret: string | null): Settings | null => {
     const typed = (room as HTMLTextAreaElement).value.trim();
@@ -115,9 +149,15 @@ function settingsScreen(): HTMLElement {
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
     return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
   };
-  const save = (next: Settings) => { keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened = null; location.hash = "#/"; };
+  const save = (next: Settings) => {
+    keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
+    const sameRoute = location.hash === "#/";
+    location.hash = "#/";
+    if (sameRoute) queueMicrotask(() => { void draw(); });
+  };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; keep(next); opened = null; void draw(); } });
+  room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret]); keep(next); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {
@@ -133,26 +173,42 @@ function settingsScreen(): HTMLElement {
     })();
   });
   const key = kept ? unb64url(kept.secret) : null;
-  return h("main", {}, h("h1", {}, "Settings"),
+  return h("main", { class: "screen settings-screen" }, h("h1", {}, "Settings"),
     h("p", {}, key && key.length === 32 ? `This browser keeps key ${keyIdOfSecret(key)}.` : "This browser keeps no key yet."),
-    h("p", {}, kept?.place ? `The room: directory ${kept.place.directory}, membership ${kept.place.membership.scope}.` : "No room is set yet."),
-    h("p", { class: "muted" }, "A key is a member's once membership enrols it. With an invitation link from artroom invite, make a new key here and join with the link; or paste the key that the command line keeps in keys/device.key with its config.json. The page shows a key ID, never the key."),
-    said, form);
+    said, form,
+    h("details", { class: "inspection" }, h("summary", {}, "Inspect connection"),
+      h("p", {}, kept?.place ? `Directory ${kept.place.directory}; membership ${kept.place.membership.scope}.` : "No room is set yet."),
+      h("p", { class: "muted" }, "An invitation enrols your key in membership. You can also use the command line's config.json and device.key. The page shows a key ID, never the key.")));
 }
 
-async function draw(): Promise<void> {
-  const show = showFor(++drawing);
-  const path = location.hash.replace(/^#/, "") || "/";
+async function draw(focus = false): Promise<void> {
+  const show = showFor(++drawing, focus);
+  const route = routeOf(location.hash);
   const kept = settings();
-  if (path === "/settings" || !kept || !kept.place || ignoredSavedAddress) return show(settingsScreen());
+  if (route.destination === "settings" || !kept || !kept.place || ignoredSavedAddress) return show(...shell("settings", null, settingsScreen()));
+  let room: Room | null = null;
   try {
-    const room = await roomOf(kept, kept.place);
-    const [, kind, scope] = path.split("/") as [string, string?, string?];
-    const last = (s: string): Answer | null => lastActs.get(actAssociation(room, s as ScopeId))?.answer ?? null;
-    if (kind === "issue" && scope) return show(issueScreen(room, await loadIssue(room, scope as ScopeId)), await panelFor(room, scope as ScopeId));
-    if (kind === "change" && scope) return show(changeScreen(room, await loadChange(room, scope as ScopeId), last(scope)), await panelFor(room, scope as ScopeId));
-    if (kind === "rules") return show(rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules));
-    return show(roomScreen(room, await listLanes(room)), await panelFor(room, room.directory));
+    room = await roomOf(kept, kept.place);
+    const { destination, scope } = route;
+    const loaded = room;
+    const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
+    if (destination === "issues" && scope) {
+      const issue = await loadIssue(room, scope as ScopeId);
+      const defaults = issue.intent === undefined ? undefined : Object.fromEntries(["edit-own", "edit-any", "close-own", "close-any", "reopen-own", "reopen-any"].map((kind) => [kind, { on: issue.intent! }]));
+      return show(...shell(destination, room, issueScreen(room, issue), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), primary: ["comment", "edit-own", "close-own", "close-any", "reopen-own"] })));
+    }
+    if (destination === "changes" && scope) {
+      const change = await loadChange(room, scope as ScopeId);
+      const current = change.manifests.find((manifest) => manifest.state === "current");
+      const defaults = {
+        ...(current ? Object.fromEntries(["merge", "review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
+        ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
+      };
+      const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
+      return show(...shell(destination, room, changeScreen(room, change, last(scope)), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, primary: ["comment", "review-verdict", "merge", "request-review-own", "ready-own"], choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
+    }
+    if (destination === "rules") return show(...shell(destination, room, rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules, { primary: ["publish"] })));
+    return show(...shell(destination, room, roomScreen(room, await listLanes(room), destination === "changes" ? "change" : "issue"), await panelFor(loaded, loaded.directory, { primary: [destination === "changes" ? "open-pr" : "open-issue"] })));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];
@@ -160,9 +216,9 @@ async function draw(): Promise<void> {
       const context = { session: sessionOf(kept), directory: kept.place.directory, membership: kept.place.membership };
       known = [...lastActs.entries()].filter(([association, result]) => association === actAssociation(context, result.scope)).map(([, result]) => result);
     } catch { /* Invalid current settings cannot match a known result. */ }
-    show(failureScreen(error, known));
+    show(...shell(route.destination, room, failureScreen(error, known)));
   }
 }
 
-window.addEventListener("hashchange", () => { void draw(); });
+window.addEventListener("hashchange", () => { void draw(true); });
 void draw();
