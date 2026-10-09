@@ -1,0 +1,342 @@
+{
+  "head": "d511fdc7ccce408c3f82388dafe07615e14d8093",
+  "tree": "8c217494e43fa382a68a3ec2b352fb497a52890c",
+  "base": "bb5bf627d6f3765623df45117299953c546a99ee",
+  "base_tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+  "main": "8479057c1ce50f01a5de488c2f6c029b45be65e7",
+  "critical": "011542c4d541571d0af7cfadf1a026295c32ad91",
+  "checks": [
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/README.md",
+      "bytes": 6820,
+      "sha256": "4655882ec174abb31ba19628db667f9ab85404769be87d4f5eed3cffe408d09c",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/definition.json",
+      "bytes": 15124,
+      "sha256": "6af37c6054184152f7a4c725721ae6b11729f1e2efada00382cf8185150e72c3",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/definition.test.ts",
+      "bytes": 10974,
+      "sha256": "2c9294653eac26ef0a0760f2a4376cd824f4b40fb2a1a969013ef649a130365d",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/definition.ts",
+      "bytes": 9344,
+      "sha256": "9019c69ddafbf31e0208deebd54af35eaaa1506f94684a5df18b0cd43de2c006",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/pin.ts",
+      "bytes": 216,
+      "sha256": "cb0d6a6c905060ff680dd77c137235eed40060d0e6195254531981227a1b4411",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/tsconfig.json",
+      "bytes": 593,
+      "sha256": "ecf470a75cec9b5c938273fdd38f564d0b1c4ce05973f71326278680654a8b5f",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "examples/counting/vitest.config.ts",
+      "bytes": 919,
+      "sha256": "2e33d7e35c17d78f77842d218965788346108817853b8e1200736bb3554729b1",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "package.json",
+      "bytes": 565,
+      "sha256": "2cb30982c01399a33e8358d98d1cbd9b26bbafe386ee0ee9b459827ce9750dca",
+      "byte_equal": true
+    },
+    {
+      "family": "C0",
+      "source": "af33638b7dbc6d9128d3665f08fede3e300ebf5e",
+      "path": "vitest.config.ts",
+      "bytes": 3329,
+      "sha256": "2803c8ccd5ddb05062d56cd79535b843f94b278e93d90fd62dc87ff5894b2f6b",
+      "byte_equal": true
+    },
+    {
+      "family": "W1",
+      "source": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+      "path": "packages/client/OBSERVE.md",
+      "bytes": 4132,
+      "sha256": "75398e61112d9ed16f1b2fb102dcad5f9de89e681c73a9aa17a92a20ebf2e37d",
+      "byte_equal": true
+    },
+    {
+      "family": "W1",
+      "source": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+      "path": "packages/client/src/head-stream.ts",
+      "bytes": 6015,
+      "sha256": "2b658504fd29220fa738942bb6c505cf38691fe6737603d831d178683dbab5d2",
+      "byte_equal": true
+    },
+    {
+      "family": "W1",
+      "source": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+      "path": "packages/client/src/index.ts",
+      "bytes": 337,
+      "sha256": "f9296e28c25d53540c859384a8bcae2b4264ec3ea45c99994a9d2042b69a5578",
+      "byte_equal": true
+    },
+    {
+      "family": "W1",
+      "source": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+      "path": "packages/client/src/observe.ts",
+      "bytes": 12197,
+      "sha256": "adbde026fe59f2bfee8e59ef8fa27c43e54d9d68ab07008166926f3feea07be8",
+      "byte_equal": true
+    },
+    {
+      "family": "W1",
+      "source": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+      "path": "packages/client/test/observe.test.ts",
+      "bytes": 18059,
+      "sha256": "a4b79e9c7ab09e42e69da6e661efffd34d86956d080c6caeb8df9973547dd70e",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/app.test.ts",
+      "bytes": 9185,
+      "sha256": "777f34aeb39121484236e021812f51e6a3288fa155c5420e427e7b2f2ce8771f",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/app.ts",
+      "bytes": 5797,
+      "sha256": "44ccc4c865a864fdd8f3941de753ad80366a52c13d4650f1e3d5794530461d76",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/client.test.ts",
+      "bytes": 15737,
+      "sha256": "946253d93df1f200af88e83a4a6c9d772ba19bb055a2a9b8e7c075ce6c8db578",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/client.ts",
+      "bytes": 14244,
+      "sha256": "a7313fb5b0ec449e35c0d40a316642c9cb4ab5f3db1c92779d568cdf1abad0cb",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/design/counting-concept.png",
+      "bytes": 1084738,
+      "sha256": "f3903851e5ea368d38cc1d38bddc265ba414fd8c35cdf767f79e5ce4bde2f895",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/design/implementation.md",
+      "bytes": 3841,
+      "sha256": "082af58b2b13321841806fa3a8fbade44a6bcdd652f754a7e78f4a31f0731aea",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/dispatcher.ts",
+      "bytes": 7793,
+      "sha256": "ef5bc0698d486a4b41db5bac47aaa35b5aac1f71407f4fdb1ab254a73cdca2ae",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/env.d.ts",
+      "bytes": 24,
+      "sha256": "35d26ea66c86da9701e4f4b467913481ffeae910761cea34c775c5dacb7f8eaa",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/index.html",
+      "bytes": 258,
+      "sha256": "ccc57c90cb18eac97f4b9f2c9db5236f9484e0ede885bcbfa4e73f9e93007ca7",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/journal.ts",
+      "bytes": 8663,
+      "sha256": "4c0a96b39634ee494d9fcbbc4d307e56537a87f15cff6efcb4b42a7eeb424bb3",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/main.ts",
+      "bytes": 3910,
+      "sha256": "a34dcfffd1e3012307831689d23377cea2c6c0a1305c434d18f78e064e81858d",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/model.ts",
+      "bytes": 6801,
+      "sha256": "a4f40f1f6a7b66726d20b22b1f5466d3a9cb1818acff57280baf7f4d7f53612f",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/preview.html",
+      "bytes": 277,
+      "sha256": "6c696e619a8ec27175e08b0ab39511bcfc2283583cce98bf4312d61637fad214",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/preview.ts",
+      "bytes": 8291,
+      "sha256": "9b01d5a23c80b3b29e9be9d4e261e6b10a90c978071314ac0a84a31239bc8bc8",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/speech.ts",
+      "bytes": 934,
+      "sha256": "6966770ffbad708e880a8da9a7fa11ad34463b53780216a10b2392d699889fae",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/startup.md",
+      "bytes": 18190,
+      "sha256": "70b3475a2bfc9d8205c1b81771b7b9ad7078c9005e62d8e612071379fae4c5b0",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/storage.ts",
+      "bytes": 4992,
+      "sha256": "1168e8295790635d12ca434b5bcf4c2e5f7cc63c9d587edc1748f9df86a6ec65",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/style.css",
+      "bytes": 5136,
+      "sha256": "eb8b1998a2684cba45a670949dbefb462aa4638d4afb212fa48ff36b430f85ce",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/tsconfig.json",
+      "bytes": 472,
+      "sha256": "fe710aad1ad7c500353fa314ffc2204d0aa9fbf4def5c7467467269dc9c662ff",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/view.ts",
+      "bytes": 8900,
+      "sha256": "811790c816ae4e16b0aa347757eb628de7bee8c62827e7e390c676d87eed9678",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/vite.config.ts",
+      "bytes": 653,
+      "sha256": "8cffc7b9d7cea9945214793c0e9a907671c06c3cf9657a5dd0548a797483dc4d",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/voice-controller.test.ts",
+      "bytes": 27572,
+      "sha256": "498863e1b7a056bab2884b53461272cb42cced1c4d0d1486edd073ad02f98785",
+      "byte_equal": true
+    },
+    {
+      "family": "U1",
+      "source": "a7b365554d6a77b1dade5ae069d0a285f2e5165a",
+      "path": "examples/counting/browser/voice-controller.ts",
+      "bytes": 24292,
+      "sha256": "fecde474404e982eac714e7735d4cfb817f8570ad1a68989f9a255a72312e83b",
+      "byte_equal": true
+    }
+  ],
+  "preserved_base_paths": 1239,
+  "preserved_base_mismatches": [],
+  "changed_vs_base": [
+    "examples/counting/browser/app.test.ts",
+    "examples/counting/browser/app.ts",
+    "examples/counting/browser/client.test.ts",
+    "examples/counting/browser/client.ts",
+    "examples/counting/browser/design/counting-concept.png",
+    "examples/counting/browser/design/implementation.md",
+    "examples/counting/browser/dispatcher.ts",
+    "examples/counting/browser/env.d.ts",
+    "examples/counting/browser/index.html",
+    "examples/counting/browser/journal.ts",
+    "examples/counting/browser/main.ts",
+    "examples/counting/browser/model.ts",
+    "examples/counting/browser/preview.html",
+    "examples/counting/browser/preview.ts",
+    "examples/counting/browser/speech.ts",
+    "examples/counting/browser/startup.md",
+    "examples/counting/browser/storage.ts",
+    "examples/counting/browser/style.css",
+    "examples/counting/browser/tsconfig.json",
+    "examples/counting/browser/view.ts",
+    "examples/counting/browser/vite.config.ts",
+    "examples/counting/browser/voice-controller.test.ts",
+    "examples/counting/browser/voice-controller.ts",
+    "packages/client/OBSERVE.md",
+    "packages/client/src/head-stream.ts",
+    "packages/client/src/index.ts",
+    "packages/client/src/observe.ts",
+    "packages/client/test/observe.test.ts"
+  ],
+  "conflicts": [],
+  "dependency_copy_excluded": "3e96fe2e81617ffac84dc00a301ed6ed1415c28a",
+  "project_execution": [],
+  "prior_source_audit_error": "C0 diff against later main anchor included deleted later docs; corrected to explicit nine owned paths; no project execution/source mutation"
+}
