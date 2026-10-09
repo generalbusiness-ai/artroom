@@ -263,7 +263,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
         expect(await runInDurableObject(G.object, () => captured.late(captured.request.operation, captured.request.attempt, captured.answer))).toMatchObject({ recorded: "written" });
         receiptMode = "none"; heldReceipt = null;
         await pause([repository.destination]);
-        expect((await G.entries()).some(entry => entry.input.type === "outcome" && entry.input.operation === captured.request.operation && entry.input.result === "confirmed" && entry.effects.some(effect => effect.effect === "state" && effect.item === publication.id && effect.state === "cleaned"))).toBe(true);
+        expect((await G.entries()).some(entry => entry.input.type === "outcome" && entry.input.operation === captured.request.operation && entry.input.attempt === captured.request.attempt && entry.input.result === "confirmed" && entry.effects.some(effect => effect.effect === "state" && effect.item === publication.id && effect.state === "cleaned"))).toBe(true);
         expect((await G.summary()).value.items.some(item => item.id === publication.id)).toBe(false);
       } else {
         for (let attempt = 0; attempt < 4; attempt++) { net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); await pause([repository.destination]); }
