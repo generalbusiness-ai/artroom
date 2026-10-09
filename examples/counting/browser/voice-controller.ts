@@ -169,7 +169,7 @@ export function createVoiceController(options: {
     stopAudio();
     completion = null;
     observation = { ...observation, fresh: false };
-    if (current()) emit(pending?.outcome ?? "idle", pending ? "A signed report remains in private custody." : "Arm a fresh assigned turn to speak.");
+    if (current()) emit(custodyBlocked ? "blocked" : pending?.outcome ?? "idle", custodyBlocked ? view.message : pending ? "A signed report remains in private custody." : "Arm a fresh assigned turn to speak.");
   };
   const guarded = async (work: () => Promise<void | (() => Promise<void>)>): Promise<void> => {
     if (!current() || busy || custodyBlocked) return;

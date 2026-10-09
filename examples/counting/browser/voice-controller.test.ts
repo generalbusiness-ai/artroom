@@ -358,7 +358,11 @@ test("Malformed restored refusal never becomes a known terminal UI classificatio
   const f=fixture();f.result({status:"refused"});await f.controller.ready;f.observe();f.controller.arm("fake");f.calls[0]!.end();await drain();
   const original=f.custody.saved!,attempt=activeAttempt(original.journal!);
   const malformed={...original,journal:{...original.journal!,attempts:[{...attempt,refusal:{...attempt.refusal!,answer:{...attempt.refusal!.answer,reason:"not-a-native-reason"}}}]}} as unknown as PendingReport;
-  const restored=fixture(malformed);await restored.controller.ready;restored.controller.observe({fresh:true,authorized:true});await restored.controller.checkPending();
+  const restored=fixture(malformed);await restored.controller.ready;
+  const diagnostic=restored.controller.state().message;assert.equal(restored.controller.state().phase,"blocked");
+  restored.controller.observe({fresh:false,authorized:true});restored.controller.observe({fresh:true,authorized:true});restored.controller.invalidate();restored.controller.disarm();
+  await restored.controller.checkPending();await restored.controller.correctReport();await restored.controller.resumePending();
+  assert.equal(restored.controller.state().message,diagnostic);assert.equal(restored.controller.state().resumeReady,false);assert.deepEqual([restored.calls.length,restored.prepared.length,restored.submitted.length],[0,0,0]);
   assert.equal(restored.controller.state().phase,"blocked");assert.equal(restored.controller.state().pending,"unknown");assert.equal(restored.controller.state().correctionReady,false);assert.equal(restored.reconciled.length,0);assert.deepEqual(restored.custody.saved,malformed);
 });
 

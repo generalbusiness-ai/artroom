@@ -42,7 +42,7 @@ async function fixture(joined=true) {
       actFetch:async(url,init)=>{assert.equal(init.redirect,"error");const response=await fake(url,{...init,signal:init.signal as never});return{status:metadata==="wrong-status"?200:response.status,body:response.body,headers:new Headers({"content-type":metadata==="wrong-media"?"text/html":"application/json"}),url:metadata==="wrong-url"?url+"/different":url,redirected:metadata==="redirected"};}});
     await new Promise<void>((resolve,reject)=>gateway.observe(state=>{if(state.status==="current")resolve();else if(["error","forbidden","unsupported"].includes(state.status))reject(new Error(`Fake gateway setup ${state.status}`));}));return gateway;
   };
-  return{identity,gateway:await connect(),connect,counters:()=>({posts,settles,saves,clears}),retained:()=>held?canonicalize(held):null,record:()=>held,snapshots,mode:(value:string)=>{metadata=value;},lose:()=>{reply="lost";},fail:(phase?:DispatchPhase)=>{failPhase=phase;},race:(value:"before-post"|"before-reply")=>{race=value;},acceptSettlement:()=>{settleAccepted=true;},corrupt:(change:(record:NonNullable<typeof held>)=>NonNullable<typeof held>)=>{if(held)held=change(held);},legacy:()=>{if(held)held={kind:held.kind,envelope:held.envelope};}};
+  return{identity,gateway:await connect(),connect,counters:()=>({posts,settles,saves,clears}),retained:()=>held?canonicalize(held):null,record:()=>held,snapshots,mode:(value:string)=>{metadata=value;},lose:()=>{reply="lost";},fail:(phase?:DispatchPhase)=>{failPhase=phase;},race:(value:"before-post"|"before-reply")=>{race=value;},acceptSettlement:()=>{settleAccepted=true;},restore:(record:NonNullable<typeof held>)=>{held=structuredClone(record);},corrupt:(change:(record:NonNullable<typeof held>)=>NonNullable<typeof held>)=>{assert.ok(held,"corruption needs actual retained custody");held=change(held);},legacy:()=>{if(held)held={kind:held.kind,envelope:held.envelope};}};
 }
 
 test("FAKE correlated trusted first refusal commits judgment before terminal control custody clears",async()=>{
@@ -106,11 +106,11 @@ test("FAKE malformed restored PreparedEnvelope and refusal stay blocked without 
     const original=f.retained();assert.equal((await f.gateway.checkCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal((await f.gateway.resumeCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal(f.counters().posts,0);assert.equal(f.counters().clears,0);
   }finally{f.gateway.dispose();}
   const g=await fixture();try{
-    await g.gateway.command("start");
-    const refused=structuredClone(g.snapshots.at(-1)!);
-    g.fail("inflight");await g.gateway.command("start");g.fail();
+    assert.equal((await g.gateway.command("start")).status,"refused");
+    const refused=structuredClone(g.snapshots.at(-1)!);assert.ok(refused.journal);assert.equal(activeAttempt(refused.journal).phase,"refused");assert.equal(g.record(),null);
+    g.restore(refused);assert.deepEqual(g.record(),refused);
     g.corrupt(()=>({...refused,journal:{...refused.journal!,attempts:refused.journal!.attempts.map(a=>({...a,refusal:{...a.refusal!,answer:{...a.refusal!.answer,judgedAt:{seq:-1,hash:"bad"}}}}))}} as never));
-    const original=g.retained(),before=g.counters();assert.equal((await g.gateway.checkCommand())?.status,"blocked");assert.equal(g.retained(),original);assert.deepEqual(g.counters(),before);
+    const original=g.retained(),before=g.counters();assert.ok(original,"malformed refused custody is retained before Check");assert.equal((await g.gateway.checkCommand())?.status,"blocked");assert.equal(g.retained(),original);assert.deepEqual(g.counters(),before);
   }finally{g.gateway.dispose();}
 });
 
