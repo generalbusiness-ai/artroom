@@ -79,7 +79,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
   const d = await registerFixture();
   try {
     const secret = d.secret;
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     let failWrites = false;
     let dropWrites = false;
@@ -103,6 +103,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
     const session = { ...d.session, fetch };
     const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks() };
     const kinds = () => sent.map((signed) => signed.intent.kind);
+    await expect(claimRoom(session, { ...configured, definition: "platform:register@2" }, storage, "My local label", options)).rejects.toThrow("pinned version");
     await expect(claimRoom(session, { ...configured, definition: "platform:register@1" }, storage, "My local label", options)).rejects.toThrow("pinned version");
     await expect(claimRoom({ ...session, secret: crypto.getRandomValues(new Uint8Array(32)) }, configured, storage, "My local label", options)).rejects.toThrow("cannot be read");
     expect(sent).toEqual([]);
@@ -184,7 +185,7 @@ test("a changed Page context stops queued and prepared native claims before deli
   const clock = net.clock.now;
   const d = await registerFixture();
   try {
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     let selected = true;
     let invalidate: "found" | "seat" | "firstKey" | null = null;
@@ -254,7 +255,7 @@ test("explicit new creates another native directory while exact operation resume
   const clock = net.clock.now;
   const d = await registerFixture();
   try {
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
     let loseFound = true;
