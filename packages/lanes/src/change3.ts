@@ -59,6 +59,19 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
     if (act) act.guards = act.guards.filter((guard) => guard.reason !== "merge-in-progress");
   }
   next.acts["cancel-merge"]!.guards = [{ state: ["intended", "committed"] }, next.acts["cancel-merge"]!.guards[1]!];
+  next.items["job"]!.states["queued"] = { final: false };
+  next.items["job"]!.states["fence-refused"] = { final: true };
+  next.items["job"]!.initial = "queued";
+  next.items["job"]!.refs["earlier"] = { fixed: true, required: false, to: { type: "item", of: "job" } };
+  next.acts["request-check"]!.effects = next.acts["request-check"]!.effects.filter((effect) => !("state" in effect && effect.of === "also.earlier"));
+  next.acts["request-check"]!.effects = [...next.acts["request-check"]!.effects, { ref: { slot: "earlier", from: { field: "earlier" } } }];
+  next.acts["request-check"]!.guards = [...next.acts["request-check"]!.guards, { none: { type: "job", states: ["queued"], where: [{ equals: { a: { slot: "manifest" }, b: { item: "also.manifest" } } }, { equals: { a: { slot: "name" }, b: { field: "name" } } }] }, reason: "retry-pending" }];
+  next.acts["request-check"]!.sends = [{ tell: { to: { slot: "destination", of: "also.proposal" }, message: "check-fence", fields: {
+    operation: { slot: "operation", of: "also.manifest" }, job: "self", name: { field: "name" }, earlier: { field: "earlier" },
+  }, result: {
+    applied: [{ state: "requested" }, { state: "superseded", of: "also.earlier" }],
+    refused: [{ state: "fence-refused" }], undelivered: [{ state: "fence-refused" }],
+  } } }];
   next.acts["request-check"]!.guards = [...next.acts["request-check"]!.guards, { set: "tree", of: "also.manifest", reason: "not-reserved" }];
   next.items["merge"]!.values["checkDeadline"] = { fixed: false, required: false, of: { type: "time" } };
   next.timed["merge-checks-deadline"] = { on: "merge", states: ["committed"], deadline: "checkDeadline", effects: [{ state: "refused" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } }], attention: [] };

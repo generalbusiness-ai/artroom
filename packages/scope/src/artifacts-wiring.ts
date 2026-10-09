@@ -98,6 +98,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
     // repeated read is not free of mutation.
     return {
       accepts, send,
+      recovery: { accepts: (owner, kind) => kind === "check-judge" && accepts(owner, kind), read: (request) => request.kind === "check-judge" && accepts(request.owner, request.kind) ? destination.send(request) : Promise.resolve(null) },
       snapshot: (asked) => bound(given.genesis()?.seed.definition ?? "") ? destination.snapshot(asked) : Promise.resolve(null),
       judged: (at, sealed) => destination.judged(at, sealed),
       replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },

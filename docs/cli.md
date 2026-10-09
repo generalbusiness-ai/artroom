@@ -329,6 +329,15 @@ NUL bytes. It names refusals for deleted or renamed files, non-UTF-8
 content, an unsupported mode change, more than 64 changed paths, a path
 that cannot be written, and a file over 65,536 bytes. Each source entry
 uses the existing per-entry transport bound. It carries no Git pack.
+A `request-check` first records a queued job. The destination fences that
+check's exact job generation, invalidating any earlier pass, before its
+acknowledgement makes the new job requested and supersedes the old job.
+A retry may be requested while checks are pending. If publication has
+started, the fence is refused as `publication-started`; the old job and
+any unresolved send remain recorded. Delayed results count only for the
+destination's acknowledged generation. Cancellation before a push and the
+recorded check deadline release an unchecked reservation.
+
 Binary content, deletion and rename support remain in the later R5 work.
 The demonstration uses two text files.
 

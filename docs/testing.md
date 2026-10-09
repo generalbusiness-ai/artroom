@@ -290,7 +290,11 @@ and signs the result that the lane admits. Its durable storage and runner
 are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
 the same object-overlay boundary with actual private Git checkout and a
 configured step that reads both files. No container platform or deployed
-checker service is established by these witnesses.
+checker service is established by these witnesses. A held outside answer
+shows that a retry fence invalidates the old result even when the old
+current-job read finished first. Other cases preserve an unresolved push
+when its retry is refused, cancel a pre-push reservation, drain its recorded
+deadline, and refuse a final membership read that exceeded its window.
 
 `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,

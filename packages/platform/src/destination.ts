@@ -543,12 +543,12 @@ export const destination2: PlatformData = {
 export const destination3: PlatformData = {
   ...destination2,
   items: { ...destination2.items,
-    publication: { ...destination2.items["publication"]!, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32 }, decisions: { withdraw: 1, checked: 32 } }, values: {
+    publication: { ...destination2.items["publication"]!, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
       ...destination2.items["publication"]!.values,
       tree: { fixed: false, required: false, of: { type: "tree" } },
       checkDeadline: { fixed: false, required: false, of: { type: "time" } },
       requiredChecks: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
-      passes: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
+      passes: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "record", of: { name: { type: "text", max: 128, required: true }, job: { type: "fact", kind: ["request-check"], under: "change", required: true }, passed: { type: "bool", required: true } } } } },
     } },
   },
   timed: { "publication-checks-deadline": { on: "publication", states: ["reserved"], deadline: "checkDeadline", effects: [
@@ -572,6 +572,12 @@ export const destination3: PlatformData = {
       guards: [OWNER, { code: "withdraw-before-push", row: "P18" }],
       effects: [{ code: "withdraw-unpublished", row: "P16" }],
       sends: [{ code: "withdraw-update", row: "P16", result: {} }],
+    },
+    "check-fence": { message: "check-fence", class: "tell", from: FROM_LANE, opens: null,
+      also: { publication: { code: "checked-publication", row: "P15", item: "publication", index: "operation", key: "operation" } },
+      bound: { of: "also.publication", where: [{ equals: { a: { sender: true }, b: { slot: "lane", of: "also.publication" } } }] },
+      fields: { operation: { ...OPERATION, required: true }, job: { type: "fact", kind: ["request-check"], under: "change", required: true }, name: { type: "text", max: 128, required: true }, earlier: { type: "fact", kind: ["request-check"], under: "change", required: false } },
+      guards: [{ code: "fence-before-push", row: "P18" }], effects: [{ code: "fence-generation", row: "P16" }], sends: [], attention: [],
     },
     checked: { message: "checked", class: "tell", from: FROM_LANE, opens: null,
       also: { publication: { code: "checked-publication", row: "P15", item: "publication", index: "operation", key: "operation" } },
@@ -2064,6 +2070,14 @@ export const destinationRules2: Rules = destinationRulesWith(READ_LANE, 2);
 
 /** Rules for manifest-list destinations. Reservation records the exact tree;
  * authentic results on its jobs open publication only when every check passed. */
+interface CheckGeneration { name: string; job: FactRef; passed: boolean }
+const generations = (publication: Item): CheckGeneration[] => (publication.values["passes"] ?? []) as unknown as CheckGeneration[];
+const resultGeneration = (given: RuleGiven, publication: Item): boolean => {
+  const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check");
+  const name = job?.entry.input.type === "act" ? job.entry.input.signed.intent.fields["name"] : null;
+  return !!job && generations(publication).some((row) => row.name === name && canonicalize(row.job) === canonicalize(job.fact));
+};
+
 export const destinationRules3: Rules = (() => {
   const listJudge = judgeDecides(READ_LIST, true);
   const oldJudge = judgeDecides(READ_LANE);
@@ -2094,6 +2108,20 @@ export const destinationRules3: Rules = (() => {
       const publication = given.resolved.subjects.get("also.publication");
       return publication ? updateRequest(given, { publication, state: "not-reserved", outcome: "aborted", reason: "withdrawn" }) : null;
     } },
+    "fence-before-push": { place: "guard", refusals: ["publication-started", "not-the-reservation", "generation-mismatch"], run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication");
+      if (!publication) return { holds: false, name: "not-the-reservation" };
+      if (pushesOf(given.state, given.own, publication, given.resolved.self).length) return { holds: false, name: "publication-started" };
+      if (publication.state !== "reserved") return { holds: false, name: "not-the-reservation" };
+      const rows = generations(publication), name = given.resolved.fields["name"], prior = rows.find((row) => row.name === name);
+      const earlier = given.resolved.fields["earlier"];
+      return (!prior && earlier === undefined) || (prior !== undefined && isFactRef(earlier) && canonicalize(prior.job) === canonicalize(earlier)) ? { holds: true } : { holds: false, name: "generation-mismatch" };
+    } },
+    "fence-generation": { place: "effect", most: 1, run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication")!;
+      const name = given.resolved.fields["name"] as string, job = given.resolved.fields["job"] as FactRef;
+      return [{ effect: "value", item: publication.id, slot: "passes", value: [...generations(publication).filter((row) => row.name !== name), { name, job, passed: false }] as unknown as FieldValue }];
+    } },
     "checked-publication": { place: "also", bind: (items) => items[0]?.id ?? null },
     "checked-bound": { place: "guard", refusals: ["not-the-reservation", "not-this-check"], run: (given) => {
       const publication = given.resolved.subjects.get("also.publication");
@@ -2122,10 +2150,10 @@ export const destinationRules3: Rules = (() => {
       const publication = given.resolved.subjects.get("also.publication")!;
       const job = given.uses.find((use) => use.fact.hash === (given.resolved.fields["job"] as FactRef).hash)!.entry;
       const name = job.input.type === "act" ? job.input.signed.intent.fields["name"] as string : "";
-      const passes = [...new Set([...((publication.values["passes"] ?? []) as string[]), name])];
+      const passes = generations(publication).map((row) => row.name === name ? { ...row, passed: true } : row);
       const required = (publication.values["requiredChecks"] ?? []) as string[];
-      const ready = publication.values["checkDeadline"] !== undefined && required.every((check) => passes.includes(check));
-      return [{ effect: "value", item: publication.id, slot: "passes", value: passes }, ...(ready ? [
+      const ready = publication.values["checkDeadline"] !== undefined && required.every((check) => passes.some((row) => row.name === check && row.passed));
+      return [{ effect: "value", item: publication.id, slot: "passes", value: passes as unknown as FieldValue }, ...(ready ? [
         { effect: "value", item: publication.id, slot: "checkDeadline", value: null } as const,
         ...opened(given, 0, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id),
         ...opened(given, 1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id),
@@ -2147,12 +2175,12 @@ export const destinationRules3: Rules = (() => {
       const fields = result?.input.type === "act" ? result.input.signed.intent.fields : null;
       const key = result?.input.type === "act" ? result.input.signed.intent.actor : null;
       const seen = key ? given.observed({ key })?.observation : null;
-      if (!publication || publication.state !== "reserved" || !seen || "subject" in seen || seen.keyState === "compromised") return null;
+      if (!publication || publication.state !== "reserved" || !resultGeneration(given, publication) || !seen || "subject" in seen || seen.keyState === "compromised") return null;
       if (fields?.["outcome"] !== "passed") return updateRequest(given, { publication, state: "not-reserved", outcome: "refused", reason: "required-check-failed" });
       const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check")?.entry;
       const name = job?.input.type === "act" ? job.input.signed.intent.fields["name"] : null;
-      const passes = [...((publication.values["passes"] ?? []) as string[]), name];
-      const complete = ((publication.values["requiredChecks"] ?? []) as string[]).every((check) => passes.includes(check));
+      const passes = generations(publication).map((row) => row.name === name ? { ...row, passed: true } : row);
+      const complete = ((publication.values["requiredChecks"] ?? []) as string[]).every((check) => passes.some((row) => row.name === check && row.passed));
       return complete ? updateRequest(given, { publication, state: "reserved", outcome: "committed", tree: publication.values["tree"] as string, commit: publication.values["integration"] as string }) : null;
     } },
     "open-check-judge": { place: "effect", most: 2, run: (given) => opened(given, 0, "check-judge", 1, given.resolved.subjects.get("also.publication")!.id) },
@@ -2175,7 +2203,7 @@ export const destinationRules3: Rules = (() => {
         const opening = given.own(Number(operation.id.split(":")[0]))!.entry;
         const held = opening.effects.find((effect) => effect.effect === "operation" && effect.kind === "check-judge");
         const publication = held?.effect === "operation" && typeof held.for === "number" ? given.state.item(held.for) : null;
-        if (!publication || publication.state !== "reserved") return { effects: [], sends: [], opens: [] };
+        if (!publication || publication.state !== "reserved" || !resultGeneration(given, publication)) return { effects: [], sends: [], opens: [] };
         const message = opening.input.type === "delivery" && opening.input.message.class === "request" && opening.input.message.type === "tell" ? opening.input.message.body as { fields: Record<string, FieldValue> } : null;
         if (!message) throw new Error("a check judge has its checked delivery");
         const resultFact = isFactRef(message.fields["result"]) ? message.fields["result"] : opening.input.type === "delivery" ? opening.input.from : null;

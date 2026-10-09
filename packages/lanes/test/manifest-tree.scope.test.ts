@@ -1,4 +1,4 @@
-import { runDurableObjectAlarm } from "cloudflare:test";
+import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
@@ -9,6 +9,9 @@ import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { valueDigest } from "@generalbusiness/artroom-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
+import { snapshotReaderOf } from "../../scope/src/worker.ts";
+import { env } from "cloudflare:workers";
 import { ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { command, memoryStore, expectedOf, type ActShape, type Context, type Outcome } from "../../cli/src/index.ts";
@@ -35,13 +38,35 @@ test("a manifest-list reservation records both files before the configured check
   try { await story(ownHost(), wired); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
+test("a retry fence after publication starts is refused without superseding the live job or forgetting the unknown send (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
   let R: Platform | null = null;
   const bindings = () => at.bindings(R!.name);
-  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => at.outside(given, sql, bindings())); };
+  let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
+  let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
+  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => {
+    const nativeReader = snapshotReaderOf(env.PLATFORM);
+    let keyReads = 0;
+    const outside = artifactsOutside(given, sql, bindings(), at.stand.fetch, { ...nativeReader, key: async (membership, key) => {
+      const answer = await nativeReader.key(membership, key);
+      if (slowFinalKey && ++keyReads % 2 === 0) net.clock.now = timeOf(timeMs(net.clock.now)! + 11_000);
+      return answer;
+    } });
+    let late: import("../../scope/src/operations.ts").LateAnswers | null = null;
+    return { ...outside, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
+      if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
+      const answer = await outside.send(request);
+      return holdPush && ["push", "read"].includes(request.kind) ? null : answer;
+    } };
+  }); };
   // STAND-IN for the scheduler: each pass drives the operations of every scope the command waits on, and of the register and the
   // destination, then their dispatchers, until nothing is due.
   const known: Platform[] = [];
@@ -81,6 +106,27 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+  if (startedOnly) {
+    const proposed = ok(await run(founder, "propose", "started"));
+    const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
+    const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
+    const manifest = await lane.item(version);
+    const requested = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    await pause([lane.name, repository.destination]);
+    const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
+    holdPush = true;
+    ok(await run(checker, "act", "check", "--on", lane.name, "--set", `job=${job}`, "--set", `tree=${manifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
+    await pause([lane.name, repository.destination]);
+    const beforeRetry = host.refs.get("refs/heads/main");
+    const retry = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", `earlier=${job}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    await pause([lane.name, repository.destination]);
+    const refusal = (await lane.entries()).find((entry) => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.reason?.name === "publication-started");
+    expect(refusal).toBeDefined();
+    expect([(await lane.item(job)).state, host.refs.get("refs/heads/main"), retry.code]).toEqual(["passed", beforeRetry, 0]);
+    const publications = (await G.summary()).value.items.filter((item) => item.type === "publication");
+    expect(publications.some((item) => ["publishing", "unresolved"].includes(item.state))).toBe(true);
+    return;
+  }
   // Freeze the wrong-source controls on a separately opened collection.
   const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(changeDemo3)}`, "--set", "title=source controls", "--set", "draft=false", "--value", "change3.json"));
   const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
@@ -102,6 +148,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(proposed.lines[1]).toMatch(/^Reserved: merge/);
   const requested = ok(await run(founder, "act", "request-check", "--on", lane, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
+  await pause([lane, repository.destination]);
   expect((await L.item(job)).values["tree"]).toBe(manifest.values["tree"]);
   const badTree = await run(checker, "act", "check", "--on", lane, "--set", `job=${job}`, "--set", `tree=${"e".repeat(40)}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
   expect([badTree.code, badTree.lines[0], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("not-this-job"), first]);
@@ -135,6 +182,11 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   const snapshot = await Gsnapshot.reservationSnapshot(readAsk);
   expect(snapshot).not.toBeNull();
+  const beforeSlow = net.clock.now;
+  slowFinalKey = true;
+  expect(await Gsnapshot.reservationSnapshot(readAsk)).toBeNull();
+  slowFinalKey = false;
+  net.clock.now = beforeSlow;
   if (snapshot) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
   if (snapshot) {
     expect(await verifyReservationObjects(snapshot)).toBe(true);
@@ -180,6 +232,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const failLane = new Platform(failMatch[1] as ScopeId), failVersion = Number(failMatch[2]);
   const failManifest = await failLane.item(failVersion);
   const failRequested = ok(await run(founder, "act", "request-check", "--on", failLane.name, "--set", `manifest=${failVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([failLane.name, repository.destination]);
   const failJob = Number(/entry \S+:(\d+),/.exec(failRequested.lines[0]!)![1]);
   ok(await run(checker, "act", "check", "--on", failLane.name, "--set", `job=${failJob}`, "--set", `tree=${failManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=failed"));
   await pause([failLane.name, repository.destination]);
@@ -193,6 +246,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const replacementLane = new Platform(replacementMatch[1] as ScopeId), replacementVersion = Number(replacementMatch[2]);
   const replacementManifest = await replacementLane.item(replacementVersion);
   const j1out = ok(await run(founder, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([replacementLane.name, repository.destination]);
   const j1 = Number(/entry \S+:(\d+),/.exec(j1out.lines[0]!)![1]);
   const wireOnly = net.hold;
   net.hold = (envelope) => { if (wireOnly?.(envelope)) return true; return envelope.from.at.scope === replacementLane.name && envelope.message.class === "request" && envelope.message.type === "tell" && (envelope.message.body as { message?: string }).message === "checked"; };
@@ -205,6 +259,31 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const replacementMerge = (await replacementLane.summary()).value.items.find((item) => item.type === "merge")!;
   ok(await run(founder, "act", "cancel-merge", "--on", replacementLane.name, "--target", String(replacementMerge.id)));
   await pause([replacementLane.name, repository.destination]);
+  // Read J1 as current, then fence J2 before offering that same old answer.
+  const racing = ok(await run(founder, "propose", "read-before-fence"));
+  const raceMatch = /as change (sc_\S+), version (\d+)\./.exec(racing.lines[0]!)!;
+  const raceLane = new Platform(raceMatch[1] as ScopeId), raceVersion = Number(raceMatch[2]);
+  const raceManifest = await raceLane.item(raceVersion);
+  const raceRequest = ok(await run(founder, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([raceLane.name, repository.destination]);
+  const raceJ1 = Number(/entry \S+:(\d+),/.exec(raceRequest.lines[0]!)![1]);
+  holdCheckAnswer = true;
+  ok(await run(checker, "act", "check", "--on", raceLane.name, "--set", `job=${raceJ1}`, "--set", `tree=${raceManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
+  await pause([raceLane.name, repository.destination]);
+  const heldAnswer = pendingCheck as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers };
+  expect((heldAnswer.answer.evidence.body as { current: boolean }).current).toBe(true);
+  const raceJ2out = ok(await run(founder, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", `earlier=${raceJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([raceLane.name, repository.destination]);
+  const raceJ2 = Number(/entry \S+:(\d+),/.exec(raceJ2out.lines[0]!)![1]);
+  expect((await raceLane.item(raceJ2)).state).toBe("requested");
+  const offered = await runInDurableObject(G.object, () => heldAnswer.late(heldAnswer.request.operation, heldAnswer.request.attempt, heldAnswer.answer));
+  expect(offered).toMatchObject({ recorded: "written" });
+  holdCheckAnswer = false;
+  await pause([raceLane.name, repository.destination]);
+  expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
+  const raceMerge = (await raceLane.summary()).value.items.find((item) => item.type === "merge")!;
+  ok(await run(founder, "act", "cancel-merge", "--on", raceLane.name, "--target", String(raceMerge.id)));
+  await pause([raceLane.name, repository.destination]);
   // Cancelling a reserved change with no push releases the publication slot.
   const cancelled = ok(await run(founder, "propose", "cancel"));
   const cancelMatch = /as change (sc_\S+), version (\d+)\./.exec(cancelled.lines[0]!)!;
@@ -232,6 +311,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const heldMatch = /as change (sc_\S+), version (\d+)\./.exec(held.lines[0]!)!;
   const heldLane = new Platform(heldMatch[1] as ScopeId), heldVersion = Number(heldMatch[2]);
   const heldRequest = ok(await run(founder, "act", "request-check", "--on", heldLane.name, "--set", `manifest=${heldVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([heldLane.name, repository.destination]);
   const heldJob = Number(/entry \S+:(\d+),/.exec(heldRequest.lines[0]!)![1]);
   const heldFact = factRefOf((await heldLane.entries())[heldJob]!);
   const heldAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await heldLane.at(), fact: heldFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });

@@ -80,7 +80,7 @@ export class DestinationHost implements Outside {
   accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge"] as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead].includes(kind as "judge" | "read" | "adopt-read"),
+    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
