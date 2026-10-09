@@ -158,3 +158,14 @@ test("editable rules omit the routine readonly copy while preserving full author
   const record = screen.all("details")[0]!;
   for (const fact of ["29", "protected", "authority", "rules.publish", "AGENTS.md", "build"]) expect(record.textContent).toContain(fact);
 });
+
+
+test("verified invalid-path source exposes the editor mount independently of preview or published-link eligibility",()=>{
+  const current=view().manifests[0]!;
+  const selected={...current,file:{...current.file!,path:"../outside.md",content:"Exact retained original\r\n"}};
+  const screen=render(view({manifests:[selected]}));
+  expect(screen.all("div").filter(node=>node.attributes["data-action-slot"]==="edit")).toHaveLength(1);
+  expect(screen.textContent).toContain("Choose a file path inside this room");
+  expect(screen.all("details").some(node=>node.attributes["class"]==="source-preview")).toBe(false);
+  expect(render(view({manifests:[{...selected,file:{...selected.file,content:null}}]})).all("div").filter(node=>node.attributes["data-action-slot"]==="edit")).toEqual([]);
+});

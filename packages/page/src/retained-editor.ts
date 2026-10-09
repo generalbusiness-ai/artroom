@@ -27,7 +27,12 @@ export function retainedEditor(room: Room, change: ChangeView, options: Retained
     const title = h("input", { type: "text", value: record.draft.title, "aria-label": "Proposal title", maxlength: "256" }) as HTMLInputElement;
     const path = h("input", { type: "text", value: record.draft.path, "aria-label": "Target file path" }) as HTMLInputElement;
     const content = h("textarea", { rows: "12", "aria-label": "Edited text" }, record.draft.content) as HTMLTextAreaElement;
-    for (const field of [title,path,content]) { if (disabled) field.disabled = true; field.addEventListener("input", () => { record.draft = { title: title.value, path: path.value, content: content.value }; }); }
+    for (const [name, field] of [["title", title], ["path", path], ["content", content]] as const) {
+      if (disabled) field.disabled = true;
+      // textarea.value normalizes CRLF/CR to LF. Read it only when the
+      // person actually edits text, never as a side effect of title/path.
+      field.addEventListener("input", () => { record.draft = { ...record.draft, [name]: field.value }; });
+    }
     const message = h("p", { role: "status", "aria-live": "polite" }, task?.message || record.message);
     const controls = h("div", { class: "form-footer" });
     if (!task) {

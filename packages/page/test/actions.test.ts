@@ -199,3 +199,14 @@ test("Create issue asks for title and description and intentionally uses the tit
   form.event("submit");
   expect((sent[0] as unknown[]).slice(0, 3)).toEqual(["open-issue", "", { definition: "authenticated-definition", title: "Fix the handbook", body: "The introduction is missing.", conditions: '["Fix the handbook"]' }]);
 });
+
+
+test("Create issue keeps authenticated multiple-definition selection and submits the chosen digest with native conditions",()=>{
+  const body=new Element("body");Object.defineProperty(globalThis,"document",{configurable:true,value:{createElement:(tag:string)=>new Element(tag),body}});
+  const open:Offered={kind:"open-issue",step:"open",on:"lane",line:"Open",fields:[{name:"definition",type:"digest",required:true,choices:[{label:"Issue v1",value:"first-authenticated"},{label:"Issue v2",value:"second-authenticated"}]},{name:"title",type:"text",required:true},{name:"body",type:"text",required:false},{name:"conditions",type:"list",required:true}]};
+  const sent:unknown[]=[];const create=asElement(createIssue(open,(...args)=>sent.push(args),{}));expect(create.hasAttribute("data-task-act")).toBe(true);create.event("click");
+  const form=body.all().find(e=>e.tag==="form")!;const select=form.all().find(e=>e.name==="field:definition")!;expect(select.tag).toBe("select");select.value="second-authenticated";
+  form.all().find(e=>e.name==="field:title")!.value="Chosen issue";form.event("submit");
+  expect((sent[0]as unknown[]).slice(0,3)).toEqual(["open-issue","",{definition:"second-authenticated",title:"Chosen issue",conditions:'["Chosen issue"]'}]);
+  const unavailable=asElement(createIssue({...open,fields:[...open.fields,{name:"custom",type:"text",required:true}]},()=>{},{}));expect(unavailable.hasAttribute("data-task-act")).toBe(false);
+});
