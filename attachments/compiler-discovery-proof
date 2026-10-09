@@ -1,0 +1,135 @@
+{
+  "authorization": "80d31c067f954ab088cbace01feb10076384f07b",
+  "before": {
+    "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+    "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:40:32.889804+00:00",
+    "load": [
+      1.6591796875,
+      1.35546875,
+      1.45947265625
+    ]
+  },
+  "source_bindings": {
+    "scope": "/private/tmp/artroom-correctness-composed/packages/scope",
+    "cli": "/private/tmp/artroom-correctness-composed/packages/cli",
+    "page": "/private/tmp/artroom-correctness-composed/packages/page",
+    "lanes": "/private/tmp/artroom-correctness-composed/packages/lanes",
+    "bytes": "/private/tmp/artroom-correctness-composed/packages/bytes",
+    "contract": "/private/tmp/artroom-correctness-composed/packages/contract",
+    "derive": "/private/tmp/artroom-correctness-composed/packages/derive",
+    "platform": "/private/tmp/artroom-correctness-composed/packages/platform",
+    "client": "/private/tmp/artroom-correctness-composed/packages/client"
+  },
+  "fresh_execution_processes": [],
+  "barrier_note": "Initial process-name probe matched test in latest on seven idle xcodebuildmcp wrappers; their exact argv was inspected and token boundaries corrected before any compiler/discovery started. Output directory was still empty.",
+  "config": {
+    "path": "/tmp/artroom-critical-677-checks/remaining-native.config.mjs",
+    "sha256": "53a36e963199fbcad1cd63dc41a8f5acfdac9d9df003263b19088e87517dfcb6"
+  },
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/page/tsconfig.scope.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.33566441608127207,
+      "cpu_seconds": 1.214318,
+      "log": "/tmp/artroom-critical-677-checks/page-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+        "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:40:32.917943+00:00",
+        "load": [
+          1.6591796875,
+          1.35546875,
+          1.45947265625
+        ]
+      },
+      "after": {
+        "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+        "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:40:33.286100+00:00",
+        "load": [
+          1.6591796875,
+          1.35546875,
+          1.45947265625
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-critical-677-checks/remaining-native.config.mjs",
+        "--json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+      "exit": 0,
+      "wall_seconds": 1.915323375025764,
+      "cpu_seconds": 2.322655,
+      "log": "/tmp/artroom-critical-677-checks/discovery.log",
+      "bytes": 6805,
+      "sha256": "97e7cba5c9df9db915e1b6f963527a211db1c2ee08ff83bf600f8f01f14d4a81",
+      "before": {
+        "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+        "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:40:33.314479+00:00",
+        "load": [
+          1.6591796875,
+          1.35546875,
+          1.45947265625
+        ]
+      },
+      "after": {
+        "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+        "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T21:40:35.264808+00:00",
+        "load": [
+          1.60595703125,
+          1.34912109375,
+          1.45654296875
+        ]
+      }
+    }
+  ],
+  "native": "not started",
+  "companion": "not started",
+  "status": "Discovery terminal; full Root exact-title verification required before native",
+  "after": {
+    "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+    "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:40:35.292993+00:00",
+    "load": [
+      1.60595703125,
+      1.34912109375,
+      1.45654296875
+    ]
+  }
+}

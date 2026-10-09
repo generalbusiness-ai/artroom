@@ -1,0 +1,55 @@
+{
+  "authorization": "80d31c067f954ab088cbace01feb10076384f07b",
+  "before": {
+    "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+    "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:41:18.430216+00:00",
+    "load": [
+      1.28662109375,
+      1.2900390625,
+      1.42724609375
+    ]
+  },
+  "argv": [
+    "/usr/bin/time",
+    "-lp",
+    "node",
+    "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "/tmp/artroom-critical-677-checks/remaining-native.config.mjs",
+    "--reporter",
+    "verbose",
+    "--bail=1"
+  ],
+  "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+  "config_sha256": "53a36e963199fbcad1cd63dc41a8f5acfdac9d9df003263b19088e87517dfcb6",
+  "discovery_matches_all_18_titles_9_files": true,
+  "root_full_discovery_read": true,
+  "prior_47_passes_not_repeated": true,
+  "status": "terminal: full Root log and per-case ledger review required",
+  "companion": "not run",
+  "full_gate": "not run",
+  "exit": 0,
+  "wall_seconds": 9.055515624932013,
+  "cpu_seconds": 10.200028999999999,
+  "log": "/tmp/artroom-critical-677-native/native.log",
+  "bytes": 8248,
+  "sha256": "110acc58b778f5999aee51f16cd586e02ece916f49fb0e8fce6534efc5bcf28f",
+  "after": {
+    "head": "677e7b3904d1d08ae51b6cc7166b1008487ff97a",
+    "tree": "3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:41:27.518483+00:00",
+    "load": [
+      1.54931640625,
+      1.34619140625,
+      1.44482421875
+    ]
+  }
+}
