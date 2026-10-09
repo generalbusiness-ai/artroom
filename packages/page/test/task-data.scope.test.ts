@@ -1,11 +1,56 @@
 import { expect, test } from "vitest";
-import { textDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { act, actsOn, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
-import { demo } from "./support/demo.ts";
+import { demo, type Demo } from "./support/demo.ts";
+import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
+import type { ScopeId, FactRef } from "@generalbusiness/artroom-contract";
+import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
+import { Platform } from "../../scope/test/repository.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
 const oid = (c: string) => c.repeat(40);
+
+/** Scheduler provenance uses the same authenticated room transport; no inspector. */
+async function completeIssue(d: Demo, room: Room, fact: FactRef): Promise<ScopeId> {
+  const owner = d.sessionOwner;
+  const transport = signedReads(httpTransport(room.session.service, room.session.fetch ? { fetch: room.session.fetch } : {}), secretSigner(room.session.secret), room.session.now ? { now: room.session.now } : {});
+  const handle = (name: ScopeId) => new ScopeHandle(transport, name, room.reader?.reader() ?? null);
+  const source = await owner.required(() => handle(d.D.name).entry(fact.seq));
+  expect(source.ok, "Accepted opening must have readable immutable source bytes").toBe(true);
+  if (!source.ok) throw new Error("Accepted opening source unavailable");
+  const entry = source.value.entry;
+  expect([entryHash(entry), entry.at]).toEqual([fact.hash, fact.at]);
+  expect(entry.input.type).toBe("act");
+  if (entry.input.type !== "act") throw new Error("Accepted opening is not an act");
+  expect(entry.input.signed.intent.kind).toBe("open-issue");
+  const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
+  expect(creates).toHaveLength(1);
+  const seed = creates[0]!.to;
+  if (!isSeed(seed)) throw new Error("Recorded create has no valid seed");
+  expect([seed.kind, seed.definition, seed.creator, seed.cause, seed.ordinal]).toEqual(["lane", DEMO_DIGESTS.issue, fact.at, intentDigest(entry.input.signed.intent), 0]);
+  const child = scopeIdOf(seed);
+  // Native effect/dispatch needs no read inspector. All parent/child reads below
+  // are authenticated. The original known register/destination remain included.
+  const nodes = [d.config.register!.scope, d.G.name, d.D.name, child].map(name => new Platform(name));
+  // Exactly one scheduler drain has one 4096-work/64-pass budget. Once it
+  // reports idle, inspect the native state once: never hammer idle passes to
+  // wait for retry backoff or advance the clock to manufacture completion.
+  await driveFixture(nodes, action => owner.required(action));
+  const [parentRead, childRead] = await owner.required(() => Promise.all([handle(d.D.name).summary(), handle(child).summary()]));
+  expect(parentRead.ok, "Directory completion must remain readable").toBe(true);
+  expect(childRead.ok, childRead.ok ? undefined : `Recorded child did not complete after scheduler idle: ${childRead.reason}`).toBe(true);
+  if (!parentRead.ok || !childRead.ok) throw new Error("Native creation completion unreadable");
+  expect([parentRead.complete, childRead.complete, parentRead.next, childRead.next]).toEqual([true, true, undefined, undefined]);
+  expect(parentRead.value.scope).toEqual(fact.at);
+  expect(childRead.value.status, "Recorded child must be active after scheduler idle; pending creation needs a distinct disposition").toBe("active");
+  const row = parentRead.value.items.find(item => item.type === "lane" && item.id === fact.seq);
+  expect(row, "Accepted opening must retain its native directory lane row").toBeDefined();
+  expect(["refused", "conflict"]).not.toContain(row?.state);
+  expect(row?.refs["scope"], "Parent must have confirmed its actual child after scheduler idle").toEqual(childRead.value.scope);
+  expect([childRead.value.scope.scope, childRead.value.scope.kind, childRead.value.definition]).toEqual([child, "lane", DEMO_DIGESTS.issue]);
+  return child;
+}
 
 // Real native ISSUE reports and manifest admissions. Authority/rules peers,
 // Git host and clock are the graph's explicitly labelled stand-ins; the
@@ -106,8 +151,11 @@ test("native task data supplies active issue choices, detached Description, exac
     expect(choices.map((choice) => choice.value)).toEqual([DEMO_DIGESTS.issue]);
     const created = await act(room, room.directory, "open-issue", { fields: { definition: choices[0]!.value, title: "Clear task", body: "A literal Description.", conditions: ["Clear task"] } });
     expect(created.answer.answer).toBe("accepted");
-    await d.pause();
+    if (created.answer.answer !== "accepted") throw new Error("Issue opening was not accepted");
+    const child = await completeIssue(d, room, created.answer.receipt.fact);
     const issue = (await listLanes(room)).issues.find((row) => row.title === "Clear task")!;
+    expect(issue, "Confirmed native issue must appear in the Page projection").toBeDefined();
+    expect(issue.scope).toBe(child);
     expect((await loadIssue(room, issue.scope)).body).toBe("A literal Description.");
     expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Task data")).code).toBe(0);
     const changeRow = (await listLanes(room)).changes.find((row) => row.title === "Task data")!;

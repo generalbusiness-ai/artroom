@@ -1,16 +1,15 @@
-import { describe, expect, test, onTestFinished } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
-import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
-import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { nativeFixtureLifetime, driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import type { ArtifactsNamespace } from "../../scope/src/artifacts-host.ts";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
 import type { Outside } from "../../scope/src/index.ts";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
-import { outsideOf, wired } from "../../scope/test/outside.ts";
+import { routed, type Platform } from "../../scope/test/repository.ts";
+import { outsideOf } from "../../scope/test/outside.ts";
 import { command, memoryStore, type Context, type Git, type Outcome } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
@@ -19,11 +18,11 @@ const NAMESPACE = "artroom-demo";
 const HOST = "service.invalid";
 
 /** STAND-IN: the binding of the hosting's own Git service, scripted. Each read token has a new plaintext and the lifetime asked. */
-function binding() {
+function binding(lifetime: ReturnType<typeof nativeFixtureLifetime>) {
   const minted: string[] = [];
   const ns: ArtifactsNamespace = {
     get: async (name) => ({
-      createToken: async (scope, ttl) => { minted.push(`read-plaintext-${minted.length + 1}`); return { id: `tok-${minted.length}`, plaintext: minted.at(-1), scope, expiresAt: new Date(timeMs(net.clock.now)! + ttl * 1000).toISOString() }; },
+      createToken: async (scope, ttl) => { lifetime.active(); minted.push(`read-plaintext-${minted.length + 1}`); return { id: `tok-${minted.length}`, plaintext: minted.at(-1), scope, expiresAt: new Date(lifetime.now() + ttl * 1000).toISOString() }; },
       revokeToken: async () => true,
       info: async () => ({ name, remote: `https://${HOST}/git/${NAMESPACE}/${name}.git` }),
     }),
@@ -35,9 +34,9 @@ function binding() {
 const onlyMintRead = (port: Outside): Outside => ({ ...port, accepts: (owner, kind) => kind === "mint-read" && port.accepts(owner, kind), send: (request) => (request.kind === "mint-read" ? port.send(request) : Promise.resolve(null)) });
 
 /** STAND-IN for the `git` program: it records each run's arguments and added environment, and exits 0. */
-function recordingGit(): Git & { runs: { args: readonly string[]; env: Readonly<Record<string, string>> }[] } {
+function recordingGit(lifetime: ReturnType<typeof nativeFixtureLifetime>): Git & { runs: { args: readonly string[]; env: Readonly<Record<string, string>> }[] } {
   const runs: { args: readonly string[]; env: Readonly<Record<string, string>> }[] = [];
-  return { runs, run: async (args, env) => { runs.push({ args: [...args], env: { ...env } }); return 0; } };
+  return { runs, run: async (args, env) => { lifetime.active(); runs.push({ args: [...args], env: { ...env } }); return 0; } };
 }
 
 // Invariant: `artroom clone` signs `read-token`, reads the token once, and gives it to git only as the header configuration in
@@ -54,61 +53,61 @@ function recordingGit(): Git & { runs: { args: readonly string[]; env: Readonly<
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations driver and the dispatchers, as a deployment's alarms would. |
 describe("artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
   test("remote prints the host's form; a member reads the destination with her session before any act there and after the claim window; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
-    net.hold = net.deaf = null;
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
-    onTestFinished(owner.close);
+    const lifetime = nativeFixtureLifetime(owner);
     try {
-      await story();
+      await story(lifetime);
     } finally {
-      owner.close();
+      lifetime.release();
     }
   });
 });
 
-async function story(): Promise<void> {
-  const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
-  const now = () => timeMs(net.clock.now)!;
+async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
+  const fetch = ((url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init))) as unknown as Fetch;
+  const now = lifetime.now;
   const registers: Platform[] = [];
   const destinations: Platform[] = [];
   // STAND-IN for the scheduler: each creation is answered under the name of attempt 1, with the ID the host gives; each pass drives
   // the registers' and destinations' operations, then the dispatchers.
   const pause = async (waiting: readonly string[]) => {
+    lifetime.active();
     for (const register of registers) {
       const final = await (register.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "claim");
       for (const claim of (await register.summary()).value.items.filter((item) => item.type === "claim").concat(final.ok ? final.value : [])) {
         const name = repositoryName(claim.values["seed"] as Digest, 1);
         const github = (await register.item(0)).values["host"] === "github.com";
+        lifetime.active();
         outsideOf(register.name).answer(`${claim.id}:0` as OperationId, 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name, id: github ? "71" : name } } });
       }
     }
-    for (const node of [...registers, ...destinations]) while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) { /* each pass may make the next one due */ }
-    await settle(...registers, ...waiting.filter((scope) => !registers.some((r) => r.name === scope)).map((scope) => new Platform(scope as never)));
+    await driveFixture([...registers, ...destinations, ...waiting.map(scope => lifetime.platform(scope as never))], lifetime.wait);
   };
-  const git = recordingGit();
+  const git = recordingGit(lifetime);
   const rita: Context = { store: memoryStore(), fetch, now, pause, git };
   const una: Context = { store: memoryStore(), fetch, now, pause, git };
-  const run = (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
+  const run = (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
   const ok = (outcome: Outcome) => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
 
   // A room on the hosting's own Git service.
   ok(await run(rita, "install", SERVICE, "--host", "artifacts", "--namespace", NAMESPACE));
-  const R = new Platform((await rita.store.config())!.register!.scope);
-  wired.set(R.name, () => ({ outside: outsideOf(R.name) }));
+  const R = lifetime.platform((await lifetime.wait(() => rita.store.config()))!.register!.scope);
+  lifetime.wire(R.name, () => ({ outside: outsideOf(R.name) }));
   await R.restart();
   registers.push(R);
   ok(await run(rita, "claim", "demo", "--handle", "@rita"));
-  const repository = (await rita.store.config())!.repository!;
-  const G = new Platform(repository.destination);
+  const repository = (await lifetime.wait(() => rita.store.config()))!.repository!;
+  const G = lifetime.platform(repository.destination);
   const name = (await G.item(0)).values["repository"] as { name: string };
   const remoteUrl = `https://${HOST}/git/${NAMESPACE}/${name.name}.git`;
-  const service = binding();
-  platformOutside.set(G.name, (given, sql) => onlyMintRead(artifactsOutside(given, sql, { ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: HOST, maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }), ARTIFACTS: service.ns })));
+  const service = binding(lifetime);
+  lifetime.outside(G.name, (given, sql) => onlyMintRead(artifactsOutside(given, sql, { ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: HOST, maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }), ARTIFACTS: service.ns })));
   await G.restart();
   destinations.push(G);
   // The first destination read and clone happen after the claim's signed-read
   // window, with no destination act or membership observation to bootstrap them.
   expect((await G.entries()).some((entry) => entry.input.type === "act")).toBe(false);
-  net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
+  lifetime.advance(16 * 60_000);
   try {
     // remote: the branch item's record. The service's hostname is the deployment's setting, which no scope records: it is marked.
     expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, `Remote URL: https://<service host>/git/${NAMESPACE}/${name.name}.git (the service host is the deployment's setting; artroom clone prints it whole)`] });
@@ -136,7 +135,7 @@ async function story(): Promise<void> {
     ]);
     expect(cloned.lines).toEqual([expect.stringMatching(new RegExp(`^Read token: ${G.name}:\\d+, until \\S+\\.$`)), `Remote URL: ${remoteUrl}`, "Cloned into here."]);
     // The token is in no argument, in no printed line, in no entry and in no config.
-    for (const text of [JSON.stringify(git.runs.map((r) => r.args)), cloned.lines.join("\n"), canonicalize(await G.entries()), JSON.stringify(await rita.store.config())]) expect(text).not.toContain("read-plaintext");
+    for (const text of [JSON.stringify(git.runs.map((r) => r.args)), cloned.lines.join("\n"), canonicalize(await G.entries()), JSON.stringify(await lifetime.wait(() => rita.store.config()))]) expect(text).not.toContain("read-plaintext");
     // remote now prints the URL whole: the clone's credential answer named it, and the config keeps it.
     expect((await run(rita, "remote")).lines.at(-1)).toBe(`Remote URL: ${remoteUrl}`);
 
@@ -151,29 +150,29 @@ async function story(): Promise<void> {
     expect((await run(una, "clone", "--hours", "25")).code).toBe(2);
     expect((await G.summary()).at).toEqual(before);
   } finally {
-    platformOutside.delete(G.name);
-    wired.delete(R.name);
+    lifetime.unOutside(G.name);
+    lifetime.unWire(R.name);
   }
 
   // GitHub: the remote URL is whole from the branch item alone.
   const vic: Context = { store: memoryStore(), fetch, now, pause };
   ok(await run(vic, "install", SERVICE, "--host", "github.com", "--namespace", "generalbusiness-ai"));
-  const H = new Platform((await vic.store.config())!.register!.scope);
-  wired.set(H.name, () => ({ outside: outsideOf(H.name) }));
+  const H = lifetime.platform((await lifetime.wait(() => vic.store.config()))!.register!.scope);
+  lifetime.wire(H.name, () => ({ outside: outsideOf(H.name) }));
   await H.restart();
   registers.length = 0;
   registers.push(H);
   try {
     ok(await run(vic, "claim", "hub", "--handle", "@vic"));
-    const hub = ((await new Platform((await vic.store.config())!.repository!.destination).item(0)).values["repository"]) as { name: string };
+    const hub = ((await lifetime.platform((await lifetime.wait(() => vic.store.config()))!.repository!.destination).item(0)).values["repository"]) as { name: string };
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
     // Past the intent window of the claim, the founder's key's signed read is refused, and the destination, which has no act yet, is
     // read with the founder's session: remote and clone go on (the planner's decision ca8ad1cf; the gap the live-ops note's section 4,
     // items 1 and 2, recorded).
-    net.clock.now = timeOf(timeMs(net.clock.now)! + 16 * 60_000);
+    lifetime.advance(16 * 60_000);
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
     expect(await run({ ...vic, git: { run: async () => null } }, "clone")).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: Basic <x-access-token:read token, base64>" clone -- https://github.com/generalbusiness-ai/${hub.name}.git`] });
   } finally {
-    wired.delete(H.name);
+    lifetime.unWire(H.name);
   }
 }
