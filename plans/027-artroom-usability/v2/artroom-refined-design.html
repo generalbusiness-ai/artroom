@@ -1,0 +1,299 @@
+<div id="artroom-refined-design">
+  <div class="text-small" style="margin-bottom:10px">Concept · sample data</div>
+  <div class="ar2-stage"><div class="artroom" aria-label="Artroom design"></div></div>
+  <details style="margin-top:12px"><summary class="text-small" style="padding:10px 0">Explore screens</summary>
+  <div class="viz-row" style="gap:12px;margin:8px 0 12px">
+    <label class="sr-only" for="ar2-view">Preview screen</label>
+    <select class="form-select" id="ar2-view" style="width:auto">
+      <option value="issues">Issues</option><option value="changes">Changes</option><option value="ready">Open change</option><option value="review">Needs review</option><option value="merged">Merged change</option><option value="blocked">Invalid path</option><option value="pending">Awaiting confirmation</option><option value="create">Create room</option><option value="rules">Rules</option><option value="empty">Empty room</option><option value="pages">Pages</option>
+    </select>
+    <label class="sr-only" for="ar2-device">Preview width</label>
+    <select class="form-select" id="ar2-device" style="width:auto"><option value="responsive">Responsive</option><option value="390">Phone · 390 px</option><option value="320">Phone · 320 px</option></select>
+  </div>
+  </details>
+  <span class="sr-only" id="ar2-live" role="status" aria-live="polite"></span>
+</div>
+<style>
+#artroom-refined-design .ar2-stage{container-type:inline-size;margin-inline:auto;width:100%;max-width:100%}
+#artroom-refined-design .ar2-stage[data-device="390"]{max-width:390px}
+#artroom-refined-design .ar2-stage[data-device="320"]{max-width:320px}
+#artroom-refined-design .artroom{--paper:light-dark(#fff,#15171b);--rail:light-dark(#f7f8fa,#1c1f25);--ink:light-dark(#171b26,#f0f1f5);--muted-ink:light-dark(#5f687c,#b1bacb);--line:light-dark(#e3e6ed,#343a45);--input-line:light-dark(#7d8798,#8894a8);--accent:light-dark(#4f46c8,#b8b3ff);--on-accent:light-dark(#fff,#171245);--selected:light-dark(#ecebfa,#302c49);--success:light-dark(#246137,#9cd6ad);--error:light-dark(#a32a38,#ffc0c7);--addition:light-dark(#eff9f2,#20372a);--addition-ink:light-dark(#22613c,#b4e4c3);color-scheme:light dark;color:var(--ink);background:var(--paper);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:16px;line-height:1.5;display:grid;grid-template-columns:200px minmax(0,1fr);min-height:680px;position:relative;border:1px solid var(--line);border-radius:10px;overflow:clip;isolation:isolate}
+#artroom-refined-design .artroom *{box-sizing:border-box}
+#artroom-refined-design .artroom :where(button,input,textarea,select){font:inherit;color:inherit}
+#artroom-refined-design .artroom input::placeholder,#artroom-refined-design .artroom textarea::placeholder{color:var(--muted-ink);opacity:1}
+#artroom-refined-design .artroom button{cursor:var(--cursor-interaction,pointer)}
+#artroom-refined-design .artroom button:disabled{cursor:default;opacity:.5}
+#artroom-refined-design .artroom button:focus-visible,#artroom-refined-design .artroom input:focus-visible,#artroom-refined-design .artroom textarea:focus-visible,#artroom-refined-design .artroom select:focus-visible,#artroom-refined-design .artroom summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#artroom-refined-design .artroom svg{flex:none;width:18px;height:18px;stroke-width:1.75}
+#artroom-refined-design .artroom p{margin:0 0 16px}
+#artroom-refined-design .artroom h1{font-size:24px;line-height:1.3;font-weight:600;letter-spacing:-.5px;margin:0}
+#artroom-refined-design .artroom h2{font-size:18px;line-height:1.4;font-weight:600;margin:0 0 16px}
+#artroom-refined-design .quiet{color:var(--muted-ink)}
+#artroom-refined-design .small{font-size:14px;line-height:1.5}
+#artroom-refined-design .hide{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#artroom-refined-design .rail{background:var(--rail);padding:18px 18px;display:flex;flex-direction:column;min-width:0;gap:12px}
+#artroom-refined-design .wordmark{font-size:20px;line-height:1.4;font-weight:600;letter-spacing:-.7px;padding:0 2px}
+#artroom-refined-design .room-switch{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:transparent;border-radius:6px;min-height:36px;padding:7px 10px;text-align:left;width:100%;font-size:14px!important}
+#artroom-refined-design .room-switch .room-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#artroom-refined-design .room-switch svg:last-child{width:14px;height:14px}
+#artroom-refined-design .navigation{display:flex;flex-direction:column;gap:6px}
+#artroom-refined-design .nav-item{display:flex;align-items:center;gap:12px;min-height:36px;border:0;border-radius:6px;background:transparent;padding:7px 10px;text-align:left;font-size:14px!important}
+#artroom-refined-design .nav-item[aria-current="page"]{background:var(--selected);color:var(--accent);font-weight:500}
+#artroom-refined-design .nav-item:hover,#artroom-refined-design .room-switch:hover{background:var(--selected)}
+#artroom-refined-design .rail-bottom{margin-top:auto;display:flex;flex-direction:column;gap:14px;padding-top:32px}
+#artroom-refined-design .account{display:flex;align-items:center;gap:10px;min-height:42px;padding:8px 10px;border:0;background:transparent;text-align:left;font-size:14px!important}
+#artroom-refined-design .avatar{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--line);color:var(--ink);font-size:13px;flex:none}
+#artroom-refined-design .mobile-header{display:none}
+#artroom-refined-design .content{padding:24px 30px 36px;min-width:0}
+#artroom-refined-design .toolbar{display:flex;gap:24px;align-items:center;margin-bottom:12px}
+#artroom-refined-design .toolbar>.button{margin-left:auto}
+#artroom-refined-design .search{display:flex;align-items:center;gap:9px;flex:0 1 314px;min-height:40px;border:1px solid var(--input-line);border-radius:6px;padding:0 11px;background:var(--rail);color:var(--muted-ink);max-width:314px;min-width:140px}
+#artroom-refined-design .search:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+#artroom-refined-design .search input{border:0;outline:none!important;background:transparent;width:100%;min-width:0;padding:8px 0;font-size:14px}
+#artroom-refined-design .filters,#artroom-refined-design .tabs{display:flex;align-items:center;gap:14px;min-width:0}
+#artroom-refined-design .filter,#artroom-refined-design .tab{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted-ink);padding:10px 3px;min-height:40px;font-size:14px!important;white-space:nowrap}
+#artroom-refined-design .filter[aria-pressed="true"],#artroom-refined-design .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+#artroom-refined-design .button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;border:1px solid var(--line);border-radius:6px;background:var(--paper);padding:8px 12px;font-size:14px!important;font-weight:500;white-space:nowrap}
+#artroom-refined-design .button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#artroom-refined-design .button:hover{filter:brightness(.97)}
+#artroom-refined-design .link-button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--accent);padding:8px 0;min-height:40px;font-size:14px!important;text-align:left}
+#artroom-refined-design .icon-button{display:inline-grid;place-items:center;min-width:40px;min-height:40px;border:0;background:transparent;border-radius:6px;padding:8px;color:var(--muted-ink)}
+#artroom-refined-design .short-label{display:none}
+#artroom-refined-design .work-list{padding:0;margin:0;list-style:none}
+#artroom-refined-design .work-row{display:flex;align-items:flex-start;gap:14px;padding:var(--row-density,12px) 0;border-bottom:1px solid var(--line)}
+#artroom-refined-design .work-row:last-child{border-bottom:0}
+#artroom-refined-design .issue-ring{width:16px;height:16px;border:1.7px solid var(--muted-ink);border-radius:50%;margin-top:5px;flex:none}
+#artroom-refined-design .work-copy{min-width:0;flex:1}
+#artroom-refined-design .work-title{display:block;width:100%;border:0;background:transparent;font-weight:550;font-size:16px!important;text-align:left;line-height:1.5;padding:0;min-height:44px;overflow-wrap:break-word}
+#artroom-refined-design .work-title:hover{color:var(--accent)}
+#artroom-refined-design .work-meta{display:block;color:var(--muted-ink);font-size:14px;font-weight:400;margin-top:4px}
+#artroom-refined-design .row-end{color:var(--muted-ink);font-size:14px;white-space:nowrap;padding-top:2px}
+#artroom-refined-design .mobile-date{display:none}
+#artroom-refined-design .condition{display:inline-flex;align-items:center;gap:6px;font-size:14px;white-space:nowrap}
+#artroom-refined-design .condition.good{color:var(--success)}
+#artroom-refined-design .condition.bad{color:var(--error)}
+#artroom-refined-design .blank{padding:76px 0;text-align:center;color:var(--muted-ink);font-size:16px}
+#artroom-refined-design .blank p{margin:0 0 10px}
+#artroom-refined-design .detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:24px}
+#artroom-refined-design .detail-heading{flex:1;min-width:200px}
+#artroom-refined-design .detail-heading h1 .number{color:var(--muted-ink);font-size:20px;font-weight:400;white-space:nowrap;margin-left:8px}
+#artroom-refined-design .back{min-width:24px;min-height:24px;padding:0;margin-bottom:12px}
+#artroom-refined-design .detail-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted-ink);font-size:14px;margin-top:12px}
+#artroom-refined-design .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#artroom-refined-design .tabs{border-bottom:1px solid var(--line);gap:26px;margin-bottom:22px}
+#artroom-refined-design .tab{padding:11px 0}
+#artroom-refined-design .filebar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-size:14px}
+#artroom-refined-design .filebar .filename{min-width:0;overflow-wrap:anywhere;display:flex;align-items:center;gap:9px;font-weight:500}
+#artroom-refined-design .diff{border:1px solid var(--line);border-radius:6px;overflow:hidden;font:14px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
+#artroom-refined-design .diff-line{display:grid;grid-template-columns:38px minmax(0,1fr);min-height:28px}
+#artroom-refined-design .line-number{color:var(--muted-ink);background:var(--rail);text-align:right;padding:3px 9px;font-size:12px}
+#artroom-refined-design .diff-text{padding:3px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+#artroom-refined-design .diff-line.added .diff-text{background:var(--addition);color:var(--addition-ink)}
+#artroom-refined-design .blocker{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px;border-left:2px solid var(--error);padding:4px 0 4px 14px}
+#artroom-refined-design .blocker p{margin:0;font-size:14px}
+#artroom-refined-design .discussion{max-width:680px}
+#artroom-refined-design .description{margin-bottom:26px}
+#artroom-refined-design .comment{padding:18px 0;border-top:1px solid var(--line)}
+#artroom-refined-design .comment p{margin:8px 0 0}
+#artroom-refined-design .comment-author{font-size:14px;font-weight:500}
+#artroom-refined-design .composer{margin-top:22px}
+#artroom-refined-design .input{display:block;width:100%;min-width:0;border:1px solid var(--input-line);border-radius:6px;background:var(--paper);padding:10px 12px;min-height:44px;font-size:16px!important;line-height:1.5;resize:vertical}
+#artroom-refined-design textarea.input{min-height:112px}
+#artroom-refined-design .composer .actions{justify-content:flex-end;margin-top:10px}
+#artroom-refined-design .form-layout{max-width:650px;margin-inline:auto}
+#artroom-refined-design .form-layout h1{margin-bottom:28px}
+#artroom-refined-design .field{margin-bottom:20px}
+#artroom-refined-design .field label{display:block;font-size:14px;font-weight:500;margin-bottom:7px}
+#artroom-refined-design .form-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:26px}
+#artroom-refined-design .error-text{color:var(--error);font-size:14px;min-height:0;margin-top:7px}
+#artroom-refined-design .error-text:empty{display:none}
+#artroom-refined-design .rules-title{margin-bottom:25px!important}
+#artroom-refined-design .rule-row{display:grid;grid-template-columns:minmax(0,1fr) 188px;gap:22px;align-items:center;border-bottom:1px solid var(--line);padding:20px 0}
+#artroom-refined-design .rule-label{display:block;font-weight:500;margin-bottom:4px}
+#artroom-refined-design .rule-path{color:var(--muted-ink);font-size:14px;overflow-wrap:anywhere}
+#artroom-refined-design .rule-row select{font-size:14px!important;min-height:44px}
+#artroom-refined-design .advanced{font-size:14px;margin-top:20px}
+#artroom-refined-design .advanced summary{padding:10px 0;min-height:44px;cursor:var(--cursor-interaction,pointer);color:var(--muted-ink)}
+#artroom-refined-design .advanced .field{margin-top:12px}
+#artroom-refined-design .page-list .work-row{align-items:center}
+#artroom-refined-design .page-list .work-title{min-height:40px;display:flex;align-items:center}
+#artroom-refined-design .reading{max-width:68ch;margin:20px auto 0}
+#artroom-refined-design .reading h1{font-size:28px;margin-bottom:24px}
+#artroom-refined-design .reading p{line-height:1.7}
+#artroom-refined-design .page-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:28px}
+#artroom-refined-design .version-label{font-size:14px;color:var(--muted-ink)}
+#artroom-refined-design .overlay{grid-column:1/-1;position:absolute;inset:0;z-index:10;display:flex;align-items:flex-start;justify-content:center;padding:56px 24px;background:light-dark(#1c23372e,#0008)}
+#artroom-refined-design .dialog{background:var(--paper);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 44px light-dark(#17213b22,#0005);padding:28px;width:440px;max-width:100%;min-width:0}
+#artroom-refined-design .dialog h1{font-size:22px;margin-bottom:24px}
+#artroom-refined-design .dialog-close{float:right;margin:-10px -10px 0 10px}
+#artroom-refined-design .record{margin:0;font-size:14px}
+#artroom-refined-design .record div{display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-bottom:1px solid var(--line)}
+#artroom-refined-design .record dt{color:var(--muted-ink)}
+#artroom-refined-design .record dd{margin:0;text-align:right}
+#artroom-refined-design .room-menu{display:flex;flex-direction:column;gap:8px}
+#artroom-refined-design .room-menu .button{justify-content:flex-start;white-space:normal;text-align:left}
+#artroom-refined-design .skip{position:absolute;top:8px;left:8px;transform:translateY(-180%);z-index:20;background:var(--paper);color:var(--accent);padding:8px}
+#artroom-refined-design .skip:focus{transform:translateY(0)}
+@container (max-width:720px){
+  #artroom-refined-design .artroom{display:block;min-height:620px;border-radius:8px}
+  #artroom-refined-design .rail{display:none}
+  #artroom-refined-design .mobile-header{display:block;border-bottom:1px solid var(--line);padding:12px 16px 0}
+  #artroom-refined-design .mobile-context{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
+  #artroom-refined-design .mobile-context .room-switch{border:0;padding:4px 0;min-height:44px;font-size:16px!important;width:auto;max-width:calc(100% - 54px)}
+  #artroom-refined-design .mobile-context .account{padding:6px;min-height:44px;min-width:44px;justify-content:center}
+  #artroom-refined-design .mobile-context .account .avatar{width:32px;height:32px}
+  #artroom-refined-design .mobile-nav{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  #artroom-refined-design .mobile-nav .nav-item{background:transparent;border-radius:0;padding:10px 2px;border-bottom:2px solid transparent;min-height:44px;justify-content:center;gap:7px;flex:1}
+  #artroom-refined-design .mobile-nav .nav-item[aria-current="page"]{border-bottom-color:var(--accent)}
+  #artroom-refined-design .content{padding:20px 16px 28px}
+  #artroom-refined-design .toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:8px}
+  #artroom-refined-design .toolbar>.button{margin-left:0;justify-self:end}
+  #artroom-refined-design .search{grid-column:1/-1;max-width:none;min-height:44px;margin-bottom:4px}
+  #artroom-refined-design .search input{font-size:16px}
+  #artroom-refined-design .filters{gap:10px}
+  #artroom-refined-design .filter{padding:10px 0;min-height:44px}
+  #artroom-refined-design .button,#artroom-refined-design .icon-button,#artroom-refined-design .link-button,#artroom-refined-design .account{min-height:44px}
+  #artroom-refined-design .icon-button{min-width:44px}
+  #artroom-refined-design .full-label{display:none}
+  #artroom-refined-design .short-label{display:inline-flex;align-items:center;gap:6px}
+  #artroom-refined-design .work-row{padding:12px 0;gap:12px}
+  #artroom-refined-design .work-title{min-height:44px;display:block}
+  #artroom-refined-design .row-end .date{display:none}
+  #artroom-refined-design .row-end:has(.date){display:none}
+  #artroom-refined-design .mobile-date{display:inline}
+  #artroom-refined-design .change-list .work-row{flex-wrap:wrap}
+  #artroom-refined-design .change-list .work-copy{flex-basis:calc(100% - 32px)}
+  #artroom-refined-design .change-list .row-end{padding:0 0 0 30px}
+  #artroom-refined-design .detail-heading{min-width:0;flex-basis:100%}
+  #artroom-refined-design .detail-heading h1{font-size:22px}
+  #artroom-refined-design .detail-heading h1 .number{font-size:18px}
+  #artroom-refined-design .detail-top{gap:12px;margin-bottom:18px}
+  #artroom-refined-design .detail-top .actions{width:100%}
+  #artroom-refined-design .detail-meta{gap:8px;margin-top:10px}
+  #artroom-refined-design .back{margin-bottom:10px}
+  #artroom-refined-design .tabs{gap:22px;margin-bottom:18px}
+  #artroom-refined-design .tab{min-height:44px}
+  #artroom-refined-design .blocker{flex-wrap:wrap;gap:8px}
+  #artroom-refined-design .rule-row{grid-template-columns:1fr;gap:12px;padding:18px 0}
+  #artroom-refined-design .rule-row select{max-width:none;font-size:16px!important}
+  #artroom-refined-design .overlay{padding:24px 12px;align-items:flex-start}
+  #artroom-refined-design .dialog{padding:22px 18px}
+  #artroom-refined-design .filebar{font-size:14px}
+  #artroom-refined-design .form-footer{flex-wrap:wrap}
+  #artroom-refined-design .form-layout h1{font-size:22px}
+}
+@container (max-width:340px){#artroom-refined-design .mobile-nav .nav-item svg{display:none}}
+@media (pointer:coarse){#artroom-refined-design .artroom button{min-height:44px}#artroom-refined-design .icon-button{min-width:44px}#artroom-refined-design .search{min-height:44px}#artroom-refined-design .search input{font-size:16px}}
+@media (prefers-reduced-motion:reduce){#artroom-refined-design *{scroll-behavior:auto}}
+</style>
+<script>
+(() => {
+  const root=document.getElementById('artroom-refined-design');
+  const app=root.querySelector('.artroom'), stage=root.querySelector('.ar2-stage'), screenSelect=root.querySelector('#ar2-view'), deviceSelect=root.querySelector('#ar2-device'), live=root.querySelector('#ar2-live');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
+  const button=(label,action,primary=false,extra='')=>`<button type="button" class="button${primary?' primary':''}" data-action="${action}" ${extra}>${label}</button>`;
+  const control=(label,action,name)=>`<button type="button" class="icon-button" data-action="${action}" aria-label="${label}">${icon(name)}</button>`;
+  let issues=[
+    {id:12,title:'Add a getting-started page',author:'Paul',date:'2h',state:'open',body:'A short guide for someone joining their first room.',comments:[]},
+    {id:11,title:'Clarify the agent instructions',author:'Hugh',date:'Yesterday',state:'open',body:'Make the review requirements easier to find.',comments:[]},
+    {id:10,title:'Document the publishing workflow',author:'Una',date:'Yesterday',state:'open',body:'Explain the steps from a proposed change to a merged version.',comments:[]},
+    {id:8,title:'Make mobile review comfortable',author:'Maya',date:'Oct 6',state:'open',body:'Keep the file content and review actions usable on a phone.',comments:[]},
+    {id:5,title:'Keep the navigation focused',author:'Hugh',date:'Oct 5',state:'closed',body:'Remove repeated room headings from work screens.',comments:[]}
+  ];
+  let changes=[
+    {id:15,title:'Clarify the agent instructions',author:'Paul',date:'2h',file:'AGENTS.md',state:'review',version:5,lines:['# Agent instructions','','Ask for review before merging protected files.','Keep changes small and explain their purpose.'],comments:[{author:'Hugh',text:'Could the example use a relative path?'}]},
+    {id:14,title:'Add an introductory page',author:'Paul',date:'Yesterday',file:'../outside.md',state:'blocked',version:5,lines:['# Introduction','','Welcome to the room.'],comments:[]},
+    {id:7,title:'Add a getting-started page',author:'Paul',date:'Oct 8',file:'guide/start.md',state:'merged',version:5,lines:['# Getting started','','Start with a small change.','Ask for review when it is ready.'],comments:[]},
+    {id:16,title:'Improve the first example',author:'Una',date:'1h',file:'guide/example.md',state:'ready',version:2,lines:['# Your first change','','Edit one page.','Review the result before merging.'],comments:[]}
+  ];
+  const rooms={'Field notes':{issues,changes,pages:{'guide/start.md':['# Getting started','','Start with a small change.','Ask for review when it is ready.'],'AGENTS.md':['# Agent instructions','','Keep changes small and explain their purpose.']}}};
+  const viewNames=['issues','changes','ready','review','merged','blocked','pending','create','rules','empty','pages'];
+  let state={screen:'issues',device:'responsive',room:'Field notes',filter:'open',query:'',selectedChange:15,selectedIssue:12,tab:'files',modal:null,theme:'system',empty:false,roomDraft:'',commentDraft:'',issueDraft:{title:'',body:''},editDraft:{title:'',path:'',body:''},ruleDraft:{docs:'0',protected:'1',infrastructure:'1'},rules:{docs:'0',protected:'1',infrastructure:'1'},rulesDirty:false};
+  const saved=window.openai?.widgetState?.privateContent;
+  if(saved?.revision===2){if(viewNames.includes(saved.view))state.screen=saved.view;if(['responsive','390','320'].includes(saved.device))state.device=saved.device;}
+  let returnFocus=null;
+  const localOrigin='preview-'+Math.random().toString(36).slice(2);
+  state.commentDrafts={};state.pagePath='guide/start.md';state.pageLines=null;state.pageVersion=null;
+  state.listState={issues:{filter:'open',query:''},changes:{filter:'open',query:''}};
+  rooms['Field notes'].rules={...state.rules};
+  const announce=text=>{live.textContent=text;};
+  function remember(){const view=state.modal==='create'?'create':state.empty&&state.screen==='issues'?'empty':state.screen==='change'?(['review','merged','blocked','pending'].includes(currentChange().state)?currentChange().state:'ready'):viewNames.includes(state.screen)?state.screen:screenSelect.value;screenSelect.value=view;if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{revision:2,screen:state.screen,device:state.device},privateContent:{revision:2,view,device:state.device,origin:localOrigin}}).catch(()=>{});}
+  function currentChange(){return changes.find(c=>c.id===state.selectedChange)||changes[0];}
+  function currentIssue(){return issues.find(c=>c.id===state.selectedIssue)||issues[0];}
+  function switchRoom(name){const changed=state.room!==name;state.room=name;issues=rooms[name].issues;changes=rooms[name].changes;state.rules={...(rooms[name].rules||{docs:'0',protected:'1',infrastructure:'1'})};state.ruleDraft={...state.rules};state.rulesDirty=false;state.empty=false;state.pageLines=null;state.pageVersion=null;if(changed){state.listState={issues:{filter:'open',query:''},changes:{filter:'open',query:''}};state.filter='open';state.query='';state.issueDraft={title:'',body:''};state.editDraft={title:'',path:'',body:''};}}
+  function commentKey(subject){return state.room+':'+(state.screen==='issue'?'issue:':'change:')+subject.id;}
+  function condition(c){const labels={ready:'Open',review:'Needs review','review-requested':'Waiting for Maya',approved:'Approved',merged:'Merged',blocked:'Invalid path',pending:'Awaiting confirmation'};const name=c.state==='merged'?'git-merge':c.state==='blocked'?'circle-alert':c.state==='pending'||c.state==='review-requested'?'clock-3':c.state==='review'?'message-square':'circle-dot';return `<span class="condition ${c.state==='merged'?'good':c.state==='blocked'?'bad':''}">${icon(name)}${labels[c.state]||'Open'}</span>`;}
+  function reviewRequired(path){const protectedPath=/(^|\/)(AGENTS|CLAUDE)\.md$/.test(path)||/^\.github\/(workflows|actions)\//.test(path);const infra=/^(infrastructure|config)\//.test(path);return Number(state.rules[protectedPath?'protected':infra?'infrastructure':'docs'])>0;}
+  function navigation(mobile=false){let selected=['issue','compose-issue'].includes(state.screen)?'issues':['change','compose-change','preview'].includes(state.screen)?'changes':state.screen==='page'?'pages':state.screen;return `<nav class="${mobile?'mobile-nav':'navigation'}" aria-label="Room navigation">${[['issues','Issues','circle-dot'],['changes','Changes','git-pull-request'],['pages','Pages','file-text']].map(([value,label,name])=>`<button type="button" class="nav-item" data-action="${value}" ${selected===value?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav>`;}
+  function roomSwitch(){return `<button type="button" class="room-switch" data-action="rooms" aria-label="Switch room: ${escape(state.room)}">${icon('panel-top')}<span class="room-name" data-tooltip="${escape(state.room)}">${escape(state.room)}</span>${icon('chevron-down')}</button>`;}
+  function shell(content){return `<a href="#ar2-main" class="skip">Skip to content</a><aside class="rail"><div class="wordmark">Artroom</div>${roomSwitch()}${navigation()}<div class="rail-bottom"><button type="button" class="nav-item" data-action="rules" ${state.screen==='rules'?'aria-current="page"':''}>${icon('settings-2')}Settings</button><button type="button" class="account" data-action="account" aria-label="Open account menu"><span class="avatar">H</span>${icon('chevron-down')}</button></div></aside><header class="mobile-header"><div class="mobile-context">${roomSwitch()}<button type="button" class="account" data-action="account" aria-label="Open account menu"><span class="avatar">H</span></button></div>${navigation(true)}</header><main class="content" id="ar2-main">${content}</main>${state.modal?modal():''}`;}
+  function list(kind){const isIssue=kind==='issues',all=state.empty?[]:isIssue?issues:changes;const filtered=all.filter(row=>(state.filter==='all'||(isIssue?row.state===state.filter:state.filter==='merged'?row.state==='merged':row.state!=='merged'))&&`${row.title} ${row.id} ${row.author}`.toLowerCase().includes(state.query.toLowerCase()));const action=isIssue?'compose-issue':'compose-change';const caption=isIssue?'Create issue':'Propose change';return `<h1 class="hide">${isIssue?'Issues':'Changes'}</h1><div class="toolbar"><label class="search">${icon('search')}<span class="hide">Search ${kind}</span><input type="search" data-search placeholder="Search ${kind}" value="${escape(state.query)}"></label><div class="filters" aria-label="Filter ${kind}">${['open',isIssue?'closed':'merged','all'].map(value=>`<button type="button" class="filter" data-filter="${value}" aria-pressed="${state.filter===value}">${value[0].toUpperCase()+value.slice(1)}</button>`).join('')}</div><button type="button" class="button primary" data-action="${action}" aria-label="${caption}"><span class="full-label">${caption}</span><span class="short-label">${icon('plus')} Create</span></button></div><div data-list>${rows(filtered,isIssue,all.length===0)}</div>`;}
+  function rows(values,isIssue,empty){if(!values.length)return `<div class="blank"><p>${empty?`No ${isIssue?'issues':'changes'} yet.`:'No matches.'}</p>${empty?'':button('Clear filters','clear')}</div>`;return `<ul class="work-list ${isIssue?'':'change-list'}">${values.sort((a,b)=>b.id-a.id).map(row=>`<li class="work-row">${isIssue?(row.state==='closed'?icon('circle-check'):'<span class="issue-ring" aria-hidden="true"></span>'):icon('git-pull-request')}<div class="work-copy"><button type="button" class="work-title" data-action="${isIssue?'issue':'change'}" data-id="${row.id}" aria-label="${escape(row.title)}" aria-describedby="ar2-meta-${isIssue?'i':'c'}-${row.id}"><span>${escape(row.title)}</span><span class="work-meta" id="ar2-meta-${isIssue?'i':'c'}-${row.id}">#${row.id} · ${escape(row.author)}<span class="mobile-date"> · ${escape(row.date)}</span>${isIssue?`<span class="hide"> · ${row.state==='closed'?'Closed':'Open'} issue</span>`:''}</span></button></div><div class="row-end">${isIssue?`<span class="date">${escape(row.date)}</span>`:condition(row)}</div></li>`).join('')}</ul>`;}
+  function change(){
+    const c=currentChange();
+    const action=c.state==='merged'?button('Open page','published'):c.state==='review'?button(c.author==='Hugh'?'Request review from Maya':'Review change',c.author==='Hugh'?'request-review':'review-dialog',true):c.state==='review-requested'?button('View request','view-request'):c.state==='blocked'?button('Fix path','fix-path',true):c.state==='pending'?button('Check status','check-status'):button('Merge change','merge',true);
+    return `<button type="button" class="icon-button back" data-action="changes" aria-label="Back to change list">${icon('arrow-left')}</button>
+      <div class="detail-top"><div class="detail-heading"><h1>${escape(c.title)} <span class="number">#${c.id}</span></h1>
+      <div class="detail-meta">${condition(c)}<span>· ${escape(c.author)}</span><span>· ${escape(c.date)}</span><span>· Version ${c.version}</span></div></div>
+      <div class="actions">${action}${control('Inspect change record','record','ellipsis')}</div></div>
+      ${c.state==='blocked'?'<div class="blocker"><p>Choose a file path inside this room.</p></div>':''}
+      <div class="tabs" role="tablist" aria-label="Change content">${['discussion','files','checks'].map(tab=>`<button type="button" class="tab" id="ar2-tab-${tab}" role="tab" data-tab="${tab}" aria-controls="ar2-panel" aria-selected="${state.tab===tab}" ${state.tab===tab?'':'tabindex="-1"'}>${tab[0].toUpperCase()+tab.slice(1)}${tab==='files'?' 1':''}</button>`).join('')}</div>
+      <section id="ar2-panel" role="tabpanel" aria-labelledby="ar2-tab-${state.tab}">${state.tab==='files'?files(c):state.tab==='checks'?'<p class="quiet small">No checks required.</p>':discussion(c)}</section>`;
+  }
+  function files(c){return `<div class="filebar"><span class="filename">${icon('file-text')}${escape(c.file)}</span><button type="button" class="link-button" data-action="preview">Preview</button></div><div class="diff" role="region" aria-label="File changes">${c.lines.map((line,i)=>`<div class="diff-line ${line?'added':''}" aria-label="${line?'Added':'Unchanged'} line ${i+1}"><span class="line-number" aria-hidden="true">${i+1}</span><span class="diff-text">${line?'+  ':''}${escape(line)}</span></div>`).join('')}</div>`;}
+  function discussion(subject){state.commentDraft=state.commentDrafts[commentKey(subject)]||'';return `<div class="discussion">${subject.body?`<p class="description">${escape(subject.body)}</p>`:''}${subject.comments.map(comment=>`<article class="comment"><span class="comment-author">${escape(comment.author)}</span><p>${escape(comment.text)}</p></article>`).join('')}<form class="composer" data-form="comment"><label class="hide" for="ar2-comment">Comment</label><textarea class="input" id="ar2-comment" data-draft="comment" placeholder="Add a comment…">${escape(state.commentDraft)}</textarea><div class="actions">${button('Comment','save-comment',false,state.commentDraft.trim()?'':'disabled')}</div></form></div>`;}
+  function issue(){const issue=currentIssue();return `<button type="button" class="icon-button back" data-action="issues" aria-label="Back to issue list">${icon('arrow-left')}</button><div class="detail-top"><div class="detail-heading"><h1>${escape(issue.title)} <span class="number">#${issue.id}</span></h1><div class="detail-meta"><span class="condition">${icon('circle-dot')}${issue.state==='closed'?'Closed':'Open'}</span><span>· ${escape(issue.author)}</span></div></div>${button(issue.state==='closed'?'Reopen issue':'Close issue','toggle-issue')}</div>${discussion(issue)}`;}
+  function composeIssue(){return `<div class="form-layout"><h1>Create issue</h1><form data-form="issue"><div class="field"><label for="ar2-title">Title</label><input id="ar2-title" class="input" data-draft="issue-title" value="${escape(state.issueDraft.title)}" maxlength="180" required></div><div class="field"><label for="ar2-description">Description <span class="quiet">(optional)</span></label><textarea id="ar2-description" class="input" data-draft="issue-body" rows="6">${escape(state.issueDraft.body)}</textarea></div><div class="form-footer">${button('Cancel','issues')}${button('Create issue','save-issue',true)}</div></form></div>`;}
+  function composeChange(){const d=state.editDraft;return `<div class="form-layout"><h1 style="overflow-wrap:anywhere">${d.fromPage?escape(d.path):'Propose a change'}</h1><form data-form="change">${d.fromPage?'':`<div class="field"><label for="ar2-change-title">Title</label><input class="input" id="ar2-change-title" data-draft="change-title" value="${escape(d.title)}" required maxlength="180"></div><div class="field"><label for="ar2-path">File path</label><input class="input" id="ar2-path" data-draft="change-path" value="${escape(d.path)}" aria-describedby="ar2-path-error" required></div>`}<div class="error-text" id="ar2-path-error" role="alert"></div><div class="field"><label ${d.fromPage?'class="hide"':''} for="ar2-body">Content</label><textarea class="input" id="ar2-body" data-draft="change-body" rows="8" required>${escape(d.body)}</textarea></div><div class="form-footer">${button('Cancel',d.fromPage?'pages':'changes')}${button('Propose change','save-change',true)}</div></form></div>`;}
+  function rules(){return `<div class="form-layout"><h1 class="rules-title">Rules</h1><form data-form="rules">${[['docs','Documentation','guide/**, docs/**'],['protected','Protected files','AGENTS.md, .github/workflows/**'],['infrastructure','Infrastructure','Configuration and infrastructure code']].map(([key,label,path])=>`<div class="rule-row"><div><label class="rule-label" for="ar2-rule-${key}">${label}</label><span class="rule-path">${path}</span></div><select class="input" id="ar2-rule-${key}" data-rule="${key}">${[['0','No review'],['1',key==='protected'?'1 rules controller':key==='infrastructure'?'1 maintainer':'1 reviewer'],['2',key==='protected'?'2 rules controllers':'2 reviewers']].map(([value,label])=>`<option value="${value}" ${state.ruleDraft[key]===value?'selected':''}>${label}</option>`).join('')}</select></div>`).join('')}<div class="form-footer">${button('Save changes','save-rules',true,state.rulesDirty?'':'disabled')}</div></form></div>`;}
+  function pages(){const entries=Object.entries(rooms[state.room].pages);return `<h1 class="hide">Pages</h1><div class="page-toolbar"><span></span>${button('Create page','compose-change',true)}</div>${entries.length?`<ul class="work-list page-list">${entries.map(([path,lines])=>{const name=lines.find(line=>line.startsWith('# '))?.slice(2)||path;return `<li class="work-row" data-path="${escape(path)}">${icon('file-text')}<div class="work-copy"><button type="button" class="work-title" data-action="page" data-path="${escape(path)}">${escape(name)}</button><div class="work-meta">${escape(path)}</div></div>${control('Edit '+name,'edit-page','pencil')}</li>`;}).join('')}</ul>`:'<div class="blank"><p>No pages yet.</p></div>'}`;}
+  function page(preview=false){const c=preview?currentChange():null;const lines=preview?c.lines:state.pageLines||rooms[state.room].pages[state.pagePath]||[];const heading=lines.find(line=>line.startsWith('# '))?.slice(2)||'Page';return `<div class="page-toolbar">${preview?`<button type="button" class="link-button" data-action="change-back">${icon('arrow-left')}Back to change</button>`:control('Back to pages','pages','arrow-left')}${preview?`<span class="version-label">Preview · Version ${c.version}</span>`:`<div class="actions">${state.pageVersion?`<span class="version-label">Version ${state.pageVersion}</span>`:''}${button('Edit page','edit-page')}</div>`}</div><article class="reading"><h1>${escape(heading)}</h1>${lines.filter(line=>line&&!line.startsWith('# ')).map(line=>`<p>${escape(line)}</p>`).join('')}</article>`;}
+  function modal(){let body='';const close=control('Close dialog','close-modal','x').replace('icon-button','icon-button dialog-close');if(state.modal==='create')body=`${close}<h1 id="ar2-dialog-title">Create room</h1><form data-form="room"><div class="field"><label for="ar2-room-name">Name</label><input class="input" id="ar2-room-name" value="${escape(state.roomDraft)}" data-draft="room" required maxlength="80" aria-describedby="ar2-room-error"><div class="error-text" id="ar2-room-error" role="alert"></div></div><div class="form-footer">${button('Cancel','close-modal')}${button('Create room','save-room',true)}</div></form>`;
+    else if(state.modal==='rooms')body=`${close}<h1 id="ar2-dialog-title">Rooms</h1><div class="room-menu">${Object.keys(rooms).map(name=>button(escape(name),'select-room',false,`data-room="${escape(name)}"`)).join('')}${button('Create room','create',true)}</div><div class="form-footer">${button('Configure rules','rules')}</div>`;
+    else if(state.modal==='account')body=`${close}<h1 id="ar2-dialog-title">Hugh</h1><div class="field"><label for="ar2-appearance">Appearance</label><select class="input" id="ar2-appearance" data-appearance>${[['system','System'],['light','Light'],['dark','Dark']].map(([value,label])=>`<option value="${value}" ${state.theme===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="form-footer">${button('Configure rules','rules')}</div>`;
+    else if(state.modal==='record'){const c=currentChange();body=`${close}<h1 id="ar2-dialog-title">Change record</h1><dl class="record">${[['Version',c.version],['Lifecycle',c.state==='merged'?'Merged':'Open'],['Branch update',c.state==='merged'?'Confirmed':c.state==='pending'?'Unknown':'Not completed'],['File',c.file]].map(([key,value])=>`<div><dt>${key}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>`;}
+    else if(state.modal==='review')body=`${close}<h1 id="ar2-dialog-title">Review version ${currentChange().version}</h1><form data-form="review"><div class="field"><label for="ar2-decision">Decision</label><select class="input" id="ar2-decision"><option value="approve">Approve</option><option value="changes">Request changes</option></select></div><div class="field"><label for="ar2-feedback">Comment <span class="quiet">(optional)</span></label><textarea class="input" id="ar2-feedback" rows="3"></textarea></div><div class="form-footer">${button('Cancel','close-modal')}${button('Submit review','save-review',true)}</div></form>`;
+    else if(state.modal==='view-request')body=`${close}<h1 id="ar2-dialog-title">Review request</h1><dl class="record"><div><dt>Reviewer</dt><dd>Maya</dd></div><div><dt>Version</dt><dd>${currentChange().version}</dd></div></dl>`;
+    else if(state.modal==='rule-review')body=`${close}<h1 id="ar2-dialog-title">Save rule changes?</h1><dl class="record">${[['docs','Documentation'],['protected','Protected files'],['infrastructure','Infrastructure']].filter(([key])=>state.rules[key]!==state.ruleDraft[key]).map(([key,label])=>`<div><dt>${label}</dt><dd>${state.rules[key]} → ${state.ruleDraft[key]} reviews</dd></div>`).join('')}</dl><div class="form-footer">${button('Keep editing','close-modal')}${button('Save changes','confirm-rules',true)}</div>`;
+    return `<div class="overlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="ar2-dialog-title">${body}</section></div>`;
+  }
+  function render(){stage.dataset.device=state.device;app.style.colorScheme=state.theme==='system'?'light dark':state.theme;const screen=state.screen;const body=screen==='issues'||screen==='changes'?list(screen):screen==='change'?change():screen==='issue'?issue():screen==='compose-issue'?composeIssue():screen==='compose-change'?composeChange():screen==='rules'?rules():screen==='pages'?pages():screen==='preview'?page(true):page();app.innerHTML=shell(body);for(const node of [...app.children].filter(node=>!node.classList.contains('overlay'))){node.inert=Boolean(state.modal);if(state.modal)node.setAttribute('aria-hidden','true');}if(globalThis.lucide)lucide.createIcons({attrs:{width:18,height:18,'stroke-width':1.75}});}
+  function go(screen){state.modal=null;state.screen=screen;state.commentDraft='';if(['issues','changes'].includes(screen)){state.filter=state.listState[screen].filter;state.query=state.listState[screen].query;}render();remember();const target=['compose-issue','compose-change'].includes(screen)?app.querySelector('main input,main textarea'):['issues','changes','pages','rules'].includes(screen)?[...app.querySelectorAll(`[data-action="${screen}"]`)].find(node=>node.getClientRects().length):app.querySelector('main button');target?.focus();}
+  function openEditor(action,el){
+    if(action==='fix-path'){const c=currentChange();state.editDraft={title:c.title,path:c.file,body:c.lines.join('\n'),fix:true};}
+    else if(action==='edit-page'){const path=el.closest('[data-path]')?.dataset.path||state.pagePath;const lines=state.screen==='page'&&state.pageLines?state.pageLines:rooms[state.room].pages[path]||[];const heading=lines.find(line=>line.startsWith('# '))?.slice(2)||path;state.editDraft={title:'Update '+heading,path,body:lines.join('\n'),fix:false,fromPage:true,baseVersion:state.pageVersion};}
+    else if(!state.editDraft.title&&!state.editDraft.body)state.editDraft={title:'',path:'',body:'',fix:false};
+    else if(state.editDraft.fix||state.editDraft.fromPage)state.editDraft={title:'',path:'',body:'',fix:false};
+    go('compose-change');
+  }
+  function openModal(value,trigger){returnFocus=trigger?{action:trigger.dataset.action}:null;state.modal=value;render();const first=app.querySelector('.dialog input,.dialog select')||app.querySelector('.dialog button');if(first)first.focus();}
+  function closeModal(){state.modal=null;render();const target=returnFocus?.action&&[...app.querySelectorAll(`[data-action="${returnFocus.action}"]`)].find(node=>node.getClientRects().length);if(target)target.focus();}
+  function setSpec(value,persist=true){screenSelect.value=value;switchRoom('Field notes');state.modal=null;state.query='';state.filter='open';state.tab='files';state.empty=false;if(['ready','review','merged','blocked','pending'].includes(value)){state.screen='change';const id=value==='merged'?7:value==='blocked'?14:['ready','pending'].includes(value)?16:15;const c=changes.find(c=>c.id===id);c.state=value;state.selectedChange=c.id;}else if(value==='create'){state.screen='issues';state.modal='create';}else if(value==='empty'){state.screen='issues';state.empty=true;}else state.screen=value;render();if(persist)remember();}
+  function valid(form){return form?.reportValidity();}
+  function save(action){const form=app.querySelector('.dialog form')||app.querySelector('main form');if(!valid(form))return;
+    if(action==='save-room'){const name=app.querySelector('#ar2-room-name').value.trim();if(!name||rooms[name]){app.querySelector('#ar2-room-error').textContent=name?'A room with this name already exists.':'Enter a room name.';return;}rooms[name]={issues:[],changes:[],pages:{}};switchRoom(name);state.roomDraft='';state.modal=null;state.screen='issues';render();announce('Room created.');}
+    if(action==='save-issue'){const id=Math.max(0,...issues.map(i=>i.id),...changes.map(i=>i.id))+1;const title=state.issueDraft.title.trim();if(!title){const input=app.querySelector('#ar2-title');input.setCustomValidity('Enter a title.');input.reportValidity();return;}issues.unshift({id,title,author:'Hugh',date:'Now',state:'open',body:state.issueDraft.body,comments:[]});state.issueDraft={title:'',body:''};state.empty=false;state.selectedIssue=id;go('issue');announce('Issue created.');}
+    if(action==='save-change'){const d=state.editDraft;const path=d.path.trim();if(!d.title.trim()){const input=app.querySelector('#ar2-change-title');input.setCustomValidity('Enter a title.');input.reportValidity();return;}if(path.startsWith('/')||path.includes('\\')||path.split('/').some(p=>p==='..'||p==='.'||!p)||/%2e|%2f|%5c/i.test(path)){app.querySelector('#ar2-path-error').textContent='Use a relative path inside this room.';return;}if(new TextEncoder().encode(d.body).length>65536){app.querySelector('#ar2-path-error').textContent='Content exceeds 64 KiB.';return;}const readiness=reviewRequired(path)?'review':'ready';if(d.fix){const c=currentChange();Object.assign(c,{file:path,lines:d.body.split('\n'),version:c.version+1,state:readiness});}else{const id=Math.max(0,...changes.map(c=>c.id),...issues.map(c=>c.id))+1;changes.unshift({id,title:d.title.trim(),author:'Hugh',date:'Now',file:path,state:readiness,version:1,lines:d.body.split('\n'),comments:[]});state.selectedChange=id;}state.empty=false;state.tab='files';go('change');announce('Change proposed.');}
+    if(action==='save-review'){const c=currentChange(),feedback=app.querySelector('#ar2-feedback').value;const approved=app.querySelector('#ar2-decision').value==='approve';c.state=approved?'approved':'review';if(feedback)c.comments.push({author:'Hugh',text:feedback});state.modal=null;render();announce(approved?'Version approved.':'Review submitted.');}
+    if(action==='save-comment'){if(!state.commentDraft.trim())return;const subject=state.screen==='issue'?currentIssue():currentChange();subject.comments.push({author:'Hugh',text:state.commentDraft.trim()});delete state.commentDrafts[commentKey(subject)];state.commentDraft='';render();app.querySelector('#ar2-comment')?.focus();announce('Comment added.');}
+  }
+  screenSelect.addEventListener('change',()=>setSpec(screenSelect.value));deviceSelect.addEventListener('change',()=>{state.device=deviceSelect.value;render();remember();});
+  root.addEventListener('input',event=>{const el=event.target;if(el.matches('[data-search]')){state.query=el.value;state.listState[state.screen].query=state.query;const isIssue=state.screen==='issues',all=state.empty?[]:isIssue?issues:changes;const result=all.filter(row=>(state.filter==='all'||(isIssue?row.state===state.filter:state.filter==='merged'?row.state==='merged':row.state!=='merged'))&&`${row.title} ${row.id} ${row.author}`.toLowerCase().includes(state.query.toLowerCase()));app.querySelector('[data-list]').innerHTML=rows(result,isIssue,all.length===0);if(globalThis.lucide)lucide.createIcons({attrs:{width:18,height:18}});announce(result.length+' matches.');}
+    const d=el.dataset.draft;if(d==='room')state.roomDraft=el.value;if(d==='comment'){state.commentDraft=el.value;const subject=state.screen==='issue'?currentIssue():currentChange();state.commentDrafts[commentKey(subject)]=el.value;app.querySelector('[data-action="save-comment"]').disabled=!el.value.trim();}if(d==='issue-title')state.issueDraft.title=el.value;if(d==='issue-body')state.issueDraft.body=el.value;if(d==='change-title')state.editDraft.title=el.value;if(d==='change-path')state.editDraft.path=el.value;if(d==='change-body')state.editDraft.body=el.value;if(el.tagName==='INPUT')el.setCustomValidity('');});
+  root.addEventListener('change',event=>{const el=event.target;if(el.dataset.rule){state.ruleDraft[el.dataset.rule]=el.value;state.rulesDirty=Object.keys(state.rules).some(k=>state.rules[k]!==state.ruleDraft[k]);app.querySelector('[data-action="save-rules"]').disabled=!state.rulesDirty;}if(el.hasAttribute('data-appearance')){state.theme=el.value;app.style.colorScheme=state.theme==='system'?'light dark':state.theme;}});
+  root.addEventListener('submit',event=>event.preventDefault());
+  root.addEventListener('click',event=>{const el=event.target.closest('button');if(!el||!root.contains(el))return;if(el.dataset.filter){state.filter=el.dataset.filter;state.listState[state.screen].filter=state.filter;render();app.querySelector(`[data-filter="${state.filter}"]`).focus();return;}if(el.dataset.tab){state.tab=el.dataset.tab;render();app.querySelector(`[data-tab="${state.tab}"]`).focus();return;}const action=el.dataset.action;if(!action)return;if(action.startsWith('save-')&&action!=='save-rules'){save(action);return;}
+    if(['issues','changes','pages','rules'].includes(action)){go(action);return;}if(action==='issue'){state.selectedIssue=Number(el.dataset.id);go('issue');return;}if(action==='change'){state.selectedChange=Number(el.dataset.id);state.tab='files';go('change');return;}if(action==='change-back'){go('change');return;}if(action==='clear'){state.filter='all';state.query='';state.listState[state.screen]={filter:'all',query:''};render();return;}if(action==='compose-issue'){go(action);return;}if(['compose-change','edit-page','fix-path'].includes(action)){openEditor(action,el);return;}
+    if(action==='request-review'){currentChange().state='review-requested';render();announce('Review requested for this version.');return;}if(['rooms','account','create','view-request'].includes(action)){openModal(action,el);return;}if(action==='select-room'){switchRoom(el.dataset.room);go('issues');return;}if(action==='close-modal'||action==='current-room'){closeModal();return;}if(action==='record'){openModal('record',el);return;}if(action==='review-dialog'){openModal('review',el);return;}if(action==='save-rules'){openModal('rule-review',el);return;}if(action==='confirm-rules'){state.rules={...state.ruleDraft};rooms[state.room].rules={...state.rules};state.rulesDirty=false;state.modal=null;render();announce('Rules saved.');return;}if(action==='toggle-issue'){const i=currentIssue();i.state=i.state==='closed'?'open':'closed';render();announce(i.state==='closed'?'Issue closed.':'Issue reopened.');return;}
+    if(action==='merge'){const c=currentChange();c.state='pending';render();announce('Merge requested.');return;}if(action==='check-status'){const c=currentChange();c.state='merged';rooms[state.room].pages[c.file]=[...c.lines];render();announce('Merge confirmed in this sample.');return;}if(action==='preview'){go('preview');return;}if(action==='published'){const c=currentChange();state.pagePath=c.file;state.pageLines=[...c.lines];state.pageVersion=c.version;go('page');return;}if(action==='page'){state.pagePath=el.dataset.path;state.pageLines=[...rooms[state.room].pages[state.pagePath]];state.pageVersion=null;go('page');return;}
+  });
+  root.addEventListener('keydown',event=>{if(state.modal){if(event.key==='Escape'){event.preventDefault();closeModal();return;}if(event.key==='Tab'){const focusable=[...app.querySelectorAll('.dialog button:not(:disabled),.dialog input,.dialog textarea,.dialog select')];const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}}
+    if(event.target.matches('[role="tab"]')&&['ArrowRight','ArrowLeft','Home','End'].includes(event.key)){event.preventDefault();const names=['discussion','files','checks'];const index=names.indexOf(state.tab);state.tab=event.key==='Home'?names[0]:event.key==='End'?names.at(-1):names[(index+(event.key==='ArrowRight'?1:2))%3];render();app.querySelector(`[data-tab="${state.tab}"]`).focus();}
+    if(event.key==='Enter'&&event.target.tagName==='INPUT'&&!event.target.matches('[data-search]')){const form=event.target.closest('form');const submit=form?.querySelector('button.primary:not(:disabled)');if(submit){event.preventDefault();submit.click();}}
+  });
+  window.addEventListener('openai:set_globals',event=>{const next=event.detail?.globals?.widgetState?.privateContent;if(next?.revision!==2||next.origin===localOrigin)return;if(['responsive','390','320'].includes(next.device))state.device=next.device;if(viewNames.includes(next.view)&&next.view!==state.screen)setSpec(next.view,false);else render();});
+  if(viewNames.includes(state.screen)&&!['issues','changes','rules'].includes(state.screen))setSpec(state.screen);else render();deviceSelect.value=state.device;
+  if(globalThis.Tweak){const choice={density:'Comfortable'};const tweak=new Tweak({container:root,onChange:()=>{app.style.setProperty('--row-density',choice.density==='Compact'?'8px':'12px');}});tweak.addSelect(choice,'density',{label:'List spacing',options:['Comfortable','Compact']});}
+})();
+</script>

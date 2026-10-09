@@ -1,0 +1,61 @@
+{
+  "source": "e46bd87b341bd720498bba1db5fa871e7ea483f2",
+  "sourceTree": "5c434baf7dd6fe569b890e909335c12f59f4a108",
+  "mode": "production Page UI; actor-bound native readonly eligibility; founding transport loss STAND-IN with no Scope admission",
+  "register": {
+    "scope": "sc_jhz6izswgd4a7xcgajjt56t6vu77azyj45sdt2t67dcfdpzyuipq",
+    "inc": "in_65lciax2wfx63kopxdheomb6e4",
+    "kind": "register"
+  },
+  "definition": "platform:register@2",
+  "memberControlAbsent": true,
+  "memberRefusal": "The configured register cannot be read: forbidden. Nothing was submitted.",
+  "dialogCheck": {
+    "title": "Artroom",
+    "origin": "https://scopes.test",
+    "nameOnly": true,
+    "fontSize": 16,
+    "inputHeight": 46,
+    "targets": [
+      44,
+      44
+    ],
+    "overflow": false
+  },
+  "escapeFocusAndDraft": true,
+  "chromiumWebLocksAcrossTwoTabs": true,
+  "pendingDoubleClickBlocked": true,
+  "attemptedRequests": 3,
+  "exactSavedEnvelopeReused": true,
+  "operation": "e38a05eb-99cc-4615-b661-cced89f3bb9a",
+  "retainedOperations": 1,
+  "staleNewPredecessorRefusedWithoutPost": true,
+  "explicitResumeRequired": true,
+  "reopeningDiscoversOriginalOperation": true,
+  "changedSettingsQueuedMutationBlocked": true,
+  "changedSettingsAttemptedRequests": 1,
+  "originalJournalBytesUnchanged": true,
+  "originalJournalDigest": "sha256:b5a9f87b6639e0ecdb2446f98c64c28132cf45834f5f72cf63f896468db408b5",
+  "envelopeDigest": "sha256:1612650b660f14750bc336e02de70082ad59a62ea7e0ca1a777677bbf66edcec",
+  "originalLabelPreserved": true,
+  "screenshots": [
+    {
+      "name": "create-room-mobile",
+      "bytes": 34501
+    },
+    {
+      "name": "create-room-pending-mobile",
+      "bytes": 43870
+    }
+  ],
+  "explainedNetwork": [
+    "Member register read refused in its own native record.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission."
+  ],
+  "errors": [],
+  "unanswered": [],
+  "limit": "No founding request was admitted by a Scope, no native completion or hosted-provider success is claimed. The separate native adapter Scope witness tests admitted lost replies and settlement."
+}
