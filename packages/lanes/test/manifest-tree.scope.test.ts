@@ -62,7 +62,9 @@ test("artroom edit uses a one-element reservation tree as the real checker servi
   try { await story(ownHost(), wired, false, false, false, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-test.each(["summary", "request", "reply", "unavailable", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
+// CLI category formatting/pre-send routing lives at the cheaper HTTP boundary
+// in cli/test/proposal-outcomes.test.ts; keep actual acceptance and lost reply.
+test.each(["reply", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
   net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, linkFault); }
@@ -108,7 +110,9 @@ test.each(["production", "demo"] as const)("%s manifest admission rejects zero s
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, profile); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-test.each(["source-reply", "source-unavailable", "source-refused", "source-mismatch", "manifest-reply", "rules-read"] as const)("interrupted manifest proposal retains known partial work after %s (real scopes; transport fault, host and scheduler STAND-INs)", async (fault) => {
+// A collected source and a frozen manifest are different admitted work. The
+// other response/read categories are CLI HTTP stand-ins, not native evidence.
+test.each(["source-reply", "manifest-reply"] as const)("interrupted manifest proposal retains known partial work after %s (real scopes; transport fault, host and scheduler STAND-INs)", async (fault) => {
   net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
   const wired = new Set<ScopeId>();
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, fault); }
