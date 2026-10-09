@@ -1,7 +1,7 @@
 /** Narrow native Pages setup. Exact descriptor approval and legitimate admin authority are required; no install/founding. */
 import type { Answer, Beside, FieldValue, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, definitionDigest, isHead, isReceipt, isRecord, isSignedIntentShape, isScopeRef, REFUSAL_REASONS, keyIdOfSecret, parseStrict, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, httpTransport, secretSigner, shapeDeclaredAct, signedIntent, signedReads } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedIntent, signedReads } from "@generalbusiness/artroom-client";
 import { expectedOf, type DefinitionShape } from "@generalbusiness/artroom-cli";
 import { platform } from "@generalbusiness/artroom-platform";
 import { openRoom, Unreadable, type Room } from "./data.ts";
@@ -116,13 +116,16 @@ export async function setupPages(room: Room, store: ClaimStorage, options: Setup
         if(!followed.ok||followed.entry.input.type!=="act"||canonicalize(followed.entry.input.signed)!==canonicalize(step.signed))return result("unknown","An accepted Pages answer is retained; its entry readback is unavailable. No new stage was sent.");
       }
     }
+    // Platform type marks (including extents) are judged by their native rules,
+    // not the declared-only client shaper. Sign the exact reviewed fields as
+    // the existing CLI platform-act path does; the scope validates every field.
     const stages=[...PAGES_PRESET.definitions.map(d=>({kind:"activate" as const,name:d.name,fields:{digest:d.digest,name:d.name} as Record<string,FieldValue>,beside:{values:[d.bytes]} as Beside})),{kind:"publish" as const,name:"rules",fields:PAGES_RULES as unknown as Record<string,FieldValue>,beside:{} as Beside}];
     for(const stage of stages){
       const existing=record.steps.find(s=>s.kind===stage.kind&&s.name===stage.name); if(existing?.answer?.answer==="accepted")continue;
       const current=await original(room,options);if(current.me?.role!=="admin"||!current.me.actions.includes("rules.activate")||!current.me.actions.includes("rules.publish"))throw new Unreadable("Pages setup authority changed; no new stage was sent.");const state=await read(current);check(options);if(canonicalize(state.scope)!==canonicalize(record.rules))throw new Unreadable("The original rules incarnation changed.");
       if(stage.kind==="activate"&&state.items.some(i=>i.type==="definition"&&i.state==="active"&&i.values["name"]===stage.name&&i.values["digest"]===stage.fields["digest"]))continue;
       let step=existing;
-      if(!step){const supplied=platform(state.definition)!;const shape=supplied.data as unknown as DefinitionShape;const on=stage.kind==="publish"?state.items.find(i=>i.type==="rules")?.id??null:null;const shaped=shapeDeclaredAct(supplied.data as never,stage.kind,{on,fields:stage.fields} as never);const signed=await signedIntent(secretSigner(current.session.secret),{to:state.scope,kind:stage.kind,on,fields:shaped.fields,expected:expectedOf(shape.acts[stage.kind]!,state.items,on,stage.fields)},current.session.now?{now:current.session.now()}:{});step={kind:stage.kind,name:stage.name,signed,beside:{...shaped.beside,...stage.beside},attempted:false};record.steps.push(step);keep();}
+      if(!step){const supplied=platform(state.definition)!;const shape=supplied.data as unknown as DefinitionShape;const on=stage.kind==="publish"?state.items.find(i=>i.type==="rules")?.id??null:null;const signed=await signedIntent(secretSigner(current.session.secret),{to:state.scope,kind:stage.kind,on,fields:stage.fields,expected:expectedOf(shape.acts[stage.kind]!,state.items,on,stage.fields)},current.session.now?{now:current.session.now()}:{});step={kind:stage.kind,name:stage.name,signed,beside:stage.beside,attempted:false};record.steps.push(step);keep();}
       const beforeSend=await original(room,options);const beforeRules=await read(beforeSend);check(options);if(beforeSend.me?.role!=="admin"||!beforeSend.me.actions.includes("rules.activate")||!beforeSend.me.actions.includes("rules.publish")||canonicalize(beforeRules.scope)!==canonicalize(record.rules))throw new Unreadable("The original setup authority or rules incarnation changed before sending.");step.attempted=true;keep();
       try{step.answer=await h(current).submit(step.signed,[],step.beside);keep();}catch{return result("unknown","The Pages request/reply is unavailable. Its exact stage is retained; no next stage was sent.");}
       if(step.answer.answer!=="accepted")return result(step.answer.answer==="refused"?"refused":"unknown",`${stage.kind}: ${step.answer.answer}. Keep the original request before another mutation.`);
