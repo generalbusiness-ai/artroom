@@ -46,7 +46,7 @@ import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
-import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
+import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading, type SignedReadObserver } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
@@ -90,6 +90,8 @@ export interface Wiring {
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
   limits?: LimitConfig;
+  /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
+  signedReadObserver?: SignedReadObserver;
 }
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
@@ -179,7 +181,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       const read = await within(() => ports.resolver.read(use.fact, bounds.fetchSeconds), bounds.fetchSeconds);
       return read !== LATE && read !== null && "entry" in read && isEntryOf(read.entry, use.fact) ? read.entry : null;
     });
-    this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains };
+    this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains, ...(wiring.signedReadObserver ? { observe: wiring.signedReadObserver } : {}) };
     this.#readers = ports.readers;
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners());
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
@@ -340,8 +342,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   async #rooted(reader: unknown, read: ReadName, arg: string): Promise<void> {
     if (presentsSignedRead(reader)) {
-      if (!("key" in checkSignedReadRequest(this.#signed, this.#store, reader as string, read, arg))) return;
-      const local = checkLocalSignedRead(this.#signed, this.#store, reader as string, read, arg);
+      if (!("key" in checkSignedReadRequest(this.#signed.observe ? { ...this.#signed, phase: "rooted-request" } : this.#signed, this.#store, reader as string, read, arg))) return;
+      const local = checkLocalSignedRead(this.#signed.observe ? { ...this.#signed, phase: "rooted-local" } : this.#signed, this.#store, reader as string, read, arg);
       // The register's recent local signers read its whole history (ca8ad1cf).
       if ("key" in local && this.#store.scope()?.at.kind === "register") return;
       if (read === "summary" || read === "entry") {

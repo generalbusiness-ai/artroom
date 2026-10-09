@@ -35,6 +35,7 @@ import { lacking } from "@generalbusiness/artroom-platform/testing";
 import { ScopeObject, type Outside, type OutsideGiven, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
+import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
 import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
 import { outsideOf, owners, wired } from "./outside.ts";
@@ -106,10 +107,12 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const outside = platformOutside.get(name ?? "");
     const ports = wired.get(name ?? "")?.();
     const { outside: _deployed, ...rest } = deployed;
+    const signedReadObserver = signedDiagnosticFor(name);
     return {
       ...(ports?.outside ? rest : deployed),
       ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
       sessions: session.sessions,
+      ...(signedReadObserver ? { signedReadObserver } : {}),
       readers: (given) => {
         const real = session.readers(given);
         return {
