@@ -107,13 +107,67 @@ safe inspection guidance. Eighteen focused tests passed with one opt-in
 recorder skipped. A narrow read-only peer re-read confirmed those repairs;
 this is not the full independent Source review. Unknown cleanup stays owed.
 
-The planner must judge the expired reservation's explicit cleanup trigger
-(`f1b87a0b017aa745ed85f77f4ed3154d36d59eb7`), the historical one-file-form
-interpretation (`f001cfc222a2df5803491cc7ecd6584421c28846`) and the demo
-proposer's existing member-versus-maintainer authority
-(`aa0eef599d6e1e20b45885b4eb3ead5b44e67102`). The
-current optional technical demo uses a maintainer; it is not claimed to meet
-the request's explicit member-role scene.
+Planner decisions `9dba1b4ce04263e3acc6a06e427f4d64ccaa9a47` and
+`6c74a564f45defed9d6d91c73148c1b53770b3d9` adopted the three choices.
+New one-file edits are one-element lists on the shared tree; old entries and
+pins stay unchanged and earlier rooms refuse the list form. The maintainer
+is the accepted proposer for the demo, with member grants unchanged.
+Expiry cleanup must be automatic on the destination's next timed turn,
+with at most three recorded cleanup attempts and named owed cleanup.
+The former explicit-resend expiry candidate does not meet that decision.
+
+## Timed cleanup implementation checkpoint
+
+Source `68ef4cef97c605498cf9c65ead6e34d797f7fe22`, tree
+`a7d00ba4d080da4d33737da4c759de184c4d6004`, implements the platform-only
+constant timed opener for destination@3 in nextDue/judgeTimed and replay.
+Its list can open only the owned three-attempt reservation deletion and its
+first mint, from held capacity. Declared definitions, different kinds,
+unknown callback fields and attempts outside the owned kind's bound refuse.
+Only the exact destination@3 runtime can use it. No general callback,
+external scheduler or new user act was added.
+
+The timed transition records deletion and mint before the normal operations
+driver runs. Failed publication, cancellation and stage mismatch use the
+same bounded cleanup. Successful deletion waits for confirmed token cleanup;
+unknown custody is not made cleaned. Mint/revoke holds cover stage 1, push 3,
+receipt 3 and deletion 3, ten each. The live cleanup-owed item records a
+closed cleanupReason name and actual cleanupAttempts. A known accepted delete
+can finish at attempt one while the old stage stays unknown: that is owed
+unknown custody, not three fabricated attempts. A late own stage answer can
+record only the unused part of the three-attempt ceiling.
+
+The carried CLI reporting reads complete live publication items from the
+matched summary and retained final items from pagination. The distinction
+matters: the items route alone returns only final items and missed live owed
+cleanup in the first actual native witness. The corrected native verify --all
+names owed ref/token cleanup separately from consistent historical replay.
+
+At this clean checkpoint the committed-source real-Scope family passed
+fifteen tests (`/tmp/artroom-manifest-timed-clean-68ef-scope.log`, 17.94 seconds),
+including ordinary-act expiry, exactly three known refusals, unknown token
+custody, late original stage settlement, positive deletion/revoke cleanup and
+actual CLI reporting. Eight focused derive tests passed
+(`/tmp/artroom-manifest-timed-clean-68ef-derive.log`); affected typechecks passed.
+An omitted timed opener control failed at the direct recorded-operation
+assertion, with source restored. It precedes the last reserve-state and
+unknown-classification guards and is not a final whole-source gate.
+
+The initial late-stage witness incorrectly expected cleaned after the next
+marked delete saw absence. Its failed log
+`/tmp/artroom-manifest-timed-late-stage.log` is retained. That expectation was
+corrected, not the provider's uncertainty guard: absence cannot settle a
+marked attempt. The final witness retains named unknown cleanup after the
+remaining real attempts. Eleven older platform data values have equal
+canonical bytes; no historical source/admission chronology proof follows.
+
+**Read-trigger boundary remains open.** Ordinary reads currently do not enter
+Scope's timed turn. A proposed pin-specific read hook was removed following
+Root's boundary review; it is not in this source or its claimed validation.
+Only existing ordinary-act and alarm turn triggers are implemented and tested.
+Root requested explicit owner judgment on recorded read-turn preparation
+versus the instruction against hidden read-writes. No cleanup completion is
+claimed by treating a readonly query as an implicit provider operation.
 
 The exact final source still needs a final gate, an observed hosted proposal
 publication and named refusal, complete independent Source review and landing.
