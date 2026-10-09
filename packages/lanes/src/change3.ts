@@ -94,6 +94,7 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
     next.acts["check-error"]!.also["manifest"] = { item: "manifest", via: { slot: "manifest", of: "also.job" } };
     next.acts["check-error"]!.sends = clone(check.sends);
   }
+  for (const kind of ["check", "check-error"]) next.acts[kind]!.guards = [{ state: ["requested", "timed-out", "passed", "failed", "errored"], of: "also.job", reason: "job-not-active" }, ...next.acts[kind]!.guards];
   return next;
 }
 

@@ -272,9 +272,15 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   await pause([raceLane.name, repository.destination]);
   const heldAnswer = pendingCheck as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers };
   expect((heldAnswer.answer.evidence.body as { current: boolean }).current).toBe(true);
+  const beforeFenceHold = net.hold;
+  net.hold = (envelope) => beforeFenceHold?.(envelope) === true || (envelope.from.at.scope === raceLane.name && envelope.message.class === "request" && envelope.message.type === "tell" && (envelope.message.body as { message?: string }).message === "check-fence");
   const raceJ2out = ok(await run(founder, "act", "request-check", "--on", raceLane.name, "--set", `manifest=${raceVersion}`, "--set", `earlier=${raceJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
-  await pause([raceLane.name, repository.destination]);
   const raceJ2 = Number(/entry \S+:(\d+),/.exec(raceJ2out.lines[0]!)![1]);
+  expect((await raceLane.item(raceJ2)).state).toBe("queued");
+  const premature = await run(checker, "act", "check", "--on", raceLane.name, "--set", `job=${raceJ2}`, "--set", `tree=${raceManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
+  expect([premature.code, premature.lines[0]]).toEqual([1, expect.stringContaining("job-not-active")]);
+  net.hold = beforeFenceHold;
+  await pause([raceLane.name, repository.destination]);
   expect((await raceLane.item(raceJ2)).state).toBe("requested");
   const offered = await runInDurableObject(G.object, () => heldAnswer.late(heldAnswer.request.operation, heldAnswer.request.attempt, heldAnswer.answer));
   expect(offered).toMatchObject({ recorded: "written" });
