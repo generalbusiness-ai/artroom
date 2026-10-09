@@ -20,6 +20,7 @@ import { derive, giving } from "./handlers.ts";
 import { withinCounts } from "./draws.ts";
 import { fieldOutsideType, grantByRule, markOf, unjudged, type JudgedInput } from "./marks.ts";
 import { directoryOf } from "./sends.ts";
+import { creationContextOf } from "./creation-context.ts";
 import type { Judgment } from "./judge.ts";
 import type { StateView } from "./state.ts";
 import { timeMs } from "./time.ts";
@@ -153,6 +154,11 @@ function genesisJudged(view: StateView, definition: ValidDefinition, asked: Foun
    */
   const refuse = (reason: Reason, uses: readonly FactUse[] = sourceUse, prepared: readonly Prepared[] = []): Judgment =>
     ({ result: "write", draft: { input: input("refused"), uses, prepared, effects: [], sends: result("refused", reason), judgesTime: founding !== null } });
+
+  // The source proved the whole message above. Reserved metadata is separate
+  // from domain fields; an invalid opt-in is a terminal refusal, with no
+  // declared child sends. An absent marker preserves the legacy judgment.
+  if (child && creationContextOf(child.message.body).kind === "invalid") return refuse({ code: "bad-field" });
 
   // The genesis act, with the opener's parties from the creation message, or with the founding intent's fields. It has no signer:
   // nobody signs for a scope that does not exist yet, and the founding rule is the authority note's.

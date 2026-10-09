@@ -148,7 +148,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     const parent = (await D.entries())[accepted.receipt.fact.seq]!;
     expect(parent.sends).toHaveLength(1);
     expect(parent.sends[0]!.to).toEqual(childSeed);
-    expect(parent.sends[0]!.message).toMatchObject({ class: "request", type: "create", body: { membership, directory: await D.at(), fields: { opener: { membership, member: "@rita" }, target: 7 } } });
+    expect(parent.sends[0]!.message).toMatchObject({ class: "request", type: "create", body: { membership, creationContext: { v: 1 }, directory: await D.at(), fields: { opener: { membership, member: "@rita" }, target: 7 } } });
     expect(await D.stub.retained(reader, "definition", COUNTING_DEFINITION)).toMatchObject({ ok: true, value: { bytes } });
     expect((await D.item(accepted.receipt.fact.seq)).state).toBe("creating");
     expect((await C.stub.summary(reader)).ok).toBe(false);
@@ -178,12 +178,18 @@ test("explicit supporting cohort establishes Counting with native authority and 
     await settle(D, A);
     const nested = await A.created(0, 1);
     await settle(D, A, nested);
+    const nestedCreate = (await A.entries())[0]!.sends.find((send) => send.n === 1);
+    expect(nestedCreate?.message).toMatchObject({ class: "request", type: "create", body: { creationContext: { v: 1 }, membership } });
+    expect((await nested.entries())[0]!.input).toMatchObject({ type: "genesis", message: { body: { creationContext: { v: 1 }, membership } } });
+    expect((await lifetime.wait(() => routed(`${SERVICE}/v1/scopes/${nested.name}`, { headers: { authorization: issued.session.reader() } }))).status).toBe(200);
+    await nested.did(rita, "initialize", { expected: await nested.expected({ configuration: 0 }) });
+    expect((await nested.summary()).value.items.find((item) => item.type === "board")).toMatchObject({ state: "paused", values: { target: 7 } });
     expect((await A.entries())[0]!.input).toMatchObject({ type: "genesis", message: { body: { fields: { peer: { membership, member: "@sam" } } } } });
     for (const [digest, value] of [[containerDigest, containerBytes], [COUNTING_DEFINITION, bytes]] as const) {
       expect(await D.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
       expect(await A.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
     }
-    for (const node of [D, C]) {
+    for (const node of [D, C, A, nested]) {
       const head = (await node.summary()).at;
       const replay = await lifetime.wait(() => verify(httpSource(SERVICE, { fetch: routed }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
       expect([replay.report.result, replay.why]).toEqual(["consistent", null]);

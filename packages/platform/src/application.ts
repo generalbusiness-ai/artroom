@@ -102,7 +102,9 @@ export const directoryRules5: Rules = {
     if (given.input.type !== "act" || checked.result !== "ready" || !signer) throw new Error("application creation follows its validated admission");
     const fields = applicationValues(given.resolved.fields["values"], checked.root, signer.member, given.resolved.bounds);
     if (!fields) throw new Error("application creation retains its validated genesis values");
+    const membership = directoryMembership(given.state);
+    if (!membership) throw new Error("application creation retains its confirmed native membership");
     const seed: Seed = { v: 1, kind: "lane", definition: given.resolved.fields["definition"] as Digest, creator: given.resolved.at, cause: intentDigest(given.input.signed.intent), ordinal: 0 };
-    return { to: seed, message: { class: "request", type: "create", body: { fields, directory: given.resolved.at, membership: directoryMembership(given.state) } } };
+    return { to: seed, message: { class: "request", type: "create", body: { fields, directory: given.resolved.at, membership, creationContext: { v: 1 } } } };
   } },
 };
