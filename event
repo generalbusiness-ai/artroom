@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at docs/manual/what-is-artroom.md","body":{"commit":"25467a36901817f18c792d350dede9765546168e","path":"docs/manual/what-is-artroom.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:30f8629897c60e48165f245c09d27a2e2ac722c4","text":"Merge retired a covered predecessor; the successor is at docs/manual/ledger.md."}
