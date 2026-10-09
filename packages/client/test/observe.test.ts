@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { Head, ScopeRef } from "@generalbusiness/artroom-contract";
 import { base32, keyIdOfSecret, timeOf, utf8, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { Session } from "../src/session.ts";
@@ -12,20 +12,22 @@ const head=(seq:number):Head=>({seq,hash:`sha256:${String(seq).padStart(64,"0")}
 const session=()=>new Session("private-token",{v:1,deployment:"test",membership,member:"@member",key,reads:["summary"],ends:timeOf(Date.now()+60_000)});
 const snapshot=(seq:number):CompleteSnapshot<number>=>({scope,definition,at:head(seq),value:seq});
 function stream(){const queue:Uint8Array[]=[];let waiting:ReturnType<typeof gate<{done:boolean;value?:Uint8Array}>>|undefined;let cancelled=0;return{body:{getReader:()=>({read:()=>queue.length?Promise.resolve({done:false,value:queue.shift()!}):(waiting=gate()).promise,cancel:async()=>{cancelled++;waiting?.resolve({done:true});}})} as ByteStream,send(value:Uint8Array){if(waiting){const w=waiting;waiting=undefined;w.resolve({done:false,value});}else queue.push(value);},notice(seq:number){this.send(utf8(JSON.stringify({at:head(seq)})+"\n"));},end(){waiting?.resolve({done:true});},get cancelled(){return cancelled;}};}
+afterEach(()=>vi.useRealTimers());
 const drain=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 
 test("head codec accepts fragmented frames but rejects oversized raw bytes, malformed UTF8 and truncated frames before yielding",async()=>{
- const body=stream(),abort=new AbortController(),lines=headLines(body.body,abort.signal);const first=lines.next();const bytes=utf8(JSON.stringify({at:head(1)})+"\n");body.send(bytes.slice(0,12));body.send(bytes.slice(12));expect((await first).value).toEqual(head(1));abort.abort();await lines.return(undefined);expect(body.cancelled).toBeGreaterThan(0);
+ const body=stream(),abort=new AbortController(),lines=headLines(body.body,abort.signal);const first=lines.next();const bytes=utf8(JSON.stringify({at:head(1)})+"\n");body.send(bytes.slice(0,12));body.send(bytes.slice(12));expect((await first).value).toEqual(head(1));abort.abort();await lines.return(undefined);expect(body.cancelled).toBe(1);
  for(const bytes of[new Uint8Array(1025).fill(97),new Uint8Array([255,10]),utf8('{"at":')]){const broken=stream(),stop=new AbortController(),reading=headLines(broken.body,stop.signal).next();broken.send(bytes);await drain();if(bytes.length===6)broken.end();await expect(reading).rejects.toThrow();}
 });
 
 test("subscribe handshake precedes snapshot; newer notices during a read coalesce and publish useful retained data without regressing",async()=>{
+ vi.useFakeTimers();
  const body=stream(),first=gate<ReturnType<typeof snapshot>>(),second=gate<ReturnType<typeof snapshot>>(),states:ObservationState<number>[]=[];let reads=0;const started=gate();
  const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{reads++;started.resolve();const value=await(reads===1?first.promise:second.promise);return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s)});
  await drain();expect(reads).toBe(0);body.notice(1);await started.promise;body.notice(2);body.notice(3);await drain();expect(reads).toBe(1);first.resolve(snapshot(1));await drain();
  expect(states.some(s=>s.status==="retained"&&s.snapshot.value===1&&s.reason==="newer-notice")).toBe(true);
  // The single coalesced reread starts after yielding once to the timer queue.
- await new Promise(resolve=>setTimeout(resolve,0));expect(reads).toBe(2);second.resolve(snapshot(3));await drain();expect(states.at(-1)).toEqual({status:"current",snapshot:snapshot(3)});observer.cancel();await observer.done;expect(body.cancelled).toBeGreaterThan(0);
+ await vi.advanceTimersByTimeAsync(0);expect(reads).toBe(2);second.resolve(snapshot(3));await drain();expect(states.at(-1)).toEqual({status:"current",snapshot:snapshot(3)});observer.cancel();await observer.done;expect(body.cancelled).toBe(1);
 });
 
 test("context cancellation rejects a late complete read and resolves despite an upstream reader ignoring cancel",async()=>{
@@ -52,7 +54,8 @@ test("same sequence different hash and wrong snapshot incarnation are visible fa
 });
 
 test("first head waiting has a bound and cancels its body rather than waiting indefinitely",async()=>{
+ vi.useFakeTimers();
  const body=stream(),states:ObservationState<number>[]=[];let observer:ReturnType<typeof observeScope<number>>;
  observer=observeScope<number>({context,current:()=>true,seconds:0.01,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{throw new Error("No head means no snapshot");},emit:s=>states.push(s),reconnectDelay:async()=>{observer.cancel();}});
- await observer.done;expect(states.some(s=>s.status==="unavailable"&&s.reason==="read-timeout")).toBe(true);expect(body.cancelled).toBeGreaterThan(0);
+ await drain();await vi.advanceTimersByTimeAsync(10);await observer.done;expect(states.some(s=>s.status==="unavailable"&&s.reason==="read-timeout")).toBe(true);expect(body.cancelled).toBe(1);
 });

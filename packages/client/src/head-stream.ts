@@ -27,9 +27,10 @@ export async function openHttpHeadStream(origin: string, scope: ScopeRef, sessio
 
 /** Raw-byte bound before decode/parse. No whole-stream buffer or queued heads. */
 export async function* headLines(body: ByteStream, signal: Expiry): AsyncGenerator<Head> {
-  const reader = body.getReader(); let pending: number[] = []; let stopped = false;
+  const reader = body.getReader(); let pending: number[] = []; let stopped = false; let cancelled = false;
+  const cancel = () => { if (cancelled) return; cancelled = true; void reader.cancel().catch(() => undefined); };
   let abort!: () => void;
-  const end = new Promise<{ done: true }>(resolve => { abort = () => { stopped = true; pending = []; void reader.cancel().catch(() => undefined); resolve({ done: true }); }; });
+  const end = new Promise<{ done: true }>(resolve => { abort = () => { stopped = true; pending = []; cancel(); resolve({ done: true }); }; });
   signal.addEventListener("abort", abort);
   try {
     for (;;) {
@@ -47,5 +48,5 @@ export async function* headLines(body: ByteStream, signal: Expiry): AsyncGenerat
         yield value.at;
       }
     }
-  } finally { signal.removeEventListener("abort", abort); stopped = true; pending = []; void reader.cancel().catch(() => undefined); }
+  } finally { signal.removeEventListener("abort", abort); stopped = true; pending = []; cancel(); }
 }
