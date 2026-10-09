@@ -55,6 +55,12 @@ deployment image, container, fresh authority or provider acceptance follows.
 
 ## Conditions still owed
 
+Peer review found a remaining custody defect: cancellation after a staging
+send with an unknown answer can finalize the publication without retaining
+cleanup, even when the provider wrote the ref. The source owner is repairing
+that path with a real-Scope witness. This candidate must not be gated or filed
+as complete before that repair is integrated.
+
 The planner must judge the expired reservation's explicit cleanup trigger
 (`f1b87a0b017aa745ed85f77f4ed3154d36d59eb7`), the historical one-file-form
 interpretation (`f001cfc222a2df5803491cc7ecd6584421c28846`) and the demo
