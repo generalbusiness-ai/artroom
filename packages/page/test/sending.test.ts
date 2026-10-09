@@ -49,7 +49,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   }));
   vi.doMock("../src/view.ts", () => ({
     h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.children = children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]; return el; },
-    roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
+    roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
     actsPanel: (_offered: unknown, callback: typeof send, last: Element | null, options: (typeof panels)[number]) => { send = callback; panels.push(options); const panel = new Element("section"); if (last) panel.append(last); return panel; },
   }));
   vi.stubGlobal("document", { getElementById: () => root, createElement: (tag: string) => new Element(tag) });
@@ -147,18 +147,18 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     const answered = gate(), observation = gate();
     dataAct.mockImplementationOnce(async (...args: unknown[]) => {
       (args[5] as () => void)();
-      const result = { kind: "comment", answer: { answer: "accepted" }, observation: "Observation refresh pending." };
+      const result = { kind: "held admission", answer: { answer: "accepted" }, observation: "Observation refresh pending." };
       (args[4] as (value: unknown) => void)(result); answered.resolve();
       await observation.promise; result.observation = "The observation could not be read."; return result as never;
     });
     const beforeAnswer = panels.length;
     send("comment", "", { body: "Known before observation" }, retired); await answered.promise;
-    expect(root.textContent).toContain("Known accepted");
+    expect(root.textContent).toContain("Known held admission accepted");
     expect(panels.length).toBe(beforeAnswer);
     expect(retired).toHaveBeenCalledTimes(2);
     rendered = gate(); observation.resolve(); await rendered.promise;
     expect(panels.at(-1)?.uncertain).toBe(true);
-    expect(root.textContent).toContain("Known accepted");
+    expect(root.textContent).toContain("Known held admission accepted");
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion
