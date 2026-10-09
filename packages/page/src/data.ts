@@ -34,9 +34,9 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, entryHash, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
@@ -285,10 +285,14 @@ export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; change
 /** A lane's definition, as the scope retains it under the digest its summary names. */
 async function laneDefinition(room: Room, handle: ScopeHandle, summary: Summary): Promise<DeclaredDefinition> {
   const kept = room.definitions.get(summary.definition);
-  if (kept) return kept;
+  if (kept) {
+    if (definitionDigest(kept) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
+    return kept;
+  }
   const read = await handle.definition();
   if (!read.ok) throw new Unreadable(`Cannot read the definition of ${handle.scope}: ${read.reason}.`);
   if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read the definition of ${handle.scope}: incomplete.`);
+  if (definitionDigest(read.value) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
   room.definitions.set(summary.definition, read.value);
   return read.value;
 }
@@ -330,6 +334,8 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
  * the Version screen does not offer it as a rendered-page link.
  */
 export interface Manifest {
+  /** Native ISSUE report facts in selection order; null means unavailable or malformed. */
+  selectedReports?: FactRef[] | null;
   id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
   file: { path: string; digest: string | null; size: number | null; page: string;
     /** Exact retained proposal text, verified for the selected version; null when unavailable. Never read from HEAD. */
@@ -350,12 +356,50 @@ export interface Merge { id: number; state: string; manifest: number | null; rea
 export interface ChangeView {
   /** The actual proposal item used by transitions. */
   proposal?: number;
+  /** Actual current item; never a retained-version fallback for a mutation. */
+  currentManifest?: number | null;
+  /** Choices from held rules and authenticated membership; null means unavailable. */
+  reviewExtents?: { label: string; value: string }[] | null;
+  reviewMembers?: { label: string; value: string }[] | null;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
 }
 
 const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
+
+/** The declared selection is the authority for its ISSUE report role. An
+ * absent optional typed slot is the native empty list, not a failed read. */
+function reportsOf(manifest: Item, definition: DeclaredDefinition): FactRef[] | null {
+  const slot = definition.items["manifest"]?.values["selected"];
+  const type = slot?.of;
+  if (!type || type.type !== "list" || type.of.type !== "record") return null;
+  const report = type.of.of["report"], accepted = type.of.of["accepted"];
+  if (report?.type !== "fact" || report.under !== "issue" || (report.kind.length !== 1 || report.kind[0] !== "report") || accepted?.type !== "fact" || accepted.under !== "issue" || (accepted.kind.length !== 1 || accepted.kind[0] !== "accept-report")) return null;
+  const selected = manifest.values["selected"];
+  if (selected === undefined || selected === null) return slot.required ? null : [];
+  if (!Array.isArray(selected) || selected.length > type.max) return null;
+  const reports: FactRef[] = [];
+  for (const row of selected) {
+    if (!row || typeof row !== "object" || Array.isArray(row) || !isFactRef(row["report"]) || !isFactRef(row["accepted"])) return null;
+    reports.push(row["report"]);
+  }
+  return reports;
+}
+
+
+/** Required merge facts without destination/history presentation reads.
+ * Reads use the caller's existing authenticated session or signed-read path. */
+export async function loadChangeSelection(room: Room, scope: ScopeId): Promise<{ scope: ScopeRef; head: Head; currentManifest: number | null; manifests: { id: number; state: string; selectedReports: FactRef[] | null }[] }> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at } = await summaryOf(handle);
+  const definition = await laneDefinition(room, handle, summary);
+  if (definition.name !== "change") throw new Unreadable(`${scope} is not a change lane.`);
+  const manifests = await itemsOf(handle, summary, "manifest", at);
+  return { scope: summary.scope, head: at, currentManifest: manifests.find((item) => item.state === "current")?.id ?? null,
+    manifests: manifests.map((item) => ({ id: item.id, state: item.state, selectedReports: reportsOf(item, definition) })) };
+}
 
 /** Item IDs are their opening entry positions (contract 4.1). Read just that
  * authenticated entry and bind its signed bytes to the selected manifest.
@@ -396,12 +440,28 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const rulesItem = summary.items.find((item) => item.type === "rules");
   const publications = await publicationsOf(room, scope);
   const manifests = await all("manifest");
-  const selected = manifests.find((m) => m.state === "current") ?? manifests.at(-1);
+  const current = manifests.find((m) => m.state === "current") ?? null;
+  const selected = current ?? manifests.at(-1); // Read-only preview may show retained history.
+  const extents = rulesItem?.values["extents"];
+  const reviewExtents = Array.isArray(extents) && extents.every((extent) => extent && typeof extent === "object" && !Array.isArray(extent) && typeof extent["name"] === "string")
+    ? extents.map((extent) => ({ label: String((extent as Record<string, FieldValue>)["name"]), value: String((extent as Record<string, FieldValue>)["name"]) })) : null;
+  let reviewMembers: { label: string; value: string }[] | null = null;
+  if (current) {
+    try {
+      const membership = await summaryOf(handleOf(room, room.membership.scope));
+      if (canonicalize(membership.summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The reviewer roster names another membership incarnation.");
+      const authorsParty = current.parties["authors"];
+      if (!Array.isArray(authorsParty) || authorsParty.some((author) => canonicalize(author.membership) !== canonicalize(room.membership))) throw new Unreadable("The manifest authors name another membership incarnation.");
+      const authors = membersOf(authorsParty);
+      reviewMembers = holdersOf(membership.summary.items, "change.review").filter((member) => !authors.includes(member)).map((member) => ({ label: member, value: member }));
+    } catch { /* Missing authority offers no invented reviewer choices. */ }
+  }
   const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
   return {
-    scope, definition: summary.definition, head: at, proposal: proposal.id,
+    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: manifests.map((m) => ({
+      selectedReports: reportsOf(m, definition),
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
       file: typeof m.values["path"] === "string" ? {
@@ -652,9 +712,12 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     submitting?.();
     answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
   } else {
-    const signed = await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing);
+    // The shaping helper reads only the actual act declaration. Platform
+    // fields use the same typed inputs and detached-text transport as lanes.
+    const shaped = shapeDeclaredAct(shape as unknown as DeclaredDefinition, kind as never, { on, fields } as never);
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on: shaped.on, fields: shaped.fields, expected: expectedOf(declaration, summary.items, shaped.on, shaped.fields) }, signing);
     submitting?.();
-    answer = await handle.submit(signed, [], values.length > 0 ? { values } : {});
+    answer = await handle.submit(signed, [], values.length > 0 ? { ...shaped.beside, values } : shaped.beside);
   }
   const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
   received?.(result); // Preserve the real answer before any awaited refresh.
