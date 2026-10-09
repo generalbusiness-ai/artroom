@@ -6,7 +6,9 @@ not settle a command. Keep pending requests, Spokens and known answers in
 their existing custody owner.
 
 Supply a fixed `ObservationContext`: exact service origin, full scope and
-membership references, definition pin, member and key. `authenticate`
+membership references, definition pin, member, key and trusted expected
+deployment. Session claims must match every captured identity; this does
+not infer a deployment from an untrusted response. `authenticate`
 obtains the caller's existing native read session; it must not enroll or
 replace that caller. `openHttpHeadStream` sends its token in Authorization,
 never in the URL. Its stream-specific HeadStreamFetch requires supported
@@ -30,7 +32,10 @@ same-sequence/different-hash is a visible error. Head notices do not carry
 incarnation/pin, so the snapshot verifies those exact captured bindings.
 
 Every NDJSON frame is bounded at 1,024 raw payload bytes before decoding or
-parsing. Reauthentication, open, first head and each snapshot wait default
+parsing. Accepted chunks are at most 64KiB; retained frame storage is at
+most 1,024 bytes. Nonempty processing yields to the task queue after
+16KiB or 32 frames, while heads remain coalesced state. This is no lifetime
+byte quota and cannot bound buffers allocated by the upstream. Reauthentication, open, first head and each snapshot wait default
 to 30 seconds, configurable up to 300; reconnect wait is bounded too. Session
 expiry on the local clock triggers a renewed native read session and a new
 subscription/current snapshot. The server's actual token windows decide
@@ -42,7 +47,9 @@ call `cancel()` immediately when it changes. Checks after awaits and before
 emission reject late results; `refresh()` also detects a changed context.
 A changed context suppresses ALL old UI emissions, including cancelled,
 so an old observer cannot clear a new renderer. Explicit cancel while the
-captured context remains current emits cancelled once. Cancel asks
+captured context remains current emits cancelled once. EOF/error aborts the old attempt before a pending snapshot can be painted
+current. Abandoned open callbacks that later yield a body receive a
+best-effort cancel, with late rejection handled. Cancel asks
 fetch/body to abort and resolves local waiting without depending
 on an upstream reader obeying cancellation. An ignoring callback may retain
 its own resources; the helper cannot physically drain it. No token/key is

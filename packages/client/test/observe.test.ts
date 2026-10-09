@@ -7,7 +7,7 @@ import { observeScope, type CompleteSnapshot, type ObservationState } from "../s
 const gate=<T=void>()=>{let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return{promise,resolve};};
 const scope={scope:`sc_${base32(new Uint8Array(32))}`,inc:`in_${base32(new Uint8Array(16))}`,kind:"lane"} as ScopeRef;
 const membership={...scope,kind:"membership"} as ScopeRef;const key=keyIdOfSecret(new Uint8Array(32));const definition="sha256:"+"1".repeat(64) as `sha256:${string}`;
-const context={origin:"https://scope.test",scope,membership,definition,member:"@member" as const,key};
+const context={origin:"https://scope.test",scope,membership,definition,member:"@member" as const,key,deployment:"test"};
 const head=(seq:number):Head=>({seq,hash:`sha256:${String(seq).padStart(64,"0")}`});
 const session=()=>new Session("private-token",{v:1,deployment:"test",membership,member:"@member",key,reads:["summary"],ends:timeOf(Date.now()+60_000)});
 const snapshot=(seq:number):CompleteSnapshot<number>=>({scope,definition,at:head(seq),value:seq});
@@ -74,4 +74,24 @@ test("HTTP stream opener requires exact response route, no redirect and native N
   const opened=await openHttpHeadStream(context.origin,scope,session(),new AbortController().signal,{fetch:async(url,init)=>{policy=init.redirect;return{status:200,body,headers:{get:()=>variant==="html"?"text/html":"application/x-ndjson"},url:variant==="wrong-url"?url+"/another":url,redirected:variant==="redirected"};}});
   expect(opened).toEqual({ok:false,reason:"unsupported"});expect(policy).toBe("error");expect(cancels).toBe(1);expect(reads).toBe(0);
  }
+});
+
+test("nonempty head floods yield after bounded task work and reject oversized concatenated chunks",async()=>{
+ vi.useFakeTimers();const body=stream(),stop=new AbortController();let notices=0;const yielded=gate();const reading=(async()=>{for await(const _head of headLines(body.body,stop.signal)){notices++;if(notices===32)yielded.resolve();}})();
+ body.send(utf8(Array.from({length:100},(_,i)=>JSON.stringify({at:head(i)})+"\n").join("")));await yielded.promise;await drain();expect(notices).toBe(32);
+ stop.abort();await vi.advanceTimersByTimeAsync(0);await reading;expect(notices).toBe(32);expect(body.cancelled).toBe(1);
+ const huge=stream(),abort=new AbortController(),first=headLines(huge.body,abort.signal).next();huge.send(new Uint8Array(65537));await expect(first).rejects.toThrow("chunk");expect(huge.cancelled).toBe(1);
+});
+
+test("EOF aborts the old attempt before a pending snapshot may paint current, and late open bodies are disposed without waiting",async()=>{
+ const body=stream(),read=gate<ReturnType<typeof snapshot>>(),started=gate(),states:ObservationState<number>[]=[];let observer:ReturnType<typeof observeScope<number>>;
+ observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{started.resolve();const value=await read.promise;return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s),reconnectDelay:async()=>{observer.cancel();}});
+ await drain();body.notice(1);await started.promise;body.end();read.resolve(snapshot(1));await observer.done;await drain();expect(states.some(s=>s.status==="current")).toBe(false);expect(body.cancelled).toBe(1);
+ const opening=gate<{ok:true;body:ByteStream}>(),opened=gate();let cancels=0;const lateBody={getReader:()=>({read:async()=>({done:true}),cancel:()=>{cancels++;return new Promise(()=>{});}})}as ByteStream;
+ const late=observeScope<number>({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>{opened.resolve();return opening.promise;},snapshot:async()=>{throw new Error("not reached");},emit:()=>{}});
+ await opened.promise;late.cancel();await late.done;opening.resolve({ok:true,body:lateBody});await drain();expect(cancels).toBe(1);
+});
+
+test("expected deployment is verified before opening or reading the captured scope",async()=>{
+ let opens=0;const states:ObservationState<number>[]=[];const observer=observeScope<number>({context:{...context,deployment:"another-trusted-deployment"},current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>{opens++;return{ok:false,reason:"unavailable"};},snapshot:async()=>{throw new Error("not reached");},emit:s=>states.push(s)});await observer.done;expect(opens).toBe(0);expect(states.at(-1)).toEqual({status:"error",reason:"session-context-mismatch"});
 });

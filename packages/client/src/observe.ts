@@ -4,13 +4,13 @@ import { canonicalize, isHead, isScopeRef, timeMs, timeOf, type Expiry } from "@
 import type { Session } from "./session.ts";
 import { headLines, observationOrigin, type HeadBodyResult } from "./head-stream.ts";
 
-export interface ObservationContext { origin: string; scope: ScopeRef; definition: Digest | PlatformDefinition; membership: ScopeRef; member: MemberId; key: KeyId }
+export interface ObservationContext { origin: string; scope: ScopeRef; definition: Digest | PlatformDefinition; membership: ScopeRef; member: MemberId; key: KeyId; deployment: string }
 /** Adapter result from actual complete authenticated reads, not a new native wire/proof. */
 export interface CompleteSnapshot<T> { scope: ScopeRef; definition: Digest | PlatformDefinition; at: Head; value: T }
 export type ObservationState<T> =
   | { status: "connecting" | "refreshing" | "reconnecting"; retained?: CompleteSnapshot<T> }
   | { status: "current"; snapshot: CompleteSnapshot<T> }
-  | { status: "retained"; snapshot: CompleteSnapshot<T>; reason: "newer-notice" | "older-snapshot" }
+  | { status: "retained"; snapshot: CompleteSnapshot<T>; reason: "newer-notice" | "older-snapshot" | "subscription-ended" }
   | { status: "unavailable" | "forbidden" | "expired" | "unsupported" | "error"; reason: string; retained?: CompleteSnapshot<T> }
   | { status: "cancelled" };
 export interface ObservationOptions<T> {
@@ -35,20 +35,23 @@ class Stopped extends Error {}
 class ObservationFailure extends Error { constructor(readonly status: "unavailable"|"forbidden"|"expired"|"unsupported"|"error",readonly reason:string){super(reason);} }
 
 /** Callback expiry raced locally as existing takeBytes does; ignoring transports cannot repaint late data. */
-async function bounded<T>(run:(signal:Expiry)=>Promise<T>, parent:Expiry, seconds:number):Promise<T>{
+async function bounded<T>(run:(signal:Expiry)=>Promise<T>, parent:Expiry, seconds:number, dispose?:(value:T)=>void):Promise<T>{
   const own=new AbortController();let stopped!:()=>void;
   const abort=new Promise<never>((_resolve,reject)=>{stopped=()=>{own.abort();reject(new Stopped());};});
   parent.addEventListener("abort",stopped);let timeout:ReturnType<typeof setTimeout>|undefined;
   const elapsed=new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>{own.abort();reject(new ObservationFailure("unavailable","read-timeout"));},seconds*1000);});
-  try{if(parent.aborted)throw new Stopped();return await Promise.race([run(own.signal),abort,elapsed]);}
+  let abandoned = false;
+  try{if(parent.aborted)throw new Stopped();const pending = run(own.signal);void pending.then(value=>{if(abandoned)dispose?.(value);},()=>undefined);return await Promise.race([pending,abort,elapsed]);}
+  catch(error){abandoned=true;throw error;}
   finally{parent.removeEventListener("abort",stopped);clearTimeout(timeout);}
 }
 function delay(milliseconds:number,signal:Expiry):Promise<void>{return new Promise((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>|undefined;const stop=()=>{clearTimeout(timer);signal.removeEventListener("abort",stop);reject(new Stopped());};signal.addEventListener("abort",stop);if(signal.aborted)return stop();timer=setTimeout(()=>{signal.removeEventListener("abort",stop);resolve();},milliseconds);});}
 
 export function observeScope<T>(options:ObservationOptions<T>):Observation{
   const context=JSON.parse(canonicalize(options.context)) as ObservationContext;
+  Object.freeze(context.scope);Object.freeze(context.membership);Object.freeze(context);
   const seconds=options.seconds??30;if(!Number.isFinite(seconds)||seconds<=0||seconds>300)throw new RangeError("An observation read bound is more than zero and at most300seconds.");
-  if(!observationOrigin(context.origin)||!isScopeRef(context.scope)||!isScopeRef(context.membership))throw new Error("Observation needs an exact origin and full native references.");
+  if(!observationOrigin(context.origin)||!isScopeRef(context.scope)||!isScopeRef(context.membership)||typeof context.deployment!=="string"||!context.deployment||context.deployment.length>128)throw new Error("Observation needs an exact origin and full native references.");
   const lifetime=new AbortController();let attempt:AbortController|undefined;let last:CompleteSnapshot<T>|undefined;let latest:Head|undefined;let dirty=false;let refreshRunning=false;let refreshAgain:(()=>void)|undefined;let generation=0;let cancelled=false;
   const now=options.now??Date.now;
   const usable=()=>!lifetime.signal.aborted&&options.current();
@@ -59,7 +62,7 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
   const done=(async()=>{
     let failures=0;
     while(usable()){
-      const at=++generation;attempt=new AbortController();const active=attempt;let renewal:ReturnType<typeof setTimeout>|undefined;let openedBody:HeadBodyResult|undefined;let readerOwned=false;let streamEnd!:()=>void;
+      const at=++generation;attempt=new AbortController();const active=attempt;let renewal:ReturnType<typeof setTimeout>|undefined;let openedBody:HeadBodyResult|undefined;let readerOwned=false;let streamAlive=true;let streamEnd!:()=>void;
       const connectionEnded=new Promise<void>(resolve=>{streamEnd=resolve;});
       const lifeAbort=()=>active.abort();lifetime.signal.addEventListener("abort",lifeAbort);
       try{
@@ -67,16 +70,16 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
         const auth=await bounded(signal=>options.authenticate(signal),active.signal,seconds);check(at);
         if(!auth.ok)throw new ObservationFailure(auth.reason==="unauthorized"?"forbidden":auth.reason==="expired"?"expired":auth.reason==="unsupported"?"unsupported":"unavailable",auth.reason);
         const session=auth.session;
-        if(!same(session.claims.membership,context.membership)||session.claims.member!==context.member||session.claims.key!==context.key||!session.claims.reads.includes("summary"))throw new ObservationFailure("error","session-context-mismatch");
+        if(session.claims.deployment!==context.deployment||!same(session.claims.membership,context.membership)||session.claims.member!==context.member||session.claims.key!==context.key||!session.claims.reads.includes("summary"))throw new ObservationFailure("error","session-context-mismatch");
         const ends=timeMs(session.claims.ends);if(ends===null||session.endedBy(timeOf(now())))throw new ObservationFailure("expired","session-expired");
         renewal=setTimeout(()=>{active.abort();streamEnd();},Math.max(1,ends-now()));
-        const opened=await bounded(signal=>options.open(session,signal),active.signal,seconds);openedBody=opened;check(at);
+        const opened=await bounded(signal=>options.open(session,signal),active.signal,seconds,value=>{if(value.ok){try{void value.body.getReader().cancel().catch(()=>undefined);}catch{/* Late body's upstream may refuse disposal. */}}});openedBody=opened;check(at);
         if(!opened.ok)throw new ObservationFailure(opened.reason==="forbidden"?"forbidden":opened.reason==="unsupported"?"unsupported":"unavailable",opened.reason);
         const lines=headLines(opened.body,active.signal);latest=undefined;
         readerOwned=true;const first=await bounded(()=>lines.next(),active.signal,seconds);check(at);
         if(first.done)throw new ObservationFailure("unavailable","stream-ended-before-head");latest=first.value;
         let streamFailure:ObservationFailure|undefined;
-        const pump=(async()=>{try{for await(const notice of lines){check(at);if(latest&&notice.seq===latest.seq&&notice.hash!==latest.hash)throw new ObservationFailure("error","head-hash-conflict");if(!latest||notice.seq>latest.seq){latest=notice;refreshAgain?.();}}}catch(error){if(!(error instanceof Stopped)&&!active.signal.aborted)streamFailure=error instanceof ObservationFailure?error:new ObservationFailure("error","malformed-head-stream");}finally{streamEnd();}})();
+        const pump=(async()=>{try{for await(const notice of lines){check(at);if(latest&&notice.seq===latest.seq&&notice.hash!==latest.hash)throw new ObservationFailure("error","head-hash-conflict");if(!latest||notice.seq>latest.seq){latest=notice;refreshAgain?.();}}}catch(error){if(!(error instanceof Stopped)&&!active.signal.aborted)streamFailure=error instanceof ObservationFailure?error:new ObservationFailure("error","malformed-head-stream");}finally{streamAlive=false;active.abort();streamEnd();}})();
         const refresh=async()=>{
           if(refreshRunning){dirty=true;return;}refreshRunning=true;
           try{do{
@@ -87,7 +90,7 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
             if(!read.complete||read.next!==undefined||!isHead(snapshot.at)||!isScopeRef(snapshot.scope)||!isHead(read.at)||!same(read.at,snapshot.at)||!same(snapshot.scope,context.scope)||snapshot.definition!==context.definition)throw new ObservationFailure("error","incomplete-or-mismatched-snapshot");
             if(last&&snapshot.at.seq===last.at.seq&&snapshot.at.hash!==last.at.hash||latest&&snapshot.at.seq===latest.seq&&snapshot.at.hash!==latest.hash)throw new ObservationFailure("error","head-hash-conflict");
             if(last&&snapshot.at.seq<last.at.seq){emit({status:"retained",snapshot:last,reason:"older-snapshot"});}
-            else{last=snapshot;if(latest&&snapshot.at.seq<latest.seq){emit({status:"retained",snapshot,reason:"newer-notice"});dirty=true;}else emit({status:"current",snapshot});}
+            else{last=snapshot;if(!streamAlive){emit({status:"retained",snapshot,reason:"subscription-ended"});}else if(latest&&snapshot.at.seq<latest.seq){emit({status:"retained",snapshot,reason:"newer-notice"});dirty=true;}else emit({status:"current",snapshot});}
             if(dirty)await delay(0,active.signal);
           }while(dirty);
           }finally{refreshRunning=false;}

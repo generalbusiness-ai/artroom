@@ -8,6 +8,9 @@ export type HeadStreamFetch = (url: string, init: { method: "GET"; headers: Reco
 
 export type HeadBodyResult = { ok: true; body: ByteStream } | { ok: false; reason: "forbidden" | "sessions-unavailable" | "clock-behind" | "unavailable" | "unsupported" };
 export const HEAD_FRAME_BYTES = 1024;
+export const HEAD_CHUNK_BYTES = 64 * 1024;
+export const HEAD_TURN_BYTES = 16 * 1024;
+export const HEAD_TURN_FRAMES = 32;
 /** Exact HTTP origin, excluding userinfo, path, query and fragment. Native URL parsing belongs to the caller's supported runtime. */
 export function observationOrigin(origin: string): boolean {
   return /^https?:\/\/(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:]+\])(?::[0-9]{1,5})?$/.test(origin);
@@ -38,7 +41,7 @@ export async function openHttpHeadStream(origin: string, scope: ScopeRef, sessio
 
 /** Raw-byte bound before decode/parse. No whole-stream buffer or queued heads. */
 export async function* headLines(body: ByteStream, signal: Expiry): AsyncGenerator<Head> {
-  const reader = body.getReader(); let pending: number[] = []; let stopped = false; let cancelled = false;
+  const reader = body.getReader(); let pending: number[] = []; let stopped = false; let cancelled = false; let turnBytes = 0; let turnFrames = 0;
   const cancel = () => { if (cancelled) return; cancelled = true; void reader.cancel().catch(() => undefined); };
   let abort!: () => void;
   const end = new Promise<{ done: true }>(resolve => { abort = () => { stopped = true; pending = []; cancel(); resolve({ done: true }); }; });
@@ -51,12 +54,15 @@ export async function* headLines(body: ByteStream, signal: Expiry): AsyncGenerat
       if (read.done) { if (pending.length) throw new Error("Truncated native head frame."); return; }
       const chunk = read.value;
       if (!chunk?.length) { await new Promise<void>(resolve => { setTimeout(resolve, 0); }); continue; }
+      if (chunk.byteLength > HEAD_CHUNK_BYTES) throw new Error("Native head chunk exceeds its raw byte bound.");
       for (const byte of chunk) {
+        if (turnBytes >= HEAD_TURN_BYTES || turnFrames >= HEAD_TURN_FRAMES) { await new Promise<void>(resolve => { setTimeout(resolve, 0); }); turnBytes = 0; turnFrames = 0; }
+        turnBytes++;
         if (signal.aborted || stopped) return;
         if (byte !== 10) { if (pending.length >= HEAD_FRAME_BYTES) throw new Error("Native head frame exceeds its byte bound."); pending.push(byte); continue; }
         const value: unknown = parseStrictBytes(Uint8Array.from(pending)); pending = [];
         if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 1 || !("at" in value) || !isHead(value.at)) throw new Error("Malformed native head frame.");
-        yield value.at;
+        turnFrames++; yield value.at;
       }
     }
   } finally { signal.removeEventListener("abort", abort); stopped = true; pending = []; cancel(); }
