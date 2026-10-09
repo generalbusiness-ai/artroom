@@ -191,9 +191,10 @@ test("explicit supporting cohort establishes Counting with native authority and 
       expect(await D.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
       expect(await A.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
     }
+    const replayFetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
     for (const node of [D, C, A, nested]) {
       const head = (await node.summary()).at;
-      const replay = await lifetime.wait(() => verify(httpSource(SERVICE, { fetch: routed }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
+      const replay = await lifetime.wait(() => verify(httpSource(SERVICE, { fetch: replayFetch, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
       expect([replay.report.result, replay.why]).toEqual(["consistent", null]);
     }
   } finally {
