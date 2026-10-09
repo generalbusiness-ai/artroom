@@ -246,7 +246,8 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
       else errors.push(message.text());
     });
   };
-  const as = async (person: "founder" | "member", width = 390): Promise<BrowserContext> => {
+  let releaseGuard: (() => void) | undefined;
+  const as = async (person: "founder" | "member", width = 390, delivery = { attempts, entered, held }): Promise<BrowserContext> => {
     const actor = native[person];
     const context = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 1, colorScheme: "light" });
     await context.route(`${sitting.service}/**`, async (route) => {
@@ -263,9 +264,9 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
         const signed = body?.signed;
         if (!signed || !verifySignedIntent(signed) || signed.intent.actor !== actor.actor || signed.intent.kind !== "found" || canonicalize(signed.intent.to) !== canonicalize(native.register)) throw new Error("Intercepted founding request does not match the configured native subject and caller.");
         const bytes = canonicalize(signed);
-        if (attempts.length && bytes !== attempts[0]) throw new Error("A pending browser claim signed a replacement envelope.");
-        attempts.push(bytes);
-        if (attempts.length === 1) { entered(); await held; }
+        if (delivery.attempts.length && bytes !== delivery.attempts[0]) throw new Error("A pending browser claim signed a replacement envelope.");
+        delivery.attempts.push(bytes);
+        if (delivery.attempts.length === 1) { delivery.entered(); await delivery.held; }
         // No native success or refusal is fabricated. The request never leaves this route.
         await route.abort("failed");
         return;
@@ -320,24 +321,78 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
     await otherDialog.locator('input[name="name"]').fill("Another label must not replace the saved claim");
     await dialog.getByRole("button", { name: "Create room", exact: true }).dblclick();
     await firstEntered;
+    const originalOperation = await tab.evaluate(() => {
+      const key = Object.keys(localStorage).find((name) => name.startsWith("artroom-page-claim:"));
+      return key ? JSON.parse(localStorage.getItem(key)!).active as string : null;
+    });
+    if (!originalOperation) throw new Error("The browser submitted a claim before retaining its operation ID.");
     if (!await dialog.getByRole("button", { name: "Create room", exact: true }).isDisabled()) throw new Error("A pending claim remained submittable.");
     await otherDialog.getByRole("button", { name: "Create room", exact: true }).click();
     if (!await otherDialog.getByRole("button", { name: "Create room", exact: true }).isDisabled() || attempts.length !== 1) throw new Error("The actual browser Web Lock did not serialize the two tabs.");
     release();
     await dialog.getByRole("button", { name: "Resume creation", exact: true }).waitFor();
     await otherDialog.getByRole("button", { name: "Resume creation", exact: true }).waitFor();
-    if (Number(attempts.length) !== 2) throw new Error("The queued second tab did not retain the exact pending claim.");
+    if (Number(attempts.length) !== 1) throw new Error("A queued new creation silently resumed or replaced the original operation.");
+    if (!(await otherDialog.locator('[role="status"]').textContent())?.includes("journal")) throw new Error("A stale new-creation predecessor was not reported as a journal conflict.");
+    if (await otherDialog.locator('input[name="name"]').inputValue() !== "Field notebook") throw new Error("A stale new dialog failed to restore the original operation label.");
+    // The second tab must explicitly resume after its stale New was refused.
+    await otherDialog.getByRole("button", { name: "Resume creation", exact: true }).click();
+    await other.waitForFunction(() => [...document.querySelectorAll("dialog[open] button")].some((button) => button.textContent === "Resume creation" && !button.hasAttribute("disabled")));
+    if (Number(attempts.length) !== 2) throw new Error("Explicit Resume did not retry the exact original operation.");
+    // Reopening discovers the unknown operation instead of presenting another New.
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await opener.click();
+    if (await name.inputValue() !== "Field notebook" || !await name.isDisabled()) throw new Error("Reopening an unknown operation replaced its original label.");
     await dialog.getByRole("button", { name: "Resume creation", exact: true }).click();
     await tab.waitForFunction(() => [...document.querySelectorAll("dialog[open] button")].some((button) => button.textContent === "Resume creation" && !button.hasAttribute("disabled")));
     if (Number(attempts.length) !== 3) throw new Error("Resume did not resubmit the exact saved claim envelope.");
     const pending = await tab.evaluate(() => {
       const key = Object.keys(localStorage).find((name) => name.startsWith("artroom-page-claim:"));
       if (!key) return null;
-      const kept = JSON.parse(localStorage.getItem(key)!);
-      return { label: kept.label as string, signed: kept.config.claim?.found?.signed as unknown };
+      const journal = JSON.parse(localStorage.getItem(key)!);
+      if (journal.v !== 2 || typeof journal.claims[journal.active] !== "string") return null;
+      const kept = JSON.parse(journal.claims[journal.active]);
+      return { operation: journal.active as string, count: Object.keys(journal.claims).length, label: kept.label as string, signed: kept.config.claim?.found?.signed as unknown };
     });
-    if (!pending || pending.label !== "Field notebook" || canonicalize(pending.signed) !== attempts[0]) throw new Error("Private recovery did not keep the original local label and exact signed envelope.");
+    if (!pending || pending.operation !== originalOperation || pending.count !== 1 || pending.label !== "Field notebook" || canonicalize(pending.signed) !== attempts[0]) throw new Error("Private recovery did not keep the original local label and exact signed envelope.");
     await tab.screenshot({ path: join(out, "create-room-pending-mobile.png") });
+    // A distinct actual browser context tests a queued continuation after a
+    // same-origin settings change. Original journal bytes are kept privately.
+    let guardEntered!: () => void;
+    const guardFirst = new Promise<void>((resolve) => { guardEntered = resolve; });
+    const guardHeld = new Promise<void>((resolve) => { releaseGuard = resolve; });
+    const guardAttempts: string[] = [];
+    const guarded = await as("founder", 390, { attempts: guardAttempts, entered: guardEntered, held: guardHeld });
+    const firstTab = await guarded.newPage(); watch(firstTab);
+    const queuedTab = await guarded.newPage(); watch(queuedTab);
+    for (const page of [firstTab, queuedTab]) {
+      await page.goto(`${sitting.service}/page/#/`);
+      await page.getByRole("button", { name: "Create room", exact: true }).filter({ visible: true }).click();
+      await page.getByRole("dialog", { name: "Create room" }).locator('input[name="name"]').fill("Guarded original");
+    }
+    await firstTab.getByRole("dialog", { name: "Create room" }).getByRole("button", { name: "Create room", exact: true }).click();
+    await guardFirst;
+    const journalBefore = await firstTab.evaluate(() => {
+      const key = Object.keys(localStorage).find((name) => name.startsWith("artroom-page-claim:"));
+      return key ? localStorage.getItem(key) : null;
+    });
+    await queuedTab.getByRole("dialog", { name: "Create room" }).getByRole("button", { name: "Create room", exact: true }).click();
+    if (!await queuedTab.getByRole("dialog", { name: "Create room" }).getByRole("button", { name: "Create room", exact: true }).isDisabled() || guardAttempts.length !== 1) throw new Error("The settings-change control did not enter the actual Web Lock queue.");
+    await queuedTab.evaluate(() => {
+      const settings = JSON.parse(localStorage.getItem("artroom-page")!);
+      settings.register.inc = settings.place.membership.inc;
+      localStorage.setItem("artroom-page", JSON.stringify(settings));
+    });
+    releaseGuard!();
+    for (const page of [firstTab, queuedTab]) await page.waitForFunction(() => {
+      const submits = [...document.querySelectorAll("dialog[open] button[type=submit]")];
+      return submits.length === 1 && submits.every((button) => !button.hasAttribute("disabled"));
+    });
+    const journalAfter = await firstTab.evaluate(() => {
+      const key = Object.keys(localStorage).find((name) => name.startsWith("artroom-page-claim:"));
+      return key ? localStorage.getItem(key) : null;
+    });
+    if (guardAttempts.length !== 1 || !journalBefore || journalAfter !== journalBefore) throw new Error("Changed settings permitted a queued mutation or rewrote the original private journal.");
     if (errors.length || unanswered.length) throw new Error(`Claim witness browser failures: ${JSON.stringify({ errors, unanswered })}`);
     const sizes = ["create-room-mobile", "create-room-pending-mobile"].map((name) => ({ name, bytes: statSync(join(out, `${name}.png`)).size }));
     if (sizes.some((shot) => shot.bytes > MOST)) throw new Error("Claim witness screenshot exceeds its byte bound.");
@@ -345,12 +400,14 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
       mode: "production Page UI; actor-bound native readonly eligibility; founding transport loss STAND-IN with no Scope admission",
       register: native.register, definition: native.definition, memberControlAbsent: true, memberRefusal: native.member.refusal,
       dialogCheck, escapeFocusAndDraft: true, chromiumWebLocksAcrossTwoTabs: true, pendingDoubleClickBlocked: true,
-      attemptedRequests: attempts.length, exactSavedEnvelopeReused: true, envelopeDigest: textDigest(attempts[0]!), originalLabelPreserved: true,
+      attemptedRequests: attempts.length, exactSavedEnvelopeReused: true, operation: pending.operation, retainedOperations: pending.count,
+      staleNewPredecessorRefusedWithoutPost: true, explicitResumeRequired: true, reopeningDiscoversOriginalOperation: true,
+      changedSettingsQueuedMutationBlocked: true, changedSettingsAttemptedRequests: guardAttempts.length, originalJournalBytesUnchanged: true, originalJournalDigest: textDigest(journalBefore), envelopeDigest: textDigest(attempts[0]!), originalLabelPreserved: true,
       screenshots: sizes, explainedNetwork, errors, unanswered,
       limit: "No founding request was admitted by a Scope, no native completion or hosted-provider success is claimed. The separate native adapter Scope witness tests admitted lost replies and settlement.",
     }, null, 2)}\n`);
     process.stdout.write("Claim browser witness: name-only dialog, native offer, member absence, Escape/draft, pending double click, cross-tab Web Lock and exact envelope retry passed. Founding transport loss STAND-IN; no Scope admission.\n");
-  } finally { release?.(); await browser.close(); }
+  } finally { release?.(); releaseGuard?.(); await browser.close(); }
 }
 
 /** A retained local label on an already recorded native room. This does not
