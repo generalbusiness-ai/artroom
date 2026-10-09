@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8, digestBytes } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
 import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
@@ -77,6 +77,25 @@ class Scripted {
   readonly minted: string[] = [];
   readonly revoked = new Set<string>();
   packs = 0;
+  packBuilds = 0;
+  private packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
+
+  /** The map's actual ordered content, including replacements/in-place bytes,
+   * is the cache identity. Count alone cannot see deletion+addition or changes.
+   * Hashing stays linear; only repeated compression/pack construction is saved. */
+  private pack(): Promise<Uint8Array> {
+    const key = digestBytes(utf8(canonicalize([...this.objects].map(([key, object]) => [key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
+    if (this.packed?.key === key) return this.packed.bytes;
+    const all: (RawGitObject | TagObject)[] = [...this.objects.values()].map(object => ({ ...object, data: object.data.slice() }));
+    this.packBuilds++;
+    // A changed map starts a new immutable pack snapshot. Failed construction
+    // is released so an identical later request may retry; no Response is cached.
+    const made = (async () => withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag")))();
+    this.packed = { key, bytes: made };
+    void made.catch(() => { if (this.packed?.bytes === made) this.packed = null; });
+    return made;
+  }
+
   /** What the service is scripted to answer: the field that holds a minted token, the remote that `info` reports, and a failure. */
   tokenField: "plaintext" | "token" = "plaintext";
   reported: ((name: string) => string) | null = null;
@@ -136,8 +155,7 @@ class Scripted {
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
       this.packs++;
       // Every object, whatever is wanted: the source keeps what it was sent and checks each object it reads.
-      const all = [...this.objects.values()];
-      const pack = await withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag"));
+      const pack = await this.pack();
       return new Response(join(utf8(pkt("NAK\n")), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     return new Response("unscripted", { status: 404 });
@@ -389,7 +407,9 @@ test("cache: same commit, same ETag, and If-None-Match answers 304 only for a se
   const etag = first.headers.get("etag")!;
   expect(first.headers.get("cache-control")).toBe("public, max-age=60");
   expect(etag).toMatch(new RegExp(`^"${host.refs.get("refs/heads/moving")}\\.[0-9a-f]{24}"$`));
+  const builds = host.packBuilds;
   expect((await get(at)).headers.get("etag")).toBe(etag);
+  expect(host.packBuilds).toBe(builds); // Same actual object bytes reuse compression, not a Response/ref/token.
   expect((await get(`/site/${D.name}/moving/docs/index.md`)).headers.get("etag")).not.toBe(etag);
   const unchanged = await get(at, { headers: { "if-none-match": etag } });
   expect([unchanged.status, await unchanged.text(), unchanged.headers.get("etag")]).toEqual([304, "", etag]);
@@ -590,4 +610,36 @@ test("no ref: /site/<directory> and /site/<directory>/ redirect to HEAD/ (STAND-
   }
   expect(host.packs).toBe(packs);
   expect((await get(`/site//`)).status).toBe(400);
+});
+
+// Invariant: only immutable wire bytes are reused; equal-size map/content changes
+// rebuild and fresh HTTP responses/token accounting remain actual stand-in work.
+test("Scripted pack cache invalidates replacements, byte mutations, deletion and clear without caching responses", async () => {
+  const source = new Scripted(); source.name = "cache-fixture";
+  const first = utf8("first"); const id = idOf("blob", first);
+  source.objects.set(id, { id, type: "blob", data: first });
+  const binding = await source.ns.get(source.name);
+  const minted = await binding.createToken("read", 120) as { plaintext: string };
+  const request = () => new Request(`${source.remote(source.name!)}/git-upload-pack`, { method: "POST", headers: { authorization: `Bearer ${minted.plaintext}` }, body: "scripted want" });
+  const one = await source.fetch(request()); const two = await source.fetch(request());
+  expect(one).not.toBe(two);
+  expect(new Uint8Array(await one.arrayBuffer())).toEqual(new Uint8Array(await two.arrayBuffer()));
+  expect([source.packs, source.packBuilds]).toEqual([2, 1]);
+  const replacement = utf8("other");
+  const replaced = { id: idOf("blob", replacement), type: "blob" as const, data: replacement };
+  source.objects.set(id, replaced); // Same map count/key; actual ID/content changes.
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(2);
+  replacement[0] = 0x61; // In-place same-length content invalidates and must fail the real pack hash check.
+  await expect(source.fetch(request())).rejects.toMatchObject({ reason: "hash-mismatch" }); expect(source.packBuilds).toBe(3);
+  await expect(source.fetch(request())).rejects.toMatchObject({ reason: "hash-mismatch" }); expect(source.packBuilds).toBe(4); // Failed promise cannot poison retry.
+  source.objects.set(id, { id, type: "blob", data: first });
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(5);
+  source.objects.delete(id);
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(6);
+  source.objects.set(id, { id, type: "blob", data: first });
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(7);
+  source.objects.clear();
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(8);
+  await binding.revokeToken(minted.plaintext);
+  expect((await source.fetch(request())).status).toBe(401);
 });
