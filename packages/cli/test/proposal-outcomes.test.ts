@@ -18,7 +18,13 @@ const CONTENT = "# TEST private source content\n";
 const BASE = "a".repeat(40);
 const PIN = definitionDigest(changeDemo3);
 const DECLARATION = canonicalize(changeDemo3);
-const ref = (char: string, kind: ScopeRef["kind"]): ScopeRef => ({ scope: `sc_${char.repeat(52)}`, inc: newIncarnation(new Uint8Array(16).fill(7)), kind });
+const DEFINITIONS = { directory: "platform:directory@3", membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@3", lane: PIN } as const;
+const ref = (label: string, kind: keyof typeof DEFINITIONS): ScopeRef => ({
+  // Repeated base32 characters are not necessarily a canonical digest. Use
+  // the real identifier codec even for this explicitly scripted identity.
+  scope: scopeIdOf({ v: 1, kind, definition: DEFINITIONS[kind], creator: null, cause: textDigest(`scripted ${label}`), ordinal: 0 }),
+  inc: newIncarnation(new Uint8Array(16).fill(7)), kind,
+});
 const item = (type: string, id: number, state: string, values: Item["values"] = {}, refs: Item["refs"] = {}, parties: Item["parties"] = {}): Item => ({ id, type, state, revision: 1, opened: null, values, refs, parties, attributed: [] });
 
 async function fixture(category: Category) {
@@ -93,6 +99,7 @@ async function fixture(category: Category) {
 test.each(["link-summary", "link-request", "link-unavailable"] as const)("CLI linking %s retains known proposal and stops before merge (HTTP STAND-IN)", async category => {
   const f = await fixture(category);
   const result = await command(f.context, ["edit", "one.md", "--file", "one.md", "--closes", "1"]);
+  expect(f.accepted.some(a => a.kind === "propose-manifest"), result.lines.join("\n")).toBe(true);
   const manifest = f.accepted.find(a => a.kind === "propose-manifest")!.fact;
   expect(result.code).toBe(1);
   expect(result.lines[0]).toBe(`Proposed one.md (${utf8(CONTENT).length} bytes) as change ${manifest.at.scope}, version ${manifest.seq}.`);
@@ -112,6 +119,7 @@ test.each(["source-unavailable", "source-refused", "source-mismatch", "rules-rea
   const f = await fixture(category);
   const result = await command(f.context, ["propose", "partial"]);
   expect(result.code).toBe(1);
+  expect(f.accepted.some(a => a.kind === "ask-rules"), result.lines.join("\n")).toBe(true);
   for (const a of f.accepted) {
     const label = a.kind === "open-pr" ? "opening" : a.kind === "ask-rules" ? "rules request" : `source ${a.path}`;
     expect(result.lines).toContain(`Recorded ${label}: ${a.fact.at.scope}:${a.fact.seq}, hash ${a.fact.hash}.`);
