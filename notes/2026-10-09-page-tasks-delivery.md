@@ -124,6 +124,14 @@ The Node fixture has a separate focused correction; no new full gate follows
 without a bounded A4 plan and owner decision. This prose successor changes
 no source or test evidence at the failed head.
 
+Fixture correction `335e3d4a` uses the real full `changeDemo` declaration and
+its computed pin; production verification and existing incomplete-read and
+known-answer assertions are unchanged. Its two Node tests passed in 417 ms,
+with test types passing. Raw `/tmp/artroom-page-join-fixture-node.log`, SHA-256
+`658928fb6e9725442db2ed6127337f2ba77d87f670fd477d80b9596c25fc4f43`.
+It is composed at `99bd03c4`; this resolves only the fixture failure, not the
+five native timeouts or the failed coordinated gate.
+
 First-use request `d01aa495` remains separate. Its exact preset assurance review
 and native setup witness do not complete invitation/reload custody, operator
 provisioning, release, two-device or hosted first-use acceptance. Shared names
