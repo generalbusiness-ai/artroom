@@ -1,5 +1,5 @@
 /** Native screens built only from the room's recorded observations. */
-import { editPath } from "@generalbusiness/artroom-platform";
+import { editPath, matches } from "@generalbusiness/artroom-platform";
 import type { Answer } from "@generalbusiness/artroom-contract";
 import { Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
@@ -99,6 +99,14 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     const approving = change.reviews.filter((r) => r.manifest === current?.id && r.state === "submitted" && r.verdict === "approve" && r.extent === extent.name);
     return [extent.name, `${approving.length} of ${extent.approvals}`, extent.approver, list(approving.map((r) => or(r.reviewer)))];
   });
+  // A one-file proposal records the path. Pattern matching is presentation,
+  // not the destination's judgment of the tree or reviewers' authority.
+  const path = current?.file?.path;
+  const knownPatterns = extents.every((extent) => extent.patterns !== undefined);
+  const matching = path && editPath(path) !== null && knownPatterns ? extents.filter((extent) => extent.patterns!.some((pattern) => matches(pattern, path))) : [];
+  const applicable = path && editPath(path) !== null && knownPatterns ? matching.length ? matching : extents.filter((extent) => extent.patterns!.length === 0) : [];
+  const requiredReviews = applicable.filter((extent) => extent.approvals > 0);
+  const currentJobs = change.jobs.filter((job) => job.manifest === current?.id);
   const version = current ? section("Files", current.file ? h("div", {},
     h("div", { class: "filebar" }, h("code", { class: "filename" }, current.file.path)),
     h("p", { class: "muted" }, editPath(current.file.path) === null ? "Choose a file path inside this room." : published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
@@ -106,8 +114,11 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
   return h("main", { class: "screen" }, back("change"),
     h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null))),
     version,
-    extents.length ? section("Review requirements", table(["Extent", "Approvals of this version", "Role", "By"], reviews)) : null,
-    change.jobs.length ? section("Checks", table(["Job", "Name", "Version", "State"], change.jobs.map((j) => [String(j.id), or(j.name), or(j.manifest), j.state]))) : null,
+    !published && requiredReviews.length ? section("Review requirements", requiredReviews.map((extent) => {
+      const approving = change.reviews.filter((review) => review.manifest === current?.id && review.state === "submitted" && review.verdict === "approve" && review.extent === extent.name);
+      return h("p", {}, h("strong", {}, extent.name), ` · ${approving.length} of ${extent.approvals} approvals recorded`);
+    })) : null,
+    !published && currentJobs.length ? section("Checks", h("ul", {}, currentJobs.map((job) => h("li", {}, job.name ? `${job.name}: ${job.state}` : `Job ${job.id}: ${job.state}`)))) : null,
     discussion(change.body, change.comments),
     inspect("Inspect change record", whoLine(room),
       h("dl", {}, field("Lane", h("code", {}, change.scope)), field("Definition", h("code", {}, change.definition)), field("Read at", `${change.head.seq}, ${change.head.hash}`), field("Lifecycle", change.state),
@@ -119,6 +130,8 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       ),
       change.manifests.length > 1 ? section("Versions", table(["Item", "State", "Integrator", "Authors", "Base", "Integration", "Tree", "Complete", "Path", "Digest", "Bytes"], change.manifests.map((m) => [String(m.id), m.state, or(m.integrator), list(m.authors), or(m.base), or(m.integration), or(m.tree), m.complete === null ? "Not recorded" : String(m.complete), or(m.file?.path), or(m.file?.digest), or(m.file?.size)]))) : null,
       states.length ? section("Recorded outcomes", h("ul", {}, states.map((s) => h("li", {}, h("strong", {}, s.state), `: ${s.detail}`)))) : null,
+      extents.length ? section("Review requirements", table(["Extent", "Approvals of this version", "Role", "By"], reviews)) : null,
+      change.jobs.length ? section("Checks", table(["Job", "Name", "Version", "State"], change.jobs.map((j) => [String(j.id), or(j.name), or(j.manifest), j.state]))) : null,
       change.rules ? h("p", {}, `Lane-held rules update ${or(change.rules.revision)}; ${or(change.rules.approvals)} approval(s) in its own count. The destination judges the rules it observes for each merge.`) : h("p", {}, "This lane has not received rules yet."),
       change.reviews.length ? section("Reviews", table(["Review", "Reviewer", "Verdict", "Extent", "Version", "State"], change.reviews.map((r) => [String(r.id), or(r.reviewer), or(r.verdict), or(r.extent), or(r.manifest), r.state]))) : null,
       change.requests.length ? section("Review requests", table(["Request", "Asked of", "Asked by", "State"], change.requests.map((r) => [String(r.id), or(r.requested), or(r.requester), r.state]))) : null,

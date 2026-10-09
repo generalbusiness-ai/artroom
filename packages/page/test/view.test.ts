@@ -73,3 +73,21 @@ test("last comment outcomes do not become the change's current merge condition",
   }
   expect(changeCondition(view(), { answer: "unavailable", reason: "busy" } as Answer, "merge")).toBe("Authority unavailable");
 });
+
+// Settled requirements are evidence, not another default-home panel.
+test("merged requirements stay in inspection; active requirements use only the recorded file's matching extent", () => {
+  const rules = { revision: 29, approvals: 1, ownerMayReview: false, checks: [], extents: [
+    { name: "protected", patterns: ["AGENTS.md"], class: "authority", approvals: 1, approver: "rules.publish", checks: [] },
+    { name: "content", patterns: [], class: "content", approvals: 1, approver: "change.review", checks: [] },
+  ] };
+  const routineText = (screen: Element) => screen.children.filter((child) => typeof child === "string" || child.tagName !== "details").map((child) => typeof child === "string" ? child : child.textContent).join("");
+  const merged = render(view({ rules, merges: [merge({ state: "published" })] }));
+  expect(routineText(merged)).not.toContain("Review requirements");
+  expect(routineText(merged)).not.toContain("Not recorded");
+  const record = merged.all("details")[0]!;
+  for (const fact of ["protected", "content", "rules.publish", "change.review", "Lane-held rules update 29"]) expect(record.textContent).toContain(fact);
+  const active = render(view({ rules }));
+  expect(routineText(active)).toContain("content · 0 of 1 approvals recorded");
+  expect(routineText(active)).not.toContain("protected");
+  expect(routineText(render(view({ rules: { ...rules, extents: rules.extents.map((extent) => ({ ...extent, approvals: 0 })) } })))).not.toContain("Review requirements");
+});
