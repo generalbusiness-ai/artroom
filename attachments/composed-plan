@@ -1,0 +1,37 @@
+# Preview successor: exact composed verification plan
+
+Source-only preparation under critical b8c5a3c8 and planner source GO 28d2f159. Clean pushed composed head 677e7b3904d1d08ae51b6cc7166b1008487ff97a, tree 3eaed3746d2f4c5d9d08f9c12b0ab8282ce8bbb9, is the same commit as the reviewed isolated source candidate. The composed branch fast-forwarded from 9fd8 with only the authorized preview file changed. Main remains clean at 8479057. No compiler, discovery, native, active-source, gate or control ran.
+
+Root read the complete authored body/delta, original assertion/title lines, all eighteen remaining full titles, nine original deadline records and the complete guarded recipe. Source identity includes all 169 main-relative paths, the one-file new delta and every local workspace export. Cached compiler/Vitest entries and the unchanged lock/install stamp are recorded; no dependency installation or links changed.
+
+## Minimal affected work
+
+The exact remaining selection is the changed preview plus seventeen active cases unrun after the previous bail: eighteen cases in nine files. The prior forty-seven passed cases are not repeated in this focused step. Those passes retain their original cca558 attribution and do not claim final-head gate coverage. The two opt-in recorders remain normally skipped in the eventual whole gate; neither is in this focused selection.
+
+Only the Page scoped compiler has a changed source closure: packages/page/tsconfig.scope.json includes the modified preview call site and wrapper. Scope test and Lanes scoped roots do not import this preview file; their unchanged previous compiler successes remain at cca558. No root/all-workspace type sweep is proposed here.
+
+After a new execution release, run one Page scoped compiler from the composed root:
+
+`node node_modules/typescript/bin/tsc -p packages/page/tsconfig.scope.json`
+
+Stop on failure and retain complete output, exit, elapsed/whole CPU and before/after identity. Do not retry unchanged or import the native recipe after a compiler failure.
+
+## Discovery and native boundaries
+
+The inert remaining-native.config.mjs.recipe binds the exact clean head/tree and canonical Scope cwd before importing tools or the Worker configuration. Both shard and sort enforce the exact nine canonical files. It inherits the real Worker plugin/globalSetup, disables concurrency/shuffle/retry and retains the original default 5000 milliseconds and recorder flags false. The task case's explicit 120000 milliseconds remains unchanged in source. All other selected cases retain their original five seconds. No timeout widening, deleted case or substituted witness.
+
+Recipe SHA-256: 53a36e963199fbcad1cd63dc41a8f5acfdac9d9df003263b19088e87517dfcb6. These bytes have not been imported. An authorized execution owner can copy them byte-for-byte to an external .mjs filename and record that hash. From /tmp/artroom-correctness-composed/packages/scope, one later discovery command is:
+
+`node /tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs list --config <frozen external config> --json`
+
+Actual discovery must match all eighteen exact expanded full titles from remaining-selection.json, once each, with no unexpected or skipped active title. Count alone is insufficient. Retain full output and stop on any missing/extra/duplicate/import failure. Only a separately released body command may then run, using the same config:
+
+`node /tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs run --config <same frozen external config> --reporter verbose --bail=1`
+
+Retain full terminal logs, exact head/tree/clean/stamp/config/argv/cwd/cost, pass/fail/skip and every required unrun title. On first failure stop without retry. Node active-source checks and the eventual ONE full review-head gate require their separate owner decision; this packet executes none.
+
+## Evidence and limits
+
+The source retains both actual CLI publications, the original selected proposal content/commit after later publication, all three missing/tampered/resealed fresh entry faults, exactly one entry read per fault and zero Site/HEAD fallback. Missing replacement cancels the unread response through the captured owner's typed reader before returning the same refusal. Existing lean setup omits unused enrollment/issue activation only for this call; shared defaults and native authority are unchanged.
+
+The failed cca558 terminal raw/proof/complete ledger remain immutable and separately attributed. Timeout cause and physical cancellation/draining remain unknown. No timing saving, broader capacity, provider/browser/audio acceptance, formal Source approval or landing is claimed. Complete final gate, independent whole Source review and ordinary implementation landing remain owed.
