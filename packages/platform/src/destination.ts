@@ -695,8 +695,8 @@ const ownEntry = (own: Own, seq: number) => {
  * their opening (section 12.1.5, "What an operation is for"; entry ER6). No
  * slot lists them, and the folded state gives an operation by its ID
  * alone. So they are found from the entries that open one: the entry at
- * `reservedAt`, whose outcome of `judge` opened the first push; and an act
- * `resend` on the publication. The search reads this scope's own entries
+ * `reservedAt`, whose outcome of `judge` opened the first push; an @3 staging/check
+ * outcome held for this publication; and an act `resend` on the publication. The search reads this scope's own entries
  * from `reservedAt` to the entry that is written (I3 deltas, entry FA5).
  */
 function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: Item, before: number): Operation[] {
@@ -705,7 +705,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && input.kind === "check-judge"));
+    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
     if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
@@ -2110,6 +2110,12 @@ const stageMayRemain = (given: Pick<RuleGiven, "state" | "own">, publication: It
   }
   return false;
 };
+/** Cleanup belongs to the mint's reservation holder. A receipt uses its
+ * own token slot, while its write, mint and revoke are held for publication. */
+function cleanupPublication(state: Pick<StateView, "item">, mint: Operation): Item | null {
+  const holder = typeof mint.for === "number" ? state.item(mint.for) : null;
+  return holder?.type === "publication" ? holder : null;
+}
 /** Every known minted token of this reservation has its own confirmed revoke.
  * The offered current revoke is counted only when its own answer confirms it. */
 function cleanupTokensClosed(given: RuleGiven, publication: Item, current: Operation): boolean {
@@ -2203,7 +2209,7 @@ export const destinationRules3: Rules = (() => {
       const old = WRITTEN["resend-due"]!; return old.place === "guard" ? old.run(given) : { holds: false, name: "resend-not-due" };
     } },
     resend3: { place: "effect", most: 4, run: (given) => {
-      const old = WRITTEN["resend"]!; return old.place === "effect" ? old.run(given) : [];
+      const old = WRITTEN["reopen-publish"]!; return old.place === "effect" ? old.run(given) : [];
     } },
     "fence-before-push": { place: "guard", refusals: ["publication-started", "not-the-reservation", "generation-mismatch"], run: (given) => {
       const publication = given.resolved.subjects.get("also.publication");
@@ -2297,14 +2303,12 @@ export const destinationRules3: Rules = (() => {
     mint: { ...(rules["mint"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["mint"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 8, requests: 1, operations: 1 }, derives: (given, operation, selected) => {
       const prior = rules["mint"] as Extract<PlatformRule, { place: "outcome" }>;
       const base = prior.rules.derives!(given, operation, selected);
-      const served = servedBy(given.state, given.own, operation);
-      const target = served ? targetOf(given.state, given.own, served.write) : null;
+      const target = cleanupPublication(given.state, operation);
       return target?.type === "publication" && ["cleanup-aborted", "cleanup-deleted", "cleanup-owed"].includes(target.state) && given.input.type === "outcome" && given.input.result === "unknown" ? { ...base, effects: [...base.effects, ...cleanupStatus(target, { token: "reservation-token-unknown", tokenAttempts: given.input.attempt })] } : base;
     } } },
     revoke: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 6, requests: 0, operations: 0 }, derives: (given, operation) => {
       const mint = mintRevoked(given.state, given.own, operation);
-      const served = mint ? servedBy(given.state, given.own, mint) : null;
-      const target = served ? targetOf(given.state, given.own, served.write) : null;
+      const target = mint ? cleanupPublication(given.state, mint) : null;
       if (!target || given.input.type !== "outcome" || !["cleanup-aborted", "cleanup-deleted", "cleanup-owed", "published"].includes(target.state)) return { effects: [], sends: [], opens: [] };
       const exhausted = given.input.result !== "confirmed" && given.input.attempt === operation.most;
       const earlierFailure = cleanupTokensExhausted(given, target, operation);

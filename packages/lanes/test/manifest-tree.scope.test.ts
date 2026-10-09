@@ -3,7 +3,7 @@ import { inject, expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite } from "@generalbusiness/artroom-platform";
+import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { valueDigest } from "@generalbusiness/artroom-derive";
@@ -118,7 +118,15 @@ test.each(["source-reply", "manifest-reply"] as const)("interrupted manifest pro
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, fault); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read"): Promise<void> {
+// The receipt token is held by publication even though it uses the receipt's
+// token slot. Native operations are independently answered; Git is a STAND-IN.
+test("eligible resend opens recovery and late receipt-token outcomes settle the publication holder (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, undefined, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read", receiptRecoveryOnly = false): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
@@ -126,6 +134,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   let R: Platform | null = null;
   const bindings = () => at.bindings(R!.name);
   let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
+  let spendPush = false;
+  let receiptMode: "none" | "hold" | "refused" = "none";
+  let heldReceipt: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let outsideSends = 0;
   let rollbackSnapshotAt: number | null = null;
   let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
@@ -148,8 +159,23 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       return answer;
     } });
     let late: import("../../scope/src/operations.ts").LateAnswers | null = null;
-    return { ...outside, replies: (limit) => { const replies = outside.replies?.(limit) ?? { answers: [], more: false }; return { ...replies, answers: replies.answers.filter((row) => releaseMint || row.operation !== pendingMint?.request.operation) }; }, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
+    return { ...outside, replies: (limit) => { const replies = outside.replies?.(limit) ?? { answers: [], more: false }; return { ...replies, answers: replies.answers.filter((row) => (releaseMint || row.operation !== pendingMint?.request.operation) && row.operation !== heldReceipt?.request.operation) }; }, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge" || request.operation === heldReceipt?.request.operation || spendPush && ["push", "read"].includes(request.kind)) return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
       outsideSends++;
+      // Two known refusals consume the first attempts. The last request has no
+      // answer: native unknown custody stays unresolved and makes resend due.
+      if (spendPush && request.kind === "push") return request.attempt < 3 ? { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: host.refs.get("refs/heads/main")! } } } : null;
+      if (spendPush && request.kind === "read") return null;
+      if (receiptMode !== "none" && request.kind === "revoke") {
+        const operation = given.state.operation(request.operation)!;
+        const mint = destinationRevokedMint(given.state, given.own, operation);
+        const write = mint ? destinationWrite(given.state, given.own, mint)?.write : null;
+        if (write?.kind === "receipt" && given.state.item(mint!.for as number)?.type === "publication") {
+          if (receiptMode === "refused") return { result: "refused", evidence: { basis: "own-answer", body: { token: revokedToken(given.state, given.own, operation)! } } };
+          const answer = await outside.send(request);
+          if (answer) heldReceipt = { request, answer, late };
+          return null;
+        }
+      }
       if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
       if (exhaustCleanup === "ref" && request.kind === "reservation-delete") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: [...host.refs].find(([ref]) => ref.startsWith("refs/artroom/reservations/"))?.[1] ?? "failed" } } };
       if ((exhaustCleanup === "token" || exhaustCleanup === "token-unknown") && request.kind === "revoke") {
@@ -195,6 +221,61 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
   const first = host.refs.get("refs/heads/main")!;
+  if (receiptRecoveryOnly) {
+    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: host.refs.get("refs/heads/main")!, files: [{ path: "one.md", bytes: files["one.md"]! }] }) };
+    for (const outcome of ["confirmed", "refused"] as const) {
+      receiptMode = outcome === "confirmed" ? "hold" : "refused";
+      spendPush = outcome === "confirmed";
+      const before = await G.summary();
+      const knownPublications = new Set(before.value.items.filter(item => item.type === "publication").map(item => item.id));
+      const proposed = await run(founder, "propose", `receipt-${outcome}`);
+      if (spendPush) {
+        expect(proposed.code).toBe(1);
+        expect(proposed.lines.some(line => line.startsWith("Accepted merge:"))).toBe(true);
+        expect(proposed.lines.join("\n")).toContain("Observation unknown: wait-exhausted");
+        expect(proposed.lines.join("\n")).toContain("do not resubmit this merge");
+        expect(host.refs.get("refs/heads/main")).toBe(first);
+      } else ok(proposed);
+      await pause([repository.destination]);
+      let publication = (await G.summary()).value.items.find(item => item.type === "publication" && !knownPublications.has(item.id))!;
+      if (spendPush) {
+        for (let attempt = 0; attempt < 4; attempt++) { net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); await pause([repository.destination]); }
+        publication = await G.item(publication.id);
+        expect(publication.state).toBe("unresolved");
+        const priorPush = (await G.entries()).flatMap(entry => entry.effects).find(effect => effect.effect === "operation" && effect.kind === "push" && effect.for === publication.id)!;
+        expect(priorPush.effect).toBe("operation");
+        if (priorPush.effect !== "operation") throw new Error("Expected the native push operation.");
+        const outcomes = (await G.entries()).flatMap(entry => entry.input.type === "outcome" && entry.input.kind === "push" ? [[entry.input.attempt, entry.input.result]] : []);
+        expect(outcomes).toEqual([[1, "refused"], [2, "refused"], [3, "unknown"]]);
+        const head = (await G.summary()).at.seq;
+        spendPush = false;
+        ok(await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id)));
+        const resend = (await G.entries()).slice(head + 1).find(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "resend")!;
+        expect(resend.effects.filter(effect => effect.effect === "operation").map(effect => effect.effect === "operation" ? [effect.kind, effect.attempts, effect.for] : null)).toEqual([["push", 1, publication.id], ["mint", 1, publication.id]]);
+        await pause([repository.destination]);
+        const deleting = await G.item(publication.id);
+        expect(deleting.state).toBe("cleanup-deleted");
+        expect((deleting.values["cleanupReason"] as { refRemoved: boolean }).refRemoved).toBe(true);
+        const captured = heldReceipt as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers };
+        expect(captured.answer.result).toBe("confirmed");
+        expect(await runInDurableObject(G.object, () => captured.late(captured.request.operation, captured.request.attempt, captured.answer))).toMatchObject({ recorded: "written" });
+        receiptMode = "none"; heldReceipt = null;
+        await pause([repository.destination]);
+        expect((await G.entries()).some(entry => entry.input.type === "outcome" && entry.input.operation === captured.request.operation && entry.input.attempt === captured.request.attempt && entry.input.result === "confirmed" && entry.effects.some(effect => effect.effect === "state" && effect.item === publication.id && effect.state === "cleaned"))).toBe(true);
+        expect((await G.summary()).value.items.some(item => item.id === publication.id)).toBe(false);
+      } else {
+        for (let attempt = 0; attempt < 4; attempt++) { net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); await pause([repository.destination]); }
+        const owed = await G.item(publication.id);
+        expect(owed.state).toBe("cleanup-owed");
+        expect(owed.values["cleanupReason"]).toEqual({ tokenReason: "reservation-token", tokenAttempts: 3, refRemoved: true });
+      }
+      const own = (await G.entries()).flatMap(entry => entry.effects).filter(effect => effect.effect === "operation" && effect.kind === "reservation-delete" && effect.for === publication.id);
+      expect(own).toHaveLength(1);
+    }
+    return;
+  }
   if (proposalFault) {
     files["docs/two.md"] = utf8("# Second source\n");
     ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
