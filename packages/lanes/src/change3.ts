@@ -59,7 +59,7 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
     const act = next.acts[kind];
     if (act) act.guards = act.guards.filter((guard) => guard.reason !== "merge-in-progress");
   }
-  next.acts["cancel-merge"]!.guards = [{ state: ["intended", "committed"] }, next.acts["cancel-merge"]!.guards[1]!];
+  next.acts["cancel-merge"]!.guards = [{ state: ["intended", "committed", "unknown"] }, next.acts["cancel-merge"]!.guards[1]!];
   next.items["job"]!.states["queued"] = { final: false };
   next.items["job"]!.states["fence-refused"] = { final: true };
   next.items["job"]!.initial = "queued";

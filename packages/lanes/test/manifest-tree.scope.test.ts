@@ -65,10 +65,16 @@ test("artroom edit uses a one-element reservation tree as the real checker servi
 test.each(["summary", "request", "reply", "unavailable", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
   net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
   const wired = new Set<ScopeId>();
-  try { await story(ownHost(), wired, false, false, false, false, linkFault); }
+  try { await story(ownHost(), wired, false, false, false, false, false, linkFault); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted"): Promise<void> {
+test("a refused publication push retains and settles its staged-ref cleanup instead of finalizing an orphan (real scopes; host refusal and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted"): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -87,6 +93,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     let late: import("../../scope/src/operations.ts").LateAnswers | null = null;
     return { ...outside, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
       if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
+      if (refusePushOnly && request.kind === "push") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: host.refs.get("refs/heads/main")! } } };
       const answer = await outside.send(request);
       return (holdPush && ["push", "read"].includes(request.kind)) || (unknownStageOnly && request.kind === "reservation-stage") || (unknownDeleteOnly && request.kind === "reservation-delete") ? null : answer;
     } };
@@ -190,6 +197,22 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+  if (refusePushOnly) {
+    const proposed = ok(await run(founder, "propose", "refused-push"));
+    const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
+    const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
+    const manifest = await lane.item(version), ref = manifest.values["reservationRef"] as string;
+    const requested = ok(await run(founder, "act", "request-check", "--on", lane.name, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+    await pause([lane.name, repository.destination]);
+    const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
+    ok(await run(checker, "act", "check", "--on", lane.name, "--set", `job=${job}`, "--set", `tree=${manifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
+    for (let attempt = 0; attempt < 3; attempt++) { await pause([lane.name, repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
+    await pause([lane.name, repository.destination]);
+    expect([host.refs.get("refs/heads/main"), host.refs.has(ref)]).toEqual([first, false]);
+    expect((await G.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.state === "cleanup-aborted"))).toBe(true);
+    expect((await G.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.state === "cleaned"))).toBe(true);
+    return;
+  }
   if (unknownStageOnly) {
     const unknown = await run(founder, "propose", "stage-unknown");
     expect(unknown.code).toBe(1);
@@ -199,6 +222,18 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     const events = await G.entries();
     expect(events.some((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-stage" && entry.input.result === "unknown")).toBe(true);
     expect(events.some((entry) => entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "push"))).toBe(false);
+    const matched = /as change (sc_\S+), version (\d+)\./.exec(unknown.lines[0]!)!;
+    const lane = new Platform(matched[1] as ScopeId);
+    const merge = (await lane.summary()).value.items.find((item) => item.type === "merge")!;
+    const reservation = events[publication.values["reservedAt"] as number]!;
+    const ref = `refs/artroom/reservations/${factRefOf(reservation).hash.slice(7)}`;
+    expect(host.refs.has(ref)).toBe(true);
+    ok(await run(founder, "act", "cancel-merge", "--on", lane.name, "--target", String(merge.id)));
+    await pause([lane.name, repository.destination]);
+    expect([(await G.item(publication.id)).state, host.refs.has(ref), (await G.item(0)).refs["slot"] ?? null]).toEqual(["cleanup-aborted", true, null]);
+    expect((await G.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "reservation-delete"))).toBe(false);
+    const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
+    expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     return;
   }
   if (startedOnly) {
@@ -370,6 +405,32 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const replacementMerge = (await replacementLane.summary()).value.items.find((item) => item.type === "merge")!;
   ok(await run(founder, "act", "cancel-merge", "--on", replacementLane.name, "--target", String(replacementMerge.id)));
   await pause([replacementLane.name, repository.destination]);
+  // J2's fence is local before its ACK makes it active in the lane.
+  // During that interval J1 is still requested there but cannot read objects.
+  const snapshotRace = ok(await run(founder, "propose", "snapshot-generation"));
+  const snapshotMatch = /as change (sc_\S+), version (\d+)\./.exec(snapshotRace.lines[0]!)!;
+  const snapshotLane = new Platform(snapshotMatch[1] as ScopeId), snapshotVersion = Number(snapshotMatch[2]);
+  const snapshotJ1out = ok(await run(founder, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([snapshotLane.name, repository.destination]);
+  const snapshotJ1 = Number(/entry \S+:(\d+),/.exec(snapshotJ1out.lines[0]!)![1]);
+  const snapshotJ1Fact = factRefOf((await snapshotLane.entries())[snapshotJ1]!);
+  const snapshotJ1Ask = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await snapshotLane.at(), fact: snapshotJ1Fact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
+  expect(await Gsnapshot.reservationSnapshot(snapshotJ1Ask)).not.toBeNull();
+  const originalHold = net.hold;
+  net.hold = (envelope) => originalHold?.(envelope) === true || (envelope.from.at.scope === G.name && envelope.message.class === "result" && envelope.message.of.from.at.scope === snapshotLane.name);
+  const snapshotJ2out = ok(await run(founder, "act", "request-check", "--on", snapshotLane.name, "--set", `manifest=${snapshotVersion}`, "--set", `earlier=${snapshotJ1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  await pause([snapshotLane.name, repository.destination]);
+  expect((await snapshotLane.item(snapshotJ1)).state).toBe("requested");
+  expect(await Gsnapshot.reservationSnapshot(snapshotJ1Ask)).toBeNull();
+  net.hold = originalHold;
+  net.clock.now = timeOf(timeMs(net.clock.now)! + 2000);
+  await pause([snapshotLane.name, repository.destination]);
+  const snapshotJ2 = Number(/entry \S+:(\d+),/.exec(snapshotJ2out.lines[0]!)![1]);
+  const snapshotJ2Ask = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await snapshotLane.at(), fact: factRefOf((await snapshotLane.entries())[snapshotJ2]!) }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
+  expect(await Gsnapshot.reservationSnapshot(snapshotJ2Ask)).not.toBeNull();
+  const snapshotMerge = (await snapshotLane.summary()).value.items.find((item) => item.type === "merge")!;
+  ok(await run(founder, "act", "cancel-merge", "--on", snapshotLane.name, "--target", String(snapshotMerge.id)));
+  await pause([snapshotLane.name, repository.destination]);
   // Read J1 as current, then fence J2 before offering that same old answer.
   const racing = ok(await run(founder, "propose", "read-before-fence"));
   const raceMatch = /as change (sc_\S+), version (\d+)\./.exec(racing.lines[0]!)!;

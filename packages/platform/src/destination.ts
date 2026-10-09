@@ -543,7 +543,7 @@ export const destination2: PlatformData = {
 export const destination3: PlatformData = {
   ...destination2,
   items: { ...destination2.items,
-    publication: { ...destination2.items["publication"]!, states: { ...destination2.items["publication"]!.states, published: { final: false }, "cleanup-aborted": { final: false }, "cleanup-deleted": { final: false }, cleaned: { final: true } }, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32, "reservation-stage": 1, "reservation-delete": 1 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
+    publication: { ...destination2.items["publication"]!, states: { ...destination2.items["publication"]!.states, published: { final: false }, "cleanup-aborted": { final: false }, "cleanup-deleted": { final: false }, cleaned: { final: true } }, holds: { ...destination2.items["publication"]!.holds!, requests: 5, /* stage, checks-ready, first unknown, final, withdrawal; explicit resend adds two */ operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32, "reservation-stage": 1, "reservation-delete": 1 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
       ...destination2.items["publication"]!.values,
       tree: { fixed: false, required: false, of: { type: "tree" } },
       checkDeadline: { fixed: false, required: false, of: { type: "time" } },
@@ -552,12 +552,14 @@ export const destination3: PlatformData = {
     } },
   },
   acts: { ...destination2.acts,
-    resend: { ...destination2.acts["resend"]!, adds: { ...destination2.acts["resend"]!.adds, operations: { "reservation-delete": 1, mint: 1, revoke: 1, push: 1, read: 1, receipt: 1, judge: 1 } }, guards: [{ code: "resend3-due", row: "P18" }], effects: [{ code: "resend3", row: "P16" }] },
+    resend: { ...destination2.acts["resend"]!, adds: { ...destination2.acts["resend"]!.adds, requests: 2, operations: { "reservation-delete": 1, mint: 1, revoke: 1, push: 1, read: 1, receipt: 1, judge: 1 } }, guards: [{ code: "resend3-due", row: "P18" }], effects: [{ code: "resend3", row: "P16" }] },
   },
   timed: { "publication-checks-deadline": { on: "publication", states: ["reserved"], deadline: "checkDeadline", effects: [
     { state: "cleanup-aborted" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } },
   ], attention: [] } },
   outcomes: { ...destination2.outcomes,
+    push: { ...destination2.outcomes["push"]!, most: { ...destination2.outcomes["push"]!.most!, effects: 20, operations: ["revoke", "receipt", "mint", "judge", "read", "reservation-delete"] } },
+    read: { ...destination2.outcomes["read"]!, most: { ...destination2.outcomes["read"]!.most!, effects: 17, operations: ["receipt", "mint", "judge", "reservation-delete"] } },
     revoke: { ...destination2.outcomes["revoke"]!, most: { effects: 1, operations: [] } },
     judge: { ...destination2.outcomes["judge"]!, most: { effects: 12, operations: ["reservation-stage", "push", "mint", "judge"] } },
     receipt: { ...destination2.outcomes["receipt"]!, most: { effects: 9, operations: ["revoke", "mint", "read", "reservation-delete"] } },
@@ -1032,8 +1034,8 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
       const [compromised, next] = [publication.values["aborting"] === true, andNext(given, state, { slot: true })];
       const reason = compromised ? "compromised" : "host-refused";
       return {
-        effects: [{ effect: "state", item: id, state: "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
-        opens: next.opens,
+        effects: [{ effect: "state", item: id, state: pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
+        opens: [...next.opens, ...(pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? [opening(given, "reservation-delete", 1, id), opening(given, "mint", 1, id)] : [])],
         update: { publication, state: "aborted", outcome: compromised ? "aborted" : "refused", reason },
       };
     }
@@ -2091,6 +2093,15 @@ const stagedOwn = (given: Pick<RuleGiven, "state" | "own">, publication: Item, b
   }
   return false;
 };
+const stageMayRemain = (given: Pick<RuleGiven, "state" | "own">, publication: Item, before: number): boolean => {
+  for (let seq = publication.values["reservedAt"] as number; seq < before; seq++) {
+    for (const operation of openedIn(given.state, seq)) {
+      if (operation.kind !== "reservation-stage" || operation.for !== publication.id) continue;
+      if (operation.sent === true || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown" || outcome.result === "confirmed"))) return true;
+    }
+  }
+  return false;
+};
 const generations = (publication: Item): CheckGeneration[] => (publication.values["passes"] ?? []) as unknown as CheckGeneration[];
 const resultGeneration = (given: RuleGiven, publication: Item): boolean => {
   const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check");
@@ -2122,8 +2133,9 @@ export const destinationRules3: Rules = (() => {
       if (!publication) { const old = WRITTEN["open-withdrawn"]!; return old.place === "effect" ? old.run(given) : []; }
       const branch = branchOf(given.state)!;
       const next = andNext(given, given.state, { slot: true, ended: publication.id });
-      const cleanup = stagedOwn(given, publication, given.resolved.self);
-      return [{ effect: "value", item: publication.id, slot: "withdrawDecided", value: true }, { effect: "state", item: publication.id, state: cleanup ? "cleanup-aborted" : "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "withdrawn" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, ...next.effects, ...next.opens.flatMap((open, k) => opened(given, k, open.kind, open.attempts, open.for!)), ...(cleanup ? [...opened(given, next.opens.length, "reservation-delete", 1, publication.id), ...opened(given, next.opens.length + 1, "mint", 1, publication.id)] : [])];
+      const confirmed = stagedOwn(given, publication, given.resolved.self);
+      const cleanup = confirmed || stageMayRemain(given, publication, given.resolved.self);
+      return [{ effect: "value", item: publication.id, slot: "withdrawDecided", value: true }, { effect: "state", item: publication.id, state: cleanup ? "cleanup-aborted" : "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "withdrawn" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, ...next.effects, ...next.opens.flatMap((open, k) => opened(given, k, open.kind, open.attempts, open.for!)), ...(confirmed ? [...opened(given, next.opens.length, "reservation-delete", 1, publication.id), ...opened(given, next.opens.length + 1, "mint", 1, publication.id)] : [])];
     } },
     "withdraw-update": { place: "send", run: (given) => {
       const publication = given.resolved.subjects.get("also.publication");
@@ -2132,6 +2144,7 @@ export const destinationRules3: Rules = (() => {
     "resend3-due": { place: "guard", refusals: ["resend-not-due"], run: (given) => {
       const target = given.resolved.subjects.get("on");
       if (target?.state === "cleanup-aborted" || target?.state === "published") {
+        if (stageMayRemain(given, target, given.resolved.self) && !stagedOwn(given, target, given.resolved.self)) return { holds: false, name: "resend-not-due" };
         for (let seq = target.values["reservedAt"] as number; seq < given.resolved.self; seq++) {
           const operations = openedIn(given.state, seq).filter((operation) => operation.kind === "reservation-delete" && operation.for === target.id);
           if (operations.some((operation) => operation.attempts.some((attempt) => attempt.outcomes.length === 0 || attempt.outcomes.some((outcome) => outcome.result === "unknown")))) return { holds: false, name: "resend-not-due" };
@@ -2225,6 +2238,8 @@ export const destinationRules3: Rules = (() => {
   const judgeRule3 = rules["judge"] as Extract<PlatformRule, { place: "outcome" }>;
   const checked = rules["checked-result"]!;
   return { ...rules,
+    push: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 20, requests: 1, operations: 6 } } },
+    "deciding-read": { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 17, requests: 1, operations: 5 } } },
     receipt: receiptCleanup,
     revoke: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 1, requests: 0, operations: 0 }, derives: (given, operation) => {
       const mint = mintRevoked(given.state, given.own, operation);
@@ -2259,7 +2274,7 @@ export const destinationRules3: Rules = (() => {
       const name = job?.input.type === "act" ? job.input.signed.intent.fields["name"] : null;
       const passes = generations(publication).map((row) => row.name === name ? { ...row, passed: true } : row);
       const complete = ((publication.values["requiredChecks"] ?? []) as string[]).every((check) => passes.some((row) => row.name === check && row.passed));
-      return complete ? updateRequest(given, { publication, state: "reserved", outcome: "committed", tree: publication.values["tree"] as string, commit: publication.values["integration"] as string }) : null;
+      return complete && publication.values["checkDeadline"] !== undefined ? updateRequest(given, { publication, state: "reserved", outcome: "committed", tree: publication.values["tree"] as string, commit: publication.values["integration"] as string }) : null;
     } },
     "reservation-stage": { place: "outcome", rules: {
       selects: false, read: false, most: { effects: 8, requests: 1, operations: 3 }, retries: () => false,
