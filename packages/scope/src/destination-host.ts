@@ -45,7 +45,7 @@ export interface DestinationProvider {
 /** What the one-time credential read answers: the plaintext, its end, and the remote URL it opens. */
 export interface ReadCredential { token: string; ends: string; remote: string }
 export interface SnapshotReader {
-  job(fact: FactRef): Promise<{ entry: Entry; under: string; state: string } | null>;
+  job(fact: FactRef): Promise<{ entry: Entry; under: string; state: string; decidedBy?: FactRef | null } | null>;
   key(membership: string, key: KeyId): Promise<unknown>;
 }
 export interface DestinationHostOptions { snapshotReader?: SnapshotReader; host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
@@ -133,7 +133,17 @@ export class DestinationHost implements Outside {
       const context = this.#bound(request);
       if (!context) return null;
       const { operation, repository, ref } = context;
-      if (operation.kind === "check-judge") return answer("confirmed", {});
+      if (operation.kind === "check-judge") {
+        const input = request.origin.entry.input;
+        const body = input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" ? input.message.body as { fields: Record<string, FieldValue> } : null;
+        const job = body?.fields["job"];
+        const result = isFactRef(body?.fields["result"]) ? body.fields["result"] : input.type === "delivery" ? input.from : null;
+        if (!isFactRef(job) || !result || !this.#options.snapshotReader) return null;
+        const readAt = this.#given.clock.read();
+        const read = await this.#options.snapshotReader.job(job);
+        const current = !!read && ["passed", "failed", "errored"].includes(read.state) && canonicalize(read.decidedBy ?? null) === canonicalize(result);
+        return answer("confirmed", { current, job, result, readAt });
+      }
       if (operation.kind === DESTINATION_KINDS.mintRead) {
         const hours = this.#hours(operation);
         if (hours === null) return null;
@@ -283,10 +293,11 @@ export class DestinationHost implements Outside {
     const reached = new Set<string>();
     const closureReader = new Reader({ object: async (id) => { const object = overlay.get(id); if (!object) return null; reached.add(id); return { type: object.kind, size: object.body.length, data: object.body }; }, ref: async () => null, refs: async () => [] }, READ_BOUNDS);
     if (!(await closureReader.closure(built.commit)).complete) return null;
-    const completed = timeMs(this.#given.clock.read());
     const currentJob = await reader.job(jobFact);
+    const finalReadAt = timeMs(this.#given.clock.read());
     const currentKey = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; controllerActive?: unknown } | null;
-    if (completed === null || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
+    const completed = timeMs(this.#given.clock.read());
+    if (completed === null || finalReadAt === null || completed < finalReadAt || completed - finalReadAt > 10_000 || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
       || !currentKey || currentKey.key !== intent.actor || currentKey.keyState !== "active" || currentKey.memberState !== "active" || currentKey.member !== check.checker || currentKey.controllerActive === false || !Array.isArray(currentKey.actions) || !currentKey.actions.includes("change.check")) return null;
     const sources = sourcesOf(manifest)!.map((row) => this.#fact(reserve!, row.entry)!);
     return { destination: scope.at, job: { entry: job, hash: entryHash(job) }, manifest: { entry: manifest, hash: entryHash(manifest) }, reservation,

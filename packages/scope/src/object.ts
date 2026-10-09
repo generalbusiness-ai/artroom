@@ -369,10 +369,13 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
 
   /** Internal namespace read of one exact job's current state. */
-  async jobState(fact: import("@generalbusiness/artroom-contract").FactRef): Promise<string | null> {
+  async jobState(fact: import("@generalbusiness/artroom-contract").FactRef): Promise<{ state: string; decidedBy: import("@generalbusiness/artroom-contract").FactRef | null } | null> {
     this.#first(); const scope = this.#store.scope(); const sealed = this.#store.stored(fact.seq);
     if (!scope || !sealed || fact.at.scope !== scope.at.scope || fact.at.inc !== scope.at.inc || sealed.hash !== fact.hash) return null;
-    const item = this.#store.item(fact.seq); return item?.type === "job" ? item.state : null;
+    const item = this.#store.item(fact.seq);
+    const deciding = item?.refs["decidedBy"];
+    const entry = typeof deciding === "number" ? this.#store.stored(deciding) : null;
+    return item?.type === "job" ? { state: item.state, decidedBy: entry ? { at: scope.at, seq: deciding as number, hash: entry.hash } : null } : null;
   }
   /** Authenticated by the signed job-read request and current configured checker. */
   async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null> {

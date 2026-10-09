@@ -58,10 +58,15 @@ function successor(prior: DeclaredDefinition): DeclaredDefinition {
     const act = next.acts[kind];
     if (act) act.guards = act.guards.filter((guard) => guard.reason !== "merge-in-progress");
   }
+  next.acts["cancel-merge"]!.guards = [{ state: ["intended", "committed"] }, next.acts["cancel-merge"]!.guards[1]!];
   next.acts["request-check"]!.guards = [...next.acts["request-check"]!.guards, { set: "tree", of: "also.manifest", reason: "not-reserved" }];
+  next.items["merge"]!.values["checkDeadline"] = { fixed: false, required: false, of: { type: "time" } };
+  next.timed["merge-checks-deadline"] = { on: "merge", states: ["committed"], deadline: "checkDeadline", effects: [{ state: "refused" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } }], attention: [] };
   const publication = next.receives["publication"]!;
+  publication.fields["checkDeadline"] = { type: "time", required: false };
   publication.fields["tree"] = { type: "tree", required: false };
   publication.effects = [...publication.effects,
+    { value: { slot: "checkDeadline", from: { field: "checkDeadline" } }, of: "also.merge", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
     { value: { slot: "tree", from: { field: "tree" } }, of: "also.manifest", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
     { value: { slot: "integration", from: { field: "commit" } }, of: "also.manifest", if: [{ equals: { a: { field: "outcome" }, b: { const: "committed" } } }] },
   ];

@@ -1,6 +1,7 @@
+import { runDurableObjectAlarm } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -186,6 +187,45 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const failMerge = (await failLane.summary()).value.items.find((item) => item.type === "merge");
   expect(failMerge).toBeUndefined();
   expect((await failLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-failed"))).toBe(true);
+  // A pass whose delivery waits while its job is superseded counts for none.
+  const replacing = ok(await run(founder, "propose", "replacement"));
+  const replacementMatch = /as change (sc_\S+), version (\d+)\./.exec(replacing.lines[0]!)!;
+  const replacementLane = new Platform(replacementMatch[1] as ScopeId), replacementVersion = Number(replacementMatch[2]);
+  const replacementManifest = await replacementLane.item(replacementVersion);
+  const j1out = ok(await run(founder, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  const j1 = Number(/entry \S+:(\d+),/.exec(j1out.lines[0]!)![1]);
+  const wireOnly = net.hold;
+  net.hold = (envelope) => { if (wireOnly?.(envelope)) return true; return envelope.from.at.scope === replacementLane.name && envelope.message.class === "request" && envelope.message.type === "tell" && (envelope.message.body as { message?: string }).message === "checked"; };
+  ok(await run(checker, "act", "check", "--on", replacementLane.name, "--set", `job=${j1}`, "--set", `tree=${replacementManifest.values["tree"]}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed"));
+  await pause([replacementLane.name]);
+  ok(await run(founder, "act", "request-check", "--on", replacementLane.name, "--set", `manifest=${replacementVersion}`, "--set", `earlier=${j1}`, "--set", "name=text", "--set", `configuration=${configuration}`));
+  net.hold = wireOnly;
+  await pause([replacementLane.name, repository.destination]);
+  expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
+  const replacementMerge = (await replacementLane.summary()).value.items.find((item) => item.type === "merge")!;
+  ok(await run(founder, "act", "cancel-merge", "--on", replacementLane.name, "--target", String(replacementMerge.id)));
+  await pause([replacementLane.name, repository.destination]);
+  // Cancelling a reserved change with no push releases the publication slot.
+  const cancelled = ok(await run(founder, "propose", "cancel"));
+  const cancelMatch = /as change (sc_\S+), version (\d+)\./.exec(cancelled.lines[0]!)!;
+  const cancelLane = new Platform(cancelMatch[1] as ScopeId);
+  const cancelMerge = (await cancelLane.summary()).value.items.find((item) => item.type === "merge")!;
+  ok(await run(founder, "act", "cancel-merge", "--on", cancelLane.name, "--target", String(cancelMerge.id)));
+  await pause([cancelLane.name, repository.destination]);
+  expect([(await G.item(0)).refs["slot"] ?? null, host.refs.get("refs/heads/main")]).toEqual([null, lastPublished]);
+  // No response at the recorded deadline ends both sides. The next reserve
+  // reclaims the final slot before it opens another judge; no push was sent.
+  const expired = ok(await run(founder, "propose", "expired"));
+  const expireMatch = /as change (sc_\S+), version (\d+)\./.exec(expired.lines[0]!)!;
+  const expireLane = new Platform(expireMatch[1] as ScopeId);
+  const expireMerge = (await expireLane.summary()).value.items.find((item) => item.type === "merge")!;
+  net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
+  await runDurableObjectAlarm(G.object);
+  await runDurableObjectAlarm(expireLane.object);
+  expect((await expireLane.summary()).value.items.some((item) => item.type === "merge")).toBe(false);
+  expect((await expireLane.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "value" && effect.slot === "reason" && effect.value === "required-check-timeout"))).toBe(true);
+  expect(expireMerge.values["checkDeadline"]).toBe(net.clock.now);
+  expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   // A second reservation cannot be disclosed to a compromised checker key.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   const held = ok(await run(founder, "propose", "held"));

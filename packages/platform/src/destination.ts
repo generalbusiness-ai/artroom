@@ -24,7 +24,7 @@
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
@@ -546,11 +546,14 @@ export const destination3: PlatformData = {
     publication: { ...destination2.items["publication"]!, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32 }, decisions: { withdraw: 1, checked: 32 } }, values: {
       ...destination2.items["publication"]!.values,
       tree: { fixed: false, required: false, of: { type: "tree" } },
-      checked: { fixed: false, required: true, default: false, of: { type: "bool" } },
+      checkDeadline: { fixed: false, required: false, of: { type: "time" } },
       requiredChecks: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
       passes: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
     } },
   },
+  timed: { "publication-checks-deadline": { on: "publication", states: ["reserved"], deadline: "checkDeadline", effects: [
+    { state: "not-reserved" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } },
+  ], attention: [] } },
   outcomes: { ...destination2.outcomes,
     "check-judge": { code: "check-judge", row: "P19", send: UPDATE, attempts: 1, origin: "opening", most: { effects: 6, operations: ["push", "mint"] }, observes: [
       { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "wait" },
@@ -565,6 +568,11 @@ export const destination3: PlatformData = {
         digest: { type: "digest", required: true },
       } } },
     } },
+    withdraw: { ...destination2.receives["withdraw"]!,
+      guards: [OWNER, { code: "withdraw-before-push", row: "P18" }],
+      effects: [{ code: "withdraw-unpublished", row: "P16" }],
+      sends: [{ code: "withdraw-update", row: "P16", result: {} }],
+    },
     checked: { message: "checked", class: "tell", from: FROM_LANE, opens: null,
       also: { publication: { code: "checked-publication", row: "P15", item: "publication", index: "operation", key: "operation" } },
       bound: { of: "also.publication", where: [{ equals: { a: { sender: true }, b: { slot: "lane", of: "also.publication" } } }] },
@@ -920,7 +928,7 @@ export function revokedToken(state: Pick<StateView, "operation" | "item">, own: 
  * gives none, and the update then holds no member `rules` (I3 deltas,
  * entry FA8).
  */
-interface Update { tree?: string; publication: Item; state: string; outcome: "committed" | "unknown" | "published" | "refused" | "aborted"; commit?: string; reason?: string; rules?: number | null }
+interface Update { checkDeadline?: string; tree?: string; publication: Item; state: string; outcome: "committed" | "unknown" | "published" | "refused" | "aborted"; commit?: string; reason?: string; rules?: number | null }
 
 /** What the rule of an outcome yields: the effects, the operations that the entry opens, and the update, when the table says "the update". */
 interface Decided { effects: readonly RuleEffect[]; opens: readonly Opening[]; update: Update | null }
@@ -939,7 +947,7 @@ function updateRequest({ own, resolved }: RuleGiven, update: Update): RuleReques
   const [lane, operation] = [publication.refs["lane"], publication.refs["operation"]];
   if (!isScopeRef(lane) || !isFactRef(operation) || publication.opened === null) throw new Error("an update is of a publication that holds its lane and its operation");
   const rules = update.rules === undefined ? rulesObserved(own, publication.values["reservedAt"]) : update.rules;
-  const detail: Record<string, FieldValue> = { operation: operation as FactRef & FieldValue, outcome, ...(commit === undefined ? {} : { commit }), ...(reason === undefined ? {} : { reason }), ...(rules === null ? {} : { rules }), ...(update.tree === undefined ? {} : { tree: update.tree }) };
+  const detail: Record<string, FieldValue> = { operation: operation as FactRef & FieldValue, outcome, ...(commit === undefined ? {} : { commit }), ...(reason === undefined ? {} : { reason }), ...(rules === null ? {} : { rules }), ...(update.tree === undefined ? {} : { tree: update.tree }), ...(update.checkDeadline === undefined ? {} : { checkDeadline: update.checkDeadline }) };
   return { to: lane, message: { class: "request", type: "relate", body: { name: "publication", item: { at: resolved.at, seq: publication.id, hash: publication.opened }, state, detail } } };
 }
 
@@ -1473,10 +1481,10 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
       { effect: "state", item: publication.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: publication.id }, { effect: "ref", item: branch.id, slot: "judging", to: null },
       { effect: "value", item: publication.id, slot: "integration", value: judged.integration }, { effect: "value", item: publication.id, slot: "reservedAt", value: resolved.self },
       ...(judged.reason === null ? [] : [{ effect: "value", item: publication.id, slot: "reason", value: judged.reason } as const]),
-      ...(list ? [{ effect: "value", item: publication.id, slot: "tree", value: evidence.tree! } as const, ...(requiredChecks.length ? [{ effect: "value", item: publication.id, slot: "requiredChecks", value: requiredChecks } as const] : [])] : []),
+      ...(list ? [{ effect: "value", item: publication.id, slot: "tree", value: evidence.tree! } as const, ...(requiredChecks.length ? [{ effect: "value", item: publication.id, slot: "requiredChecks", value: requiredChecks } as const, { effect: "value", item: publication.id, slot: "checkDeadline", value: timeOf(timeMs(time)! + 1800_000) } as const] : [])] : []),
     ],
     opens: list && requiredChecks.length > 0 ? [] : [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
-    update: { ...(list ? { tree: evidence.tree!, commit: judged.integration } : {}), publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
+    update: { ...(list ? { tree: evidence.tree!, commit: judged.integration, ...(requiredChecks.length ? { checkDeadline: timeOf(timeMs(time)! + 1800_000) } : {}) } : {}), publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
   };
 };
 
@@ -1635,8 +1643,9 @@ const WRITTEN: Rules = {
     place: "effect", most: 3,
     run: (given) => {
       const { state, resolved } = given;
-      const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self })];
-      return branch && publication !== null ? [...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
+      const expiredSlot = pinnedBy(given) === "platform:destination@3" && branchOf(state)?.refs["slot"] !== undefined && state.item(branchOf(state)!.refs["slot"] as number)?.state === "not-reserved";
+      const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self, ...(expiredSlot ? { slot: true } : {}) })];
+      return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
   },
   /**
@@ -2064,8 +2073,27 @@ export const destinationRules3: Rules = (() => {
     const manifest = statement ? given.uses.find((use) => use.fact.hash === statement.manifest.hash)?.entry : null;
     return sourcesOf(manifest) ? listJudge(given, operation) : oldJudge(given, operation);
   };
-  const rules: Rules = { ...destinationRulesWith(READ_LIST, 2), judge: judgeRule(judge),
+  const rules: Rules = { ...destinationRulesWith(READ_LIST, 2),
+    "open-judge": { ...(WRITTEN["open-judge"] as Extract<PlatformRule, { place: "effect" }>), most: 4 }, judge: judgeRule(judge),
     "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }),
+    "withdraw-before-push": { place: "guard", refusals: ["reserved", "ended"], run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication");
+      if (!publication || publication.state === "queued") return { holds: true };
+      if (publication.state !== "reserved") return { holds: false, name: "ended" };
+      const pushes = pushesOf(given.state, given.own, publication, given.resolved.self);
+      return pushes.length === 0 ? { holds: true } : { holds: false, name: "reserved" };
+    } },
+    "withdraw-unpublished": { place: "effect", most: 8, run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication");
+      if (!publication) { const old = WRITTEN["open-withdrawn"]!; return old.place === "effect" ? old.run(given) : []; }
+      const branch = branchOf(given.state)!;
+      const next = andNext(given, given.state, { slot: true, ended: publication.id });
+      return [{ effect: "value", item: publication.id, slot: "withdrawDecided", value: true }, { effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "withdrawn" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, ...next.effects, ...next.opens.flatMap((open, k) => opened(given, k, open.kind, open.attempts, open.for!))];
+    } },
+    "withdraw-update": { place: "send", run: (given) => {
+      const publication = given.resolved.subjects.get("also.publication");
+      return publication ? updateRequest(given, { publication, state: "not-reserved", outcome: "aborted", reason: "withdrawn" }) : null;
+    } },
     "checked-publication": { place: "also", bind: (items) => items[0]?.id ?? null },
     "checked-bound": { place: "guard", refusals: ["not-the-reservation", "not-this-check"], run: (given) => {
       const publication = given.resolved.subjects.get("also.publication");
@@ -2096,9 +2124,9 @@ export const destinationRules3: Rules = (() => {
       const name = job.input.type === "act" ? job.input.signed.intent.fields["name"] as string : "";
       const passes = [...new Set([...((publication.values["passes"] ?? []) as string[]), name])];
       const required = (publication.values["requiredChecks"] ?? []) as string[];
-      const ready = publication.values["checked"] !== true && required.every((check) => passes.includes(check));
+      const ready = publication.values["checkDeadline"] !== undefined && required.every((check) => passes.includes(check));
       return [{ effect: "value", item: publication.id, slot: "passes", value: passes }, ...(ready ? [
-        { effect: "value", item: publication.id, slot: "checked", value: true } as const,
+        { effect: "value", item: publication.id, slot: "checkDeadline", value: null } as const,
         ...opened(given, 0, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id),
         ...opened(given, 1, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id),
       ] : [])];
@@ -2110,6 +2138,7 @@ export const destinationRules3: Rules = (() => {
       if (given.input.type !== "outcome" || given.input.kind !== "check-judge") {
         const old = rules["publication-update"]!; return old.place === "send" ? old.run(given) : null;
       }
+      if (!isObject(given.input.evidence.body) || (given.input.evidence.body["current"] !== true || timeMs(given.time)! < timeMs(given.input.evidence.body["readAt"])! || timeMs(given.time)! - timeMs(given.input.evidence.body["readAt"])! > 10_000)) return null;
       const operation = given.state.operation(given.input.operation)!;
       const opening = given.own(Number(operation.id.split(":")[0]))!.entry;
       const held = opening.effects.find((effect) => effect.effect === "operation" && effect.kind === "check-judge");
@@ -2123,13 +2152,20 @@ export const destinationRules3: Rules = (() => {
     "open-check-judge": { place: "effect", most: 2, run: (given) => opened(given, 0, "check-judge", 1, given.resolved.subjects.get("also.publication")!.id) },
     "check-judge": { place: "outcome", rules: {
       selects: false, read: false, most: { effects: 6, requests: 1, operations: 2 }, retries: () => false,
-      wellFormed: (result, evidence) => result === "confirmed" && isObject(evidence.body) && Object.keys(evidence.body).length === 0,
+      wellFormed: (result, evidence, given) => {
+        if (result !== "confirmed" || !isObject(evidence.body) || Object.keys(evidence.body).length !== 4 || timeMs(evidence.body["readAt"]) === null || typeof evidence.body["current"] !== "boolean" || !isFactRef(evidence.body["job"]) || !isFactRef(evidence.body["result"]) || given.input.type !== "outcome") return false;
+        const origin = given.own(Number(given.input.operation.split(":")[0]))?.entry.input;
+        const fields = origin?.type === "delivery" && origin.message.class === "request" && origin.message.type === "tell" ? (origin.message.body as { fields: Record<string, FieldValue> }).fields : null;
+        const resultFact = fields && isFactRef(fields["result"]) ? fields["result"] : origin?.type === "delivery" ? origin.from : null;
+        return !!fields && canonicalize(fields["job"]) === canonicalize(evidence.body["job"]) && canonicalize(resultFact) === canonicalize(evidence.body["result"]);
+      },
       unknown: () => ({}),
       subjects: (given, _operation) => {
         const result = given.uses.find((use) => use.entry.input.type === "act" && ["check", "check-error"].includes(use.entry.input.signed.intent.kind))?.entry;
         return result?.input.type === "act" ? [result.input.signed.intent.actor] : [];
       },
       derives: (given, operation) => {
+        if (given.input.type !== "outcome" || !isObject(given.input.evidence.body) || (given.input.evidence.body["current"] !== true || timeMs(given.time)! < timeMs(given.input.evidence.body["readAt"])! || timeMs(given.time)! - timeMs(given.input.evidence.body["readAt"])! > 10_000)) return { effects: [], sends: [], opens: [] };
         const opening = given.own(Number(operation.id.split(":")[0]))!.entry;
         const held = opening.effects.find((effect) => effect.effect === "operation" && effect.kind === "check-judge");
         const publication = held?.effect === "operation" && typeof held.for === "number" ? given.state.item(held.for) : null;

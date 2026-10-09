@@ -380,11 +380,12 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
 export function snapshotReaderOf(binding: Binding): import("./destination-host.ts").SnapshotReader {
   return {
     job: async (fact) => {
-      const peer = binding.get(binding.idFromName(fact.at.scope)) as { source(seq: number): Promise<{ bytes: string | null; under: string } | null>; summary(reader: unknown): Promise<unknown>; jobState(fact: FactRef): Promise<string | null> };
+      const peer = binding.get(binding.idFromName(fact.at.scope)) as { source(seq: number): Promise<{ bytes: string | null; under: string } | null>; summary(reader: unknown): Promise<unknown>; jobState(fact: FactRef): Promise<{ state: string; decidedBy: FactRef | null } | null> };
       const read = await peer.source(fact.seq);
       if (!read?.bytes) return null;
       const entry = parseStrict(read.bytes) as unknown as Entry;
-      return { entry, under: read.under, state: await peer.jobState(fact) ?? "absent" };
+      const standing = await peer.jobState(fact);
+      return { entry, under: read.under, state: standing?.state ?? "absent", decidedBy: standing?.decidedBy ?? null };
     },
     key: async (membership, key) => (binding.get(binding.idFromName(membership)) as { observe(ask: unknown): Promise<unknown> }).observe({ of: { scope: membership, kind: "membership" }, key }),
   };
