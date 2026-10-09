@@ -16,7 +16,7 @@ export const PAGES_RULES = frozen({ approvals: 1, ownerMayReview: false, singleC
 export const PAGES_PRESET = frozen({
   format: "artroom-pages-preset-1", version: 1, runtime: { packages: "0.1.0-dev.1", source: "f6d80b3996df7ad3e7d00feff88d48cf29877ddc", cohort: { register: "platform:register@2", directory: "platform:directory@2", membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@2" } },
   definitions, closure: definitions.map(({ name, digest }) => ({ name, digest })), rules: PAGES_RULES,
-  meaning: "One distinct human approval; source reviewer holds change.review; authority extent reviewer holds rules.publish; no owner or single-controller exception; no machine check claimed. Definitions alone do not establish readiness.",
+  meaning: "One approval per touched extent from a distinct eligible member: source requires change.review, infrastructure change.merge, authority rules.publish. Authors and their observed agent controllers are excluded; the single-controller exception is disabled. Human participation is the intended setup and workflow, not a native identity predicate. Mixed changes require each touched extent's own eligible verdict; one verdict counts only for its stated extent. No machine check is required or claimed passed. Definitions alone do not establish readiness.",
 });
 export const PAGES_PRESET_BYTES = canonicalize(PAGES_PRESET);
 export const PAGES_PRESET_DIGEST = digestBytes(utf8(PAGES_PRESET_BYTES));

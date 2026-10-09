@@ -84,7 +84,7 @@ export async function pagesReadiness(room: Room): Promise<PagesReadiness> {
     if (!kept.ok || kept.value.bytes !== definition.bytes || definitionDigest(parseStrict(kept.value.bytes) as never) !== definition.digest) missing.push(`The exact active ${definition.name} bytes could not be verified.`);
   }
   const rules = R.items.find(i=>i.type==="rules");
-  if (!rules?.refs["published"] || Object.entries(PAGES_RULES).some(([name,value])=>canonicalize(rules.values[name]??null)!==canonicalize(value))) missing.push("An admin must publish the complete reviewed Pages rules; one distinct human approval, exceptions off and no unprovisioned machine checks.");
+  if (!rules?.refs["published"] || Object.entries(PAGES_RULES).some(([name,value])=>canonicalize(rules.values[name]??null)!==canonicalize(value))) missing.push("An admin must publish the complete reviewed Pages rules: one eligible approval per touched extent, exceptions off and no unprovisioned machine checks.");
   if (typeof G.items.find(i=>i.type==="branch")?.values["head"] !== "string") missing.push("The destination's founding/publication head is not ready.");
   return {ready:missing.length===0,missing};
 }
