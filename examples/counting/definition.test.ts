@@ -87,15 +87,21 @@ test("three then four members follow native join order; exact reports preserve s
 
 test("departures cancel only the current turn, preserve the same number, and empty next binding pauses safely", async () => {
   const s = make(), a = await joined(s, keys.una), b = await joined(s, keys.vic), c = await joined(s, keys.paul);
+  const d = await joined(s, keys.sam);
   await wrote(act(s, keys.rita, "start", startFields(s, a)));
-  const old = spokenFields(s, b), serial = board(s).values["serial"];
-  await wrote(act(s, keys.paul, "leave", leaveFields(s, c, a), c));
-  expect([board(s).values["number"], board(s).values["serial"], board(s).parties["speaker"]]).toEqual([1, serial, keys.una.member]);
-  await wrote(act(s, keys.una, "leave", leaveFields(s, a, b), a));
-  expect([board(s).values["lastNumber"], board(s).values["number"], board(s).parties["speaker"]]).toEqual([0, 1, keys.vic.member]);
-  expect((await act(s, keys.una, "spoken", old)).result).toBe("refused");
-  await wrote(act(s, keys.rita, "cancel-turn", { ...leaveFields(s, b), reason: "disconnect" }, b));
-  expect([board(s).state, board(s).values["lastNumber"], board(s).parties["speaker"], basis(s)]).toEqual(["paused", 0, null, []]);
+  await wrote(act(s, keys.una, "spoken", spokenFields(s, b)));
+  const old = spokenFields(s, c), serial = board(s).values["serial"];
+  await wrote(act(s, keys.paul, "leave", leaveFields(s, c, b), c));
+  expect([board(s).values["lastNumber"], board(s).values["number"], board(s).values["serial"], board(s).parties["speaker"]]).toEqual([1, 2, serial, keys.vic.member]);
+  // With lastNumber=1 and remaining [a,d], index 1 selects d, not a.
+  expect((await act(s, keys.vic, "leave", leaveFields(s, b, a), b)).result).toBe("refused");
+  await wrote(act(s, keys.vic, "leave", leaveFields(s, b, d), b));
+  expect([board(s).values["lastNumber"], board(s).values["number"], board(s).parties["speaker"]]).toEqual([1, 2, keys.sam.member]);
+  expect((await act(s, keys.vic, "spoken", old)).result).toBe("refused");
+  await wrote(act(s, keys.rita, "cancel-turn", { ...leaveFields(s, d, a), reason: "disconnect" }, d));
+  expect([board(s).values["number"], board(s).parties["speaker"]]).toEqual([2, keys.una.member]);
+  await wrote(act(s, keys.una, "leave", leaveFields(s, a), a));
+  expect([board(s).state, board(s).values["lastNumber"], board(s).parties["speaker"], basis(s)]).toEqual(["paused", 1, null, []]);
   const one = await joined(s, keys.una);
   await wrote(act(s, keys.rita, "start", startFields(s, one)));
   await wrote(act(s, keys.una, "leave", leaveFields(s, one), one));
