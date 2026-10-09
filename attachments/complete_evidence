@@ -1,0 +1,147 @@
+{
+  "authorization": "3dafaf7d4813121f6a199d39802a310a07385020",
+  "candidate_head": "d026c4f29278f139c3e85e973a753202f5ee818e",
+  "candidate_tree": "d2fc03a22ec3440ac5602ee80008a3c067aeab32",
+  "before": {
+    "head": "d026c4f29278f139c3e85e973a753202f5ee818e",
+    "tree": "d2fc03a22ec3440ac5602ee80008a3c067aeab32",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "authorization": "3dafaf7d4813121f6a199d39802a310a07385020",
+    "command": "npm run gate",
+    "cwd": "/tmp/artroom-correctness-composed",
+    "utc": "2026-10-09T20:14:47Z",
+    "machine": "arm64",
+    "node": "v26.11.0",
+    "npm": "11.20.0",
+    "load_average_before": [
+      1.7529296875,
+      1.9853515625,
+      1.85205078125
+    ],
+    "concurrency": "all known runtime/types/browser/provider/audio/gate owners idle; U1 read-only source proposal only",
+    "cache": "existing reviewed lock-stamped cached dependencies; no reinstall requested"
+  },
+  "after": {
+    "terminal_exit": 1,
+    "observed_wall_seconds": 293.56551537499763,
+    "head": "d026c4f29278f139c3e85e973a753202f5ee818e",
+    "tree": "d2fc03a22ec3440ac5602ee80008a3c067aeab32",
+    "status": "",
+    "load_average_after": [
+      4.873046875,
+      3.78662109375,
+      2.7080078125
+    ],
+    "utc": "2026-10-09T20:19:41Z"
+  },
+  "result": "failed",
+  "counts": {
+    "tests_passed": 970,
+    "tests_failed": 5,
+    "tests_skipped": 2,
+    "test_files_passed": 160,
+    "test_files_failed": 5,
+    "test_files_skipped": 1
+  },
+  "phase_cost": {
+    "whitespace": {
+      "exit": 0,
+      "wall_seconds": 0.0,
+      "cpu_seconds": 0.0
+    },
+    "types": {
+      "exit": 0,
+      "wall_seconds": 5.4,
+      "cpu_seconds": 17.4
+    },
+    "tests": {
+      "exit": 1,
+      "wall_seconds": 287.89,
+      "cpu_seconds": 328.49
+    }
+  },
+  "whole_cost": {
+    "wall_seconds": 293.56,
+    "user_seconds": 323.67,
+    "system_seconds": 22.44,
+    "cpu_seconds": 346.11
+  },
+  "failures": [
+    {
+      "file": "packages/cli/test/claim.scope.test.ts",
+      "kind": "assertion",
+      "detail": "expected saved-request mismatch message; received Cannot read register: forbidden; resumed line127; body1479ms"
+    },
+    {
+      "file": "packages/cli/test/clone.scope.test.ts",
+      "kind": "original5000ms timeout"
+    },
+    {
+      "file": "packages/page/test/claim.scope.test.ts",
+      "kind": "original5000ms timeout; explicit-new scenario"
+    },
+    {
+      "file": "packages/page/test/task-data.scope.test.ts",
+      "kind": "TypeError",
+      "detail": "issue lookup returned undefined; scope access line111; body4824ms"
+    },
+    {
+      "file": "packages/scope/test/site-native3-publication.test.ts",
+      "kind": "original5000ms timeout"
+    }
+  ],
+  "uncaught_section_in_log": false,
+  "active_source_six_checks": "not executed after Vitest nonzero, npm test uses &&",
+  "qualification": "Complete raw evidence, no repeated run. No exact session tuple/body/writer chronology or causal attribution, production exposure, timeout cause, global10x/paired savings or complete Source approval. Original CLI headerless denial is absent from failure list; alone this does not establish all access/custody acceptance. Duration cache is post-run, no start-order or CPU attribution. Tool handle lost during environment transition; same live Python/time/npm/workerd process tree observed, original before/after files establish terminal1; no restart.",
+  "files": {
+    "after.json": {
+      "bytes": 313,
+      "sha256": "54ff3ebc0ba607a7ce4486f58f8b15f515e72e5ae56f55d9ef8a7e55aa1d2148"
+    },
+    "before.json": {
+      "bytes": 741,
+      "sha256": "896a288ac70d779b2b953adf397e305536a150d2cd9f91ae3c896f02cfb28ed3"
+    },
+    "gate.log": {
+      "bytes": 2873,
+      "sha256": "dbf5f6d02dca57a03beeaf16a5b90ba2dd368c38a463cf342331fae1b2a83700"
+    },
+    "phase-test.log": {
+      "bytes": 6113,
+      "sha256": "b6f7fc8f12d614179b6c1e6b437c3b6328c96e126aa098fcabe9f2341310a426"
+    },
+    "phase-test.time": {
+      "bytes": 34,
+      "sha256": "48517aaa9788cb46eccaf7fabdf84d54aa2a7ebd5a2c6d6bc7746a84d9efd486"
+    },
+    "phase-typecheck.log": {
+      "bytes": 1510,
+      "sha256": "b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447"
+    },
+    "phase-typecheck.time": {
+      "bytes": 30,
+      "sha256": "045f51a0d63cd654001322026685853aa8eeedce66fa82e672c5707d118d0642"
+    },
+    "phase-whitespace.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "phase-whitespace.time": {
+      "bytes": 29,
+      "sha256": "302732af76ca3eab791b52904a4ed3b0f543b9387f423c028783f4353e0912c6"
+    },
+    "results-cache-snapshot.json": {
+      "bytes": 15367,
+      "sha256": "238453849a22a329afad036f25421f101b090341df2fe7b00406e82b91793d0c"
+    },
+    "retained-files.json": {
+      "bytes": 2194,
+      "sha256": "32dcf51812aee847bc50046e73783f4e545056f56354b23a145467fcc092a3e2"
+    },
+    "whole.time": {
+      "bytes": 758,
+      "sha256": "d95b0f87ee5bc2ec5f0012eb4b29bc9f29a54235fab6a2f31cd7d4b5d3302e55"
+    }
+  }
+}
