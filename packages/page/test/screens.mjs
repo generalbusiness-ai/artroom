@@ -86,9 +86,13 @@ const shot = async (tab, name, height = null) => {
       .filter((element) => element.getBoundingClientRect().width > 0)
       .map((element) => ({ name: element.getAttribute("name"), fontSize: parseFloat(getComputedStyle(element).fontSize) })),
   }));
+  if (check.origin !== new URL(record.service).origin || !(check.pathname === "/page/" || check.pathname.startsWith("/site/"))) throw new Error(`${name}: document left the recorded service routes.`);
+  if (check.pathname === "/page/" && check.title !== "Artroom") throw new Error(`${name}: unexpected page title ${check.title}.`);
   if (!check.meaningful || check.overlay || check.horizontalOverflow) throw new Error(`${name}: invalid rendered layout ${JSON.stringify(check)}`);
   if (viewport.width <= 390 && check.controls.some((control) => control.fontSize < 16)) throw new Error(`${name}: editable phone text is smaller than 16px.`);
   layoutChecks.push({ name, url: tab.url(), viewport, ...check });
+  const expectedNavigation = name.startsWith("issues") || name.startsWith("issue") ? "Issues" : name.startsWith("change") ? "Changes" : name.startsWith("rules") ? "Rules" : null;
+  if (expectedNavigation && (check.selectedNavigation !== expectedNavigation || check.roomSwitches !== 1)) throw new Error(`${name}: duplicate room identity or wrong selected destination.`);
   await tab.screenshot({ path: file, ...(height ? { clip: { x: 0, y: 0, width: viewport.width, height } } : { fullPage: true }) });
   sizes.push([name, statSync(file).size]);
 };
