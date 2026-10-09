@@ -91,7 +91,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     // Actual authenticated birth-session reads must select directory@5 even
     // though its destination@2 pin is also used by the legacy directory@2.
     const issued = await lifetime.wait(() => requestSession(SERVICE, M.name, sessionRequest(membership, rita.secret, soon(60), crypto.randomUUID()), { fetch: routed as unknown as Fetch }));
-    expect(issued.ok).toBe(true);
+    expect(issued.ok, issued.ok ? undefined : `Read session refused: ${issued.reason}`).toBe(true);
     if (!issued.ok) throw new Error("the actual admin receives a read session");
     expect((await lifetime.wait(() => routed(`${SERVICE}/v1/scopes/${G.name}`, { headers: { authorization: issued.session.reader() } }))).status).toBe(200);
 
