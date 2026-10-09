@@ -7,11 +7,11 @@ import { net } from "@generalbusiness/artroom-scope/testing";
 import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { site } from "../../scope/src/site/route.ts";
-import { ownHost, type Stand } from "../../scope/test/hosts.ts";
+import { gitHub, Hub, ownHost, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
 import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
-import { FILES, judged, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
+import { FILES, judged, registerSetting, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
 import { captureBinding, observeCaptures } from "../../../scripts/demo/capture-binding.ts";
 
 const SERVICE = "https://scopes.test";
@@ -28,26 +28,28 @@ declare module "vitest" {
 // |---|---|
 // | The rehearsal | Real: `rehearse` of `scripts/demo/rehearse.ts`, which `scripts/demo-run.ts` runs against a deployment. Its commands are `command` of the cli package's `src/line.ts`, with a store in memory for each person. |
 // | The scopes, the routes and the readers | Real, as in `issues.scope.test.ts`: the namespace `PLATFORM`, the Worker's HTTP routes, and the real read sessions under a TEST SECRET. The lanes are created by the real directory under the demo profile's digests, which the real rules scope activated. |
-// | The Git host | The production wiring of the ports of the hosting's own Git service, `artifacts-wiring.ts`, over the STAND-IN `OwnGit` of `packages/scope/test/hosts.ts`. The operator's setting that pins the planned register is the test wiring the stand-in to that register's ID before the planned install, as `install.scope.test.ts` does. |
+// | The Git host | The production wiring of `artifacts-wiring.ts` over STAND-IN `OwnGit`, or `github-wiring.ts` over STAND-IN `Hub`, of `packages/scope/test/hosts.ts`. The operator's setting that pins the planned register is the test wiring the stand-in to that register's ID before the planned install. No live provider runs. |
 // | The site route and the page | Real: `site` of the scope package over the same stand-in, and the Worker's entry for `/page/`, called as the Worker calls them. Their answers are read as text; no browser runs. |
 // | `git` | A STAND-IN: `clone` asks the stand-in host for its refs with the header that `artroom clone` put in git's environment, and keeps the head; `log --oneline` reads the commits from that head in the stand-in's objects. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of every scope that a command has waited on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces signs the intents; the wall clock times the shots. |
 describe("the demo runner's rehearsal on real scopes. The Git host, git and the scheduler are STAND-INs", () => {
-  test("every shot, from the planned install to the page, prints the exit code and the lines the script expects, and the transcript's table says yes for each; a shot whose outcome differs is a row that says no; no secret is in the transcript", async () => {
-    net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    const wired = new Set<ScopeId>();
-    try {
-      await story(ownHost(), wired);
-    } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      net.hold = null;
-      for (const name of wired) platformOutside.delete(name);
-    }
-  }, 240_000);
+  for (const [host, make] of [["artifacts", () => Promise.resolve(ownHost())], ["github.com", gitHub]] as const) {
+    test(`on ${host}: every shot, from the planned install to the page, prints the exit code and the lines the script expects, and the transcript's table says yes for each; a shot whose outcome differs is a row that says no; no secret is in the transcript`, async () => {
+      net.hold = net.deaf = null;
+      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+      platformNet.sessions = true;
+      const wired = new Set<ScopeId>();
+      try {
+        await story(await make(), wired);
+      } finally {
+        platformNet.secret = null;
+        platformNet.sessions = false;
+        net.hold = null;
+        for (const name of wired) platformOutside.delete(name);
+      }
+    }, 240_000);
+  }
 
   // Not a test of a property: the recorder for `scripts/demo-captures.ts --recorded`. It runs only when the root config provides
   // `demoRecord`, which `DEMO_RECORD=1` sets. It rehearses on a fresh room, as the test above does, then reads each screen of the
@@ -178,7 +180,7 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
       register = planned as ScopeId;
       wire(register);
       known.push(new Platform(register));
-      return `STAND-IN for the operator's setting: the test wires the stand-in host to ${planned} before the planned install.`;
+      return `STAND-IN for the operator's setting: the test wires ${registerSetting(at.host)} to ${planned} before the planned install.`;
     },
     get: async (url) => {
       const answer = await deployed(url);
@@ -211,6 +213,12 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(failed, failed.join("\n\n")).toEqual([]);
   expect([rehearsal.ok, told, rows.length, rows.every((row) => row.endsWith(" | yes |"))]).toEqual([true, rehearsal.shots.map((shot) => shot.n), 26, true]);
   expect(text).toContain("Result: all 26 shots printed what the script expects.");
+  expect(rehearsal.shots[0]!.typed).toContain(`--host ${at.host} --namespace ${at.namespace}`);
+  expect(rehearsal.shots[0]!.note).toContain(`${at.host === "github.com" ? "GITHUB_APP_CONFIG" : "ARTIFACTS_CONFIG"}.registerScope`);
+  if (at.stand instanceof Hub) {
+    expect(at.stand.mintedPermissions.slice(0, 2)).toEqual(["write", "read"]);
+    expect(at.stand.mintedPermissions.filter((permission) => permission === "read")).toHaveLength(1);
+  }
   // The room's ids are what the shots printed, for the captures.
   expect(Object.keys(rehearsal.room).sort()).toEqual(["controlled", "destination", "directory", "issue", "membership", "published", "refused", "register", "rules", "service"]);
 

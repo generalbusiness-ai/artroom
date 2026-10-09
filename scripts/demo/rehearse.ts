@@ -113,6 +113,10 @@ const slash = (service: string) => service.replace(/\/+$/, "");
 const bytes = (name: string) => FILES[name]!.length;
 export const INSTALL_ACKNOWLEDGEMENT = "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.";
 
+/** The setting the operator must pin before the planned install. */
+export const registerSetting = (host: string): string => host === "github.com" ? "GITHUB_APP_CONFIG.registerScope"
+  : host === "artifacts" ? "ARTIFACTS_CONFIG.registerScope" : "registerScope in the Git host's setting";
+
 /**
  * The shots. An expected line is a template: `<name>` stands for any text without a space and keeps it under that name,
  * `<...>` stands for any text, and `{name}` is a value an earlier line kept. A typed command names kept values the same way.
