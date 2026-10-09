@@ -36,16 +36,20 @@ export function createIssue(act: Offered, send: Send, context: ActionContext): H
   // The existing CLI intentionally uses the entered title as the issue's
   // condition. The form does the same, without claiming a native default.
   const taskAct = { ...act, fields: act.fields.filter((field) => field.name !== "conditions") };
-  const missing = missingFields(taskAct, context, ["title", "body"]);
+  const definitionChoices = context.choices?.[act.kind]?.["definition"] ?? act.fields.find(field => field.name === "definition")?.choices;
+  const fields = ["title", "body", ...(definitionChoices && definitionChoices.length > 1 ? ["definition"] : [])];
+  const missing = missingFields(taskAct, context, fields);
   if (missing.length) return h("p", { class: "muted", role: "status" }, `Create issue is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from the room's active issue definition.`);
-  const button = h("button", { type: "button", class: "primary" }, "Create issue");
+  const button = h("button", { type: "button", class: "primary", "data-task-act": act.kind }, "Create issue");
   if (context.uncertain || context.pending) button.setAttribute("disabled", "");
   button.addEventListener("click", () => {
     let dialog!: HTMLDialogElement;
+    const capturedDefinitions = definitionChoices?.map(choice => ({ ...choice }));
     const submit: Send = (kind, on, typed, accepted) => {
+      if (capturedDefinitions && !capturedDefinitions.some(choice => choice.value === typed["definition"])) return;
       send(kind, on, issueTaskValues(typed), () => { accepted?.(); dialog.close(); dialog.remove(); button.focus(); });
     };
-    const form = taskForm(taskAct, submit, context, ["title", "body"], "Create issue");
+    const form = taskForm(taskAct, submit, context, fields, "Create issue");
     const close = h("button", { type: "button" }, "Cancel");
     dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, close) as HTMLDialogElement;
     close.addEventListener("click", () => { dialog.close(); dialog.remove(); button.focus(); });

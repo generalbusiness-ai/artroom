@@ -116,8 +116,8 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       h("p", { class: "version-label" }, `Version ${current.id} · ${current.file.path}`),
       current.file.digest ? h("p", { class: "record-meta" }, "Digest ", h("code", {}, current.file.digest)) : null,
       h("pre", { "aria-label": `Source of ${current.file.path}, version ${current.id}` }, h("code", {}, current.file.content)),
-      h("div", { "data-action-slot": "edit" }),
     ) : h("p", { class: "muted" }, published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
+    typeof current.file.content === "string" ? h("div", { "data-action-slot": "edit" }) : null,
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
     h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { "data-action-slot": "next" })),

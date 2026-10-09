@@ -484,7 +484,11 @@ async function draw(focus = false): Promise<void> {
     return show(...shell(destination, room, screen, await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
       const open = destination === "issues" ? acts.acts.find((act) => act.kind === "open-issue") : undefined;
       if (!open) return [];
-      screen.querySelector('[data-action-slot="create"]')?.append(createIssue(open, send, context)); return [open.kind];
+      const control = createIssue(open, send, context);
+      screen.querySelector('[data-action-slot="create"]')?.append(control);
+      // An unavailable task paragraph must not remove the usable native
+      // declaration from Inspect (for example a custom required field).
+      return control.hasAttribute("data-task-act") ? [open.kind] : [];
     } })));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
