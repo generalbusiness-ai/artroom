@@ -1,0 +1,74 @@
+{
+  "source": "54b71c69e91b143e22c90fa90c5b06f561c1565b",
+  "sourceTree": "1138b362b0d3d204b40a42ff93eabc4c1d9c4f4e",
+  "mode": "production Page over actor-bound native reads of an existing room; local label seeded only in private browser settings",
+  "recordedName": "4bfclcvyrozcru2opy4ym5dlvtky6cbljhvaimiwyhsor73mxyaq-1",
+  "localLabel": "Field notebook",
+  "checks": [
+    {
+      "colorScheme": "light",
+      "width": 320,
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "visibleSwitches": 1,
+      "local": "Field notebook",
+      "recorded": "4bfclcvyrozcru2opy4ym5dlvtky6cbljhvaimiwyhsor73mxyaq-1",
+      "recordedTitle": "Recorded repository name",
+      "switchHeight": 50,
+      "overflow": false,
+      "editableFontSizes": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "staleLabelBindingIgnored": true
+    },
+    {
+      "colorScheme": "dark",
+      "width": 320,
+      "title": "Artroom",
+      "origin": "https://scopes.test",
+      "visibleSwitches": 1,
+      "local": "Field notebook",
+      "recorded": "4bfclcvyrozcru2opy4ym5dlvtky6cbljhvaimiwyhsor73mxyaq-1",
+      "recordedTitle": "Recorded repository name",
+      "switchHeight": 50,
+      "overflow": false,
+      "editableFontSizes": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "staleLabelBindingIgnored": true
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "local-label-light-320.png",
+      "bytes": 24257
+    },
+    {
+      "name": "local-label-dark-320.png",
+      "bytes": 24367
+    }
+  ],
+  "errors": [],
+  "unanswered": [],
+  "limit": "No claim completion is fabricated, no founding or native name mutation is submitted. Label persistence after native completion is covered separately at the native adapter and Page boundaries."
+}
