@@ -38,3 +38,9 @@ This map names the evidence available from this recorder. It does not extend the
 | 6. Real affordances | Pages is separate latest navigation. No exact-version Open page is shown because immutable selected-version rendering is unsupported in this source. `actions.test.ts` “a single eligible choice is fixed” covers removal of a false picker. |
 | 7. Preserve subject | Review form is checked against the recorded manifest and rules extent before sending. Published/source-preview screenshots identify and check the selected recorded version and retained content, opening without new network reads; latest Pages makes no immutable claim. `shell.test.ts` “a late read from the previous room cannot replace the active room” and the comment-draft navigation interaction cover scope preservation. |
 | 8. Designed narrow layouts | issues/issue at 390px and 320px, dark Rules at 390px; checks.json records overflow and editable-text checks. Touch target and keyboard checks remain separate. |
+
+## Creation and recovery follow-up
+
+[Create room evidence](claim/README.md) was recorded separately at source `346aec0a`, after the screenshots above. It checks native founder eligibility and the member's own forbidden read, the name-only phone dialog, Escape/focus/draft, pending double click, actual Chromium Web Locks across two tabs and exact saved-envelope retry. Its founding transport is an explicit loss stand-in that admits nothing to a Scope. This supplements design rules 2, 4, 6, 7 and 8; it does not turn the earlier pictures into evidence of the later source.
+
+The native claim adapter's separate Scope test covers admitted lost replies and recovery. Name-only browser presentation and native completion are distinct witnesses. Controller rule confirmation, Cancel with no POST and native value reread are recorded in [the six demo captures](../../../../../notes/2026-10-09-demo-captures/README.md).

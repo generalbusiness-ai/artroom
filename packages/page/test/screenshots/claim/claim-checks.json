@@ -1,0 +1,51 @@
+{
+  "source": "346aec0a8201376f2c7e8adb24219f6df50d388e",
+  "sourceTree": "c34f6e00ad12e088df1da27cfc497da5d2beb9bf",
+  "mode": "production Page UI; actor-bound native readonly eligibility; founding transport loss STAND-IN with no Scope admission",
+  "register": {
+    "scope": "sc_exrm3a4uv2ia2rwlkbyaragteayue7345recxlf53ywzkql37ogq",
+    "inc": "in_giwpozstsfq72ctxlfpkqbh6ly",
+    "kind": "register"
+  },
+  "definition": "platform:register@2",
+  "memberControlAbsent": true,
+  "memberRefusal": "The configured register cannot be read: forbidden. Nothing was submitted.",
+  "dialogCheck": {
+    "title": "Artroom",
+    "origin": "https://scopes.test",
+    "nameOnly": true,
+    "fontSize": 16,
+    "inputHeight": 46,
+    "targets": [
+      44,
+      44
+    ],
+    "overflow": false
+  },
+  "escapeFocusAndDraft": true,
+  "chromiumWebLocksAcrossTwoTabs": true,
+  "pendingDoubleClickBlocked": true,
+  "attemptedRequests": 3,
+  "exactSavedEnvelopeReused": true,
+  "envelopeDigest": "sha256:99a9e4a5a68ca626aab516a3bcfaa95ef797ee5e2d6df2e017217a923b5a6249",
+  "originalLabelPreserved": true,
+  "screenshots": [
+    {
+      "name": "create-room-mobile",
+      "bytes": 34942
+    },
+    {
+      "name": "create-room-pending-mobile",
+      "bytes": 44368
+    }
+  ],
+  "explainedNetwork": [
+    "Member register read refused in its own native record.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission."
+  ],
+  "errors": [],
+  "unanswered": [],
+  "limit": "No founding request was admitted by a Scope, no native completion or hosted-provider success is claimed. The separate native adapter Scope witness tests admitted lost replies and settlement."
+}
