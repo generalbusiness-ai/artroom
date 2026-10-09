@@ -97,6 +97,21 @@ token is never printed by `artroom clone`, and keys are shown by their
 key IDs only. The keys stay in the config directories, readable only by
 their owner.
 
+## Recording
+
+Add `--pace` to either deployment command above. Before each runnable
+shot, the runner prints its number, title, script shot, person and the
+command about to run, then waits for Enter. Narrate the shot and press
+Enter when the recorder is ready. Invitation links remain cut on screen.
+The separate register-setting pause after shot 1 still applies; finish
+pinning and installing within the plan's printed expiry.
+
+The transcript keeps its existing format. The pause before a shot is
+outside that shot's duration. At the end, the terminal prints the
+observed total elapsed seconds, including operator waits, setup and
+capture observations, and separately the sum of recorded shot seconds.
+The sum is not the elapsed time of the whole run.
+
 ## What the transcript shows
 
 For each shot: its number and title, the script shot it shows, who ran

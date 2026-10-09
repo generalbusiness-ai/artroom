@@ -11,7 +11,7 @@ import { gitHub, Hub, ownHost, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
 import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
-import { FILES, judged, registerSetting, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
+import { FILES, judged, registerSetting, rehearse, transcript, type NextShot, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
 import { captureBinding, observeCaptures } from "../../../scripts/demo/capture-binding.ts";
 
 const SERVICE = "https://scopes.test";
@@ -204,7 +204,33 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
 async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const { stage, people, drained } = testStage(at, wired);
   const told: number[] = [];
-  const rehearsal: Rehearsal = await rehearse({ ...stage, told: (shot) => told.push(shot.n) });
+  const next: NextShot[] = [];
+  const events: string[] = [];
+  let waiting = false;
+  let clock = Date.UTC(2026, 9, 8);
+  // The pacing wait must finish before a command/read runs or its timer starts.
+  // A clock and a microtask gate avoid wall-clock sleeps. The real scope story
+  // still proves each shot runs; the added boundary guards against running it
+  // while the operator is narrating.
+  const rehearsal: Rehearsal = await rehearse({
+    ...stage,
+    now: () => clock,
+    beforeShot: async (shot) => {
+      waiting = true;
+      next.push(shot);
+      events.push(`before ${shot.n}`);
+      await Promise.resolve();
+      clock += 10_000;
+      waiting = false;
+    },
+    person: (who) => { expect(waiting, "command started before pacing completed").toBe(false); return stage.person(who); },
+    get: (url) => { expect(waiting, "GET started before pacing completed").toBe(false); return stage.get(url); },
+    log: (directory) => { expect(waiting, "git started before pacing completed").toBe(false); return stage.log(directory); },
+    told: (shot) => { told.push(shot.n); events.push(`after ${shot.n}`); },
+  });
+  expect(events).toEqual(rehearsal.shots.flatMap((shot) => [`before ${shot.n}`, `after ${shot.n}`]));
+  expect(next).toEqual(rehearsal.shots.map(({ n, title, scene, who, typed }) => ({ n, title, scene, who, typed })));
+  expect(rehearsal.shots.every((shot) => shot.seconds === 0), "pre-shot waits must be outside shot durations").toBe(true);
   const text = transcript(rehearsal, { service: SERVICE, host: at.host, namespace: at.namespace, started: "in the test", how: "On the test Worker." });
 
   // Every shot ran, in order, as it ended, and each matches; the table has one row for each, and each says yes.
