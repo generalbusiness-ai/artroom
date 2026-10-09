@@ -63,6 +63,7 @@ test("title/path-only input preserves untouched BOM CRLF/CR bytes while delibera
   expect(vi.mocked(prepareEdit).mock.calls[0]![3]).toEqual({title:"Title edit",path:"b.md",content:exact});
   expect(editFields(vi.mocked(prepareEdit).mock.calls[0]![3],"a".repeat(40))["digest"]).toBe(digestBytes(utf8(exact)));
 
+  shown=retainedEditor(room,change,{current:()=>true}) as unknown as Element;
   const edited=shown.all().find(e=>e.tag==="textarea")!;edited.value="new\r\ntext";edited.event("input");
   shown=retainedEditor(room,change,{current:()=>true}) as unknown as Element;
   expect(shown.all().find(e=>e.tag==="textarea")!.textContent).toBe("new\ntext");
