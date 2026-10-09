@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-09-offline-and-sync-design.md","body":{"commit":"31584fd90ed9f2ab8d7753ededbe4e64592c6b3c","path":"notes/2026-10-09-offline-and-sync-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d29e4a12c8d6b8b06e49244b9861e3521439c867","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-09-offline-and-sync-design.md."}
