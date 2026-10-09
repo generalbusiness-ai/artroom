@@ -1,0 +1,51 @@
+
+> gate
+> bash scripts/gate.sh
+
+head d048f759d4be685c715863cbdc6f84aedef895e1  tree 8bf5ffaf06d0feec60b31dfb01d1b1f44681a7d7  changed files 0
+install    skipped: node_modules was installed from this package-lock.json
+whitespace exit 0  elapsed    0.0 s  cpu    0.0 s
+typecheck  exit 0  elapsed    5.5 s  cpu   18.3 s
+test       exit 1  elapsed  344.9 s  cpu  389.7 s
+--- last lines of /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.UcXei3jNlw/test.log
+ ❯ test/application-establish.test.ts:23:1
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  |scope| test/founding-real.test.ts > a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN > an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/founding-real.test.ts:52:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  |scope| test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/site-immutable-publication.test.ts:10:1
+      8| // OwnGit/scheduler/clock/memory stores are labelled STAND-INs in the …
+      9| // No provider or browser runs. Published authority is never fabricate…
+     10| test("two native publications retain older immutable content and deny …
+       | ^
+     11|   const d = await demo();
+     12|   const snapshot = () => runInDurableObject(d.G.object, (_instance, st…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  |scope| test/versions.test.ts > a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN > a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/versions.test.ts:27:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+
+ Test Files  9 failed | 162 passed | 1 skipped (172)
+      Tests  9 failed | 996 passed | 2 skipped (1007)
+   Start at  19:17:12
+   Duration  344.08s (transform 15.57s, setup 0ms, import 24.33s, tests 367.53s, environment 5ms)
+
+gate FAILED; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.UcXei3jNlw
