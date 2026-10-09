@@ -175,8 +175,24 @@
   .page-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
   .version-label { font-size: 14px; color: var(--muted-ink); }
 
+  .room-dialog {
+    width: 440px; max-width: calc(100vw - 24px); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px);
+    margin: auto; padding: 28px; overflow-y: auto; color: var(--ink); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 12px 44px #17213b22;
+  }
+  .room-dialog::backdrop { background: #1c23372e; }
+  .room-dialog h1 { margin-bottom: 24px; font-size: 22px; }
+  .room-dialog form { min-width: 0; }
+  .room-dialog .form-footer { flex-wrap: wrap; }
+  .room-dialog .answer { margin-bottom: 0; }
+  @media (prefers-color-scheme: dark) {
+    .room-dialog { box-shadow: 0 12px 44px #0005; }
+    .room-dialog::backdrop { background: #0008; }
+  }
+
   @media (max-width: 760px) {
     .artroom { display: block; }
+    .room-dialog { padding: 22px 18px; }
     .rail { display: none; }
     .mobile-header { display: block; border-bottom: 1px solid var(--line); padding: 12px 16px 0; }
     .mobile-context { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
