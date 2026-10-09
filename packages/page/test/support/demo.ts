@@ -116,7 +116,7 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
           for (;;) {
             const effects = await (node.stub as unknown as { effect(): Promise<number> }).effect();
             active();
-            if (effects === 0) break;
+            if (!(effects > 0)) break;
             made++;
           }
           made += await node.stub.dispatch();
