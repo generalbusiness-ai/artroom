@@ -98,7 +98,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
     // repeated read is not free of mutation.
     return {
       accepts, send,
-      snapshot: (asked) => destination.snapshot(asked),
+      snapshot: (asked) => bound(given.genesis()?.seed.definition ?? "") ? destination.snapshot(asked) : Promise.resolve(null),
       judged: (at, sealed) => destination.judged(at, sealed),
       replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },
       credential: (handle, key) => bound(given.genesis()?.seed.definition ?? "") ? destination.credential(handle, key) : null,
