@@ -1,0 +1,92 @@
+# F1 bb5 strict runtime recipe preparation
+
+INERT preparation only. Exact source bb5bf627d6f3765623df45117299953c546a99ee / tree 13069e33cf59230e411d8b127bf6dc2da9f38241. Request fc1c26a81321cad7c2ce487f2949fa72c0db9e87, promise ec7d2b2220c1935b89dd7fb40764964d179e0900. Compiler GO 0c3fef6ffd5dda7791ab5a112e1ea0563532dc18 is Root’s four-project authority only; it is not a Node/native/discovery release. This agent ran no compiler, config import, discovery, project test, control, gate, installation, browser, hosted or audio work.
+
+Root’s prepared existing-lock view has 12 workspace bindings, each resolving to this actual checkout. Vitest/compiler binaries alone resolve to the existing /private/tmp/artroom-demo-github-host cache. runtime-manifest.json binds all 12 package identities, 24 exact runtime aliases, the one type-only bytes/web export, original source/config hashes, tool realpaths/hashes and the matching installed-lock stamp. No old workspace link or isolated fb2432 config is used.
+
+## Guard and project semantics
+
+source-guard.mjs uses Node builtins only to check canonical cwd, exact clean head/tree, lock/stamp, source/config bytes, actual workspace links, alias targets and cached tool hashes. node-selection.config.mjs and native-selection.config.mjs call this guard before any Vitest tool or owned base configuration import. All such imports are dynamic and occur only when Root later runs the recipe. Merely writing these files imports nothing.
+
+The Node recipe imports only the actual derive, platform and Counting Node configurations. It supplies three named projects and directly replaces each include list with its actual selected absolute paths. It preserves each actual Node environment/thread pool and directs every owned package alias to this checkout. It does not import root Vitest configuration or create a workerd/Scope project.
+
+Both shard and sort validate the complete canonical file/project set. This is a global four-file guard, appropriate to the pinned Vitest implementation: cli-api.CnMVyzaz.js lines 3672–3696 constructs one root sequencer and sorts global specifications before project/environment groups; coverage.DM_a_rWm.js BaseSequencer reads spec.project.name and spec.moduleId. The two platform files belong to the same project. Added/missing/duplicate/foreign-project/foreign-source files refuse; partitioning other than 1/1 refuses. These are statically read implementation semantics, not executed recipe proof.
+
+The native recipe imports only the actual packages/scope/vitest.worker.config.ts after the guard. It keeps its native plugin, Worker/wrangler, global setup, exclusions, isolate=false and maxWorkers=1. It directly replaces include with the single original F1 file, gives its project an explicit name, and guards that one source/project in both sequencer methods. No other root native project is introduced.
+
+Every selected original case uses the original default 5000 ms timeout; retry is explicitly 0. No title, assertion or source was changed by these recipes. The pinned resolver defaults Node/nonbrowser testTimeout to 5e3 (coverage.DM_a_rWm.js line 538). The explicit settings retain that original bound. No deadline widening, retry or test omission is selected. File guards alone do not prove complete case execution: Root must read discovery and terminal counts/titles through EOF.
+
+## Complete expected Node titles: 13 active cases in four files
+
+f1-derive — packages/derive/test/creation-context.test.ts (4 cases, 5000 ms each, retry 0)
+
+- unmarked genesis create bytes stay legacy even with incoming membership or a domain creationContext; later creates keep their old retained-genesis membership
+- recognized verified-context metadata and the same full membership flow through two genesis edges and a later actual retained-genesis create
+- unknown or malformed opt-in and marked missing/invalid full membership record bad-field refusal with only the native result; source-message proof and typed lower bounds still hold
+- marked declared genesis does not stamp a platform creation, and membership-self retains its own full reference without a stamp
+
+f1-platform — packages/platform/test/application.test.ts (3 cases, 5000 ms each, retry 0)
+
+- supporting cohort validates with actual embedded rules, grants establishment only to admin, and leaves the existing default pins unchanged
+- genesis values reject caller authority and schema errors, and apply the final canonical byte cap after inserting the trusted opener
+- complete static closure requires unique exact declared places; missing bindings, unused bindings, duplicate bindings and mismatched bytes cannot be complete
+
+f1-platform — packages/platform/test/versions.test.ts (2 cases, 5000 ms each, retry 0)
+
+- every shipped version resolves to its own data, pinned by digest, and version 1 of each is the data that main shipped; no other version resolves; default founding keeps the existing cohort
+- a rule reads its own version from the scope's genesis: the register of each version seeds the directory of the same version, and membership of each version writes its own first lists, with destination.read-token only at version 2
+
+f1-counting — examples/counting/definition.test.ts (4 cases, 5000 ms each, retry 0)
+
+- the complete closure validates with actual rule grammar and canonical definition bytes
+- three then four members follow native join order; exact reports preserve sequence and reject stale or forged successors
+- departures cancel only the current turn, preserve the same number, and empty next binding pauses safely
+- the same completion can correct a known roster refusal; pause, reset and expiry fence late reports
+
+## Original expected native case
+
+explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant
+
+packages/scope/test/application-establish.test.ts: one active case, 5000 ms, retry 0. The unchanged source has 49 expect calls and its four original proven D/C/A/nested consistent/null replay assertions. This static source count is not a claim that runtime assertions/replays completed. Its current A4 Site helper, settings, Worker and actual native source are hash-bound. No raw tuple setter or clock rewind was introduced.
+
+## Conditional owner sequence, no execution performed
+
+1. Root first confirms the separately running C1 job’s actual terminal state. Under its exact compiler GO, Root alone runs the four compiler projects once and records exact source/dependency identity, phase cost and terminal evidence: packages/derive/tsconfig.test.json; packages/platform/tsconfig.test.json; packages/scope/tsconfig.test.json; examples/counting/tsconfig.json. This preparation does not assert any result for those Root runs. Stop on an actual compiler failure; no unchanged retry.
+
+2. After Root reads and selects this entire recipe/manifest packet and obtains the actual next release, one Node discovery from canonical /private/tmp/artroom-f1-c0-composed may use:
+
+    node /private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs list --config /tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs --json
+
+   Read the complete emitted list/proof/log and match all three projects, all four files and all 13 exact active titles, zero skips. No config import or discovery has occurred in this preparation. A mismatched list stops the path.
+
+3. Only the appropriate explicit/conditional Node release permits one pure run from that same canonical root using the same config:
+
+    node /private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs run --config /tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs --reporter verbose
+
+   Record/fully read raw output, exact source/config identity, file/case/skip/failure counts and wall/CPU/terminal state. All 13 source cases, rather than merely four files, must complete; otherwise stop for disposition. This is focused source evidence, not a whole gate.
+
+4. A separately authorized native discovery from canonical /private/tmp/artroom-f1-c0-composed/packages/scope may use:
+
+    node /private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs list --config /tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs --json
+
+   Root fully reads the exact one-file/one-title discovery before the corresponding actual conditional native release. The original title and timeout remain. No isolated fb2432 selection/result transfers.
+
+5. Only that native release permits one serialized native run from the same Scope cwd and unchanged config:
+
+    node /private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs run --config /tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs --reporter verbose
+
+   Preserve and fully read raw output, assertions/replay coverage and any SQL diagnostic, plus phase/wall/CPU/head/tree/terminal evidence. The previous v7 native PASS at fb2432 retained an unresolved printed SQL-trigger uncaught diagnostic; it is not an error-free bb5 proof. Do not suppress the fault, remove assertions, widen timeout or retry unchanged.
+
+6. The one coordinated final gate and independent complete exact-head Source review, same-head normal filing and builder landing remain separate owner obligations. Root’s frozen011 conditional authority does not release bb5 runtime. The four focused compilers and 13+1 cases cannot close full critical/F1/C0/W1/U1/C1/M1/full4073/578 or hosted/browser/audio/device acceptance.
+
+## Read and preparation inventory
+
+Current source/config files and all exported source alias targets were hash-verified without import. The full bodies of the helper and two generated recipes were read through EOF after writing. Source titles were extracted from the unchanged actual test declarations and checked against static per-file counts. Actual Node/native bases were read as source; no evaluator/test runner was loaded. Vitest pool/sequencer/default-timeout implementation was read in bounded slices only, explicitly not a whole library review. Root provided the dependency view; this agent made no install or source change.
+
+The M1 symbol/custody map under decision699 remains independently frozen at /tmp/artroom-m1-cohort-custody-preparation. All earlier M1 R1/R2/R3 and F1 integration packets stay unchanged.
+
+## R2 static correction
+
+This successor corrects only the prose selection count to three projects/four files/13 active titles. The original source guard and both inert recipes remain byte-for-byte unchanged in /tmp/artroom-f1-bb5-runtime-preparation, and all command paths above intentionally use those original frozen recipes. Their runtime manifest remains unchanged. No configuration import, execution or source/package modification occurred.
+
+The escaping utility was inspected as actual source bytes. Its regex literal is the standard character class, and its replacement string has exactly two backslashes in the JavaScript source, producing the intended single literal backslash before the matched metacharacter. It is not the overescaped alternative. Two of the 24 aliases contain dot metacharacters (the lanes change.json and issue.json exports), so the utility is useful; no executed alias result or runtime failure is claimed by this static inspection.

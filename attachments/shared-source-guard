@@ -1,0 +1,72 @@
+// INERT source preparation. Root must separately release every runtime phase.
+import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
+const rootExpected = "/private/tmp/artroom-f1-c0-composed";
+const headExpected = "bb5bf627d6f3765623df45117299953c546a99ee";
+const treeExpected = "13069e33cf59230e411d8b127bf6dc2da9f38241";
+const manifestPath = "/tmp/artroom-f1-bb5-runtime-preparation/runtime-manifest.json";
+const sha = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+export function assertFrozen(cwd) {
+  const m = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (m.root !== rootExpected || m.source_head !== headExpected || m.source_tree !== treeExpected
+      || realpathSync(process.cwd()) !== cwd || realpathSync(m.root) !== rootExpected) {
+    throw new Error("F1 recipe requires its exact canonical working directory and frozen source identity.");
+  }
+  const git = (...args) => execFileSync("git", args, { cwd: rootExpected, encoding: "utf8" }).trim();
+  if (git("rev-parse", "HEAD") !== headExpected || git("rev-parse", "HEAD^{tree}") !== treeExpected
+      || git("status", "--porcelain") !== "") {
+    throw new Error("F1 recipe requires the exact frozen clean head and tree.");
+  }
+  if (m.workspaces.length !== 12 || sha(`${rootExpected}/package-lock.json`) !== m.lock_sha256
+      || readFileSync(m.installed_lock_stamp_path, "utf8").trim() !== m.lock_sha256
+      || sha(m.installed_lock_stamp_path) !== m.installed_lock_stamp_sha256) {
+    throw new Error("F1 recipe requires the prepared existing-lock dependency view.");
+  }
+  for (const w of m.workspaces) {
+    if (realpathSync(`${rootExpected}/node_modules/${w.name}`) !== w.directory
+        || !w.directory.startsWith(`${rootExpected}/packages/`)
+        || sha(`${w.directory}/package.json`) !== w.package_json_sha256) {
+      throw new Error("F1 workspace dependency resolves outside its actual frozen source.");
+    }
+  }
+  for (const s of m.source_files) if (sha(s.path) !== s.sha256) {
+    throw new Error("F1 source/configuration bytes differ from the frozen recipe manifest.");
+  }
+  for (const a of [...m.aliases, ...m.type_only_exports]) {
+    if (!a.replacement.startsWith(`${rootExpected}/packages/`) || sha(a.replacement) !== a.sha256) {
+      throw new Error("F1 alias resolves outside its actual frozen source.");
+    }
+  }
+  for (const t of m.tools) if (realpathSync(t.path) !== t.realpath || sha(t.realpath) !== t.sha256) {
+    throw new Error("F1 tool dependency differs from the reviewed prepared cache.");
+  }
+  return m;
+}
+export const toolUrl = (m, relative) => pathToFileURL(m.tools.find(t => t.relative_path === relative).realpath).href;
+export const fileUrl = (path) => pathToFileURL(path).href;
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export function sourceAliases(m) {
+  return m.aliases.map(a => ({ find: new RegExp(`^${escape(a.find)}$`), replacement: a.replacement }));
+}
+export function exactFiles(m, files, selection) {
+  const expected = selection === "node" ? m.node_files : [m.native_file];
+  if (files.length !== expected.length) throw new Error("F1 strict selection received an added or missing file.");
+  const seen = new Set();
+  for (const spec of files) {
+    const path = realpathSync(spec.moduleId);
+    const item = expected.find(f => f.path === path);
+    if (!item || spec.project.name !== item.project || seen.has(path)) {
+      throw new Error("F1 strict selection received a duplicate, foreign-project or foreign-source file.");
+    }
+    seen.add(path);
+  }
+  return files;
+}
+export function rejectPartition(ctx) {
+  const shard = ctx.config.shard;
+  if (shard && (shard.index !== 1 || shard.count !== 1)) {
+    throw new Error("F1 strict selection cannot partition or repeat its complete frozen file set.");
+  }
+}

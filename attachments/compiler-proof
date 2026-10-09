@@ -1,0 +1,230 @@
+{
+  "authorization": "0c3fef6ffd5dda7791ab5a112e1ea0563532dc18",
+  "prior_C1_compiler_terminal": {
+    "head": "2c7a650b6a76f88ea99d48f6a29bb29a7045d081",
+    "exit": 0,
+    "proof": "/tmp/artroom-c1-2c7a-compiler/proof.json"
+  },
+  "before": {
+    "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+    "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T22:31:39.401506+00:00",
+    "load": [
+      2.06982421875,
+      2.28173828125,
+      1.98828125
+    ]
+  },
+  "dependency_view": {
+    "root": "/private/tmp/artroom-f1-c0-composed",
+    "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+    "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "installed_stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "cache": "/private/tmp/artroom-demo-github-host/node_modules",
+    "workspace_bindings": {
+      "@generalbusiness/artroom-bytes": "/private/tmp/artroom-f1-c0-composed/packages/bytes",
+      "@generalbusiness/artroom-checkers": "/private/tmp/artroom-f1-c0-composed/packages/checkers",
+      "@generalbusiness/artroom-cli": "/private/tmp/artroom-f1-c0-composed/packages/cli",
+      "@generalbusiness/artroom-client": "/private/tmp/artroom-f1-c0-composed/packages/client",
+      "@generalbusiness/artroom-contract": "/private/tmp/artroom-f1-c0-composed/packages/contract",
+      "@generalbusiness/artroom-derive": "/private/tmp/artroom-f1-c0-composed/packages/derive",
+      "@generalbusiness/artroom-git": "/private/tmp/artroom-f1-c0-composed/packages/git",
+      "@generalbusiness/artroom-lanes": "/private/tmp/artroom-f1-c0-composed/packages/lanes",
+      "@generalbusiness/artroom-page": "/private/tmp/artroom-f1-c0-composed/packages/page",
+      "@generalbusiness/artroom-platform": "/private/tmp/artroom-f1-c0-composed/packages/platform",
+      "@generalbusiness/artroom-replay": "/private/tmp/artroom-f1-c0-composed/packages/replay",
+      "@generalbusiness/artroom-scope": "/private/tmp/artroom-f1-c0-composed/packages/scope"
+    },
+    "compiler": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+    "vitest": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+    "source_status": "",
+    "actions": "Existing pinned dependency links prepared; no install, source/config edit or project import"
+  },
+  "sole_runtime_before": [],
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/derive/tsconfig.test.json"
+      ],
+      "cwd": "/tmp/artroom-f1-c0-composed",
+      "exit": 0,
+      "wall_seconds": 0.1974951250012964,
+      "cpu_seconds": 0.780938,
+      "log": "/tmp/artroom-f1-bb5-compiler/derive-test.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:39.430274+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      },
+      "after": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:39.662503+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/platform/tsconfig.test.json"
+      ],
+      "cwd": "/tmp/artroom-f1-c0-composed",
+      "exit": 0,
+      "wall_seconds": 0.19974108401220292,
+      "cpu_seconds": 0.705785,
+      "log": "/tmp/artroom-f1-bb5-compiler/platform-test.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:39.693096+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      },
+      "after": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:39.925796+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/scope/tsconfig.test.json"
+      ],
+      "cwd": "/tmp/artroom-f1-c0-composed",
+      "exit": 0,
+      "wall_seconds": 0.3453919159946963,
+      "cpu_seconds": 1.5789080000000002,
+      "log": "/tmp/artroom-f1-bb5-compiler/scope-test.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:39.958559+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      },
+      "after": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:40.337632+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      }
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "examples/counting/tsconfig.json"
+      ],
+      "cwd": "/tmp/artroom-f1-c0-composed",
+      "exit": 0,
+      "wall_seconds": 0.14825399999972433,
+      "cpu_seconds": 0.5126379999999997,
+      "log": "/tmp/artroom-f1-bb5-compiler/counting-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:40.368110+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      },
+      "after": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": "",
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "utc": "2026-10-09T22:31:40.548805+00:00",
+        "load": [
+          2.06982421875,
+          2.28173828125,
+          1.98828125
+        ]
+      }
+    }
+  ],
+  "Node_native_config_import": "not run",
+  "gate": "not run",
+  "status": "All four compilers terminal passed; Node/native/config/gate still held",
+  "after": {
+    "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+    "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T22:31:40.579633+00:00",
+    "load": [
+      2.06982421875,
+      2.28173828125,
+      1.98828125
+    ]
+  }
+}

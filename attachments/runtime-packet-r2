@@ -1,0 +1,49 @@
+{
+  "revision": 2,
+  "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+  "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+  "source_only": true,
+  "recipes_unchanged": true,
+  "node_projects": 3,
+  "node_files": 4,
+  "node_titles": 13,
+  "native_cases": 1,
+  "runtime_release": "HELD / Root separate authority",
+  "files": {
+    "static-conclusion.json": {
+      "bytes": 827,
+      "sha256": "15b14a6c01a31ffdb4e6489af02a31a4be2d686fd0d4cbeac1f2915cda470d1e"
+    },
+    "recipe-and-conditional-plan.md": {
+      "bytes": 11356,
+      "sha256": "6d33024b4e0f51350c023931c6c6f8481c069bfd33223eeb09a0c17fdf49e72e"
+    }
+  },
+  "immutable_original_refs": {
+    "runtime-manifest.json": {
+      "path": "/tmp/artroom-f1-bb5-runtime-preparation/runtime-manifest.json",
+      "bytes": 26825,
+      "sha256": "d7a083c3378750de20b5f41f718c4dc5bdfd5e3a009f8f11e87dc5bf2831a1ce"
+    },
+    "source-guard.mjs": {
+      "path": "/tmp/artroom-f1-bb5-runtime-preparation/source-guard.mjs",
+      "bytes": 3933,
+      "sha256": "004d2b204e816ac61109b1e1673d679ae8bc0c0621bc0bd9e7383119fa46384e"
+    },
+    "node-selection.config.mjs": {
+      "path": "/tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs",
+      "bytes": 1693,
+      "sha256": "a12946e3e47ab8ab6ddca5df2ecb4ab8dd1650e42a445ec7bda970f35d855d74"
+    },
+    "native-selection.config.mjs": {
+      "path": "/tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs",
+      "bytes": 1305,
+      "sha256": "c3cff2fa7266dc9db3d167bac9d260d5505bb4acb79756c9f1eb3f176ccae7f6"
+    },
+    "packet.json": {
+      "path": "/tmp/artroom-f1-bb5-runtime-preparation/packet.json",
+      "bytes": 1281,
+      "sha256": "accb379e4be7cc8b04e54a8b5d88bb2d0436013f9a195732c7adee6594ef5905"
+    }
+  }
+}
