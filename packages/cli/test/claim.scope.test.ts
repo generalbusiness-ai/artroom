@@ -1,12 +1,12 @@
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { Entry, OperationId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId, ScopeId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, intentDigest, scopeIdOf, seedDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { DIRECTORY_OF, repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { captureSignedSummary, installSignedDiagnostic } from "../../scope/test/signed-read-diagnostic.ts";
 import { beginSessionFixture, type SessionOwner } from "../../scope/test/session-settings.ts";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
+import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
 import { command, memoryStore, type Context } from "../src/index.ts";
 
@@ -26,22 +26,23 @@ const reader = "a test reader";
 // operations driver runs but the one its own object starts; and the clock is the namespaces' scripted clock.
 describe("claim resumes a claim it gave up on. The Git host and the scheduler are STAND-INs", () => {
   test("claim keeps exact requests across loss before found delivery and after accepted seat/first-key replies; settings restart and --again preserve distinct founds, with no duplicate enrollment or signing-key exposure", async () => {
-    const clock = net.clock.now;
-    net.hold = net.deaf = null;
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
-    let changedClock = clock;
     const cleanups: (() => void)[] = [];
     let closed = false;
     const close = () => {
       if (closed) return;
       closed = true;
       for (const cleanup of cleanups.reverse()) cleanup();
-      if (owner.isCurrent() && net.clock.now === changedClock) net.clock.now = clock;
       owner.close();
     };
     onTestFinished(close);
+    // Captured, identity-bearing no-op hooks cannot overwrite later fixtures.
+    const installedHold = () => !owner.isCurrent();
+    const installedDeaf = () => !owner.isCurrent();
+    net.hold = installedHold; net.deaf = installedDeaf;
+    cleanups.push(() => { if (net.hold === installedHold) net.hold = null; if (net.deaf === installedDeaf) net.deaf = null; });
     try {
-      await owner.required(() => resumed(owner, cleanups, () => { owner.active(); net.clock.now = changedClock = timeOf(timeMs(net.clock.now)! + 30_000); }));
+      await owner.required(() => resumed(owner, cleanups, () => { owner.active(); net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000); }));
     } finally { close(); }
   });
 });
@@ -57,7 +58,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   let after: "seat" | "first-key" | null = null;
   let watchingAgain = false;
   const watched: { diagnostic: ReturnType<typeof captureSignedSummary> | null; unavailable: boolean } = { diagnostic: null, unavailable: false };
-  let watchedGet = false;
+  let watchedGets = 0;
   const sent: Record<string, SignedIntent[]> = { found: [], seat: [], "first-key": [] };
   const fetch = (async (url: string, init?: RequestInit) => owner.required(async () => {
     owner.active();
@@ -74,22 +75,23 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
     if (kind === "found" && unavailableFound) { unavailableFound = false; return Response.json({ answer: "unavailable", reason: "unavailable" }); }
     const url_ = new URL(url);
     const authorization = new Headers(init?.headers).get("authorization");
-    if (watchingAgain && !watchedGet && url_.pathname === `/v1/scopes/${registerName}` && (init?.method ?? "GET") === "GET") {
-      watchedGet = true;
-      if (authorization?.startsWith("Signed ")) {
+    if (watchingAgain && url_.pathname === `/v1/scopes/${registerName}` && (init?.method ?? "GET") === "GET") {
+      watchedGets++;
+      if (watchedGets === 1 && authorization?.startsWith("Signed ")) {
         try { watched.diagnostic = captureSignedSummary(owner, registerName, authorization); cleanups.push(watched.diagnostic.close); }
         catch { watched.unavailable = true; }
       }
     }
     let response: Response;
     try { response = await routed(url, init); }
-    finally { if (watchingAgain && watchedGet) watched.diagnostic?.close(); }
+    finally { if (watchingAgain && watchedGets > 0) watched.diagnostic?.close(); }
     owner.active();
     if (kind === "found" && mismatchedDefinition) {
       mismatchedDefinition = false;
       // The Worker really admits the exact request under @3. Only this HTTP
       // response metadata is scripted; the actual core's receipt is checked.
       const actual = await response.json() as { answer: string; receipt: { definition: string } };
+      owner.active();
       expect([actual.answer, actual.receipt.definition]).toEqual(["accepted", "platform:register@3"]);
       return Response.json({ ...actual, receipt: { ...actual.receipt, definition: "platform:register@1" } });
     }
@@ -97,7 +99,33 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
     return response;
   })) as unknown as Fetch;
   // STAND-IN for the scheduler: the dispatchers of the scopes the command waits on. No pass of an operations driver.
-  const pause = async (waiting: readonly string[]) => owner.required(() => settle(...waiting.map((scope) => new Platform(scope as never))));
+  const platform = (scope: ScopeId) => new class extends Platform {
+    override get object() { owner.active(); return super.object; }
+    override get stub(): Platform["stub"] {
+      owner.active();
+      const stub = super.stub;
+      return new Proxy(stub, { get(target, property) {
+        const method = Reflect.get(target, property, target) as unknown;
+        if (typeof method !== "function") return method;
+        return (...args: unknown[]) => owner.required(async () => {
+          owner.active();
+          const answer: unknown = await Reflect.apply(method, target, args);
+          owner.active();
+          return answer;
+        });
+      } });
+    }
+    override restart() { return owner.required(() => super.restart()); }
+  }(scope);
+  const pause = async (waiting: readonly string[]) => {
+    const nodes = waiting.map(scope => platform(scope as ScopeId));
+    let passes = 0;
+    for (let made = 1; made > 0;) {
+      if (++passes > 64) expect.fail("The owned dispatch fixture did not quiesce within 64 passes.");
+      owner.active(); made = 0;
+      for (const node of nodes) { owner.active(); made += await node.stub.dispatch(); owner.active(); }
+    }
+  };
   const rita: Context = { store: memoryStore(), fetch, now: () => { owner.active(); return timeMs(net.clock.now)!; }, pause, tries: 3 };
   // A fresh command context each time; only the store survives. memoryStore
   // stands for local file persistence, and server restarts below are actual.
@@ -109,20 +137,23 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
 
   expect((await run("install", SERVICE, "--host", "git.example", "--namespace", "artroom")).code).toBe(0);
   owner.active();
-  const R = new Platform((await configOf())!.register!.scope);
+  const R = platform((await configOf())!.register!.scope);
   registerName = R.name;
   const directoryDefinition = DIRECTORY_OF[(await owner.required(() => R.summary())).value.definition]!;
   // STAND-IN: the register's Git host, which sends nothing yet: no settings.
   const host = outsideOf(R.name);
-  const previousAccepting = host.accepting;
-  let installedAccepting = false;
   owner.active();
-  host.accepting = installedAccepting;
-  cleanups.push(() => { if (owner.isCurrent() && host.accepting === installedAccepting) host.accepting = previousAccepting; });
-  const previousWiring = wired.get(R.name);
-  const installedWiring = () => ({ outside: host });
+  host.accepting = false;
+  // The register is unique to the install signature kept in this memory store.
+  // Do not revive any previous factory or undo its host after ownership ends.
+  const ownedOutside = {
+    accepts: () => owner.isCurrent() && host.accepts(),
+    send: (request: Parameters<typeof host.send>[0]) => owner.required(() => host.send(request)),
+    late: (deliver: Parameters<typeof host.late>[0]) => host.late((...args) => owner.required(() => deliver(...args))),
+  };
+  const installedWiring = () => { owner.active(); return { outside: ownedOutside }; };
   wired.set(R.name, installedWiring);
-  cleanups.push(() => { if (wired.get(R.name) === installedWiring) { if (previousWiring) wired.set(R.name, previousWiring); else wired.delete(R.name); } });
+  cleanups.push(() => { if (wired.get(R.name) === installedWiring) wired.delete(R.name); });
   cleanups.push(installSignedDiagnostic(owner, R.name));
   await owner.required(() => R.restart());
   const founds = async () => (await owner.required(() => R.entries())).filter((entry): entry is Entry & { input: { type: "act" } } => entry.input.type === "act" && entry.input.signed.intent.kind === "found");
@@ -165,7 +196,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   finally { watchingAgain = false; watched.diagnostic?.close(); }
   const safeDiagnostic = watched.diagnostic?.report() ?? { complete: false, released: true, ownerCurrent: owner.isCurrent(), records: [] };
   expect(again, JSON.stringify(safeDiagnostic)).toEqual({ code: 1, lines: ["No answer: The accepted reply names another register definition; its exact saved request remains pending."] });
-  expect([watchedGet && !watched.unavailable, safeDiagnostic.complete, safeDiagnostic.released, safeDiagnostic.ownerCurrent]).toEqual([true, true, true, true]);
+  expect([watchedGets, watched.unavailable, safeDiagnostic.complete, safeDiagnostic.released, safeDiagnostic.ownerCurrent]).toEqual([1, false, true, true, true]);
   expect(safeDiagnostic.records.every(record => record.phase !== "unmarked")).toBe(true);
   expect(safeDiagnostic.records.filter(record => record.phase === "final-summary" && (record.stage === "local-summary-eligible" || record.stage === "genesis-root-summary-eligible" || record.stage === "genesis-root-summary-ineligible" || record.stage === "request-refused")).map(record => record.stage)).toEqual([expect.stringMatching(/^(local-summary-eligible|genesis-root-summary-eligible)$/)]);
   expect(requestedPaths.slice(beforeMismatch).every((path) => path.startsWith(`/v1/scopes/${R.name}`))).toBe(true);
@@ -175,7 +206,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
 
   // The Git host's settings are set, and the register's object restarts. The host will create each repository.
   owner.active();
-  host.accepting = installedAccepting = true;
+  host.accepting = true;
   await owner.required(() => R.restart());
   for (const claim of await founds()) {
     const seed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: await owner.required(() => R.at()), cause: intentDigest(claim.input.signed.intent), ordinal: 0 };
@@ -189,7 +220,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   const seatLoss = await run("claim", "demo");
   expect(seatLoss).toMatchObject({ code: 1, lines: [expect.stringMatching(/^No answer:/)] });
   const seatedPending = (await configOf())!.claim!;
-  const M = new Platform(seatedPending.repository!.membership.scope);
+  const M = platform(seatedPending.repository!.membership.scope);
   const enrollment = async (kind: string) => (await owner.required(() => M.entries())).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === kind);
   expect([(await enrollment("seat")).length, seatedPending.seat?.accepted, seatedPending.firstKey]).toEqual([1, undefined, undefined]);
   expect(sent["seat"]).toEqual([seatedPending.seat!.signed]);
@@ -209,9 +240,9 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeMarker);
   await owner.required(async () => rita.store.save(originalSeated));
   const firstSeed: Seed = { v: 1, kind: "directory", definition: directoryDefinition, creator: await owner.required(() => R.at()), cause: pending.claim!.intent, ordinal: 0 };
-  const firstDirectory = new Platform(scopeIdOf(firstSeed));
+  const firstDirectory = platform(scopeIdOf(firstSeed));
   const firstBirths = (await owner.required(() => firstDirectory.entries()))[0]!.sends;
-  const firstMembership = new Platform(scopeIdOf(firstBirths.find((send) => "creator" in send.to && send.to.kind === "membership")!.to as Seed));
+  const firstMembership = platform(scopeIdOf(firstBirths.find((send) => "creator" in send.to && send.to.kind === "membership")!.to as Seed));
   const { seat: _seat, firstKey: _firstKey, ...withoutEnrollment } = seatedPending;
   await owner.required(async () => rita.store.save({ ...originalSeated, claim: { ...withoutEnrollment, repository: { ...seatedPending.repository!, membership: await owner.required(() => firstMembership.at()) } } }));
   const beforeMix = [sent["seat"]!.length, sent["first-key"]!.length];
@@ -234,7 +265,7 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
   expect(resumedClaim.code, resumedClaim.lines.join("\n")).toBe(0);
   const config = (await configOf())!;
   expect([config.claim, config.handle, resumedClaim.lines[1], resumedClaim.lines[2]]).toEqual([undefined, "@rita", "Definitions: platform:directory@3, platform:membership@2, platform:rules@2, platform:destination@3.", expect.stringMatching(/^You are @rita, an admin, on key key_\S+; your inbox is sc_\S+\.$/)]);
-  const D = new Platform(config.repository!.directory.scope);
+  const D = platform(config.repository!.directory.scope);
   expect((await owner.required(() => D.entries()))[0]!.uses.map((use) => use.fact.seq)).toContain((await founds())[1]!.seq);
   // No third found; each creation attempt was sent once, by the pass that the register's first call after its restart started.
   expect([(await founds()).length, host.attempts.sort()]).toEqual([2, [`${(await founds())[0]!.seq}:0#1`, `${(await founds())[1]!.seq}:0#1`].sort()]);
