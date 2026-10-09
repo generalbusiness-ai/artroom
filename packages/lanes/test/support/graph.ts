@@ -475,6 +475,8 @@ export async function graph(foundingTransport: Transport = transport): Promise<G
   // Native service by default. The dedicated wire witness supplies HTTP.
   // Both receive the exact declaration closure and detached text beside it.
   const { answer, scope } = await found(foundingTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
+  expect(answer.answer).toBe("accepted");
+  expect(scope).not.toBeNull();
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
   const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
   expect(answer.receipt.definition).toBe(seed.definition);
