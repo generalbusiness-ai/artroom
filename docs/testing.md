@@ -276,7 +276,18 @@ objects in maps and decodes each pushed pack; the site route reads the
 published file back over the same stand-in. It lives with the lanes,
 because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
-git package. `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+git package. `packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
+successor on real platform and lane scopes, through the production wiring
+of the hosting's own Git service over its labelled host stand-in. It
+records two signed file entries and a frozen manifest, reserves the shared
+tree before a required check, refuses a wrong source digest and wrong job
+tree, and publishes only after a configured checker member signs a pass.
+The destination replays from its retained inputs. The checker pass is
+signed by the test: it runs no checker-service origin read or runner. The
+reservation origin and unpublished object access duties are recorded in
+workroom assertion `1b5b048f718d9d053da821feeab75c7fb81c4672`.
+
+`packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
 `packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
