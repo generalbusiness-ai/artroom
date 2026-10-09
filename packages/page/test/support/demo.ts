@@ -45,6 +45,7 @@ export interface Demo {
   pause(waiting?: readonly string[]): Promise<void>;
   /** A required-session lease and the same fixture resource boundary for direct proof work. */
   wait<T>(action: () => Promise<T>): Promise<T>;
+  active(): void;
   run(who: Context, ...argv: string[]): Promise<Outcome>;
   rita: Context; paul: Context;
   /** rita's config, as `claim` saved it: what the planner's config.json holds. */
@@ -136,7 +137,7 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     active();
 
     return {
-      at, fetch, pause, wait, run, rita, paul, config, D, G, M, rules, link, sessionOwner,
+      at, fetch, pause, wait, active, run, rita, paul, config, D, G, M, rules, link, sessionOwner,
       as: (secret, owner = sessionOwner) => {
         lifetime.activeFor(owner);
         return { service: SERVICE, secret, fetch: guarded(owner, wrapped), now: () => lifetime.nowFor(owner) };

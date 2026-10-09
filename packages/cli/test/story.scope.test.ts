@@ -83,7 +83,14 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   // Control: with no header the register is not read at all.
   expect((await lifetime.wait(() => routed(`${SERVICE}/v1/scopes/${R.name}`))).status).toBe(403);
   // STAND-IN: the Git host of this register, wired from the object's next start.
-  lifetime.wire(R.name, () => ({ outside: outsideOf(R.name) }));
+  lifetime.wire(R.name, () => {
+    const host = outsideOf(R.name);
+    return { outside: {
+      accepts: () => { lifetime.active(); return host.accepts(); },
+      send: (request) => lifetime.wait(() => host.send(request)),
+      late: (deliver) => { lifetime.active(); host.late(deliver); },
+    } };
+  });
   await R.restart();
   register = R;
 

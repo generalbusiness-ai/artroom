@@ -10,6 +10,7 @@ import { PUBLICATION_PROOF_BOUNDS, type SitePublicationPeer } from "../src/site/
 test("two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes", async () => {
   const d = await demo(undefined, null, { editorOnly: true, invitation: false });
   const snapshot = () => d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+    d.active();
     const tables = state.storage.sql.exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").toArray();
     return tables.map(({ name }) => [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]);
   }));
@@ -35,35 +36,39 @@ test("two native publications retain older immutable content and deny pending/co
     // they do not pretend a SQL change is a native lifecycle transition.
     for (const stateName of ["owed", "conflict"]) {
       const prior = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+        d.active();
         const row = state.storage.sql.exec<{ id: number; state: string; record: string }>("SELECT id, state, record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one();
         const changed = JSON.parse(row.record); changed.state = stateName;
         state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", stateName, JSON.stringify(changed), row.id);
         return row;
       }));
       try { expect((await get(first, { "if-none-match": "*" })).status).toBe(404); }
-      finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", prior.state, prior.record, prior.id); })); }
+      finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", prior.state, prior.record, prior.id); })); }
     }
     const peer = d.G.stub as unknown as SitePublicationPeer;
     const directory = d.config.repository!.directory;
-    const repo = await d.wait(() => runInDurableObject(d.D.object, (_instance, state) => JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'repository'").one().record).values.repository));
+    const repo = await d.wait(() => runInDurableObject(d.D.object, (_instance, state) => { d.active(); return JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'repository'").one().record).values.repository; }));
     expect(await peer.sitePublishedCommit(directory, repo as never, "e".repeat(40))).toEqual({ ok: false, reason: "not-published" });
     // The default CLI install founds the actual @3 graph, including native
     // publication cleanup. These are deliberate folded-state corruptions;
     // restore the exact original column and bytes after each projection check.
     const historicalPublication = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+      d.active();
       const receipt = JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one().record);
       return state.storage.sql.exec<{ id: number; state: string; record: string }>("SELECT id, state, record FROM item WHERE id = ?", receipt.refs.publication).one();
     }));
     for (const cleanupState of ["cleanup-deleted", "cleanup-owed", "cleaned"]) {
       await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+        d.active();
         const changed = JSON.parse(historicalPublication.record); changed.state = cleanupState;
         state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", cleanupState, JSON.stringify(changed), historicalPublication.id);
       }));
       try { expect((await get(first)).status).toBe(200); }
-      finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", historicalPublication.state, historicalPublication.record, historicalPublication.id); })); }
+      finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", historicalPublication.state, historicalPublication.record, historicalPublication.id); })); }
     }
     // Cleanup state alone cannot replace the original publication judgment.
     const openingProof = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+      d.active();
       const receipt = JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one().record);
       const row = state.storage.sql.exec<{ seq: number; bytes: string }>("SELECT seq, bytes FROM entry WHERE seq = ?", receipt.id).one();
       const held = JSON.parse(historicalPublication.record); held.state = "cleaned";
@@ -74,8 +79,9 @@ test("two native publications retain older immutable content and deny pending/co
       return row;
     }));
     try { expect((await get(first, { "if-none-match": "*" })).status).toBe(404); }
-    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", openingProof.bytes, openingProof.seq); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", historicalPublication.state, historicalPublication.record, historicalPublication.id); })); }
+    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", openingProof.bytes, openingProof.seq); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", historicalPublication.state, historicalPublication.record, historicalPublication.id); })); }
     const metadata = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+      d.active();
       const saved = state.storage.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'scope'").one().v;
       const changed = JSON.parse(saved); changed.head.seq = PUBLICATION_PROOF_BOUNDS.historyEntries;
       state.storage.sql.exec("UPDATE meta SET v = ? WHERE k = 'scope'", JSON.stringify(changed));
@@ -86,24 +92,26 @@ test("two native publications retain older immutable content and deny pending/co
       const limited = await get(first, { "if-none-match": "*" });
       expect(limited.status).toBe(502);
       expect(await bodyOf(limited)).toContain("publication-history-limit");
-    } finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE meta SET v = ? WHERE k = 'scope'", metadata); })); }
+    } finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE meta SET v = ? WHERE k = 'scope'", metadata); })); }
     // Invalid oversized retained JSON must hit the byte preflight before SQL
     // json_each or JavaScript parsing can inspect it.
     const historyRows = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+      d.active();
       const rows = state.storage.sql.exec<{ seq: number; bytes: string }>("SELECT seq, bytes FROM entry ORDER BY seq LIMIT 18").toArray();
       for (const row of rows) state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", "x".repeat(1024 * 1024), row.seq);
       return rows;
     }));
     try { expect(await peer.sitePublishedCommit(directory, repo as never, first)).toEqual({ ok: false, reason: "publication-history-limit" }); }
-    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { for (const row of historyRows) state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", row.bytes, row.seq); })); }
+    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); for (const row of historyRows) state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", row.bytes, row.seq); })); }
     const oversized = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
+      d.active();
       const row = state.storage.sql.exec<{ id: number; state: string; record: string }>("SELECT id, state, record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one();
       const changed = JSON.parse(row.record); changed.values.padding = "x".repeat(PUBLICATION_PROOF_BOUNDS.bytes + 1);
       state.storage.sql.exec("UPDATE item SET record = ? WHERE id = ?", JSON.stringify(changed), row.id);
       return row;
     }));
     try { expect(await peer.sitePublishedCommit(directory, repo as never, first)).toEqual({ ok: false, reason: "publication-history-limit" }); }
-    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", oversized.state, oversized.record, oversized.id); })); }
+    finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", oversized.state, oversized.record, oversized.id); })); }
     expect(await peer.sitePublishedCommit({ ...directory, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never }, repo as never, first)).toEqual({ ok: false, reason: "not-published" });
     expect(await peer.sitePublishedCommit(directory, { ...repo, id: "foreign" } as never, first)).toEqual({ ok: false, reason: "not-published" });
     const selection = await peer.sitePublishedCommit(directory, repo as never, first);

@@ -37,6 +37,7 @@ describe("a room founded on version 1 of every definition, on the code that ship
     lifetime.wire(R.name, () => ({ outside: {
       accepts: () => { lifetime.active(); return host.accepts(); },
       send: (request) => lifetime.wait(() => host.send(request)),
+      late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
     expect((await R.stub.found(signIntent(install, paul.secret), REGISTER_1)).answer).toBe("accepted");
     const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });

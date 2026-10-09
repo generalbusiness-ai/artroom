@@ -1,7 +1,7 @@
 /** Test-only ownership for the clone and Page claim fixtures. No native cancellation. */
 import { onTestFinished } from "vitest";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { Digest, ScopeId } from "@generalbusiness/artroom-contract";
 import { net } from "../../src/testing.ts";
 import type { SessionOwner } from "../session-settings.ts";
 import { Platform } from "../repository.ts";
@@ -10,16 +10,16 @@ import { platformOutside } from "../worker.ts";
 
 type PortFactory = NonNullable<ReturnType<typeof wired.get>>;
 type OutsideFactory = NonNullable<ReturnType<typeof platformOutside.get>>;
-const retired = new WeakSet<Function>();
-const predecessors = new WeakMap<Function, Function | null>();
+const retired = new WeakSet<object>();
+const predecessors = new WeakMap<object, object | null>();
 /** A nested owner can finish after its parent: skip retired tokens to the
  * first still-owned predecessor, rather than restoring a retired parent. */
-const previousLive = <V extends Function>(value: V | undefined | null): V | null => {
-  let previous: Function | null = value ?? null;
+const previousLive = <V extends object>(value: V | undefined | null): V | null => {
+  let previous: object | null = value ?? null;
   while (previous && retired.has(previous)) previous = predecessors.get(previous) ?? null;
   return previous as V | null;
 };
-function resources<K, V extends Function>(map: Map<K, V>) {
+function resources<K, V extends object>(map: Map<K, V>) {
   const installed = new Map<K, { previous: V | undefined; value: V }>();
   return {
     set(key: K, value: V): void {
@@ -61,7 +61,7 @@ export function nativeFixtureLifetime(owner: SessionOwner, options: { required?:
   let hold: NonNullable<typeof net.hold> = () => false;
   const deaf: NonNullable<typeof net.deaf> = () => false;
   let released = false;
-  const ports = resources(wired), outsides = resources(platformOutside);
+  const ports = resources(wired), outsides = resources(platformOutside), peers = resources(net.peers);
   const cleanups = new Set<() => void>();
   net.hold = hold; net.deaf = deaf;
   predecessors.set(hold, before.hold); predecessors.set(deaf, before.deaf);
@@ -79,7 +79,7 @@ export function nativeFixtureLifetime(owner: SessionOwner, options: { required?:
     const value = await (options.required === false ? action() : actor.required(action));
     // required permits a still-live explicit descendant on completion. Do not
     // replace that check with exact-current active; a new action still needs it.
-    if (!actor.belongsTo(owner)) throw new Error("Native fixture session ownership ended during its continuation.");
+    if (!actor.belongsTo(owner) || !actor.ownsCurrentFrame()) throw new Error("Native fixture session ownership ended during its continuation.");
     intact();
     return value;
   };
@@ -98,7 +98,7 @@ export function nativeFixtureLifetime(owner: SessionOwner, options: { required?:
       retired.add(hold); retired.add(deaf);
       if (net.hold === hold) net.hold = previousLive(before.hold);
       if (net.deaf === deaf) net.deaf = previousLive(before.deaf);
-      ports.release(); outsides.release();
+      ports.release(); outsides.release(); peers.release();
     }
     // Every gate and provider is released even if one cleanup failed. Do not
     // expose arbitrary cleanup errors, which may contain private fixture data.
@@ -129,9 +129,11 @@ export function nativeFixtureLifetime(owner: SessionOwner, options: { required?:
     unOutside: (name: string): void => { active(); outsides.remove(name); },
     platform: (name: ScopeId): Platform => { active(); return new OwnedPlatform(name); },
     cleanup(run: () => void): void { if (released) run(); else cleanups.add(run); },
-    setHold(next: NonNullable<typeof net.hold>): void { active(); retired.add(hold); predecessors.set(next, before.hold); hold = next; net.hold = hold; },
+    setHold(next: NonNullable<typeof net.hold>): void { active(); if (next === hold) return; retired.add(hold); predecessors.set(next, before.hold); hold = next; net.hold = hold; },
     wire(name: string, factory: PortFactory): void { active(); ports.set(name, () => { active(); return factory(); }); },
     outside(name: string, factory: OutsideFactory): void { active(); outsides.set(name, (given, sql) => { active(); return factory(given, sql); }); },
+    /** Scripted anchors stay available until the owning scenario has finished. */
+    peer(hash: Digest, value: Parameters<typeof net.peers.set>[1]): void { active(); peers.set(hash, value); },
     now(): number { active(); return timeMs(clock.now)!; },
     nowFor(actor: SessionOwner): number { activeFor(actor); return timeMs(clock.now)!; },
     advance(milliseconds: number): void {

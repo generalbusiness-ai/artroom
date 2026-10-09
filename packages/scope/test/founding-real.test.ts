@@ -10,7 +10,6 @@ import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, 
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
-import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";
 import { Platform, rita, routed, sam } from "./repository.ts";
@@ -64,6 +63,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     lifetime.wire(R.name, () => ({ outside: {
       accepts: () => { lifetime.active(); return host.accepts(); },
       send: (request) => lifetime.wait(() => host.send(request)),
+      late: (deliver) => { lifetime.active(); host.late(deliver); },
     } }));
     expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted", receipt: { definition: REGISTER, fact: { at: { scope: R.name, kind: "register" }, seq: 0 } } });
     const register = await R.at();
@@ -318,14 +318,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const merge: Entry = { v: 1, at: otherLane, seq: 4, prev: entryHash(decision), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
     const sourceFacts = [manifest, job, decision, merge];
     for (const entry of sourceFacts) {
-      lifetime.active();
-      const hash = entryHash(entry), previous = net.peers.get(hash), peer = { entry, under: "change" };
-      net.peers.set(hash, peer);
-      lifetime.cleanup(() => {
-        if (net.peers.get(hash) !== peer) return;
-        if (previous) net.peers.set(hash, previous);
-        else net.peers.delete(hash);
-      });
+      lifetime.peer(entryHash(entry), { entry, under: "change" });
     }
     expect(await G.stub.deliver({ to: branchScope, from: factRefOf(merge), n: 0, message: request })).toMatchObject({ answer: "recorded" });
     lifetime.active();

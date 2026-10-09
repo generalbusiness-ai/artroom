@@ -3,7 +3,8 @@ import { b64url, timeMs } from "@generalbusiness/artroom-bytes";
 import { command, memoryStore } from "@generalbusiness/artroom-cli";
 import { Gate, net } from "../src/testing.ts";
 import { routed } from "./repository.ts";
-import { beginSessionFixture, observeSessionReads, sessionSettings, type SessionReadChoice } from "./session-settings.ts";
+import { beginSessionChild, beginSessionFixture, observeSessionReads, sessionSettings, type SessionReadChoice } from "./session-settings.ts";
+import { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 // Native register/route/session readers. The lifecycle Gate is a model, not
 // evidence of the unknown 270 chronology. No response data/credentials logged.
@@ -35,6 +36,34 @@ test("stale session cleanup and one completed lease cannot expose a new owner's 
     expect([response.status, classification]).toEqual([403, "forbidden"]);
     expect([sessionSettings().sessions, fresh.isCurrent(), choices.some(c => c.phase === "prepare"), choices.some(c => c.phase === "allows")]).toEqual([true, true, true, true]);
     expect(choices.every(c => c.sessions && c.ownerMatches && c.requiredLeases === 1 && c.nullReader && !c.inspectorPresent && c.branch === "real")).toBe(true);
+
+    // Ownership-only waits preserve the configured read mode. Explicit
+    // authenticated leases still force real readers and keep child ancestry.
+    stop(); stop = () => {};
+    lease2.close();
+    const lifetime = nativeFixtureLifetime(fresh, { required: false });
+    const held = new Gate(); held.hold();
+    try {
+      expect(await lifetime.wait(async () => sessionSettings().sessions)).toBe(false);
+      const child = await lifetime.wait(async () => beginSessionChild(fresh, { secret: null, sessions: false }));
+      try {
+        expect(await lifetime.waitFor(child, async () => sessionSettings().sessions)).toBe(false);
+        expect(await lifetime.waitFor(child, () => child.required(async () => sessionSettings().sessions))).toBe(true);
+        expect([sessionSettings().sessions, child.belongsTo(fresh), fresh.ownsCurrentFrame()]).toEqual([false, true, true]);
+      } finally { child.close(); }
+      let continued = false;
+      const late = lifetime.wait(() => held.pass()).then(() => { continued = true; });
+      const refused = expect(late).rejects.toThrow("Native fixture session ownership ended");
+      await held.held();
+      const next = beginSessionFixture({ sessions: false });
+      onTestFinished(next.close);
+      const replacement = nativeFixtureLifetime(next, { required: false });
+      onTestFinished(replacement.release);
+      try {
+        lifetime.release(); held.release(); await refused;
+        expect([continued, replacement.current(), sessionSettings().sessions]).toEqual([false, true, false]);
+      } finally { held.release(); replacement.release(); }
+    } finally { held.release(); lifetime.release(); }
   } finally {
     stop(); gate.release(); await lateCleanup;
     lease1.close(); lease2.close(); fresh.close(); old.close();

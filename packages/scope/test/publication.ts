@@ -33,10 +33,14 @@ export async function foundingPublication(G: Platform, lifetime?: ReturnType<typ
   const wait = <T>(run: () => Promise<T>): Promise<T> => lifetime ? lifetime.wait(run) : run();
   const host = outsideOf(G.name);
   let driving = "";
-  const ports = () => ({ outside: { accepts: (_owner: string, kind: string) => kind === driving, send: (request: import("../src/index.ts").EffectRequest) => host.send(request) } });
+  const ports = () => ({ outside: {
+    accepts: (_owner: string, kind: string) => { lifetime?.active(); return kind === driving; },
+    send: (request: import("../src/index.ts").EffectRequest) => wait(() => host.send(request)),
+  } });
   if (lifetime) lifetime.wire(G.name, ports); else wired.set(G.name, ports);
   const drive = async (kind: string) => {
     const answers = await wait(() => runInDurableObject(G.object, (_instance, state) => {
+      lifetime?.active();
       const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
       const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
       return store.all().operations.filter((operation) => operation.kind === kind).flatMap((operation) => operation.attempts.filter((attempt) => attempt.outcomes.length === 0).map((attempt) => {

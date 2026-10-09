@@ -25,6 +25,8 @@ export class SessionOwner {
   isCurrent(): boolean { return live(this) && current === this; }
   /** Live ownership ancestry only; it grants no read mode or required lease. */
   belongsTo(ancestor: SessionOwner): boolean { return live(this) && within(ancestor, this); }
+  /** A guarded completion may retain a live explicit descendant as current. */
+  ownsCurrentFrame(): boolean { return live(this) && within(this, current); }
   active(): void { if (!this.isCurrent()) throw new Error("Session fixture ownership ended before its continuation completed."); }
   close = (): void => {
     const state = stateOf(this); state.closed = true; state.leases.clear();
