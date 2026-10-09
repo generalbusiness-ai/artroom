@@ -74,7 +74,7 @@ test("artroom edit uses a one-element reservation tree as the real checker servi
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // CLI category formatting/pre-send routing lives at the cheaper HTTP boundary
-// in cli/test/proposal-outcomes.test.ts; keep actual acceptance and lost reply.
+// in lanes/test/cli-proposal-outcomes.test.ts; keep actual acceptance and lost reply.
 test.each(["reply", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });

@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type DeclaredDefinition, type DutyId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, entryHash, factRefOf, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
+import { changeDemo3 } from "../src/index.ts";
 import { validateDefinition } from "@generalbusiness/artroom-derive";
-import { command, memoryStore, type Context } from "../src/index.ts";
+import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 
 // CLI/HTTP boundary STAND-IN: summaries and accepted work are scripted, not
 // native admission or authority. The real client still shapes and signs every

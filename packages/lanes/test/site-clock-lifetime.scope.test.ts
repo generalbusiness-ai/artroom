@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { timeMs } from "@generalbusiness/artroom-bytes";
-import { Gate, net } from "../src/testing.ts";
-import { graph, onCode, rita, una } from "../../lanes/test/support/graph.ts";
-import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
+import { Gate, net } from "../../scope/src/testing.ts";
+import { graph, onCode, rita, una } from "./support/graph.ts";
+import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
 
 // Deterministic lifetime model, not a reproduction of the 676 timeout.
 // Native offer admission; scripted authority/clock and peer rules.

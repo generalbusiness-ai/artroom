@@ -3,14 +3,14 @@ import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { command, memoryStore, type Context, type Outcome } from "@generalbusiness/artroom-cli";
-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
+import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
+import { changeDemo3 } from "../src/index.ts";
 import { firstExtents } from "@generalbusiness/artroom-platform";
-import { net } from "../src/testing.ts";
-import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
-import { ownHost } from "./hosts.ts";
-import { Platform, routed } from "./repository.ts";
-import { site } from "../src/site/route.ts";
+import { net } from "../../scope/src/testing.ts";
+import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
+import { ownHost } from "../../scope/test/hosts.ts";
+import { Platform, routed } from "../../scope/test/repository.ts";
+import { site } from "../../scope/src/site/route.ts";
 
 // Real @3 CLI/register/directory/lane/rules/destination admission and cleanup.
 // Only the Git provider, scheduler, clock and local key store are STAND-INs.

@@ -429,7 +429,10 @@ gate.
 The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
-names the lanes package. The lanes package keeps
+names the lanes package. The Site publication and clock lifetime scenarios
+also live in the lanes package: they need its definition or graph. They use
+the Scope package's existing host, repository and lifetime helpers, with no
+copy of a fixture or change to the native Worker classes. The lanes package keeps
 `vitest.scope.config.ts` and `wrangler.test.jsonc`, which run the same
 files alone, in a Worker of its own with the same classes: for `npm test`
 in the package, for `scripts/control.mjs` and for
@@ -440,8 +443,10 @@ scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has
 made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
-The `lanes` project is the four tests of
-`packages/lanes/test/definitions.test.ts`. They read the four byte files
+The Node `lanes` project checks the definitions and the scripted CLI proposal
+outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
+witness has no native admission or authority; its native counterparts stay in
+`manifest-tree.scope.test.ts`. The four definition tests read the four byte files
 under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those
 files alone is not selected by `npm run test:changed`; the gate runs it.
