@@ -116,6 +116,12 @@ keeps that scope read-only. Check status reads; it does not resubmit or treat
 a changed head as settlement. Generic submission does not retain its exact
 signed envelope across reload, so that recovery limit remains.
 
+Join also blocks duplicate requests and checks captured settings before
+submission and before selecting an accepted reply. A late accepted answer
+is kept in memory for its original context; Use joined room selects that
+known result with the original signing key and makes no new Join. Unknown
+Join outcomes remain read-only, with the same reload-recovery limitation.
+
 The Rules editor changes approval counts and preserves complete checks,
 extents, labels and exception values. Only an actually offered `publish`
 action exposes it. Changes require before/after confirmation; cancellation

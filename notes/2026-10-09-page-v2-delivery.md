@@ -144,6 +144,17 @@ IDs, digests and observations. Founding delivery is deliberately intercepted
 without Scope admission; the native two-room/settlement witness is separate.
 Full independent Source review remains owed.
 
+The current review also found an inherited late Join callback that could
+replace newer settings. Its repair fences in-flight Join, captures the
+invitation/key before waiting, checks context immediately before the POST,
+and retains accepted or unknown answers under their original context.
+A stale acceptance does not save another room's settings. Selecting the
+known joined room is an explicit action using its original signing settings,
+with no repeated Join. Unknown enrollment remains fenced. Focused handler,
+encoding and asset checks and Page types pass; generic enrollment envelopes
+are still not durable across reload. This is a focused inherited-path repair,
+not a new outbox protocol or a repeated whole-suite gate.
+
 A narrow peer read found and verified the repair of a late-draw label race.
 Final DOM publication checks the original room context; the displayed local
 label also matches the loaded directory and full membership reference. Its
