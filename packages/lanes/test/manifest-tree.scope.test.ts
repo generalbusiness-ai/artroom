@@ -112,21 +112,23 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     const value = await response.json() as Omit<import("@generalbusiness/artroom-contract").ReservationSnapshot, "objects"> & { objects: { id: string; type: "blob" | "tree" | "commit"; data: string }[] };
     return { ...value, objects: value.objects.map((object) => ({ ...object, data: unb64url(object.data)! })) };
   } };
-  let runs = 0, prepares = 0;
-  const service = new CheckerService({
+  let runs = 0, prepares = 0, snapshots = 0;
+  let loseSubmit = true, refuseSnapshot = false;
+  const serviceOptions: ConstructorParameters<typeof CheckerService>[0] = {
     signer: { key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, outcomes: new Outcomes(new MemoryDurable()), clock: now, random: (length) => crypto.getRandomValues(new Uint8Array(length)),
     scopes: {
       entry: async (_scope, seq) => (await L.sealed())[seq] ?? null,
       pinned: async () => definitionDigest(changeDemo3), activated: async () => ({ name: "change", state: "active" }),
       configuration: async () => canonicalize(checkConfig),
-      reservationSnapshot: async (_scope, asked) => Gsnapshot.reservationSnapshot(asked),
+      reservationSnapshot: async (_scope, asked) => { snapshots++; return refuseSnapshot ? null : Gsnapshot.reservationSnapshot(asked); },
       prepare: async () => { prepares++; throw new Error("reservation snapshot must mint nothing"); },
       standing: async (_scope, id, kind) => { const items = (await L.summary()).value.items; const item = items.find((item) => item.id === id); return item ? { state: item.state, expected: expectedOf(changeDemo3.acts[kind] as unknown as ActShape, items, null, { job: id }) } : null; },
-      submit: async (_scope, signed) => L.stub.submit(signed, []),
+      submit: async (_scope, signed) => { if (loseSubmit) { loseSubmit = false; throw new Error("reply unavailable"); } return L.stub.submit(signed, []); },
     },
     // Runner boundary STAND-IN here; actual object checkout is tested in checkers/runner.test.ts.
     runner: { find: async () => null, run: async (ask) => { runs++; expect(ask.job.snapshot?.tree).toBe(manifest.values["tree"]); expect(ask.job.snapshot?.sources).toHaveLength(2); return { started: true, image: checkConfig.image, environment: [], checkout: true, steps: [{ status: 0, line: "ok" }], end: "complete" }; } },
-  });
+  };
+  const service = new CheckerService(serviceOptions);
   const jobEntry = (await L.sealed())[job]!;
   const jobFact = factRefOf(jobEntry.entry);
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
@@ -143,8 +145,11 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const wrongAsk = await signJobRead({ key: keyIdOfSecret(wrongKey), sign: (bytes) => sign(wrongKey, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   expect(await Gsnapshot.reservationSnapshot(wrongAsk)).toBeNull();
   const delivered = await service.deliver({ lane: await L.at(), job: factRefOf(jobEntry.entry), name: "text", tree: manifest.values["tree"] as string });
-  expect([delivered, runs, prepares]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" }, 1, 0]);
-  expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "no-manifest" });
+  expect([delivered, runs, prepares]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "kept" }, 1, 0]);
+  refuseSnapshot = true;
+  const resumed = await new CheckerService(serviceOptions).deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string });
+  expect([resumed, runs, snapshots]).toEqual([{ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: false, lane: "admitted" }, 1, 1]);
+  expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "closed" });
   expect(runs).toBe(1);
   await pause([lane, repository.destination]);
   const published = host.refs.get("refs/heads/main")!;

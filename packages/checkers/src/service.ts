@@ -177,8 +177,10 @@ export class CheckerService {
       const activated = typeof pinned === "string" && pinned.startsWith("sha256:") ? await scopes.activated(pinned as Digest) : null;
       const manifest = at === null ? null : await scopes.entry(notice.lane, at);
       const listManifest = manifest?.entry.input.type === "act" && Array.isArray(manifest.entry.input.signed.intent.fields["files"]);
-      let reservation: ReservationSnapshot | null = null;
-      if (listManifest && scopes.reservationSnapshot) {
+      const previous = listManifest ? await this.#o.outcomes.get(notice.job) : null;
+      if (previous?.state === "admitted" || previous?.state === "superseded") return { did: "nothing", why: "closed" };
+      let reservation: ReservationSnapshot | null = previous?.reservation ?? null;
+      if (listManifest && !reservation && scopes.reservationSnapshot) {
         const asked = await signJobRead(this.#o.signer, { lane: notice.lane, fact: notice.job }, this.#signing());
         reservation = await scopes.reservationSnapshot(notice.lane, asked);
       }
@@ -197,7 +199,7 @@ export class CheckerService {
     if (record === null) {
       const run = b64url(this.#o.random(16));
       const asked = await signJobRead(this.#o.signer, job, this.#signing());
-      if (await outcomes.start(job.fact, run, asked)) {
+      if (await outcomes.start(job.fact, run, asked, job.snapshot)) {
         // Nothing waits between the write that made the record and this mark.
         const key = flightOf(job);
         this.#flying.add(key);
