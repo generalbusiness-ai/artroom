@@ -34,7 +34,7 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 const NEW_REGISTER = NEWEST["platform:register"]!;
 
@@ -324,14 +324,27 @@ async function createdBy(handle: ScopeHandle, seq: number): Promise<{ n: number;
 
 // ---------------------------------------------------------------- the commands
 
-/**
- * `artroom install <base-url>`: found the register, at the newest version of the register that this command's platform package
- * ships. Its host and namespace are where the Git host keeps the repositories.
- */
-export function install(ctx: Context, service: string, options: { host?: string; namespace?: string } = {}): Promise<Outcome> {
+/** Explicit selection only; omission retains the installed default cohort. */
+export type InstallCohort = "counting-commitments";
+export interface InstallOptions { host?: string; namespace?: string; cohort?: InstallCohort }
+const COUNTING_INSTALL = "counting-commitments" as const;
+function countingSelected(cohort: unknown): boolean {
+  if (cohort === undefined) return false;
+  if (cohort !== COUNTING_INSTALL) stop(usage("--cohort takes exactly counting-commitments; nothing was signed or sent."));
+  return true;
+}
+
+/** Ordinary installs keep their legacy path; selected installs use exact planned custody. */
+export function install(ctx: Context, service: string, options: InstallOptions = {}): Promise<Outcome> {
   return run(async () => {
+    const selected = countingSelected(options.cohort);
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    if (selected) {
+      const plan = await countingPlan(ctx, service, options, before);
+      return executePlannedInstall(ctx, COUNTING_INSTALL, plan);
+    }
+    if (before?.plan?.definition === COUNTING_COHORT.register) return failed("Refused: install-pending. The retained Counting plan must use its original cohort and request; run install --planned.");
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed, key } = await installing(ctx, options, signing(ctx));
     const { answer } = await found(transportOf(ctx, service), signed, NEW_REGISTER);
@@ -365,16 +378,76 @@ const installAttemptOf = (plan: PlannedInstall): Digest => textDigest(canonicali
   service: plan.service, operator: plan.founding.intent.actor, founding: plan.founding, definition: plan.definition, register: plan.register,
 }));
 
+/** Verify exact selected custody without creating a second store or lock. */
+async function readBackCountingConfig(ctx: Context, expected: Config | string): Promise<void> {
+  let matches = false;
+  try {
+    const identity = typeof expected === "string" ? expected : canonicalize(expected);
+    const saved = await ctx.store.config();
+    matches = saved !== null && canonicalize(saved) === identity;
+  } catch { /* no verified selected custody */ }
+  if (!matches) stop(failed("Held: storage of the exact Counting install plan could not be verified. No request was sent by this run; keep the original request."));
+}
+async function saveCountingConfig(ctx: Context, config: Config): Promise<void> {
+  const identity = canonicalize(config);
+  const copy = parseStrict(identity) as Config;
+  try { await ctx.store.save(copy); }
+  catch { stop(failed("Held: storage of the exact Counting install plan failed. No request was sent by this run; keep the original request.")); }
+  await readBackCountingConfig(ctx, identity);
+}
+function retainedCountingPlan(before: Config, service: string, options: InstallOptions): PlannedInstall {
+  const plan = before.plan!;
+  let compatible = false;
+  try {
+    compatible = plan.definition === COUNTING_COHORT.register && before.key === "operator"
+      && plan.service === service && before.service === service
+      && isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
+      && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
+      && Object.keys(plan.founding.intent.expected).length === 0
+      && typeof plan.founding.intent.fields["host"] === "string" && typeof plan.founding.intent.fields["namespace"] === "string"
+      && (options.host === undefined || options.host === plan.founding.intent.fields["host"])
+      && (options.namespace === undefined || options.namespace === plan.founding.intent.fields["namespace"])
+      && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register;
+  } catch { /* malformed retained plan cannot select a new request */ }
+  if (!compatible) stop(failed("Refused: plan-mismatch. The retained install's cohort, service, host or namespace conflicts with this request. The original plan is kept; nothing was signed or sent."));
+  return parseStrict(canonicalize(plan)) as PlannedInstall;
+}
+async function countingPlan(ctx: Context, service: string, options: InstallOptions, before: Config | null): Promise<PlannedInstall> {
+  if (!knownPlatform(COUNTING_COHORT.register, "platform:register")) stop(failed("Unsupported Counting cohort: the exact register pin is not installed. Nothing was signed or sent."));
+  if (before?.plan) {
+    const plan = retainedCountingPlan(before, service, options);
+    await readBackCountingConfig(ctx, before);
+    return plan;
+  }
+  if (before && (before.key !== "operator" || before.repository || before.claim || before.join)) {
+    stop(usage("This config directory already holds another setup or pending request. Use a separate config directory for the Counting install."));
+  }
+  const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
+  const plan: PlannedInstall = { service, definition: COUNTING_COHORT.register, founding: signed, register: registerIdOf(signed, COUNTING_COHORT.register) };
+  await saveCountingConfig(ctx, { ...before, v: 1, service, key: "operator", plan });
+  return plan;
+}
+function plannedLines(plan: PlannedInstall): Outcome {
+  const { host, namespace } = plan.founding.intent.fields;
+  return done(
+    `Planned: register ${plan.register}, under ${plan.definition}, on host ${String(host)}, namespace ${String(namespace)}. The seed's time is ${plan.founding.intent.notAfter}.`,
+    `Set registerScope to ${plan.register} in the Worker's host setting, then run artroom install --planned before ${plan.founding.intent.notAfter}.`,
+  );
+}
+
 /**
  * `artroom install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
  * nothing. The intent lives as long as an intent may, so it can be founded until its `notAfter`, the time printed. The plan is
  * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
- * run `install --planned`. A later plan replaces it.
+ * run `install --planned`. Only a definitely-unsent legacy plan may be replaced; a selected Counting plan stays exact.
  */
-export function planInstall(ctx: Context, service: string, options: { host?: string; namespace?: string } = {}): Promise<Outcome> {
+export function planInstall(ctx: Context, service: string, options: InstallOptions = {}): Promise<Outcome> {
   return run(async () => {
+    const selected = countingSelected(options.cohort);
     const before = await ctx.store.config();
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+    if (selected) return plannedLines(await countingPlan(ctx, service, options, before));
+    if (before?.plan?.definition === COUNTING_COHORT.register) return failed("Refused: install-pending. The retained Counting plan must use its original cohort and request; run install --planned.");
     if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
     const register = registerIdOf(signed, NEW_REGISTER);
@@ -394,58 +467,68 @@ export function planInstall(ctx: Context, service: string, options: { host?: str
  * submission. Exact attempted late recovery retains the original plan and
  * configured-service acknowledgement; it claims no independent history proof.
  */
-export function installPlanned(ctx: Context): Promise<Outcome> {
-  return run(async () => {
-    const before = await ctx.store.config();
-    if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
-    const plan = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
-    const operator = await ctx.store.secret("operator");
-    const now = ctx.now?.() ?? Date.now();
-    if (!knownPlatform(plan.definition, "platform:register")) return failed("Unsupported install provenance: this command cannot serve the plan's exact pinned register version. The pending plan is kept; nothing was sent.");
-    const valid = isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
-      && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
-      && Object.keys(plan.founding.intent.expected).length === 0
-      && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan.founding.intent.actor === keyIdOfSecret(operator)
-      && typeof plan.service === "string" && plan.service === before!.service
-      && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register
-      && timeMs(plan.founding.intent.notAfter)! - now <= PROPOSED_BOUNDS.intentLifetimeSeconds * 1000;
-    if (!valid) {
-      return failed("Refused: plan-mismatch. The saved plan does not match this service, operator key and supported register version. Nothing was sent. Keep the original plan for recovery; do not silently replace it.");
-    }
-    const attempt = installAttemptOf(plan);
-    if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
-    if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
-      return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
-    }
-    const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)
-      && receipt.definition === plan.definition && receipt.intent === intentDigest(plan.founding.intent)
-      && receipt.fact.at.scope === plan.register && receipt.fact.at.kind === "register" && receipt.fact.seq === 0;
-    const prior = plan.acknowledged;
-    if (prior !== undefined && (!prior || prior.status !== "service-acknowledged" || prior.service !== plan.service || !matches(prior.receipt))) {
-      return failed("Held: the retained install acknowledgement does not match the original plan. The plan is kept.");
-    }
-    if (ctx.fetch !== undefined && (ctx.trustedFoundingService?.service !== plan.service || ctx.trustedFoundingService.fetch !== ctx.fetch)) {
-      return failed("Held: this injected transport has no configured-service acknowledgement trust. The plan is kept; no request was sent.");
-    }
-    // The durable marker must precede the first possible request. An exact
-    // attempted replay may recover an accepted genesis after expiry; the
-    // server still refuses an expired founding that was never accepted.
-    if (plan.attempted === undefined) await ctx.store.save({ ...before!, plan: { ...plan, attempted: attempt } });
-    const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
-    const receipt = accepted(answer, null, "Installed").receipt;
-    if (!matches(receipt)) {
-      return failed("Held: the install acknowledgement does not match the planned register's exact identity. The plan is kept.");
-    }
-    if (prior !== undefined && canonicalize(prior.receipt.fact) !== canonicalize(receipt.fact)) {
-      return failed("Held: the install acknowledgement conflicts with the retained accepted fact. The plan is kept.");
-    }
-    // Save acceptance evidence before the final installed config. A lost final
-    // save can recover only the same fact; neither save erases the envelope.
-    const acknowledged: PlannedInstall = { ...plan, attempted: attempt, acknowledged: { status: "service-acknowledged", service: plan.service, receipt } };
-    await ctx.store.save({ ...before!, plan: acknowledged });
-    await ctx.store.save({ ...before!, plan: acknowledged, register: receipt.fact.at });
-    return done(`Installed: register ${receipt.fact.at.scope}, under ${plan.definition}, as planned.`, "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.");
-  });
+export function installPlanned(ctx: Context, options: { cohort?: InstallCohort } = {}): Promise<Outcome> {
+  return run(() => executePlannedInstall(ctx, options.cohort));
+}
+async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expected?: PlannedInstall): Promise<Outcome> {
+  const selected = countingSelected(cohort);
+  const before = await ctx.store.config();
+  if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
+  const kept = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
+  if (selected && kept.definition !== COUNTING_COHORT.register) return failed("Refused: plan-mismatch. The selected cohort conflicts with the original install plan. Nothing was sent; the plan is kept.");
+  if (expected && canonicalize(kept) !== canonicalize(expected)) return failed("Held: the selected install plan changed before delivery. Nothing was sent; restore the original request.");
+  const counting = kept.definition === COUNTING_COHORT.register;
+  const plan = counting ? parseStrict(canonicalize(kept)) as PlannedInstall : kept;
+  const operator = await ctx.store.secret("operator");
+  const now = ctx.now?.() ?? Date.now();
+  if (!knownPlatform(plan.definition, "platform:register")) return failed("Unsupported install provenance: this command cannot serve the plan's exact pinned register version. The pending plan is kept; nothing was sent.");
+  const valid = isSignedIntentShape(plan.founding) && verifySignedIntent(plan.founding)
+    && plan.founding.intent.kind === "install" && plan.founding.intent.to === null && plan.founding.intent.on === null
+    && Object.keys(plan.founding.intent.expected).length === 0
+    && before!.key === "operator" && operator instanceof Uint8Array && operator.length === 32 && plan.founding.intent.actor === keyIdOfSecret(operator)
+    && typeof plan.service === "string" && plan.service === before!.service
+    && isScopeId(plan.register) && registerIdOf(plan.founding, plan.definition) === plan.register
+    && timeMs(plan.founding.intent.notAfter)! - now <= PROPOSED_BOUNDS.intentLifetimeSeconds * 1000;
+  if (!valid) {
+    return failed("Refused: plan-mismatch. The saved plan does not match this service, operator key and supported register version. Nothing was sent. Keep the original plan for recovery; do not silently replace it.");
+  }
+  const attempt = installAttemptOf(plan);
+  if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
+  if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
+    return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
+  }
+  const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)
+    && receipt.definition === plan.definition && receipt.intent === intentDigest(plan.founding.intent)
+    && receipt.fact.at.scope === plan.register && receipt.fact.at.kind === "register" && receipt.fact.seq === 0;
+  const prior = plan.acknowledged;
+  if (prior !== undefined && (!prior || prior.status !== "service-acknowledged" || prior.service !== plan.service || !matches(prior.receipt))) {
+    return failed("Held: the retained install acknowledgement does not match the original plan. The plan is kept.");
+  }
+  if (ctx.fetch !== undefined && (ctx.trustedFoundingService?.service !== plan.service || ctx.trustedFoundingService.fetch !== ctx.fetch)) {
+    return failed("Held: this injected transport has no configured-service acknowledgement trust. The plan is kept; no request was sent.");
+  }
+  // The durable marker must precede the first possible request. An exact
+  // attempted replay may recover an accepted genesis after expiry; the
+  // server still refuses an expired founding that was never accepted.
+  if (plan.attempted === undefined) {
+    const pending: Config = { ...before!, plan: { ...plan, attempted: attempt } };
+    if (counting) await saveCountingConfig(ctx, pending);
+    else await ctx.store.save(pending);
+  } else if (counting) await readBackCountingConfig(ctx, before!);
+  const { answer } = await found(transportOf(ctx, plan.service), plan.founding, plan.definition);
+  const receipt = accepted(answer, null, "Installed").receipt;
+  if (!matches(receipt)) {
+    return failed("Held: the install acknowledgement does not match the planned register's exact identity. The plan is kept.");
+  }
+  if (prior !== undefined && canonicalize(prior.receipt.fact) !== canonicalize(receipt.fact)) {
+    return failed("Held: the install acknowledgement conflicts with the retained accepted fact. The plan is kept.");
+  }
+  // Save acceptance evidence before the final installed config. A lost final
+  // save can recover only the same fact; neither save erases the envelope.
+  const acknowledged: PlannedInstall = { ...plan, attempted: attempt, acknowledged: { status: "service-acknowledged", service: plan.service, receipt } };
+  await ctx.store.save({ ...before!, plan: acknowledged });
+  await ctx.store.save({ ...before!, plan: acknowledged, register: receipt.fact.at });
+  return done(`Installed: register ${receipt.fact.at.scope}, under ${plan.definition}, as planned.`, "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.");
 }
 
 /** Saved envelopes are checked against their actual caller and destination,

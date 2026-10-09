@@ -357,7 +357,7 @@ export function issueSession(
   const { to, actor, notAfter } = asked.request;
   const scope = state.scope();
   // A provisional membership answers no session (section 12.1.3).
-  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2" || pinned.named === "platform:membership@4") && platform(pinned.named))) return no("not-found");
+  if (!scope || scope.status !== "active" || scope.at.kind !== "membership" || !(pinned && (pinned.named === "platform:membership@1" || pinned.named === "platform:membership@2" || pinned.named === "platform:membership@4" || pinned.named === "platform:membership@5") && platform(pinned.named))) return no("not-found");
   if (to.scope !== scope.at.scope || to.inc !== scope.at.inc || to.kind !== scope.at.kind) return no("misaddressed");
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
   if (reading === null || previous === null || reading < previous) return no("clock-behind");
