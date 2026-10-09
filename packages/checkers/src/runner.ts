@@ -9,10 +9,11 @@
  * Here, in this order:
  *
  * 1. Every value is checked inside `checkout`, before it is an argument:
- *    the remote, the directory, and the three object IDs. An end-of-options
+ *    the remote, the directory, the three object IDs and any staged ref. An end-of-options
  *    mark stands before every remote and revision.
- * 2. The commit is fetched by its ID, with its parents, into a new
- *    repository. Git checks every object as it arrives.
+ * 2. The reservation's staged ref, when stated, is fetched and its actual
+ *    target must be the job's commit. Otherwise the commit is fetched by
+ *    its ID. Git checks every arriving object in the private repository.
  * 3. The commit is read by the reviewed reader: its exact type is `commit`,
  *    so a tag does not pass; its bytes hash to its ID; its tree is read as
  *    a tree, and each parent as a commit.
@@ -39,7 +40,7 @@
  * deployment, and none is run (plan question Q8).
  */
 
-import { GitFailure, GitProgram, GitRefusal, READ_BOUNDS, Reader, idOf, isObjectId, objectId, remoteUrl, repositorySource, snapshotFiles, type GitReason, type ObjectId, type ReadBounds } from "@generalbusiness/artroom-git";
+import { GitFailure, GitProgram, GitRefusal, READ_BOUNDS, Reader, idOf, isObjectId, objectId, refName, remoteUrl, repositorySource, snapshotFiles, type GitReason, type ObjectId, type ReadBounds } from "@generalbusiness/artroom-git";
 import type { Configuration, Variable } from "./configuration.ts";
 import type { StepReport } from "./outcome.ts";
 
@@ -53,9 +54,11 @@ export interface CheckoutAsk {
   tree: ObjectId;
   /** The commit's first parent. */
   base: ObjectId;
+  /** The reservation's staged ref. When supplied, only that ref is fetched. */
+  ref?: string;
 }
 
-export type CheckoutReason = GitReason | "bad-directory" | "fetch-failed" | "checkout-failed" | "not-as-fetched";
+export type CheckoutReason = GitReason | "bad-directory" | "fetch-failed" | "checkout-failed" | "not-as-fetched" | "reservation-mismatch";
 export type Checkout = { confirmed: true; commit: ObjectId; tree: ObjectId; parents: readonly ObjectId[] } | { confirmed: false; reason: CheckoutReason };
 
 const text = new TextDecoder();
@@ -69,12 +72,14 @@ export async function checkout(git: GitProgram, ask: CheckoutAsk, bounds?: ReadB
   let commit: ObjectId;
   let tree: ObjectId;
   let base: ObjectId;
+  let ref: string | undefined;
   try {
     // 1. Checked here, whatever a caller checked before.
     remote = remoteUrl(ask.remote, git.transport);
     commit = objectId(ask.commit, "commit");
     tree = objectId(ask.tree, "tree");
     base = objectId(ask.base, "base");
+    ref = ask.ref === undefined ? undefined : refName(ask.ref, "reservation ref");
   } catch (e) {
     return no(e instanceof GitRefusal ? e.reason : "bad-remote");
   }
@@ -82,9 +87,17 @@ export async function checkout(git: GitProgram, ask: CheckoutAsk, bounds?: ReadB
   const at = ["-C", ask.dir];
   try {
     await git.ok("init", ["init", "-q", "--", ask.dir]);
-    // 2. The commit and its parents, by the commit's ID. No tag, no ref and no `FETCH_HEAD` is written: nothing is later read by a name that the remote chose.
-    const fetched = await git.run([...at, "fetch", "-q", "--no-tags", "--no-write-fetch-head", "--depth=2", "--", remote, commit]);
+    // 2. Fetch the exact staged ref when present; otherwise retain the legacy
+    // commit-ID fetch. Ref mode records only this private FETCH_HEAD, not a
+    // public ref, so the actual fetched target can be checked without a race
+    // between a remote ref read and the fetch.
+    const fetched = await git.run([...at, "fetch", "-q", "--no-tags", ...(ref === undefined ? ["--no-write-fetch-head"] : []), "--depth=2", "--", remote, ref ?? commit]);
     if (fetched.code !== 0 || fetched.timedOut) return no("fetch-failed");
+    if (ref !== undefined) {
+      const target = await git.run([...at, "rev-parse", "--verify", "--end-of-options", "FETCH_HEAD"]);
+      if (target.code !== 0 || target.timedOut) return no("fetch-failed");
+      if (text.decode(target.stdout).trim() !== commit) return no("reservation-mismatch");
+    }
     // 3 to 5. Read by the reviewed reader, from what the fetch stored.
     const reader = new Reader(repositorySource(git, ask.dir), bounds);
     const read = await reader.linked(commit, "commit");

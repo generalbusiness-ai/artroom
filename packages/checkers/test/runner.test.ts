@@ -132,6 +132,36 @@ test("reservation checkout refuses an existing repository and a symlink without 
   expect(ran.some((argv) => argv.includes("checkout"))).toBe(false);
 });
 
+// Invariant: a required checker reads the staged reservation itself, and never
+// falls back to a published commit that remains available on the same remote.
+test("the runner fetches only the named reservation ref and refuses an absent or changed staging target even when the expected commit is available", async () => {
+  const ref = "refs/artroom/reservations/checker-1";
+  setRef(remote, ref, f.head);
+  const seen = { argv: [] as string[], env: [] as string[] };
+  const staged = ask({ ref });
+  expect(await checkout(program(seen), staged)).toEqual({ confirmed: true, commit: f.head, tree: f.root, parents: [f.base] });
+  expect(git(staged.dir, ["ls-files"])).toBe("bin/run.sh\nfile");
+  expect(git(staged.dir, ["for-each-ref"])).toBe("");
+  expect(await said({ ref: "refs/artroom/reservations/missing" })).toBe("fetch-failed");
+  // Stage the base, while its child (the expected head) stays published. A
+  // fallback by commit ID would incorrectly accept that child.
+  setRef(remote, ref, f.base);
+  const mismatched = ask({ ref });
+  expect(await checkout(program(), mismatched)).toEqual({ confirmed: false, reason: "reservation-mismatch" });
+  expect(existsSync(join(mismatched.dir, "file"))).toBe(false);
+  // The expected commit can also be included as a fetched parent: merely
+  // finding it among fetched objects does not establish the ref's target.
+  const later = commit(remote, f.root, [f.head]);
+  setRef(remote, ref, later);
+  expect(await said({ ref })).toBe("reservation-mismatch");
+  expect(await said({ ref: "--upload-pack=evil" })).toBe("bad-ref-name");
+  expect(await said({ ref: "refs/artroom/../heads/head" })).toBe("bad-ref-name");
+  setRef(remote, ref, f.head);
+  expect(await said({ ref, tree: f.baseTree })).toBe("tree-mismatch");
+  expect(await said({ ref, base: f.other })).toBe("parent-mismatch");
+  expect(seen.argv.filter((argv) => argv.includes(" fetch "))).toEqual([expect.stringContaining(` -- ${remote} ${ref}`)]);
+});
+
 test("T36, the runner's checkout checks the commit, its tree and its parents against the job, on a real repository: the job's commit with its tree and its base is checked out; another tree, another first parent, no parent, a tag in the commit's place and a parent that is no commit are each not confirmed, and nothing is checked out for them", async () => {
   const seen = { argv: [] as string[], env: [] as string[] };
   const work = ask();
