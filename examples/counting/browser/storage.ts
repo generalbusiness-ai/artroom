@@ -1,5 +1,6 @@
 /** Private, bounded browser custody. Tokens and signing keys are never stored here. */
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
+import type { AttemptJournal } from "./journal.ts";
 import type { ActorIdentity, CustodyLock, PendingReport, PendingStore, PreparedEnvelope } from "./voice-controller.ts";
 const MOST=64*1024, IDENTITIES=32;
 const keyOf=(identity:ActorIdentity)=>digestBytes(utf8(canonicalize(identity)));
@@ -21,4 +22,4 @@ function privateSlot<T>(identity:ActorIdentity,purpose:"voice"|"command") {
 }
 
 export function privatePendingStore(identity:ActorIdentity):PendingStore{return privateSlot<PendingReport>(identity,"voice");}
-export function privateCommandStore(identity:ActorIdentity){return privateSlot<{kind:string;envelope:PreparedEnvelope}>(identity,"command");}
+export function privateCommandStore(identity:ActorIdentity){return privateSlot<{kind:string;envelope:PreparedEnvelope;journal?:AttemptJournal}>(identity,"command");}
