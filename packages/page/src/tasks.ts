@@ -3,6 +3,7 @@ import type { ChangeView, Offered, Room } from "./data.ts";
 import { actionForm, type ActionContext, type Send } from "./actions.ts";
 import { h } from "./view.ts";
 import { issueTaskValues } from "./task-values.ts";
+export { changeTaskContext } from "./task-values.ts";
 
 function missingFields(act: Offered, context: ActionContext, fields: readonly string[]): string[] {
   const fixed = context.defaults?.[act.kind];
@@ -18,21 +19,6 @@ export function nextChangeAction(room: Room, change: ChangeView, offered: readon
   const author = !!room.me && (current?.authors.includes(room.me.handle) || change.author === room.me.handle);
   const order = change.state === "draft" ? ["ready-own", "ready-any"] : author ? ["merge", "request-review-own", "request-review-any"] : ["review-verdict", "merge"];
   return order.map((kind) => offered.find((act) => act.kind === kind && allowed.includes(kind))).find((act) => act !== undefined) ?? null;
-}
-
-/** Technical form values come from the authenticated selected version and membership projections. */
-export function changeTaskContext(change: ChangeView): ActionContext {
-  const selected = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
-  const defaults: NonNullable<ActionContext["defaults"]> = {};
-  if (selected) {
-    for (const kind of ["review-verdict", "request-check"]) defaults[kind] = { fields: { manifest: String(selected.id) } };
-    if (selected.selectedReports !== undefined && selected.selectedReports !== null) defaults["merge"] = { fields: { manifest: String(selected.id), reports: JSON.stringify(selected.selectedReports) } };
-  }
-  if (change.proposal !== undefined) for (const kind of ["ready-own", "ready-any"]) defaults[kind] = { on: change.proposal };
-  const choices: NonNullable<ActionContext["choices"]> = {};
-  if (change.reviewExtents !== undefined && change.reviewExtents !== null) choices["review-verdict"] = { extent: change.reviewExtents };
-  if (change.reviewMembers !== undefined && change.reviewMembers !== null) for (const kind of ["request-review-own", "request-review-any"]) choices[kind] = { requested: change.reviewMembers };
-  return { defaults, choices };
 }
 
 /** Technical requirements must be fixed from authenticated facts, never typed by the person. */
