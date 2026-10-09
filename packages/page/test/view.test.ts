@@ -16,7 +16,7 @@ class Element {
 }
 const document = { createElement: (tag: string) => new Element(tag) };
 afterEach(() => vi.unstubAllGlobals());
-const room = { key: "ed25519:member", me: { handle: "@member", role: "controller" }, reader: {}, directory: "sc_directory" } as unknown as Room;
+const room = { key: "ed25519:member", me: { handle: "@member", role: "controller" }, reader: {}, directory: "sc_directory", session: { service: "https://room.test" } } as unknown as Room;
 const head = { seq: 42, hash: "sha256:recorded-head" };
 const view = (over: Partial<ChangeView> = {}): ChangeView => ({
   scope: "sc_change", definition: "sha256:definition", head, number: 7, title: "Improve guide", body: null, state: "open", author: "@author",
@@ -56,7 +56,7 @@ test("issue and rules keep their subject once and move authority detail into ins
   expect(issue.all("h2")).toEqual([]);
   expect(issue.all("details")[0]!.textContent).toContain("sha256:issue-definition");
   const rules = rulesScreen(room, { scope: "sc_rules", head, revision: 3, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: [{ name: "protected", class: "rules", approvals: 1, approver: "rules.publish", checks: [], patterns: ["AGENTS.md"] }], definitions: [], controllers: ["@controller"] } as never) as unknown as Element;
-  expect(rules.textContent.match(/AGENTS.md/g)).toHaveLength(1);
+  expect(rules.children.filter((child) => typeof child === "string" || child.tagName !== "details").map((child) => typeof child === "string" ? child : child.textContent).join("").match(/AGENTS.md/g)).toHaveLength(1);
   expect(rules.all("details")[0]!.textContent).toContain("rules.publish");
 });
 
@@ -109,4 +109,26 @@ test("source preview preserves the selected manifest identity and treats markup 
   expect(screen.all("a").some((node) => node.attributes["href"] === selected.file.page)).toBe(false);
   expect(render(view()).all("details").some((node) => node.attributes["class"] === "source-preview")).toBe(false);
   expect(render(view({ manifests: [{ ...selected, file: { ...selected.file, content: "" } }] })).all("pre")[0]!.textContent).toBe("");
+});
+
+test("published latest-page navigation is explicitly distinct from selected source preview", () => {
+  const current = view().manifests[0]!;
+  const selected = { ...current, file: { ...current.file!, path: "docs/a page.md", content: "Exact selected source" } };
+  const screen = render(view({ manifests: [selected], merges: [merge({ state: "published" })] }));
+  const page = screen.all("a").find((node) => node.textContent === "Open latest page")!;
+  expect(page.attributes["href"]).toBe("https://room.test/site/sc_directory/HEAD/docs/a%20page.md");
+  expect(screen.all("a").some((node) => node.textContent === "Open page")).toBe(false);
+  const preview = screen.all("details").find((node) => node.attributes["class"] === "source-preview")!;
+  expect(preview.textContent).toContain("Version 12 · docs/a page.md");
+  expect(preview.all("pre")[0]!.textContent).toBe("Exact selected source");
+  expect(render(view({ manifests: [selected] })).all("a").some((node) => node.textContent === "Open latest page")).toBe(false);
+  expect(render(view({ manifests: [{ ...selected, file: { ...selected.file, path: "../outside.md" } }], merges: [merge({ state: "published" })] })).all("a").some((node) => node.textContent === "Open latest page")).toBe(false);
+});
+
+test("editable rules omit the routine readonly copy while preserving full authority in inspection", () => {
+  vi.stubGlobal("document", document);
+  const screen = rulesScreen(room, { scope: "sc_rules", head, revision: 29, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [{ name: "build", required: true }], labels: [], extents: [{ name: "protected", class: "authority", approvals: 1, approver: "rules.publish", checks: ["build"], patterns: ["AGENTS.md"] }], definitions: [], controllers: ["@controller"] } as never, true) as unknown as Element;
+  expect(screen.children.filter((node) => typeof node !== "string" && node.tagName === "section")).toEqual([]);
+  const record = screen.all("details")[0]!;
+  for (const fact of ["29", "protected", "authority", "rules.publish", "AGENTS.md", "build"]) expect(record.textContent).toContain(fact);
 });
