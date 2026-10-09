@@ -18,21 +18,22 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
-import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
+import type { Answer, FieldValue, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { b64url, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
+import { allowedClaim, claimRoom, type ClaimRegister } from "./claim.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
 let roomDraft = "";
 let roomDraftContext = "";
 /** What this browser keeps: the room (no secret of it) and the key. */
-interface Settings { place: Place | null; secret: string }
+interface Settings { place: Place | null; secret: string; register?: ScopeRef }
 let ignoredSavedAddress = false;
 
 function settings(): Settings | null {
@@ -41,7 +42,7 @@ function settings(): Settings | null {
     const kept = JSON.parse(localStorage.getItem(KEPT) ?? "null") as (Settings & { service?: unknown }) | null;
     // Migration only: an obsolete saved address never chooses where this page reads or signs.
     ignoredSavedAddress = !!kept && Object.hasOwn(kept, "service");
-    return kept && typeof kept.secret === "string" ? { place: kept.place ?? null, secret: kept.secret } : null;
+    return kept && typeof kept.secret === "string" ? { place: kept.place ?? null, secret: kept.secret, ...(isScopeRef(kept.register) && kept.register.kind === "register" ? { register: kept.register } : {}) } : null;
   } catch {
     return null;
   }
@@ -75,6 +76,11 @@ const opened = new RoomOpening<Room>();
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
+const claimDrafts = new Map<string, string>();
+const claiming = new Set<string>();
+let roomDialog: HTMLDialogElement | null = null;
+const settingsContext = (kept: Settings): string => JSON.stringify([location.origin, kept.place, kept.secret, kept.register ?? null]);
+let claimOffer: { kept: Settings; configured: ClaimRegister } | undefined;
 function unknownRequest(kind: string): HTMLElement {
   return h("p", { class: "muted" }, `The ${kind} request may have been recorded. Checking status only reads the scope; a changed head does not settle this request. This page does not retain the exact signed request for automatic recovery. Keep this session open and inspect the original request before recovery; do not send a replacement.`);
 }
@@ -85,6 +91,7 @@ async function roomOf(kept: Settings, place: Place): Promise<Room> {
 
 /** Room and account labels come from the recorded read, never prototype fixtures. */
 function shell(destination: Destination, room: Room | null, ...content: HTMLElement[]): HTMLElement[] {
+  const offer = claimOffer;
   const kept = settings();
   const directory = room?.directory ?? kept?.place?.directory;
   const name = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
@@ -97,11 +104,55 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
     room ? h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages") : null);
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
   skip.addEventListener("click", (event) => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
+  const create = () => {
+    const button = h("button", { class: "nav-item", type: "button" }, "Create room");
+    button.addEventListener("click", () => { if (room && offer) claimDialog(room, offer.kept, offer.configured, button); });
+    return button;
+  };
   return [skip,
     h("aside", { class: "rail" }, h("div", { class: "wordmark" }, "Artroom"), roomSwitch(), navigation(),
-      h("div", { class: "rail-bottom" }, h("a", { class: "nav-item", href: "#/settings", ...(destination === "settings" ? { "aria-current": "page" } : {}) }, "Settings"), accountControl())),
-    h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, roomSwitch(), accountControl()), navigation(true)),
+      offer ? create() : null, h("div", { class: "rail-bottom" }, h("a", { class: "nav-item", href: "#/settings", ...(destination === "settings" ? { "aria-current": "page" } : {}) }, "Settings"), accountControl())),
+    h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
+}
+
+function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, opener: HTMLElement): void {
+  const binding = settingsContext(kept);
+  if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+  roomDialog?.close(); roomDialog?.remove();
+  const name = h("input", { name: "name", required: "", maxlength: "256", value: claimDrafts.get(binding) ?? "", autocomplete: "off" }) as HTMLInputElement;
+  const message = h("p", { role: "status", hidden: "" });
+  const submit = h("button", { type: "submit", class: "primary" }, "Create room");
+  const cancel = h("button", { type: "button" }, "Cancel");
+  const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Room name", name), message, h("div", { class: "form-footer" }, cancel, submit));
+  const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-room-title" }, form) as HTMLDialogElement;
+  roomDialog = dialog;
+  const close = () => { claimDrafts.set(binding, name.value); dialog.close(); dialog.remove(); if (roomDialog === dialog) roomDialog = null; opener.focus(); };
+  cancel.addEventListener("click", close);
+  dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
+  name.addEventListener("input", () => { claimDrafts.set(binding, name.value); });
+  if (claiming.has(binding)) { submit.setAttribute("disabled", ""); name.setAttribute("disabled", ""); }
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (claiming.has(binding) || !name.value.trim() || settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+    claiming.add(binding); claimDrafts.set(binding, name.value); submit.setAttribute("disabled", ""); name.setAttribute("disabled", "");
+    message.textContent = "Creating room"; message.removeAttribute("hidden");
+    void (async () => {
+      try {
+        const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle });
+        if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+        if (result.repository) {
+          keep({ ...kept, place: { directory: result.repository.directory.scope, membership: result.repository.membership } });
+          opened.clear(); close(); location.hash = "#/"; await draw();
+        } else {
+          message.textContent = result.outcome.lines.join(" "); submit.textContent = result.pending ? "Resume creation" : "Create room";
+          if (result.pending) name.setAttribute("disabled", ""); else name.removeAttribute("disabled");
+        }
+      } catch (error) { message.textContent = error instanceof Error ? error.message : "Creation could not be confirmed. Resume with the saved request."; submit.textContent = "Resume creation"; }
+      finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
+    })();
+  });
+  root().append(dialog); dialog.showModal(); name.focus();
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
@@ -152,7 +203,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
 
 function settingsScreen(): HTMLElement {
   const kept = settings();
-  const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null]);
+  const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null, kept?.register ?? null]);
   if (roomDraftContext !== context) { roomDraft = ""; roomDraftContext = context; }
   const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
   const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
@@ -170,7 +221,15 @@ function settingsScreen(): HTMLElement {
     const typed = (room as HTMLTextAreaElement).value.trim();
     const place = typed ? placeOf(typed) : kept?.place ?? null;
     if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
-    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "") };
+    let register = kept?.register;
+    if (typed && !typed.startsWith("artroom-invite:")) {
+      try {
+        const parsed = JSON.parse(typed) as { register?: unknown };
+        if (parsed.register !== undefined && (!isScopeRef(parsed.register) || parsed.register.kind !== "register")) { tell(false, "The register reference in this config is invalid."); return null; }
+        register = parsed.register as ScopeRef | undefined;
+      } catch { tell(false, "The config could not be read."); return null; }
+    } else if (typed) register = undefined;
+    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}) };
   };
   const save = (next: Settings) => {
     keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
@@ -180,7 +239,7 @@ function settingsScreen(): HTMLElement {
   };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
   room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret]); keep(next); opened.clear(); void draw(); } });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); keep(next); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {
@@ -205,13 +264,24 @@ function settingsScreen(): HTMLElement {
 }
 
 async function draw(focus = false): Promise<void> {
-  const show = showFor(++drawing, focus);
+  const currentDraw = ++drawing;
+  const show = showFor(currentDraw, focus);
+  claimOffer = undefined;
+  roomDialog?.close(); roomDialog?.remove(); roomDialog = null;
   const route = routeOf(location.hash);
   const kept = settings();
   if (route.destination === "settings" || !kept || !kept.place || ignoredSavedAddress) return show(...shell("settings", null, settingsScreen()));
   let room: Room | null = null;
   try {
     room = await roomOf(kept, kept.place);
+    if (kept.register && room.me?.handle && typeof navigator !== "undefined" && navigator.locks && typeof HTMLDialogElement !== "undefined") {
+      try {
+        const configured = await allowedClaim(sessionOf(kept), kept.register);
+        if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
+        claimOffer = { kept, configured };
+      } catch { /* No founding control is offered without a current native eligibility read. */ }
+    }
+    if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     const { destination, scope } = route;
     const loaded = room;
     const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
