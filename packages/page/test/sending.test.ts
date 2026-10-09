@@ -19,7 +19,8 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
   const root = new Element("div");
-  let context = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
+  type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
+  let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
   const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: null };
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>) => void;
@@ -33,14 +34,15 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     attempt.resolve();
     return new Promise<never>((_resolve, reject) => { rejects.push(reject); });
   });
+  const issueRead = vi.fn(async () => ({ state: "closed", intent: 0 }));
   // The scripted reads are resolved promises. Drain their finite microtask
   // chain before checking that a forbidden callback created no second act.
   const drain = async () => { for (let turn = 0; turn < 20; turn++) await Promise.resolve(); };
-  vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key" }));
+  vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key", isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value }));
   vi.doMock("../src/data.ts", () => ({
     act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: ["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own"].map((kind) => ({ kind, fields: [] })), hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
-    openRoom: async () => room, listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
-    joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: async () => ({ state: "closed", intent: 0 }), loadRules: vi.fn(),
+    openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
+    joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: vi.fn(),
   }));
   vi.doMock("../src/view.ts", () => ({
     h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.children = children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]; return el; },
@@ -111,6 +113,16 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(panels.at(-1)?.pending).toBe(false);
     expect(panels.at(-1)?.uncertain).toBe(false);
     expect(alert).toHaveBeenCalledWith("The room or key changed before submission. Nothing was sent.");
+    const reading = gate(), releaseRead = gate();
+    issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0 }; });
+    location.hash = "#/issue/delayed";
+    redraw(); await reading.promise;
+    context = { ...context, place: { ...context.place, directory: "newest-room" } };
+    context.label = { text: "Newest local label", place: context.place };
+    rendered = gate(); releaseRead.resolve(); await rendered.promise;
+    expect(root.textContent).toContain("Newest local label");
+    expect(root.textContent).toContain("Room est-room");
+    expect(root.textContent).not.toContain("Room ther-roo");
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion

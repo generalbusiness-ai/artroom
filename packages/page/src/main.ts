@@ -111,7 +111,7 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const kept = settings();
   const directory = room?.directory ?? kept?.place?.directory;
   const recordedName = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
-  const local = kept?.label?.text;
+  const local = room && kept ? labelFor(kept.label, { directory: room.directory, membership: room.membership }, kept.register)?.text : undefined;
   const name = local || recordedName;
   const account = room?.me?.handle || "Your key";
   const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}` }, h("span", { class: "room-name" }, h("span", local ? { title: "Local room label" } : {}, name), local ? h("span", { class: "room-recorded-name", title: "Recorded repository name" }, recordedName) : null), h("span", { "aria-hidden": "true" }, "⌄"));
@@ -294,11 +294,18 @@ function settingsScreen(): HTMLElement {
 
 async function draw(focus = false): Promise<void> {
   const currentDraw = ++drawing;
-  const show = showFor(currentDraw, focus);
   claimOffer = undefined;
   roomDialog?.close(); roomDialog?.remove(); roomDialog = null;
   const route = routeOf(location.hash);
   const kept = settings();
+  const publish = showFor(currentDraw, focus);
+  const originalContext = kept ? settingsContext(kept) : null;
+  const show = (...children: HTMLElement[]) => {
+    const current = settings();
+    if (currentDraw !== drawing) return;
+    if ((current ? settingsContext(current) : null) !== originalContext) { void draw(focus); return; }
+    publish(...children);
+  };
   if (route.destination === "settings" || !kept || !kept.place || ignoredSavedAddress) return show(...shell("settings", null, settingsScreen()));
   let room: Room | null = null;
   try {
