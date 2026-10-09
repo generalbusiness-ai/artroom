@@ -9,6 +9,12 @@ wall-clock time. Scope IDs are shown as placeholders of the printed shape
 (`sc_<directory>`, `key_<founder>`); hashes, times and entry numbers are
 the run's own and differ on every run.
 
+Shot 13 was separately corrected from the live GitHub run on 2026-10-08,
+started at 23:45:20.994Z with runner source `705cb8d7`. All 26 runner
+shots matched. Its complete observed lines are retained in
+[the GitHub transcript](2026-10-08-demo-github-transcript.md). The earlier
+own-host observations in shots 3 to 12 keep their original subject.
+
 2026-10-07. A shot list for the recording of plan 024 (gate of Monday
 2026-10-13), written by a cloud builder from the documents named below.
 It is a document only: no source changed. Five to seven minutes of screen
@@ -28,14 +34,13 @@ uses plan 019, the nouns, verbs and invariants of plan 025, and the phrase
 
 Labels used in the shot list:
 
-- **Live**: observed on the deployment by the demo runner on 2026-10-08
-  (shots 3 to 12), or, for shot 13, by the local colleague on 2026-10-07.
+- **Live**: observed on the deployment by the demo runner on 2026-10-08,
+  with separate own-host and GitHub runs for shots 3 to 12 and shot 13.
   The expected lines are copied from the runner's transcript. IDs, times
   and hashes differ on every run.
-- **To be confirmed**: not run by the runner. Shot 13's lines are in the
-  form of the 2026-10-07 live runs, and section 7 keeps the gaps as they
-  were found on 2026-10-07, with a note on what the 2026-10-08 run
-  settled.
+- **To be confirmed**: not run by the runner. Section 7 keeps the gaps as
+  they were found on 2026-10-07, with notes on what the 2026-10-08 runs
+  settled. HTTP page reads are not browser or device acceptance.
 
 ## 1. The shape
 
@@ -408,26 +413,48 @@ eight letters in the captions, as the command line prints them in full.
 ### Shot 13. GitHub as the linked host (5:15 to 5:40). Live
 
 - **On screen**: a fresh terminal, a second register, then the
-  organization's repository list on GitHub.
-- **Typed**:
+  organization's repository list on GitHub. This is the separate
+  GitHub-backed room from the 2026-10-08 observed run.
+- **Typed**, with the operator ready for the pin between the two install
+  steps:
 
   ```
-  $ artroom install <base-url> --host github.com --namespace <organization>
-  $ artroom claim demo-github --handle @hugh
+  $ artroom install --plan https://artroom-scope.inguz.workers.dev --host github.com --namespace generalbusiness-ai
   ```
 
-- **Expected**, in the form of the live runs of 08:27 and 09:23 (their
-  full lines are not in the documents I read):
+- **Observed**:
 
   ```
-  Installed: register sc_....
-  Claimed demo-github: directory sc_..., membership sc_..., rules sc_..., destination sc_...; each created and confirmed.
-  You are @hugh, an admin, on key key_...; your inbox is sc_....
+  Planned: register sc_shtel2ujlpw4md4c3ke7uvegoacjuzbp7mn3ttdcwvwokwkwo72a, under platform:register@2, on host github.com, namespace generalbusiness-ai. The seed's time is 2026-10-08T23:59:21Z.
+  Set registerScope to sc_shtel2ujlpw4md4c3ke7uvegoacjuzbp7mn3ttdcwvwokwkwo72a in the Worker's host setting, then run artroom install --planned before 2026-10-08T23:59:21Z.
   ```
 
-  and on GitHub, a new repository with one commit, "Found this
-  repository."
-- **Said**: "The same room can keep its repository on GitHub, through
+  The operator pins that exact register in `GITHUB_APP_CONFIG`, preserving
+  the other fields and secrets. The runner pauses for confirmation; it
+  does not inspect the deployment's setting. Then type:
+
+  ```
+  $ artroom install --planned
+  Installed: register sc_shtel2ujlpw4md4c3ke7uvegoacjuzbp7mn3ttdcwvwokwkwo72a, under platform:register@2, as planned.
+  Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.
+  $ artroom claim rehearsal-github-20261008-1945 --handle @hugh
+  Claimed rehearsal-github-20261008-1945: directory sc_6odmdk3z7ln3rpyrnu66t2ts7mgqv4rtlupshkjsts2adkwdcxra, membership sc_fln4dy6prpwt65olchwdyfrl5x5mz7t7horj2e3synuu2mxazeva, rules sc_mo2tabx7vy4koblfedkzshjxryduujrzpbzwqegdb5zetupe36wa, destination sc_lv4wyiopxa7xzpcb7brnjzz7wyrrnokugcvgnad2kisxxdunvyqa; each created and confirmed.
+  Definitions: platform:directory@2, platform:membership@2, platform:rules@2, platform:destination@2.
+  You are @hugh, an admin, on key key_YMJPgNXTBrlEEC5s4qB09BPnsuSg02kojJ-ubY-x2sg; your inbox is sc_sktnjn4fmzhhjd636qifmuu3x6rbatrr2u22f2l53rwrri6tquaa.
+  ```
+
+  At claim, the repository's founding commit is `220e521`, "Found this
+  repository." The member's subsequent observed clone prints:
+
+  ```
+  Remote URL: https://github.com/generalbusiness-ai/6odmdk3z7ln3rpyrnu66t2ts7mgqv4rtlupshkjsts2adkwdcxra-1.git
+  ```
+
+  The full 26-shot run later publishes two changes. The one-commit
+  description applies before those publications, not to its final head.
+  This recording may stop after the founding view; the full observed run
+  is retained as evidence for the linked host.
+- **Said**: "A room can keep its repository on GitHub, through
   the organization's App. Same acts, same rules, same record."
 
 ### Shot 14. The jam, as the sting (5:40 to 6:00). Optional
