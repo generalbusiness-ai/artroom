@@ -49,9 +49,14 @@ export interface Stage {
   log(directory: string): Promise<Outcome>;
   /** The wall clock, in milliseconds. The default is `Date.now`. */
   now?(): number;
+  /** Before a runnable shot starts, its secrets cut. Awaited before any command or read and before its timer. */
+  beforeShot?(shot: NextShot): Promise<void>;
   /** Told each shot as it ends, its secrets cut: for a person who watches the run. */
   told?(shot: Taken): void;
 }
+
+/** What is about to run. Invitation links remain cut on the recording screen. */
+export interface NextShot { n: number; title: string; scene: string; who: string; typed: string }
 
 /** What one shot did. */
 export interface Taken {
@@ -112,6 +117,10 @@ interface Shot {
 const slash = (service: string) => service.replace(/\/+$/, "");
 const bytes = (name: string) => FILES[name]!.length;
 export const INSTALL_ACKNOWLEDGEMENT = "Service-acknowledged identity recovery. The original plan and receipt are retained for later history verification.";
+
+/** The setting the operator must pin before the planned install. */
+export const registerSetting = (host: string): string => host === "github.com" ? "GITHUB_APP_CONFIG.registerScope"
+  : host === "artifacts" ? "ARTIFACTS_CONFIG.registerScope" : "registerScope in the Git host's setting";
 
 /**
  * The shots. An expected line is a template: `<name>` stands for any text without a space and keeps it under that name,
@@ -380,20 +389,22 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const list = shots(stage);
   let identityStop: string | null = null;
   for (const [i, shot] of list.entries()) {
-    const started = now();
     const expected = { code: shot.expect.code, lines: shot.expect.lines(v) };
-    const base = { n: i + 1, title: shot.title, scene: shot.scene, who: `${shot.who} (${HANDLES[shot.who]})`, at: new Date(started).toISOString(), expected };
+    const base = { n: i + 1, title: shot.title, scene: shot.scene, who: `${shot.who} (${HANDLES[shot.who]})`, expected };
     let words: string[];
     try {
       if (identityStop !== null) throw new Missing(identityStop);
       words = filled(shot.typed(v), v);
     } catch (error) {
       if (!(error instanceof Missing)) throw error;
-      const skipped: Taken = { ...base, typed: "(not run)", code: -1, lines: [], seconds: 0, match: false, why: `not run: ${error.message}`, note: null };
+      const skipped: Taken = { ...base, at: new Date(now()).toISOString(), typed: "(not run)", code: -1, lines: [], seconds: 0, match: false, why: `not run: ${error.message}`, note: null };
       taken.push(skipped);
       stage.told?.(skipped);
       continue;
     }
+    const typed = withheld(words.map(quoted).join(" "));
+    await stage.beforeShot?.({ n: base.n, title: base.title, scene: base.scene, who: base.who, typed });
+    const started = now();
     let outcome: Outcome;
     const shows = expected.lines.find((line) => line.startsWith("Shows: \""))?.slice(8, -1) ?? null;
     if (words[0] === "GET") outcome = seen(await stage.get(words[1]!), shows);
@@ -425,7 +436,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     }
     const note = shot.after && why === null ? await shot.after(v, stage) : null;
     const done: Taken = {
-      ...base, typed: withheld(words.map(quoted).join(" ")), code: outcome.code, lines: outcome.lines.map(withheld),
+      ...base, at: new Date(started).toISOString(), typed, code: outcome.code, lines: outcome.lines.map(withheld),
       seconds: Math.round((now() - started) / 100) / 10, match: why === null, why, note,
     };
     taken.push(done);

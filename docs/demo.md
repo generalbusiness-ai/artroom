@@ -57,12 +57,38 @@ node --import tsx --no-warnings scripts/demo-run.ts \
    `founder`, `member` and `maintainer` in it, one config directory each,
    and `work`, which holds the local files and the member's clone.
 2. After shot 1 it prints the planned register ID and waits. Set
-   `registerScope` to that ID in the Git host's setting
+   `ARTIFACTS_CONFIG.registerScope` to that ID for `--host artifacts`, or
+   `GITHUB_APP_CONFIG.registerScope` for `--host github.com`
    ([deploy.md](deploy.md), "Plan"), then press Enter. The plan can be
-   founded for 14 minutes. With `--setting-set` the runner does not wait.
+   founded for 14 minutes. Preserve the other setting fields and secrets,
+   including `DEPLOYMENT`. The runner records the operator's Enter as a
+   confirmation; it does not inspect the deployment's setting.
 3. It prints each shot as it ends, with "matches" or what differs.
 4. It writes `transcript.md` and `room.json` in the output directory, and
    exits 0 when every shot matches and 1 otherwise.
+
+For the GitHub adapter, run the same shots and transcript format:
+
+```
+node --import tsx --no-warnings scripts/demo-run.ts \
+  https://<service> --host github.com --namespace generalbusiness-ai \
+  --scratch /tmp/rehearsal-github-1 --out /tmp/rehearsal-github-1/out
+```
+
+Arrange the pin step with the deployment operator before starting. The
+App installation must cover the new repository; the creation credential
+must be current. The GitHub adapter supports all 26 shots, including
+the member's one-hour read token, clone, publications and site reads, so
+none is skipped for this host. A missing setting, expired credential or
+unexpected provider answer is a mismatch to investigate, not an
+unsupported shot to hide. The run creates a repository and keeps it;
+the runner does not delete repositories or revoke the deployment's
+credentials afterwards.
+
+`--setting-set` skips the pause only. Shot 1 still makes a fresh signed
+plan and prints its register ID; this flag neither uses an earlier plan
+nor proves that its register is pinned. Use the interactive pause for
+the coordinated GitHub run.
 
 `--name <room>` names the room; the default is `rehearsal-` and the month,
 day, hour and minute. The runner prints no secret: an invitation link is
@@ -70,6 +96,21 @@ cut to its first eight letters on screen and in the transcript, the read
 token is never printed by `artroom clone`, and keys are shown by their
 key IDs only. The keys stay in the config directories, readable only by
 their owner.
+
+## Recording
+
+Add `--pace` to either deployment command above. Before each runnable
+shot, the runner prints its number, title, script shot, person and the
+command about to run, then waits for Enter. Narrate the shot and press
+Enter when the recorder is ready. Invitation links remain cut on screen.
+The separate register-setting pause after shot 1 still applies; finish
+pinning and installing within the plan's printed expiry.
+
+The transcript keeps its existing format. The pause before a shot is
+outside that shot's duration. At the end, the terminal prints the
+observed total elapsed seconds, including operator waits, setup and
+capture observations, and separately the sum of recorded shot seconds.
+The sum is not the elapsed time of the whole run.
 
 ## What the transcript shows
 
@@ -133,8 +174,9 @@ answers the browser with the Worker's recorded answers, as
 
 `packages/lanes/test/demo.scope.test.ts` runs the same rehearsal on the
 test Worker, on real scopes, and asserts that every row of the table says
-"yes" and that the transcript holds no secret. Its stand-ins are the Git
-host (`OwnGit`), `git` and the scheduler; the operator's setting is the
-test wiring the stand-in host to the planned register. A second test in
-the file is the recorder for `demo-captures.ts --recorded`; it runs only
+"yes" and that the transcript holds no secret. It covers both host paths
+through their production wiring. Its stand-ins are the Git host (`OwnGit`
+or GitHub's `Hub`), `git` and the scheduler; the operator's setting is the
+test wiring the stand-in host to the planned register. The recorder in
+the file serves `demo-captures.ts --recorded`; it runs only
 with `DEMO_RECORD=1`, and is skipped by name otherwise.
