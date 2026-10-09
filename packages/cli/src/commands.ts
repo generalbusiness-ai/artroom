@@ -1402,44 +1402,76 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
   const shape = (await definitionOf(D, await summaryOf(D))).shape;
   const fields = { definition: change.digest, title, draft: false };
   const signed = await signedIntent(signer, { to: repository.directory, kind: "open-pr", fields, expected: expectedOf(shape.acts["open-pr"]!, (await summaryOf(D)).items, null, fields) }, signing(ctx));
-  const opened = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact.seq;
-  const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed("The directory opened no change lane."));
-  const L = await handleOf(ctx, config, lane, reader);
-  await waitFor(ctx, () => [D.scope, lane], () => laneActive(L, `${D.scope}:${opened}`), `the change ${lane}`);
-  const C = await laneOf(ctx, config, lane, reader, change.declared);
-  const ask = await C.intent(signer, "ask-rules" as never, { on: 0, fields: {}, expected: expectedOf(change.declared.acts["ask-rules"] as unknown as ActShape, (await summaryOf(L)).items, 0, {}) } as never, signing(ctx));
-  accepted(await C.submit(ask.signed, [], ask.beside), lane, "Asked");
-  await waitFor(ctx, () => [lane, repository.rules], async () => (await summaryOf(L)).items.some((item) => item.type === "rules" && typeof item.values["revision"] === "number") ? true : null, `the rules of ${lane}`);
-  const sources: { path: string; entry: FactRef; digest: Digest }[] = [];
-  for (const file of contents) {
-    const fields = { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content };
-    const made = await C.intent(signer, "propose-file" as never, { on: null, fields, expected: expectedOf(change.declared.acts["propose-file"] as unknown as ActShape, (await summaryOf(L)).items, null, fields) } as never, signing(ctx));
+  const opening = accepted(await D.submit(signed, [], { values: [change.bytes] }), D.scope, "Opened").receipt.fact;
+  const opened = opening.seq;
+  let knownLane: ScopeId | null = null;
+  const known: { label: string; fact: FactRef }[] = [{ label: "Opening", fact: opening }];
+  let phase = "discovering the opened change lane";
+  let currentRequest: { kind: string; digest: Digest; status: "outcome unknown" | "refused" | "mismatch" } | null = null;
+  const partial = (outcome: Outcome): Outcome => outcome.code === 0 ? outcome : { ...outcome, lines: [...outcome.lines,
+    ...known.map(({ label, fact }) => `Recorded ${label.toLowerCase()}: ${fact.at.scope}:${fact.seq}, hash ${fact.hash}.`),
+    ...(knownLane ? [`Known change lane: ${knownLane}.`] : []),
+    `Interrupted while ${phase}. ${currentRequest ? `${currentRequest.kind} request ${currentRequest.digest}: ${currentRequest.status}.` : "No current mutation request was submitted in this phase."}`,
+    `Inspect artroom show ${opening.at.scope}:${opening.seq}${knownLane ? ` and artroom log ${knownLane}` : ` and artroom log ${opening.at.scope}`} before another mutation. A fresh propose or edit opens another change lane and signs new requests. No mutation was retried; recovery requires any uncertain request's original signed envelope, which this command does not retain.`,
+  ] };
+  try {
+    const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed("The directory opened no change lane."));
+    knownLane = lane;
+    const L = await handleOf(ctx, config, lane, reader);
+    await waitFor(ctx, () => [D.scope, lane], () => laneActive(L, `${D.scope}:${opened}`), `the change ${lane}`);
+    const C = await laneOf(ctx, config, lane, reader, change.declared);
+    phase = "preparing the rules request";
+    const ask = await C.intent(signer, "ask-rules" as never, { on: 0, fields: {}, expected: expectedOf(change.declared.acts["ask-rules"] as unknown as ActShape, (await summaryOf(L)).items, 0, {}) } as never, signing(ctx));
+    currentRequest = { kind: "ask-rules", digest: intentDigest(ask.signed.intent), status: "outcome unknown" }; phase = "submitting the rules request";
+    const askedRules = await C.submit(ask.signed, [], ask.beside);
+    if (askedRules.answer === "refused" || askedRules.answer === "mismatch") currentRequest.status = askedRules.answer;
+    known.push({ label: "Rules request", fact: accepted(askedRules, lane, "Asked").receipt.fact });
+    currentRequest = null; phase = "reading the requested rules";
+    await waitFor(ctx, () => [lane, repository.rules], async () => (await summaryOf(L)).items.some((item) => item.type === "rules" && typeof item.values["revision"] === "number") ? true : null, `the rules of ${lane}`);
+    const sources: { path: string; entry: FactRef; digest: Digest }[] = [];
+    for (const file of contents) {
+      currentRequest = null; phase = `preparing source ${file.path}`;
+      const fields = { base, path: file.path, digest: digestBytes(file.bytes), size: file.bytes.length, content: file.content };
+      const made = await C.intent(signer, "propose-file" as never, { on: null, fields, expected: expectedOf(change.declared.acts["propose-file"] as unknown as ActShape, (await summaryOf(L)).items, null, fields) } as never, signing(ctx));
+      currentRequest = { kind: "propose-file", digest: intentDigest(made.signed.intent), status: "outcome unknown" }; phase = `submitting source ${file.path}`;
+      const answer = await C.submit(made.signed, [], made.beside);
+      if (answer.answer === "refused" || answer.answer === "mismatch") currentRequest.status = answer.answer;
+      if (answer.answer !== "accepted") return partial(answered(lane, answer, "Proposed"));
+      sources.push({ path: file.path, entry: answer.receipt.fact, digest: fields.digest });
+      known.push({ label: `Source ${file.path}`, fact: answer.receipt.fact }); currentRequest = null;
+    }
+    phase = "preparing the manifest";
+    const manifest = { base, files: sources };
+    const made = await C.intent(signer, "propose-manifest" as never, { on: null, fields: manifest, expected: expectedOf(change.declared.acts["propose-manifest"] as unknown as ActShape, (await summaryOf(L)).items, null, manifest) } as never, signing(ctx));
+    currentRequest = { kind: "propose-manifest", digest: intentDigest(made.signed.intent), status: "outcome unknown" }; phase = "submitting the manifest";
     const answer = await C.submit(made.signed, [], made.beside);
-    if (answer.answer !== "accepted") return answered(lane, answer, "Proposed");
-    sources.push({ path: file.path, entry: answer.receipt.fact, digest: fields.digest });
+    if (answer.answer === "refused" || answer.answer === "mismatch") currentRequest.status = answer.answer;
+    if (answer.answer !== "accepted") return partial(answered(lane, answer, "Proposed"));
+    known.push({ label: "Manifest", fact: answer.receipt.fact }); currentRequest = null;
+    const proposal = options.edit ? `Proposed ${files[0]!.path} (${files[0]!.bytes.length} bytes) as change ${lane}, version ${answer.receipt.fact.seq}.` : `Proposed ${files.length} files as change ${lane}, version ${answer.receipt.fact.seq}.`;
+    const lines = [proposal];
+    if (options.closes) {
+      const linked = await run(async () => {
+        try { return await linking(ctx, config, lane, reader, change.declared, options.closes!); }
+        catch (error) {
+          if (error instanceof TransportError) return failed("Linking could not be confirmed: a required request or reply was unavailable.");
+          throw error;
+        }
+      });
+      if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
+        `Inspect artroom show ${lane}:${answer.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+      ] };
+      lines.push(...linked.lines);
+    }
+    const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
+    const page = options.edit && outcome.code === 0 && outcome.lines[0]?.startsWith("Published:") ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${files[0]!.path.split("/").map(encodeURIComponent).join("/")}`] : [];
+    return { ...outcome, lines: [...lines, ...outcome.lines, ...page] };
+  } catch (error) {
+    if (error instanceof Stop) return partial(error.outcome);
+    if (error instanceof TransportError) return partial(failed("The current request or read could not be confirmed; known earlier work remains recorded."));
+    if (error instanceof SourceError) return partial(failed(error.message));
+    throw error;
   }
-  const manifest = { base, files: sources };
-  const made = await C.intent(signer, "propose-manifest" as never, { on: null, fields: manifest, expected: expectedOf(change.declared.acts["propose-manifest"] as unknown as ActShape, (await summaryOf(L)).items, null, manifest) } as never, signing(ctx));
-  const answer = await C.submit(made.signed, [], made.beside);
-  if (answer.answer !== "accepted") return answered(lane, answer, "Proposed");
-  const proposal = options.edit ? `Proposed ${files[0]!.path} (${files[0]!.bytes.length} bytes) as change ${lane}, version ${answer.receipt.fact.seq}.` : `Proposed ${files.length} files as change ${lane}, version ${answer.receipt.fact.seq}.`;
-  const lines = [proposal];
-  if (options.closes) {
-    const linked = await run(async () => {
-      try { return await linking(ctx, config, lane, reader, change.declared, options.closes!); }
-      catch (error) {
-        if (error instanceof TransportError) return failed("Linking could not be confirmed: a required request or reply was unavailable.");
-        throw error;
-      }
-    });
-    if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
-      `Inspect artroom show ${lane}:${answer.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
-    ] };
-    lines.push(...linked.lines);
-  }
-  const outcome = await run(() => merging(ctx, config, lane, reader, change.declared));
-  const page = options.edit && outcome.code === 0 && outcome.lines[0]?.startsWith("Published:") ? [`Page: ${config.service.replace(/\/+$/, "")}/site/${repository.directory.scope}/HEAD/${files[0]!.path.split("/").map(encodeURIComponent).join("/")}`] : [];
-  return { ...outcome, lines: [...lines, ...outcome.lines, ...page] };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -100,7 +100,13 @@ test("confirmed ref removal survives an older refused deletion while token custo
   try { await story(ownHost(), wired, false, false, true, false, false, undefined, "token-unknown"); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false): Promise<void> {
+test.each(["source-reply", "source-unavailable", "source-refused", "source-mismatch", "manifest-reply", "rules-read"] as const)("interrupted manifest proposal retains known partial work after %s (real scopes; transport fault, host and scheduler STAND-INs)", async (fault) => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, fault); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read"): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -169,6 +175,50 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
   const first = host.refs.get("refs/heads/main")!;
+  if (proposalFault) {
+    files["docs/two.md"] = utf8("# Second source\n");
+    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    const accepted: { kind: string; path?: string; fact: FactRef }[] = [];
+    let sourceRequests = 0;
+    const faultFetch = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      const intent = init?.method === "POST" && path.endsWith("/acts") ? (JSON.parse(String(init.body)) as { signed?: { intent?: { kind?: string; fields?: { path?: string } } } }).signed?.intent : undefined;
+      if (proposalFault === "rules-read" && accepted.some((entry) => entry.kind === "ask-rules") && path === `/v1/scopes/${accepted.find((entry) => entry.kind === "ask-rules")!.fact.at.scope}`) throw new Error("TEST private partial-proposal transport detail");
+      if (intent?.kind === "propose-file") {
+        sourceRequests++;
+        if (sourceRequests === 2 && proposalFault === "source-unavailable") return Response.json({ answer: "unavailable", reason: "busy" });
+        if (sourceRequests === 2 && proposalFault === "source-mismatch") return Response.json({ answer: "mismatch", reason: "idempotency-mismatch" });
+        if (sourceRequests === 2 && proposalFault === "source-refused") return Response.json({ answer: "refused", reason: "bad-field", name: "test-refusal", judgedAt: { seq: 99, hash: textDigest("fixture refusal") } });
+      }
+      const response = await routed(url, init);
+      if (intent?.kind) {
+        const answer = await response.clone().json() as { answer: string; receipt?: { fact: FactRef } };
+        if (answer.answer === "accepted") accepted.push({ kind: intent.kind, ...(intent.fields?.path ? { path: intent.fields.path } : {}), fact: answer.receipt!.fact });
+      }
+      if (sourceRequests === 2 && intent?.kind === "propose-file" && proposalFault === "source-reply" || intent?.kind === "propose-manifest" && proposalFault === "manifest-reply") throw new Error("TEST private partial-proposal transport detail");
+      return response;
+    }) as unknown as Fetch;
+    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["docs/two.md"]! }] }) };
+    const result = await command({ ...founder, fetch: faultFetch }, ["propose", "partial"]);
+    expect(result.code, result.lines.join("\n")).toBe(1);
+    expect(accepted.some((entry) => entry.kind === "open-pr"), result.lines.join("\n")).toBe(true);
+    const opening = accepted.find((entry) => entry.kind === "open-pr")!.fact;
+    const rules = accepted.find((entry) => entry.kind === "ask-rules")!.fact;
+    expect(result.lines).toContain(`Recorded opening: ${opening.at.scope}:${opening.seq}, hash ${opening.hash}.`);
+    expect(result.lines).toContain(`Recorded rules request: ${rules.at.scope}:${rules.seq}, hash ${rules.hash}.`);
+    if (proposalFault !== "rules-read") {
+      const source = accepted.find((entry) => entry.kind === "propose-file")!;
+      expect(result.lines).toContain(`Recorded source ${source.path}: ${source.fact.at.scope}:${source.fact.seq}, hash ${source.fact.hash}.`);
+    }
+    expect(result.lines).toContain(`Known change lane: ${rules.at.scope}.`);
+    expect(result.lines.at(-1)).toContain("A fresh propose or edit opens another change lane and signs new requests");
+    expect(result.lines.join("\n")).toContain(proposalFault === "source-refused" ? ": refused." : proposalFault === "source-mismatch" ? ": mismatch." : proposalFault === "rules-read" ? "No current mutation request was submitted in this phase." : ": outcome unknown.");
+    expect(result.lines.join("\n")).not.toContain("TEST private");
+    if (proposalFault === "source-refused") expect(result.lines[0]).toContain("test-refusal");
+    expect(host.refs.get("refs/heads/main")).toBe(first);
+    return;
+  }
   if (linkFault) {
     files["issue-demo.json"] = utf8(canonicalize(issueDemo));
     ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
