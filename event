@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0148a0176116a4fb5401c96dbbb813a144b65616","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/label/label-checks.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0357a3c97289e2782ff1264563897f39ecb2ce42","text":"Merge retired a covered predecessor; the successor is at packages/page/test/join.test.ts."}
