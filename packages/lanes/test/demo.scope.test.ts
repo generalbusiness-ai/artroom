@@ -12,6 +12,7 @@ import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
 import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
 import { FILES, judged, registerSetting, rehearse, transcript, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
+import { allowedClaim } from "../../page/src/claim.ts";
 import { captureBinding, observeCaptures } from "../../../scripts/demo/capture-binding.ts";
 
 const SERVICE = "https://scopes.test";
@@ -81,7 +82,7 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const rehearsal = await rehearse(stage);
   expect(rehearsal.ok).toBe(true);
   await drained();
-  const recording = new Map<string, Recorded>();
+  let recording = new Map<string, Recorded>();
   const keep = async (key: string, answer: Response): Promise<Response> => {
     const body = await answer.text();
     const headers = Object.fromEntries(KEPT_HEADERS.flatMap((name) => (answer.headers.get(name) ? [[name, answer.headers.get(name)!]] : [])));
@@ -116,7 +117,32 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   await actsOn(room, room.rules);
   expect((await loadSite(room, "guide/start.md")).status).toBe(200);
   for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
-  const kept = { service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: Object.fromEntries(recording) };
+  // Readonly claim eligibility is recorded separately for each actual caller.
+  // A path-only map cannot reuse the operator's signed read for a member.
+  const founderSession = { service: SERVICE, secret, fetch: recorded, now: () => timeMs(net.clock.now)! };
+  const configured = await allowedClaim(founderSession, config.register!);
+  const founderAnswers = Object.fromEntries(recording);
+  recording = new Map();
+  const member = people.member!;
+  const memberConfig = (await member.store.config())!;
+  const memberSecret = (await member.store.secret(memberConfig.key))!;
+  const memberPlace = placeOf(JSON.stringify(memberConfig))!;
+  const memberSession = { service: SERVICE, secret: memberSecret, fetch: recorded, now: () => timeMs(net.clock.now)! };
+  const memberRoom = await openRoom(memberSession, memberPlace);
+  await listLanes(memberRoom);
+  await actsOn(memberRoom, memberRoom.directory);
+  let memberRefusal = "";
+  try { await allowedClaim(memberSession, config.register!); }
+  catch (error) { memberRefusal = error instanceof Error ? error.message : "Eligibility could not be read."; }
+  expect(memberRefusal).not.toBe("");
+  const assets = Object.fromEntries(Object.entries(founderAnswers).filter(([key]) => key === "GET /page/" || key === "GET /page/page.js"));
+  const kept = {
+    service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: founderAnswers,
+    claimWitness: { register: configured.register, definition: configured.definition,
+      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), answers: founderAnswers },
+      member: { place: memberPlace, secret: b64url(memberSecret), actor: keyIdOfSecret(memberSecret), answers: { ...assets, ...Object.fromEntries(recording) }, refusal: memberRefusal },
+    },
+  };
   // In lines of at most 64 KiB, which the test runner prints whole.
   const text = b64url(new TextEncoder().encode(JSON.stringify(kept)));
   for (let i = 0, n = 0; i < text.length; i += 65536, n++) console.log(`DEMO-RECORD ${n} ${text.slice(i, i + 65536)}`);

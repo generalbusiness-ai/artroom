@@ -23,7 +23,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { b64url, keyIdOfSecret } from "@generalbusiness/artroom-bytes";
+import type { ScopeRef, SignedIntent, SignedRead } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, keyIdOfSecret, textDigest, verifySignedIntent, verifySignedRead } from "@generalbusiness/artroom-bytes";
 import { fileStore } from "../packages/cli/src/files.ts";
 import type { Config } from "../packages/cli/src/store.ts";
 import { CAPTURE_CONTEXT, captureBinding, captureSource, initializeCapture, ownerJson, type CaptureObservations } from "./demo/capture-context.ts";
@@ -36,32 +37,37 @@ const USAGE = "Usage: scripts/demo-captures.ts <base-url> --home <config directo
 /** The few parts of playwright-core that this script uses. */
 interface Locator {
   waitFor(options?: { timeout?: number; state?: "attached" | "visible" | "hidden" }): Promise<void>;
-  first(): Locator; click(): Promise<void>; fill(value: string): Promise<void>;
+  first(): Locator; click(): Promise<void>; dblclick(): Promise<void>; fill(value: string): Promise<void>;
+  count(): Promise<number>; isDisabled(): Promise<boolean>; filter(options: { visible: boolean }): Locator;
+  evaluate<T>(f: (element: HTMLElement) => T): Promise<T>;
   inputValue(): Promise<string>; textContent(): Promise<string | null>;
   locator(selector: string): Locator;
   getByRole(role: string, options: { name: string | RegExp; exact?: boolean }): Locator;
 }
 interface Tab {
   url(): string;
+  keyboard: { press(key: string): Promise<void> };
+  waitForFunction(f: () => boolean): Promise<unknown>;
   on(event: "pageerror", listener: (error: Error) => void): void;
-  on(event: "console", listener: (message: { type(): string; text(): string }) => void): void;
+  on(event: "console", listener: (message: { type(): string; text(): string; location(): { url?: string } }) => void): void;
   on(event: "request", listener: (request: { method(): string; url(): string }) => void): void;
   reload(): Promise<unknown>;
   locator(selector: string): Locator;
   goto(url: string): Promise<unknown>;
-  getByRole(role: string, options: { name: string | RegExp }): Locator;
+  getByRole(role: string, options: { name: string | RegExp; exact?: boolean }): Locator;
   getByText(text: string | RegExp): Locator;
   screenshot(options: { path: string }): Promise<unknown>;
   evaluate<T>(f: () => T): Promise<T>;
   setViewportSize(size: { width: number; height: number }): Promise<void>;
 }
-interface Route { request(): { url(): string; method(): string; postData(): string | null }; fulfill(answer: { status: number; headers?: Record<string, string>; contentType?: string; body: string }): Promise<void> }
+interface Route { abort(reason: string): Promise<void>; request(): { url(): string; method(): string; postData(): string | null; headers(): Record<string, string> }; fulfill(answer: { status: number; headers?: Record<string, string>; contentType?: string; body: string }): Promise<void> }
 interface BrowserContext { route(pattern: string, handler: (route: Route) => unknown): Promise<void>; addInitScript<A>(f: (arg: A) => void, arg: A): Promise<void>; newPage(): Promise<Tab> }
 interface Browser { newContext(options: object): Promise<BrowserContext>; close(): Promise<void> }
 interface Chromium { launch(options: { executablePath: string }): Promise<Browser> }
 
 /** What the browser needs: the service's base URL, the room, the key, and the recorded answers when there is no service. */
-interface Sitting { service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
+interface ClaimActorRecord { place: { directory: string; membership: unknown }; secret: string; actor: string; answers: NonNullable<Sitting["answers"]> }
+interface Sitting { claimWitness?: { register: ScopeRef; definition: string; founder: ClaimActorRecord; member: ClaimActorRecord & { refusal: string } }; service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
 
 function browserPath(): string | null {
   if (process.env["CHROMIUM"]) return existsSync(process.env["CHROMIUM"]) ? process.env["CHROMIUM"] : null;
@@ -207,6 +213,138 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   return sizes;
 }
 
+/** Production Page UI over actor-bound native read records. Founding transport
+ * loss is a labelled stand-in: intercepted requests never reach a Scope. */
+async function claimWitness(chromium: Chromium, executablePath: string, sitting: Sitting, out: string): Promise<void> {
+  const native = sitting.claimWitness;
+  if (!native) throw new Error("The native recorder supplied no actor-bound claim eligibility.");
+  const browser = await chromium.launch({ executablePath });
+  const errors: string[] = [], explainedNetwork: string[] = [], unanswered: string[] = [];
+  const attempts: string[] = [];
+  let entered!: () => void, release!: () => void;
+  const firstEntered = new Promise<void>((resolve) => { entered = resolve; });
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const actPath = `/v1/scopes/${native.register.scope}/acts`;
+  const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const watch = (tab: Tab): void => {
+    tab.on("pageerror", (error) => errors.push(error.message));
+    tab.on("console", (message) => {
+      if (message.type() !== "error") return;
+      const location = message.location();
+      const path = location.url?.startsWith(sitting.service) ? location.url.slice(sitting.service.length) : null;
+      if (path === actPath && /net::ERR_FAILED/.test(message.text())) explainedNetwork.push("Intercepted founding request: transport loss stand-in, no Scope admission.");
+      else if (path === `/v1/scopes/${native.register.scope}` && /status of 403/.test(message.text())) explainedNetwork.push("Member register read refused in its own native record.");
+      else errors.push(message.text());
+    });
+  };
+  const as = async (person: "founder" | "member", width = 390): Promise<BrowserContext> => {
+    const actor = native[person];
+    const context = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 1, colorScheme: "light" });
+    await context.route(`${sitting.service}/**`, async (route) => {
+      const request = route.request();
+      const path = request.url().slice(sitting.service.length);
+      if (request.method() === "GET" && path === `/v1/scopes/${native.register.scope}`) {
+        const header = request.headers()["authorization"];
+        const signed = header?.startsWith("Signed ") ? JSON.parse(Buffer.from(header.slice(7), "base64url").toString("utf8")) as SignedRead : null;
+        if (!signed || !verifySignedRead(signed) || signed.request.actor !== actor.actor || signed.request.to !== native.register.scope || signed.request.read !== "summary") throw new Error("Register response was requested by a different signed caller or subject.");
+      }
+      if (request.method() === "POST" && path === actPath) {
+        if (person !== "founder") throw new Error("Member attempted founding without an offer.");
+        const body = JSON.parse(request.postData() ?? "null") as { signed?: SignedIntent };
+        const signed = body?.signed;
+        if (!signed || !verifySignedIntent(signed) || signed.intent.actor !== actor.actor || signed.intent.kind !== "found" || canonicalize(signed.intent.to) !== canonicalize(native.register)) throw new Error("Intercepted founding request does not match the configured native subject and caller.");
+        const bytes = canonicalize(signed);
+        if (attempts.length && bytes !== attempts[0]) throw new Error("A pending browser claim signed a replacement envelope.");
+        attempts.push(bytes);
+        if (attempts.length === 1) { entered(); await held; }
+        // No native success or refusal is fabricated. The request never leaves this route.
+        await route.abort("failed");
+        return;
+      }
+      const caller = path.endsWith("/sessions") ? ` ${(JSON.parse(request.postData() ?? "{}") as { request?: { actor?: string } }).request?.actor}` : "";
+      const answer = actor.answers[`${request.method() === "POST" ? "POST" : "GET"} ${path}${caller}`];
+      if (!answer || request.method() === "POST" && !path.endsWith("/sessions")) {
+        unanswered.push(`${request.method()} ${path}`);
+        await route.abort("failed"); return;
+      }
+      await route.fulfill({ status: answer.status, headers: answer.headers, body: answer.body });
+    });
+    await context.addInitScript((kept) => {
+      if (location.origin === kept.service && location.pathname === "/page/" && window.top === window) localStorage.setItem("artroom-page", JSON.stringify({ place: kept.place, secret: kept.secret, register: kept.register }));
+    }, { service: sitting.service, place: actor.place, secret: actor.secret, register: native.register });
+    return context;
+  };
+  try {
+    const member = await as("member", 320);
+    const memberTab = await member.newPage(); watch(memberTab);
+    await memberTab.goto(`${sitting.service}/page/#/`);
+    await memberTab.getByRole("heading", { name: "Issues" }).waitFor({ state: "attached" });
+    if (await memberTab.getByRole("button", { name: "Create room", exact: true }).count() !== 0) throw new Error("An ordinary member received a founding affordance despite its native eligibility refusal.");
+    const founder = await as("founder", 390);
+    const tab = await founder.newPage(); watch(tab);
+    await tab.goto(`${sitting.service}/page/#/`);
+    const opener = tab.getByRole("button", { name: "Create room", exact: true }).filter({ visible: true });
+    await opener.click();
+    const dialog = tab.getByRole("dialog", { name: "Create room" });
+    const name = dialog.locator('input[name="name"]');
+    if (await dialog.locator("input").count() !== 1) throw new Error("Create room is not a name-only dialog.");
+    await name.fill("Field notebook");
+    await tab.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden" });
+    if (!await opener.evaluate((element) => document.activeElement === element)) throw new Error("Escape did not return focus to the opener.");
+    await opener.click();
+    if (await name.inputValue() !== "Field notebook") throw new Error("Escape discarded the local name draft.");
+    const dialogCheck = await tab.evaluate(() => {
+      const modal = document.querySelector("dialog[open]")!;
+      const input = modal.querySelector("input")!;
+      return { title: document.title, origin: location.origin, nameOnly: modal.querySelectorAll("input").length === 1,
+        fontSize: parseFloat(getComputedStyle(input).fontSize), inputHeight: input.getBoundingClientRect().height,
+        targets: [...modal.querySelectorAll("button")].map((button) => button.getBoundingClientRect().height),
+        overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+    });
+    if (dialogCheck.title !== "Artroom" || dialogCheck.origin !== sitting.service || dialogCheck.fontSize < 16 || dialogCheck.inputHeight < 44 || dialogCheck.targets.some((height) => height < 44) || dialogCheck.overflow) throw new Error("Create room dialog failed its phone identity or target-size checks.");
+    await tab.screenshot({ path: join(out, "create-room-mobile.png") });
+    const other = await founder.newPage(); watch(other);
+    await other.goto(`${sitting.service}/page/#/`);
+    await other.getByRole("button", { name: "Create room", exact: true }).filter({ visible: true }).click();
+    const otherDialog = other.getByRole("dialog", { name: "Create room" });
+    await otherDialog.locator('input[name="name"]').fill("Another label must not replace the saved claim");
+    await dialog.getByRole("button", { name: "Create room", exact: true }).dblclick();
+    await firstEntered;
+    if (!await dialog.getByRole("button", { name: "Create room", exact: true }).isDisabled()) throw new Error("A pending claim remained submittable.");
+    await otherDialog.getByRole("button", { name: "Create room", exact: true }).click();
+    if (!await otherDialog.getByRole("button", { name: "Create room", exact: true }).isDisabled() || attempts.length !== 1) throw new Error("The actual browser Web Lock did not serialize the two tabs.");
+    release();
+    await dialog.getByRole("button", { name: "Resume creation", exact: true }).waitFor();
+    await otherDialog.getByRole("button", { name: "Resume creation", exact: true }).waitFor();
+    if (Number(attempts.length) !== 2) throw new Error("The queued second tab did not retain the exact pending claim.");
+    await dialog.getByRole("button", { name: "Resume creation", exact: true }).click();
+    await tab.waitForFunction(() => [...document.querySelectorAll("dialog[open] button")].some((button) => button.textContent === "Resume creation" && !button.hasAttribute("disabled")));
+    if (Number(attempts.length) !== 3) throw new Error("Resume did not resubmit the exact saved claim envelope.");
+    const pending = await tab.evaluate(() => {
+      const key = Object.keys(localStorage).find((name) => name.startsWith("artroom-page-claim:"));
+      if (!key) return null;
+      const kept = JSON.parse(localStorage.getItem(key)!);
+      return { label: kept.label as string, signed: kept.config.claim?.found?.signed as unknown };
+    });
+    if (!pending || pending.label !== "Field notebook" || canonicalize(pending.signed) !== attempts[0]) throw new Error("Private recovery did not keep the original local label and exact signed envelope.");
+    await tab.screenshot({ path: join(out, "create-room-pending-mobile.png") });
+    if (errors.length || unanswered.length) throw new Error(`Claim witness browser failures: ${JSON.stringify({ errors, unanswered })}`);
+    const sizes = ["create-room-mobile", "create-room-pending-mobile"].map((name) => ({ name, bytes: statSync(join(out, `${name}.png`)).size }));
+    if (sizes.some((shot) => shot.bytes > MOST)) throw new Error("Claim witness screenshot exceeds its byte bound.");
+    writeFileSync(join(out, "claim-checks.json"), `${JSON.stringify({ source, sourceTree,
+      mode: "production Page UI; actor-bound native readonly eligibility; founding transport loss STAND-IN with no Scope admission",
+      register: native.register, definition: native.definition, memberControlAbsent: true, memberRefusal: native.member.refusal,
+      dialogCheck, escapeFocusAndDraft: true, chromiumWebLocksAcrossTwoTabs: true, pendingDoubleClickBlocked: true,
+      attemptedRequests: attempts.length, exactSavedEnvelopeReused: true, envelopeDigest: textDigest(attempts[0]!), originalLabelPreserved: true,
+      screenshots: sizes, explainedNetwork, errors, unanswered,
+      limit: "No founding request was admitted by a Scope, no native completion or hosted-provider success is claimed. The separate native adapter Scope witness tests admitted lost replies and settlement.",
+    }, null, 2)}\n`);
+    process.stdout.write("Claim browser witness: name-only dialog, native offer, member absence, Escape/draft, pending double click, cross-tab Web Lock and exact envelope retry passed. Founding transport loss STAND-IN; no Scope admission.\n");
+  } finally { release?.(); await browser.close(); }
+}
+
 const SHOWS: Record<string, string> = {
   room: "The room’s Issues destination, with the All filter showing the recorded closed issue and the actions the signed-in person may sign on the directory.",
   issue: "Observed issue screen for the rehearsal's issue lane.",
@@ -221,12 +359,13 @@ async function main(argv: readonly string[]): Promise<number> {
   const flags = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--recorded") flags.set("recorded", "true");
+    if (arg === "--recorded" || arg === "--claim-witness") flags.set(arg.slice(2), "true");
     else if (arg.startsWith("--")) { const value = argv[++i]; if (value === undefined) { process.stderr.write(`${arg} needs a value.\n${USAGE}\n`); return 2; } flags.set(arg.slice(2), value); }
     else words.push(arg);
   }
   const recorded = flags.has("recorded");
   const out = flags.get("out");
+  if (flags.has("claim-witness") && !recorded) { process.stderr.write("--claim-witness requires --recorded.\n"); return 2; }
   if (!out || (recorded ? words.length > 0 || flags.has("home") || flags.has("room") : words.length !== 1 || !flags.get("home") || !flags.get("room"))) { process.stderr.write(`${USAGE}\n`); return 2; }
   const executablePath = browserPath();
   const chromium = chromiumOf();
@@ -236,6 +375,7 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   const sitting = recorded ? recordedSitting() : await liveSitting(words[0]!, flags.get("home")!, flags.get("room")!);
   mkdirSync(resolve(out), { recursive: true });
+  if (flags.has("claim-witness")) { await claimWitness(chromium, executablePath, sitting, resolve(out)); return 0; }
   const sizes = await captures(chromium, executablePath, sitting, resolve(out));
   writeFileSync(join(resolve(out), "captures.md"), [
     "# Page captures",
