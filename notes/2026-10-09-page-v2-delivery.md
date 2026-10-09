@@ -34,10 +34,11 @@ reuses the CLI claim workflow without installing a register. Private storage
 retains the recovery key and exact founding/enrollment envelopes before send.
 Cross-tab locking prevents competing records. Completion is revalidated by
 native settlement; settings must persist before the Page switches rooms.
-The typed name is a local intent label. Current native founding generates
-the repository name, and that recorded name remains the displayed identity.
-The mismatch with the planner's earlier naming premise was reported and
-independently corroborated in `d7837f3c3a5bd7b1359e3b65e4c19262fb7da1db`.
+The typed name is a local intent label, saved with the exact room context and
+shown beside the unchanged native generated repository name. Planner accepted
+that meaning in `59a6744c5a97c3038751e99625ebb76b3b9e5f7b`, correcting the
+earlier naming premise. The underlying source mismatch was independently
+corroborated in `d7837f3c3a5bd7b1359e3b65e4c19262fb7da1db`.
 
 ## Eight design rules and evidence
 
@@ -110,6 +111,8 @@ separate. Raw gate output is `/tmp/artroom-page-v2-gate.log`; phase logs are
 in `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.azGmMU9FdF`.
 
 Planner's local-label display correction `59a6744c` arrived after this gate
-started. That small source follow-up requires focused verification and exact
-delta attribution; the gate is not relabelled as its later head. Complete
+started. The follow-up changes the browser settings label binding, switcher
+presentation, its focused handler witness and rebuilt assets. Seven affected
+handler tests and Page source/test types pass. Its focused browser label
+observation is still owed. The gate is not relabelled as the later head. Complete
 independent Source review and landing remain owed.

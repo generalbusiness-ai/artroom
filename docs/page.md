@@ -127,8 +127,9 @@ Create room appears only for an eligible key with a known member handle,
 Web Locks and dialog support. It never installs a register. Its private
 claim record retains exact founding and enrollment envelopes plus a separate
 recovery key before sending; Resume creation follows those same requests.
-The typed name is a local intent label. Native founding currently generates
-the repository name, which remains the displayed room identity.
+The typed name is a local intent label, saved with the exact room context
+and shown beside the native generated repository name. It does not replace
+the recorded name or travel to another selected room.
 
 A value is read as `artroom act --set` reads it: a list or a record as
 JSON, a number for an item, `true` or `false`, and `@handle` for a member.
