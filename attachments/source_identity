@@ -1,0 +1,16 @@
+{
+  "base": "315198c938b1fcc6b8562e82e468472160272e5d",
+  "head": "9901344b4bf924b4f5a55b8dcd7cf3a4a783056f",
+  "tree": "d221d7dbcf8cf7943aba54c682a5b28ed94d4ee7",
+  "branch": "request/d026-page-fetch-types",
+  "source_choice": "Planner critical thread25 contextual Fetch correction; Root explicit same-scope ByteStream getReader cancellation approval",
+  "path": "packages/page/test/claim.scope.test.ts",
+  "bytes": 22852,
+  "sha256": "ed8b63ca454221edf2049a542df6ea5af88505348ccfef3ae3fdc78e1253aae1",
+  "diff_bytes": 3775,
+  "diff_sha256": "3380340fdcb9fa67567c574ee552fc64a548573bec79839e44f98b43ae741ad0",
+  "original_titles_unchanged": true,
+  "original_assertion_lines_unchanged": true,
+  "original_tests": 3,
+  "execution": "none; types/discovery/native/gate held"
+}
