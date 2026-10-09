@@ -40,6 +40,7 @@ import {
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
+import { knownLIST1 } from "./source-support.ts";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -422,6 +423,42 @@ async function manifestContent(handle: ScopeHandle, scope: Summary["scope"], man
   } catch { return null; }
 }
 
+async function manifestListFile(handle: ScopeHandle, scope: ScopeRef, manifest: Item, definition: DeclaredDefinition, pin: string, sources: readonly Item[]): Promise<NonNullable<Manifest["file"]> | null> {
+  try {
+    if (!knownLIST1(definition, pin)) return null;
+    const files = manifest.values["files"];
+    if (!Array.isArray(files) || files.length !== 1) return null;
+    const row = files[0];
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row["path"] !== "string" || typeof row["digest"] !== "string" || typeof row["entry"] !== "number" || !Number.isSafeInteger(row["entry"]) || row["entry"] >= manifest.id) return null;
+    const opening = await handle.entry(manifest.id);
+    if (!opening.ok || !opening.complete || opening.next !== undefined) return null;
+    const frozenInput = opening.value.entry.input;
+    const frozenFiles = frozenInput.type === "act" ? frozenInput.signed.intent.fields["files"] : null;
+    if (!Array.isArray(frozenFiles) || frozenFiles.length !== 1) return null;
+    const frozen = frozenFiles[0];
+    if (!frozen || typeof frozen !== "object" || Array.isArray(frozen) || !isFactRef(frozen["entry"]) || frozen["path"] !== row["path"] || frozen["digest"] !== row["digest"]) return null;
+    const fact = frozen["entry"];
+    if (canonicalize(fact.at) !== canonicalize(scope) || fact.seq !== row["entry"]) return null;
+    const source = await handle.entry(fact.seq);
+    if (!opening.ok || !opening.complete || opening.next !== undefined || !source.ok || !source.complete || source.next !== undefined) return null;
+    const m = opening.value, s = source.value;
+    if (m.entry.seq !== manifest.id || canonicalize(m.entry.at) !== canonicalize(scope) || entryHash(m.entry) !== m.hash || m.hash !== manifest.opened || s.entry.seq !== fact.seq || canonicalize(s.entry.at) !== canonicalize(fact.at) || entryHash(s.entry) !== s.hash || s.hash !== fact.hash) return null;
+    const mi = m.entry.input, si = s.entry.input;
+    if (mi.type !== "act" || si.type !== "act" || mi.signed.intent.kind !== "propose-manifest" || si.signed.intent.kind !== "propose-file" || !verifySignedIntent(mi.signed) || !verifySignedIntent(si.signed) || canonicalize(mi.signed.intent.to) !== canonicalize(scope) || canonicalize(si.signed.intent.to) !== canonicalize(scope)) return null;
+    if (!m.entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id) || !s.entry.effects.some((effect) => effect.effect === "open" && effect.type === "source" && effect.item === fact.seq)) return null;
+    const storedSource = sources.find((item) => item.id === fact.seq && item.type === "source");
+    if (!storedSource || storedSource.opened !== fact.hash) return null;
+    if (mi.signed.intent.fields["base"] !== manifest.values["base"]) return null;
+    const author = mi.authority.length === 1 ? mi.authority[0] : null, sourceAuthor = si.authority.length === 1 ? si.authority[0] : null;
+    if (!author || !sourceAuthor || author.key !== mi.signed.intent.actor || sourceAuthor.key !== si.signed.intent.actor || si.signed.intent.actor !== mi.signed.intent.actor || canonicalize(sourceAuthor.subject) !== canonicalize(author.subject) || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(manifest.parties["authors"]) || !manifest.parties["authors"].some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { base, path, digest, size, content } = si.signed.intent.fields;
+    shapeDeclaredAct(definition, "propose-file", { on: null, fields: si.signed.intent.fields });
+    shapeDeclaredAct(definition, "propose-manifest", { on: null, fields: mi.signed.intent.fields });
+    if (base !== manifest.values["base"] || path !== row["path"] || digest !== row["digest"] || typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || !fileSound({ path, digest, size, content })) return null;
+    if (base !== storedSource.values["base"] || path !== storedSource.values["path"] || digest !== storedSource.values["digest"] || size !== storedSource.values["size"] || canonicalize(storedSource.parties["integrator"]) !== canonicalize(sourceAuthor.subject)) return null;
+    return { path, digest, size, content, page: "" };
+  } catch { return null; }
+}
 /**
  * A change lane, and for each of its merges the destination's publication
  * and that publication's outside operations, read from the destination's
@@ -457,6 +494,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
     } catch { /* Missing authority offers no invented reviewer choices. */ }
   }
   const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
+  const listFile = selected && selected.values["files"] !== undefined ? await manifestListFile(handle, summary.scope, selected, definition, summary.definition, await all("source")) : null;
   return {
     scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
@@ -466,7 +504,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
       file: typeof m.values["path"] === "string" ? {
         path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]), ...(m === selected ? { content } : {}),
-      } : null,
+      } : m === selected && listFile ? { ...listFile, page: siteAddress(room, listFile.path) } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
     requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]) })),
