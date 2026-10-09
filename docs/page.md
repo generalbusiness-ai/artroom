@@ -127,6 +127,11 @@ Create room appears only for an eligible key with a known member handle,
 Web Locks and dialog support. It never installs a register. Its private
 claim record retains exact founding and enrollment envelopes plus a separate
 recovery key before sending; Resume creation follows those same requests.
+Each logical creation has a separate retained operation. Another Create
+requires verified completion of the previous active operation; unresolved
+work is not replaced. Old operations remain resumable by their exact identity.
+The private journal admits at most 64 operations and evicts none to make room.
+Context is checked again after a queued lock and before each mutation POST.
 The typed name is a local intent label, saved with the exact room context
 and shown beside the native generated repository name. It does not replace
 the recorded name or travel to another selected room.

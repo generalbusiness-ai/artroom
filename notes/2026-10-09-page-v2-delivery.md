@@ -126,11 +126,17 @@ independent Source review and landing remain owed.
 
 Review preparation found two claim-specific defects after the initial filing:
 a queued claim could submit after the Page context changed, and an ordinary
-second creation would resume the first completed journal. The actual POST
-context guard is repaired and focused native/UI witnesses pass. Distinct new
-creation versus explicit resume is being repaired with retained per-creation
-journals; the initial filed head must not be landed before that repair and
-its focused evidence replace the candidate.
+second creation would resume the first completed journal. Both are repaired
+in the replacement source. A predicate checks the captured context after
+locking and immediately before every mutation POST. Separate per-creation
+journals distinguish explicit New, expected completed predecessor, and Resume
+of an exact operation. Pending claims cannot be replaced; old proofs and raw
+legacy bytes remain retained. The client journal stops at 64 operations and
+evicts none. Three real-Scope witnesses prove two distinct creations, original
+resume without new POSTs, stale-context prevention, pending preservation and
+legacy migration. Eight affected UI/asset checks and Page types pass. A narrow
+peer re-read found no further defect in this lifecycle; the replacement's
+focused browser recheck and full Source review remain separate obligations.
 
 A narrow peer read found and verified the repair of a late-draw label race.
 Final DOM publication checks the original room context; the displayed local
