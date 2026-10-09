@@ -283,3 +283,55 @@ owed when b8 and this source are composed. The strengthened focused witness
 passed (1 test,2.11 s), raw `/tmp/artroom-site-immutable-cleanup-compat.log`,
 SHA-256 `4727f2a82ddf3bad560d7c3a2d14ace1dbef0a521d1b2b9d7482a1316691d4e3`.
 Types and whitespace checks passed. No whole gate or deployment occurred.
+
+## Native @3 integration witness
+
+Joint branch `request/site-immutable-native3` starts at b8 exact
+`4aa91b14bff98ed1bf3f231b0c351220f8cff2dc` and merges A1 successor
+`b06d3b9140dca61f5b176ed4878da09e09d0db3f` without conflicts; root's b8
+checkout is untouched. New `site-native3-publication.test.ts` is one native
+witness, discovered as exactly one through an explicit filename filter and
+an ExactOne sequencer. The active change declaration is the actual
+`changeDemo3` digest, not a legacy @2 alias.
+
+Two native @3 CLI edits publish through real lane/rules/destination judgment
+and write receipts. Actual reservation-delete/revoke outcomes clean the
+published items. An older immutable page then returns 200 with its original
+content and selected commit link prefix, and separately 304; all destination
+SQLite rows stay unchanged. A later genuinely reserved version with a required
+check and no check result is refused by Site. Advancing the scripted clock and
+running the real Durable Object alarm writes timed cleanup-aborted and the
+actual cleanup reaches cleaned; that unpublished version remains refused,
+while the earlier published version stays eligible. No SQL publication or
+cleanup state is fabricated in this native witness.
+
+The Git provider, scheduler, clock and local key store remain labelled
+stand-ins; no deployment/browser/provider run occurred. Published cleanup is
+outcome-driven. Timed expiry applies to reserved unpublished work; it is not
+misreported as the source of published cleanup.
+
+The strengthened witness passed (1 test,2.27 s), raw
+`/tmp/artroom-site-native3-evidence/test-positive.log`, SHA-256
+`954089b3ca62e2883369dcbe260d9ad5dc8c309b6f2cde6bdca1c18d268b7e1c`.
+One useful omission control reinstated the erroneous current-state=published
+restriction; the same native witness failed its older page 200 assertion with
+404 (1 test,1.96 s), raw
+`/tmp/artroom-site-native3-evidence/test-control-published-state.log`, SHA-256
+`b650f36f68c4e963bbfca7a1cf6ce954824425fd34753a14346d471f6e248312`.
+The source was restored exactly afterwards. This is one control, not a sweep.
+Initial fixture preparation incorrectly supplied a text image instead of a
+content digest; native keep-configuration refused it. That failure is retained
+as `test-initial-configuration-refusal.log` (SHA-256
+`f7f0e3dffd216140863558864dacfa69a90257c4ed6041b764ba7214f74efa69`).
+The fixture was corrected to the actual configuration contract; no production
+bug or authority widening is attributed to that refusal.
+
+Original A1 request `6ec330fda2e3337b6626683bbe5c6ee024d33e38` and adopted
+owner decision `53142223f52080fb32d1fcfb9d130ca575888352` were read in full.
+The latter explicitly retains room-issued tag/human version mapping as a
+separate missing native contract and owed A1 scope. Builder must return that
+bounded proposal under A1; planner is the adopting authority. Existing
+publication facts and provider advertisements do not create naming authority.
+This joint source satisfies neither that contract gap nor the original deployed
+positive/refusal observation, final coordinated gate, independent Source review
+and normal landing. No full A1 completion is claimed.
