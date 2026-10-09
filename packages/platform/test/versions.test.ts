@@ -15,20 +15,23 @@ const DIGESTS: Readonly<Record<string, string>> = {
   "platform:inbox@1": "sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748",
   "platform:register@1": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:register@2": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
+  "platform:register@3": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@1": "sha256:5463d69af0b876502c25e643160ae71cbcbafa55608082486cd9893969d9197b",
   "platform:directory@2": "sha256:053ec528406d1de077992d80f405f846940fb3c2c44f9206263e18329e1d58f6",
+  "platform:directory@3": "sha256:053ec528406d1de077992d80f405f846940fb3c2c44f9206263e18329e1d58f6",
   "platform:membership@1": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
   "platform:membership@2": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
   "platform:rules@1": "sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471",
   "platform:rules@2": "sha256:84f2d2e583932e1b8d3cf565216e6c4ea14b004b65e69077e84d7d24aa727471",
   "platform:destination@1": "sha256:8876db18e301991a2d8d936191598998c9b1ec9aef5ed71e4e75d08651327743",
   "platform:destination@2": "sha256:2caf58557aaf561be0696ee232f4b333d0cfb68962caec710989bc0f3ddfacc1",
+  "platform:destination@3": "sha256:f73f9a4177b8a5e129a0b0e57378f7f0cae3c1dbf5f26bd8761402208e110cf3",
 };
 
 test("every shipped version resolves to its own data, pinned by digest, and version 1 of each is the data that main shipped; no other version resolves; a new scope is founded on the newest", () => {
   expect(Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]))).toEqual(DIGESTS);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
-  expect(["platform:destination@3", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
+  expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
   // The newest of each name is its highest shipped version.
   const highest = Object.keys(VERSIONS).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
@@ -46,7 +49,7 @@ test("a rule reads its own version from the scope's genesis: the register of eac
   const signed = { intent: { v: 1, to: null, actor: rita.key, kind: "found", fields: {} } };
   const at = { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` };
   const found = (definition: PlatformDefinition) => ({ input: { type: "act", signed }, own: (seq: number) => (seq === 0 ? { entry: { input: { type: "genesis", seed: genesisOf(definition) } } } : null), resolved: { at } }) as unknown as RuleGiven;
-  expect((["platform:register@1", "platform:register@2"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2"]);
+  expect((["platform:register@1", "platform:register@2", "platform:register@3"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2", "platform:directory@3"]);
 
   const roleTable = (platform("platform:membership@1")!.rules["role-table"] as Extract<PlatformRule, { place: "effect" }>);
   const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as unknown as readonly { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));

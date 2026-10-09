@@ -250,7 +250,8 @@ export class CheckerService {
     let report: unknown = null;
     let ran = false;
     if (configuration !== null) {
-      // 4. The read token. Without it no runner starts: the run has no end to find, which is `run-lost`.
+      // 4. Legacy runs require the read token; snapshot runs use their verified overlay.
+      // Without the required legacy token no runner starts, leaving `run-lost`.
       let token: Answer | null = null;
       try {
         token = job.snapshot ? null : await this.#o.scopes.prepare(job.lane, asked, JOB_READ.capability, JOB_READ.step);
