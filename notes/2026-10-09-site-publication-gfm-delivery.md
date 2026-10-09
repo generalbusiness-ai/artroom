@@ -268,3 +268,18 @@ Scope source and test TypeScript checks passed; whitespace check passed.
 Intermediate failed focused runs were retained in /tmp while their concrete
 fixture expectations and bounds were corrected. No whole gate or mutation
 sweep ran. These local stand-in results do not replace deployment acceptance.
+
+Compatibility correction after root review: the current publication item's
+state is not the authority for historical publication. Unlanded b8 destination
+@3 moves published items through cleanup-deleted/cleanup-owed/cleaned. The
+selector retains historical eligibility through the actual receipt-opening
+entry's hashed `published` effect, matching integration, judged reservation
+and written receipt, rather than rejecting a cleaned item. Cleanup state alone
+still grants nothing. A labelled projection control changes only the folded
+state of an actual @2 native publication through those three states and keeps
+it eligible; removing its original publication evidence while claiming cleaned
+refuses before 304. This is not a native @3 transition witness: that remains
+owed when b8 and this source are composed. The strengthened focused witness
+passed (1 test,2.11 s), raw `/tmp/artroom-site-immutable-cleanup-compat.log`,
+SHA-256 `4727f2a82ddf3bad560d7c3a2d14ace1dbef0a521d1b2b9d7482a1316691d4e3`.
+Types and whitespace checks passed. No whole gate or deployment occurred.

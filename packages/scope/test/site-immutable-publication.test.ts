@@ -47,6 +47,35 @@ test("two native publications retain older immutable content and deny pending/co
     const directory = d.config.repository!.directory;
     const repo = await runInDurableObject(d.D.object, (_instance, state) => JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'repository'").one().record).values.repository);
     expect(await peer.sitePublishedCommit(directory, repo as never, "e".repeat(40))).toEqual({ ok: false, reason: "not-published" });
+    // Compatibility projection control for the unlanded @3 cleanup states.
+    // This @2 fixture cannot natively transition there: its original judged
+    // publication and written receipt remain real; only current folded state
+    // is changed here. Actual @3 lifecycle acceptance belongs to composition.
+    const historicalPublication = await runInDurableObject(d.G.object, (_instance, state) => {
+      const receipt = JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one().record);
+      return state.storage.sql.exec<{ id: number; record: string }>("SELECT id, record FROM item WHERE id = ?", receipt.refs.publication).one();
+    });
+    for (const cleanupState of ["cleanup-deleted", "cleanup-owed", "cleaned"]) {
+      await runInDurableObject(d.G.object, (_instance, state) => {
+        const changed = JSON.parse(historicalPublication.record); changed.state = cleanupState;
+        state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", cleanupState, JSON.stringify(changed), historicalPublication.id);
+      });
+      try { expect((await get(first)).status).toBe(200); }
+      finally { await runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE item SET state = 'published', record = ? WHERE id = ?", historicalPublication.record, historicalPublication.id); }); }
+    }
+    // Cleanup state alone cannot replace the original publication judgment.
+    const openingProof = await runInDurableObject(d.G.object, (_instance, state) => {
+      const receipt = JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'receipt' AND json_extract(record, '$.values.commit') = ?", first).one().record);
+      const row = state.storage.sql.exec<{ seq: number; bytes: string }>("SELECT seq, bytes FROM entry WHERE seq = ?", receipt.id).one();
+      const held = JSON.parse(historicalPublication.record); held.state = "cleaned";
+      state.storage.sql.exec("UPDATE item SET state = 'cleaned', record = ? WHERE id = ?", JSON.stringify(held), historicalPublication.id);
+      const changed = JSON.parse(row.bytes);
+      changed.effects = changed.effects.filter((e: { effect: string; state?: string }) => !(e.effect === "state" && e.state === "published"));
+      state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", JSON.stringify(changed), row.seq);
+      return row;
+    });
+    try { expect((await get(first, { "if-none-match": "*" })).status).toBe(404); }
+    finally { await runInDurableObject(d.G.object, (_instance, state) => { state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", openingProof.bytes, openingProof.seq); state.storage.sql.exec("UPDATE item SET state = 'published', record = ? WHERE id = ?", historicalPublication.record, historicalPublication.id); }); }
     const metadata = await runInDurableObject(d.G.object, (_instance, state) => {
       const saved = state.storage.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'scope'").one().v;
       const changed = JSON.parse(saved); changed.head.seq = PUBLICATION_PROOF_BOUNDS.historyEntries;

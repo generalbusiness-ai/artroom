@@ -120,7 +120,7 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
         const publicationId = receipt.refs["publication"];
         if (typeof publicationId === "number") {
           const published = item(publicationId);
-          if (published?.type !== "publication" || published.state !== "published" || published.values["integration"] !== commit
+          if (published?.type !== "publication" || published.values["integration"] !== commit
             || !opening.entry.effects.some(e => e.effect === "state" && e.item === publicationId && e.state === "published")) continue;
           const reservedAt = published.values["reservedAt"];
           if (typeof reservedAt !== "number") continue;
