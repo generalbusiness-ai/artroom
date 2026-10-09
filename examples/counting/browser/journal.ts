@@ -60,7 +60,7 @@ export function validJournal(journal:AttemptJournal,identity:ActorIdentity,envel
       if(!closed(a,["envelope","phase"],["refusal"])||!validEnvelope(a.envelope,identity))return false;
       if(!["prepared","inflight","unknown","refused","recorded"].includes(a.phase)||index<journal.active&&a.phase!=="refused")return false;
       if(a.phase==="refused"){
-        const r=a.refusal;if(!closed(r,["answer","origin","url","request","context"])||r.origin!==identity.origin||r.url!==actURL(identity)||r.context!==contextKey(identity)||r.request!==envelopeKey(a.envelope)||!closed(r.answer,["answer","reason","judgedAt"],["name"])||r.answer.answer!=="refused"||typeof r.answer.reason!=="string"||!Object.hasOwn(REFUSAL_REASONS,r.answer.reason)||!isHead(r.answer.judgedAt)||(Object.hasOwn(r.answer,"name")&&typeof r.answer.name!=="string"))return false;
+        const r=a.refusal;if(!r||!closed(r,["answer","origin","url","request","context"])||r.origin!==identity.origin||r.url!==actURL(identity)||r.context!==contextKey(identity)||r.request!==envelopeKey(a.envelope)||!closed(r.answer,["answer","reason","judgedAt"],["name"])||r.answer.answer!=="refused"||typeof r.answer.reason!=="string"||!Object.hasOwn(REFUSAL_REASONS,r.answer.reason)||!isHead(r.answer.judgedAt)||(Object.hasOwn(r.answer,"name")&&typeof r.answer.name!=="string"))return false;
       }else if(Object.hasOwn(a,"refusal"))return false;
     }
     return true;
@@ -77,16 +77,16 @@ export function terminalJournal(journal:AttemptJournal|undefined,identity:ActorI
 /** Completion custody is local and must stay bound to the same full device identity. */
 export function validReport(value:unknown,identity:ActorIdentity):value is PendingReport {
   try{
-    if(!isRecord(value)||!closed(value,["completion","envelope","outcome"],["journal"])||!["unknown","refused"].includes(value.outcome as string)||!closed(value.completion,["turn","voiceId","completedAt"]))return false;
-    const c=value.completion as Record<string,unknown>,t=c.turn;
-    if(typeof c.voiceId!=="string"||!c.voiceId||typeof c.completedAt!=="number"||!Number.isSafeInteger(c.completedAt)||c.completedAt<0||!isRecord(t)||!closed(t,["origin","deployment","scope","definition","membership","member","publicKey","generation","serial","N","expiresAt"]))return false;
+    if(!isRecord(value)||!closed(value,["completion","envelope","outcome"],["journal"])||!["unknown","refused"].includes(value["outcome"] as string)||!closed(value["completion"],["turn","voiceId","completedAt"]))return false;
+    const c=value["completion"] as Record<string,unknown>,t=c["turn"];
+    if(typeof c["voiceId"]!=="string"||!c["voiceId"]||typeof c["completedAt"]!=="number"||!Number.isSafeInteger(c["completedAt"])||c["completedAt"]<0||!isRecord(t)||!closed(t,["origin","deployment","scope","definition","membership","member","publicKey","generation","serial","N","expiresAt"]))return false;
     const {generation,serial,N,expiresAt,...context}=t;
-    if(canonicalize(context)!==canonicalize(identity)||![generation,serial,N,expiresAt].every(v=>typeof v==="number"&&Number.isSafeInteger(v))||(generation as number)<0||(serial as number)<1||(N as number)<1||(expiresAt as number)<0||!validEnvelope(value.envelope,identity)||!fitsPending(identity,value))return false;
-    const intent=value.envelope.signed.intent;
+    if(canonicalize(context)!==canonicalize(identity)||![generation,serial,N,expiresAt].every(v=>typeof v==="number"&&Number.isSafeInteger(v))||(generation as number)<0||(serial as number)<1||(N as number)<1||(expiresAt as number)<0||!validEnvelope(value["envelope"],identity)||!fitsPending(identity,value))return false;
+    const intent=value["envelope"].signed.intent;
     if(intent.kind!=="spoken"||intent.fields["generation"]!==generation||intent.fields["serial"]!==serial||intent.fields["n"]!==N)return false;
     if(!Object.hasOwn(value,"journal"))return true;
-    const journal=value.journal as AttemptJournal;
-    return validJournal(journal,identity,value.envelope)&&journal.attempts.every(a=>a.envelope.signed.intent.kind==="spoken"&&a.envelope.signed.intent.fields["generation"]===generation&&a.envelope.signed.intent.fields["serial"]===serial&&a.envelope.signed.intent.fields["n"]===N);
+    const journal=value["journal"] as AttemptJournal;
+    return validJournal(journal,identity,value["envelope"])&&journal.attempts.every(a=>a.envelope.signed.intent.kind==="spoken"&&a.envelope.signed.intent.fields["generation"]===generation&&a.envelope.signed.intent.fields["serial"]===serial&&a.envelope.signed.intent.fields["n"]===N);
   }catch{return false;}
 }
 

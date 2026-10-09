@@ -61,8 +61,8 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
     const signed=await signedIntent(signer,{to:identity.scope,kind,on:shaped.on,fields:shaped.fields,expected:plan.expected});current();return{signed,grants:[],beside:shaped.beside};
   };
   const commandRecord=(held:unknown):held is NonNullable<Awaited<ReturnType<CommandStore["load"]>>>=>{
-    if(!isRecord(held)||Object.keys(held).some(k=>!["kind","envelope","journal"].includes(k))||!Object.hasOwn(held,"kind")||!Object.hasOwn(held,"envelope")||typeof held.kind!=="string"||!["initialize","join","leave","start","pause","reset"].includes(held.kind)||!validEnvelope(held.envelope,identity)||held.envelope.signed.intent.kind!==held.kind||!fitsPending(identity,held))return false;
-    return !Object.hasOwn(held,"journal")||validJournal(held.journal as AttemptJournal,identity,held.envelope);
+    if(!isRecord(held)||Object.keys(held).some(k=>!["kind","envelope","journal"].includes(k))||!Object.hasOwn(held,"kind")||!Object.hasOwn(held,"envelope")||typeof held["kind"]!=="string"||!["initialize","join","leave","start","pause","reset"].includes(held["kind"])||!validEnvelope(held["envelope"],identity)||held["envelope"].signed.intent.kind!==held["kind"]||!fitsPending(identity,held))return false;
+    return !Object.hasOwn(held,"journal")||validJournal(held["journal"] as AttemptJournal,identity,held["envelope"]);
   };
   const clearCommand=async(envelope:PreparedEnvelope,result:ReportOutcome):Promise<ReportOutcome>=>{
     if(result.status==="unknown"||result.status==="blocked")return result;

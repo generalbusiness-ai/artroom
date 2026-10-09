@@ -1,7 +1,8 @@
 // DOM surface, gateway, memory custody and speech are fake. No browser/native/audio execution.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { domainBytes, DOMAINS, keyIdOfSecret, newIncarnation, scopeIdOf, sign, textDigest } from "@generalbusiness/artroom-bytes";
+import { DOMAINS } from "@generalbusiness/artroom-contract";
+import { domainBytes, keyIdOfSecret, newIncarnation, scopeIdOf, sign, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Summary } from "@generalbusiness/artroom-contract";
 import type { ObservationState } from "@generalbusiness/artroom-client";
 import { COUNTING_DEFINITION } from "../pin.ts";
