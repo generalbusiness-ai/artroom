@@ -5,8 +5,8 @@ Each one ends with a report on main that tells a user's story about
 capability that is on main and works, and says what did not land. This
 report covers 15:00 to 23:00 on 2026-10-08 Eastern. The previous report
 landed as `9341c76a` at 14:37 and was updated as `16d7ba44` at 15:40
-when the expanded candidate landed. Main at the boundary is `6afa0377`
-unless updated below.
+when the expanded candidate landed. Main at the boundary is `4ab8f849`: the v2 design
+documents landed at 22:05, after this report was first written.
 
 Everything marked "observed run" was run on the shared machine, Node
 v26.10.0, against the deployment at the account's standard hostname,
@@ -17,9 +17,10 @@ wall clock. Workroom states are the planner's account, not in git.
 
 ## Summary
 
-Five landings on main and one in the jam repository, measured from the
+Six landings on main and one in the jam repository, measured from the
 15:00 report's update `16d7ba44` to `6afa0377` (git diff stat): 30
-files, 5,990 insertions, 167 deletions, in 12 commits.
+files, 5,990 insertions, 167 deletions, in 12 commits; then the v2
+design documents at `4ab8f849`.
 
 - **The expanded candidate** itself, `7bb3a641`, pushed at 15:30 (its
   story and size are in the 15:00 report's update).
@@ -153,8 +154,9 @@ sync design (`47923460`), the timeout diagnostic (`45405ec5`).
 
 ## What did not land and why
 
-- **The v2 design documents** were filed at 21:24 (`ca193768`) and are
-  under the checker's document review at the boundary.
+- **The v2 design documents** landed at 22:05 as `4ab8f849` (approved
+  `49e7dae7`), after this report was first written: the design review,
+  the refined design page, screens, concepts and checks under plan 027.
 - **Propose from a branch** is in progress: the reservation's staging on
   the host is written (`9218fb70`); its review is due Saturday noon.
 - **The v2 page** was commissioned at 21:25; builder names the day it
