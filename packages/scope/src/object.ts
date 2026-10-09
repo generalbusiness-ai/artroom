@@ -376,7 +376,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** Authenticated by the signed job-read request and current configured checker. */
   async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null> {
-    this.#first(); return this.#outside.snapshot?.(asked) ?? null;
+    this.#first();
+    try { return await this.#outside.snapshot?.(asked) ?? null; } catch { return null; }
   }
 
   /**
