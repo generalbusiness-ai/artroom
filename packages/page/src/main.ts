@@ -20,7 +20,7 @@
 
 import type { Answer, FieldValue, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, enrollmentAssociation, fieldValue, joinAssociation, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
@@ -253,7 +253,10 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
 function settingsScreen(): HTMLElement {
   const kept = settings();
   const selectedContext = settingsContext(kept ?? { place: null, secret: "" });
-  const joinKey = `join:${selectedContext}`;
+  let joinKey: string | null = null;
+  if (kept?.place) {
+    try { joinKey = enrollmentAssociation(sessionOf(kept), kept.place.membership); } catch { /* Invalid key cannot select a Join record. */ }
+  }
   const screenDraw = drawing;
   const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null, kept?.register ?? null]);
   if (roomDraftContext !== context) { roomDraft = ""; roomDraftContext = context; }
@@ -294,11 +297,10 @@ function settingsScreen(): HTMLElement {
     if (sameRoute) queueMicrotask(() => { void draw(); });
   };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
-  room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
   form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   const joinButton = form.querySelector("#join")!;
-  const previousRecord = joinAnswers.get(joinKey);
+  const previousRecord = joinKey ? joinAnswers.get(joinKey) : undefined;
   const previousJoin = previousRecord?.result;
   if (previousJoin?.answer.answer === "accepted") {
     joinButton.setAttribute("disabled", "");
@@ -309,31 +311,50 @@ function settingsScreen(): HTMLElement {
     });
     form.append(select);
   }
-  if (joining.get(joinKey)) { joinButton.setAttribute("disabled", ""); tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room"); }
+  if (joinKey && joining.get(joinKey)) { joinButton.setAttribute("disabled", ""); tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room"); }
   if (previousJoin) tell(previousJoin.answer.answer === "accepted", previousJoin.answer.answer === "accepted" ? `Joining was accepted by membership ${previousJoin.place.membership.scope}. The saved room was not changed after the settings context changed. Inspect that membership before choosing this room.` : `${nonacceptedAnswerText(previousJoin.answer)} Inspect membership ${previousJoin.place.membership.scope} and the original request.`);
+  if (previousJoin) form.append(h("details", { class: "inspection" }, h("summary", {}, "Inspect Join answer"), h("pre", {}, JSON.stringify(previousJoin.answer, null, 2))));
+  const offeredJoin = () => {
+    try {
+      const typed = (room as HTMLTextAreaElement).value;
+      if (!typed.trim().startsWith("artroom-invite:")) return;
+      const key = (secret as HTMLInputElement).value.trim() || kept?.secret || "";
+      const enrollment = joinAssociation(sessionOf({ place: kept?.place ?? null, secret: key }), typed);
+      const state = joining.get(enrollment);
+      if (state || joinAnswers.get(enrollment)?.result.answer.answer === "accepted") {
+        joinButton.setAttribute("disabled", "");
+        if (state) tell(false, state.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. Do not send a replacement." : "Joining room");
+      } else joinButton.removeAttribute("disabled");
+    } catch { /* The submit handler reports an invalid invitation or key. */ }
+  };
+  room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; offeredJoin(); });
+  secret.addEventListener("input", offeredJoin);
   joinButton.addEventListener("click", () => {
     void (async () => {
       const next = read(null);
       if (!next) return;
       const invitation = (room as HTMLTextAreaElement).value;
       const current = () => settingsContext(settings() ?? { place: null, secret: "" }) === selectedContext;
-      if (!current() || joinAnswers.get(joinKey)?.result.answer.answer === "accepted" || !joining.begin(joinKey, "join")) return;
+      let enrollment: string;
+      try { enrollment = joinAssociation(sessionOf(next), invitation); }
+      catch (error) { tell(false, error instanceof Error ? error.message : "The invitation could not be read."); return; }
+      if (!current() || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
       joinButton.setAttribute("disabled", "");
       try {
         const joined = await joinRoom(sessionOf(next), invitation, () => {
           if (!current()) throw new Error("The room or key changed before joining. Nothing was sent.");
-          joining.submitting(joinKey);
+          joining.submitting(enrollment);
         });
-        joinAnswers.set(joinKey, { result: joined, settings: next });
-        if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(joinKey); else joining.answered(joinKey);
+        joinAnswers.set(enrollment, { result: joined, settings: next });
+        if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(enrollment); else joining.answered(enrollment);
         if (!current() || screenDraw !== drawing) return;
         if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);
         save({ ...next, place: joined.place });
       } catch (error) {
-        joining.failed(joinKey);
-        if (current() && screenDraw === drawing) tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : error instanceof Error ? error.message : String(error));
+        joining.failed(enrollment);
+        if (current() && screenDraw === drawing) tell(false, joining.get(enrollment)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : error instanceof Error ? error.message : String(error));
       } finally {
-        if (!joining.get(joinKey) && joinAnswers.get(joinKey)?.result.answer.answer !== "accepted") joinButton.removeAttribute("disabled");
+        if (!joining.get(enrollment) && joinAnswers.get(enrollment)?.result.answer.answer !== "accepted") joinButton.removeAttribute("disabled");
       }
     })();
   });
