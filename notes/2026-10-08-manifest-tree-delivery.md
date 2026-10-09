@@ -4,6 +4,26 @@ Work in progress for request `b8c5a3c8d9a8f4b9c34d8609b9e779ceef86419a`
 and builder promise `1721118488413cc0d65f8ab3ef2d28b9c054c02d`.
 This note is not a completed delivery, gate result or deployment claim.
 
+## Current handoff status
+
+Current code checkpoint is `d909cefb4545dcc4794d7d123e52397bbc12038e`, tree
+`f503bed5d4fd329b5818940fd216d624b30430b1`; `b461ea5e` changes this note only.
+The latest whole gate is the failed `856907f7` run: one CLI story timeout,
+RefcountedCanceler diagnostic, 930 passed and two recorders skipped. Its
+unchanged isolated story passed separately. Later test-boundary checks passed;
+no later whole-gate pass is claimed.
+
+Pending owner dispositions: gate risk `f496c732`, snapshot history floor
+`ed2303e9`, and explicit scope binding `ddbfd6cb` for the later Page cleanup
+compatibility repair/native fixtures/assets, since original b8 excludes Page
+changes. The landed C1 approval does not cover those later bytes. Hosted
+proposal publication/refusal, normal final review and landing remain owed.
+The read-trigger choice is resolved by `41e959e7`: act/alarm only, with a
+write-free expiry projection and separate CLI pending/owed reports.
+
+The sections below preserve exact historical checkpoints and their evidence.
+Their earlier open statuses are superseded where later sections say so.
+
 ## Historical documentation preparation
 
 The composed branch was clean at
@@ -96,7 +116,7 @@ The three repaired typecheck logs for scripts, Scope and lanes are empty.
 Their successful completion remains producer-attributed; empty files alone
 do not establish an exit code. No typecheck was repeated here.
 
-## Conditions still owed
+## Historical conditions before timed cleanup
 
 Peer findings were repaired at composed source
 `5a98b42407cafae4b61d466c012f8f1ffc41b950`. Unknown-stage cancellation
@@ -116,7 +136,7 @@ Expiry cleanup must be automatic on the destination's next timed turn,
 with at most three recorded cleanup attempts and named owed cleanup.
 The former explicit-resend expiry candidate does not meet that decision.
 
-## Timed cleanup implementation checkpoint
+## Historical timed cleanup checkpoint
 
 Source `68ef4cef97c605498cf9c65ead6e34d797f7fe22`, tree
 `a7d00ba4d080da4d33737da4c759de184c4d6004`, implements the platform-only
@@ -167,13 +187,13 @@ turn. Reads must not prepare a turn. The removed patch is not adopted and
 receives no validation credit. The later pure expiry projection is described
 below; it never runs cleanup or calls the provider.
 
-The exact final source still needs a final gate, an observed hosted proposal
+At that checkpoint the exact source still needed a final gate, an observed hosted proposal
 publication and named refusal, complete independent Source review and landing.
-No final gate or hosted proposal run has occurred for this candidate. Page v2 is separately landed as `d0a3bdcc`; its approval supplies no manifest
+No final gate or hosted proposal run had occurred at that checkpoint. Page v2 is separately landed as `d0a3bdcc`; its approval supplies no manifest
 validation or protocol adoption.
 
 
-## Independent cleanup duties repair
+## Historical independent cleanup duties repair
 
 Source `28d12a372b433088f718a80ac133f5a715986adc`, tree
 `2dfc63b076cad048efe75fa14fe2bc62f62357a2`, repairs the coupled
@@ -244,7 +264,7 @@ unchanged boundaries. This is bounded implementation feedback and validation,
 not independent Source approval. The ordinary-read owner decision and all
 remaining delivery duties above remain open.
 
-## Current source preparation
+## Historical source preparation at 43ca
 
 The coherent source is `43cae0dbd190cccaf5b32c7763e9e639d9e4d109`, tree
 `d33acc7e885391be1d5932f5a87e57e47d9a354c`. It carries landed Page v2 and
