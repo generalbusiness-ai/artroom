@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-09-condition-subscriptions-and-webhooks.md","body":{"commit":"1564551731af8a5314ecb9e5f305863793826cc3","path":"notes/2026-10-09-condition-subscriptions-and-webhooks.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1e278b9dccbb77ffd18f986a0aac3479f1091a9a","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-09-condition-subscriptions-and-webhooks.md."}
