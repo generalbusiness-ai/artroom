@@ -11,7 +11,7 @@ import { gitHub, Hub, ownHost, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { memoryStore, type Context, type Git, type Outcome } from "../../cli/src/index.ts";
 import { actsOn, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf } from "../../page/src/index.ts";
-import { FILES, judged, registerSetting, rehearse, transcript, type NextShot, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
+import { FILES, branchFiles, judged, registerSetting, rehearse, transcript, type NextShot, type Person, type Rehearsal, type Stage, type Taken } from "../../../scripts/demo/rehearse.ts";
 import { captureBinding, observeCaptures } from "../../../scripts/demo/capture-binding.ts";
 
 const SERVICE = "https://scopes.test";
@@ -46,6 +46,46 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
         platformNet.secret = null;
         platformNet.sessions = false;
         net.hold = null;
+        for (const name of wired) platformOutside.delete(name);
+      }
+    }, 240_000);
+  }
+
+  for (const [host, make] of [["artifacts", () => Promise.resolve(ownHost())], ["github.com", gitHub]] as const) {
+    test(`on ${host}: the optional manifest sequence follows shot 16, publishes both text files together and refuses a controlled two-file branch; Git capture is a STAND-IN`, async () => {
+      net.hold = net.deaf = null;
+      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+      platformNet.sessions = true;
+      const wired = new Set<ScopeId>();
+      try {
+        const at = await make();
+        const { stage, drained } = testStage(at, wired);
+        const next: number[] = [];
+        const rehearsal = await rehearse({ ...stage, manifest: true, beforeShot: async (shot) => { next.push(shot.n); } });
+        const failed = rehearsal.shots.filter((shot) => !shot.match).map((shot) => `${shot.n}. ${shot.title}: ${shot.why}\n${shot.lines.join("\n")}`);
+        expect(failed, failed.join("\n\n")).toEqual([]);
+        expect([rehearsal.ok, rehearsal.shots.length, next]).toEqual([true, 31, Array.from({ length: 31 }, (_, i) => i + 1)]);
+        expect(rehearsal.shots.slice(15, 21).map((shot) => shot.title)).toEqual([
+          "Edit a page in an open folder, closing the issue", "Activate the manifest-list change definition",
+          "Prepare the committed two-text-file branch two-pages", "Propose a two-text-file branch: published",
+          "Prepare the committed two-text-file branch two-controlled", "Propose a controlled two-text-file branch: refused by name",
+        ]);
+        expect(rehearsal.shots[18]!.lines[0]).toMatch(/^Proposed 2 files as change sc_/);
+        expect(rehearsal.shots[20]!.lines[1]).toContain("rules-not-met:rules");
+        const directory = rehearsal.room.directory!;
+        for (const file of branchFiles("two-pages")) {
+          const page = await stage.get(`${SERVICE}/site/${directory}/HEAD/${file.path}`);
+          expect([page.status, page.body.includes(new TextDecoder().decode(file.bytes).split("\n\n")[1]!.trim())]).toEqual([200, true]);
+        }
+        expect((await stage.get(`${SERVICE}/site/${directory}/HEAD/guide/controlled.md`)).status).toBe(404);
+        expect(rehearsal.shots.find((shot) => shot.title === "The verifier, every scope")!.lines.at(-1)).toBe("All consistent: 14 scopes.");
+        const text = transcript(rehearsal, { service: SERVICE, host, namespace: at.namespace, started: "in the test", how: "Git capture and preparation are STAND-INs." });
+        expect(text).not.toMatch(/artroom-invite:[A-Za-z0-9_-]{9}/);
+        const published = rehearsal.shots[18]!;
+        expect(judged(published.expected, { code: 0, lines: [published.lines[0]!.replace("2 files", "1 files"), published.lines[1]!] }, {})).toMatch(/^line 1/);
+        await drained();
+      } finally {
+        platformNet.secret = null; platformNet.sessions = false; net.hold = null;
         for (const name of wired) platformOutside.delete(name);
       }
     }, 240_000);
@@ -146,7 +186,13 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
   };
   // STAND-IN for git: a clone is a read of the stand-in's refs with the clone's header, and keeps the head it read.
   const clones = new Map<string, string>();
+  const branches = new Map<string, { base: string; files: readonly { path: string; bytes: Uint8Array }[] }>();
   const git: Git = {
+    files: async (base, branch) => {
+      const captured = branches.get(branch);
+      if (!captured || captured.base !== base) return { ok: false, reason: "stand-in-base-mismatch" };
+      return { ok: true, tip: base, files: captured.files };
+    },
     run: async (args, given) => {
       if (args.length === 1 && args[0] === "--version") {
         expect(given).toEqual({});
@@ -185,6 +231,12 @@ function testStage(at: Stand, wired: Set<ScopeId>): { stage: Stage; people: Part
     get: async (url) => {
       const answer = await deployed(url);
       return { status: answer.status, type: answer.headers.get("content-type") ?? "", body: await answer.text() };
+    },
+    prepareBranch: async (branch, files) => {
+      const base = at.stand.refs.get("refs/heads/main")!;
+      clones.set("site", base);
+      branches.set(branch, { base, files });
+      return { code: 0, lines: [`Prepared local Git branch ${branch} with ${files.length} text files.`, `STAND-IN Git preparation: pull current room head ${base}, commit the two named text files locally.`] };
     },
     log: async (directory): Promise<Outcome> => {
       let id = clones.get(directory);

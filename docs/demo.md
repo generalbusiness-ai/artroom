@@ -9,7 +9,7 @@ evening before a recording, and again on the morning of it.
 
 ## What the runner does
 
-`scripts/demo-run.ts` runs 26 shots in order. Each shot is one command
+`scripts/demo-run.ts` runs 26 shots in order by default. Each shot is one command
 line, called as the command line's own function with that person's config
 directory, or one read of `git log` or of a page. The people are the
 founder `@hugh`, a member `@una` and a maintainer `@paul`, each with a
@@ -96,6 +96,35 @@ cut to its first eight letters on screen and in the transcript, the read
 token is never printed by `artroom clone`, and keys are shown by their
 key IDs only. The keys stay in the config directories, readable only by
 their owner.
+
+## Proposing a committed two-file branch
+
+Add `--manifest` to opt in to five shots immediately after shot 16. The
+founder activates the current manifest-list demo definition. In the
+member's clone, the runner pulls the room's head, creates `two-pages`,
+writes two UTF-8 Markdown files and commits them with Git. It records
+these local Git commands and their outputs explicitly. The maintainer
+runs `artroom propose two-pages` in the same local clone and proposes both
+committed files as one change, expecting publication. Artroom writes its own integration commit; the local commit
+is source preparation, not a commit made by an Artroom command.
+
+The next preparation checks out `main` and pulls again, observing the
+room's integration commit, then creates `two-controlled` with `AGENTS.md`
+and a second text file. The maintainer's proposal must be refused
+`rules-not-met:rules`, with neither file published. The remaining
+scenes use the manifest-list definition; the explicit later merge prints
+its publication line without the legacy convenience page line.
+
+The optional run has 31 shots and verifies 14 scopes; the default run
+keeps its 26 shots and 12 scopes. Both flags can be used together:
+`--manifest --pace` waits before the preparation steps too.
+
+The Node runner uses actual local Git in the member's `site` clone.
+The real-scope rehearsal tests label preparation and branch capture as
+stand-ins. Their published and refused outcomes prove the scopes' behavior
+from those captured bytes; they do not prove Git capture or a deployment.
+The manifest-tree scenario separately witnesses the required check on the
+recorded reservation. The demo profile has no required check configured.
 
 ## Recording
 

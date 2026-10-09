@@ -2,7 +2,7 @@
 // The demo runner: a rehearsal of the demo script's middle against a deployment, with a transcript.
 //
 //   node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> \
-//     --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace]
+//     --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace] [--manifest]
 //
 // It runs the shots of `scripts/demo/rehearse.ts` in order, as the command line's own functions, each as its person: the founder,
 // a member and a maintainer, each with a fresh config directory under the scratch directory (`founder`, `member`, `maintainer`).
@@ -23,33 +23,33 @@ import type { Context, Outcome } from "../packages/cli/src/commands.ts";
 import { FILES, registerSetting, rehearse, transcript, type NextShot, type Person, type Stage, type Taken } from "./demo/rehearse.ts";
 import { keepCaptureObservations, observeCaptures } from "./demo/capture-context.ts";
 
-const USAGE = "Usage: scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace]";
+const USAGE = "Usage: scripts/demo-run.ts <base-url> --host <git-host> --namespace <name> --scratch <empty directory> --out <directory> [--name <room>] [--setting-set] [--pace] [--manifest]";
 
-function options(argv: readonly string[]): { service: string; host: string; namespace: string; scratch: string; out: string; name: string; settingSet: boolean; pace: boolean } | string {
+function options(argv: readonly string[]): { service: string; host: string; namespace: string; scratch: string; out: string; name: string; settingSet: boolean; pace: boolean; manifest: boolean } | string {
   const words: string[] = [];
   const flags = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--setting-set" || arg === "--pace") flags.set(arg.slice(2), "true");
+    if (arg === "--setting-set" || arg === "--pace" || arg === "--manifest") flags.set(arg.slice(2), "true");
     else if (arg.startsWith("--")) {
       const value = argv[++i];
       if (value === undefined) return `${arg} needs a value.`;
       flags.set(arg.slice(2), value);
     } else words.push(arg);
   }
-  const unknown = [...flags.keys()].find((flag) => !["host", "namespace", "scratch", "out", "name", "setting-set", "pace"].includes(flag));
+  const unknown = [...flags.keys()].find((flag) => !["host", "namespace", "scratch", "out", "name", "setting-set", "pace", "manifest"].includes(flag));
   if (unknown !== undefined) return `There is no --${unknown}.`;
   const [service, ...more] = words;
   if (service === undefined || more.length > 0) return "Give one base URL.";
   for (const flag of ["host", "namespace", "scratch", "out"]) if (!flags.has(flag)) return `--${flag} is needed.`;
   const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(4, 13).replace("T", "-").toLowerCase();
-  return { service, host: flags.get("host")!, namespace: flags.get("namespace")!, scratch: resolve(flags.get("scratch")!), out: resolve(flags.get("out")!), name: flags.get("name") ?? `rehearsal-${stamp}`, settingSet: flags.has("setting-set"), pace: flags.has("pace") };
+  return { service, host: flags.get("host")!, namespace: flags.get("namespace")!, scratch: resolve(flags.get("scratch")!), out: resolve(flags.get("out")!), name: flags.get("name") ?? `rehearsal-${stamp}`, settingSet: flags.has("setting-set"), pace: flags.has("pace"), manifest: flags.has("manifest") };
 }
 
 /** `git` with its output kept, in the working directory. */
-function gitLines(args: readonly string[], cwd: string): Promise<Outcome> {
+function gitLines(args: readonly string[], cwd: string, gitEnv: Readonly<Record<string, string>> = {}): Promise<Outcome> {
   return new Promise((done) => {
-    const child = spawn("git", [...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("git", [...args], { cwd, env: { ...process.env, ...gitEnv }, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     child.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8"); });
     child.stderr.on("data", (chunk: Buffer) => { out += chunk.toString("utf8"); });
@@ -84,9 +84,21 @@ async function main(argv: readonly string[]): Promise<number> {
   const read = async (path: string): Promise<Uint8Array | null> => { try { return new Uint8Array(await readFile(join(work, path))); } catch { return null; } };
   const started = new Date().toISOString();
   const people: Partial<Record<Person, Context>> = {};
+  // The clone's header stays only in this runner's memory. Pulls need it for
+  // the private artifacts host; no secret enters a Git argument or file.
+  let cloneHeader: Readonly<Record<string, string>> = {};
+  const localGit = nodeGit("git", work);
+  const runnerGit = {
+    files: nodeGit("git", join(work, "site")).files,
+    run: async (args: readonly string[], env: Readonly<Record<string, string>>) => {
+      const code = await localGit.run(args, env);
+      if (given.manifest && args[0] === "clone" && code === 0) cloneHeader = { ...env };
+      return code;
+    },
+  };
   const stage: Stage = {
-    service: given.service, host: given.host, namespace: given.namespace, name: given.name,
-    person: (who: Person) => (people[who] = { store: fileStore(join(given.scratch, who)), git: nodeGit(), read }),
+    service: given.service, host: given.host, namespace: given.namespace, name: given.name, manifest: given.manifest,
+    person: (who: Person) => (people[who] = { store: fileStore(join(given.scratch, who)), git: runnerGit, read }),
     pin: async (register) => {
       const setting = registerSetting(given.host);
       if (given.settingSet) return `--setting-set was given: the runner did not wait for ${setting} = ${register}. It did not inspect the deployment's setting.`;
@@ -104,6 +116,28 @@ async function main(argv: readonly string[]): Promise<number> {
       } catch (error) {
         return { status: 0, type: `no answer (${error instanceof Error ? error.message : String(error)})`, body: "" };
       }
+    },
+    prepareBranch: async (branch, files) => {
+      const clone = join(work, "site");
+      const lines: string[] = [];
+      const commands: string[][] = [["checkout", "main"], ["pull", "--ff-only"], ["log", "-1", "--format=%H %s"], ["checkout", "-b", branch]];
+      for (const args of commands) {
+        const result = await gitLines(args, clone, cloneHeader);
+        lines.push(`$ git ${args.join(" ")}`, ...result.lines);
+        if (result.code !== 0) return { code: 1, lines };
+      }
+      for (const file of files) {
+        const target = join(clone, file.path);
+        mkdirSync(resolve(target, ".."), { recursive: true });
+        writeFileSync(target, file.bytes);
+        lines.push(`Wrote ${file.path} (${file.bytes.length} UTF-8 bytes).`);
+      }
+      for (const args of [["add", "--", ...files.map((file) => file.path)], ["-c", "user.name=Demo member", "-c", "user.email=demo@example.invalid", "commit", "-m", `Prepare ${branch}`]]) {
+        const result = await gitLines(args, clone, cloneHeader);
+        lines.push(`$ git ${args.join(" ")}`, ...result.lines);
+        if (result.code !== 0) return { code: 1, lines };
+      }
+      return { code: 0, lines: [`Prepared local Git branch ${branch} with ${files.length} text files.`, lines.join("; ")] };
     },
     log: (directory) => gitLines(["-C", directory, "log", "--oneline"], work),
     ...(given.pace ? { beforeShot: async (shot: NextShot) => {
