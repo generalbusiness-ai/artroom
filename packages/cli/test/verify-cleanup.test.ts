@@ -12,7 +12,8 @@ const item = (id: number, reason: string): Item => ({ id, type: "publication", s
 // Scripted read-port boundary: no native destination or external cleanup runs.
 test("complete same-head cleanup observations name every owed reservation and retain unknown custody without exposing token values", async () => {
   const cursors: (string | undefined)[] = [];
-  const liveSummary = (): Read<Summary> => { const read = summary(); return read.ok ? { ...read, value: { ...read.value, items: [item(4, "reservation-ref"), item(8, "reservation-token-unknown")] } } : read; };
+  const both: Item = { ...item(8, "reservation-token-unknown"), values: { ...item(8, "reservation-token-unknown").values, cleanupReason: { refReason: "reservation-stage-unknown", tokenReason: "reservation-token-unknown", tokenAttempts: 1, refRemoved: false }, cleanupAttempts: 1 } };
+  const liveSummary = (): Read<Summary> => { const read = summary(); return read.ok ? { ...read, value: { ...read.value, items: [item(4, "reservation-ref"), both] } } : read; };
   const final = { ...item(12, "reservation-ref"), state: "cleaned" };
   const result = await observeCleanup({ summary: async () => liveSummary(), items: async (_type, cursor) => {
     cursors.push(cursor);
@@ -21,10 +22,19 @@ test("complete same-head cleanup observations name every owed reservation and re
   expect(cursors).toEqual([undefined, "second"]);
   expect(result.finding).toEqual(expect.stringContaining("2 reservation(s)"));
   expect(result.lines[0]).toContain("reservation 4");
+  expect(result.lines.filter((line) => line.includes("reservation 8"))).toHaveLength(2);
+  expect(result.lines[1]).toContain("reservation-stage-unknown; attempts 1");
+  expect(result.lines[2]).toContain("reservation-token-unknown; attempts 1");
   expect(result.lines[1]).toContain("custody remains unknown");
   expect(result.lines.join("\n")).not.toContain("private-token");
   expect(result.lines.join("\n")).not.toContain("cleaned");
   expect(result.lines.join("\n")).not.toContain("reservation 12");
+  const tokenOnly: Item = { ...both, values: { ...both.values, cleanupReason: { tokenReason: "reservation-token-unknown", refRemoved: true, tokenAttempts: 2 } } };
+  const tokenSummary = (): Read<Summary> => { const read = summary(); return read.ok ? { ...read, value: { ...read.value, items: [tokenOnly] } } : read; };
+  const remaining = await observeCleanup({ summary: async () => tokenSummary(), items: async () => ({ ok: true, complete: true, at: head, value: [] }) }, target);
+  expect(remaining.lines).toHaveLength(1);
+  expect(remaining.lines[0]).toContain("reservation-token-unknown; attempts 2");
+  expect(remaining.lines[0]).not.toContain("reservation-ref-unknown");
 });
 
 test("head movement or incomplete pagination yields no cleanup absence claim, while old pins make no cleanup claim", async () => {

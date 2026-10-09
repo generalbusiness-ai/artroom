@@ -3,7 +3,7 @@ import { inject, expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken } from "@generalbusiness/artroom-platform";
+import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { valueDigest } from "@generalbusiness/artroom-derive";
@@ -82,7 +82,19 @@ test.each(["ref", "token", "token-unknown"] as const)("expired reservations reta
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, resource); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false): Promise<void> {
+test("unknown staging and exhausted token cleanup retain independent duties across late original and earlier deletion answers (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, true, false, false, false, undefined, "token"); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+test("an unknown cleanup mint remains named after confirmed ref deletion until its exact late mint and revoke settle (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -91,6 +103,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
   let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let pendingStage: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
+  let releaseMint = false;
+  let pendingMint: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
+  let earlierDelete: { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => {
     const nativeReader = snapshotReaderOf(env.PLATFORM);
     let keyReads = 0;
@@ -100,7 +115,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       return answer;
     } });
     let late: import("../../scope/src/operations.ts").LateAnswers | null = null;
-    return { ...outside, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
+    return { ...outside, replies: (limit) => { const replies = outside.replies?.(limit) ?? { answers: [], more: false }; return { ...replies, answers: replies.answers.filter((row) => releaseMint || row.operation !== pendingMint?.request.operation) }; }, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
       if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
       if (exhaustCleanup === "ref" && request.kind === "reservation-delete") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: [...host.refs].find(([ref]) => ref.startsWith("refs/artroom/reservations/"))?.[1] ?? "failed" } } };
       if ((exhaustCleanup === "token" || exhaustCleanup === "token-unknown") && request.kind === "revoke") {
@@ -110,6 +125,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       }
       if (refusePushOnly && request.kind === "push") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: host.refs.get("refs/heads/main")! } } };
       const answer = await outside.send(request);
+      if (unknownMintOnly && request.kind === "mint" && answer && !pendingMint && destinationWrite(given.state, given.own, given.state.operation(request.operation)!)?.write.kind === "reservation-delete") { pendingMint = { request, answer, late }; return null; }
+      if (unknownStageOnly && request.kind === "reservation-delete" && request.attempt === 1) earlierDelete = { request, late };
       if (unknownStageOnly && request.kind === "reservation-stage" && answer) pendingStage = { request, answer, late };
       return (holdPush && ["push", "read"].includes(request.kind)) || (unknownStageOnly && request.kind === "reservation-stage") || (unknownDeleteOnly && request.kind === "reservation-delete") ? null : answer;
     } };
@@ -213,7 +230,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
-  if (exhaustCleanup) {
+  if ((exhaustCleanup && !unknownStageOnly) || unknownMintOnly) {
     const proposed = ok(await run(founder, "propose", "cleanup-exhausted"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
@@ -224,7 +241,20 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect((await G.entries()).filter((entry) => entry.input.type === "timed" && entry.input.item === expiring.id && entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "reservation-delete" && effect.attempts === 3))).toHaveLength(1);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
     const owed = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "cleanup-owed")!;
-    expect([owed.values["cleanupAttempts"], owed.values["cleanupReason"], host.refs.has(ref), host.refs.get("refs/heads/main")]).toEqual([3, exhaustCleanup === "ref" ? "reservation-ref" : exhaustCleanup === "token-unknown" ? "reservation-token-unknown" : "reservation-token", exhaustCleanup === "ref", first]);
+    if (unknownMintOnly) {
+      expect([owed.values["cleanupAttempts"], owed.values["cleanupReason"], host.refs.has(ref)]).toEqual([2, { tokenReason: "reservation-token-unknown", tokenAttempts: 1, refRemoved: true }, false]);
+      const verified = await run(founder, "verify", "--all");
+      expect(verified.lines.join("\n")).toContain("reservation-token-unknown; attempts 1");
+      const held = pendingMint as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers };
+      releaseMint = true;
+      expect(await runInDurableObject(G.object, () => held.late(held.request.operation, held.request.attempt, held.answer))).toMatchObject({ recorded: "written" });
+      await pause([repository.destination]);
+      expect((await G.entries()).some((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.item === expiring.id && effect.state === "cleaned"))).toBe(true);
+      expect((await G.summary()).value.items.some((item) => item.id === expiring.id)).toBe(false);
+      expect((await G.entries()).flatMap((entry) => entry.effects).filter((effect) => effect.effect === "value" && effect.item === expiring.id && effect.slot === "cleanupAttempts").at(-1)).toMatchObject({ value: 2 });
+      return;
+    }
+    expect([owed.values["cleanupAttempts"], owed.values["cleanupReason"], host.refs.has(ref), host.refs.get("refs/heads/main")]).toEqual([exhaustCleanup === "ref" ? 3 : 1, exhaustCleanup === "ref" ? { refReason: "reservation-ref", tokenAttempts: 0, refRemoved: false } : { tokenReason: exhaustCleanup === "token-unknown" ? "reservation-token-unknown" : "reservation-token", tokenAttempts: 3, refRemoved: true }, exhaustCleanup === "ref", first]);
     const deletions = (await G.entries()).filter((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete");
     expect(deletions.map((entry) => entry.input.type === "outcome" ? entry.input.attempt : null)).toEqual(exhaustCleanup === "ref" ? [1, 2, 3] : [1]);
     await pause([repository.destination]);
@@ -271,9 +301,14 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     ok(await run(founder, "act", "cancel-merge", "--on", lane.name, "--target", String(merge.id)));
     await pause([lane.name, repository.destination]);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
-    expect([(await G.item(publication.id)).state, (await G.item(publication.id)).values["cleanupReason"], host.refs.has(ref), (await G.item(0)).refs["slot"] ?? null]).toEqual(["cleanup-owed", "reservation-stage-unknown", false, null]);
+    expect([(await G.item(publication.id)).state, (await G.item(publication.id)).values["cleanupReason"], host.refs.has(ref), (await G.item(0)).refs["slot"] ?? null]).toEqual(["cleanup-owed", { refReason: "reservation-stage-unknown", ...(exhaustCleanup ? { tokenReason: "reservation-token" } : {}), tokenAttempts: exhaustCleanup ? 3 : 0, refRemoved: false }, false, null]);
     expect((await G.entries()).filter((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete")).toHaveLength(1);
     expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(1);
+    if (exhaustCleanup) {
+      const verified = await run(founder, "verify", "--all");
+      expect(verified.lines.join("\n")).toContain("reservation-stage-unknown; attempts 1");
+      expect(verified.lines.join("\n")).toContain("reservation-token; attempts 3");
+    }
     const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
     expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     // Settle that exact original stage answer; a remaining cleanup operation
@@ -286,7 +321,14 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(cleanupEntries).toHaveLength(3);
     // The new marked deletion sees absence, but receives no decisive own
     // mutation answer. The original stage is now known; ref custody stays unknown.
-    expect([(await G.item(publication.id)).state, (await G.item(publication.id)).values["cleanupReason"], (await G.item(publication.id)).values["cleanupAttempts"], host.refs.has(ref)]).toEqual(["cleanup-owed", "reservation-ref-unknown", 3, false]);
+    expect([(await G.item(publication.id)).state, (await G.item(publication.id)).values["cleanupReason"], (await G.item(publication.id)).values["cleanupAttempts"], host.refs.has(ref)]).toEqual(["cleanup-owed", { refReason: "reservation-ref-unknown", ...(exhaustCleanup ? { tokenReason: "reservation-token" } : {}), tokenAttempts: exhaustCleanup ? 3 : 0, refRemoved: false }, 3, false]);
+    if (exhaustCleanup) {
+      const held = earlierDelete as unknown as { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers };
+      expect(held.request.attempt).toBe(1);
+      expect(await runInDurableObject(G.object, () => held.late(held.request.operation, held.request.attempt, { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: "failed" } } }))).toMatchObject({ recorded: "written" });
+      expect((await G.item(publication.id)).values["cleanupAttempts"]).toBe(3);
+      expect((await G.item(publication.id)).values["cleanupReason"]).toEqual({ refReason: "reservation-ref-unknown", tokenReason: "reservation-token", tokenAttempts: 3, refRemoved: false });
+    }
     return;
   }
   if (startedOnly) {

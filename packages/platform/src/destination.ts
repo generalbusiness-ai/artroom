@@ -546,7 +546,12 @@ export const destination3: PlatformData = {
     publication: { ...destination2.items["publication"]!, states: { ...destination2.items["publication"]!.states, published: { final: false }, "cleanup-aborted": { final: false }, "cleanup-deleted": { final: false }, "cleanup-owed": { final: false }, cleaned: { final: true } }, holds: { ...destination2.items["publication"]!.holds!, requests: 5, /* stage, checks-ready, first unknown, final, withdrawal; explicit resend adds two */ operations: { ...destination2.items["publication"]!.holds!.operations, mint: 10, revoke: 10, "check-judge": 32, "reservation-stage": 1, "reservation-delete": 3 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
       ...destination2.items["publication"]!.values,
       tree: { fixed: false, required: false, of: { type: "tree" } },
-      cleanupReason: { fixed: false, required: false, of: { type: "enum", of: ["reservation-ref", "reservation-ref-unknown", "reservation-token", "reservation-token-unknown", "reservation-stage-unknown"] } },
+      cleanupReason: { fixed: false, required: true, default: { tokenAttempts: 0, refRemoved: false }, of: { type: "record", of: {
+        refReason: { type: "enum", of: ["reservation-ref", "reservation-ref-unknown", "reservation-stage-unknown"], required: false },
+        tokenReason: { type: "enum", of: ["reservation-token", "reservation-token-unknown"], required: false },
+        tokenAttempts: { type: "int", min: 0, max: 3, required: true },
+        refRemoved: { type: "bool", required: true },
+      } } },
       cleanupAttempts: { fixed: false, required: true, default: 0, of: { type: "int", min: 0, max: 3 } },
       checkDeadline: { fixed: false, required: false, of: { type: "time" } },
       requiredChecks: { fixed: false, required: false, of: { type: "list", max: 32, of: { type: "text", max: 128 } } },
@@ -562,10 +567,11 @@ export const destination3: PlatformData = {
   outcomes: { ...destination2.outcomes,
     push: { ...destination2.outcomes["push"]!, most: { ...destination2.outcomes["push"]!.most!, effects: 20, operations: ["revoke", "receipt", "mint", "judge", "read", "reservation-delete"] } },
     read: { ...destination2.outcomes["read"]!, most: { ...destination2.outcomes["read"]!.most!, effects: 17, operations: ["receipt", "mint", "judge", "reservation-delete"] } },
-    revoke: { ...destination2.outcomes["revoke"]!, most: { effects: 3, operations: [] } },
+    mint: { ...destination2.outcomes["mint"]!, most: { effects: 8, operations: ["revoke"] } },
+    revoke: { ...destination2.outcomes["revoke"]!, most: { effects: 6, operations: [] } },
     judge: { ...destination2.outcomes["judge"]!, most: { effects: 12, operations: ["reservation-stage", "push", "mint", "judge"] } },
     receipt: { ...destination2.outcomes["receipt"]!, most: { effects: 9, operations: ["revoke", "mint", "read", "reservation-delete"] } },
-    "reservation-delete": { code: "reservation-delete", row: "P19", attempts: 3, most: { effects: 8, operations: ["revoke", "mint"] } },
+    "reservation-delete": { code: "reservation-delete", row: "P19", attempts: 3, most: { effects: 12, operations: ["revoke", "mint"] } },
     "reservation-stage": { code: "reservation-stage", row: "P19", send: UPDATE, attempts: 1, most: { effects: 8, operations: ["push", "mint", "revoke", "reservation-delete"] } },
     "check-judge": { code: "check-judge", row: "P19", send: UPDATE, attempts: 1, origin: "opening", most: { effects: 8, operations: ["push", "mint", "reservation-delete", "judge"] }, observes: [
       { of: "key", from: "rule", max: 1, window: 10, use: "once", without: "wait" },
@@ -1868,7 +1874,7 @@ const WRITTEN: Rules = {
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || (closed(target) && !(served.write.owner === "platform:destination@3" && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
+        if (target === null || (closed(target) && !(served.write.owner === "platform:destination@3" && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
           effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...(target.type === "publication" && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
@@ -2114,25 +2120,44 @@ function cleanupTokensClosed(given: RuleGiven, publication: Item, current: Opera
     return operations.some((revoke) => revoke.kind === "revoke" && mintRevoked(given.state, given.own, revoke)?.id === mint.id && ((revoke.id === current.id && given.input.type === "outcome" && given.input.result === "confirmed") || revoke.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "confirmed"))));
   });
 }
-function cleanupTokensExhausted(given: RuleGiven, publication: Item): "reservation-token" | "reservation-token-unknown" | null {
+function cleanupTokensExhausted(given: RuleGiven, publication: Item, current: Operation): "reservation-token" | "reservation-token-unknown" | null {
   for (let seq = publication.values["reservedAt"] as number; seq < given.resolved.self; seq++) for (const operation of openedIn(given.state, seq)) {
-    if (operation.for !== publication.id || operation.kind !== "revoke") continue;
+    if (operation.for !== publication.id || operation.kind !== "revoke" || (operation.id === current.id && given.input.type === "outcome" && given.input.result === "confirmed")) continue;
     if (!operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "confirmed")) && operation.attempts.length === operation.most && operation.attempts.every((attempt) => attempt.outcomes.length > 0)) return operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown")) ? "reservation-token-unknown" : "reservation-token";
   }
   return null;
 }
 function cleanupAttempt(given: RuleGiven, publication: Item, current: Operation): number {
-  let earlier = 0;
+  let opened = 0;
   for (let seq = publication.values["reservedAt"] as number; seq < given.resolved.self; seq++) for (const operation of openedIn(given.state, seq)) {
-    if (operation.for === publication.id && operation.kind === "reservation-delete" && operation.id !== current.id) earlier += operation.attempts.length;
+    if (operation.for === publication.id && operation.kind === "reservation-delete") opened += operation.attempts.length;
   }
-  return earlier + (given.input.type === "outcome" ? given.input.attempt : 0);
+  const input = given.input;
+  if (input.type === "outcome" && !current.attempts.some((attempt) => attempt.attempt === input.attempt)) opened++;
+  return Math.max(publication.values["cleanupAttempts"] as number, opened);
 }
-const cleanupOwed = (publication: Item, reason: string, attempt: number): RuleEffect[] => [
-  { effect: "state", item: publication.id, state: "cleanup-owed" },
-  { effect: "value", item: publication.id, slot: "cleanupReason", value: reason },
-  { effect: "value", item: publication.id, slot: "cleanupAttempts", value: attempt },
-];
+function cleanupMintUnknown(given: RuleGiven, publication: Item): boolean {
+  for (let seq = publication.values["reservedAt"] as number; seq < given.resolved.self; seq++) for (const operation of openedIn(given.state, seq)) {
+    if (operation.for !== publication.id || operation.kind !== "mint") continue;
+    const outcomes = operation.attempts.flatMap((attempt) => attempt.outcomes);
+    if (!outcomes.some((outcome) => outcome.result === "confirmed") && outcomes.some((outcome) => outcome.result === "unknown")) return true;
+  }
+  return false;
+}
+type CleanupDuties = { refReason?: string; tokenReason?: string; tokenAttempts: number; refRemoved: boolean };
+const cleanupDuties = (publication: Item): CleanupDuties => publication.values["cleanupReason"] as unknown as CleanupDuties;
+/** Independent obligations share one bounded record; the deletion budget
+ * remains cumulative across all operations and late answers. */
+function cleanupStatus(publication: Item, changed: { ref?: string | null; token?: string | null; deletes?: number; tokenAttempts?: number; removed?: boolean }, tokensClosed = false): RuleEffect[] {
+  const previous = cleanupDuties(publication);
+  const ref = changed.ref === undefined ? previous.refReason : changed.ref;
+  const token = changed.token === undefined ? previous.tokenReason : changed.token;
+  const removed = changed.removed ?? previous.refRemoved;
+  const state = ref || token ? "cleanup-owed" : removed ? tokensClosed ? "cleaned" : "cleanup-deleted" : publication.state;
+  const duties = { ...(ref ? { refReason: ref } : {}), ...(token ? { tokenReason: token } : {}), tokenAttempts: Math.max(previous.tokenAttempts, changed.tokenAttempts ?? 0), refRemoved: removed };
+  const deletes = Math.max(publication.values["cleanupAttempts"] as number, changed.deletes ?? 0);
+  return [...(state === publication.state ? [] : [{ effect: "state", item: publication.id, state } as const]), ...(canonicalize(previous) === canonicalize(duties) ? [] : [{ effect: "value", item: publication.id, slot: "cleanupReason", value: duties as unknown as FieldValue } as const]), ...(deletes === publication.values["cleanupAttempts"] ? [] : [{ effect: "value", item: publication.id, slot: "cleanupAttempts", value: deletes } as const])];
+}
 const generations = (publication: Item): CheckGeneration[] => (publication.values["passes"] ?? []) as unknown as CheckGeneration[];
 const resultGeneration = (given: RuleGiven, publication: Item): boolean => {
   const job = given.uses.find((use) => use.entry.input.type === "act" && use.entry.input.signed.intent.kind === "request-check");
@@ -2237,10 +2262,10 @@ export const destinationRules3: Rules = (() => {
     const publication = targetOf(given.state, given.own, operation);
     if (!publication || given.input.type !== "outcome") return NOTHING;
     const body = given.input.evidence.body as { send?: unknown; seen?: unknown; tree?: unknown };
-    if (publication.state === "cleanup-owed" && publication.values["cleanupReason"] === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
-      const used = publication.values["cleanupAttempts"] as number;
+    if (publication.state === "cleanup-owed" && cleanupDuties(publication).refReason === "reservation-stage-unknown" && given.input.result === "confirmed" && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) {
+      const used = cleanupAttempt(given, publication, operation);
       if (used >= 3) return NOTHING;
-      return { effects: [{ effect: "state", item: publication.id, state: "cleanup-aborted" }, { effect: "value", item: publication.id, slot: "cleanupReason", value: null }], opens: [opening(given, "reservation-delete", 3 - used, publication.id), opening(given, "mint", 1, publication.id)], update: null };
+      return { effects: cleanupStatus(publication, { ref: "reservation-ref", deletes: used, removed: false }), opens: [opening(given, "reservation-delete", 3 - used, publication.id), opening(given, "mint", 1, publication.id)], update: null };
     }
     if (publication.state !== "reserved") return NOTHING;
     const token = tokenStep(given, operation);
@@ -2269,26 +2294,36 @@ export const destinationRules3: Rules = (() => {
     push: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 20, requests: 1, operations: 6 } } },
     "deciding-read": { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 17, requests: 1, operations: 5 } } },
     receipt: receiptCleanup,
-    revoke: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 3, requests: 0, operations: 0 }, derives: (given, operation) => {
+    mint: { ...(rules["mint"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["mint"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 8, requests: 1, operations: 1 }, derives: (given, operation, selected) => {
+      const prior = rules["mint"] as Extract<PlatformRule, { place: "outcome" }>;
+      const base = prior.rules.derives!(given, operation, selected);
+      const served = servedBy(given.state, given.own, operation);
+      const target = served ? targetOf(given.state, given.own, served.write) : null;
+      return target?.type === "publication" && ["cleanup-aborted", "cleanup-deleted", "cleanup-owed"].includes(target.state) && given.input.type === "outcome" && given.input.result === "unknown" ? { ...base, effects: [...base.effects, ...cleanupStatus(target, { token: "reservation-token-unknown", tokenAttempts: given.input.attempt })] } : base;
+    } } },
+    revoke: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 6, requests: 0, operations: 0 }, derives: (given, operation) => {
       const mint = mintRevoked(given.state, given.own, operation);
       const served = mint ? servedBy(given.state, given.own, mint) : null;
       const target = served ? targetOf(given.state, given.own, served.write) : null;
       if (!target || given.input.type !== "outcome" || !["cleanup-aborted", "cleanup-deleted", "cleanup-owed", "published"].includes(target.state)) return { effects: [], sends: [], opens: [] };
       const exhausted = given.input.result !== "confirmed" && given.input.attempt === operation.most;
-      const earlierFailure = cleanupTokensExhausted(given, target);
+      const earlierFailure = cleanupTokensExhausted(given, target, operation);
       const unknown = given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"));
-      const effects: RuleEffect[] = exhausted ? cleanupOwed(target, unknown ? "reservation-token-unknown" : "reservation-token", given.input.attempt)
-        : target.state === "cleanup-deleted" && earlierFailure ? cleanupOwed(target, earlierFailure, 3) : target.state === "cleanup-deleted" && cleanupTokensClosed(given, target, operation) ? [{ effect: "state", item: target.id, state: "cleaned" }] : [];
+      const closed = given.input.result === "confirmed" && cleanupTokensClosed(given, target, operation);
+      const effects: RuleEffect[] = exhausted ? cleanupStatus(target, { token: unknown ? "reservation-token-unknown" : "reservation-token", tokenAttempts: given.input.attempt })
+        : earlierFailure ? cleanupStatus(target, { token: earlierFailure, tokenAttempts: 3 })
+        : cleanupMintUnknown(given, target) ? cleanupStatus(target, { token: "reservation-token-unknown", tokenAttempts: 1 })
+        : closed && (cleanupDuties(target).refRemoved || cleanupDuties(target).tokenReason) ? cleanupStatus(target, { token: null }, true) : [];
       return { effects, sends: [], opens: [] };
     } } },
     "reservation-delete": { place: "outcome", rules: {
-      selects: false, read: false, most: { effects: 8, requests: 0, operations: 2 },
-      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && target.state !== "cleanup-owed" && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
+      selects: false, read: false, most: { effects: 12, requests: 0, operations: 2 },
+      retries: (_result, operation, given) => { const target = targetOf(given.state, given.own, operation); return !!target && cleanupDuties(target).refRemoved !== true && cleanupAttempt(given, target, operation) < 3 && given.input.type === "outcome" && isObject(given.input.evidence.body) && (given.input.evidence.body["seen"] !== "absent" || !stagedOwn(given, target, given.resolved.self)); },
       ready: (state, write, attempt) => (mintOf(state, write, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => isObject(evidence.body) && SENDS[result]!.includes(evidence.body["send"] as string) && isSeen(evidence.body["seen"]), unknown: () => ({ send: "unknown", seen: "failed" }),
       derives: (given, operation) => {
         const target = targetOf(given.state, given.own, operation);
-        if (!target || given.input.type !== "outcome") return { effects: [], opens: [], sends: [] };
+        if (!target || target.state === "cleaned" || given.input.type !== "outcome") return { effects: [], opens: [], sends: [] };
         const token = tokenStep(given, operation);
         const body = given.input.evidence.body as { seen: unknown };
         const stageKnown = stagedOwn(given, target, given.resolved.self) || !stageMayRemain(given, target, given.resolved.self);
@@ -2296,11 +2331,11 @@ export const destinationRules3: Rules = (() => {
         const attempt = cleanupAttempt(given, target, operation);
         const heldUnknownStage = given.input.result === "confirmed" && !stageKnown;
         const exhausted = !removed && given.input.attempt === operation.most;
-        const effects: RuleEffect[] = [...token.effects,
-          ...(!exhausted && !heldUnknownStage ? [{ effect: "value", item: target.id, slot: "cleanupAttempts", value: attempt } as const] : []),
-          ...(exhausted || heldUnknownStage ? cleanupOwed(target, !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref", attempt) : removed && target.state !== "cleanup-owed" ? [{ effect: "state", item: target.id, state: "cleanup-deleted" } as const] : []),
-        ];
-        return { effects, opens: [...token.opens, ...(!removed && !exhausted && !heldUnknownStage && target.state !== "cleanup-owed" ? [opening(given, "mint", 1, target.id)] : [])], sends: [] };
+        const next = cleanupDuties(target).refRemoved !== true && !removed && !heldUnknownStage && !exhausted && attempt < 3 && given.input.attempt === operation.attempts.length;
+        const ref = exhausted || heldUnknownStage ? !stageKnown ? "reservation-stage-unknown" : (given.input.result === "unknown" || operation.attempts.some((attempt) => attempt.outcomes.some((outcome) => outcome.result === "unknown"))) ? "reservation-ref-unknown" : "reservation-ref" : removed ? null : undefined;
+        const unknownMint = cleanupMintUnknown(given, target);
+        const effects: RuleEffect[] = [...token.effects, ...cleanupStatus(target, { ...(ref === undefined ? {} : { ref }), deletes: attempt + (next ? 1 : 0), ...(removed ? { removed: true } : ref ? { removed: false } : {}), ...(unknownMint ? { token: "reservation-token-unknown", tokenAttempts: 1 } : {}) })];
+        return { effects, opens: [...token.opens, ...(next ? [opening(given, "mint", 1, target.id)] : [])], sends: [] };
       },
     } },
     judge: { ...judgeRule3, rules: { ...judgeRule3.rules, most: { effects: 12, requests: 1, operations: 2 } } },

@@ -379,11 +379,11 @@ export class DestinationHost implements Outside {
     const mint = destinationMint(state, write, request.attempt);
     const credential = mint ? this.#options.custody.live(mint.id, 1, this.#given.clock.read()) : null;
     // After the driver's mark a local denial supplies no decisive host answer.
-    if (!(write.kind === "reservation-delete" ? target && ["published", "cleanup-aborted"].includes(target.state) && target.values["token"] === mint?.id : destinationSends(state, own, write, request.attempt)) || !credential) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
+    if (!(write.kind === "reservation-delete" ? target && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state) && target.values["token"] === mint?.id : destinationSends(state, own, write, request.attempt)) || !credential) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     if (write.kind === "reservation-delete") {
       const old = target?.values["integration"];
       if (!objectId(old) || !this.#options.provider.deleteRef) return null;
-      const allowed = () => !!target && ["published", "cleanup-aborted"].includes(target.state) && target.values["token"] === mint?.id && this.#options.custody.live(mint!.id, 1, this.#given.clock.read())?.plaintext === credential.plaintext;
+      const allowed = () => !!target && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state) && target.values["token"] === mint?.id && this.#options.custody.live(mint!.id, 1, this.#given.clock.read())?.plaintext === credential.plaintext;
       const reply = members(await this.#options.provider.deleteRef({ repository, ref: binding.ref, old, token: credential.plaintext!, binding, allowed, ...(request.sentAt ? { sentAt: request.sentAt } : {}) }), ["send"]);
       const sent = reply?.["send"];
       if (!["accepted", "refused", "not-sent"].includes(sent as string)) return null;

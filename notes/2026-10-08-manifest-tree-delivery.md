@@ -173,3 +173,51 @@ The exact final source still needs a final gate, an observed hosted proposal
 publication and named refusal, complete independent Source review and landing.
 No final gate or hosted proposal run has occurred for this candidate. UI
 implementation remains with the separate session under the user's instruction.
+
+
+## Independent cleanup duties repair
+
+Source `28d12a372b433088f718a80ac133f5a715986adc`, tree
+`2dfc63b076cad048efe75fa14fe2bc62f62357a2`, repairs the coupled
+ref and token duty fields in the preceding checkpoint. A token's exhausted
+revoke no longer hides an unknown stage or spends the ref's remaining
+attempt budget. The existing draft cleanupReason slot now holds one bounded
+record: optional refReason and tokenReason, tokenAttempts and refRemoved.
+cleanupAttempts counts all opened deletion attempts across operations. This
+keeps the publication at its existing twelve-slot bound; old pins and global
+bounds do not change. The CLI reads each independent duty and its actual
+counter. Its string fallback describes prior in-progress source, not a new
+historical admission guarantee.
+
+The real-Scope witness combines an unknown original stage, one confirmed
+delete and three refused token revokes. Native verify --all names both duties.
+The original stage's exact late proof then opens only the remaining two
+deletes. A later answer to the earlier deletion cannot lower the cumulative
+count from three to two. A separate actual adapter witness retains an unknown
+mint as token custody owed at attempt one after a confirmed ref deletion;
+its exact late mint proof and attributed revoke then settle cleanup.
+The host, transport fault and scheduler fixtures remain labelled stand-ins.
+
+At this exact source, all seventeen affected Scope tests passed
+(`/tmp/artroom-manifest-independent-28d12-scope.log`, 20.40 seconds). Eight
+focused derive tests passed
+(`/tmp/artroom-manifest-independent-28d12-derive.log`). Platform, scope,
+lane Scope-test and CLI source/test typechecks passed. Eleven older platform
+data values retain equal canonical bytes, recorded in
+`/tmp/artroom-manifest-independent-28d12-preservation.json`.
+
+Two restored controls fail direct assertions: dropping the retained ref duty
+loses reservation-stage-unknown
+(`/tmp/artroom-manifest-independent-duty-control.log`), and restoring ordinal
+counting for a late earlier answer changes the count to two
+(`/tmp/artroom-manifest-independent-late-budget-control.log`). Both restored
+the same source SHA256, `378e9ec24ff8a9408c29f457c75eddb67a5955f7262591d4431c2d4b952e0e9e`.
+The first attempted four-field schema failed before room creation because
+sixteen slots exceed the bound of twelve
+(`/tmp/artroom-manifest-independent-first.log`); this is retained as a failed
+implementation probe, not control credit. The late-answer API rejects unknown
+answers, so the counter witness uses an admissible late refused answer.
+
+The ordinary-read turn boundary, final gate, hosted observation, independent
+Source review and landing remain owed as stated above. No read hook, deployed
+claim or completed delivery is introduced by this repair.
