@@ -13,13 +13,16 @@ RefcountedCanceler diagnostic, 930 passed and two recorders skipped. Its
 unchanged isolated story passed separately. Later test-boundary checks passed;
 no later whole-gate pass is claimed.
 
-Pending owner dispositions: gate risk `f496c732`, snapshot history floor
-`ed2303e9`, and explicit scope binding `ddbfd6cb` for the later Page cleanup
-compatibility repair/native fixtures/assets, since original b8 excludes Page
-changes. The landed C1 approval does not cover those later bytes. Hosted
-proposal publication/refusal, normal final review and landing remain owed.
-The read-trigger choice is resolved by `41e959e7`: act/alarm only, with a
-write-free expiry projection and separate CLI pending/owed reports.
+Planner `041deabaf0dbe27c8aa6c8084483111453326e3b` resolves the three
+owner matters. The snapshot must use the ordinary sealed-history floor;
+the narrow Page cleanup compatibility/native-fixture/assets repair is in b8
+scope without borrowing C1 approval; and the failed856 gate stays failed.
+After these actual amendments, one coordinated final gate must pass before
+normal full review, hosted publication/refusal and landing. A further failure
+must use existing A4 localization for a bounded discriminating check before
+another whole run. No timeout widening or invariant removal is authorized.
+The read-trigger choice remains act/alarm only under `41e959e7`, with a
+write-free projection and separate CLI pending/owed reports.
 
 The sections below preserve exact historical checkpoints and their evidence.
 Their earlier open statuses are superseded where later sections say so.
@@ -378,3 +381,25 @@ contains generated asset bodies: Root read the authored failure blocks and
 headers; those generated payload lines receive no complete-read credit.
 The failed gates, canceler diagnostic, hosted proposal observation and final
 review/landing obligations remain retained.
+
+## Adopted snapshot floor and next gate
+
+Source `c5ebdbdd41a96894be5e12fa7f595ceeba10ee0b`, tree
+`886f065116cd074b8dffd71928413b9f6e4c33b7`, adds the minimal retained-history
+clock floor at authentication and against current scope.time after final
+asynchronous observations. Existing identity, deadline/window, key,
+generation and within-pair checks remain. Refusal stays null/read-unavailable;
+no new clock protocol or exploit claim follows.
+
+Two native configured-checker counterparts pass at that source. Removing only
+the final floor guard admits the tested cross-pair rollback and fails the
+direct null assertion, with exact source restored. Scope and lane Scope types
+pass; a narrow peer read found no concrete defect. Root read the complete raw
+focus and control logs. `/tmp/artroom-snapshot-history-floor-c5eb-scope.log`
+SHA-256 `623c3a3a8fba44c377baad84edf3a94fb1f67e69e7378996cd54fd02b48e405a`;
+control `5d4746deac8a131e881b67f605534ee23bcd8397f5c4cfb964cee491da874d4e`.
+
+The composition at `5a36fe6b5c3240325ae40aaaf303b8393b0e6b1a`, tree
+`2a20cb1fac2e3044575efa910a428d19281efd6f`, carries this source and the
+source-neutral Sprint14 report on main38b0. The next gate will name its own
+exact frozen commit and logs. No passing gate or hosted run is claimed yet.
