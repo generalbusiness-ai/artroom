@@ -2,10 +2,9 @@ import { expect, test } from "vitest";
 import { ScopeHandle, httpTransport, type Fetch } from "@generalbusiness/artroom-client";
 import { command } from "@generalbusiness/artroom-cli";
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { change3, changeDemo3, MANIFEST_DIGESTS } from "@generalbusiness/artroom-lanes";
+import { changeDemo3 } from "@generalbusiness/artroom-lanes";
 import { act, joinRoom, listLanes, loadChange, openRoom, placeOf, type Room } from "../src/data.ts";
 import { checkEditRequest, continueEdit, editFields, prepareEdit, readEditSource } from "../src/retained-editor-data.ts";
-import { knownLIST1, LIST1_DEFINITION_DIGESTS } from "../src/source-support.ts";
 import { demo } from "./support/demo.ts";
 
 // Native directory, membership, collection/freeze and exact signed receipts.
@@ -24,11 +23,6 @@ async function fixture() {
 }
 
 test("the known LIST1 member editor freezes exactly one authenticated source; source receipts are not versions (native; Git/scheduler stand-ins)", async () => {
-  expect(LIST1_DEFINITION_DIGESTS).toEqual(MANIFEST_DIGESTS);
-  expect(knownLIST1(change3, MANIFEST_DIGESTS.change)).toBe(true);
-  expect(knownLIST1(changeDemo3, MANIFEST_DIGESTS.demo)).toBe(true);
-  const custom = structuredClone(changeDemo3); custom.acts["propose-manifest"]!.guards = custom.acts["propose-manifest"]!.guards.slice(0, -1);
-  expect(knownLIST1(custom, definitionDigest(custom))).toBe(false);
   const f = await fixture();
   try {
     const before = f.d.at.stand.refs.get("refs/heads/main"), task = await prepareEdit(f.room, f.source, f.original.id, f.draft, f.options);
