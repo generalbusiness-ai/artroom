@@ -2,7 +2,7 @@ import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
-import type { Fetch } from "@generalbusiness/artroom-client";
+import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
@@ -122,6 +122,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   let R: Platform | null = null;
   const bindings = () => at.bindings(R!.name);
   let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
+  let outsideSends = 0;
   let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let pendingStage: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let confirmedDelete: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
@@ -139,6 +140,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     } });
     let late: import("../../scope/src/operations.ts").LateAnswers | null = null;
     return { ...outside, replies: (limit) => { const replies = outside.replies?.(limit) ?? { answers: [], more: false }; return { ...replies, answers: replies.answers.filter((row) => releaseMint || row.operation !== pendingMint?.request.operation) }; }, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
+      outsideSends++;
       if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
       if (exhaustCleanup === "ref" && request.kind === "reservation-delete") return { result: "refused", evidence: { basis: "own-answer", body: { send: "refused", seen: [...host.refs].find(([ref]) => ref.startsWith("refs/artroom/reservations/"))?.[1] ?? "failed" } } };
       if ((exhaustCleanup === "token" || exhaustCleanup === "token-unknown") && request.kind === "revoke") {
@@ -337,8 +339,60 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
     const manifest = await lane.item(version), ref = manifest.values["reservationRef"] as string;
+    const beforeRead = await G.summary();
+    const databaseDigest = () => runInDurableObject(G.object, async (_instance, state) => {
+      const tables = state.storage.sql.exec("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' ORDER BY name").toArray();
+      const rows = tables.map((table) => { const name = table["name"] as string; return [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]; });
+      return digestBytes(utf8(canonicalize(rows)));
+    });
+    const beforeDatabase = await databaseDigest(), sendsBeforeRead = outsideSends;
+    const expiring = beforeRead.value.items.find((item) => item.type === "publication" && item.state === "reserved")!;
+    expect(beforeRead.value.reservationExpiry).toEqual({ clock: "available", time: net.clock.now, expired: [] });
     net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
-    const expiring = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "reserved")!;
+    const expiredClock = net.clock.now;
+    const founderConfig = (await founder.store.config())!;
+    const founderSecret = (await founder.store.secret(founderConfig.key))!;
+    const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, founderSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
+    expect(session.ok).toBe(true);
+    if (!session.ok) throw new Error("native session unavailable");
+    const sessionRead = await G.stub.summary(session.session.reader());
+    expect(sessionRead.ok && sessionRead.value.reservationExpiry).toEqual({ clock: "available", time: expiredClock, expired: [expiring.id] });
+    // Script the final projection reading after authentic Session authorization.
+    // Count the real warm path, without bypassing or changing that authorization.
+    const readClock = net.clock.read;
+    let sessionClockReads = 0;
+    net.clock.read = () => { sessionClockReads++; return expiredClock; };
+    try { expect((await G.stub.summary(session.session.reader())).ok).toBe(true); }
+    finally { net.clock.read = readClock; }
+    expect(sessionClockReads).toBeGreaterThan(1);
+    let fallibleReads = 0;
+    net.clock.read = () => { if (++fallibleReads === sessionClockReads) throw new Error("scripted final projection clock unavailable"); return expiredClock; };
+    try {
+      const fallible = await G.stub.summary(session.session.reader());
+      expect(fallible.ok && fallible.value.reservationExpiry).toEqual({ clock: "unavailable" });
+    } finally { net.clock.read = readClock; }
+    const signed = await signedReader({ key: keyIdOfSecret(founderSecret), sign: (bytes) => sign(founderSecret, bytes) }, G.name, "summary", "summary", { now: () => timeMs(expiredClock)! });
+    const expiredRead = await G.summary();
+    expect([expiredRead.at, expiredRead.value.items.find((item) => item.id === expiring.id)?.state, expiredRead.value.reservationExpiry]).toEqual([beforeRead.at, "reserved", { clock: "available", time: expiredClock, expired: [expiring.id] }]);
+    net.clock.now = timeOf(timeMs(beforeRead.value.time)! - 1);
+    const behindRead = await G.summary();
+    expect(await G.stub.summary(session.session.reader())).toEqual({ ok: false, reason: "clock-behind" });
+    expect(await G.stub.summary(signed)).toEqual({ ok: false, reason: "clock-behind" });
+    expect([behindRead.at, behindRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
+    net.clock.now = "unavailable-test-clock" as typeof net.clock.now;
+    const unavailableRead = await G.summary();
+    expect([unavailableRead.at, unavailableRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
+    const clockRead = net.clock.read;
+    net.clock.read = () => { throw new Error("scripted unavailable clock"); };
+    try { expect((await G.summary()).value.reservationExpiry).toEqual({ clock: "unavailable" }); }
+    finally { net.clock.read = clockRead; }
+    net.clock.now = expiredClock;
+    const pendingCleanup = await run(founder, "verify", "--all");
+    expect(pendingCleanup.code, pendingCleanup.lines.join("\n")).toBe(1);
+    expect(pendingCleanup.lines.join("\n")).toContain(`reservation ${expiring.id}`);
+    expect(pendingCleanup.lines.join("\n")).toContain("waits for the next act or alarm");
+    expect(pendingCleanup.lines.join("\n")).not.toContain("Owed cleanup:");
+    expect([await databaseDigest(), outsideSends]).toEqual([beforeDatabase, sendsBeforeRead]);
     await run(founder, "act", "add-room", "--on", "destination", "--target", String(expiring.id));
     expect((await G.entries()).filter((entry) => entry.input.type === "timed" && entry.input.item === expiring.id && entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "reservation-delete" && effect.attempts === 3))).toHaveLength(1);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
@@ -712,6 +766,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
 
 test("a native version-2 room refuses branch list proposals before local Git capture", async () => {
   const old = await legacyRoom();
+  expect((await old.G.summary()).value.reservationExpiry).toBeUndefined();
   const directory = await old.D.at(), membership = await old.M.at();
   platformNet.inspector = reader;
   platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true;
