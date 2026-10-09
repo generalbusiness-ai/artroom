@@ -50,6 +50,7 @@ import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRea
 import { LATE, within } from "./turn.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
+import { siteDestination, sitePublication } from "./site/publication.ts";
 
 /**
  * What a deployment gives a scope in place of a default. `authority`: the
@@ -282,6 +283,10 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
   source(seq: number): Sourced | null { this.#first(); return sourced(this.#store, this.#scope.pinned(), seq); }
+  /** Site reads current publication selection only; unlike ordinary reads these start no outside work. */
+  siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
+  siteRoom() { return sourced(this.#store, this.#scope.pinned(), 0); }
+  sitePublication(directory: unknown, repository: unknown) { return sitePublication(this.#store, this.#scope.pinned()?.named, directory, repository); }
   /** The bytes of one declaration this scope retains, for a child that is about to write its genesis (sections 7.2 and 9.2). */
   declared(digest: Digest): string | null { this.#first(); return declaredBy(this.#store, digest); }
   /** A detached text that a send of this scope's entry at `seq` names, for the scope that received that send (section 6.2). */

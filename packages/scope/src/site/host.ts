@@ -5,8 +5,8 @@
  * The room is read from the directory's genesis entry: the repository
  * record `{ host, namespace, name, id }` and the published branch, which
  * the register's `create` gave it. The entry is read through the object's
- * `source` method, the one that scopes use to check each other's sends: it
- * checks no reader. Only a directory that the register pinned in the host's
+ * `siteRoom` method, which checks no reader and starts no outside work.
+ * Only a directory that the register pinned in the host's
  * setting created is a room here, as only that register and its
  * destinations may use the host (`host-wiring.ts`, `hostBound`).
  *
@@ -16,7 +16,7 @@
  * with none when the setting says reads are public.
  */
 import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
-import { isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
 import { isOf } from "@generalbusiness/artroom-platform";
 import type { GitSource } from "@generalbusiness/artroom-git";
 import { githubRepository, type GitHubAccount } from "@generalbusiness/artroom-git/github";
@@ -27,6 +27,7 @@ import { ARTIFACTS_HOST, type ArtifactsBindings } from "../artifacts-wiring.ts";
 import type { DestinationRepository } from "../destination-host.ts";
 import type { GitHubBindings } from "../github-wiring.ts";
 import type { Binding, Sourced } from "../namespace.ts";
+import type { Publication, SitePublicationPeer } from "./publication.ts";
 
 export const GITHUB_HOST = "github.com";
 
@@ -37,6 +38,19 @@ export interface Room {
   repository: DestinationRepository;
   /** The published branch's name, without `refs/heads/`. */
   branch: string;
+}
+
+/** Read the room's confirmed destination and its publication, never provider refs. */
+export async function publicationOf(scopes: Binding, directory: string, room: Room): Promise<Publication | null> {
+  const directoryObject = scopes.get(scopes.idFromName(directory)) as SitePublicationPeer & { siteRoom(): Promise<Sourced | null> };
+  const source = await directoryObject.siteRoom();
+  if (!source || source.at.scope !== directory || source.at.kind !== "directory") return null;
+  const destination = await directoryObject.siteDestination();
+  if (!destination || destination.kind !== "destination") return null;
+  const object = scopes.get(scopes.idFromName(destination.scope)) as SitePublicationPeer;
+  const publication = await object.sitePublication(source.at, room.repository);
+  if (!publication || canonicalize(publication.at) !== canonicalize(destination)) return null;
+  return publication;
 }
 
 /** A source for one repository, and how to end it: a minted read token is revoked. */
@@ -93,8 +107,8 @@ const record = (value: unknown): Record<string, unknown> | null => (typeof value
  */
 export async function roomOf(scopes: Binding, directory: string): Promise<Room | null> {
   if (!isScopeId(directory)) return null;
-  const object = scopes.get(scopes.idFromName(directory)) as { source(seq: number): Promise<Sourced | null> };
-  const sourced = await object.source(0);
+  const object = scopes.get(scopes.idFromName(directory)) as { siteRoom(): Promise<Sourced | null> };
+  const sourced = await object.siteRoom();
   if (!sourced || sourced.at.kind !== "directory" || sourced.at.scope !== directory || sourced.bytes === null) return null;
   const entry = parseStrict(sourced.bytes) as unknown as Entry;
   const input = entry.input;

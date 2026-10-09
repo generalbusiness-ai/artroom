@@ -8,6 +8,7 @@ import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroo
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
+import type { Binding } from "../src/namespace.ts";
 import type { SiteEnv } from "../src/site/host.ts";
 import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
@@ -141,6 +142,22 @@ class Scripted {
 }
 
 const host = new Scripted();
+// SCRIPTED publication boundary for these renderer/HTTP witnesses. The
+// selected-publication test separately exercises actual destination records.
+const publishedScopes: Binding = {
+  idFromName: (name) => env.PLATFORM.idFromName(name),
+  get: (id) => {
+    const object = env.PLATFORM.get(id) as unknown as import("../src/site/publication.ts").SitePublicationPeer & { siteRoom(): Promise<import("../src/namespace.ts").Sourced | null> };
+    return {
+      siteRoom: () => object.siteRoom(),
+      siteDestination: () => object.siteDestination(),
+      sitePublication: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
+        const actual = await object.sitePublication(directory, repository);
+        return actual && { ...actual, refs: [...host.refs].map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
+      },
+    };
+  },
+};
 let D: Platform;
 let R: Platform;
 let siteEnv: SiteEnv;
@@ -153,7 +170,7 @@ beforeAll(async () => {
   const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const registerSeed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 };
   R = new Platform(scopeIdOf(registerSeed));
-  siteEnv = { SCOPES: env.PLATFORM, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
+  siteEnv = { SCOPES: publishedScopes, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
   platformOutside.set(R.name, (given, sql) => artifactsOutside(given, sql, siteEnv, host.fetch));
   expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
@@ -274,14 +291,14 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
   const cases: [string, number, string, SiteEnv?][] = [
     [`/site/${D.name}/HEAD/docs/missing.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs/guide.md/`, 404, "not-found"],
-    [`/site/${D.name}/no-such-branch/README.md`, 404, "ref-not-found"],
-    [`/site/${D.name}/bad..ref/README.md`, 404, "ref-not-found"],
+    [`/site/${D.name}/no-such-branch/README.md`, 404, "not-published"],
+    [`/site/${D.name}/bad..ref/README.md`, 404, "not-published"],
     [`/site/${D.name}/HEAD/big.md`, 413, "too-large"],
     [`/site/${R.name}/HEAD/README.md`, 404, "not-found"],
     [`/site/not-a-scope/HEAD/README.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs%2Fguide.md`, 400, "bad-request"],
     [`/site/${D.name}/HEAD/%E0%A4%A`, 400, "bad-request"],
-    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: env.PLATFORM }],
+    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: publishedScopes }],
     // The host's setting pins another register: this room was not created by it, and its repository is not read.
     [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { ...siteEnv, ARTIFACTS_CONFIG: canonicalize({ registerScope: D.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) }],
   ];
@@ -366,7 +383,7 @@ test("a failure at each step answers the same refusal with x-site-step and logs 
   const lines: string[] = [];
   const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
   try {
-    for (const [failing, step] of [["get", "open"], ["info", "info"], ["token", "token"], ["refs", "refs"], ["pack", "objects"]] as const) {
+    for (const [failing, step] of [["get", "open"], ["info", "info"], ["token", "token"], ["refs", "objects"], ["pack", "objects"]] as const) {
       host.failing = failing;
       lines.length = 0;
       const response = await get(at);
@@ -405,7 +422,7 @@ test("navigation: the header labels the repository and the branch or tag, the br
   expect(head.body).toContain(`<span class="version">branch main (HEAD)</span>`);
   expect(head.body).toContain(`Rendered from commit <code>${host.refs.get("refs/heads/main")}</code>.`);
   expect((await page(await get(`${at("main")}docs/guide.md`))).body).toContain(`<span class="version">branch main</span>`);
-  // An annotated tag is followed to its commit.
+  // SCRIPTED publication names the annotated tag's already-recorded commit.
   expect((await page(await get(`${at("release")}README.md`))).body).toContain(`Rendered from commit <code>${nav}</code>.`);
 });
 
@@ -439,9 +456,10 @@ test("a folder: its listing gives sub-folders, markdown files by their first hea
   expect((await page(await get(`${prefix}guide/deep`))).body).toContain('<h1 id="deep">Deep</h1>');
 });
 
-// Invariant: the versions page lists every branch and tag of the repository with the commit it names, an annotated tag
-// followed, and marks the published branch; its ETag changes when a ref changes, and invalid rows fail before 304.
-test("versions: /site/<directory>/versions/ lists each branch and tag with its commit, an annotated tag followed, the published branch marked; a new tag gives a new ETag (STAND-IN host)", async () => {
+// Invariant: the versions page renders the SCRIPTED publication record, marks
+// its published branch, and validates recorded commit targets before 304.
+// This fixture scripts additional named versions that today's real room has no registry for.
+test("versions: recorded version rows and their commits render, changed publication gives a new ETag, invalid targets fail before 304 (SCRIPTED publication, STAND-IN host)", async () => {
   const at = `/site/${D.name}/versions/`;
   const response = await get(at);
   const versions = await page(response);
@@ -461,14 +479,14 @@ test("versions: /site/<directory>/versions/ lists each branch and tag with its c
   const etag = response.headers.get("etag")!;
   expect((await get(at, { headers: { "if-none-match": etag } })).status).toBe(304);
   expect((await get(at, { headers: { "if-none-match": "*" } })).status).toBe(304);
-  // A supported annotated-tag pack entry whose target is a blob, not a commit.
+  // An invalid publication target: a blob rather than a recorded commit.
   const wrong = utf8("not a commit\n");
   const wrongId = idOf("blob", wrong);
   host.objects.set(wrongId, { id: wrongId, type: "blob", data: wrong });
   const tag = utf8(`object ${wrongId}\ntype blob\ntag wrong-target\ntagger Rita <rita@example.invalid> 0 +0000\n\nwrong target\n`);
   const tagId = idOf("tag", tag);
   host.objects.set(tagId, { id: tagId, type: "tag", data: tag });
-  host.refs.set("refs/tags/wrong-target", tagId);
+  host.refs.set("refs/tags/wrong-target", wrongId);
   try {
     const ordinary = await get(at);
     const conditional = await get(at, { headers: { "if-none-match": "*" } });
