@@ -115,5 +115,5 @@ export function initializeCapture(kept: { service: string; place: { directory: s
   const allowed = new URL(`${kept.service}/page/`);
   const document = globalThis as unknown as { window: { top: unknown }; location: { origin: string; pathname: string }; localStorage: { setItem(key: string, value: string): void } };
   if (document.window.top !== document.window || document.location.origin !== allowed.origin || document.location.pathname !== allowed.pathname) return;
-  document.localStorage.setItem("artroom-page", JSON.stringify({ service: kept.service, place: kept.place, secret: kept.secret }));
+  document.localStorage.setItem("artroom-page", JSON.stringify({ place: kept.place, secret: kept.secret }));
 }
