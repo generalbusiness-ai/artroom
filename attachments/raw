@@ -1,0 +1,50 @@
+
+> gate
+> bash scripts/gate.sh
+
+head 327c791c82b85bcfc3706333340e3c8b6612277a  tree cbc629be6f157a55f27e33d11d97cade6bae95ee  changed files 0
+install    skipped: node_modules was installed from this package-lock.json
+whitespace exit 0  elapsed    0.1 s  cpu    0.0 s
+typecheck  exit 1  elapsed    5.5 s  cpu   17.5 s
+--- last lines of /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.DEHgdM8fLN/typecheck.log
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json
+
+
+> @generalbusiness/artroom-git@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json
+
+
+> @generalbusiness/artroom-lanes@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json
+
+
+> @generalbusiness/artroom-page@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json
+
+../client/src/observe.ts(45,68): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number | null'.
+  Type 'undefined' is not assignable to type 'number | null'.
+../client/src/observe.ts(47,182): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number | null'.
+  Type 'undefined' is not assignable to type 'number | null'.
+../client/src/observe.ts(116,230): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number | null'.
+  Type 'undefined' is not assignable to type 'number | null'.
+npm error Lifecycle script `typecheck` failed with error:
+npm error code 1
+npm error path /private/tmp/artroom-initial-review-candidate/packages/page
+npm error workspace @generalbusiness/artroom-page@0.1.0-dev.1
+npm error location /private/tmp/artroom-initial-review-candidate/packages/page
+npm error command failed
+npm error command sh -c tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scope.json
+
+
+> @generalbusiness/artroom-platform@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json
+
+
+> @generalbusiness/artroom-replay@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json
+
+
+> @generalbusiness/artroom-scope@0.1.0-dev.1 typecheck
+> tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p test/support/tsconfig.node.json
+
+gate FAILED; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.DEHgdM8fLN
