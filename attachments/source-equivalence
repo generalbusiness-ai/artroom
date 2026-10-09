@@ -1,0 +1,11 @@
+# Strict browser compiler repair: source equivalence
+
+Source-only successor from exact d511; four paths only. No public package/API/config/dependency/source-checker change. No project execution or checked claim.
+
+Both Node fixtures import DOMAINS from its existing public contract export. The value intent=artroom-intent-1 is the exact tag already used by domainBytes; signing calls/fixtures/test bodies/assertions remain unchanged. Static text audit shows those two files equal their original bodies after only the precise import transform; no signed bytes are intentionally changed.
+
+client.commandRecord replaces held.kind/envelope/journal with bracket access to the same keys; every closed-key whitelist, own-presence, allowed-kind, validEnvelope, signed-kind match, fitsPending and journal predicate is unchanged. journal.validReport likewise replaces only index-signature accesses with identical-key brackets. Existing casts remain compile-time annotations followed by runtime shape/signature/context/history predicates, not authority. No new cast or validator bypass.
+
+journal.validJournal adds !r before closed(r,...). Undefined/null/falsy values already failed closed, so this explicitly narrows the optional refusal and preserves outcomes. Every reason/name/judgedAt/context/origin/URL/request/signature/full-ref/history/byte predicate remains intact.
+
+Actual original browser compiler failed once undercc395 at d511;4300-byte log SHA2561fd7ecaf6d626396c569522c5fd1937fa6ded289b9d46868190a90dedaa69c24. No esbuild/Node ran on that failed chain and no unchanged retry occurred. Frozen d511/a7 and prior packets remain untouched. This successor has not been compiled or tested.

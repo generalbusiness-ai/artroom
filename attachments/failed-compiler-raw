@@ -1,0 +1,33 @@
+examples/counting/browser/app.test.ts(4,23): error TS2305: Module '"@generalbusiness/artroom-bytes"' has no exported member 'DOMAINS'.
+examples/counting/browser/client.ts(64,170): error TS4111: Property 'kind' comes from an index signature, so it must be accessed with ['kind'].
+examples/counting/browser/client.ts(64,256): error TS4111: Property 'kind' comes from an index signature, so it must be accessed with ['kind'].
+examples/counting/browser/client.ts(64,283): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/client.ts(64,308): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/client.ts(64,343): error TS4111: Property 'kind' comes from an index signature, so it must be accessed with ['kind'].
+examples/counting/browser/client.ts(65,62): error TS4111: Property 'journal' comes from an index signature, so it must be accessed with ['journal'].
+examples/counting/browser/client.ts(65,102): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/journal.ts(63,88): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,116): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,142): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,176): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,221): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,272): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,308): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,367): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,393): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,428): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(63,453): error TS18048: 'r' is possibly 'undefined'.
+examples/counting/browser/journal.ts(80,128): error TS4111: Property 'outcome' comes from an index signature, so it must be accessed with ['outcome'].
+examples/counting/browser/journal.ts(80,162): error TS4111: Property 'completion' comes from an index signature, so it must be accessed with ['completion'].
+examples/counting/browser/journal.ts(81,19): error TS4111: Property 'completion' comes from an index signature, so it must be accessed with ['completion'].
+examples/counting/browser/journal.ts(81,60): error TS4111: Property 'turn' comes from an index signature, so it must be accessed with ['turn'].
+examples/counting/browser/journal.ts(82,17): error TS4111: Property 'voiceId' comes from an index signature, so it must be accessed with ['voiceId'].
+examples/counting/browser/journal.ts(82,40): error TS4111: Property 'voiceId' comes from an index signature, so it must be accessed with ['voiceId'].
+examples/counting/browser/journal.ts(82,58): error TS4111: Property 'completedAt' comes from an index signature, so it must be accessed with ['completedAt'].
+examples/counting/browser/journal.ts(82,106): error TS4111: Property 'completedAt' comes from an index signature, so it must be accessed with ['completedAt'].
+examples/counting/browser/journal.ts(82,122): error TS4111: Property 'completedAt' comes from an index signature, so it must be accessed with ['completedAt'].
+examples/counting/browser/journal.ts(84,256): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/journal.ts(85,24): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/journal.ts(88,25): error TS4111: Property 'journal' comes from an index signature, so it must be accessed with ['journal'].
+examples/counting/browser/journal.ts(89,48): error TS4111: Property 'envelope' comes from an index signature, so it must be accessed with ['envelope'].
+examples/counting/browser/voice-controller.test.ts(4,23): error TS2305: Module '"@generalbusiness/artroom-bytes"' has no exported member 'DOMAINS'.

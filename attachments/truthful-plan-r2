@@ -1,0 +1,53 @@
+# Combined C0/W1/U1 exact-source supplemental plan
+
+Preparation only underdc0a34c239046e8a58c26b6baeba5df5a7efe65e and197d/669. NO compiler/build/config import/discovery/test/native/browser/audio/provider/IndexedDB/gate/control/install/link probe occurred. Source combined HEAD 016d8e4f42e289a36f78549d946f224cbe125a32 tree ec4a897ee2e08594fc906972fc100b9170a6cdad is clean/pushed at /tmp/artroom-counting-stage-types (request/counting-stage-types).
+
+Basebb5bf627d6f3765623df45117299953c546a99ee/tree13069e33cf59230e411d8b127bf6dc2da9f38241 is a true parent, preserving all F1/currentcritical011/main847 bytes. Complete W1 branch451 is a normal merge ancestor, all5ownedpaths byte-identical. All7U1authoredcommits througha7b365 were cherry-picked without conflicts; At initial d511 composition, all23browserpaths were byte-identical to a7, including the latest app refusal/playback fence. Current016 adds exactly four equivalent source overrides: app.test.ts and voice-controller.test.ts use the existing public contract DOMAINS import; client.ts uses strict record-key bracket access; journal.ts uses identical-key bracket access and explicit optional-refusal presence narrowing. The remaining19browserpaths remain byte-identical to a7; signing calls, fixtures and assertions in both test files are unchanged except imports. C0af336 actual9ownedpaths byte-identical. Dependency-copy3e96 was excluded. Source byte audit compared1239otherbasepaths, zero mismatches. Initial d511 needed no manual conflict resolutions or authored composition changes. Current016 changes only the four listed strict-source paths; root selectors, dependencies, lockfile and permanent coverage remain unchanged. Initial source-only audit failed when a C0 diff against a later main docs anchor named absent docs; explicit9ownedpath audit then completed. This is source provenance, not executed test validation.
+
+## Exact supplemental selection after owner GO
+
+There are THREE Node entrypoints, exactly:
+
+- examples/counting/browser/client.test.ts
+- examples/counting/browser/voice-controller.test.ts
+- examples/counting/browser/app.test.ts
+
+The third file mounts actual app/view/controller over a fake DOM surface, gateway, memory custody and speech. It removes the joined participant through a published observation and checks the stable identity-owned original Check report remains reachable with no prepare, POST or speech. It is not actual browser/assistive-technology or native proof.
+
+Proposed separately captured steps from the composed repository root, STOP on any nonzero result:
+
+```sh
+task_u1_repo="$(pwd -P)"
+task_u1_evidence="$(mktemp -d /tmp/artroom-u1-composed.XXXXXX)"
+git rev-parse HEAD 'HEAD^{tree}' > "$task_u1_evidence/source.txt"
+git status --porcelain > "$task_u1_evidence/status.txt"
+node node_modules/typescript/bin/tsc -p examples/counting/browser/tsconfig.json > "$task_u1_evidence/types.log" 2>&1
+./node_modules/.bin/esbuild examples/counting/browser/client.test.ts examples/counting/browser/voice-controller.test.ts examples/counting/browser/app.test.ts --bundle --platform=node --format=esm --outdir="$task_u1_evidence/node" --out-extension:.js=.mjs --metafile="$task_u1_evidence/metafile.json" --alias:@generalbusiness/artroom-client="$task_u1_repo/packages/client/src/index.ts" --alias:@generalbusiness/artroom-bytes="$task_u1_repo/packages/bytes/src/index.ts" --alias:@generalbusiness/artroom-contract="$task_u1_repo/packages/contract/src/index.ts" > "$task_u1_evidence/build.log" 2>&1
+```
+
+Before Node starts, inspect the actual bounded metafile: require a regular file no larger than4MiB before reading/JSON parsing; inspect no more than10,000 input/output records. Normalize resolved paths; require exactly the three distinct source entrypoints above, one output each and no unexpected entryPoint. Require each expected .mjs output exists in the temporary node directory, no outside/symlink escape. Reject any source input resolved outside the composed checkout except existing dependency installation paths explicitly recorded against the reviewed lock/cache. Require actual W1 observe.ts/head-stream.ts/index.ts and client intent.ts, byte and contract sources resolved from the exact composed checkout, with C0 definition/pin and all three tests bound to their current Git blobs/SHA256. The metafile validates real bundler selection and dependency origin, not a hand-maintained expected count. Record the three output hashes and exact Node argv. Do not execute a source copy from /tmp/artroom-client-observe or an older SDK alias.
+
+Only after that preflight succeeds:
+
+```sh
+node --test "$task_u1_evidence/node/client.test.mjs" "$task_u1_evidence/node/voice-controller.test.mjs" "$task_u1_evidence/node/app.test.mjs" > "$task_u1_evidence/node.log" 2>&1
+```
+
+Existing locked esbuild0.28.1 is the proposed tool; no install/probe or unowned dependency fallback. Capture each command/head/tree/exit/time/cache/tool/concurrency and raw complete logs. Require actual named first-refusal gateway, Explicit Arm controller and roster-removal app cases once each, plus a terminal complete summary; a test count alone does not prove selection. Browser type include*.ts already includes app.test.ts; retain the frozen tsconfig rather than changing it to make a check pass. Before/after source must remain clean. All outputs stay outside the checkout.
+
+After successful supplemental checks and the exclusive owner decision, run the ONE normal npm run gate at the same exact composed head. Gate itself still does not select U1 browser Node/types without the separately commissioned permanent integration. File explicit supplemental evidence alongside the gate, with existing C0 counting/W1 client/all normal suites retained. Failure stops; no unchanged retry, timeout widening, sweep or scope reduction.
+
+
+## Current selection and remaining obligations
+
+All aliases in the proposed commands resolve the actual composed checkout packages/client, bytes and contract source. W1observe/head-stream/index/test are current451, C0definition/pin/tests/config/rootselectors currentaf336, Current U1 browser source is a7 plus exactly the four listed016 overrides, not byte-identical a7 as a whole. Keep exact3 entrypoints client.test.ts/voice-controller.test.ts/app.test.ts, including BOTH app roster-removal and Resume cancellation/refusal scenarios. Metafile bounded4MiB/10krecords validates real entrypoints/output/source paths; capture head/tree/raw logs/exits/times/lock/cache/tool identity and SHA256 outputs before Node. No bundle/type check is inferred from source correspondence.
+
+Use the existing reviewed lock/cachedesbuild0.28.1 only after separate runtimeGO; no install or linking probe in this preparation. Browsertsconfig already includes all3Nodefiles. Rootnormalgate does not select these supplemental browser checks; permanent runner9bb/2d599 is separate. ONE appropriate coordinated normalgate remains owed after successful supplemental checks and ownerGO, with all existing C0/W1/critical/F1 suites retained. No approval or full4073/newC1refinement acceptance is supplied.
+
+Old b4 fake results,629 captures, W1468scratchaliases and all earlier F1/critical native evidence remain attributed to their originalheads. This composition creates no new native/HTTPS/IndexedDB/audio/browser/provider/hosting/cross-device result.
+
+
+The strict compiler repair is a four-path source-only successor after the failed cc395 d511 browserTSC. Execute only after Root full source reading and exclusive owner GO: ONE browser compiler at this exact clean head; stop on any failure, no retry. If that succeeds, the proposed same-checkout existing esbuild build/metafile preflight and exact THREE Node files may proceed under that GO. No source config/options/validator/deadline/assertion weakening, public bytes export or dependency install is included. Retain failed original compiler log with its original head and source-only equivalence note; do not overwrite previous packets. Subsequent gate remains a separate owner decision.
+
+
+Provenance correction: d511's initial source audit established all23browserpaths equal a7, W1five equal451, C0nine equalaf336 and1239otherbasepaths unchanged. Those dependency/base sets remain unchanged at016; exactly four browser paths now differ by the equivalent strict compiler repairs above, with the other19equal a7. Prior execution-plan.md and packet.json remain immutable and retain their original hashes; this plan-r2 corrects only their copied provenance prose. No source edit or project execution accompanies it. Actualfailedcc395d511compiler log and zero subsequent bundle/Node execution remain attributed as before.
