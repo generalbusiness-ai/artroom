@@ -1,0 +1,21 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-f1-c0-composed/packages/scope
+
+uncaught exception; source = Uncaught (in promise); stack = Error: fixture retention fault: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+    at Object.exec (/private/tmp/artroom-f1-c0-composed/packages/scope/src/object.ts:130:53)
+    at SqliteStore.#run (/private/tmp/artroom-f1-c0-composed/packages/scope/src/sqlite.ts:131:66)
+    at SqliteStore.retain (/private/tmp/artroom-f1-c0-composed/packages/scope/src/sqlite.ts:397:10)
+    at Turns.#seal (/private/tmp/artroom-f1-c0-composed/packages/scope/src/turn.ts:348:45)
+    at Turns.#judged (/private/tmp/artroom-f1-c0-composed/packages/scope/src/turn.ts:312:29)
+    at /private/tmp/artroom-f1-c0-composed/packages/scope/src/turn.ts:288:89
+    at Object.transaction (/private/tmp/artroom-f1-c0-composed/packages/scope/src/object.ts:131:45)
+    at SqliteStore.transaction (/private/tmp/artroom-f1-c0-composed/packages/scope/src/sqlite.ts:135:55)
+    at /private/tmp/artroom-f1-c0-composed/packages/scope/src/turn.ts:288:46
+    at Turns.#telling (/private/tmp/artroom-f1-c0-composed/packages/scope/src/turn.ts:167:18)
+ ✓ |f1-native| test/application-establish.test.ts > explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant 944ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:03:39
+   Duration  2.06s (transform 420ms, setup 0ms, import 927ms, tests 944ms, environment 0ms)
+

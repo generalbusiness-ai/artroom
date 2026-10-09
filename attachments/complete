@@ -1,0 +1,96 @@
+{
+  "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+  "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+  "release": "7b45a08e3484b4248499909b8c535e3e411861e6",
+  "proofs": [
+    {
+      "phase": "node-discovery",
+      "argv": [
+        "node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs",
+        "--json"
+      ],
+      "cwd": "/private/tmp/artroom-f1-c0-composed",
+      "before": {
+        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+        "status": ""
+      },
+      "exit": 0,
+      "elapsed": 0.7557899160310626,
+      "cpu": 1.5013029999999998,
+      "log_sha256": "c84f6c7176f0fa54e3e9261971daf5003de848a04a08bcf1d2f85b5feed9ee19"
+    },
+    {
+      "phase": "node-body",
+      "argv": [
+        "node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs",
+        "--reporter",
+        "verbose",
+        "--bail=1"
+      ],
+      "cwd": "/private/tmp/artroom-f1-c0-composed",
+      "exit": 0,
+      "elapsed": 0.8190796250710264,
+      "cpu": 1.8189689999999998,
+      "log_sha256": "63d09a4e3eb111909e8455206a6e8f0dc80c225aac6efca51c17f9f5ab45d1b1"
+    },
+    {
+      "phase": "native-discovery",
+      "argv": [
+        "node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs",
+        "--json"
+      ],
+      "cwd": "/private/tmp/artroom-f1-c0-composed/packages/scope",
+      "exit": 0,
+      "elapsed": 2.0088454999495298,
+      "cpu": 2.299807,
+      "log_sha256": "32301d5615ad955c760240cec770fb0dceb710a7f02e55d803bfb75773b7cc11"
+    },
+    {
+      "phase": "native-body",
+      "argv": [
+        "node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs",
+        "--reporter",
+        "verbose",
+        "--bail=1"
+      ],
+      "cwd": "/private/tmp/artroom-f1-c0-composed/packages/scope",
+      "exit": 0,
+      "elapsed": 2.685954040964134,
+      "cpu": 3.2801750000000003,
+      "log_sha256": "89255b8c90cdd3314364db76a73d9a48540ae726d96483b63fe904b18b4d9bc6"
+    }
+  ],
+  "node": {
+    "files": 4,
+    "passed": 13,
+    "skipped": 0
+  },
+  "native": {
+    "files": 1,
+    "passed": 1,
+    "skipped": 0,
+    "original_expect_calls": 49,
+    "four_proven_replay_assertions_completed": true,
+    "qualification": "Printed uncaught SQL fixture retention fault remains unresolved; pass is qualified.",
+    "error_free": false
+  },
+  "full_gate": false,
+  "source_review": false
+}
