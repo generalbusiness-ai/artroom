@@ -7,7 +7,14 @@ const stateOf = (owner: SessionOwner): Owned => owned.get(owner)!;
 const baseline: Readonly<SessionSettings> = Object.freeze({ secret: null, sessions: false, inspector: null });
 let current: SessionOwner | null = null;
 let observer: { owner: SessionOwner; record: (choice: SessionReadChoice) => void } | null = null;
-const live = (owner: SessionOwner): boolean => { const state = stateOf(owner), root = stateOf(state.root); return !state.closed && !root.closed && !root.superseded; };
+const within = (owner: SessionOwner, descendant: SessionOwner | null): boolean => {
+  for (let at = descendant; at; at = stateOf(at).parent) if (at === owner) return true;
+  return false;
+};
+const live = (owner: SessionOwner): boolean => {
+  for (let at: SessionOwner | null = owner; at; at = stateOf(at).parent) if (stateOf(at).closed || stateOf(stateOf(at).root).superseded) return false;
+  return true;
+};
 const ancestry = (): SessionOwner[] => { const owners: SessionOwner[] = []; for (let owner = current; owner; owner = stateOf(owner).parent) if (live(owner)) owners.push(owner); return owners; };
 const requiredCount = (): number => ancestry().reduce((count, owner) => count + stateOf(owner).leases.size, 0);
 export function sessionSettings(): Readonly<SessionSettings> {
@@ -19,9 +26,9 @@ export class SessionOwner {
   active(): void { if (!this.isCurrent()) throw new Error("Session fixture ownership ended before its continuation completed."); }
   close = (): void => {
     const state = stateOf(this); state.closed = true; state.leases.clear();
-    // A root close also invalidates its current child; stale closes cannot
+    // Closing an ancestor ends its descendants too; stale closes cannot
     // publish a baseline or restore an old root over a newer owner.
-    if (current === this || current && stateOf(current).root === this) {
+    if (within(this, current)) {
       let parent = state.parent;
       while (parent && !live(parent)) parent = stateOf(parent).parent;
       current = parent;
@@ -38,7 +45,13 @@ export class SessionOwner {
   }
   async required<T>(action: () => Promise<T>): Promise<T> {
     const lease = this.acquireRequired();
-    try { const value = await action(); this.active(); return value; }
+    try {
+      const value = await action();
+      // A live explicit child may still be current when a parent lease ends.
+      // Do not borrow another root or re-enable a closed ancestor.
+      if (!live(this) || !within(this, current)) throw new Error("Session fixture ownership ended before its continuation completed.");
+      return value;
+    }
     finally { lease.close(); }
   }
   async withSettings<T>(patch: Partial<SessionSettings>, action: (child: SessionOwner) => Promise<T>): Promise<T> {
