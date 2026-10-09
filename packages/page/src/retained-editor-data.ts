@@ -62,7 +62,8 @@ function supports(declared: DeclaredDefinition, fields: Record<string, FieldValu
 async function currentRoom(room: Room, options: EditOptions): Promise<Room> { check(options); const fresh = await openRoom(room.session, { directory: room.directory, membership: room.membership }); check(options); if (fresh.rules !== room.rules || fresh.destination !== room.destination || fresh.me?.handle !== room.me?.handle || fresh.key !== room.key) throw new Unreadable("The room identity changed. Nothing new was sent."); return fresh; }
 async function head(room: Room): Promise<string> { const s = await summary(handle(room, room.destination)); if (s.value.definition !== "platform:destination@2") throw new Unreadable("This destination does not support the one-file text workflow."); const h = s.value.items.find(i => i.type === "branch")?.values["head"]; if (typeof h !== "string") throw new Unreadable("The room has no recorded published head."); return h; }
 export async function prepareEdit(room: Room, change: ChangeView, manifest: number, draft: EditDraft, options: EditOptions): Promise<EditTask> {
-  editFields(draft, "0".repeat(40)); const fresh = await currentRoom(room, options);
+  const captured = Object.freeze({ ...draft });
+  editFields(captured, "0".repeat(40)); const fresh = await currentRoom(room, options);
   if (!fresh.me?.actions.includes("change.open") || !fresh.me.actions.includes("change.propose")) throw new Unreadable("Your current member does not hold permission to open and propose a change.");
   const source = await readEditSource(fresh, change, manifest); check(options);
   const R = handle(fresh, fresh.rules); const rs = await summary(R);
@@ -70,16 +71,26 @@ export async function prepareEdit(room: Room, change: ChangeView, manifest: numb
   const digest = active?.values["digest"]; if (typeof digest !== "string") throw new Unreadable("No change definition is active.");
   const kept = await signedReads(httpTransport(fresh.session.service, fresh.session.fetch ? { fetch: fresh.session.fetch } : {}), secretSigner(fresh.session.secret), fresh.session.now ? { now: fresh.session.now } : {}).retained(fresh.rules, fresh.reader?.reader() ?? null, "definition", digest as Digest); if (!kept.ok) throw new Unreadable("The active change definition could not be read.");
   const declared = JSON.parse(kept.value.bytes) as DeclaredDefinition; if (canonicalize(declared) !== kept.value.bytes || definitionDigest(declared) !== digest) throw new Unreadable("The active definition bytes do not match their digest.");
-  const base = await head(fresh); check(options); if (!supports(declared, editFields(draft, base))) throw new Unreadable("The active change definition does not support this bounded text workflow.");
+  const base = await head(fresh); check(options); if (!supports(declared, editFields(captured, base))) throw new Unreadable("The active change definition does not support this bounded text workflow.");
   const D = await summary(handle(fresh, fresh.directory));
   const directoryShape = platform(D.value.definition)?.data as unknown as DefinitionShape | undefined;
   if (!directoryShape || !heldActs(directoryShape, fresh.me).acts.some(([kind]) => kind === "open-pr")) throw new Unreadable("The directory does not offer the supported native change opening.");
-  shapeDeclaredAct(platform(D.value.definition)!.data as unknown as DeclaredDefinition, "open-pr", { on: null, fields: { definition: digest, title: draft.title, draft: false, body: "Source reference" } } as never);
-  return { association: actAssociation(room, change.scope), source, draft: Object.freeze({ ...draft }), base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
+  shapeDeclaredAct(platform(D.value.definition)!.data as unknown as DeclaredDefinition, "open-pr", { on: null, fields: { definition: digest, title: captured.title, draft: false, body: "Source reference" } } as never);
+  return { association: actAssociation(room, change.scope), source, draft: captured, base, definition: digest as Digest, definitionBytes: kept.value.bytes, declared, directory: D.value.scope, steps: [], state: "prepared", message: "Current file comparison is unavailable. This proposal writes the target on the named published base; it may overwrite existing content and leaves the old path unchanged.", busy: false };
+}
+
+async function taskRoom(room: Room, task: EditTask, options: EditOptions): Promise<Room> {
+  if (task.association !== actAssociation(room, task.source.scope.scope)) throw new Unreadable("This task belongs to another room/member/key context.");
+  const fresh = await currentRoom(room, options);
+  const directory = await summary(handle(fresh, fresh.directory)); check(options);
+  if (canonicalize(directory.value.scope) !== canonicalize(task.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
+  const rules = await summary(handle(fresh, fresh.rules)); check(options);
+  if (!rules.value.items.some(item => item.type === "definition" && item.state === "active" && item.values["name"] === "change" && item.values["digest"] === task.definition)) throw new Unreadable("The confirmed change definition is no longer active. Nothing new was sent.");
+  return fresh;
 }
 
 async function sendStep(room: Room, task: EditTask, kind: EditStep["kind"], target: ScopeId, on: number | null, fields: Record<string, FieldValue>, options: EditOptions): Promise<boolean> {
-  const fresh = await currentRoom(room, options);
+  const fresh = await taskRoom(room, task, options);
   if (await head(fresh) !== task.base) throw new Unreadable("The published base moved. Keep this task and compare/reconfirm before a new proposal; nothing new was sent.");
   check(options); const h = handle(fresh, target); const s = await summary(h); check(options);
   if (kind === "open-pr" && canonicalize(s.value.scope) !== canonicalize(task.directory)) throw new Unreadable("The original directory incarnation changed. Nothing new was sent.");
@@ -101,7 +112,7 @@ async function sendStep(room: Room, task: EditTask, kind: EditStep["kind"], targ
   // The exact serializable envelope belongs to this task before any mutation crosses the transport boundary.
   const step: EditStep = { kind, target: s.value.scope, signed: freeze(JSON.parse(JSON.stringify(signed)) as SignedIntent), grants: freeze([]), beside: freeze(JSON.parse(JSON.stringify(beside)) as Beside), attempted: false };
   task.steps.push(step); options.changed?.();
-  const current = await currentRoom(room, options);
+  const current = await taskRoom(room, task, options);
   if (await head(current) !== task.base) throw new Unreadable("The published base moved before submission. Nothing new was sent.");
   check(options); step.attempted = true; options.changed?.();
   try { step.answer = await h.submit(step.signed, step.grants, step.beside); }
@@ -128,7 +139,7 @@ export async function continueEdit(room: Room, task: EditTask, options: EditOpti
     }
     const opened = task.steps.find(s => s.kind === "open-pr");
     if (!opened || opened.answer?.answer !== "accepted" || !opened.receiptVerified) return;
-    const fresh = await currentRoom(room, options); const D = handle(fresh, room.directory);
+    const fresh = await taskRoom(room, task, options); const D = handle(fresh, room.directory);
     const original = await D.followReceipt(opened.answer.receipt); if (!original.ok) throw new Unreadable("Change opened; its creation entry is currently unreadable.");
     const children = original.entry.sends.filter(s => "creator" in s.to && s.to.kind === "lane").map(s => scopeIdOf(s.to as Seed));
     if (children.length !== 1) throw new Unreadable("The original opening does not name exactly one change lane.");
@@ -159,6 +170,7 @@ export async function continueEdit(room: Room, task: EditTask, options: EditOpti
 /** Read-only reconciliation; absence never releases an unknown task or creates a fresh signature. */
 export async function checkEditRequest(room: Room, task: EditTask, options: EditOptions): Promise<void> {
   if (task.busy || task.state !== "unknown") return;
+  if (task.association !== actAssociation(room, task.source.scope.scope)) { task.message = "Check this task using its original room/key context."; return; }
   const step = task.steps.at(-1); if (!step?.attempted) return;
   task.busy = true;
   try {

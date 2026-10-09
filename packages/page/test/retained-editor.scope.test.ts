@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { utf8 } from "@generalbusiness/artroom-bytes";
+import { takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { act, joinRoom, listLanes, loadChange, openRoom, placeOf } from "../src/data.ts";
 import { checkEditRequest, continueEdit, prepareEdit } from "../src/retained-editor-data.ts";
 import { demo } from "./support/demo.ts";
@@ -73,6 +73,12 @@ test("invalid target and stale context/base send nothing new; an invalid old pro
     expect(corrected.state, corrected.message).toBe("recorded");
     expect((await loadChange(room, old.scope)).manifests[0]!.file?.path).toBe("../outside.md");
 
+    const mutable = { title: "Captured draft", path: "capture.md", content: "original bytes" };
+    const preparing = prepareEdit(room, old, old.manifests[0]!.id, mutable, options);
+    mutable.content = "changed during reads";
+    const captured = await preparing;
+    expect(captured.draft.content).toBe("original bytes");
+
     let same = true;
     const stopped = await prepareEdit(watched, old, old.manifests[0]!.id, { title: "Context guard", path: "context.md", content: "x" }, { current: () => same });
     const before = posts; same = false;
@@ -89,6 +95,24 @@ test("invalid target and stale context/base send nothing new; an invalid old pro
     const race = await prepareEdit(room, old, old.manifests[0]!.id, { title: "Pre-POST context guard", path: "race.md", content: "x" }, options);
     await continueEdit(raceRoom, race, { current: () => current, pause: d.pause });
     expect(triggered).toBe(true); expect(crossed).toBe(0); expect(race.steps[0]!.attempted).toBe(false); expect(race.state).toBe("stopped");
+
+    let reIncPosts = 0;
+    const reincarnated = await prepareEdit(room, old, old.manifests[0]!.id, { title: "Directory identity guard", path: "inc.md", content: "x" }, options);
+    const changedDirectory = { ...room, session: { ...room.session, fetch: (async (url: string, init?: Parameters<typeof d.fetch>[1]) => {
+      const reply = await d.fetch(url, init);
+      if (init?.method === "POST" && new URL(url).pathname.endsWith("/acts")) reIncPosts++;
+      if (reIncPosts > 0 && new URL(url).pathname.endsWith(`/${room.directory}`)) {
+        const bytes = reply.body ? await takeBytes(reply.body, 256 * 1024, AbortSignal.timeout(30_000)) : null;
+        if (!(bytes instanceof Uint8Array)) return reply;
+        const read = JSON.parse(new TextDecoder().decode(bytes));
+        if (read.ok) read.value.scope.inc = d.config.repository!.membership.inc;
+        return new Response(JSON.stringify(read));
+      }
+      return reply;
+    }) as typeof d.fetch } };
+    await continueEdit(changedDirectory, reincarnated, options);
+    expect(reIncPosts).toBe(1); expect(reincarnated.state).toBe("stopped"); expect(reincarnated.message).toContain("directory incarnation");
+    expect(reincarnated.steps[0]!.answer?.answer).toBe("accepted");
 
     const moved = await prepareEdit(watched, old, old.manifests[0]!.id, { title: "Moved base", path: "moved.md", content: "x" }, options);
     const published = await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Move base before editor submit");
