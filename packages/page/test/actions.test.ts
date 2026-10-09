@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { createIssue, taskForm } from "../src/tasks.ts";
+import { changeTaskContext, createIssue, taskForm } from "../src/tasks.ts";
 import type { Offered } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -176,6 +176,14 @@ test("a Merge task uses the exact observed manifest and selected issue reports w
   expect(ready.all().filter((node) => node.tag === "label")).toEqual([]);
   expect(ready.all().filter((node) => node.tag === "input").map((node) => node.attrs.get("type"))).toEqual(["hidden", "hidden"]);
   ready.event("submit"); expect(sent[0]).toEqual(["merge", "", { manifest: "12", reports }]);
+});
+
+test("task defaults retain selected issue-report order and never fall back to an older manifest or checker jobs", () => {
+  const reports = [{ at: { kind: "lane", scope: "second-issue", inc: "second" }, seq: 9, hash: "second-hash" }, { at: { kind: "lane", scope: "first-issue", inc: "first" }, seq: 4, hash: "first-hash" }];
+  const change = { currentManifest: 12, proposal: 0, manifests: [{ id: 11, state: "superseded", selectedReports: [] }, { id: 12, state: "current", selectedReports: reports }], jobs: [{ id: 99, state: "passed" }], reviewExtents: [{ label: "Docs", value: "docs" }], reviewMembers: [{ label: "@reviewer", value: "@reviewer" }] } as never;
+  expect(changeTaskContext(change).defaults?.["merge"]?.fields).toEqual({ manifest: "12", reports: JSON.stringify(reports) });
+  const unreadable = { ...change as object, currentManifest: null } as never;
+  expect(changeTaskContext(unreadable).defaults?.["merge"]).toBeUndefined();
 });
 
 test("Create issue asks for title and description and intentionally uses the title as its native condition", () => {

@@ -26,7 +26,7 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { createIssue, nextChangeAction, taskForm } from "./tasks.ts";
+import { changeTaskContext, createIssue, nextChangeAction, taskForm } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
@@ -441,11 +441,12 @@ async function draw(focus = false): Promise<void> {
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
-      const current = change.manifests.find((manifest) => manifest.state === "current");
+      const current = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
       const defaults = {
-        ...(current ? Object.fromEntries(["merge", "review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
+        ...(current ? Object.fromEntries(["review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
+      const taskContext = changeTaskContext(change);
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
       const { primary, blockedKinds } = changeActions(change.state, !!current?.file && editPath(current.file.path) === null);
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
@@ -461,12 +462,12 @@ async function draw(focus = false): Promise<void> {
           recorded: (lane) => { location.hash = `#/change/${lane}`; },
         }));
       }
-      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
+      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
         if (comment) { screen.querySelector('[data-action-slot="comment"]')?.append(taskForm(comment, send, context, ["body"], "Comment")); represented.push("comment"); }
         const next = nextChangeAction(loaded, change, acts.acts, primary);
-        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["verdict", "body", "extent"], next.kind === "merge" ? "Merge change" : "Review change")); represented.push(next.kind); }
+        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change")); represented.push(next.kind); }
         return represented;
       } })));
     }
