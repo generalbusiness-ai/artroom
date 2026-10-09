@@ -1,0 +1,56 @@
+{
+  "request": "d40e7f093504e874386bbdc740e9af80a16b7cf5",
+  "promise": "c3f747a376f5eaf3eef1814c430e655da4621ac3",
+  "head": "f6d80b3996df7ad3e7d00feff88d48cf29877ddc",
+  "tree": "7b0e8ef8778051257ff98b078c959dffa8caf374",
+  "sourceReads": [
+    {
+      "path": "packages/page/src/claim.ts",
+      "sha256": "c214001b9a8f3331b5f524bb08c831c4a755fa3454eeb590d351f376df7d5427",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "sha256": "b6f1783157a4692e6d6a35dec35be2cd5a76e3c728dd626fb55cb2bce8a3d5f2",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "sha256": "b4132ad3b5e9b877a27d35cd39df247e85fab634d4d90263ad2004ada40a04a5",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/platform/src/register.ts",
+      "sha256": "715717f3724c6875cc45855a1e39731d7dd67d94fc43f4b1314d7193cdf80b09",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/scope/src/reads.ts",
+      "sha256": "a5fa307bfdb00b512b2123006db5a27b61148de17248b2b04d2ada3666cca511",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/scope/src/signed-reads.ts",
+      "sha256": "3a0ba7c7590c58bfbb3da2ebc57f2ae1e3be5dc6e220fdcbc37203aca7d8a856",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/client/src/signed-read.ts",
+      "sha256": "1aa6fe35dafe5c53c1ca4f3ba31f1c9540a3b04dcd0640b7857842c3f5dd2a9a",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    },
+    {
+      "path": "packages/contract/src/read.ts",
+      "sha256": "306506483dde07a2098432127ec8747921faa094e98bc84fd0e7367804284028",
+      "coverage": "targeted relevant spans, not a full Source audit"
+    }
+  ],
+  "priorPlanning": "2972b32b51a796c5b3cb757ea928010923f0faba",
+  "priorAcceptance": "9386f1496537f19d9f4b5a0098a1ae7ed00824d3",
+  "recoveryOwner": "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+  "limit": "Design proposal only; no source/runtime/authority mutation, tests, package/provider/browser execution or adoption.",
+  "baseline": "ac54a18b6d011a5efeaa9a9a3e4980c3d353c6d3",
+  "baselineTree": "9c598beefab48c01e0f75d751dc1bce5ede91048",
+  "sourceCorrespondence": "All cited application-source paths identical between ac54 baseline and observed final f6d80b3 head; document movement receives no runtime credit.",
+  "presetStatus": "9386 accepts first-use planning/defaults only. Proposed exact preset descriptor ca1 is under independent c37 review; activation awaits review. No exact descriptor adoption inferred."
+}
