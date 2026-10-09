@@ -26,6 +26,10 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
+import { createIssue, nextChangeAction, taskForm } from "./tasks.ts";
+import type { Send } from "./actions.ts";
+import { stateOf, keepState } from "./list-context.ts";
+import { retainedEditor } from "./retained-editor.ts";
 import { allowedClaim, claimRoom, claimStatus, type ClaimRegister } from "./claim.ts";
 
 const KEPT = "artroom-page";
@@ -208,6 +212,7 @@ interface PanelOptions {
   offered?: Awaited<ReturnType<typeof actsOn>>;
   represented?: readonly string[];
   customForm?: (send: (kind: string, on: string, typed: Record<string, string>) => void, blocked: boolean, draftKey: string) => HTMLElement;
+  tasks?: (offered: Awaited<ReturnType<typeof actsOn>>, send: Send, context: ActionContext) => readonly string[];
 }
 async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}, options: PanelOptions = {}): Promise<HTMLElement> {
   const association = actAssociation(room, scope);
@@ -215,7 +220,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
-  const send = (kind: string, on: string, typed: Record<string, string>) => {
+  const send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => {
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
@@ -228,7 +233,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
-        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); }, () => {
+        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); if (known.answer.answer === "accepted") accepted?.(); }, () => {
           if (!currentContext()) throw new Error("The room or key changed before submission. Nothing was sent.");
           sending.submitting(association);
         });
@@ -245,8 +250,10 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const fence = sending.get(association);
   const pending = !!fence && fence.state !== "unknown";
   const uncertain = fence?.state === "unknown" || context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
-  const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind)) };
-  const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } });
+  const taskContext = { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } };
+  const represented = options.tasks?.(offered, send, taskContext) ?? [];
+  const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind) && !represented.includes(act.kind)) };
+  const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...taskContext, primary: [] });
   if (options.customForm) panel.append(options.customForm(send, pending || !!uncertain, association));
   if (fence?.state === "unknown") panel.append(unknownRequest(fence.kind));
   return panel;
@@ -405,7 +412,16 @@ async function draw(focus = false): Promise<void> {
       const issue = await loadIssue(room, scope as ScopeId);
       const defaults = issue.intent === undefined ? undefined : Object.fromEntries(["edit-own", "edit-any", "close-own", "close-any", "reopen-own", "reopen-any"].map((kind) => [kind, { on: issue.intent! }]));
       const offered = await actsOn(room, scope as ScopeId);
-      return show(...shell(destination, room, issueScreen(room, issue), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) }, { offered })));
+      const screen = issueScreen(room, issue);
+      const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) };
+      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, actionContext, { offered, tasks: (acts, send, context) => {
+        const represented: string[] = [];
+        const comment = acts.acts.find((act) => act.kind === "comment");
+        if (comment) { screen.querySelector('[data-action-slot="comment"]')?.append(taskForm(comment, send, context, ["body"], "Comment")); represented.push("comment"); }
+        const next = acts.acts.find((act) => actionContext.primary.includes(act.kind) && act.kind !== "comment");
+        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["reason"], "Issue action")); represented.push(next.kind); }
+        return represented;
+      } })));
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
@@ -418,7 +434,23 @@ async function draw(focus = false): Promise<void> {
       const { primary, blockedKinds } = changeActions(change.state, !!current?.file && editPath(current.file.path) === null);
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
       const mergeAnswer = lastAct && ["merge", "cancel-merge"].includes(lastAct.kind) ? last(scope) : null;
-      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds })));
+      const screen = changeScreen(room, change, mergeAnswer, lastAct?.kind);
+      if (current?.file && typeof current.file.content === "string") {
+        const capturedHash = location.hash;
+        const capturedContext = settingsContext(kept);
+        screen.querySelector('[data-action-slot="edit"]')?.append(retainedEditor(room, change, {
+          current: () => location.hash === capturedHash && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext,
+          recorded: (lane) => { location.hash = `#/change/${lane}`; },
+        }));
+      }
+      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
+        const represented: string[] = [];
+        const comment = acts.acts.find((act) => act.kind === "comment");
+        if (comment) { screen.querySelector('[data-action-slot="comment"]')?.append(taskForm(comment, send, context, ["body"], "Comment")); represented.push("comment"); }
+        const next = nextChangeAction(loaded, change, acts.acts, primary);
+        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["verdict", "body", "extent"], next.kind === "merge" ? "Merge change" : "Review change")); represented.push(next.kind); }
+        return represented;
+      } })));
     }
     if (destination === "rules") {
       const rules = await loadRules(room);
@@ -427,7 +459,14 @@ async function draw(focus = false): Promise<void> {
       const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
       return show(...shell(destination, room, rulesScreen(room, rules, editable), await panelFor(room, room.rules, {}, options)));
     }
-    return show(...shell(destination, room, roomScreen(room, await listLanes(room), destination === "changes" ? "change" : "issue"), await panelFor(loaded, loaded.directory, { primary: [destination === "changes" ? "open-pr" : "open-issue"] })));
+    const kind = destination === "changes" ? "change" : "issue";
+    const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
+    const screen = roomScreen(room, await listLanes(room), kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); } });
+    return show(...shell(destination, room, screen, await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
+      const open = destination === "issues" ? acts.acts.find((act) => act.kind === "open-issue") : undefined;
+      if (!open) return [];
+      screen.querySelector('[data-action-slot="create"]')?.append(createIssue(open, send, context)); return [open.kind];
+    } })));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
+import { taskForm } from "../src/tasks.ts";
 import type { Offered } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -136,4 +137,37 @@ test("a pending signed request prevents fresh submission without claiming its ou
   expect(panel.textContent).not.toContain("Request outcome unknown");
   panel.all().find((node) => node.tag === "form")!.event("submit");
   expect(sends).toBe(0);
+});
+
+test("only the exact accepted comment draft retires; delayed acceptance preserves newer edits and other subjects", () => {
+  const comment: Offered = { kind: "comment", step: "open", on: "comment", line: "Comment", fields: [{ name: "body", type: "text", required: true }] };
+  const callbacks: (() => void)[] = [];
+  const form = (subject: string) => asElement(actsPanel({ acts: [comment], hidden: 0 }, (_kind, _on, _typed, accepted) => { callbacks.push(accepted!); }, null, { primary: ["comment"], draftKey: subject })).all().find((node) => node.tag === "form")!;
+  const edit = (shown: Element, value: string) => { shown.all().find((node) => node.name === "field:body")!.value = value; shown.event("input"); };
+  const first = form("room/key/first-subject"); edit(first, "Accepted text"); first.event("submit"); callbacks[0]!();
+  expect(form("room/key/first-subject").all().find((node) => node.name === "field:body")!.value).toBe("");
+  const delayed = form("room/key/first-subject"); edit(delayed, "Old submission"); delayed.event("submit");
+  const newer = form("room/key/first-subject"); edit(newer, "Newer unsent edit");
+  const other = form("room/key/other-subject"); edit(other, "Other subject draft");
+  callbacks[1]!();
+  expect(form("room/key/first-subject").all().find((node) => node.name === "field:body")!.value).toBe("Newer unsent edit");
+  expect(form("room/key/other-subject").all().find((node) => node.name === "field:body")!.value).toBe("Other subject draft");
+  const repeated = form("room/key/same-text-subject"); edit(repeated, "Repeated text"); repeated.event("submit");
+  const changedBack = form("room/key/same-text-subject"); edit(changedBack, "Different text"); edit(changedBack, "Repeated text");
+  callbacks[2]!();
+  expect(form("room/key/same-text-subject").all().find((node) => node.name === "field:body")!.value).toBe("Repeated text");
+  const unknown = form("room/key/unknown-subject"); edit(unknown, "Unknown or refused submission"); unknown.event("submit");
+  expect(form("room/key/unknown-subject").all().find((node) => node.name === "field:body")!.value).toBe("Unknown or refused submission");
+});
+
+test("a Merge task uses the exact observed manifest and selected issue reports without asking for protocol fields", () => {
+  const merge: Offered = { kind: "merge", step: "open", on: "merge", line: "Merge", fields: [{ name: "manifest", type: "item", required: true }, { name: "reports", type: "list", required: true }] };
+  const missing = asElement(taskForm(merge, () => {}, { defaults: { merge: { fields: { manifest: "12" } } } }, [], "Merge change"));
+  expect(missing.textContent).toContain("selected issue-report evidence"); expect(missing.all().filter((node) => node.tag === "input")).toEqual([]);
+  const reports = '[{"at":{"kind":"lane","scope":"recorded-issue","inc":"recorded"},"seq":8,"hash":"recorded-hash"}]';
+  const sent: unknown[] = [];
+  const ready = asElement(taskForm(merge, (...args) => sent.push(args), { defaults: { merge: { fields: { manifest: "12", reports } } } }, [], "Merge change"));
+  expect(ready.all().filter((node) => node.tag === "label")).toEqual([]);
+  expect(ready.all().filter((node) => node.tag === "input").map((node) => node.attrs.get("type"))).toEqual(["hidden", "hidden"]);
+  ready.event("submit"); expect(sent[0]).toEqual(["merge", "", { manifest: "12", reports }]);
 });

@@ -16,6 +16,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
+    querySelector() { return new Element("div"); }
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
   const root = new Element("div");
@@ -23,7 +24,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
   const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: null };
   let redraw!: () => void;
-  let send!: (kind: string, on: string, fields: Record<string, string>) => void;
+  let send!: (kind: string, on: string, fields: Record<string, string>, accepted?: () => void) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
   const rejects: ((error: Error) => void)[] = [];
   const posts = vi.fn();
@@ -49,7 +50,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn(),
     actsPanel: (_offered: unknown, callback: typeof send, _last: unknown, options: (typeof panels)[number]) => { send = callback; panels.push(options); return new Element("section"); },
   }));
-  vi.stubGlobal("document", { getElementById: () => root });
+  vi.stubGlobal("document", { getElementById: () => root, createElement: (tag: string) => new Element(tag) });
   const location = { origin: "https://page.test", hash: "#/" };
   vi.stubGlobal("location", location);
   vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(context) });
@@ -85,7 +86,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(dataAct).toHaveBeenCalledTimes(1);
     location.hash = "#/issue/closed-issue";
     rendered = gate(); redraw(); await rendered.promise;
-    expect(panels.at(-1)?.primary).toEqual(["comment", "reopen-own"]);
+    expect(panels.at(-1)?.primary).toEqual([]); // Primary tasks live beside the subject, not the Inspect panel.
     expect(panels.at(-1)?.blockedKinds).toEqual(["close-own", "close-any"]);
     send("close-own", "0", {});
     await drain();
@@ -123,6 +124,19 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(root.textContent).toContain("Newest local label");
     expect(root.textContent).toContain("Room est-room");
     expect(root.textContent).not.toContain("Room ther-roo");
+    context = { ...context, secret: "device" };
+    rendered = gate(); redraw(); await rendered.promise;
+    const retired = vi.fn();
+    for (const answer of ["refused", "accepted"] as const) {
+      dataAct.mockImplementationOnce(async (...args: unknown[]) => {
+        (args[5] as () => void)();
+        const result = { kind: "comment", answer: { answer }, observation: null };
+        (args[4] as (value: unknown) => void)(result);
+        return result as never;
+      });
+      rendered = gate(); send("comment", "", { body: "Exact submission" }, retired); await drain();
+      expect(retired).toHaveBeenCalledTimes(answer === "accepted" ? 1 : 0);
+    }
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion

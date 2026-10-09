@@ -3,6 +3,7 @@ import { editPath, matches } from "@generalbusiness/artroom-platform";
 import type { Answer } from "@generalbusiness/artroom-contract";
 import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
+import { LIST_QUERY_LIMIT, type ListState } from "./list-context.ts";
 
 type Child = Node | string | null | undefined | false;
 
@@ -31,11 +32,11 @@ export function whoLine(room: Room): HTMLElement {
 }
 
 /** One list destination, without repeating room identity from the switcher. */
-export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: LaneRow[] }, kind: "issue" | "change" = "issue"): HTMLElement {
+export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: LaneRow[] }, kind: "issue" | "change" = "issue", context?: { state: ListState; changed(state: ListState): void }): HTMLElement {
   const label = kind === "issue" ? "Issues" : "Changes";
   const all = kind === "issue" ? lanes.issues : lanes.changes;
-  let filter = "open";
-  const query = h("input", { type: "search", placeholder: `Search ${label.toLowerCase()}`, "aria-label": `Search ${label.toLowerCase()}` }) as HTMLInputElement;
+  let filter = context?.state.filter ?? "open";
+  const query = h("input", { type: "search", value: context?.state.query ?? "", maxlength: String(LIST_QUERY_LIMIT), placeholder: `Search ${label.toLowerCase()}`, "aria-label": `Search ${label.toLowerCase()}` }) as HTMLInputElement;
   const content = h("div", { "data-list": "" });
   const filters = h("div", { class: "filters", "aria-label": `Filter ${label.toLowerCase()}` });
   const render = () => {
@@ -49,24 +50,25 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   };
   for (const value of ["open", kind === "issue" ? "closed" : "merged", "all"]) {
     const button = h("button", { type: "button", class: "filter", "data-filter": value }, value[0]!.toUpperCase() + value.slice(1));
-    button.addEventListener("click", () => { filter = value; render(); });
+    button.addEventListener("click", () => { filter = value as ListState["filter"]; context?.changed({ query: query.value, filter }); render(); });
     filters.append(button);
   }
-  query.addEventListener("input", render);
+  query.addEventListener("input", () => { context?.changed({ query: query.value, filter }); render(); });
   render();
-  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters), content,
+  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { "data-action-slot": "create" })), content,
     inspect("Inspect room record", whoLine(room), h("dl", {}, field("Directory", h("code", {}, room.directory)))),
   );
 }
 
-const discussion = (body: string | null, comments: IssueView["comments"]): HTMLElement | null => !body && comments.length === 0 ? null : h("section", { class: "discussion", "aria-label": "Discussion" },
+const discussion = (body: string | null, comments: IssueView["comments"]): HTMLElement => h("section", { class: "discussion", "aria-label": "Discussion" },
   body ? h("p", { class: "description" }, body) : null,
   comments.map((c) => h("article", { class: "comment" }, h("span", { class: "comment-author" }, or(c.author)), h("p", {}, or(c.body, "Text not held")), c.state !== "visible" ? h("p", { class: "muted" }, `Comment ${c.id}: ${c.state}`) : null)),
+  h("div", { "data-action-slot": "comment" }),
 );
 
 export function issueScreen(room: Room, issue: IssueView): HTMLElement {
   return h("main", { class: "screen" }, back("issue"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null))),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null)), h("div", { "data-action-slot": "next" })),
     issue.assignees.length ? h("p", { class: "record-meta" }, `Assigned to ${list(issue.assignees)}`) : null,
     issue.conditions.length ? section("Conditions", h("ul", {}, issue.conditions.map((c) => h("li", {}, c)))) : null,
     discussion(issue.body, issue.comments),
@@ -114,10 +116,11 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
       h("p", { class: "version-label" }, `Version ${current.id} · ${current.file.path}`),
       current.file.digest ? h("p", { class: "record-meta" }, "Digest ", h("code", {}, current.file.digest)) : null,
       h("pre", { "aria-label": `Source of ${current.file.path}, version ${current.id}` }, h("code", {}, current.file.content)),
+      h("div", { "data-action-slot": "edit" }),
     ) : h("p", { class: "muted" }, published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null))),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { "data-action-slot": "next" })),
     version,
     !published && requiredReviews.length ? section("Review requirements", requiredReviews.map((extent) => {
       const approving = change.reviews.filter((review) => review.manifest === current?.id && review.state === "submitted" && review.verdict === "approve" && review.extent === extent.name);
