@@ -98,6 +98,8 @@ const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
 const joining = new ScopeSending();
 const joinAnswers = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
+/** Known replies remain discoverable where the person began joining; custody stays keyed by actual enrollment. */
+const joinRepliesByContext = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
@@ -300,7 +302,7 @@ function settingsScreen(): HTMLElement {
   form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   const joinButton = form.querySelector("#join")!;
-  const previousRecord = joinKey ? joinAnswers.get(joinKey) : undefined;
+  const previousRecord = joinRepliesByContext.get(selectedContext) ?? (joinKey ? joinAnswers.get(joinKey) : undefined);
   const previousJoin = previousRecord?.result;
   if (previousJoin?.answer.answer === "accepted") {
     joinButton.setAttribute("disabled", "");
@@ -323,7 +325,7 @@ function settingsScreen(): HTMLElement {
       const state = joining.get(enrollment);
       if (state || joinAnswers.get(enrollment)?.result.answer.answer === "accepted") {
         joinButton.setAttribute("disabled", "");
-        if (state) tell(false, state.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. Do not send a replacement." : "Joining room");
+        if (state) tell(false, state.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room");
       } else joinButton.removeAttribute("disabled");
     } catch { /* The submit handler reports an invalid invitation or key. */ }
   };
@@ -338,14 +340,16 @@ function settingsScreen(): HTMLElement {
       let enrollment: string;
       try { enrollment = joinAssociation(sessionOf(next), invitation); }
       catch (error) { tell(false, error instanceof Error ? error.message : "The invitation could not be read."); return; }
-      if (!current() || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
+      if (!current() || joinRepliesByContext.get(selectedContext)?.result.answer.answer === "accepted" || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
       joinButton.setAttribute("disabled", "");
       try {
         const joined = await joinRoom(sessionOf(next), invitation, () => {
           if (!current()) throw new Error("The room or key changed before joining. Nothing was sent.");
           joining.submitting(enrollment);
         });
-        joinAnswers.set(enrollment, { result: joined, settings: next });
+        const record = { result: joined, settings: next };
+        joinAnswers.set(enrollment, record);
+        if (joined.answer.answer !== "unavailable" && joined.answer.answer !== "mismatch") joinRepliesByContext.set(selectedContext, record);
         if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(enrollment); else joining.answered(enrollment);
         if (!current() || screenDraw !== drawing) return;
         if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);
