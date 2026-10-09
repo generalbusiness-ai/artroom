@@ -1,0 +1,137 @@
+/** Test-only ownership for the clone and Page claim fixtures. No native cancellation. */
+import { onTestFinished } from "vitest";
+import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import type { ScopeId } from "@generalbusiness/artroom-contract";
+import { net } from "../../src/testing.ts";
+import type { SessionOwner } from "../session-settings.ts";
+import { Platform } from "../repository.ts";
+import { wired } from "../outside.ts";
+import { platformOutside } from "../worker.ts";
+
+type PortFactory = NonNullable<ReturnType<typeof wired.get>>;
+type OutsideFactory = NonNullable<ReturnType<typeof platformOutside.get>>;
+const retired = new WeakSet<Function>();
+function resources<K, V extends Function>(map: Map<K, V>) {
+  const installed = new Map<K, { previous: V | undefined; value: V }>();
+  return {
+    set(key: K, value: V): void {
+      const prior = installed.get(key);
+      if (prior) retired.add(prior.value);
+      installed.set(key, { previous: prior ? prior.previous : map.get(key), value });
+      map.set(key, value);
+    },
+    remove(key: K): void {
+      const record = installed.get(key);
+      if (!record) return;
+      retired.add(record.value);
+      if (map.get(key) === record.value) {
+        if (record.previous && !retired.has(record.previous)) map.set(key, record.previous);
+        else map.delete(key);
+      }
+      installed.delete(key);
+    },
+    release(): void {
+      for (const [key, record] of installed) {
+        retired.add(record.value);
+        if (map.get(key) !== record.value) continue;
+        if (record.previous && !retired.has(record.previous)) map.set(key, record.previous);
+        else map.delete(key);
+      }
+    },
+  };
+}
+
+export function nativeFixtureLifetime(owner: SessionOwner) {
+  const clock = net.clock;
+  const before = { hold: net.hold, deaf: net.deaf };
+  let hold: NonNullable<typeof net.hold> = () => false;
+  const deaf: NonNullable<typeof net.deaf> = () => false;
+  let released = false;
+  const ports = resources(wired), outsides = resources(platformOutside);
+  const cleanups = new Set<() => void>();
+  net.hold = hold; net.deaf = deaf;
+  const intact = () => {
+    if (released || net.clock !== clock || net.hold !== hold || net.deaf !== deaf) throw new Error("Native fixture resources ended before the continuation completed.");
+  };
+  const active = () => { owner.active(); intact(); };
+  const wait = async <T>(action: () => Promise<T>): Promise<T> => {
+    active();
+    const value = await owner.required(action);
+    // required permits a still-live explicit descendant on completion. Do not
+    // replace that check with exact-current active; a new action still needs it.
+    intact();
+    return value;
+  };
+  const release = () => {
+    if (released) return;
+    released = true;
+    owner.close();
+    try {
+      for (const cleanup of cleanups) cleanup();
+    } finally {
+      cleanups.clear();
+      retired.add(hold); retired.add(deaf);
+      if (net.hold === hold) net.hold = before.hold && !retired.has(before.hold) ? before.hold : null;
+      if (net.deaf === deaf) net.deaf = before.deaf && !retired.has(before.deaf) ? before.deaf : null;
+      ports.release(); outsides.release();
+    }
+    // Same clock persists, including any legitimate advances. No physical drain.
+  };
+  onTestFinished(release);
+  class OwnedPlatform extends Platform {
+    override get stub() {
+      const source = super.stub;
+      return new Proxy(source, { get(target, key) {
+        const value: unknown = Reflect.get(target, key, target);
+        return typeof value === "function" ? (...args: unknown[]) => wait(() => Promise.resolve(Reflect.apply(value, target, args))) : value;
+      } });
+    }
+    override restart(): Promise<void> { return wait(() => super.restart()); }
+    override async created(seq: number, n = 0): Promise<Platform> { const made = await super.created(seq, n); active(); return new OwnedPlatform(made.name); }
+  }
+  return {
+    owner, active, wait, release,
+    unWire: (name: string): void => ports.remove(name),
+    unOutside: (name: string): void => outsides.remove(name),
+    platform: (name: ScopeId): Platform => { active(); return new OwnedPlatform(name); },
+    cleanup(run: () => void): void { if (released) run(); else cleanups.add(run); },
+    setHold(next: NonNullable<typeof net.hold>): void { active(); retired.add(hold); hold = next; net.hold = hold; },
+    wire(name: string, factory: PortFactory): void { active(); ports.set(name, () => { active(); return factory(); }); },
+    outside(name: string, factory: OutsideFactory): void { active(); outsides.set(name, (given, sql) => { active(); return factory(given, sql); }); },
+    now(): number { active(); return timeMs(clock.now)!; },
+    advance(milliseconds: number): void {
+      active(); if (!Number.isFinite(milliseconds) || milliseconds < 0) throw new Error("Fixture clock advance must be nonnegative.");
+      clock.now = timeOf(timeMs(clock.now)! + milliseconds);
+    },
+  };
+}
+
+/** Finite fixture scheduler, not a transitive native quiescence or drain proof. */
+export async function driveFixture(nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> {
+  const distinct = [...new Map(nodes.map(node => [node.name, node])).values()];
+  // At most two rooms, one native creation per scheduler call, and finite
+  // enrollment/token effects are expected here. 4096 counted actions is an
+  // intentionally generous failure ceiling, not an expected acceptance count
+  // or a proof that all native background work has drained.
+  let work = 0;
+  const count = (value: number): void => {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error("Native fixture driver returned an invalid work count.");
+    work += value;
+    if (work > 4096) throw new Error("Native fixture exceeded its finite work budget.");
+  };
+  for (let pass = 0; pass < 64; pass++) {
+    let made = 0;
+    for (const node of distinct) {
+      for (;;) {
+        const effects = await wait(() => (node.stub as unknown as { effect(): Promise<number> }).effect());
+        count(effects);
+        if (effects === 0) break;
+        made += effects;
+      }
+      const dispatched = await wait(() => node.stub.dispatch());
+      count(dispatched); made += dispatched;
+    }
+    if (!made) return;
+  }
+  throw new Error("Native fixture exceeded its finite scheduler passes.");
+}
