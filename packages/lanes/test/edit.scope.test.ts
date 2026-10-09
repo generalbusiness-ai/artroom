@@ -216,7 +216,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect([outside.code, outside.lines[1]]).toEqual([1, expect.stringMatching(/^Not published: the merge sc_\S+:\d+ is refused, path-invalid\. /)]);
   expect([host.refs.get("refs/heads/main"), host.pushes.length]).toEqual([head3, pushes]);
 
-  // The destination's history, with its three publications of a one-file manifest and two refusals, replays consistent, with the
+  // The new destination's history, with its three publications of a one-file manifest and two refusals, replays consistent, with the
   // histories whose entries it names: a verifier reads each over HTTP and derives every entry again, with the platform package's
   // rules and the capability code that the production ports hold, as `wiring.scope.test.ts` does. `artroom verify` carries no
   // capability code, and answers that it cannot derive a lane (the delivery note's section 5).
@@ -228,7 +228,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // The publications are the room's: every push to the branch is the destination's, after the founding one.
   expect(host.pushes.filter((p) => p.ref === "refs/heads/main").map((p) => p.commit)).toEqual([first, head1, head2, head3]);
   const items = await (G.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "publication");
-  expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["published", null], ["published", null], ["not-reserved", "rules-not-met:rules"], ["published", null], ["not-reserved", "path-invalid"]]);
+  expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["cleaned", null], ["cleaned", null], ["not-reserved", "rules-not-met:rules"], ["cleaned", null], ["not-reserved", "path-invalid"]]);
   if (at.host === "artifacts") {
     // Scripted HTTP read boundary only: after one real accepted merge, three
     // unrelated entries precede its terminal entry. That terminal is just

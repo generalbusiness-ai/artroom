@@ -2218,8 +2218,8 @@ export const destinationRules3: Rules = (() => {
     if (!written || written.effect !== "state") return base;
     const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"];
     const publication = typeof publicationId === "number" ? given.state.item(publicationId) : null;
-    if (!publication?.values["tree"]) return base;
-    if (!stagedOwn(given, publication, given.resolved.self)) return base;
+    if (!publication) return base;
+    if (!publication.values["tree"] || !stagedOwn(given, publication, given.resolved.self)) return { ...base, effects: [...base.effects, { effect: "state", item: publication.id, state: "cleaned" }] };
     return { ...base, opens: [...base.opens, opening(given, "reservation-delete", 1, publication.id), opening(given, "mint", 1, publication.id)] };
   } } };
   const judgeRule3 = rules["judge"] as Extract<PlatformRule, { place: "outcome" }>;
