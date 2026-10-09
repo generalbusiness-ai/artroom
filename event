@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/027-artroom-usability/v2/screens/rules-mobile-dark.png","body":{"commit":"4ab8f849be8a1ef49e09f6e812392877dbcf75eb","path":"plans/027-artroom-usability/v2/screens/rules-mobile-dark.png"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:002cf757ba6e5397a15fda07c153af0ce2856aaa","text":"Merge retired a covered predecessor; the successor is at plans/027-artroom-usability/v2/concepts/change-merged-desktop.png."}
