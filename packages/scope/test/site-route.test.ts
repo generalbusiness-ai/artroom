@@ -3,17 +3,21 @@ import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER } from "@generalbusiness/artroom-platform";
+import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
 import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
+import type { Binding } from "../src/namespace.ts";
 import type { SiteEnv } from "../src/site/host.ts";
 import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
 import { platformOutside } from "./worker.ts";
+import completeness from "./site/completeness/fixture.md?raw";
+import companion from "./site/completeness/companion.md?raw";
+import diagram from "./site/completeness/diagram.svg?raw";
 
 // The site route on a real register and directory, under the deployed class in the namespace `PLATFORM`, with the platform
 // package's rules. The register's claim creates the repository through the production wiring of the hosting's own Git service,
@@ -141,6 +145,35 @@ class Scripted {
 }
 
 const host = new Scripted();
+// SCRIPTED publication boundary for these renderer/HTTP witnesses. The
+// selected-publication test separately exercises actual destination records.
+const publishedScopes: Binding = {
+  idFromName: (name) => env.PLATFORM.idFromName(name),
+  get: (id) => {
+    const object = env.PLATFORM.get(id) as unknown as import("../src/site/publication.ts").SitePublicationPeer & { siteRoom(): Promise<import("../src/namespace.ts").Sourced | null> };
+    return {
+      siteRoom: () => object.siteRoom(),
+      siteDestination: () => object.siteDestination(),
+      // SCRIPTED proof and matching Git receipt objects; not native publication evidence.
+      sitePublishedCommit: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository, commit: string) => {
+        const actual = await object.sitePublication(directory, repository);
+        if (!actual) return { ok: false, reason: "not-published" };
+        const fact = { at: actual.at, seq: 1, hash: `sha256:${"a".repeat(64)}` } as const;
+        const file = canonicalize({ v: 1, scripted: true, commit });
+        const receipt = receiptObjects("sha1", actual.at.scope, "2099-01-01T00:00:00Z", fact, JSON.parse(file));
+        const ref = `refs/artroom/receipts/${commit}`;
+        host.refs.set(ref, receipt.commit);
+        for (const o of receipt.objects) host.objects.set(o.id, { id: o.id, type: o.kind, data: o.body });
+        return { ok: true, proof: { at: actual.at, head: actual.head, directory, repository, commit, publication: fact, written: fact,
+          receipt: { ref, commit: receipt.commit, tree: receipt.objects.find(o => o.kind === "tree")!.id, blob: receipt.objects.find(o => o.kind === "blob")!.id, file } } };
+      },
+      sitePublication: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
+        const actual = await object.sitePublication(directory, repository);
+        return actual && { ...actual, refs: [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
+      },
+    };
+  },
+};
 let D: Platform;
 let R: Platform;
 let siteEnv: SiteEnv;
@@ -153,7 +186,7 @@ beforeAll(async () => {
   const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const registerSeed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 };
   R = new Platform(scopeIdOf(registerSeed));
-  siteEnv = { SCOPES: env.PLATFORM, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
+  siteEnv = { SCOPES: publishedScopes, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
   platformOutside.set(R.name, (given, sql) => artifactsOutside(given, sql, siteEnv, host.fetch));
   expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
@@ -168,6 +201,9 @@ beforeAll(async () => {
     "docs/index.md": "# Docs\n\nThe [guide](guide.md).\n",
     "docs/guide.md": "# Guide\n\n## Setup\n\n## Setup\n\nBack [home](../README.md), [the top](/README.md), [elsewhere](https://example.com/x), [setup](#setup).\n\n![A diagram](diagram.png)\n\n| a | b |\n| - | :-: |\n| 1 | ~~2~~ |\n\n- [x] done\n- [ ] not yet\n",
     "docs/diagram.png": PNG,
+    "docs/completeness/fixture.md": completeness,
+    "docs/completeness/companion.md": companion,
+    "docs/completeness/diagram.svg": diagram,
     "notes/a.txt": "plain\n",
     "notes/b.md": "b\n",
     "big.md": "a".repeat(FILE_BYTES + 1),
@@ -239,6 +275,52 @@ test("a page: a markdown file at HEAD, at its branch and at a tag renders as HTM
   expect(host.minted.filter((token) => !host.revoked.has(token))).toEqual([]);
 });
 
+// Invariant: one checked-in document renders the supported GFM constructs through Site; its repository links and image
+// remain at the requested ref and serve the companion bytes, while the documented safety differences and unsupported syntax
+// remain visible. The register/directory are real scopes; the Git host is the labelled stand-in above.
+test("GFM completeness fixture: constructs render through Site, relative page and image addresses serve their repository bytes, and documented differences stay visible (STAND-IN host)", async () => {
+  const prefix = `/site/${D.name}/HEAD/`;
+  const response = await get(`${prefix}docs/completeness/fixture.md`);
+  expect([response.status, response.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
+  const body = await response.text();
+  for (const construct of [
+    '<h1 id="site-completeness">Site completeness</h1>',
+    '<h2 id="getting-started">Getting <em>started</em></h2>',
+    '<h2 id="getting-started-1">Getting <em>started</em></h2>',
+    '<a href="#getting-started">the first section</a>',
+    '<a href="#getting-started-1">the repeated section</a>',
+    '<em>Emphasis</em>', '<strong>strong emphasis</strong>', '<del>strikethrough</del>', '<code>inline code</code>',
+    '<ul>\n<li>First bullet</li>', '<li>Nested bullet</li>', '<ol>\n<li>First ordered item</li>',
+    '<li><input checked="" disabled="" type="checkbox"> Finished task</li>',
+    '<li><input disabled="" type="checkbox"> Open task</li>',
+    '<th align="left">Feature</th>', '<th align="right">State</th>', '<td align="right">working</td>',
+    '<pre><code class="language-ts">const answer = 42;\n</code></pre>',
+    '<blockquote>\n<p>A quoted paragraph.</p>\n<p>With another paragraph.</p>\n</blockquote>',
+    '<a href="https://example.com/guide">https://example.com/guide</a>',
+    '<a href="http://www.example.com">www.example.com</a>',
+    '<a href="mailto:reader@example.com">reader@example.com</a>',
+    `<a href="${prefix}docs/completeness/companion.md#linked-section">the companion page</a>`,
+    `<a href="${prefix}README.md">the repository root</a>`, `<a href="${prefix}docs/index.md">the parent page</a>`,
+    `<img src="${prefix}docs/completeness/diagram.svg" alt="Repository diagram" title="A repository image" />`,
+    'Inline HTML &lt;em&gt;stays text&lt;/em&gt;.',
+    '<pre class="raw-html">&lt;div&gt;Block HTML stays text.&lt;/div&gt;</pre>',
+    '<a href="">An unsafe link</a>',
+    'a note[^note].', '[^note]: This is ordinary text, not a footnote.', '[[Companion]]',
+  ]) expect(body, construct).toContain(construct);
+  expect(body).not.toMatch(/<sup|<div>|<em>stays text|href="javascript:/);
+
+  // Follow the addresses written by Site, rather than rebuilding the next requests from the fixture paths.
+  const linked = /<a href="([^"]+)">the companion page<\/a>/.exec(body)![1]!;
+  const linkedResponse = await get(linked);
+  expect(linkedResponse.status).toBe(200);
+  expect(await linkedResponse.text()).toContain('<h2 id="linked-section">Linked section</h2>');
+  const src = /<img src="([^"]+)" alt="Repository diagram"/.exec(body)![1]!;
+  const image = await get(src);
+  expect([image.status, image.headers.get("content-type")]).toEqual([200, "image/svg+xml"]);
+  expect(image.headers.get("content-security-policy")).toContain("sandbox");
+  expect(new Uint8Array(await image.arrayBuffer())).toEqual(utf8(diagram));
+});
+
 // Invariant: a directory answers its index page if it has one, else a listing of its entries.
 test("an index: the root answers its README, a directory its index.md, and a directory with neither a listing of its files (STAND-IN host)", async () => {
   const root = await page(await get(`/site/${D.name}/HEAD/`));
@@ -274,14 +356,14 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
   const cases: [string, number, string, SiteEnv?][] = [
     [`/site/${D.name}/HEAD/docs/missing.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs/guide.md/`, 404, "not-found"],
-    [`/site/${D.name}/no-such-branch/README.md`, 404, "ref-not-found"],
-    [`/site/${D.name}/bad..ref/README.md`, 404, "ref-not-found"],
+    [`/site/${D.name}/no-such-branch/README.md`, 404, "not-published"],
+    [`/site/${D.name}/bad..ref/README.md`, 404, "not-published"],
     [`/site/${D.name}/HEAD/big.md`, 413, "too-large"],
     [`/site/${R.name}/HEAD/README.md`, 404, "not-found"],
     [`/site/not-a-scope/HEAD/README.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs%2Fguide.md`, 400, "bad-request"],
     [`/site/${D.name}/HEAD/%E0%A4%A`, 400, "bad-request"],
-    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: env.PLATFORM }],
+    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: publishedScopes }],
     // The host's setting pins another register: this room was not created by it, and its repository is not read.
     [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { ...siteEnv, ARTIFACTS_CONFIG: canonicalize({ registerScope: D.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) }],
   ];
@@ -405,7 +487,7 @@ test("navigation: the header labels the repository and the branch or tag, the br
   expect(head.body).toContain(`<span class="version">branch main (HEAD)</span>`);
   expect(head.body).toContain(`Rendered from commit <code>${host.refs.get("refs/heads/main")}</code>.`);
   expect((await page(await get(`${at("main")}docs/guide.md`))).body).toContain(`<span class="version">branch main</span>`);
-  // An annotated tag is followed to its commit.
+  // SCRIPTED publication names the annotated tag's already-recorded commit.
   expect((await page(await get(`${at("release")}README.md`))).body).toContain(`Rendered from commit <code>${nav}</code>.`);
 });
 
@@ -439,15 +521,16 @@ test("a folder: its listing gives sub-folders, markdown files by their first hea
   expect((await page(await get(`${prefix}guide/deep`))).body).toContain('<h1 id="deep">Deep</h1>');
 });
 
-// Invariant: the versions page lists every branch and tag of the repository with the commit it names, an annotated tag
-// followed, and marks the published branch; its ETag changes when a ref changes, and invalid rows fail before 304.
-test("versions: /site/<directory>/versions/ lists each branch and tag with its commit, an annotated tag followed, the published branch marked; a new tag gives a new ETag (STAND-IN host)", async () => {
+// Invariant: the versions page renders the SCRIPTED publication record, marks
+// its published branch, and validates recorded commit targets before 304.
+// This fixture scripts additional named versions that today's real room has no registry for.
+test("versions: recorded version rows and their commits render, changed publication gives a new ETag, invalid targets fail before 304 (SCRIPTED publication, STAND-IN host)", async () => {
   const at = `/site/${D.name}/versions/`;
   const response = await get(at);
   const versions = await page(response);
   expect([versions.status, versions.type]).toEqual([200, "text/html; charset=utf-8"]);
   const rows = [...versions.body.matchAll(/<tr><td>(branch|tag)<\/td><td><a href="([^"]+)">([^<]+)<\/a>([^<]*)<\/td><td><code>([0-9a-f]{40})<\/code><\/td><\/tr>/g)].map((m) => m.slice(1));
-  const expected = [...host.refs].sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
+  const expected = [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
     const tag = ref.startsWith("refs/tags/");
     const name = ref.replace(/^refs\/(heads|tags)\//, "");
     return [tag ? "tag" : "branch", `/site/${D.name}/${name}/`, name, name === "main" && !tag ? " (HEAD, the published branch)" : "", name === "release" ? nav : id];
@@ -461,14 +544,14 @@ test("versions: /site/<directory>/versions/ lists each branch and tag with its c
   const etag = response.headers.get("etag")!;
   expect((await get(at, { headers: { "if-none-match": etag } })).status).toBe(304);
   expect((await get(at, { headers: { "if-none-match": "*" } })).status).toBe(304);
-  // A supported annotated-tag pack entry whose target is a blob, not a commit.
+  // An invalid publication target: a blob rather than a recorded commit.
   const wrong = utf8("not a commit\n");
   const wrongId = idOf("blob", wrong);
   host.objects.set(wrongId, { id: wrongId, type: "blob", data: wrong });
   const tag = utf8(`object ${wrongId}\ntype blob\ntag wrong-target\ntagger Rita <rita@example.invalid> 0 +0000\n\nwrong target\n`);
   const tagId = idOf("tag", tag);
   host.objects.set(tagId, { id: tagId, type: "tag", data: tag });
-  host.refs.set("refs/tags/wrong-target", tagId);
+  host.refs.set("refs/tags/wrong-target", wrongId);
   try {
     const ordinary = await get(at);
     const conditional = await get(at, { headers: { "if-none-match": "*" } });
