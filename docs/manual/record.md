@@ -20,8 +20,8 @@ flowchart LR
   F --> R[Accepted-act receipt]
 ```
 
-An exact **fact reference** names a scope, its incarnation, an entry position
-and that entry's hash. A position such as “entry 12” is meaningful only
+An exact **fact reference** names a scope's ID, kind and incarnation, an entry
+position and that entry's hash. A position such as “entry 12” is meaningful only
 inside its own scope. An incarnation distinguishes this lifetime from a
 different lifetime under the same scope ID.
 
