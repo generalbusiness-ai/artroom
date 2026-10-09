@@ -93,3 +93,47 @@ test("a single eligible choice is fixed and drafts stay with their room, member 
   expect(saved({ draftKey: "room-A/member-B/scope" })).toBe("");
   expect(saved({ defaults: { "review-verdict": { fields: { manifest: "10" } } } })).toBe("");
 });
+
+test("ordinary declared inherited names remain own fields with their exact text, including saved drafts", () => {
+  // These names are valid declarations, as the real validator/judgment witness in derive/timed.test.ts shows.
+  const names = ["__proto__", "constructor", "toString"];
+  const offered = { acts: names.map((kind): Offered => ({ kind, step: "open", on: "record", line: kind, fields: names.map((name) => ({ name, type: "text", required: true })) })), hidden: 0 };
+  const sent: unknown[] = [];
+  const context = { defaults: {}, choices: {}, draftKey: "ordinary-inherited-names" };
+  const panel = asElement(actsPanel(offered, (...args) => sent.push(args), null, context));
+  expect(panel.all().filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Inspect", ...names]);
+  const form = panel.all().find((node) => node.attrs.get("data-act") === "__proto__")!;
+  for (const name of names) {
+    const input = form.all().find((node) => node.name === `field:${name}`)!;
+    expect([input.attrs.get("type"), input.value]).toEqual(["text", ""]);
+    input.value = `text for ${name}`;
+  }
+  form.event("input");
+  const redraw = asElement(actsPanel(offered, (...args) => sent.push(args), null, context));
+  const restored = redraw.all().find((node) => node.attrs.get("data-act") === "__proto__")!;
+  for (const name of names) expect(restored.all().find((node) => node.name === `field:${name}`)!.value).toBe(`text for ${name}`);
+  restored.event("submit");
+  const fields = (sent[0] as [string, string, Record<string, string>])[2];
+  expect(Object.keys(fields)).toEqual(names);
+  for (const name of names) expect([Object.hasOwn(fields, name), fields[name]]).toEqual([true, `text for ${name}`]);
+  expect(Object.getPrototypeOf(fields)).toBeNull();
+});
+
+test("a final subject can retain its declared action for inspection without offering another merge", () => {
+  let sends = 0;
+  const merge: Offered = { kind: "merge", step: "open", on: "merge", line: "Merge", fields: [] };
+  const panel = asElement(actsPanel({ acts: [merge], hidden: 0 }, () => sends++, null, { blockedKinds: ["merge"] }));
+  const form = panel.all().find((node) => node.tag === "form")!;
+  expect(form.all().find((node) => node.tag === "button")?.hasAttribute("disabled")).toBe(true);
+  form.event("submit");
+  expect(sends).toBe(0);
+});
+
+test("a pending signed request prevents fresh submission without claiming its outcome is unknown", () => {
+  let sends = 0;
+  const panel = asElement(actsPanel({ acts: [review], hidden: 0 }, () => sends++, null, { pending: true, refresh: () => {} }));
+  expect(panel.textContent).toContain("Sending request");
+  expect(panel.textContent).not.toContain("Request outcome unknown");
+  panel.all().find((node) => node.tag === "form")!.event("submit");
+  expect(sends).toBe(0);
+});

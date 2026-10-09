@@ -9,8 +9,12 @@ export interface ActionContext {
   refresh?: () => void;
   /** A submit or its subsequent observation is unsettled. Refresh is read-only. */
   uncertain?: boolean;
+  /** A submission is in flight; a fresh signed act must not replace it. */
+  pending?: boolean;
   /** The current subject already shows its uncertainty in its status. */
   statusShown?: boolean;
+  /** Actions whose observed subject is final or otherwise unavailable. */
+  blockedKinds?: readonly string[];
   /** Association includes the service, room, member key and scope. Memory only. */
   draftKey?: string;
 }
@@ -37,8 +41,9 @@ const fieldLabels: Record<string, string> = {
   labels: "Labels", extents: "Review requirements", conditions: "Conditions", definition: "Definition", draft: "Draft",
 };
 const drafts = new Map<string, Record<string, string>>();
+const own = <T>(record: Record<string, T> | undefined, name: string): T | undefined => record && Object.hasOwn(record, name) ? record[name] : undefined;
 const technical = new Set(["base", "digest", "size", "definition", "draft", "conditions", "reports", "manifest", "earlier", "request", "replyTo", "mentions", "thread", "number", "opener"]);
-const labelOf = (name: string) => fieldLabels[name] ?? name.replace(/-/g, " ");
+const labelOf = (name: string) => own(fieldLabels, name) ?? name.replace(/-/g, " ");
 
 /** Supported domain forms remain ordinary controls; other declarations stay in Inspect. */
 export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Send, last: HTMLElement | null, context: ActionContext = {}): HTMLElement {
@@ -47,18 +52,18 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
     const record = element("details", { class: "action-record" }, element("summary", {}, "Last request"), last);
     panel.append(record);
   }
-  if (context.uncertain) {
+  if (context.uncertain || context.pending) {
     const refresh = element("button", { type: "button", class: "primary" }, "Check status");
     if (!context.refresh) refresh.setAttribute("disabled", "");
     refresh.addEventListener("click", () => context.refresh?.());
-    if (!context.statusShown) panel.append(element("p", { role: "status" }, "Request outcome unknown"));
+    if (!context.statusShown) panel.append(element("p", { role: "status" }, context.pending ? "Sending request" : "Request outcome unknown"));
     panel.append(refresh);
   }
   const ordinary: HTMLElement[] = [], advanced: HTMLElement[] = [];
   for (const act of offered.acts) {
     const primary = context.primary?.includes(act.kind) ?? false;
     const form = actionForm(act, send, context, primary);
-    const details = element("details", { class: primary ? "action" : "advanced-action" }, element("summary", {}, labels[act.kind] ?? act.kind), form);
+    const details = element("details", { class: primary ? "action" : "advanced-action" }, element("summary", {}, own(labels, act.kind) ?? act.kind), form);
     (primary ? ordinary : advanced).push(details);
   }
   panel.append(...ordinary);
@@ -71,7 +76,9 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
 }
 
 function actionForm(act: Offered, send: Send, context: ActionContext, primary: boolean): HTMLElement {
-  const defaults = context.defaults?.[act.kind];
+  const defaults = own(context.defaults, act.kind);
+  const choicesFor = own(context.choices, act.kind);
+  const blocked = context.uncertain || context.pending || context.blockedKinds?.includes(act.kind);
   // Exact-version defaults are part of the key: a version change never reuses a stale review draft.
   const draftKey = context.draftKey ? JSON.stringify([context.draftKey, act.kind, defaults ?? null]) : null;
   const draft = draftKey ? drafts.get(draftKey) ?? {} : {};
@@ -80,16 +87,16 @@ function actionForm(act: Offered, send: Send, context: ActionContext, primary: b
   const advanced: HTMLElement[] = [];
   if (act.step === "transition") {
     const fixed = defaults?.on;
-    const input = element("input", { name: "on", type: fixed === undefined ? "number" : "hidden", min: "0", value: fixed === undefined ? (draft["on"] ?? "") : String(fixed), required: "" }) as HTMLInputElement;
+    const input = element("input", { name: "on", type: fixed === undefined ? "number" : "hidden", min: "0", value: fixed === undefined ? (own(draft, "on") ?? "") : String(fixed), required: "" }) as HTMLInputElement;
     controls.push(input);
     form.append(fixed === undefined ? element("label", {}, "Item", input) : input);
   }
   for (const field of act.fields) {
-    const fixed = defaults?.fields?.[field.name];
-    const choices = context.choices?.[act.kind]?.[field.name] ?? field.choices;
+    const fixed = own(defaults?.fields, field.name);
+    const choices = own(choicesFor, field.name) ?? field.choices;
     const attrs: Record<string, string> = { name: `field:${field.name}`, "data-type": field.type };
     if (field.required) attrs["required"] = "";
-    const value = fixed ?? draft[field.name] ?? "";
+    const value = fixed ?? own(draft, field.name) ?? "";
     let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     if (fixed !== undefined || choices?.length === 1) {
       input = element("input", { ...attrs, type: "hidden", value: fixed ?? choices![0]!.value }) as HTMLInputElement;
@@ -113,13 +120,13 @@ function actionForm(act: Offered, send: Send, context: ActionContext, primary: b
     else form.append(label);
   }
   if (advanced.length) form.append(element("details", {}, element("summary", {}, "More options"), advanced));
-  const button = element("button", { type: "submit", class: primary ? "primary" : "" }, labels[act.kind] ?? act.kind);
-  if (context.uncertain || act.fields.some((field) => field.required && (context.choices?.[act.kind]?.[field.name] ?? field.choices)?.length === 0 && defaults?.fields?.[field.name] === undefined)) button.setAttribute("disabled", "");
-  if (context.uncertain) for (const control of controls) control.setAttribute("disabled", "");
+  const button = element("button", { type: "submit", class: primary ? "primary" : "" }, own(labels, act.kind) ?? act.kind);
+  if (blocked || act.fields.some((field) => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined)) button.setAttribute("disabled", "");
+  if (blocked) for (const control of controls) control.setAttribute("disabled", "");
   form.append(button);
   const read = (): { on: string; typed: Record<string, string> } => {
     let on = "";
-    const typed: Record<string, string> = {};
+    const typed: Record<string, string> = Object.create(null) as Record<string, string>;
     for (const control of controls) {
       if (control.name === "on") on = control.value;
       else if (control.value !== "") typed[control.name.slice(6)] = control.value;
@@ -131,7 +138,7 @@ function actionForm(act: Offered, send: Send, context: ActionContext, primary: b
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (context.uncertain || button.hasAttribute("disabled")) return;
+    if (blocked || button.hasAttribute("disabled")) return;
     const { on, typed } = read();
     // Block repeated clicks while the shell's signed operation is awaiting its answer.
     button.setAttribute("disabled", "");
