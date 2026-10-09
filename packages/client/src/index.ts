@@ -7,3 +7,5 @@ export * from "./prepare.ts";
 export * from "./session.ts";
 export * from "./signed-read.ts";
 export * from "./credential.ts";
+export * from "./head-stream.ts";
+export * from "./observe.ts";
