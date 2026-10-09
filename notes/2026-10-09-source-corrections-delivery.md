@@ -204,7 +204,8 @@ The observed test time differs from the earlier 408.6 s run; this is not a
 paired savings measurement or proof of the 10x goal. This gate remains failed.
 No retry, wider deadline, suite omission, approval, landing or deployment
 follows. A concrete failure disposition and new owner decision are required.
-This note update changes no source or test bytes from the failed head.
+The original result-note successor changed no source or test bytes from the
+failed head. The session ownership section below records the later repair.
 
 ## Session fixture owners and counted required leases
 
