@@ -124,6 +124,14 @@ code adds one recorder mode and the native recorded-name field to its fixture.
 The gate is not relabelled as the later head. Complete
 independent Source review and landing remain owed.
 
+Review preparation found two claim-specific defects after the initial filing:
+a queued claim could submit after the Page context changed, and an ordinary
+second creation would resume the first completed journal. The actual POST
+context guard is repaired and focused native/UI witnesses pass. Distinct new
+creation versus explicit resume is being repaired with retained per-creation
+journals; the initial filed head must not be landed before that repair and
+its focused evidence replace the candidate.
+
 A narrow peer read found and verified the repair of a late-draw label race.
 Final DOM publication checks the original room context; the displayed local
 label also matches the loaded directory and full membership reference. Its
