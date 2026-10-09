@@ -17,8 +17,11 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     replaceChildren(...children: (Element | string)[]) { this.children = children; if (this === root) rendered.resolve(); }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
-    querySelector() { return new Element("div"); }
+    removeAttribute(name: string) { delete this.attrs[name]; }
+    hasAttribute(name: string) { return Object.hasOwn(this.attrs, name); }
+    querySelector(selector: string) { return selector.includes("data-action-slot") ? new Element("div") : null; }
     querySelectorAll() { return []; }
+    set textContent(value: string) { this.children = [value]; }
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
   const root = new Element("div");
@@ -48,6 +51,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: vi.fn(),
   }));
   vi.doMock("../src/view.ts", () => ({
+    icon: () => new Element("svg"),
     h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.children = children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]; return el; },
     roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
     actsPanel: (_offered: unknown, callback: typeof send, last: Element | null, options: (typeof panels)[number]) => { send = callback; panels.push(options); const panel = new Element("section"); if (last) panel.append(last); return panel; },
