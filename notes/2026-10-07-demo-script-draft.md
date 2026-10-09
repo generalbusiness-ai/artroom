@@ -273,10 +273,13 @@ eight letters in the captions, as the command line prints them in full.
   1 issues, 0 open.
   ```
 
-- **Picture**: `issue.png` (the issue's screen) and
-  `change-published.png` (the `guide/start.md` change's screen), from the
-  room's page at `<base-url>/page/`; `room.png` shows the room's issues
-  and changes with their states, taken at the end of the run.
+- **Picture**: [issue.png](2026-10-09-demo-captures/issue.png) shows the
+  closed issue; [change-published.png](2026-10-09-demo-captures/change-published.png)
+  shows the merged `guide/start.md` change, its exact source preview and
+  explicitly latest page link. [room.png](2026-10-09-demo-captures/room.png)
+  uses the All filter to show the recorded closed issue. These v2 captures
+  use the test Worker's recorded rehearsal answers; [their provenance](2026-10-09-demo-captures/README.md)
+  is separate from the earlier hosted command observations.
 - **Said**: "Una opens an issue. Paul takes it and edits a page in an
   open folder. The room publishes the page and closes the issue."
 
@@ -295,7 +298,8 @@ eight letters in the captions, as the command line prints them in full.
   A new ETag whose first part is the new commit (`docs/pages.md`,
   "Caching"), and the front page listing `guide/`, are not read by the
   runner; confirm in the browser.
-- **Picture**: `site-page.png`, the page as the site renders it.
+- **Picture**: [site-page.png](2026-10-09-demo-captures/site-page.png),
+  the latest page as the Site route renders it.
 - **Said**: "The page is live, from the commit the room just published."
 
 ### Shot 10. An edit in a controlled folder, refused by name (3:45 to 4:20). Live
@@ -326,8 +330,9 @@ eight letters in the captions, as the command line prints them in full.
   ../outside.md --file start.md`, which exits 1 and prints
   `Not published: the merge sc_<refused>:6 is refused, path-invalid. ...`
   after its `Proposed` line.
-- **Picture**: `change-refused.png`, the `../outside.md` change's
-  screen. There is no capture of the `AGENTS.md` change while refused.
+- **Picture**: [change-refused.png](2026-10-09-demo-captures/change-refused.png),
+  the `../outside.md` change's Invalid path screen, with no ordinary merge
+  control. There is no capture of the `AGENTS.md` change while refused.
 - **Said**: "Now Paul touches the instructions the agents follow. A
   maintainer's edit is not enough. The room refuses, and says which rule
   is not met. A refusal writes nothing to the repository."
@@ -365,8 +370,9 @@ eight letters in the captions, as the command line prints them in full.
   Shows: "Ask before you push."
   ```
 
-- **Picture**: `rules.png`, the rules of this room and who may change
-  them.
+- **Picture**: [rules.png](2026-10-09-demo-captures/rules.png), the
+  controller's editable review requirements. The capture checks a change
+  confirmation and cancellation without submitting another publication.
 - **Said**: "The rules scope's controller approves, and the same change
   takes effect. The rules are the room's own: written down, versioned,
   and changed only by the people they name."
