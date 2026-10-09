@@ -1,0 +1,40 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-correctness-composed/packages/lanes
+
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI linking link-summary retains known proposal and stops before merge (HTTP STAND-IN) 47ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI linking link-request retains known proposal and stops before merge (HTTP STAND-IN) 20ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI linking link-unavailable retains known proposal and stops before merge (HTTP STAND-IN) 19ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > a valid custom required rules input refuses the fixed CLI workflow before opening (HTTP STAND-IN) 13ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > a local callback failure retains known opening/rules locators without exposing its text or signing the next step (HTTP STAND-IN) 11ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > an accepted merge keeps the protected reservation observation after merge-final-read (HTTP STAND-IN) 20ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > an accepted merge keeps the protected reservation observation after merge-read-error (HTTP STAND-IN) 17ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI partial proposal source-unavailable retains known work and stops the next phase (HTTP STAND-IN) 12ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI partial proposal source-refused retains known work and stops the next phase (HTTP STAND-IN) 16ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI partial proposal source-mismatch retains known work and stops the next phase (HTTP STAND-IN) 14ms
+ ✓ |lanes| ../../../../../tmp/artroom-correctness-composed/packages/lanes/test/cli-proposal-outcomes.test.ts > CLI partial proposal rules-read retains known work and stops the next phase (HTTP STAND-IN) 9ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  18:10:08
+   Duration  563ms (transform 253ms, setup 0ms, import 332ms, tests 199ms, environment 0ms)
+
+real 0.79
+user 0.96
+sys 0.15
+           429080576  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               29932  page reclaims
+                 131  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   2  messages sent
+                   2  messages received
+                   0  signals received
+                   0  voluntary context switches
+               10082  involuntary context switches
+         15926274926  instructions retired
+          4697258825  cycles elapsed
+           399319120  peak memory footprint

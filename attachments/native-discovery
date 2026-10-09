@@ -1,0 +1,12 @@
+[
+  {
+    "name": "a released Site continuation cannot advance the shared clock past a new native offer deadline",
+    "file": "/tmp/artroom-correctness-composed/packages/lanes/test/site-clock-lifetime.scope.test.ts",
+    "projectName": "scope"
+  },
+  {
+    "name": "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it",
+    "file": "/tmp/artroom-correctness-composed/packages/lanes/test/site-native3-publication.scope.test.ts",
+    "projectName": "scope"
+  }
+]

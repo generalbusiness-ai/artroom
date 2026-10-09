@@ -1,0 +1,34 @@
+✔ no active file names a removed format, binding or variable (29.780083ms)
+✔ no active source or configuration file reaches into parked/, and parked/ is in no workspace (688.286833ms)
+✔ no platform package depends on the lanes package or imports from it (9.678375ms)
+✔ the platform package depends only on contract, bytes and derive, and only scope, replay, lanes, cli and page name it (3.619667ms)
+✔ the git package depends only on contract and bytes, and only scope, checkers and the platform's tests name it (19.726917ms)
+✔ the checkers package depends only on contract, bytes and git, and no package names it (42.939667ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 881.445125
+real 0.95
+user 0.89
+sys 0.06
+            58458112  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                8819  page reclaims
+                 181  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                  41  messages sent
+                  14  messages received
+                   0  signals received
+                   0  voluntary context switches
+                 468  involuntary context switches
+          1429641143  instructions retired
+           346162558  cycles elapsed
+            16943528  peak memory footprint

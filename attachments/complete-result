@@ -1,0 +1,332 @@
+{
+  "authorization": "87693aee55e07846129fe76f6631c005e4ac44f8",
+  "head": "011542c4d541571d0af7cfadf1a026295c32ad91",
+  "tree": "52f0ba6b6870368c4607461a32b1dfcec5cc5937",
+  "status": "All authorized affected checks passed",
+  "types": {
+    "commands": 2,
+    "passed": 2
+  },
+  "discovery": {
+    "node": {
+      "files": 1,
+      "titles": 11
+    },
+    "native": {
+      "files": 2,
+      "titles": 2
+    },
+    "root_full_exact_title_match": true
+  },
+  "node": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI linking link-summary retains known proposal and stops before merge (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 47
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI linking link-request retains known proposal and stops before merge (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 20
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI linking link-unavailable retains known proposal and stops before merge (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 19
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "a valid custom required rules input refuses the fixed CLI workflow before opening (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 13
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "a local callback failure retains known opening/rules locators without exposing its text or signing the next step (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 11
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "an accepted merge keeps the protected reservation observation after merge-final-read (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 20
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "an accepted merge keeps the protected reservation observation after merge-read-error (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 17
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI partial proposal source-unavailable retains known work and stops the next phase (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 12
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI partial proposal source-refused retains known work and stops the next phase (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 16
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI partial proposal source-mismatch retains known work and stops the next phase (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 14
+      },
+      {
+        "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+        "name": "CLI partial proposal rules-read retains known work and stops the next phase (HTTP STAND-IN)",
+        "status": "passed",
+        "body_milliseconds": 9
+      }
+    ],
+    "boundary": "Scripted HTTP/CLI only"
+  },
+  "native": {
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      {
+        "file": "packages/lanes/test/site-clock-lifetime.scope.test.ts",
+        "name": "a released Site continuation cannot advance the shared clock past a new native offer deadline",
+        "status": "passed",
+        "body_milliseconds": 106
+      },
+      {
+        "file": "packages/lanes/test/site-native3-publication.scope.test.ts",
+        "name": "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it",
+        "status": "passed",
+        "body_milliseconds": 997
+      }
+    ],
+    "boundary": "Original real native Site and deterministic clock lifetime model with labelled stand-ins"
+  },
+  "active_source": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      {
+        "name": "no active file names a removed format, binding or variable",
+        "status": "passed",
+        "body_milliseconds": 29.780083
+      },
+      {
+        "name": "no active source or configuration file reaches into parked/, and parked/ is in no workspace",
+        "status": "passed",
+        "body_milliseconds": 688.286833
+      },
+      {
+        "name": "no platform package depends on the lanes package or imports from it",
+        "status": "passed",
+        "body_milliseconds": 9.678375
+      },
+      {
+        "name": "the platform package depends only on contract, bytes and derive, and only scope, replay, lanes, cli and page name it",
+        "status": "passed",
+        "body_milliseconds": 3.619667
+      },
+      {
+        "name": "the git package depends only on contract and bytes, and only scope, checkers and the platform's tests name it",
+        "status": "passed",
+        "body_milliseconds": 19.726917
+      },
+      {
+        "name": "the checkers package depends only on contract, bytes and git, and no package names it",
+        "status": "passed",
+        "body_milliseconds": 42.939667
+      }
+    ],
+    "checker_unchanged": true
+  },
+  "unrun_authorized_affected": [],
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/lanes/tsconfig.test.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.2344403329771012,
+      "cpu_seconds": 0.795992,
+      "log": "/tmp/artroom-critical-011-checks/lanes-node-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/lanes/tsconfig.scope.json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.3386062500067055,
+      "cpu_seconds": 1.572062,
+      "log": "/tmp/artroom-critical-011-checks/lanes-scope-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "node",
+        "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-critical-011-checks/node.config.mjs",
+        "--json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed/packages/lanes",
+      "exit": 0,
+      "wall_seconds": 0.6399428339209408,
+      "cpu_seconds": 0.8279129999999999,
+      "log": "/tmp/artroom-critical-011-checks/node-discovery.log",
+      "sha256": "49b24fa32f408a6de5303ba2537f8edc9ddea65e0e8ed2bd7cb7beeb3b21347a"
+    },
+    {
+      "argv": [
+        "node",
+        "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-critical-011-checks/native.config.mjs",
+        "--json"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+      "exit": 0,
+      "wall_seconds": 1.9985657499637455,
+      "cpu_seconds": 2.3285910000000003,
+      "log": "/tmp/artroom-critical-011-checks/native-discovery.log",
+      "sha256": "0d70f8b57f8f75368d5f89557528cc5bafde28dcaf531ef67340111fc66758ad"
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-lp",
+        "node",
+        "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-critical-011-checks/node.config.mjs",
+        "--reporter",
+        "verbose",
+        "--bail=1"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed/packages/lanes",
+      "exit": 0,
+      "wall_seconds": 0.7957827089121565,
+      "cpu_seconds": 1.113561,
+      "log": "/tmp/artroom-critical-011-checks/node-body.log",
+      "sha256": "4f20dfc152bf49a8b196ebfe4afa23ae8917b9d60a9ff125c46391707e93ff4b"
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-lp",
+        "node",
+        "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-critical-011-checks/native.config.mjs",
+        "--reporter",
+        "verbose",
+        "--bail=1"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+      "exit": 0,
+      "wall_seconds": 2.9163037079852074,
+      "cpu_seconds": 3.548665,
+      "log": "/tmp/artroom-critical-011-checks/native-body.log",
+      "sha256": "ac641e2eee9e5242ed57cae90c55aa5201be219ce883ad51a2aa01f3f879eb42"
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-lp",
+        "node",
+        "--test",
+        "scripts/active-source.test.mjs"
+      ],
+      "cwd": "/tmp/artroom-correctness-composed",
+      "exit": 0,
+      "wall_seconds": 0.9534408330218866,
+      "cpu_seconds": 0.960517,
+      "log": "/tmp/artroom-critical-011-checks/active-source.log",
+      "sha256": "d6bf7e529f0f1707406f33cb422202b6432d35ce115b3e5cb13a14432a1f6402"
+    }
+  ],
+  "files": {
+    "/tmp/artroom-critical-011-checks/active-source.log": {
+      "bytes": 1507,
+      "sha256": "d6bf7e529f0f1707406f33cb422202b6432d35ce115b3e5cb13a14432a1f6402"
+    },
+    "/tmp/artroom-critical-011-checks/lanes-node-types.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/artroom-critical-011-checks/lanes-scope-types.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/tmp/artroom-critical-011-checks/native-body.log": {
+      "bytes": 1448,
+      "sha256": "ac641e2eee9e5242ed57cae90c55aa5201be219ce883ad51a2aa01f3f879eb42"
+    },
+    "/tmp/artroom-critical-011-checks/native-case-ledger.json": {
+      "bytes": 743,
+      "sha256": "68fd1b20e297aa0158539db54295767da0c88062605130c541ba807954774bd2"
+    },
+    "/tmp/artroom-critical-011-checks/native-discovery.log": {
+      "bytes": 519,
+      "sha256": "0d70f8b57f8f75368d5f89557528cc5bafde28dcaf531ef67340111fc66758ad"
+    },
+    "/tmp/artroom-critical-011-checks/native.config.mjs": {
+      "bytes": 1759,
+      "sha256": "6489e3bd4ede994a030ec39afee800e3388d241745db62be41c84e6d2cf59d3d"
+    },
+    "/tmp/artroom-critical-011-checks/node-body.log": {
+      "bytes": 3372,
+      "sha256": "4f20dfc152bf49a8b196ebfe4afa23ae8917b9d60a9ff125c46391707e93ff4b"
+    },
+    "/tmp/artroom-critical-011-checks/node-case-ledger.json": {
+      "bytes": 2924,
+      "sha256": "761bfb4d29feb95ecd4922382729995ea82ca38c91545508bbe7ef56a7896649"
+    },
+    "/tmp/artroom-critical-011-checks/node-discovery.log": {
+      "bytes": 2732,
+      "sha256": "49b24fa32f408a6de5303ba2537f8edc9ddea65e0e8ed2bd7cb7beeb3b21347a"
+    },
+    "/tmp/artroom-critical-011-checks/node.config.mjs": {
+      "bytes": 1601,
+      "sha256": "de60ba7f21a2bb9ac95a8bf9b5e450f9c58bdad8e6d2feb6347f2691229639d1"
+    },
+    "/tmp/artroom-critical-011-checks/proof.json": {
+      "bytes": 10386,
+      "sha256": "bb92df49f942e86d19ff68a78e167a0cc553618fde64ce92d4d3358d575bebab"
+    }
+  },
+  "machine": {
+    "system": "Darwin",
+    "release": "27.0.0",
+    "architecture": "arm64"
+  },
+  "scope_limits": [
+    "Separate timed steps, not one observed pipeline cost.",
+    "No repeated previous eighteen or forty-seven case batch; prior evidence retains original heads.",
+    "No full gate, Source approval, landing, physical draining or global speedup.",
+    "F1/C0, W1/U1 and C1 source successors remain separately unverified; no browser/provider/audio/full parent claim."
+  ]
+}
