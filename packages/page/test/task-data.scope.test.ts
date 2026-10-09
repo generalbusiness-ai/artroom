@@ -33,25 +33,23 @@ async function completeIssue(d: Demo, room: Room, fact: FactRef): Promise<ScopeI
   // Native effect/dispatch needs no read inspector. All parent/child reads below
   // are authenticated. The original known register/destination remain included.
   const nodes = [d.config.register!.scope, d.G.name, d.D.name, child].map(name => new Platform(name));
-  for (let pass = 0; pass < 64; pass++) {
-    await driveFixture(nodes, action => owner.required(action));
-    const [parentRead, childRead] = await owner.required(() => Promise.all([handle(d.D.name).summary(), handle(child).summary()]));
-    expect(parentRead.ok, "Directory completion must remain readable").toBe(true);
-    expect(childRead.ok, "Recorded child completion must remain readable").toBe(true);
-    if (!parentRead.ok || !childRead.ok) throw new Error("Native creation completion unreadable");
-    expect([parentRead.complete, childRead.complete, parentRead.next, childRead.next]).toEqual([true, true, undefined, undefined]);
-    expect(parentRead.value.scope).toEqual(fact.at);
-    expect(childRead.value.status, "Native issue creation must not be refused").not.toBe("refused");
-    const row = parentRead.value.items.find(item => item.type === "lane" && item.id === fact.seq);
-    expect(row, "Accepted opening must retain its native directory lane row").toBeDefined();
-    expect(["refused", "conflict"]).not.toContain(row?.state);
-    if (childRead.value.status === "active" && row?.refs["scope"]) {
-      expect([childRead.value.scope.scope, childRead.value.scope.kind, childRead.value.definition]).toEqual([child, "lane", DEMO_DIGESTS.issue]);
-      expect(row.refs["scope"]).toEqual(childRead.value.scope);
-      return child;
-    }
-  }
-  expect.fail("The recorded issue child and its parent confirmation did not complete within finite fixture passes");
+  // Exactly one scheduler drain has one 4096-work/64-pass budget. Once it
+  // reports idle, inspect the native state once: never hammer idle passes to
+  // wait for retry backoff or advance the clock to manufacture completion.
+  await driveFixture(nodes, action => owner.required(action));
+  const [parentRead, childRead] = await owner.required(() => Promise.all([handle(d.D.name).summary(), handle(child).summary()]));
+  expect(parentRead.ok, "Directory completion must remain readable").toBe(true);
+  expect(childRead.ok, childRead.ok ? undefined : `Recorded child did not complete after scheduler idle: ${childRead.reason}`).toBe(true);
+  if (!parentRead.ok || !childRead.ok) throw new Error("Native creation completion unreadable");
+  expect([parentRead.complete, childRead.complete, parentRead.next, childRead.next]).toEqual([true, true, undefined, undefined]);
+  expect(parentRead.value.scope).toEqual(fact.at);
+  expect(childRead.value.status, "Recorded child must be active after scheduler idle; pending creation needs a distinct disposition").toBe("active");
+  const row = parentRead.value.items.find(item => item.type === "lane" && item.id === fact.seq);
+  expect(row, "Accepted opening must retain its native directory lane row").toBeDefined();
+  expect(["refused", "conflict"]).not.toContain(row?.state);
+  expect(row?.refs["scope"], "Parent must have confirmed its actual child after scheduler idle").toEqual(childRead.value.scope);
+  expect([childRead.value.scope.scope, childRead.value.scope.kind, childRead.value.definition]).toEqual([child, "lane", DEMO_DIGESTS.issue]);
+  return child;
 }
 
 // Real native ISSUE reports and manifest admissions. Authority/rules peers,

@@ -66,8 +66,11 @@ export function nativeFixtureLifetime(owner: SessionOwner) {
     if (released) return;
     released = true;
     owner.close();
+    let cleanupFailed = false;
     try {
-      for (const cleanup of cleanups) cleanup();
+      for (const cleanup of cleanups) {
+        try { cleanup(); } catch { cleanupFailed = true; }
+      }
     } finally {
       cleanups.clear();
       retired.add(hold); retired.add(deaf);
@@ -75,13 +78,18 @@ export function nativeFixtureLifetime(owner: SessionOwner) {
       if (net.deaf === deaf) net.deaf = before.deaf && !retired.has(before.deaf) ? before.deaf : null;
       ports.release(); outsides.release();
     }
+    // Every gate and provider is released even if one cleanup failed. Do not
+    // expose arbitrary cleanup errors, which may contain private fixture data.
+    if (cleanupFailed) throw new Error("Native fixture cleanup failed after releasing all owned resources.");
     // Same clock persists, including any legitimate advances. No physical drain.
   };
   onTestFinished(release);
   class OwnedPlatform extends Platform {
     override get stub() {
+      active();
       const source = super.stub;
       return new Proxy(source, { get(target, key) {
+        active();
         const value: unknown = Reflect.get(target, key, target);
         return typeof value === "function" ? (...args: unknown[]) => wait(() => Promise.resolve(Reflect.apply(value, target, args))) : value;
       } });
