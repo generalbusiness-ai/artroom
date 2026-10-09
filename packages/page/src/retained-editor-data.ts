@@ -60,7 +60,7 @@ function supports(declared: DeclaredDefinition, fields: Record<string, FieldValu
   } catch { return false; }
 }
 async function currentRoom(room: Room, options: EditOptions): Promise<Room> { check(options); const fresh = await openRoom(room.session, { directory: room.directory, membership: room.membership }); check(options); if (fresh.rules !== room.rules || fresh.destination !== room.destination || fresh.me?.handle !== room.me?.handle || fresh.key !== room.key) throw new Unreadable("The room identity changed. Nothing new was sent."); return fresh; }
-async function head(room: Room): Promise<string> { const s = await summary(handle(room, room.destination)); if (s.value.definition !== "platform:destination@2") throw new Unreadable("This destination does not support the one-file text workflow."); const h = s.value.items.find(i => i.type === "branch")?.values["head"]; if (typeof h !== "string") throw new Unreadable("The room has no recorded published head."); return h; }
+async function head(room: Room): Promise<string> { const s = await summary(handle(room, room.destination)); if (!["platform:destination@2", "platform:destination@3"].includes(s.value.definition)) throw new Unreadable("This destination does not support the one-file text workflow."); const h = s.value.items.find(i => i.type === "branch")?.values["head"]; if (typeof h !== "string") throw new Unreadable("The room has no recorded published head."); return h; }
 export async function prepareEdit(room: Room, change: ChangeView, manifest: number, draft: EditDraft, options: EditOptions): Promise<EditTask> {
   const captured = Object.freeze({ ...draft });
   editFields(captured, "0".repeat(40)); const fresh = await currentRoom(room, options);
