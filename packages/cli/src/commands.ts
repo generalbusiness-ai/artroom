@@ -1042,6 +1042,8 @@ function verifyAll(ctx: Context): Promise<Outcome> {
             const finding = `Cleanup status not read: destination ${scope}: ${error.message}.`;
             lines.push(finding); first ??= finding;
           }
+        } else if (kind === "destination") {
+          lines.push(`Cleanup status not read: destination ${scope}: historical replay is ${report.result}; no verified cleanup snapshot.`);
         }
       } catch (error) {
         if (!(error instanceof SourceError)) throw error;
