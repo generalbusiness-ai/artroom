@@ -119,3 +119,79 @@ receipt as publication, or adopt the proposed site factory/delegation protocol.
 No observed deployment run, final gate, artifact filing or landing occurred
 in this preparation. Current-publication hardening and the A2 fixture remain
 preparation, not a substituted narrower definition of completion.
+
+## Immutable selection implementation plan
+
+This appendix is a read-only implementation plan for A1, grounded in request
+`6ec330fd` and planner `58257220`. It does not adopt the evidence-only
+authority amendment or enable a new route. Current source remains `068e33cd`.
+
+The present selector returns only a branch name and its current head. It must
+instead return a bounded proof for the requested immutable commit. The
+destination already keeps the necessary native facts: the publication item,
+the receipt item and its `written` or `conflict` state, and the entries from
+which `destinationReceipt` derives the exact receipt file, Git objects and
+receipt ref. No new publication act, item field, mutable provider tag or
+implicit ancestry permission is needed for this seam.
+
+The smallest internal boundary is a separate readonly method such as
+`sitePublishedCommit(directoryRef, repositoryRecord, commitId)`. Its result
+must bind the complete destination reference and reported head, the exact
+directory reference and stable repository record, the selected content commit,
+the judged first-head or publication fact, and its written receipt fact. It
+also returns the expected receipt ref, receipt commit and canonical receipt
+file derived by the existing `destinationReceipt` helper. A pending or
+conflicting receipt gives no eligible result. This method reads destination
+storage only; it does not start a turn, driver, session, token or provider call.
+
+Implementation can use the destination's retained `receipt` pages, filtered
+by the requested commit, plus direct stored entry and publication lookups.
+The native state is the authority at this trusted internal Worker boundary;
+the returned facts and entries must still agree by exact hash, incarnation,
+kind, position, repository and commit. A scan has a fixed page and byte budget.
+Exhaustion returns a named unreadable result, never `not-published` or an
+invented complete index. Historical `cleaned` publications remain eligible
+only through their actual publication and written receipt proof; cleanup
+state alone is neither publication nor revocation of it.
+
+The route then opens the already identity-checked Git source. Before any
+conditional response, it resolves the expected receipt ref and requires its
+target to equal the derived receipt commit. It reads hash-checked receipt
+commit/tree/blob objects and compares canonical `receipt.json` bytes with the
+derived file. It then serves the selected content commit through the existing
+path, object type and size checks. Missing receipt bytes, a moved receipt ref,
+foreign repository identity or correspondence mismatch denies the request.
+Provider advertisements never select the content commit. Relative links and
+images retain the immutable commit selector in their Site prefix.
+
+`HEAD` and the recorded branch alias can keep the present latest-navigation
+meaning while resolving to an eligible commit proof. A raw commit selector
+becomes permitted only when the proof method returns that exact commit.
+An older publication after a newer head must remain eligible; an arbitrary
+ancestor, unpublished branch, proposal commit or imported ancestry must not.
+Room-issued tag and human-readable version mappings are still a separate
+native owner decision: none exists in the present destination. Do not infer
+one from provider refs or advertise tags as implemented.
+
+The likely source delta is `site/publication.ts` for proof construction,
+`ScopeObject` for the typed readonly method, `site/host.ts` for its checked
+boundary, and `site/route.ts` for receipt correspondence and immutable routing.
+The Git reader and existing receipt-object helpers provide the byte and hash
+checks. Tests belong in the real-Scope Site selector file: two actual
+publications, the older commit served after the newer one, pending/conflict
+receipt denied, receipt-ref/object mismatch denied, arbitrary same-repository
+commit denied and complete directory/destination SQL snapshots unchanged.
+The host remains a labelled stand-in until the required deployment run.
+
+The concrete owner decision needed before source work is whether A1 adopts
+this minimal existing-destination proof seam at the trusted internal boundary,
+including written receipt and fetched Git correspondence, without adopting
+the amendment's separate site-factory/delegation protocol. The owner must
+also decide the exact immutable selector syntax and the bounded refusal for
+history lookup exhaustion. Full A1 stays open for the recorded label/tag
+mapping policy and its implementation; this plan does not narrow it.
+
+A2 remains implemented fixture evidence with deployment publication and
+observation owed. C1 continues to say Open latest page until immutable A1
+selection is implemented, reviewed and landed. No tests, gate, deployment,
+provider calls or production changes were made for this appendix.
