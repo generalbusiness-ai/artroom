@@ -132,6 +132,22 @@ with test types passing. Raw `/tmp/artroom-page-join-fixture-node.log`, SHA-256
 It is composed at `99bd03c4`; this resolves only the fixture failure, not the
 five native timeouts or the failed coordinated gate.
 
+Planner-authorized A4 cold baseline `f2554033` ran exactly the unchanged
+source-preview test with test-only numeric metadata. It passed in 861 ms
+(2.10 s Vitest, 2.71 s process). Native effect calls: 65, with 57 idle and
+eight reporting progress; dispatch calls: 57, with 51 idle and six progress.
+There were 14 pause calls, 19 outer passes, ten initialization hooks, no
+shared pending foreground promise and no outstanding observed await at cleanup.
+Root parsed all 909 numeric rows. Weak aliases preserve the original returned
+promise; private background calls are not counted. Initialization is not a
+resident-object count, and overlapping interval sums are not wallclock cost.
+No timeout/canceler cause, background drain, redundant-work fix or gate safety
+follows. The run stopped after one. Compact evidence SHA-256
+`87f85b995149dcd2b8efdc2644d05e5f7d909325729700237ff7eea49be569f9`
+at `/tmp/artroom-a4-native-promise-evidence/evidence.json`; durable record
+`c11bfdab` retains this qualified baseline. Full-run warm-state evidence and
+the next owner decision remain required.
+
 First-use request `d01aa495` remains separate. Its exact preset assurance review
 and native setup witness do not complete invitation/reload custody, operator
 provisioning, release, two-device or hosted first-use acceptance. Shared names
