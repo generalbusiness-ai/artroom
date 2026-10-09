@@ -34,7 +34,7 @@ const MOST = 300 * 1024;
 const USAGE = "Usage: scripts/demo-captures.ts <base-url> --home <config directory> --room <room.json> --out <directory>, or scripts/demo-captures.ts --recorded --out <directory>";
 
 /** The few parts of playwright-core that this script uses. */
-interface Locator { waitFor(options?: { timeout?: number }): Promise<void>; first(): Locator }
+interface Locator { waitFor(options?: { timeout?: number; state?: "attached" | "visible" }): Promise<void>; first(): Locator }
 interface Tab {
   url(): string;
   goto(url: string): Promise<unknown>;
@@ -129,15 +129,15 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
     const screen = async (hash: string, heading: string | RegExp, name: string) => {
       await tab.goto(`${service}/page/#${hash}`);
       if (new URL(tab.url()).origin !== new URL(service).origin || new URL(tab.url()).pathname !== new URL(`${service}/page/`).pathname) throw new Error("Capture document left the configured page address.");
-      await tab.getByRole("heading", { name: heading }).first().waitFor({ timeout: 30_000 });
-      await tab.getByText("What you may do here").first().waitFor({ timeout: 30_000 });
+      await tab.getByRole("heading", { name: heading }).first().waitFor({ timeout: 30_000, state: "attached" });
+      await tab.getByRole("navigation", { name: "Room" }).first().waitFor({ timeout: 30_000, state: "attached" });
       await shot(name);
     };
-    await screen("/", "Room", "room");
+    await screen("/", "Issues", "room");
     await screen(`/issue/${room.issue}`, /Add a getting-started page/, "issue");
     await screen(`/change/${room.refused}`, /outside\.md/, "change-refused");
     await screen(`/change/${room.published}`, /guide\/start\.md/, "change-published");
-    await screen("/rules", "The rules of this room", "rules");
+    await screen("/rules", "Rules", "rules");
     await tab.goto(`${service}/site/${room.directory}/HEAD/guide/start.md`);
     if (new URL(tab.url()).origin !== new URL(service).origin || new URL(tab.url()).pathname !== new URL(`${service}/site/${room.directory}/HEAD/guide/start.md`).pathname) throw new Error("Capture document left the configured site address.");
     await tab.getByRole("heading", { name: "Getting started" }).first().waitFor({ timeout: 30_000 });
@@ -152,7 +152,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
 }
 
 const SHOWS: Record<string, string> = {
-  room: "The room: its issues and changes, with their states, and the acts the signed-in person may sign on the directory.",
+  room: "The room’s Issues destination, with recorded issue states and the actions the signed-in person may sign on the directory.",
   issue: "Observed issue screen for the rehearsal's issue lane.",
   "change-refused": "Observed change screen for the rehearsal's outside.md lane.",
   "change-published": "Observed change screen for the rehearsal's guide/start.md lane.",
