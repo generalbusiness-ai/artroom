@@ -1,0 +1,144 @@
+{
+  "request": "04f7e14e31da28f4a912fb2481b477d87264c106",
+  "promise": "3181024a92cf8bf556f1e3b3b0ea100d2e4bed0e",
+  "decision": "699039e2f8959f980ffe852076badb71b6ba214e",
+  "decision_read": "FULL gs inspect through EOF",
+  "head": "bb5bf627d6f3765623df45117299953c546a99ee",
+  "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
+  "paths": [
+    {
+      "path": "packages/cli/src/line.ts",
+      "bytes": 7933,
+      "sha256": "494402690fc453667902ee26e1245fe4fa37b0606d607e50330bf407422d3952",
+      "git_blob_sha1": "7ff307685896703b1d2350d6e35a5e2a5d4f90e9",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/src/store.ts",
+      "bytes": 5070,
+      "sha256": "11c26b104d1cda75cdb3a4dbd5c58f318951dfcd5da8d5030b0fe7079b4fbdbb",
+      "git_blob_sha1": "ff2fb4b7c6166fa2efb143195b38152a6bb97d1a",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/src/files.ts",
+      "bytes": 4062,
+      "sha256": "338318375ff3390a4179b40713c8e380bcfde94de056e06a9846d344165cdd1e",
+      "git_blob_sha1": "4844cd6ad9f8366f8f7b5743e2a7d22c4acc092e",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/src/main.ts",
+      "bytes": 936,
+      "sha256": "cd4ee26511d87cdc8b72e4115e33dda8d01d6413064af6ee95ecbeb67882b109",
+      "git_blob_sha1": "5ba75da1d59881bb66f898765c9aa77d4fa8c882",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/src/index.ts",
+      "bytes": 215,
+      "sha256": "f329cbabe54877ea927a2d0e892ddf10140d50924b5980d6d1361bad6f0251fb",
+      "git_blob_sha1": "64af9ee9c87d3047f61a782e1d181a5a394bd930",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/bin/artroom.js",
+      "bytes": 703,
+      "sha256": "600d405b47f9f9f4ecc29c639273e98cb749d225e721e434fa0035279dc7c9a7",
+      "git_blob_sha1": "cf039327a8f464774bdf5bd46c31798d49fb4124",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "bytes": 128454,
+      "sha256": "4f25a2fa26371c5c9e7bb6ca94aafb0c2bbb6f85624d3eb47082d680c85d3caa",
+      "git_blob_sha1": "9cc20a2e287494befe1f3006178e0407daecef09",
+      "semantic_read": "Bounded 105\u2013172 and 310\u2013466, install/plan/parser references, actual current default selection; not FULL file."
+    },
+    {
+      "path": "packages/cli/test/install.scope.test.ts",
+      "bytes": 17130,
+      "sha256": "be120f218cf9abccbe592e30ff0aebd86b5335120f44ca3c0d363f9f40b8c59b",
+      "git_blob_sha1": "71ac5c16db996af96742c4c77dab1155fadf55b3",
+      "semantic_read": "FULL through EOF in 1\u2013145 and 146\u2013300 slices"
+    },
+    {
+      "path": "packages/cli/test/files.test.ts",
+      "bytes": 7355,
+      "sha256": "6dd239cc39b40480136a317282f360f11057f80b88871a6f024e931defe1b267",
+      "git_blob_sha1": "702b1f7846dc71bb014cac4fdf535737a4531e9c",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/intent.ts",
+      "bytes": 5282,
+      "sha256": "e681e250e5ee1cbaa04b9649fda6eea3a3b5fccff9bfd91bdacb291b8c5e7b29",
+      "git_blob_sha1": "8ad5f2a39b29681df139490838df95367ee84b72",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/handle.ts",
+      "bytes": 7921,
+      "sha256": "d1ae3172cf63c8252347e2519d10d2de693222647b5231314372cd2e5c1412e9",
+      "git_blob_sha1": "e37707f23ff7a860e35bbbd5f1cb9c556de9b2f2",
+      "semantic_read": "FULL through EOF in 1\u2013190 slice"
+    },
+    {
+      "path": "packages/client/src/http.ts",
+      "bytes": 7134,
+      "sha256": "8e8973321f361223c7d4c534034ac77c703ca5a30575a18d3e5f9f1351c5810b",
+      "git_blob_sha1": "661f616b6d9a6289b9dc9ae0a3aa81c00971a86b",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/index.ts",
+      "bytes": 273,
+      "sha256": "c5f422127d33eeb88d90a40cb0e1ea7b52f3096b32ea5e0ad5f8105f63252ec0",
+      "git_blob_sha1": "4e727cf9c3303a4c793da8b2d713f0df01ec4b6c",
+      "semantic_read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/answers.ts",
+      "bytes": 4095,
+      "sha256": "8e73fb0bac158df247ef99346fe58b3c23fe9550815aa2a69b606fd1f2915146",
+      "git_blob_sha1": "b196e968b35f2b6e8a0440186d6bbc667df8788b",
+      "semantic_read": "20\u201345 founding answer guard only"
+    },
+    {
+      "path": "packages/scope/src/worker.ts",
+      "bytes": 32502,
+      "sha256": "74b520ea287d82345c4f114c258a222a44b86f424452504fcef769280e0b824b",
+      "git_blob_sha1": "017f3b7b0d88276b344548e797e709a3b95459cd",
+      "semantic_read": "140\u2013173 exact API.found seed/transport shape only"
+    },
+    {
+      "path": "packages/scope/src/artifacts-wiring.ts",
+      "bytes": 7328,
+      "sha256": "4e32c4a239f51f5a30a269ab1aa6c867996df408be58293437440705f51a4bdd",
+      "git_blob_sha1": "75cde8ce805effc94470bda4c2473526a1816090",
+      "semantic_read": "1\u201362 config/register binding source only"
+    },
+    {
+      "path": "packages/scope/src/github-wiring.ts",
+      "bytes": 8392,
+      "sha256": "53cf896c020dbd75d570e2e6986a7b145bcb45babf13a629edf45e04e36daa62",
+      "git_blob_sha1": "303ae99ce08a17786b256e07e12f4c87edd09e41",
+      "semantic_read": "18\u201350 config/register binding source only"
+    },
+    {
+      "path": "packages/platform/src/index.ts",
+      "bytes": 11597,
+      "sha256": "4edc087118c7e0808e19104ea1ad4cd557db11a04406d3aad7d17ffe9dd0786f",
+      "git_blob_sha1": "56f8cf07753f01a47eb9ce2d1da9dbb036642822",
+      "semantic_read": "Exact NEWEST/catalog section freshly read in R3; whole exact body prior integration read"
+    },
+    {
+      "path": "packages/platform/src/register.ts",
+      "bytes": 27788,
+      "sha256": "3caa722d218ec0caa038e88c97026aa8b28f8e77417d8e014e1a3c61ec70ad65",
+      "git_blob_sha1": "6d22f4fac3ad874e0d0119d286888d2142d0b710",
+      "semantic_read": "43\u201375 exact map/historical constant from R3"
+    }
+  ],
+  "checks": "UNRUN / HELD"
+}
