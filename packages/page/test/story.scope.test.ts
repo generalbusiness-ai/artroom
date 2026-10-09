@@ -34,7 +34,9 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     const joined = await joinRoom(d.as(unas), d.link);
     expect([joined.answer.answer, joined.place]).toEqual(["accepted", place]);
     const forUna = await openRoom(d.as(unas), place);
-    expect(forUna.name).toBe(d.config.repository!.name);
+    const directoryRead = await d.D.stub.summary(forUna.reader!.reader());
+    expect(directoryRead.ok).toBe(true);
+    if (directoryRead.ok) expect(forUna.name).toBe((directoryRead.value.items.find((item) => item.type === "repository")?.values["repository"] as { name: string }).name);
     expect([forUna.me?.handle, forUna.me?.role, forUna.reader !== null, forUna.rules, forUna.destination]).toEqual(["@una", "member", true, d.rules.name, d.G.name]);
     // A second join with the same link is refused by membership, by name, and writes nothing.
     const again = await joinRoom(d.as(crypto.getRandomValues(new Uint8Array(32))), d.link);
@@ -79,8 +81,10 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     const loadedIssue = await loadIssue(forUna, issue!.scope);
     expect(loadedIssue).toMatchObject({ number: 1, state: "open", requester: "@una", conditions: ["README.md says what the room is for"], comments: [{ author: "@paul", body: "I will write it with artroom edit." }] });
     expect(loadedIssue.intent).toEqual(expect.any(Number));
-    const updatedIssue = await act(forUna, issue!.scope, "edit-own", { on: loadedIssue.intent!, fields: { title: "The handbook is empty" } });
+    const sendPhases: string[] = [];
+    const updatedIssue = await act(forUna, issue!.scope, "edit-own", { on: loadedIssue.intent!, fields: { title: "The handbook is empty" } }, () => sendPhases.push("answered"), () => sendPhases.push("submitting"));
     expect(updatedIssue.answer.answer).toBe("accepted");
+    expect(sendPhases).toEqual(["submitting", "answered"]);
 
     // rita's `artroom edit README.md`: a source-only change, merged on her own act and published by the room.
     const edited = await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Write the handbook");
