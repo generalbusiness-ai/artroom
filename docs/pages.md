@@ -89,6 +89,31 @@ extensions to it.
   started` has the id `getting-started`, and a second heading of the same
   text has `getting-started-1`.
 
+The checked-in document
+[`packages/scope/test/site/completeness/fixture.md`](../packages/scope/test/site/completeness/fixture.md)
+puts these constructs together. The `GFM completeness fixture` test in
+`packages/scope/test/site-route.test.ts` renders those exact bytes through
+Site and follows its companion-page and repository-image addresses. Its
+Git host is a labelled stand-in; this test does not show a deployment.
+The companion page and SVG beside the fixture can be published with it
+for the separate deployment observation.
+
+| Construct in the fixture | Site's answer |
+|---|---|
+| Headings, including repeated headings; same-page anchors | Renders. The anchors are `getting-started` and `getting-started-1`. |
+| Emphasis, strong emphasis, strikethrough and inline code | Renders. |
+| Bullet, nested and ordered lists | Renders. |
+| Task lists | Renders as disabled checkboxes, including checked and unchecked tasks. |
+| Tables | Renders with the declared column alignment. |
+| Fenced code with a language | Renders as code with `language-ts`; syntax colouring is not built. |
+| Block quotes and extended URL and email autolinks | Renders. |
+| Relative page links, repository-root and parent-folder links | Renders as links under the same room and ref. The companion page serves its heading and anchor. |
+| A repository SVG image | Renders at the same room and ref; the image route serves its exact bytes with a sandbox policy. |
+| Inline and block HTML | Differs from GitHub: shown as escaped source; a block is in a source box. |
+| An unsafe `javascript:` address | Filtered: the link text remains, with an empty address. |
+| Footnotes | Unsupported: the reference and definition stay ordinary text. Footnotes are outside the GFM specification; this fixture records the limitation rather than adding another parser extension. |
+| Wiki links | Unsupported: `[[Companion]]` stays ordinary text. |
+
 Links and images:
 
 - A relative address, such as `setup.md`, `../README.md` or

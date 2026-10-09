@@ -15,6 +15,9 @@ import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
 import { platformOutside } from "./worker.ts";
+import completeness from "./site/completeness/fixture.md?raw";
+import companion from "./site/completeness/companion.md?raw";
+import diagram from "./site/completeness/diagram.svg?raw";
 
 // The site route on a real register and directory, under the deployed class in the namespace `PLATFORM`, with the platform
 // package's rules. The register's claim creates the repository through the production wiring of the hosting's own Git service,
@@ -185,6 +188,9 @@ beforeAll(async () => {
     "docs/index.md": "# Docs\n\nThe [guide](guide.md).\n",
     "docs/guide.md": "# Guide\n\n## Setup\n\n## Setup\n\nBack [home](../README.md), [the top](/README.md), [elsewhere](https://example.com/x), [setup](#setup).\n\n![A diagram](diagram.png)\n\n| a | b |\n| - | :-: |\n| 1 | ~~2~~ |\n\n- [x] done\n- [ ] not yet\n",
     "docs/diagram.png": PNG,
+    "docs/completeness/fixture.md": completeness,
+    "docs/completeness/companion.md": companion,
+    "docs/completeness/diagram.svg": diagram,
     "notes/a.txt": "plain\n",
     "notes/b.md": "b\n",
     "big.md": "a".repeat(FILE_BYTES + 1),
@@ -254,6 +260,52 @@ test("a page: a markdown file at HEAD, at its branch and at a tag renders as HTM
   }
   expect(host.minted.length).toBeGreaterThan(0);
   expect(host.minted.filter((token) => !host.revoked.has(token))).toEqual([]);
+});
+
+// Invariant: one checked-in document renders the supported GFM constructs through Site; its repository links and image
+// remain at the requested ref and serve the companion bytes, while the documented safety differences and unsupported syntax
+// remain visible. The register/directory are real scopes; the Git host is the labelled stand-in above.
+test("GFM completeness fixture: constructs render through Site, relative page and image addresses serve their repository bytes, and documented differences stay visible (STAND-IN host)", async () => {
+  const prefix = `/site/${D.name}/HEAD/`;
+  const response = await get(`${prefix}docs/completeness/fixture.md`);
+  expect([response.status, response.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
+  const body = await response.text();
+  for (const construct of [
+    '<h1 id="site-completeness">Site completeness</h1>',
+    '<h2 id="getting-started">Getting <em>started</em></h2>',
+    '<h2 id="getting-started-1">Getting <em>started</em></h2>',
+    '<a href="#getting-started">the first section</a>',
+    '<a href="#getting-started-1">the repeated section</a>',
+    '<em>Emphasis</em>', '<strong>strong emphasis</strong>', '<del>strikethrough</del>', '<code>inline code</code>',
+    '<ul>\n<li>First bullet</li>', '<li>Nested bullet</li>', '<ol>\n<li>First ordered item</li>',
+    '<li><input checked="" disabled="" type="checkbox"> Finished task</li>',
+    '<li><input disabled="" type="checkbox"> Open task</li>',
+    '<th align="left">Feature</th>', '<th align="right">State</th>', '<td align="right">working</td>',
+    '<pre><code class="language-ts">const answer = 42;\n</code></pre>',
+    '<blockquote>\n<p>A quoted paragraph.</p>\n<p>With another paragraph.</p>\n</blockquote>',
+    '<a href="https://example.com/guide">https://example.com/guide</a>',
+    '<a href="http://www.example.com">www.example.com</a>',
+    '<a href="mailto:reader@example.com">reader@example.com</a>',
+    `<a href="${prefix}docs/completeness/companion.md#linked-section">the companion page</a>`,
+    `<a href="${prefix}README.md">the repository root</a>`, `<a href="${prefix}docs/index.md">the parent page</a>`,
+    `<img src="${prefix}docs/completeness/diagram.svg" alt="Repository diagram" title="A repository image" />`,
+    'Inline HTML &lt;em&gt;stays text&lt;/em&gt;.',
+    '<pre class="raw-html">&lt;div&gt;Block HTML stays text.&lt;/div&gt;</pre>',
+    '<a href="">An unsafe link</a>',
+    'a note[^note].', '[^note]: This is ordinary text, not a footnote.', '[[Companion]]',
+  ]) expect(body, construct).toContain(construct);
+  expect(body).not.toMatch(/<sup|<div>|<em>stays text|href="javascript:/);
+
+  // Follow the addresses written by Site, rather than rebuilding the next requests from the fixture paths.
+  const linked = /<a href="([^"]+)">the companion page<\/a>/.exec(body)![1]!;
+  const linkedResponse = await get(linked);
+  expect(linkedResponse.status).toBe(200);
+  expect(await linkedResponse.text()).toContain('<h2 id="linked-section">Linked section</h2>');
+  const src = /<img src="([^"]+)" alt="Repository diagram"/.exec(body)![1]!;
+  const image = await get(src);
+  expect([image.status, image.headers.get("content-type")]).toEqual([200, "image/svg+xml"]);
+  expect(image.headers.get("content-security-policy")).toContain("sandbox");
+  expect(new Uint8Array(await image.arrayBuffer())).toEqual(utf8(diagram));
 });
 
 // Invariant: a directory answers its index page if it has one, else a listing of its entries.
