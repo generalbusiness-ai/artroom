@@ -55,15 +55,14 @@ deployment image, container, fresh authority or provider acceptance follows.
 
 ## Conditions still owed
 
-Peer review found a remaining custody defect: cancellation after a staging
-send with an unknown answer can finalize the publication without retaining
-cleanup, even when the provider wrote the ref. The source owner is repairing
-that path with a real-Scope witness. Exhausted refused publication pushes
-also finalize without staged-ref cleanup. A separate command recovery fix
-must preserve the accepted proposal locator when linking loses an answer.
-Snapshot reads must bind to the destination's current job generation as well
-as the lane's requested state. This candidate must not be gated or filed as
-complete before those repairs are integrated.
+Peer findings were repaired at composed source
+`5a98b42407cafae4b61d466c012f8f1ffc41b950`. Unknown-stage cancellation
+retains a live cleanup duty; refused publication pushes open staged-ref
+deletion and token cleanup. Snapshot reads bind to the destination's current
+job generation. Linking failures retain the accepted proposal locator and
+safe inspection guidance. Eighteen focused tests passed with one opt-in
+recorder skipped. A narrow read-only peer re-read confirmed those repairs;
+this is not the full independent Source review. Unknown cleanup stays owed.
 
 The planner must judge the expired reservation's explicit cleanup trigger
 (`f1b87a0b017aa745ed85f77f4ed3154d36d59eb7`), the historical one-file-form
