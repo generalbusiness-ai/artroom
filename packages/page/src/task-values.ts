@@ -23,4 +23,3 @@ export function changeTaskContext(change: ChangeView): TaskContext {
   if (change.reviewMembers !== undefined && change.reviewMembers !== null) for (const kind of ["request-review-own", "request-review-any"]) choices[kind] = { requested: change.reviewMembers };
   return { defaults, choices };
 }
-
