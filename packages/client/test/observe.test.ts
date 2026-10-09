@@ -95,3 +95,12 @@ test("EOF aborts the old attempt before a pending snapshot may paint current, an
 test("expected deployment is verified before opening or reading the captured scope",async()=>{
  let opens=0;const states:ObservationState<number>[]=[];const observer=observeScope<number>({context:{...context,deployment:"another-trusted-deployment"},current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>{opens++;return{ok:false,reason:"unavailable"};},snapshot:async()=>{throw new Error("not reached");},emit:s=>states.push(s)});await observer.done;expect(opens).toBe(0);expect(states.at(-1)).toEqual({status:"error",reason:"session-context-mismatch"});
 });
+
+
+test("same-turn abort before ignoring open resolution disposes its late body once without old-context paint or waiting for physical cancel",async()=>{
+ const opening=gate<{ok:true;body:ByteStream}>(),started=gate();let current=true,cancels=0;const states:ObservationState<number>[]=[];
+ const body={getReader:()=>({read:()=>new Promise<{done:boolean}>(()=>{}),cancel:()=>{cancels++;return new Promise(()=>{});}})}as ByteStream;
+ const observer=observeScope<number>({context,current:()=>current,authenticate:async()=>({ok:true,session:session()}),open:()=>{started.resolve();return opening.promise;},snapshot:async()=>{throw new Error("not reached");},emit:s=>states.push(s)});
+ await started.promise;const before=states.length;current=false;observer.cancel();opening.resolve({ok:true,body});
+ await observer.done;await drain();expect(cancels).toBe(1);expect(states).toHaveLength(before);
+});

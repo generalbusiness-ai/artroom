@@ -36,11 +36,10 @@ class ObservationFailure extends Error { constructor(readonly status: "unavailab
 
 /** Callback expiry raced locally as existing takeBytes does; ignoring transports cannot repaint late data. */
 async function bounded<T>(run:(signal:Expiry)=>Promise<T>, parent:Expiry, seconds:number, dispose?:(value:T)=>void):Promise<T>{
-  const own=new AbortController();let stopped!:()=>void;
-  const abort=new Promise<never>((_resolve,reject)=>{stopped=()=>{own.abort();reject(new Stopped());};});
+  const own=new AbortController();let stopped!:()=>void;let abandoned=false;
+  const abort=new Promise<never>((_resolve,reject)=>{stopped=()=>{abandoned=true;own.abort();reject(new Stopped());};});
   parent.addEventListener("abort",stopped);let timeout:ReturnType<typeof setTimeout>|undefined;
-  const elapsed=new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>{own.abort();reject(new ObservationFailure("unavailable","read-timeout"));},seconds*1000);});
-  let abandoned = false;
+  const elapsed=new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>{abandoned=true;own.abort();reject(new ObservationFailure("unavailable","read-timeout"));},seconds*1000);});
   try{if(parent.aborted)throw new Stopped();const pending = run(own.signal);void pending.then(value=>{if(abandoned)dispose?.(value);},()=>undefined);return await Promise.race([pending,abort,elapsed]);}
   catch(error){abandoned=true;throw error;}
   finally{parent.removeEventListener("abort",stopped);clearTimeout(timeout);}
