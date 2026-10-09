@@ -1,0 +1,15 @@
+{
+  "head": "3d0cfc3047d2c9e5613fa9365b4b52f18dcacb5a",
+  "tree": "ca7e182163dab3e8061ef19d83e218f6e44cca4e",
+  "base": "59b51d3be42cf14d7a757d8406be8998b86daa7e",
+  "clean": true,
+  "testsRun": false,
+  "discoveryRun": false,
+  "typecheckExit": 0,
+  "files": {
+    "/tmp/artroom-site-clock-lifetime-fix/packages/scope/test/support/site-fixture-lifetime.ts": "ba988d3551d8fbd7bc4ed80c2ab37e6ef4303de291a3689c11087b1ebc75c368",
+    "/tmp/artroom-site-clock-lifetime-fix/packages/scope/test/site-native3-publication.test.ts": "6d90abfcfc7e5f7015b665e236ba2f1313bc72adc8a47495e182dda49a89cf31",
+    "/tmp/artroom-site-clock-lifetime-fix/packages/scope/test/site-clock-lifetime.test.ts": "1a0cdaf2f3f0f49a5dfb0f3d3ce879c75fa4554129da6c2ab134c4b18c9d9218"
+  },
+  "patchSHA256": "0a8b543a96605e789dade5d260e5c389632233ba23e82d9d33f81817dbac280a"
+}
