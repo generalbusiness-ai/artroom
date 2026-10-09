@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-counting-commitments/examples/counting
+
+ ✓ |counting-commitments| commitments.test.ts > commitments declaration has a distinct exact canonical pin and finite own-item timer/settlement closure 18ms
+ ✓ |counting-commitments| commitments.test.ts > competing complete claims leave one pledge; fulfilled numbers, activity and anti-consecutive fairness refold 75ms
+ ✓ |counting-commitments| commitments.test.ts > failure, cancellation and paired board-first expiry fence old callbacks and retain separate obligations 49ms
+ ✓ |counting-commitments| commitments.test.ts > live participant cap and exact ownership survive removal, re-entry and non-controller requests 51ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  18:48:52
+   Duration  449ms (transform 155ms, setup 0ms, import 223ms, tests 193ms, environment 0ms)
+
+real 0.67
+user 0.77
+sys 0.12
+           285097984  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               21037  page reclaims
+                 193  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   2  messages sent
+                   2  messages received
+                   0  signals received
+                   1  voluntary context switches
+                7931  involuntary context switches
+         12830463503  instructions retired
+          3770995250  cycles elapsed
+           244457808  peak memory footprint

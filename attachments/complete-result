@@ -1,0 +1,76 @@
+{
+  "head": "2c7a650b6a76f88ea99d48f6a29bb29a7045d081",
+  "tree": "ee77d74eaa1d328fca1d8ae4549f8ae8ff8735e6",
+  "authorization": "b73ee38ac51065cbef745687e60156c2dbbbe989",
+  "compiler": "passed once under28336",
+  "discovery": "four exact titles/one file passed once under171",
+  "body": {
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "unrun_required": [],
+    "cases": [
+      {
+        "file": "examples/counting/commitments.test.ts",
+        "name": "commitments declaration has a distinct exact canonical pin and finite own-item timer/settlement closure",
+        "status": "passed",
+        "body_milliseconds": 18
+      },
+      {
+        "file": "examples/counting/commitments.test.ts",
+        "name": "competing complete claims leave one pledge; fulfilled numbers, activity and anti-consecutive fairness refold",
+        "status": "passed",
+        "body_milliseconds": 75
+      },
+      {
+        "file": "examples/counting/commitments.test.ts",
+        "name": "failure, cancellation and paired board-first expiry fence old callbacks and retain separate obligations",
+        "status": "passed",
+        "body_milliseconds": 49
+      },
+      {
+        "file": "examples/counting/commitments.test.ts",
+        "name": "live participant cap and exact ownership survive removal, re-entry and non-controller requests",
+        "status": "passed",
+        "body_milliseconds": 51
+      }
+    ],
+    "wall_seconds": 0.7164854590082541,
+    "cpu_seconds": 0.8977349999999998
+  },
+  "validated_pin": "sha256:b55824346382d9b158be4cadd9d098008f8129147fba772537778e2f738d5271",
+  "evidence_boundary": "Actual grammar/canonical/pin/deadline/pending computation plus scripted-grant memory evaluator/judge/seal/fold; not native/physical/custody/audio proof",
+  "files": {
+    "/tmp/artroom-c1-2c7a-compiler/proof.json": {
+      "bytes": 3630,
+      "sha256": "3b48fa6bf9be46789fb481631278a1d5843a73f9edc8f9ae047bbd73ad8fa890"
+    },
+    "/tmp/artroom-c1-2c7a-discovery/proof.json": {
+      "bytes": 1777,
+      "sha256": "719f1adf2adda96d86979ce06d2a6f4ed64b9bf80e35159c5df77e3660f82bf5"
+    },
+    "/tmp/artroom-c1-2c7a-discovery/discovery.log": {
+      "bytes": 1059,
+      "sha256": "fc6361a57d8862e851463c86342d401f6ba37376df426f7cb9d2a804a448f143"
+    },
+    "/tmp/artroom-c1-2c7a-body/proof.json": {
+      "bytes": 1838,
+      "sha256": "ac5ee61b17b5a26c75a1fed12d200d27021a0a9512fdab257252e0872fc2fdfb"
+    },
+    "/tmp/artroom-c1-2c7a-body/body.log": {
+      "bytes": 1629,
+      "sha256": "34891aab7e7b2830a4583ff383ad2453bd2ff0a48e1c85f876087ad2d825e62b"
+    },
+    "/tmp/artroom-c1-2c7a-body/case-ledger.json": {
+      "bytes": 1270,
+      "sha256": "a9520001ee47d5d2df8d0077fbf065ddc96b35f9e4692adfbd78e36f33cfd2a0"
+    }
+  },
+  "not_proved": [
+    "Native membership/authority/enrollment/concurrency/restart/transport/custody/audio",
+    "Reserved completion and expiry under actual admission exhaustion",
+    "Full all-dimensional retention/capacity",
+    "Reviewed ordinary-root selection of both C0 and C1",
+    "Full gate/Source approval/landing and full Counting/I6/hosted delivery"
+  ]
+}

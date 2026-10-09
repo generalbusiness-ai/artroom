@@ -1,0 +1,53 @@
+{
+  "authorization": "b73ee38ac51065cbef745687e60156c2dbbbe989",
+  "before": {
+    "head": "2c7a650b6a76f88ea99d48f6a29bb29a7045d081",
+    "tree": "ee77d74eaa1d328fca1d8ae4549f8ae8ff8735e6",
+    "status": "",
+    "utc": "2026-10-09T22:48:52.031898+00:00",
+    "load": [
+      3.0673828125,
+      2.5615234375,
+      2.228515625
+    ],
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+  },
+  "after": {
+    "head": "2c7a650b6a76f88ea99d48f6a29bb29a7045d081",
+    "tree": "ee77d74eaa1d328fca1d8ae4549f8ae8ff8735e6",
+    "status": "",
+    "utc": "2026-10-09T22:48:52.748629+00:00",
+    "load": [
+      3.0673828125,
+      2.5615234375,
+      2.228515625
+    ],
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+  },
+  "sole_runtime_before": [],
+  "discovery": "actual four-title JSON fully read/matched, not repeated",
+  "argv": [
+    "/usr/bin/time",
+    "-lp",
+    "node",
+    "/tmp/artroom-counting-commitments/node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "/tmp/artroom-c1-2c7a-discovery/strict-node.config.mjs",
+    "--reporter",
+    "verbose",
+    "--bail=1"
+  ],
+  "cwd": "/tmp/artroom-counting-commitments/examples/counting",
+  "config_sha256": "81e13f5bdb8982ff4c053c11f1f1e6e3f68c5b7ec642f9051aa530802d0b9d62",
+  "exit": 0,
+  "wall_seconds": 0.7164854590082541,
+  "cpu_seconds": 0.8977349999999998,
+  "log": "/tmp/artroom-c1-2c7a-body/body.log",
+  "bytes": 1629,
+  "sha256": "34891aab7e7b2830a4583ff383ad2453bd2ff0a48e1c85f876087ad2d825e62b",
+  "native_controls_gate": "not run",
+  "status": "Body terminal; complete raw statuses and still-unrun obligations need Root review"
+}
