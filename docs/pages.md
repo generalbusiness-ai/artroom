@@ -46,8 +46,8 @@ Two more addresses:
 ## What every page shows
 
 - **A header.** "Repository:" and the repository's name as the directory
-  records it, linking to the root of the same branch or tag; the branch
-  or tag shown, such as "branch main (HEAD)" or "branch main";
+  records it, linking to the root of the same published branch; the branch
+  shown, such as "branch main (HEAD)" or "branch main";
   and a link to the versions page. This is the name the register gave the
   repository at the Git host. It is not a human claim name. Carrying a
   signed claim display name into the directory and header remains a named
