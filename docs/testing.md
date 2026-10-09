@@ -276,7 +276,9 @@ objects in maps and decodes each pushed pack; the site route reads the
 published file back over the same stand-in. It lives with the lanes,
 because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
-git package. `packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
+git package.
+
+`packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
 successor on real platform and lane scopes, through the production wiring
 of the hosting's own Git service over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
