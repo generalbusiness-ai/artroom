@@ -24,6 +24,14 @@ test("an open request waits for its reviewer until a merge is published; a merge
     ["effect queued", "revoke, operation 43:0, no attempt yet."],
   ]);
   expect(changeStates({ requests: [request], merges: [merge({ state: "published", commit: "c".repeat(40) })] }).map((s) => s.state)).toEqual(["publication confirmed"]);
+  const cleaned = { ...publication, state: "cleaned", operations: [] };
+  expect(changeStates({ requests: [], merges: [merge({ state: "published", publication: cleaned })] }).map((s) => s.state)).toEqual(["publication confirmed"]);
+  expect(changeStates({ requests: [], merges: [merge({ state: "refused", publication: cleaned })] })).toEqual([]);
+  for (const state of ["cleanup-aborted", "cleanup-deleted", "cleanup-owed", "unresolved"]) {
+    const live = { ...cleaned, state };
+    if (state === "cleanup-deleted" || state === "cleanup-owed") expect(changeStates({ requests: [], merges: [merge({ state: "published", publication: live })] }).map((s) => s.state)).toEqual(["publication in progress", "publication confirmed"]);
+    expect(changeStates({ requests: [], merges: [merge({ state: "unknown", publication: live })] }).map((s) => s.state)).toEqual(["publication in progress"]);
+  }
 });
 
 test("unavailable authority is an answer of unavailable, a dependency that could not be read, or authority-lost; a refusal for a grant is none of these", () => {

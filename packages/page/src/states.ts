@@ -54,7 +54,7 @@ export function changeStates(view: Pick<ChangeView, "requests" | "merges">, last
     states.push({ state: "policy not met", detail: "The lane refused the merge: its copy of the rules needs more approvals of this version (approvals-needed)." });
   }
 
-  if (latest && (["intended", "committed", "unknown"].includes(latest.state) || (latest.publication && !["published", "aborted", "not-reserved"].includes(latest.publication.state)))) {
+  if (latest && (["intended", "committed", "unknown"].includes(latest.state) || (latest.publication && !["published", "aborted", "not-reserved", "cleaned"].includes(latest.publication.state)))) {
     states.push({ state: "publication in progress", detail: `Merge ${latest.id} is ${latest.state}${latest.publication ? `; the destination's publication ${latest.publication.id} is ${latest.publication.state}` : ""}.` });
   }
   if (latest?.state === "published") states.push({ state: "publication confirmed", detail: `Merge ${latest.id} is published${latest.commit ? ` at ${latest.commit.slice(0, 12)}` : ""}.` });
