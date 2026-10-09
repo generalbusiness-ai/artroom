@@ -1,0 +1,129 @@
+{
+  "gate_head": "1d7fa27359e25ad1cc5acd7f772fa3343555bc5a",
+  "cache_sha256": "f8347a8e2a2bc7d4f0e1c849e91f4b379a8c55dfdb33893000f0bf72b2fe3c57",
+  "cache_qualification": "Mutable post-run file duration/failed cache; five failure flags and counts match retained gate; no start/order timestamps or reconstructed predecessor credit",
+  "scope_files": 73,
+  "failed": [
+    [
+      "scope:packages/scope/test/founding-real.test.ts",
+      {
+        "duration": 5013,
+        "failed": true
+      }
+    ],
+    [
+      "scope:packages/cli/test/story.scope.test.ts",
+      {
+        "duration": 5013,
+        "failed": true
+      }
+    ],
+    [
+      "scope:packages/scope/test/versions.test.ts",
+      {
+        "duration": 5007,
+        "failed": true
+      }
+    ],
+    [
+      "scope:packages/page/test/source-preview.scope.test.ts",
+      {
+        "duration": 5267,
+        "failed": true
+      }
+    ],
+    [
+      "scope:packages/scope/test/site-immutable-publication.test.ts",
+      {
+        "duration": 5008,
+        "failed": true
+      }
+    ]
+  ],
+  "longest": [
+    [
+      "scope:packages/lanes/test/manifest-tree.scope.test.ts",
+      {
+        "duration": 104578,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/page/test/editor-list1.scope.test.ts",
+      {
+        "duration": 46909,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/lanes/test/demo.scope.test.ts",
+      {
+        "duration": 19624,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/page/test/retained-editor.scope.test.ts",
+      {
+        "duration": 16606,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/scope/test/signed-reads.test.ts",
+      {
+        "duration": 16505,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/page/test/tasks.scope.test.ts",
+      {
+        "duration": 11157,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/scope/test/site-route.test.ts",
+      {
+        "duration": 10961,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/scope/test/membership.test.ts",
+      {
+        "duration": 8706,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/scope/test/sessions.test.ts",
+      {
+        "duration": 8107,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/scope/test/site-selected-publication.test.ts",
+      {
+        "duration": 7443,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/lanes/test/edit.scope.test.ts",
+      {
+        "duration": 6992,
+        "failed": false
+      }
+    ],
+    [
+      "scope:packages/lanes/test/wiring.scope.test.ts",
+      {
+        "duration": 6845,
+        "failed": false
+      }
+    ]
+  ]
+}

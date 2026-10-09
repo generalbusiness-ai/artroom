@@ -1,0 +1,87 @@
+# A4: next bounded measurement proposal — NOT executed
+
+Source failure baseline1d7fa27359e25ad1cc5acd7f772fa3343555bc5a; current
+test/prose successor99bd03c4ca9de420143108d64d6952197c4593a4 was inspected.
+Request45405ec50a448e6b90787ce941902279b039c98a remains open. No cause,
+fix, gate acceptance or native background-drain completion is established.
+
+## Facts and limits
+
+The1d7 gate spent350.8s elapsed/392.3CPU in tests. Five short native stories
+timed out at their unchanged5s bounds; no RefcountedCanceler appears. Larger
+passing native files also cost much more than focused runs. Current Vitest
+cache has per-file duration/failed only. Its sequencer ranks using PRE-run
+cache, but the retained cache is POST-run and mutable; it cannot reconstruct
+execution order or justify an arbitrary predecessor.
+
+The prior177 serial isolated runs emitted no diagnostic. The five ordered
+cohort also passed. The accidental42-file trace is NOT the authorized target
+run: its intended preview interval had310 matched foreground await pairs,
+finalActive0,1049ms total and no observed pending foreground await. These
+negatives do not cover native background drivers or long pool accumulation.
+
+CLI/Page use routed→route(env.PLATFORM), not SELF.fetch. Historical DK11
+SELF/service-binding slowdown is a lead, not an explanation of these cases.
+ScopeObject caches a pin per object life; definition validation is therefore
+not presumed to repeat on every read. New object initialization and repeated
+wire serialization may still contribute; neither is measured here.
+
+Source supports a narrower hypothesis: demo.pause polls every known/requested
+scope, loops effect until0, then dispatches repeatedly. Operations.run shares
+one running promise and marks again when joined. ScopeObject also schedules
+private driver/dispatcher runs through waitUntil. Thus many idle/progress
+polls and joins may cost more than a single outstanding foreground RPC.
+The installed pool exposes global waitUntil registration/drain helpers, but
+this inspection found no actual drain caller in shipped non-map modules;
+that search is NOT proof that no virtual/runtime caller exists or that native
+Durable Object background work remains pending.
+
+## Preferred smallest next check, awaiting owner decision
+
+ONE exact existing Page source-preview test, unchanged assertions, timeout,
+clock and call order, in an isolated scratch worktree at the agreed baseline.
+Explicit file filter + exact title; list discovery must show exactly1 test
+before execution. No preceding files, repeated full story or broad bisection.
+
+Retain the previous safe phase/fetch/pause begin/end metadata and add the
+missing discriminant in TEST harness only:
+
+- In PlatformScope test-worker effect/dispatch overrides, call super exactly
+  once, retain and return its ORIGINAL promise. Assign local numeric object
+  and promise aliases; observe begin/end/result-count via side callbacks.
+  Use WeakMap aliases so metadata does not retain objects/promises strongly.
+  Count overlapping foreground calls returning the SAME original promise,
+  rather than treating every completed RPC as a new driver pass. Do not add
+  awaits, drains, timers, retry passes or change production modules.
+- Count effect/dispatch returns0 versus positive, calls per pause/pass, and
+  cumulative completed time. Count test-worker object initialization hooks;
+  known namespace IDs are not a count of resident/live objects.
+- Keep metadata in plain test-isolate memory; read it after the witness.
+  Do not console-log from user Durable Object context. Preserve rejection
+  behavior and never print exception text, IDs, bodies, headers, argv,
+  sessions, credentials, fields or signing material.
+
+Why this differs from the310-pair negative: it measures original native
+promise sharing and idle/progress results at the method boundary, which the
+prior outer await trace did not record. It can distinguish many completed
+idle polls/joins from one incomplete foreground wait without changing the
+polling protocol. Private background calls bypass public effect/dispatch,
+so a first-seen promise is NOT labelled a newly started/background driver.
+
+Interpretation must remain bounded: many matched zero/progress completions
+with rising cost supports completed polling overhead; repeated same-promise
+overlaps supports joining, not a leak; a missing completion identifies one
+pending boundary only. A fast cold run is negative again and does not justify
+another gate. It leaves the full-run warm-state/order missing. Root/planner
+must then choose whether to capture metadata in a future authorized run or
+commission an exact additional contrast; do not infer a predecessor.
+
+## Alternative, lower priority
+
+A fixed same-head read comparison (DO stub versus direct routed summary/body
+decode, plus pure canonicalization) can separate per-call transport/format
+cost. It has no new objects or clock advance and must verify unchanged head.
+It does NOT target demo P×N polling or many-new-object storage cost, so a
+24-pair negative could repeat the current ambiguity. Do not run it merely
+because it is easy. No test, instrumentation or runtime change has been made
+by this proposal; owner decision is required before execution.
