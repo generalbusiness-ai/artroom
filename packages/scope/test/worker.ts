@@ -35,6 +35,7 @@ import { lacking } from "@generalbusiness/artroom-platform/testing";
 import { ScopeObject, type Outside, type OutsideGiven, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
+import { sessionFields, testSessionBypass } from "./session-settings.ts";
 import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
 import { outsideOf, owners, wired } from "./outside.ts";
 
@@ -80,7 +81,13 @@ export class NetScope extends DeployedScope<NetEnv> {
  * for a test's own reads of what a scope holds, by a reader that no client presents. Every other reader is judged by the real read
  * sessions.
  */
-export const platformNet: { without: string | null; sessions: boolean; secret: string | null; limits: LimitConfig | null; inspector: string | null } = { without: null, sessions: false, secret: null, limits: null, inspector: null };
+export const platformNet: { without: string | null; readonly sessions: boolean; readonly secret: string | null; limits: LimitConfig | null; readonly inspector: string | null } = {
+  without: null, limits: null,
+  get sessions() { return sessionFields.sessions; },
+  get secret() { return sessionFields.secret; },
+  get inspector() { return sessionFields.inspector; },
+};
+for (const field of ["sessions", "secret", "inspector"] as const) Object.defineProperty(platformNet, field, { ...Object.getOwnPropertyDescriptor(platformNet, field)!, configurable: false });
 /** Test-only, name-bound outside factories. ScopeObject supplies its live
  * readonly store facade after storage exists; no default port is changed. */
 export const platformOutside = new Map<string, (given: OutsideGiven, sql: Pick<SqlStorage, "exec">) => Outside>();
@@ -106,10 +113,10 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
       readers: (given) => {
         const real = session.readers(given);
         return {
-          allows: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? true : real.allows(reader, read)), chained: real.chained!, holder: real.holder!,
+          allows: (reader, read) => (testSessionBypass(reader, "allows") ? true : real.allows(reader, read)), chained: real.chained!, holder: real.holder!,
           // The inspector is an explicit test bypass. It resolves no peer and
           // supplies no production session authority.
-          prepare: (reader, read) => (!platformNet.sessions || (platformNet.inspector !== null && reader === platformNet.inspector) ? Promise.resolve() : real.prepare!(reader, read)),
+          prepare: (reader, read) => (testSessionBypass(reader, "prepare") ? Promise.resolve() : real.prepare!(reader, read)),
         };
       },
       ...(platformNet.limits ? { limits: platformNet.limits } : {}),

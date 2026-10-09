@@ -1,4 +1,4 @@
-import { expect, inject, test } from "vitest";
+import { expect, inject, onTestFinished, test } from "vitest";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { keys } from "@generalbusiness/artroom-derive/testing";
@@ -15,7 +15,9 @@ const knownPlatform = (named: string, family: string) => platform(named) !== nul
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
-import { platformNet, platformOutside } from "./worker.ts";
+import { beginSessionChild, beginSessionFixture } from "./session-settings.ts";
+import { reader } from "./support.ts";
+import { platformOutside } from "./worker.ts";
 import { localClone } from "./support/local-clone.ts";
 
 // Invariant: known @2 observations and current aged directory/session preparation
@@ -29,7 +31,12 @@ import { localClone } from "./support/local-clone.ts";
 test("runtime exact @2 membership observations and aged destination/rules reads retain full references; unknown catalog names are unavailable", async () => {
   expect([knownPlatform("platform:membership@1", "platform:membership"), knownPlatform("platform:membership@2", "platform:membership"), knownPlatform("platform:membership@99", "platform:membership"), knownPlatform("platform:directory@2", "platform:membership")]).toEqual([true, true, false, false]);
   net.hold = net.deaf = null;
-  platformNet.sessions = false;
+  const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
+  onTestFinished(owner.close);
+  const inspected = async <T>(action: () => Promise<T>): Promise<T> => {
+    const child = beginSessionChild(owner, { inspector: reader });
+    try { return await child.required(action); } finally { child.close(); }
+  };
   const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: "platform:register@2", creator: null, cause: intentDigest(install), ordinal: 0 }));
   const host = outsideOf(R.name);
@@ -88,9 +95,8 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     const firstHead = published.values["head"];
     expect((await G.entries()).some((entry) => entry.input.type === "outcome" && entry.input.kind === "receipt" && entry.input.result === "confirmed" && entry.effects.some((effect) => effect.effect === "state" && effect.state === "written"))).toBe(true);
     net.clock.now = soon(901);
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    const session = await requestSession("https://scopes.test", M.name, sessionRequest(await M.at(), rita.secret, soon(60), "runtime-known-v2"), { fetch: routed as unknown as Fetch });
+    owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true });
+    const session = await requestSession("https://scopes.test", M.name, sessionRequest(await inspected(() => M.at()), rita.secret, soon(60), "runtime-known-v2"), { fetch: routed as unknown as Fetch });
     expect(session.ok).toBe(true);
     if (!session.ok) return expect.fail(session.reason);
     for (const node of [rules, G]) {
@@ -99,7 +105,7 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     }
     const store = memoryStore();
     await store.keep("device", rita.secret);
-    await store.save({ v: 1, service: "https://scopes.test", key: "device", register: await R.at(), repository: { directory: directoryAt, membership: membershipAt, rules: rules.name, destination: G.name }, handle: "@rita" });
+    await store.save({ v: 1, service: "https://scopes.test", key: "device", register: await inspected(() => R.at()), repository: { directory: directoryAt, membership: membershipAt, rules: rules.name, destination: G.name }, handle: "@rita" });
     let gitCalls = 0;
     const context: Context = {
       store, fetch: routed as unknown as Fetch, now: () => timeMs(net.clock.now)!,
@@ -135,14 +141,12 @@ test("runtime exact @2 membership observations and aged destination/rules reads 
     expect(actual.readRequests).toBeGreaterThan(0);
     // Inspector-only history read; the CLI above presented actual sessions and
     // used real HTTP admission, bounded outcome/receipt proof and private take.
-    platformNet.sessions = false;
-    const entries = await G.entries();
+    const entries = await inspected(() => G.entries());
     const minted = entries.find((entry) => entry.input.type === "outcome" && entry.input.kind === "mint-read");
     expect(minted?.input).toMatchObject({ type: "outcome", owner: "platform:destination@2", kind: "mint-read", result: "confirmed" });
     if (minted?.input.type !== "outcome") return expect.fail("confirmed outcome is required");
     const handle = (minted.input.evidence.body as { token: string }).token;
     expect(JSON.stringify(entries).includes(callerToken)).toBe(false);
-    platformNet.sessions = true;
     expect(await readCredential("https://scopes.test", G.name, session.session.reader(), handle, { fetch: routed as unknown as Fetch })).toEqual({ ok: false, reason: "forbidden" });
-  } finally { platformNet.sessions = false; platformNet.secret = null; wired.delete(R.name); platformOutside.delete(G.name); }
+  } finally { owner.close(); wired.delete(R.name); platformOutside.delete(G.name); }
 });

@@ -1,10 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
 import { foundingPublication } from "../../scope/test/publication.ts";
@@ -29,20 +29,17 @@ const reader = "a test reader";
 // | The Git host | A STAND-IN: `OutsideDouble` of the scope package's `test/outside.ts`, wired as the register's outside port. It answers the one creation request with what the test writes. No repository is created. For the destination's founding publication it is wired as the destination's port (`test/publication.ts`), and answers each request with the commit IDs the platform package computes. Nothing is pushed. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the register's operations driver and the dispatchers of the scopes it waits on, as a deployment's alarms would. No test waits on the wall clock. |
 // | The clock | The scripted clock of the namespaces. The command signs its intents and reads by it. |
-// | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (`platformNet.inspector`), past the read sessions. |
+// | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (the fixture inspector), past the read sessions. |
 // | Who may install | Nothing checks it: that is the installation design's. |
 describe("the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs", () => {
   test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it", async () => {
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     try {
       await story();
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
     }
   });
 });

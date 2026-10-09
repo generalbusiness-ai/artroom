@@ -1,10 +1,11 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, inject, test } from "vitest";
+import { describe, expect, inject, test, onTestFinished } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { site } from "../../scope/src/site/route.ts";
 import { gitHub, Hub, ownHost, type Stand } from "../../scope/test/hosts.ts";
@@ -38,14 +39,13 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
   for (const [host, make] of [["artifacts", () => Promise.resolve(ownHost())], ["github.com", gitHub]] as const) {
     test(`on ${host}: every shot, from the planned install to the page, prints the exit code and the lines the script expects, and the transcript's table says yes for each; a shot whose outcome differs is a row that says no; no secret is in the transcript`, async () => {
       net.hold = net.deaf = null;
-      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      platformNet.sessions = true;
+      const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: null });
+      onTestFinished(owner.close);
       const wired = new Set<ScopeId>();
       try {
         await story(await make(), wired);
       } finally {
-        platformNet.secret = null;
-        platformNet.sessions = false;
+        owner.close();
         net.hold = null;
         for (const name of wired) platformOutside.delete(name);
       }
@@ -55,8 +55,8 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
   for (const [host, make] of [["artifacts", () => Promise.resolve(ownHost())], ["github.com", gitHub]] as const) {
     test(`on ${host}: the optional manifest sequence follows shot 16, publishes both text files together and refuses a controlled two-file branch; Git capture is a STAND-IN`, async () => {
       net.hold = net.deaf = null;
-      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      platformNet.sessions = true;
+      const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: null });
+      onTestFinished(owner.close);
       const wired = new Set<ScopeId>();
       try {
         const at = await make();
@@ -86,7 +86,7 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
         expect(judged(published.expected, { code: 0, lines: [published.lines[0]!.replace("2 files", "1 files"), published.lines[1]!] }, {})).toMatch(/^line 1/);
         await drained();
       } finally {
-        platformNet.secret = null; platformNet.sessions = false; net.hold = null;
+        owner.close(); net.hold = null;
         for (const name of wired) platformOutside.delete(name);
       }
     }, 240_000);
@@ -99,14 +99,13 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
   // in place of a service, as `packages/page/test/screens.mjs` does with its own recorder.
   test.skipIf(!inject("demoRecord"))("record the Worker's answers to the page's reads on the rehearsal's room, for demo-captures (runs only with DEMO_RECORD=1)", async () => {
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: null });
+    onTestFinished(owner.close);
     const wired = new Set<ScopeId>();
     try {
       await record(ownHost(), wired);
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
+      owner.close();
       net.hold = null;
       for (const name of wired) platformOutside.delete(name);
     }

@@ -1,3 +1,4 @@
+import { beginSessionFixture, beginSessionChild, type SessionOwner } from "../../../scope/test/session-settings.ts";
 /**
  * The demo room that the page's story and its recorder open: founded by
  * the command line on real scopes, as `packages/lanes/test/edit.scope.test.ts`
@@ -51,10 +52,11 @@ export interface Demo {
   /** An invitation link for @una, a member, from rita's `artroom invite`; nobody has used it. */
   link: string;
   /** A page session for a 32-byte secret. */
-  as(secret: Uint8Array): Session;
+  as(secret: Uint8Array, owner?: SessionOwner): Session;
   /** A person's key, as the command line keeps it. */
   secretOf(who: Context): Promise<Uint8Array>;
   done(): void;
+  sessionOwner: SessionOwner;
 }
 
 const ok = (outcome: Outcome): Outcome => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
@@ -63,11 +65,12 @@ let fixtureOwner: FixtureOwner | null = null;
 const providerOwners = new WeakMap<NonNullable<ReturnType<typeof platformOutside.get>>, FixtureOwner>();
 
 /** Founds the room. `wrap` may stand between the page and the routes, as the recorder does. */
-export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<Demo> {
+export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = (f) => f, parent: SessionOwner | null = null): Promise<Demo> {
   const before = { hold: net.hold, deaf: net.deaf, secret: platformNet.secret, sessions: platformNet.sessions };
+  const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const sessionOwner = parent ? beginSessionChild(parent, { secret, sessions: true, inspector: null }) : beginSessionFixture({ secret, sessions: true, inspector: null });
   const owner: FixtureOwner = { released: false, previous: fixtureOwner, before };
   fixtureOwner = owner;
-  const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
   let released = false;
   let held: typeof net.hold = null;
   const wired = new Map<ScopeId, { previous: ReturnType<typeof platformOutside.get>; installed: NonNullable<ReturnType<typeof platformOutside.get>> }>();
@@ -78,7 +81,7 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
     let restore = owner;
     while (restore.previous?.released) restore = restore.previous;
     if (fixtureOwner === owner) fixtureOwner = restore.previous;
-    if (currentOwner && platformNet.secret === secret) { platformNet.secret = restore.before.secret; if (platformNet.sessions === true) platformNet.sessions = restore.before.sessions; }
+    sessionOwner.close();
     if (currentOwner && net.hold === held) net.hold = restore.before.hold;
     // `deaf` has no owner token; never overwrite a later non-null setting.
     if (currentOwner && net.deaf === null) net.deaf = restore.before.deaf;
@@ -86,12 +89,10 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
       if (wiring.previous && !providerOwners.get(wiring.previous)?.released) platformOutside.set(name, wiring.previous); else platformOutside.delete(name);
     }
   };
-  const active = () => { if (released) throw new Error("The demo fixture was released before setup completed."); };
+  const active = () => { if (released) throw new Error("The demo fixture was released before setup completed."); sessionOwner.active(); };
   onTestFinished(done);
   try {
     net.hold = net.deaf = null;
-    platformNet.secret = secret;
-    platformNet.sessions = true;
     const at = ownHost();
     let R: Platform | null = null;
     let siteEnv: SiteEnv | null = null;
@@ -114,26 +115,28 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
         let made = 0;
         for (const node of nodes) {
           for (;;) {
-            const effects = await (node.stub as unknown as { effect(): Promise<number> }).effect();
+            const effects = await sessionOwner.required(() => (node.stub as unknown as { effect(): Promise<number> }).effect());
             active();
             if (!(effects > 0)) break;
             made++;
           }
-          made += await node.stub.dispatch();
+          made += await sessionOwner.required(() => node.stub.dispatch());
           active();
         }
         if (made === 0) return;
       }
-      await settle(...nodes);
+      await sessionOwner.required(() => settle(...nodes));
     };
     const routes = (async (url: string, init?: RequestInit) =>
       (siteEnv && new URL(url).pathname.startsWith("/site/") ? site(new Request(url, init), siteEnv, at.stand.fetch) : routed(url, init))) as unknown as Fetch;
-    const fetch = wrap(routes);
-    const now = () => timeMs(net.clock.now)!;
-    const person = (): Context => ({ store: memoryStore(), fetch: routes, now, pause, read: async (path) => FILES[path] ?? null });
+    const wrapped = wrap(routes, sessionOwner);
+    const guarded = (owner: SessionOwner, through: Fetch): Fetch => (url, init) => owner.required(() => through(url, init));
+    const fetch = guarded(sessionOwner, wrapped);
+    const now = () => { active(); return timeMs(net.clock.now)!; };
+    const person = (): Context => ({ store: memoryStore(), fetch: guarded(sessionOwner, routes), now, pause, read: async (path) => { active(); return FILES[path] ?? null; } });
     const rita = person();
     const paul = person();
-    const run = (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
+    const run = (who: Context, ...argv: string[]): Promise<Outcome> => sessionOwner.required(() => command(who, argv));
 
     ok(await run(rita, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
     active();
@@ -175,9 +178,9 @@ export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<De
     active();
 
     return {
-      at, fetch, pause, run, rita, paul, config, D, G, M, rules, link,
-      as: (secret) => ({ service: SERVICE, secret, fetch, now }),
-      secretOf: async (who) => (await who.store.secret((await who.store.config())!.key))!,
+      at, fetch, pause, run, rita, paul, config, D, G, M, rules, link, sessionOwner,
+      as: (secret, owner = sessionOwner) => ({ service: SERVICE, secret, fetch: guarded(owner, wrapped), now: () => { owner.active(); return timeMs(net.clock.now)!; } }),
+      secretOf: async (who) => sessionOwner.required(async () => (await who.store.secret((await who.store.config())!.key))!),
       done,
     };
   } catch (error) { done(); throw error; }

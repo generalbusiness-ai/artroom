@@ -1,10 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, scopeIdOf, textDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { ownHost, type Stand } from "../../scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
@@ -31,16 +32,13 @@ const reader = "a test reader";
 describe("artroom issue and issues, edit --closes and verify --all on real scopes. The Git host and the scheduler are STAND-INs", () => {
   test("an issue opened by a member, commented on by another and assigned by the admin; a member's edit with --closes is linked and waits for a merger, the admin's merge publishes it and closes the issue; merge --closes links a waiting change the same way; a member who did not open an issue and holds no issue.triage is refused close and assign by name, with nothing written; issues lists both closed; verify --all prints one line for each scope of the room and all consistent", async () => {
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     const wired = new Set<ScopeId>();
     try {
       await story(ownHost(), wired);
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
       net.hold = null;
       for (const name of wired) platformOutside.delete(name);
     }

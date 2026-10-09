@@ -1,10 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { Entry, OperationId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, intentDigest, scopeIdOf, seedDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { DIRECTORY_OF, repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
 import { command, memoryStore, type Context } from "../src/index.ts";
@@ -27,15 +27,12 @@ describe("claim resumes a claim it gave up on. The Git host and the scheduler ar
   test("claim keeps exact requests across loss before found delivery and after accepted seat/first-key replies; settings restart and --again preserve distinct founds, with no duplicate enrollment or signing-key exposure", async () => {
     const clock = net.clock.now;
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     try {
       await resumed();
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
       net.clock.now = clock;
     }
   });

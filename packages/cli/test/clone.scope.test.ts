@@ -1,10 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import type { ArtifactsNamespace } from "../../scope/src/artifacts-host.ts";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
 import type { Outside } from "../../scope/src/index.ts";
@@ -54,15 +55,12 @@ function recordingGit(): Git & { runs: { args: readonly string[]; env: Readonly<
 describe("artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
   test("remote prints the host's form; a member reads the destination with her session before any act there and after the claim window; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     try {
       await story();
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
     }
   });
 });
