@@ -289,7 +289,7 @@ for (const context of contexts) await context.close();
 await browser.close();
 if (consoleErrors.length > 0) throw new Error(`Browser errors: ${JSON.stringify(consoleErrors)}`);
 writeFileSync(join(out, "checks.json"), `${JSON.stringify({
-  source, sourceTree, playwrightVersion, browserVersion,
+  source, sourceTree, fixture: record.fixture, playwrightVersion, browserVersion,
   executablePath: browserPath, fallback: "Browser plugin not available", layoutChecks,
   consoleErrors, expectedNetworkRefusals, unanswered, previewChecks, taskChecks, navigationChecks, keyboardChecks, playbackBoundary: "Recorded native replies; POST replay is keyed by route and does not verify the browser intent/signature or re-admit it",
 }, null, 2)}\n`);
@@ -306,7 +306,7 @@ const shows = {
   issue: "Signed in as @una (who joined on the page with an invitation link): the issue she opened through the page, paul's comment, and the acts she may sign on it.",
   "change-refused": "Signed in as @paul: the change that AGENTS.md is, waiting for the rules extent's approval (policy not met), its one-file version, the merge the destination refused (rules-not-met:rules), and paul's own review refused by the lane, author-cannot-review.",
   "change-refused-record": "The same refusal with Inspect change record expanded, retaining native policy refusal and outside operation history separately from the main condition.",
-  "change-published": "Signed in as @paul in the explicit native @2 recorder fixture: the recorded README.md change, merged result and selected retained source; Pages remains latest navigation, not an immutable result link.",
+  "change-published": "Signed in as @paul in the current CLI @3-destination recorder fixture with the legacy one-file change declaration: the recorded README.md change, merged result and selected retained source; Pages remains latest navigation, not an immutable result link.",
   "change-source-preview": "The selected README.md version’s authenticated retained source text, opened locally without an additional network read; this is not a rendered GitHub-Flavored Markdown or HEAD preview.",
   rules: "Signed in as @paul: the rules of this room, who may change them, and that paul may sign no act that changes them.",
   "site-readme": "README.md as the site route renders the latest published branch, reached by the separate Pages navigation; this is not an immutable version preview.",
@@ -324,8 +324,9 @@ writeFileSync(join(out, "README.md"), [
   "while AGENTS.md waits for the controller.",
   "These files describe this recorder invocation only. Browser POST replies are played by route; no browser intent/signature is verified or admitted again. Native form acceptance belongs to separate real-scope witnesses. They establish no live deployment or immutable rendered version acceptance.",
   `Source at invocation: \`${source}\`; tree \`${sourceTree}\`. Uncommitted shared source, if present, is not described as that committed tree.`,
+  `Recorded fixture: destination ${record.fixture?.destinationDefinition ?? "unreported"}; change ${record.fixture?.changeDefinition ?? "unreported"}; ${record.fixture?.workflow ?? "unreported"}.`,
   `Environment: Playwright ${playwrightVersion}, Chromium ${browserVersion}; desktop 1024px, phones 390px/320px, dark Rules, Create issue dialog, inline comment/primary review, editor preparation, list back/refresh and 200% CSS layout zoom. Browser plugin not available.`,
-  "The flow under test is: recorded native @2 room → Create issue dialog cancellation → list query/detail/back/refresh → inline comment draft → primary nonauthor review presentation → own-review refusal playback → retained editor preparation → latest Pages navigation. No new proposal is confirmed or published by browser playback.",
+  "The flow under test is: recorded current CLI cohort with legacy one-file change → Create issue dialog cancellation → list query/detail/back/refresh → inline comment draft → primary nonauthor review presentation → own-review refusal playback → retained editor preparation → latest Pages navigation. No new proposal is confirmed or published by browser playback.",
   "",
   "| File | Shows | Bytes |",
   "|---|---|---:|",
