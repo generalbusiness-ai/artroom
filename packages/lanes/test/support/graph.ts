@@ -8,7 +8,7 @@
  * |---|---|
  * | The definitions | `issue` and `change` of this package. The office creates each lane by its pinned digest, and each lane's handle is checked against the same pin. Real. |
  * | The lanes | Real scopes, written through the turn, the store and the dispatchers of the scope package. |
- * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. An office is founded over the Worker's HTTP routes, and `over` sends one act over them. |
+ * | The acts | Signed by the client's declared handle, and sent to the scope service's own operations. Ordinary office founding uses the same native service operations; a dedicated wire witness founds it over HTTP, and `over` sends one act over that transport. |
  * | The office | A made-up directory definition that creates the lanes. A test fixture. The separate `room.ts` fixture uses the real platform directory, which creates lanes after the runtime reads its declared active-definition observations from the real rules scope. |
  * | The members | The key set of derive's fixtures. Test keys. |
  * | Authority | The scope package's test authority: every presented grant is current. A STAND-IN. It shows nothing about real authority. |
@@ -25,7 +25,7 @@ import { SELF, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test
 import { expect, onTestFinished } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
-import { entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, entryHash, intentDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
 import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import { grantOf, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
@@ -46,7 +46,7 @@ export const reader = "a test reader";
  * entrypoint both call and add nothing to), called in the test's isolate:
  * every act and read of the fixture goes through it. `http` is the client's
  * transport over the Worker's HTTP routes, for the few calls that are about
- * a route: the founding of an office, one act, and the replay.
+ * a route: one dedicated office founding, an explicit act, and the replay.
  *
  * The reason is cost. In the Workers pool a call through the Worker's
  * entrypoint, by `SELF.fetch` or by a service binding, takes longer the more
@@ -467,16 +467,23 @@ export const README = "The office of a test repository.";
  * capability code at all, no scope runs under either lane definition: the
  * scope package's founding test shows that.
  */
-export async function graph(): Promise<Graph> {
+export async function graph(foundingTransport: Transport = transport): Promise<Graph> {
   net.hold = net.deaf = null;
   net.capability = {};
   net.outside = null;
   const founding = await signedIntent(secretSigner(rita.secret), { to: null, kind: "found", fields: { readme: textDigest(README) } }, { now: timeMs(net.clock.now)! });
-  // Over the Worker's HTTP route: the founding intent names the digest of the text, and the text travels beside it in the body.
-  const { answer, scope } = await found(http, founding, officeDefinition, definitions, reader, { texts: [README] });
+  // Native service by default. The dedicated wire witness supplies HTTP.
+  // Both receive the exact declaration closure and detached text beside it.
+  const { answer, scope } = await found(foundingTransport, founding, officeDefinition, definitions, reader, { texts: [README] });
   if (answer.answer !== "accepted" || !scope) throw new Error(`the office was not founded: ${JSON.stringify(answer)}`);
+  const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(officeDefinition), creator: null, cause: intentDigest(founding.intent), ordinal: 0 };
+  expect(answer.receipt.definition).toBe(seed.definition);
+  expect(isScopeRef(answer.receipt.fact.at)).toBe(true);
+  expect([scope.scope, answer.receipt.fact.at.scope, answer.receipt.fact.at.kind]).toEqual([scopeIdOf(seed), scopeIdOf(seed), "directory"]);
   const declared = await declaredHandle(new ScopeHandle(transport, scope.scope, reader), officeDefinition);
   if (!declared.ok) throw new Error(`no handle on the office: ${JSON.stringify(declared)}`);
+  expect(canonicalize(declared.handle.at)).toBe(canonicalize(answer.receipt.fact.at));
+  expect(definitionDigest(declared.handle.definition)).toBe(seed.definition);
   const made = new Graph(new Node(declared.handle, VALID.office));
   // The namespace's controls are shared with every test of the run. The test that asked for the graph leaves them as it found
   // them, once no dispatcher of the graph is still at work: a scope that reads its definition with no capability cannot run.
