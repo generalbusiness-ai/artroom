@@ -89,9 +89,17 @@ function chromiumOf(): Chromium | null {
 
 /** The recorded form: the rehearsal on the test Worker, with its answers to the page's reads. */
 function recordedSitting(): Sitting {
-  const log = execFileSync("npx", ["vitest", "run", "--project", "scope", "lanes/test/demo", "--silent=false", "--reporter=verbose"], {
-    cwd: ROOT, env: { ...process.env, DEMO_RECORD: "1" }, encoding: "utf8", maxBuffer: 256 * 1024 * 1024,
-  });
+  let log: string;
+  try {
+    log = execFileSync("npx", ["vitest", "run", "--project", "scope", "lanes/test/demo", "--silent=false", "--reporter=verbose"], {
+      cwd: ROOT, env: { ...process.env, DEMO_RECORD: "1" }, encoding: "utf8", maxBuffer: 256 * 1024 * 1024,
+    });
+  } catch (error) {
+    // The recorder's stdout contains ephemeral signing secrets. A child-process
+    // Error includes that stdout, so it must never become a public diagnostic.
+    const status = (error as { status?: number }).status;
+    throw new Error(`The native demo recorder failed (exit ${status ?? "unknown"}); no private record was exported. Inspect the focused producer tests separately.`);
+  }
   const parts = [...log.matchAll(/^DEMO-RECORD (\d+) (\S+)$/gm)].sort((a, b) => Number(a[1]) - Number(b[1])).map((m) => m[2]);
   if (parts.length === 0 || !/^DEMO-RECORD end$/m.test(log)) throw new Error("The recorder printed no whole record.");
   return JSON.parse(Buffer.from(parts.join(""), "base64url").toString("utf8")) as Sitting;
