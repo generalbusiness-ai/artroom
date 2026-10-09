@@ -20,7 +20,7 @@
 
 import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, roomContext, routeOf, type Destination } from "./shell.ts";
 import type { ActionContext } from "./actions.ts";
@@ -87,7 +87,8 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}` }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
     ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) =>
-      h("a", { class: "nav-item", href, ...(destination === kind ? { "aria-current": "page" } : {}) }, label)));
+      h("a", { class: "nav-item", href, ...(destination === kind ? { "aria-current": "page" } : {}) }, label)),
+    room ? h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages") : null);
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
   skip.addEventListener("click", (event) => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
   return [skip,
@@ -205,7 +206,9 @@ async function draw(focus = false): Promise<void> {
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
-      return show(...shell(destination, room, changeScreen(room, change, last(scope)), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, primary: ["comment", "review-verdict", "merge", "request-review-own", "ready-own"], choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
+      const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
+      const mergeAnswer = lastAct && ["merge", "cancel-merge"].includes(lastAct.kind) ? last(scope) : null;
+      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary: ["comment", "review-verdict", "merge", "request-review-own", "ready-own"], choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
     }
     if (destination === "rules") return show(...shell(destination, room, rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules, { primary: ["publish"] })));
     return show(...shell(destination, room, roomScreen(room, await listLanes(room), destination === "changes" ? "change" : "issue"), await panelFor(loaded, loaded.directory, { primary: [destination === "changes" ? "open-pr" : "open-issue"] })));
