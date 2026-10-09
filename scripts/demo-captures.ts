@@ -37,6 +37,8 @@ const USAGE = "Usage: scripts/demo-captures.ts <base-url> --home <config directo
 interface Locator { waitFor(options?: { timeout?: number; state?: "attached" | "visible" }): Promise<void>; first(): Locator }
 interface Tab {
   url(): string;
+  on(event: "pageerror", listener: (error: Error) => void): void;
+  on(event: "console", listener: (message: { type(): string; text(): string }) => void): void;
   goto(url: string): Promise<unknown>;
   getByRole(role: string, options: { name: string | RegExp }): Locator;
   getByText(text: string | RegExp): Locator;
@@ -98,6 +100,10 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   const browser = await chromium.launch({ executablePath });
   const unanswered: string[] = [];
   const sizes: { name: string; bytes: number }[] = [];
+  const consoleErrors: string[] = [];
+  const checks: unknown[] = [];
+  const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: ROOT, encoding: "utf8" }).trim();
   try {
     const context = await browser.newContext({ viewport: { width: 1000, height: 800 }, deviceScaleFactor: 1, colorScheme: "light" });
     if (sitting.answers) {
@@ -117,11 +123,20 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
     // The page's settings, as it keeps them: the page's own origin, the room, and the key.
     await context.addInitScript(initializeCapture, { service, place: sitting.place, secret: sitting.secret });
     const tab = await context.newPage();
+    tab.on("pageerror", (error) => consoleErrors.push(error.message));
+    tab.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
     // The whole content, down to its lowest element and at most 1,400 pixels: the viewport is set to that height for the capture.
     const shot = async (name: string) => {
       const path = join(out, `${name}.png`);
       const bottom = await tab.evaluate(() => Math.max(document.documentElement.scrollHeight, ...[...document.querySelectorAll("body *")].map((e) => e.getBoundingClientRect().bottom + window.scrollY)));
       await tab.setViewportSize({ width: 1000, height: Math.min(Math.ceil(bottom) + 24, 1400) });
+      const check = await tab.evaluate(() => ({ title: document.title,
+        meaningful: !!document.querySelector("main")?.textContent?.trim(),
+        horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+        overlay: !!document.querySelector("vite-error-overlay, nextjs-portal"),
+      }));
+      if (!check.meaningful || check.horizontalOverflow || check.overlay || (new URL(tab.url()).pathname === "/page/" && check.title !== "Artroom")) throw new Error(`Invalid rendered capture ${name}: ${JSON.stringify(check)}`);
+      checks.push({ name, url: tab.url(), width: 1000, ...check });
       await tab.screenshot({ path });
       await tab.setViewportSize({ width: 1000, height: 800 });
       sizes.push({ name, bytes: statSync(path).size });
@@ -145,6 +160,11 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   } finally {
     await browser.close();
   }
+  if (consoleErrors.length > 0) throw new Error(`Browser errors: ${consoleErrors.join("; ")}`);
+  writeFileSync(join(out, "checks.json"), `${JSON.stringify({ source, sourceTree, service,
+    mode: sitting.answers ? "recorded native Worker answers; Git host and scheduler stand-ins" : "deployment",
+    browserFallback: "Browser plugin not available", checks, consoleErrors, unanswered,
+  }, null, 2)}\n`);
   if (unanswered.length > 0) throw new Error(`The browser asked for what the recorder did not read: ${unanswered.join("; ")}`);
   const over = sizes.filter((size) => size.bytes > MOST);
   if (over.length > 0) throw new Error(`Over ${MOST} bytes: ${over.map((size) => `${size.name}.png ${size.bytes}`).join(", ")}.`);
