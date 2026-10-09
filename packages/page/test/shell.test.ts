@@ -1,5 +1,18 @@
 import { expect, test } from "vitest";
-import { RoomOpening, ScopeSending, roomContext, routeOf } from "../src/shell.ts";
+import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf } from "../src/shell.ts";
+
+test("closed issues offer one reopen and invalid changes offer no merge or review decision", () => {
+  const offered = ["comment", "close-own", "close-any", "reopen-own", "reopen-any", "edit-own"];
+  const closed = issueActions("closed", offered);
+  expect(closed.primary).toEqual(["comment", "reopen-own"]);
+  expect(closed.blockedKinds).toEqual(["close-own", "close-any"]);
+  expect(issueActions("open", offered).primary).toEqual(["comment", "close-own"]);
+  expect(issueActions("open", ["close-any"]).primary).toEqual(["comment", "close-any"]);
+  const invalid = changeActions("open", true);
+  expect(invalid.primary).toEqual(["comment"]);
+  expect(invalid.blockedKinds).toContain("merge");
+  expect(changeActions("merged", false).primary).toEqual(["comment"]);
+});
 
 test("navigation keeps lane identity and separates the room's Issues and Changes lists", () => {
   expect(routeOf("#/")).toEqual({ destination: "issues", scope: null });

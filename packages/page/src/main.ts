@@ -22,7 +22,8 @@ import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contr
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
-import { RoomOpening, ScopeSending, roomContext, routeOf, type Destination } from "./shell.ts";
+import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
+import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
 
@@ -217,7 +218,8 @@ async function draw(focus = false): Promise<void> {
     if (destination === "issues" && scope) {
       const issue = await loadIssue(room, scope as ScopeId);
       const defaults = issue.intent === undefined ? undefined : Object.fromEntries(["edit-own", "edit-any", "close-own", "close-any", "reopen-own", "reopen-any"].map((kind) => [kind, { on: issue.intent! }]));
-      return show(...shell(destination, room, issueScreen(room, issue), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), primary: ["comment", "edit-own", "close-own", "close-any", "reopen-own"] })));
+      const offered = await actsOn(room, scope as ScopeId);
+      return show(...shell(destination, room, issueScreen(room, issue), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) }, { offered })));
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
@@ -227,8 +229,7 @@ async function draw(focus = false): Promise<void> {
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
-      const blockedKinds = change.state === "merged" ? ["merge", "review-verdict", "ready-own", "ready-any", "request-review-own", "request-review-any"] : [];
-      const primary = ["comment", "review-verdict", "merge", "request-review-own", "ready-own"].filter((kind) => !blockedKinds.includes(kind));
+      const { primary, blockedKinds } = changeActions(change.state, !!current?.file && editPath(current.file.path) === null);
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
       const mergeAnswer = lastAct && ["merge", "cancel-merge"].includes(lastAct.kind) ? last(scope) : null;
       return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds })));
