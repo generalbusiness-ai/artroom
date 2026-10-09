@@ -67,8 +67,11 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
       await loadIssue(room, issue);
       await actsOn(room, issue);
       for (const change of [readme, agents]) {
-        await loadChange(room, change);
-        await actsOn(room, change);
+        // Each browser can land directly on this route with an empty
+        // definition cache. Record that actor's actual cold lane read.
+        const direct = await openRoom(room.session, place);
+        await loadChange(direct, change);
+        await actsOn(direct, change);
       }
       await loadRules(room);
       await actsOn(room, d.rules.name);
