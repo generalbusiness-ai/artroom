@@ -205,3 +205,38 @@ paired savings measurement or proof of the 10x goal. This gate remains failed.
 No retry, wider deadline, suite omission, approval, landing or deployment
 follows. A concrete failure disposition and new owner decision are required.
 This note update changes no source or test bytes from the failed head.
+
+## Session fixture owners and counted required leases
+
+Owner `b51315f2` commissioned the complete mapped 23-path test-only repair.
+Captured root and explicit child owners now control the session tuple. A stale
+cleanup cannot disable a newer owner, and closing one required lease removes
+only that lease. Closing an ancestor invalidates its descendants; a live parent
+lease may finish under its explicit child. The test tuple has readonly getters
+and no raw setter/restore alias. Page and Site hold/provider/clock guards and
+all existing access-denial controls remain. Four affected typechecks pass.
+
+Exact candidate `36395245ebdd4afc29952453249aa48ab66f702c`, tree
+`7517cd5c87b16ec907f77979a938e0185b545eeb`, passed one native lifetime
+witness at the original five-second deadline: 27 ms body, 1.8556 s wall and
+2.3636 s CPU. It asserts the actual parsed headerless HTTP 403/forbidden reply,
+new current owner, one remaining required lease, and both prepare/allows using
+the real branch with a null reader and no inspector bypass.
+
+The isolated one-line control `a5a557baa` removes only the cleanup publication
+fence. It reached the same native response assertion and failed with HTTP
+200/ok-summary: 20 ms body, 1.8812 s wall and 2.3871 s CPU. There was no earlier
+error, timeout or selection failure. Its strict config uses its own frozen
+head/tree/cwd; the pristine candidate's 23 files were checked before and after.
+The control is retained as evidence and never lands.
+
+Root read the complete 2,000-line original delta, controller successor,
+current inventory and strict selection/control packets, then both raw logs and
+complete results. Evidence:
+`/tmp/artroom-session-ownership-control-result/complete-evidence.json`, SHA-256
+`5b7658c234ab46e3c93bc6ad3a5b77e54aabb5cf1c2b5b26d45fa56e801e41ef`.
+This proves the ownership mechanism, not the actual 270 mode/body/writer
+chronology, production exposure, the four timeout causes, a full 23-path
+regression or global savings. No retry, extra positive or whole gate ran.
+The source is composed for the next exact filing decision; final gate and
+independent complete Source review remain owed.
