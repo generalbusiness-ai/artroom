@@ -64,15 +64,15 @@ test("FAKE wrong-route first response stays unknown; later refusal/head cannot s
   }finally{f.gateway.dispose();}
 });
 
-test("FAKE restored prepared command first-dispatches identical bytes; restored inflight and legacy commands never POST",async()=>{
+test("FAKE Check command leaves prepared custody unchanged; concurrent explicit Resume first-dispatches identical bytes once; restored inflight and legacy commands never POST",async()=>{
   const f=await fixture();let next:Awaited<ReturnType<typeof f.connect>>|undefined,peer:Awaited<ReturnType<typeof f.connect>>|undefined;try{
     f.fail("inflight");assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.counters().posts,0);const original=f.record()!.envelope;
-    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const results=await Promise.all([next.checkCommand(),peer.checkCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["refused",null]);assert.equal(f.counters().posts,1);assert.equal(canonicalize(f.snapshots.at(-1)!.envelope),canonicalize(original));
+    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const prepared=f.retained();assert.equal((await next.checkCommand())?.status,"unknown");assert.equal((await peer.checkCommand())?.status,"unknown");assert.equal(f.retained(),prepared);assert.equal(f.counters().posts,0);assert.equal(next.commandResumeReady(),true);const results=await Promise.all([next.resumeCommand(),peer.resumeCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["refused",null]);assert.equal(f.counters().posts,1);assert.equal(canonicalize(f.snapshots.at(-1)!.envelope),canonicalize(original));
   }finally{f.gateway.dispose();next?.dispose();peer?.dispose();}
   const lost=await fixture();let resumed:Awaited<ReturnType<typeof lost.connect>>|undefined;try{
     lost.lose();lost.fail("unknown");assert.equal((await lost.gateway.command("start")).status,"unknown");assert.equal(activeAttempt(lost.record()!.journal!).phase,"inflight");const original=lost.retained();
-    lost.gateway.dispose();lost.fail();resumed=await lost.connect();await resumed.restoreCommand();assert.equal((await resumed.checkCommand())?.status,"unknown");assert.equal(lost.retained(),original);assert.equal(lost.counters().posts,1);
-    lost.legacy();const legacy=lost.retained();assert.equal((await resumed.checkCommand())?.status,"unknown");assert.equal(lost.retained(),legacy);assert.equal(lost.counters().posts,1);
+    lost.gateway.dispose();lost.fail();resumed=await lost.connect();await resumed.restoreCommand();assert.equal((await resumed.checkCommand())?.status,"unknown");assert.equal(lost.retained(),original);assert.equal(lost.counters().posts,1);assert.equal((await resumed.resumeCommand())?.status,"blocked");assert.equal(lost.counters().posts,1);
+    lost.legacy();const legacy=lost.retained();assert.equal((await resumed.checkCommand())?.status,"unknown");assert.equal(lost.retained(),legacy);assert.equal((await resumed.resumeCommand())?.status,"blocked");assert.equal(lost.retained(),legacy);assert.equal(lost.counters().posts,1);
   }finally{lost.gateway.dispose();resumed?.dispose();}
 });
 
@@ -103,7 +103,7 @@ test("FAKE malformed restored PreparedEnvelope and refusal stay blocked without 
   const f=await fixture();try{
     f.fail("inflight");await f.gateway.command("start");assert.equal(f.counters().posts,0);f.fail();
     f.corrupt(record=>({...record,envelope:{...record.envelope,beside:{...record.envelope.beside,signed:record.envelope.signed}} as never}));
-    const original=f.retained();assert.equal((await f.gateway.checkCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal(f.counters().posts,0);assert.equal(f.counters().clears,0);
+    const original=f.retained();assert.equal((await f.gateway.checkCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal((await f.gateway.resumeCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal(f.counters().posts,0);assert.equal(f.counters().clears,0);
   }finally{f.gateway.dispose();}
   const g=await fixture();try{
     await g.gateway.command("start");
