@@ -15,7 +15,7 @@ import type { DestinationObject, RecordedJudgeEvidence } from "@generalbusiness/
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource, type ReadBounds } from "@generalbusiness/artroom-git";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import type { DestinationBinding, DestinationInspection, DestinationProvider, DestinationRepository } from "./destination-host.ts";
-import { inspectGit, sendOnce } from "./github-host.ts";
+import { deleteRefOnce, inspectGit, sendOnce, type DestinationRefDeletion } from "./github-host.ts";
 import type { RegisterProvider } from "./register-host.ts";
 
 /** A repository handle of the binding: the parts this port uses. */
@@ -210,6 +210,11 @@ export class ArtifactsProvider implements RegisterProvider, DestinationProvider 
     request = { ...request, repository: { ...request.repository }, binding: { ...request.binding, scope: { ...request.binding.scope } } };
     const remote = this.#remote(request.repository);
     return sendOnce(request, { ...this.#transport(remote), authorization: `Bearer ${plaintextOf(request.token)}` }, () => this.ref(request.repository, request.ref));
+  }
+  async deleteRef(request: DestinationRefDeletion): Promise<unknown> {
+    request = { ...request, repository: { ...request.repository }, binding: { ...request.binding, scope: { ...request.binding.scope } } };
+    const remote = this.#remote(request.repository);
+    return deleteRefOnce(request, { ...this.#transport(remote), authorization: `Bearer ${plaintextOf(request.token)}` }, () => this.ref(request.repository, request.ref));
   }
   async inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }> {
     context = { ...context, repository: { ...context.repository }, reports: [...context.reports] };

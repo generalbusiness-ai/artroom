@@ -5,7 +5,7 @@
  * mapping require owner-approved configuration. A local handle is not a
  * GitHub-issued token ID. No plaintext is recorded in an outside answer.
  */
-import type { RetainedInput } from "@generalbusiness/artroom-contract";
+import type { RetainedInput, Timestamp } from "@generalbusiness/artroom-contract";
 import { canonicalize, hex, utf8 } from "@generalbusiness/artroom-bytes";
 import { byteOrder, valueDigest } from "@generalbusiness/artroom-derive";
 import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/artroom-platform";
@@ -155,6 +155,11 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
     const remote = this.#remote(request.repository);
     return sendOnce(request, { ...this.#transport(remote), authorization: gitAuthorization(request.token) }, () => this.ref(request.repository, request.ref));
   }
+  async deleteRef(request: DestinationRefDeletion): Promise<unknown> {
+    request = { ...request, repository: { ...request.repository }, binding: { ...request.binding, scope: { ...request.binding.scope } } };
+    const remote = this.#remote(request.repository);
+    return deleteRefOnce(request, { ...this.#transport(remote), authorization: gitAuthorization(request.token) }, () => this.ref(request.repository, request.ref));
+  }
   async inspect(context: DestinationInspection): Promise<{ evidence: RecordedJudgeEvidence; retain?: readonly RetainedInput[] }> {
     context = { ...context, repository: { ...context.repository }, reports: [...context.reports] };
     return inspectGit(new Reader(await this.#source(context.repository), this.#bounds), context, this.#bounds);
@@ -210,6 +215,29 @@ export async function sendOnce(request: Parameters<DestinationProvider["send"]>[
   if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
   if (result.exit === 0 && (result.reported === "created" || result.reported === "updated") && !result.timedOut && await readBack() === request.commit) return { send: "accepted" };
   return null; // An applied ref cannot settle a lost or incomplete own answer.
+}
+
+/** One recorded deletion's provider request. Its write credential is already in custody. */
+export interface DestinationRefDeletion {
+  repository: DestinationRepository;
+  ref: string;
+  old: string;
+  token: string;
+  binding: DestinationBinding;
+  allowed(): boolean;
+  sentAt?: Timestamp;
+}
+
+/** One CAS deletion. A complete own reply plus a verified absent ref is accepted;
+ * lost replies, unavailable reads and marked local denials stay unknown. */
+export async function deleteRefOnce(request: DestinationRefDeletion, transport: SmartHttpOptions, readBack: () => Promise<string | null>): Promise<unknown> {
+  const result = await new SmartHttpGit(transport).send({ ref: request.ref, old: request.old, new: null, beforeSend: request.allowed });
+  if (!result.ran || result.reported === "stale") return request.sentAt === undefined ? { send: "not-sent" } : null;
+  if (result.exit === 1 && result.reported === "remote-rejected" && !result.timedOut) return { send: "refused" };
+  if (result.exit === 0 && result.reported === "deleted" && !result.timedOut) {
+    try { if (await readBack() === null) return { send: "accepted" }; } catch { /* no verified absence */ }
+  }
+  return null;
 }
 
 interface FlatFile { id: string; mode: string; path: string | null }
