@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER } from "@generalbusiness/artroom-platform";
+import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
 import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
@@ -154,9 +154,22 @@ const publishedScopes: Binding = {
     return {
       siteRoom: () => object.siteRoom(),
       siteDestination: () => object.siteDestination(),
+      // SCRIPTED proof and matching Git receipt objects; not native publication evidence.
+      sitePublishedCommit: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository, commit: string) => {
+        const actual = await object.sitePublication(directory, repository);
+        if (!actual) return { ok: false, reason: "not-published" };
+        const fact = { at: actual.at, seq: 1, hash: `sha256:${"a".repeat(64)}` } as const;
+        const file = canonicalize({ v: 1, scripted: true, commit });
+        const receipt = receiptObjects("sha1", actual.at.scope, "2099-01-01T00:00:00Z", fact, JSON.parse(file));
+        const ref = `refs/artroom/receipts/${commit}`;
+        host.refs.set(ref, receipt.commit);
+        for (const o of receipt.objects) host.objects.set(o.id, { id: o.id, type: o.kind, data: o.body });
+        return { ok: true, proof: { at: actual.at, head: actual.head, directory, repository, commit, publication: fact, written: fact,
+          receipt: { ref, commit: receipt.commit, tree: receipt.objects.find(o => o.kind === "tree")!.id, blob: receipt.objects.find(o => o.kind === "blob")!.id, file } } };
+      },
       sitePublication: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
         const actual = await object.sitePublication(directory, repository);
-        return actual && { ...actual, refs: [...host.refs].map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
+        return actual && { ...actual, refs: [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
       },
     };
   },
@@ -435,7 +448,7 @@ test("a failure at each step answers the same refusal with x-site-step and logs 
   const lines: string[] = [];
   const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
   try {
-    for (const [failing, step] of [["get", "open"], ["info", "info"], ["token", "token"], ["refs", "objects"], ["pack", "objects"]] as const) {
+    for (const [failing, step] of [["get", "open"], ["info", "info"], ["token", "token"], ["refs", "refs"], ["pack", "objects"]] as const) {
       host.failing = failing;
       lines.length = 0;
       const response = await get(at);
@@ -517,7 +530,7 @@ test("versions: recorded version rows and their commits render, changed publicat
   const versions = await page(response);
   expect([versions.status, versions.type]).toEqual([200, "text/html; charset=utf-8"]);
   const rows = [...versions.body.matchAll(/<tr><td>(branch|tag)<\/td><td><a href="([^"]+)">([^<]+)<\/a>([^<]*)<\/td><td><code>([0-9a-f]{40})<\/code><\/td><\/tr>/g)].map((m) => m.slice(1));
-  const expected = [...host.refs].sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
+  const expected = [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
     const tag = ref.startsWith("refs/tags/");
     const name = ref.replace(/^refs\/(heads|tags)\//, "");
     return [tag ? "tag" : "branch", `/site/${D.name}/${name}/`, name, name === "main" && !tag ? " (HEAD, the published branch)" : "", name === "release" ? nav : id];

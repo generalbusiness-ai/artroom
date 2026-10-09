@@ -144,6 +144,28 @@ export class SqliteStore implements Store {
 
   scope(): ScopeState | null { return orNull<ScopeState>(this.#one("SELECT v FROM meta WHERE k = 'scope'")?.["v"]); }
   item(id: number): Item | null { return orNull<Item>(this.#one("SELECT record FROM item WHERE id = ?", id)?.["record"]); }
+  /** Internal Site proof reads check allocation before materializing JSON. */
+  itemBytes(id: number): number | null {
+    return this.#one("SELECT length(CAST(record AS BLOB)) AS size FROM item WHERE id = ?", id)?.["size"] as number | null ?? null;
+  }
+  itemPositions(type: string, after: number | null, limit: number): { id: number; size: number }[] {
+    return this.#all("SELECT id, length(CAST(record AS BLOB)) AS size FROM item WHERE type = ? AND id > ? ORDER BY id LIMIT ?", type, after ?? -1, limit)
+      .map(row => ({ id: row["id"] as number, size: row["size"] as number }));
+  }
+  storedBytes(seq: number): number | null {
+    return this.#one("SELECT length(CAST(bytes AS BLOB)) AS size FROM entry WHERE seq = ?", seq)?.["size"] as number | null ?? null;
+  }
+  scopeBytes(): number | null {
+    return this.#one("SELECT length(CAST(v AS BLOB)) AS size FROM meta WHERE k = 'scope'")?.["size"] as number | null ?? null;
+  }
+  storedTotalBytes(before: number): number {
+    return this.#one("SELECT COALESCE(SUM(length(CAST(bytes AS BLOB))), 0) AS size FROM entry WHERE seq < ?", before)?.["size"] as number;
+  }
+  /** Only metadata crosses SQL while locating an item's judged state fact. */
+  statePositions(item: number, state: string, after: number, before: number, limit: number): { seq: number; size: number }[] {
+    return this.#all("SELECT seq, length(CAST(bytes AS BLOB)) AS size FROM entry WHERE seq >= ? AND seq < ? AND EXISTS (SELECT 1 FROM json_each(entry.bytes, '$.effects') WHERE json_extract(value, '$.effect') = 'state' AND json_extract(value, '$.item') = ? AND json_extract(value, '$.state') = ?) ORDER BY seq LIMIT ?", after, before, item, state, limit)
+      .map(row => ({ seq: row["seq"] as number, size: row["size"] as number }));
+  }
   count(type: string, state: string): number { return (this.#one("SELECT n FROM item_count WHERE type = ? AND state = ?", type, state)?.["n"] as number | undefined) ?? 0; }
 
   /**

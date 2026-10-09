@@ -195,3 +195,76 @@ A2 remains implemented fixture evidence with deployment publication and
 observation owed. C1 continues to say Open latest page until immutable A1
 selection is implemented, reviewed and landed. No tests, gate, deployment,
 provider calls or production changes were made for this appendix.
+
+
+## Adopted immutable source implementation
+
+Planner owner decision `53142223f52080fb32d1fcfb9d130ca575888352` adopted the
+minimal existing-destination proof seam above and full canonical lowercase
+object-ID selector. Isolated source branch `request/site-immutable-source`
+starts at `068e33cdd`, incorporates exact plan `03088c355` and main
+`38b0b2f2bdb7af6f59076ac3b423741555a7b437`. This is source preparation;
+no final gate, provider/deployment observation, artifact or Source approval.
+
+The internal projection binds destination incarnation/head, directory full
+reference, repository identity, content commit, judged reservation/first-head
+fact and a written receipt state fact. It computes the expected receipt through
+`destinationReceipt`; only native published items or the computed nonimport
+founding commit qualify. The Site request verifies the provider's repository
+identity, exact receipt ref target and hash-checked receipt commit/tree/blob
+and canonical file before content or 304. A full lowercase 40-character ID
+takes precedence over branch-like names. HEAD and the recorded branch remain
+latest aliases. Relative content links/images retain the selected prefix.
+No Page wording or link has changed.
+
+Sizes of native scope/item/entry rows are queried before their JSON payloads
+are allocated. Selection has fixed page/item/entry/history/byte allowances;
+exhaustion returns unreadable/publication-history-limit. Git transport wire,
+inflation and retained cache are capped before allocation; object/ref counts
+and path traversal are bounded. Native eligibility is rechecked after the
+provider read before responses, including 304. Ordinary reads do not start
+scope drivers; own-host access still mints a read token and attempts revocation.
+Failed revocation remains unconfirmed.
+
+Focused witnesses extend the existing selected-publication and renderer
+files and add a real two-publication witness over the shared native CLI/lane/
+destination fixture. Host, scheduler, clock and memory stores are explicitly
+stand-ins. The historical test reads the first published page after a second,
+checks its immutable prefix and 304, snapshots every destination SQLite table,
+and refuses pending/conflicting receipt, foreign identity, budget exhaustion
+and forged receipt objects. SQL corruption controls are labelled boundary
+controls, not fabricated native lifecycle transitions. Renderer tests retain a
+scripted proof with matching receipt objects; they do not prove native authority.
+Exact final focused results are recorded with the source commit below.
+
+### Accounted tag/version dependency
+
+There is no native destination act or registry for room-issued tags or human
+version labels. Provider advertisements cannot fill that gap. A later owner
+contract must identify the authorized naming actor/action, immutable published
+commit and written-receipt reference, label uniqueness/replacement policy,
+incarnation/revocation meaning and finite lookup budgets. It then needs an
+explicit native recorded naming act and read projection before Site can list
+or select it. This source adopts none of those decisions. Full A1 stays open
+for that owed mapping and the original deployed positive/refusal acceptance.
+
+### Subsequent Page delta
+
+After this A1 source is reviewed, gated, deployed and landed, the Page owner
+can change a merged-result link to `/site/<directory>/<recorded-publication-
+commit>/<selected-path>`, only from the actual publication commit of the
+selected merge/version. Missing proof remains a refusal; no guessed HEAD,
+model-finished result or generic outbox is supplied. Current Page's Open
+latest page stays accurate until that separately owned delta is delivered.
+
+Focused source verification: final selected-publication/renderer/host run passed
+21 tests in three files (7.06 s), raw `/tmp/artroom-site-immutable-final-focus.log`,
+SHA-256 `978836c6ffed46a8a784532902539c940a199f4e691d738bb3a84b67bcfdf05f`.
+The strengthened native history/allocation and receipt-corruption witness passed
+at the final source (1 test, 1.96 s), raw
+`/tmp/artroom-site-immutable-native-final.log`, SHA-256
+`d91ed35056bce67e427d738416f2299c9314db78899074c2df47e1f1a46ef359`.
+Scope source and test TypeScript checks passed; whitespace check passed.
+Intermediate failed focused runs were retained in /tmp while their concrete
+fixture expectations and bounds were corrected. No whole gate or mutation
+sweep ran. These local stand-in results do not replace deployment acceptance.

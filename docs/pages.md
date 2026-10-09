@@ -23,14 +23,20 @@ A page's address is:
 - `<ref>` is `HEAD` or a published branch name. `HEAD` names the room's
   branch at the exact head its destination records. The Worker does not
   substitute the Git host's current branch head. A name that holds a `/`
-  uses `%2F`, such as `release%2F1.0`. Every other branch, tag or commit
-  name is refused as `not-published`, even if the backing repository holds it.
+  uses `%2F`, such as `release%2F1.0`. A full 40-character lowercase Git
+  object ID selects an immutable native publication with a written receipt.
+  This syntax takes precedence over a branch whose name looks like that ID.
+  Short or uppercase hashes, arbitrary ancestors and provider-only branches
+  or tags confer no publication authority. The proof must match the exact
+  receipt ref, commit, tree and canonical file fetched from the same repository.
   The current room model records one branch and no tags or named versions;
   provider tags do not become published versions.
 - `<path>` is a file or a folder in the repository at that commit.
 
 For example, `<base-url>/site/sc_hs5f27fz.../HEAD/` opens the room's
-front page. Use the recorded branch name to open another path at the same published head.
+front page. Use the recorded branch name for latest navigation. To preserve
+a published result, use its complete commit ID; relative links and images
+keep that same immutable prefix. Imported ancestry is not a native publication.
 
 Two more addresses:
 
@@ -152,9 +158,18 @@ as the specification's runner sets it.
 - **File size.** A file of more than 1 MiB (1,048,576 bytes) is refused
   with `too-large` (status 413).
 - **Transfer size.** To read a file, the Worker fetches the commit with
-  its whole history from the Git host, limited by the host setting's
-  `maxBytes` (docs/hosts.md). A repository whose history is larger than
+  its history from the Git host. Wire, inflated and retained bytes are capped
+  at the lesser of the host setting's `maxBytes` and 16 MiB; commit/tree/blob
+  allocations and the 4,096-object and 4,096-ref allowances are checked before
+  download or inflation exceeds them. A repository whose history is larger than
   that cannot be read, and every page answers `unreadable`.
+- **Native proof budget.** Scope/item/entry sizes are checked in SQLite before
+  their JSON is allocated. Selection allows 16 pages of 16 receipt items,
+  256 item reads, 16 entry reads, a 1 MiB aggregate native payload and
+  at most 4,096 history entries and 16 MiB of stored history before SQL JSON
+  inspection. Exhaustion is `unreadable` with
+  `publication-history-limit`, never absent or not published. Paths allow
+  at most 64 segments and 8 KiB of UTF-8 path bytes.
 - **Caching.** An answer may be kept for 60 seconds. Each answer has an
   `ETag` made from the commit, the path, and what the header shows: the
   recorded repository name, the ref as written in the address, and the
@@ -165,7 +180,8 @@ as the specification's runner sets it.
   The versions page's tag covers only the recorded published refs and commits,
   whose commit objects are validated before 304.
 - Each page read on the hosting's own Git service mints a read token for
-  two minutes and revokes it after the read.
+  two minutes and attempts to revoke it after the read. A failed revocation
+  remains unconfirmed; Site does not turn that into confirmed cleanup.
 
 ## Refusals
 

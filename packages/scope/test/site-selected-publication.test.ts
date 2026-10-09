@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type { Entry, Intent, Seed, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, foundingOf, repositoryName } from "@generalbusiness/artroom-platform";
+import { DIRECTORY, REGISTER, destinationReceipt, foundingOf, repositoryName } from "@generalbusiness/artroom-platform";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import { SqliteStore } from "../src/index.ts";
 import { site } from "../src/site/route.ts";
@@ -24,8 +24,10 @@ const { paul } = keys;
 const pkt = (s: string) => `${(utf8(s).length + 4).toString(16).padStart(4, "0")}${s}`;
 const concat = (...xs: Uint8Array[]) => { const b = new Uint8Array(xs.reduce((n, x) => n + x.length, 0)); let at = 0; for (const x of xs) { b.set(x, at); at += x.length; } return b; };
 let D: Platform, G: Platform, R: Platform, siteEnv: SiteEnv;
+let receiptRef: string, receiptCommit: string;
 let published: string, objects: RawGitObject[], repository: { name: string; id: string };
 let providerId = 71;
+let receiptTarget: string | null = null;
 const calls: string[] = [];
 const roots: string[] = [];
 const fetchHost = async (request: Request) => {
@@ -36,8 +38,8 @@ const fetchHost = async (request: Request) => {
     return new Response(JSON.stringify({ id: providerId, name: repository.name, owner: ACCOUNT, private: true, full_name: `${ACCOUNT.login}/${repository.name}`, html_url: `https://github.com/${ACCOUNT.login}/${repository.name}`, clone_url: `https://github.com/${ACCOUNT.login}/${repository.name}.git` }), { headers: { "content-type": "application/json" } });
   }
   expect(request.headers.get("authorization")).toBe(`Basic ${btoa(`x-access-token:${TOKEN}`)}`);
-  if (url.pathname.endsWith("/info/refs")) return new Response(`${pkt("# service=git-upload-pack\n")}0000${pkt(`${"f".repeat(40)} refs/heads/main\0object-format=sha1 allow-reachable-sha1-in-want\n`)}${pkt(`${"e".repeat(40)} refs/heads/private-draft\n`)}0000`, { headers: { "content-type": "application/x-git-upload-pack-advertisement" } });
-  expect(new TextDecoder().decode(await request.arrayBuffer())).toContain(`want ${published}`);
+  if (url.pathname.endsWith("/info/refs")) return new Response(`${pkt("# service=git-upload-pack\n")}0000${pkt(`${"f".repeat(40)} refs/heads/main\0object-format=sha1 allow-reachable-sha1-in-want\n`)}${pkt(`${"e".repeat(40)} refs/heads/private-draft\n`)}${pkt(`${receiptTarget ?? receiptCommit} ${receiptRef}\n`)}0000`, { headers: { "content-type": "application/x-git-upload-pack-advertisement" } });
+  expect(new TextDecoder().decode(await request.arrayBuffer())).toMatch(new RegExp(`want (${published}|${receiptCommit})`));
   return new Response(concat(utf8(pkt("NAK\n")), await buildPack(objects, { maxBytes: 8 * 1024 * 1024 })), { headers: { "content-type": "application/x-git-upload-pack-result" } });
 };
 async function founding(publish: boolean) {
@@ -66,9 +68,12 @@ beforeAll(async () => {
   const f = await founding(true); R = f.r; D = f.d; G = f.g; repository = f.repo;
   const commit = await runInDurableObject(G.object, (_instance, state) => {
     const store = new SqliteStore({ exec: (q, ...b) => state.storage.sql.exec(q, ...b), transaction: (f) => state.storage.transactionSync(f) });
-    return foundingOf(store, seq => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; }, "sha1");
+    const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
+    const first = foundingOf(store, own, "sha1");
+    const receipt = destinationReceipt(store, own, store.page("receipt", ["written"], null, 1).items[0]!, "sha1");
+    return { ...first, receipt };
   });
-  published = commit.commit; objects = commit.objects.map(o => ({ id: o.id, type: o.kind, data: o.body }));
+  published = commit.commit; receiptRef = commit.receipt.ref; receiptCommit = commit.receipt.commit; objects = [...commit.objects, ...commit.receipt.objects].map(o => ({ id: o.id, type: o.kind, data: o.body }));
   siteEnv = { SCOPES: env.PLATFORM, GITHUB_READ_TOKEN: TOKEN, GITHUB_APP_CONFIG: canonicalize({ registerScope: R.name, account: ACCOUNT, maxBytes: 8 * 1024 * 1024, publicReads: false }) };
 });
 afterAll(() => { for (const r of roots) wired.delete(r); });
@@ -79,6 +84,7 @@ test("published head served from the real destination record, with conditional/p
   const response = await get("HEAD");
   expect(response.status).toBe(200);
   expect(await response.text()).toContain(`Rendered from commit <code>${published}</code>`);
+  expect((await get(published)).status).toBe(200);
   expect((await get("main", { headers: { "if-none-match": "*" } })).status).toBe(304);
   expect((await site(new Request(`https://scopes.test/site/${D.name}/HEAD/missing.md`, { headers: { "if-none-match": "*" } }), siteEnv, fetchHost)).status).toBe(404);
   const versions = await site(new Request(`https://scopes.test/site/${D.name}/versions/`), siteEnv, fetchHost);
@@ -88,9 +94,9 @@ test("published head served from the real destination record, with conditional/p
 // Invariant: same-repository unpublished names and raw commit IDs cannot acquire provider access.
 test("unpublished branch, tag and commit names refused before provider access (real scopes)", async () => {
   const before = calls.length;
-  for (const ref of ["private-draft", "v1", published, "e".repeat(40)]) {
+  for (const ref of ["private-draft", "v1", "e".repeat(40)]) {
     const response = await get(ref, { headers: { "if-none-match": "*" } });
-    expect([response.status, response.headers.get("cache-control"), await response.text()]).toEqual([404, "no-store", "not-published: the room has not published that ref\n"]);
+    expect([response.status, response.headers.get("cache-control"), await response.text()]).toEqual([404, "no-store", ref.length === 40 ? "not-published: the room has no written publication receipt for that commit\n" : "not-published: the room has not published that ref\n"]);
   }
   expect(calls.length).toBe(before);
 });
@@ -117,4 +123,29 @@ test("not-published refusal writes no entries, operation bookkeeping, custody or
   expect(await Promise.all([f.d, f.g].map(snapshot))).toEqual(before);
   expect(sent).toBe(0);
   wired.delete(f.g.name);
+});
+
+// Invariant: native authority cannot turn a missing/moved receipt ref into cached success.
+test("written native receipt needs matching fetched ref before immutable content or 304", async () => {
+  receiptTarget = "e".repeat(40);
+  try {
+    const result = await get(published, { headers: { "if-none-match": "*" } });
+    expect(result.status).toBe(502);
+    expect(result.headers.get("x-site-step")).toBe("refs");
+  } finally { receiptTarget = null; }
+});
+
+// Invariant: native immutable proof reads retain every SQLite row and reject foreign incarnation.
+test("immutable proof is read-only and complete-directory-bound", async () => {
+  const snapshot = (node: Platform) => runInDurableObject(node.object, (_instance, state) => {
+    const tables = state.storage.sql.exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").toArray();
+    return tables.map(({ name }) => [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]);
+  });
+  const before = await Promise.all([D, G].map(snapshot));
+  const source = await D.at();
+  const repo = (await D.item(0)).values["repository"];
+  const peer = G.stub as unknown as import("../src/site/publication.ts").SitePublicationPeer;
+  expect(await peer.sitePublishedCommit(source, repo as never, published)).toMatchObject({ ok: true, proof: { commit: published, directory: source, receipt: { ref: receiptRef, commit: receiptCommit } } });
+  expect(await peer.sitePublishedCommit({ ...source, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never }, repo as never, published)).toEqual({ ok: false, reason: "not-published" });
+  expect(await Promise.all([D, G].map(snapshot))).toEqual(before);
 });
