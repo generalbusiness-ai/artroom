@@ -47,6 +47,8 @@ test("page join refuses mismatched encoding before submission and accepts script
     await expect(joinRoom(session, encode(changed))).rejects.toThrow("The invitation does not match this configured service");
   }
   expect(submissions).toEqual([]);
+  await expect(joinRoom(session, encode(original), () => { throw new Error("Page context changed before join submission"); })).rejects.toThrow("Page context changed before join submission");
+  expect(submissions).toEqual([]);
   for (const definition of ["platform:membership@1", "platform:membership@2"]) {
     replyDefinition = definition;
     const joined = await joinRoom(session, encode({ ...original, definition }));
