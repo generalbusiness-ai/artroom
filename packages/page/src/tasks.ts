@@ -48,6 +48,19 @@ export function taskReviewExtents(change: ChangeView): NonNullable<ChangeView["r
   return matching.length ? matching : extents.filter(extent => extent.patterns!.length === 0);
 }
 
+/** A retained ordinary review must keep its selected version AND requirement.
+ * This is presentation qualification; the native lane/destination still judge it. */
+export function reviewSelectionProblem(room: Room, change: ChangeView, manifest: number, extent: string): string | null {
+  if (change.currentManifest !== manifest) return "This version is no longer current. Keep this draft and choose the new version explicitly.";
+  if (change.state !== "open") return "This change is no longer open for ordinary review. This draft keeps its original version.";
+  if (!extent) return "Choose a review requirement before submitting this version.";
+  if (!taskReviewExtents(change).some(row => row.name === extent)) return "This requirement is no longer available for the selected file. Keep the draft and choose a requirement explicitly.";
+  const candidates = change.reviewMembersByExtent?.[extent];
+  if (!candidates || !room.me) return "Current reviewer authority could not be read for this requirement. This draft is kept.";
+  if (!candidates.some(candidate => candidate.value === room.me!.handle)) return "You are no longer eligible to review this requirement. Keep the draft and choose an eligible requirement explicitly.";
+  return null;
+}
+
 /** A single prominent task; native declarations remain the final authority. */
 export function nextChangeAction(room: Room, change: ChangeView, offered: readonly Offered[], allowed: readonly string[]): Offered | null {
   const current = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
@@ -68,12 +81,14 @@ export function nextChangeAction(room: Room, change: ChangeView, offered: readon
 
 /** Technical requirements must be fixed from authenticated facts, never typed by the person. */
 export function taskForm(act: Offered, send: Send, context: ActionContext, fields: readonly string[], label: string): HTMLElement {
+  if (act.kind === "review-verdict" && !act.fields.some(field => field.name === "extent")) return h("p", { class: "muted", role: "status" }, "This declaration cannot name an ordinary review requirement. Its native action remains in Advanced.");
   if (act.kind.startsWith("request-review") && context.choices?.[act.kind]?.["requested"]?.length === 0) return h("p", { class: "muted", role: "status" }, "No eligible reviewer is available for this version.");
   const fixed = context.defaults?.[act.kind];
   const unsupportedChoice = fields.filter((field) => act.fields.some((value) => value.name === field) && ["extent", "requested"].includes(field) && context.choices?.[act.kind]?.[field] === undefined);
   const missing = [...missingFields(act, context, fields), ...unsupportedChoice];
   if (missing.length) return h("p", { class: "muted", role: "status" }, `${label} is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from this version's recorded facts.`);
   const shown: Offered = { ...act, fields: act.fields.filter((field) => fields.includes(field.name) || fixed?.fields?.[field.name] !== undefined || (context.choices?.[act.kind]?.[field.name] ?? field.choices)?.length === 1) };
+  if (act.kind === "review-verdict") shown.fields = shown.fields.map(field => field.name === "extent" ? { ...field, required: true } : field);
   const recipients = context.choices?.[act.kind]?.["requested"];
   const namedReview = act.kind.startsWith("request-review") && recipients?.length === 1 ? `Request review from ${recipients[0]!.label}` : undefined;
   const submitLabel = namedReview ?? (label === "Issue action" ? act.kind.startsWith("reopen") ? "Reopen issue" : act.kind.startsWith("close") ? "Close issue" : undefined : undefined);

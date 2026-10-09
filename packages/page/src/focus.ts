@@ -28,8 +28,9 @@ export function restoreFocus(container: HTMLElement, kept: KeptFocus | null): bo
   if (!control || control.hasAttribute("disabled")) return false;
   if (kept.value !== undefined && (control.tagName === "INPUT" || control.tagName === "TEXTAREA" || control.tagName === "SELECT")) {
     const input = control as HTMLInputElement | HTMLTextAreaElement;
-    input.value = kept.value;
-    if (kept.start !== undefined && kept.start !== null && kept.end !== undefined && kept.end !== null) {
+    // The freshly rendered draft and eligible options are authoritative.
+    // Focus must never repaint retired text or restore a removed select choice.
+    if (input.value === kept.value && kept.start !== undefined && kept.start !== null && kept.end !== undefined && kept.end !== null) {
       try { input.setSelectionRange(kept.start, kept.end, kept.direction ?? undefined); }
       catch { /* A non-text control retains its value, without a text selection. */ }
     }

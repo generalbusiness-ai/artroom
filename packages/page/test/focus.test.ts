@@ -21,7 +21,7 @@ test("same keyed refresh preserves the unsent value, selection and focus on the 
   const original = new Control(key);
   vi.stubGlobal("document", { activeElement: original });
   const saved = keepFocus(container([original]));
-  const replacement = new Control(key); replacement.value = "Earlier render value";
+  const replacement = new Control(key); replacement.value = "Unsent words";
   expect(restoreFocus(container([replacement]), saved)).toBe(true);
   expect([replacement.value, replacement.selectionStart, replacement.selectionEnd, replacement.focused]).toEqual(["Unsent words", 2, 8, true]);
 });
@@ -35,4 +35,20 @@ test("a new room or selected version cannot inherit another subject's focus or d
   changedRoom.value = "Room B draft"; changedVersion.value = "Version 8 draft";
   expect(restoreFocus(container([changedRoom, changedVersion]), saved)).toBe(false);
   expect([changedRoom.value, changedVersion.value, changedRoom.focused, changedVersion.focused]).toEqual(["Room B draft", "Version 8 draft", false, false]);
+});
+
+
+test("current text and select choices stay authoritative while the old control regains focus", () => {
+  const original = new Control(controlKey("same-context", "field:body"));
+  vi.stubGlobal("document", { activeElement: original });
+  const saved = keepFocus(container([original]));
+  const retired = new Control(original.key); retired.value = "";
+  expect(restoreFocus(container([retired]), saved)).toBe(true);
+  expect(retired.value).toBe("");
+  const oldChoice = new Control(controlKey("same-context", "field:extent")); oldChoice.value = "rules";
+  vi.stubGlobal("document", { activeElement: oldChoice });
+  const selected = keepFocus(container([oldChoice]));
+  const currentChoice = { ...oldChoice, tagName: "SELECT", value: "source", getAttribute: oldChoice.getAttribute.bind(oldChoice), hasAttribute: () => false, focus: () => { currentChoice.focused = true; } };
+  expect(restoreFocus(container([currentChoice as unknown as Control]), selected)).toBe(true);
+  expect(currentChoice.value).toBe("source");
 });

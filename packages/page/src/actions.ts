@@ -24,7 +24,7 @@ export interface ActionContext {
   draftKey?: string;
 }
 
-export type Send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => void;
+export type Send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void, beforeSign?: () => Promise<void>) => void;
 type Child = HTMLElement | string | null;
 const element = (tag: string, attrs: Record<string, string> = {}, ...children: (Child | Child[])[]): HTMLElement => {
   const node = document.createElement(tag);
@@ -47,9 +47,16 @@ const fieldLabels: Record<string, string> = {
 };
 const drafts = new Map<string, Record<string, string>>();
 const draftVersions = new Map<string, number>();
+const renderedDrafts = new WeakMap<HTMLElement, () => void>();
 const own = <T>(record: Record<string, T> | undefined, name: string): T | undefined => record && Object.hasOwn(record, name) ? record[name] : undefined;
 const technical = new Set(["base", "digest", "size", "definition", "draft", "conditions", "reports", "manifest", "earlier", "request", "replyTo", "mentions", "thread", "number", "opener"]);
 const labelOf = (name: string) => own(fieldLabels, name) ?? name.replace(/-/g, " ");
+
+/** Reuse B8's draft state at publication, after any awaited reads or acceptance.
+ * This is a render projection, not a second draft store or request journal. */
+export function reconcileActionDrafts(container: HTMLElement): void {
+  for (const form of container.querySelectorAll<HTMLElement>("form[data-act]")) renderedDrafts.get(form)?.();
+}
 
 /** Supported domain forms remain ordinary controls; other declarations stay in Inspect. */
 export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Send, last: HTMLElement | null, context: ActionContext = {}): HTMLElement {
@@ -160,6 +167,18 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
       if (current && (draftVersions.get(draftKey) ?? 0) === submittedVersion && JSON.stringify(current) === JSON.stringify(submittedDraft)) drafts.delete(draftKey);
     } : undefined;
     if (accepted) send(act.kind, on, typed, accepted); else send(act.kind, on, typed);
+  });
+  if (draftKey) renderedDrafts.set(form, () => {
+    const current = drafts.get(draftKey) ?? {};
+    for (const control of controls) {
+      if (control.name === "on") { if (defaults?.on === undefined) control.value = own(current, "on") ?? ""; continue; }
+      const name = control.name.slice(6);
+      const field = act.fields.find(field => field.name === name)!;
+      const choices = own(choicesFor, name) ?? field.choices;
+      if (own(defaults?.fields, name) !== undefined || choices?.length === 1) continue;
+      const value = own(current, name) ?? "";
+      control.value = choices && !choices.some(choice => choice.value === value) ? "" : value;
+    }
   });
   return form;
 }

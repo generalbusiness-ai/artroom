@@ -24,9 +24,9 @@ import { act, actAssociation, actsOn, enrollmentAssociation, fieldValue, joinAss
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
-import type { ActionContext } from "./actions.ts";
+import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, taskForm, taskReviewExtents } from "./tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, reviewSelectionProblem, taskForm, taskReviewExtents } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
@@ -94,6 +94,8 @@ const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
   if (n !== drawing) return;
   const previousFocus = keepFocus(root());
   root().replaceChildren(...children);
+  reconcileActionDrafts(root());
+  syncCurrentFences();
   if (focus) document.getElementById("page-main")?.focus?.();
   else restoreFocus(root(), previousFocus);
 };
@@ -114,12 +116,29 @@ let roomDialogBinding: { settings: string; route: string } | null = null;
 interface WorkbenchDialog {
   dialog: HTMLDialogElement; body: HTMLElement; context: string; route: string; kind: "record" | "review" | "source";
   opener: string; manifest?: number; action?: string; message: HTMLElement; binding: string;
+  review?: { room: Room; change: Awaited<ReturnType<typeof loadChange>>; blocked: boolean; offered: boolean };
 }
 let workbenchDialog: WorkbenchDialog | null = null;
 const settingsContext = (kept: Settings): string => JSON.stringify([location.origin, kept.place, kept.secret, kept.register ?? null]);
 let claimOffer: { kept: Settings; configured: ClaimRegister } | undefined;
 function unknownRequest(kind: string): HTMLElement {
   return h("p", { class: "muted" }, `The ${kind} request may have been recorded. Checking status only reads the scope; a changed head does not settle this request. This page does not retain the exact signed request for automatic recovery. Keep this session open and inspect the original request before recovery; do not send a replacement.`);
+}
+
+function currentScopeHosts(context: string): HTMLElement[] {
+  return [root(), ...(workbenchDialog?.context === context && workbenchDialog.route === location.hash ? [workbenchDialog.body] : [])];
+}
+function fenceCurrentScope(context: string): void {
+  for (const host of currentScopeHosts(context)) for (const control of host.querySelectorAll<HTMLElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+}
+/** A render prepared before submission still publishes the current scope fence. */
+function syncCurrentFences(): void {
+  const hosts = [root(), ...(workbenchDialog?.kind === "record" && workbenchDialog.route === location.hash ? [workbenchDialog.body] : [])];
+  for (const host of hosts) for (const marker of host.querySelectorAll<HTMLElement>("[data-request-context]")) {
+    const context = marker.getAttribute("data-request-context")!;
+    const last = lastActs.get(context);
+    if (sending.get(context) || last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null)) fenceCurrentScope(context);
+  }
 }
 
 function returnToControl(key: string): void {
@@ -167,12 +186,13 @@ function inspectedScreen(screen: HTMLElement, panel: HTMLElement, context: strin
   if (workbenchDialog?.kind === "record" && workbenchDialog.context === context && workbenchDialog.route === location.hash) {
     const saved = keepFocus(workbenchDialog.body);
     body.removeAttribute("hidden"); workbenchDialog.body.replaceWith(body); workbenchDialog.body = body;
+    reconcileActionDrafts(body);
     restoreFocus(body, saved);
   }
   return screen;
 }
 
-function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send: Send, context: ActionContext, fields: readonly string[], label: string, association: string): HTMLElement {
+function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send: Send, context: ActionContext, fields: readonly string[], label: string, association: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>): HTMLElement {
   const form = taskForm(act, send, context, fields, label);
   if (!form.hasAttribute("data-act") || act.kind !== "review-verdict") return form;
   const manifest = context.defaults?.[act.kind]?.fields?.["manifest"];
@@ -182,30 +202,42 @@ function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send:
   if (context.pending || context.uncertain) button.setAttribute("disabled", "");
   button.addEventListener("click", () => {
     let owned: WorkbenchDialog | null = null;
-    const content = taskForm(act, (kind, on, typed, accepted) => send(kind, on, typed, () => { accepted?.(); if (workbenchDialog === owned) closeWorkbench(); }), context, fields, label);
+    const scopeOfReview = change.scope;
+    const content = taskForm(act, (kind, on, typed, accepted) => send(kind, on, typed, () => { accepted?.(); if (workbenchDialog === owned) closeWorkbench(); }, async () => {
+      if (!owned || workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
+      const latest = await loadChange(room, scopeOfReview);
+      if (workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
+      const problem = reviewSelectionProblem(room, latest, Number(manifest), typed["extent"] ?? "");
+      if (problem) { owned.message.textContent = problem; owned.message.removeAttribute("hidden"); throw new Error(problem); }
+    }), context, fields, label);
     openWorkbench(`Review version ${manifest}`, content, association, key, "review", { manifest: Number(manifest), action: act.kind });
     owned = workbenchDialog;
+    if (owned) owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true };
+    content.addEventListener("input", () => { if (workbenchDialog === owned && owned?.review) reconcileReview(association, owned.review.room, owned.review.change, owned.review.blocked, owned.review.offered); });
   });
   return button;
 }
 
-function reconcileReview(context: string, change: Awaited<ReturnType<typeof loadChange>>, blocked: boolean, offered = true): void {
+function reconcileReview(context: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>, blocked: boolean, offered = true): void {
   const selected = workbenchDialog;
   if (selected?.kind !== "review" || selected.context !== context || selected.route !== location.hash) return;
-  if (selected.manifest !== change.currentManifest) {
-    selected.message.textContent = `Version ${selected.manifest} is no longer current. This draft is kept. Close this review and choose the new version explicitly.`;
-    selected.message.removeAttribute("hidden");
-    for (const button of selected.body.querySelectorAll("button[type=submit]")) button.setAttribute("disabled", "");
-  } else if (blocked || !offered) {
-    selected.message.textContent = blocked ? "Check the original request before another action. This review still names its original version." : "Review is no longer available to this member. This draft still names its original version.";
+  selected.review = { room, change, blocked, offered };
+  const last = lastActs.get(context);
+  const requestBlocked = blocked || !!sending.get(context) || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
+  const extent = selected.body.querySelector<HTMLInputElement | HTMLSelectElement>('[name="field:extent"]')?.value ?? "";
+  const problem = reviewSelectionProblem(room, change, selected.manifest!, extent);
+  if (requestBlocked || !offered || problem) {
+    selected.message.textContent = requestBlocked ? "Check the original request before another action. This review still names its original version." : !offered ? "Review is no longer available to this member. This draft still names its original version." : problem!;
     selected.message.removeAttribute("hidden");
     for (const button of selected.body.querySelectorAll("button[type=submit]")) button.setAttribute("disabled", "");
   } else {
-    const last = lastActs.get(context);
     if (last?.kind === selected.action && last.answer.answer === "refused") {
       selected.message.textContent = nonacceptedAnswerText(last.answer);
       selected.message.removeAttribute("hidden");
       for (const control of selected.body.querySelectorAll("input, textarea, select, button[type=submit]")) control.removeAttribute("disabled");
+    } else if (!sending.get(context)) {
+      selected.message.setAttribute("hidden", "");
+      for (const button of selected.body.querySelectorAll("button[type=submit]")) button.removeAttribute("disabled");
     }
   }
 }
@@ -378,24 +410,22 @@ interface PanelOptions {
 async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}, options: PanelOptions = {}): Promise<HTMLElement> {
   const association = actAssociation(room, scope);
   const capturedRoute = location.hash;
-  const capturedDrawing = drawing;
-  let answerHost: HTMLElement | null = null;
-  let noticeHost: HTMLElement | null = null;
-  const activeView = () => capturedDrawing === drawing && location.hash === capturedRoute && currentContext();
+  const activeView = () => location.hash === capturedRoute && currentContext();
   const showLocally = (message: HTMLElement, blocked = true, notice = "") => {
     if (!activeView()) return;
-    answerHost?.replaceChildren(message);
-    if (noticeHost && notice) { noticeHost.textContent = notice; noticeHost.removeAttribute("hidden"); }
-    if (blocked) {
-      const hosts = [root(), ...(workbenchDialog?.context === association ? [workbenchDialog.body] : [])];
-      for (const host of hosts) for (const control of host.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+    for (const host of currentScopeHosts(association)) {
+      const answerHost = [...host.querySelectorAll<HTMLElement>("[data-request-context]")].find(node => node.getAttribute("data-request-context") === association);
+      answerHost?.replaceChildren(message);
+      const noticeHost = [...host.querySelectorAll<HTMLElement>("[data-task-context]")].find(node => node.getAttribute("data-task-context") === association);
+      if (noticeHost && notice) { noticeHost.textContent = notice; noticeHost.removeAttribute("hidden"); }
     }
+    if (blocked) fenceCurrentScope(association);
   };
   const currentContext = () => {
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
-  const send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => {
+  const send: Send = (kind, on, typed, accepted, beforeSign) => {
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
@@ -406,6 +436,8 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
         const offered = (await actsOn(room, scope)).acts.find((a) => a.kind === kind);
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
+        await beforeSign?.();
+        if (!currentContext()) throw new Error("The room or key changed before signing. Nothing was sent.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
         const result = await act(room, scope, kind, { on: target, fields }, (known) => {
@@ -439,9 +471,9 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const advancedContext = { ...taskContext };
   delete advancedContext.choices;
   const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...advancedContext, primary: [] });
-  answerHost = h("div", { class: "request-answer", "aria-live": "polite" });
+  const answerHost = h("div", { class: "request-answer", "aria-live": "polite", "data-request-context": association });
   panel.prepend(answerHost);
-  noticeHost = h("p", { "data-task-status": "", role: "status", "aria-live": "polite", hidden: "" });
+  const noticeHost = h("p", { "data-task-status": "", "data-task-context": association, role: "status", "aria-live": "polite", hidden: "" });
   if (pending || uncertain) { noticeHost.textContent = pending ? "Sending request" : "Request outcome unknown"; noticeHost.removeAttribute("hidden"); }
   panel.append(noticeHost);
   if (options.customForm) panel.append(options.customForm(send, pending || !!uncertain, association));
@@ -669,10 +701,10 @@ async function draw(focus = false): Promise<void> {
           if (control.hasAttribute("data-act")) represented.push("comment");
         }
         const next = nextChangeAction(loaded, change, acts.acts, primary);
-        reconcileReview(association, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"));
+        reconcileReview(association, loaded, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"));
         if (next && !context.pending && !context.uncertain) {
           const label = next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change";
-          const control = nextTask(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], label, association);
+          const control = nextTask(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], label, association, loaded, change);
           screen.querySelector('[data-action-slot="next"]')?.append(control);
           if (control.hasAttribute("data-act") || control.hasAttribute("data-task-act")) represented.push(next.kind);
         }
