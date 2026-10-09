@@ -42,6 +42,13 @@ const log = execFileSync(process.execPath, [join(root, "node_modules/vitest/vite
 const parts = [...log.matchAll(/^PAGE-RECORD (\d+) (\S+)$/gm)].sort((a, b) => Number(a[1]) - Number(b[1])).map((m) => m[2]);
 if (parts.length === 0 || !/^PAGE-RECORD end$/m.test(log)) throw new Error("The recorder printed no whole record.");
 const record = JSON.parse(Buffer.from(parts.join(""), "base64url").toString("utf8"));
+// Optional private scratch handoff for targeted browser debugging. This record
+// contains fixture signing keys; never write it into published capture assets.
+if (process.env.PAGE_CAPTURE_RECORD_OUT) {
+  const target = process.env.PAGE_CAPTURE_RECORD_OUT;
+  if (!target.startsWith("/tmp/") && !target.startsWith("/private/tmp/")) throw new Error("PAGE_CAPTURE_RECORD_OUT must be a private scratch path under /tmp.");
+  writeFileSync(target, JSON.stringify({ source, sourceTree, record }), { mode: 0o600, flag: "wx" });
+}
 
 if (playwrightVersion !== "1.63.0") throw new Error(`Capture expects pinned cached Playwright 1.63.0; got ${playwrightVersion}.`);
 const browser = await chromium.launch({ executablePath: browserPath });
