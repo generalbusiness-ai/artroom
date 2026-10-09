@@ -319,6 +319,11 @@ the host, and that read stages no public ref. While a check is owed, the command
 reserved tree. A published result prints the room's commit. A policy
 refusal prints its name and the merge command to run after approval.
 
+Reservation snapshots currently use the Git reader’s supported SHA-1
+format. The private checkout refuses SHA-256 as
+`unsupported-object-format`; this is a supported-format limit, not a
+claim that SHA-256 checks ran.
+
 This delivery carries UTF-8 text, including its exact byte order mark and
 NUL bytes. It names refusals for deleted or renamed files, non-UTF-8
 content, an unsupported mode change, more than 64 changed paths, a path

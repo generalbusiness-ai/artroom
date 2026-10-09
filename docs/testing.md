@@ -284,8 +284,8 @@ of the hosting's own Git service over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
 tree before a required check, refuses a wrong source digest and wrong job
 tree, and publishes only after a configured checker member signs a pass.
-The destination replays from its retained inputs. The actual CheckerService reads a signed, job-bound snapshot over the
-Worker route, validates the recorded reservation and its object closure,
+The destination replays from its retained inputs. The actual CheckerService
+reads a signed, job-bound snapshot over the Worker route, validates the recorded reservation and its object closure,
 and signs the result that the lane admits. Its durable storage and runner
 are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
 the same object-overlay boundary with actual private Git checkout and a
