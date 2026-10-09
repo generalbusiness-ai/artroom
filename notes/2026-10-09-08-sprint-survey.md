@@ -41,7 +41,7 @@ The manifest delivery remains in progress. Its exact `679d7a96` gate failed: 927
 
 Builder is investigating one lifecycle hypothesis with bounded stage timings and active-wait counts. No whole-suite repetition, timeout increase or deletion of useful invariants follows from that negative result. Deployment and hosted acceptance wait for the required passing gate.
 
-The original 10× test-overhead reduction remains the highest implementation priority. Planner has requested retained comparable edit-to-review and complete-gate measurements, including elapsed and aggregate worker time. A shorter smoke run or fewer test names cannot establish that target.
+**08:37 correction after the retained-cost survey:** the original 10× test-overhead task was accepted and landed. Its reviewed historical report records a 12.1× reduction in observed gate elapsed time and 10.6× in process CPU. Separately timed step sums gave 10.1× and 9.5×; the report distinguishes those boundaries. The survey did not recheck the historical raw timings. Today's architecture and workload differ, and a comparable current edit-to-review cost or current 10× gain is unknown. The current reliability and cost investigation stays with A4; the completed original task is not reopened. A shorter smoke run or fewer test names cannot establish a comparable gain.
 
 The obsolete service-address setting has been reconciled to its actual delivery in the already reviewed Page landing. No duplicate merge or gate was run. The separate cross-origin obligation remains open.
 
