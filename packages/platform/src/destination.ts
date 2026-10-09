@@ -2082,7 +2082,11 @@ interface CheckGeneration { name: string; job: FactRef; passed: boolean }
 const stagedOwn = (given: Pick<RuleGiven, "state" | "own">, publication: Item, before: number): boolean => {
   for (let seq = publication.values["reservedAt"] as number; seq < before; seq++) {
     const entry = given.own(seq)?.entry;
-    if (entry?.input.type === "outcome" && entry.input.kind === "reservation-stage" && entry.input.result === "confirmed") return true;
+    if (entry?.input.type === "outcome" && entry.input.kind === "reservation-stage" && entry.input.result === "confirmed") {
+      const operation = given.state.operation(entry.input.operation);
+      const body = entry.input.evidence.body as { seen?: unknown; tree?: unknown };
+      if (operation?.for === publication.id && body.seen === publication.values["integration"] && body.tree === publication.values["tree"]) return true;
+    }
   }
   return false;
 };
@@ -2145,6 +2149,7 @@ export const destinationRules3: Rules = (() => {
       if (!publication) return { holds: false, name: "not-the-reservation" };
       if (pushesOf(given.state, given.own, publication, given.resolved.self).length) return { holds: false, name: "publication-started" };
       if (publication.state !== "reserved") return { holds: false, name: "not-the-reservation" };
+      if (!stagedOwn(given, publication, given.resolved.self)) return { holds: false, name: "not-the-reservation" };
       const rows = generations(publication), name = given.resolved.fields["name"], prior = rows.find((row) => row.name === name);
       const earlier = given.resolved.fields["earlier"];
       return (!prior && earlier === undefined) || (prior !== undefined && isFactRef(earlier) && canonicalize(prior.job) === canonicalize(earlier)) ? { holds: true } : { holds: false, name: "generation-mismatch" };
@@ -2197,6 +2202,7 @@ export const destinationRules3: Rules = (() => {
     if (!publication || publication.state !== "reserved" || given.input.type !== "outcome") return NOTHING;
     const body = given.input.evidence.body as { send?: unknown; seen?: unknown; tree?: unknown };
     const token = tokenStep(given, operation);
+    if (given.input.result === "unknown") return { effects: [...token.effects, { effect: "value", item: publication.id, slot: "reason", value: "reservation-stage-unknown" }], opens: token.opens, update: { publication, state: "reserved", outcome: "unknown", reason: "reservation-stage-unknown" } };
     if (given.input.result !== "confirmed" || body.seen !== publication.values["integration"] || body.tree !== publication.values["tree"]) return { effects: [...token.effects, { effect: "state", item: publication.id, state: "not-reserved" }, { effect: "value", item: publication.id, slot: "reason", value: "reservation-stage-mismatch" }, { effect: "ref", item: branchOf(given.state)!.id, slot: "slot", to: null }], opens: token.opens, update: { publication, state: "not-reserved", outcome: "refused", reason: "reservation-stage-mismatch" } };
     const required = (publication.values["requiredChecks"] ?? []) as string[];
     const reservation = given.own(publication.values["reservedAt"] as number)!;

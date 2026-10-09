@@ -1,5 +1,5 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
-import { expect, test } from "vitest";
+import { inject, expect, test } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -44,7 +44,19 @@ test("a retry fence after publication starts is refused without superseding the 
   try { await story(ownHost(), wired, true); }
   finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promise<void> {
+test("a lost staging answer keeps its recorded reservation and starts no check or publication (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+test("an unknown reservation deletion retains the live publication cleanup duty and cannot be resent from ref absence alone (real scopes; host and scheduler STAND-INs)", async () => {
+  net.hold = net.deaf = null; platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32))); platformNet.sessions = true; platformNet.inspector = reader;
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, true); }
+  finally { platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -64,7 +76,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
     return { ...outside, late: (callback) => { outside.late?.(callback); late = callback; }, recovery: { accepts: (owner, kind) => outside.recovery?.accepts(owner, kind) ?? false, read: async (request) => { if (holdCheckAnswer && request.kind === "check-judge") return null; return outside.recovery?.read(request) ?? null; } }, send: async (request) => {
       if (holdCheckAnswer && request.kind === "check-judge") { const answer = await outside.send(request); if (answer) pendingCheck = { request, answer, late }; return null; }
       const answer = await outside.send(request);
-      return holdPush && ["push", "read"].includes(request.kind) ? null : answer;
+      return (holdPush && ["push", "read"].includes(request.kind)) || (unknownStageOnly && request.kind === "reservation-stage") || (unknownDeleteOnly && request.kind === "reservation-delete") ? null : answer;
     } };
   }); };
   // STAND-IN for the scheduler: each pass drives the operations of every scope the command waits on, and of the register and the
@@ -96,6 +108,20 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
   const first = host.refs.get("refs/heads/main")!;
+  if (unknownDeleteOnly) {
+    ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
+    founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+    const proposed = ok(await run(founder, "propose", "delete-unknown"));
+    await pause([repository.destination]);
+    expect(proposed.lines[1]).toMatch(/^Published:/);
+    const publication = (await G.summary()).value.items.find((item) => item.type === "publication")!;
+    expect(publication.state).toBe("published");
+    expect((await G.entries()).some((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-delete" && entry.input.result === "unknown")).toBe(true);
+    const retry = await run(founder, "act", "resend", "--on", "destination", "--target", String(publication.id));
+    expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
+    return;
+  }
   const invitation = ok(await run(founder, "invite", "@check", "--role", "checker")).lines[1]!.split(": ")[1]!;
   ok(await run(checker, "join", invitation));
   const checkMember = { membership: repository.membership, member: "@check" };
@@ -106,6 +132,17 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
   ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json"));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
+  if (unknownStageOnly) {
+    const unknown = await run(founder, "propose", "stage-unknown");
+    expect(unknown.code).toBe(1);
+    expect(unknown.lines.some((line) => line.includes("Observation unknown"))).toBe(true);
+    const publication = (await G.summary()).value.items.find((item) => item.type === "publication")!;
+    expect([publication.state, publication.values["reason"], host.refs.get("refs/heads/main")]).toEqual(["reserved", "reservation-stage-unknown", first]);
+    const events = await G.entries();
+    expect(events.some((entry) => entry.input.type === "outcome" && entry.input.kind === "reservation-stage" && entry.input.result === "unknown")).toBe(true);
+    expect(events.some((entry) => entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "push"))).toBe(false);
+    return;
+  }
   if (startedOnly) {
     const proposed = ok(await run(founder, "propose", "started"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
@@ -185,6 +222,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false): Promi
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   const snapshot = await Gsnapshot.reservationSnapshot(readAsk);
   expect(snapshot).not.toBeNull();
+  if (snapshot && !("refused" in snapshot) && inject("demoRecord")) console.log("RESERVATION_RECORD", canonicalize({ snapshot: { ...snapshot, objects: snapshot.objects.map((object) => ({ ...object, data: b64url(object.data) })) }, configuration: checkConfig, configurationDigest: configuration, readAsk, destinationHead: (await G.summary()).at, laneHead: (await L.summary()).at }));
   const beforeSlow = net.clock.now;
   slowFinalKey = true;
   expect(await Gsnapshot.reservationSnapshot(readAsk)).toBeNull();
