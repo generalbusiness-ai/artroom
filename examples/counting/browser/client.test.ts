@@ -7,6 +7,7 @@ import type { Fetch, HeadStreamFetch } from "@generalbusiness/artroom-client";
 import { COUNTING_DEFINITION } from "../pin.ts";
 import { nativeGateway, type CommandStore } from "./client.ts";
 import { activeAttempt, markActive, type DispatchPhase } from "./journal.ts";
+import { attemptDispatcher } from "./dispatcher.ts";
 import type { ActorIdentity } from "./voice-controller.ts";
 
 async function fixture(joined=true) {
@@ -41,7 +42,7 @@ async function fixture(joined=true) {
       actFetch:async(url,init)=>{assert.equal(init.redirect,"error");const response=await fake(url,{...init,signal:init.signal as never});return{status:metadata==="wrong-status"?200:response.status,body:response.body,headers:new Headers({"content-type":metadata==="wrong-media"?"text/html":"application/json"}),url:metadata==="wrong-url"?url+"/different":url,redirected:metadata==="redirected"};}});
     await new Promise<void>((resolve,reject)=>gateway.observe(state=>{if(state.status==="current")resolve();else if(["error","forbidden","unsupported"].includes(state.status))reject(new Error(`Fake gateway setup ${state.status}`));}));return gateway;
   };
-  return{gateway:await connect(),connect,counters:()=>({posts,settles,saves,clears}),retained:()=>held?canonicalize(held):null,record:()=>held,snapshots,mode:(value:string)=>{metadata=value;},lose:()=>{reply="lost";},fail:(phase?:DispatchPhase)=>{failPhase=phase;},race:(value:"before-post"|"before-reply")=>{race=value;},acceptSettlement:()=>{settleAccepted=true;},legacy:()=>{if(held)held={kind:held.kind,envelope:held.envelope};}};
+  return{identity,gateway:await connect(),connect,counters:()=>({posts,settles,saves,clears}),retained:()=>held?canonicalize(held):null,record:()=>held,snapshots,mode:(value:string)=>{metadata=value;},lose:()=>{reply="lost";},fail:(phase?:DispatchPhase)=>{failPhase=phase;},race:(value:"before-post"|"before-reply")=>{race=value;},acceptSettlement:()=>{settleAccepted=true;},corrupt:(change:(record:NonNullable<typeof held>)=>NonNullable<typeof held>)=>{if(held)held=change(held);},legacy:()=>{if(held)held={kind:held.kind,envelope:held.envelope};}};
 }
 
 test("FAKE correlated trusted first refusal commits judgment before terminal control custody clears",async()=>{
@@ -63,10 +64,10 @@ test("FAKE wrong-route first response stays unknown; later refusal/head cannot s
   }finally{f.gateway.dispose();}
 });
 
-test("FAKE restored never-dispatched prepared envelope first-dispatches identical bytes; restored inflight/legacy never POST",async()=>{
+test("FAKE read-only checks never dispatch restored prepared, inflight or legacy envelopes",async()=>{
   const f=await fixture();let next:Awaited<ReturnType<typeof f.connect>>|undefined,peer:Awaited<ReturnType<typeof f.connect>>|undefined;try{
     f.fail("inflight");assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.counters().posts,0);const original=f.record()!.envelope;
-    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const results=await Promise.all([next.checkCommand(),peer.checkCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["refused",null]);assert.equal(f.counters().posts,1);assert.equal(canonicalize(f.snapshots.at(-1)!.envelope),canonicalize(original));
+    f.gateway.dispose();f.fail();next=await f.connect();await next.restoreCommand();peer=await f.connect();await peer.restoreCommand();const results=await Promise.all([next.checkCommand(),peer.checkCommand()]);assert.deepEqual(results.map(r=>r?.status??null),["unknown","unknown"]);assert.equal(f.counters().posts,0);assert.equal(canonicalize(f.record()!.envelope),canonicalize(original));
   }finally{f.gateway.dispose();next?.dispose();peer?.dispose();}
   const lost=await fixture();let resumed:Awaited<ReturnType<typeof lost.connect>>|undefined;try{
     lost.lose();lost.fail("unknown");assert.equal((await lost.gateway.command("start")).status,"unknown");assert.equal(activeAttempt(lost.record()!.journal!).phase,"inflight");const original=lost.retained();
@@ -95,4 +96,32 @@ test("FAKE changed active journal fences the first ticket and prevents a stale t
     after.race("before-reply");assert.equal((await after.gateway.command("start")).status,"unknown");
     assert.equal(after.counters().posts,1);assert.equal(activeAttempt(after.record()!.journal!).phase,"unknown");assert.equal(after.counters().clears,0);
   }finally{after.gateway.dispose();}
+});
+
+// Conditional storage corruption must fail before inflight commit or any wire side effect.
+test("FAKE malformed restored PreparedEnvelope and refusal stay blocked without POST or terminal clear",async()=>{
+  const f=await fixture();try{
+    f.fail("inflight");await f.gateway.command("start");assert.equal(f.counters().posts,0);f.fail();
+    f.corrupt(record=>({...record,envelope:{...record.envelope,beside:{...record.envelope.beside,signed:record.envelope.signed}} as never}));
+    const original=f.retained();assert.equal((await f.gateway.checkCommand())?.status,"blocked");assert.equal(f.retained(),original);assert.equal(f.counters().posts,0);assert.equal(f.counters().clears,0);
+  }finally{f.gateway.dispose();}
+  const g=await fixture();try{
+    await g.gateway.command("start");
+    const refused=structuredClone(g.snapshots.at(-1)!);
+    g.fail("inflight");await g.gateway.command("start");g.fail();
+    g.corrupt(()=>({...refused,journal:{...refused.journal!,attempts:refused.journal!.attempts.map(a=>({...a,refusal:{...a.refusal!,answer:{...a.refusal!.answer,judgedAt:{seq:-1,hash:"bad"}}}}))}} as never));
+    const original=g.retained(),before=g.counters();assert.equal((await g.gateway.checkCommand())?.status,"blocked");assert.equal(g.retained(),original);assert.deepEqual(g.counters(),before);
+  }finally{g.gateway.dispose();}
+});
+
+
+test("FAKE prepared structural mismatch blocks dispatcher before inflight and preserves the whole original",async()=>{
+  const f=await fixture();try{
+    f.fail("inflight");await f.gateway.command("start");const original=f.record()!;
+    const malformed={...original,envelope:{...original.envelope,beside:{...original.envelope.beside,grants:[]}}} as unknown as typeof original;
+    let record=structuredClone(malformed),writes=0,posts=0,settles=0;
+    const dispatcher=attemptDispatcher({identity:f.identity,current:()=>true,fetch:async()=>{posts++;throw new Error("must not POST");},accepted:async()=>({status:"unknown"}),settle:async()=>{settles++;return{ok:false};},refresh(){}});
+    const answer=await dispatcher.run({load:async()=>record,save:async next=>{writes++;record=next;}},malformed.envelope);
+    assert.equal(answer.status,"blocked");assert.deepEqual([writes,posts,settles],[0,0,0]);assert.deepEqual(record,malformed);
+  }finally{f.gateway.dispose();}
 });

@@ -2,7 +2,7 @@
 import type { Answer, Receipt } from "@generalbusiness/artroom-contract";
 import { canonicalize, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { httpTransport, ScopeHandle } from "@generalbusiness/artroom-client";
-import { activeAttempt, actURL, contextKey, envelopeKey, fitsPending, legacyUnknown, markActive, validJournal, type AttemptJournal, type RefusalJudgment } from "./journal.ts";
+import { activeAttempt, actURL, contextKey, envelopeKey, fitsPending, legacyUnknown, markActive, requestBody, validEnvelope, validJournal, type AttemptJournal, type RefusalJudgment } from "./journal.ts";
 import type { ActorIdentity, PreparedEnvelope, ReportOutcome } from "./voice-controller.ts";
 export type TrustedActFetch=(url:string,init:{method:"POST";headers:Record<string,string>;body:string;signal:AbortSignal;redirect:"error"})=>Promise<{status:number;body:ByteStream|null;headers:{get(name:string):string|null};url:string;redirected:boolean}>;
 export interface JournalRecord {readonly envelope:PreparedEnvelope;readonly journal?:AttemptJournal}
@@ -17,7 +17,7 @@ export function attemptDispatcher(options:{identity:ActorIdentity;current():bool
   const current=()=>{if(!options.current())throw new Error("The private dispatch context is no longer current.");};
   const held=async<T extends JournalRecord>(store:JournalStore<T>,envelope:PreparedEnvelope):Promise<T>=>{
     current();const record=await store.load();current();
-    if(!record||envelopeKey(record.envelope)!==envelopeKey(envelope)||record.journal&&!validJournal(record.journal,identity,envelope)||!fitsPending(identity,record))throw new Error("The private original attempt is unavailable.");
+    if(!validEnvelope(envelope,identity)||!record||!validEnvelope(record.envelope,identity)||envelopeKey(record.envelope)!==envelopeKey(envelope)||record.journal&&!validJournal(record.journal,identity,envelope)||!fitsPending(identity,record))throw new Error("The private original attempt is unavailable.");
     return structuredClone(record);
   };
   const save=async<T extends JournalRecord>(store:JournalStore<T>,record:T,journal:AttemptJournal):Promise<T>=>{current();const latest=await held(store,record.envelope);if(canonicalize(latest)!==canonicalize(record))throw new Error("The private attempt changed before commit.");const next={...record,journal};if(!fitsPending(identity,next))throw new Error("Private attempt history is full.");await store.save(next);current();return next;};
@@ -32,22 +32,25 @@ export function attemptDispatcher(options:{identity:ActorIdentity;current():bool
   const recover=async<T extends JournalRecord>(store:JournalStore<T>,record:T):Promise<ReportOutcome>=>{
     const answer=await options.settle(record.envelope);current();return answer.ok?accepted(store,record,answer.receipt):unknown();
   };
-  async function run<T extends JournalRecord>(store:JournalStore<T>,envelope:PreparedEnvelope):Promise<ReportOutcome> {
+  async function run<T extends JournalRecord>(store:JournalStore<T>,envelope:PreparedEnvelope,readOnly=false):Promise<ReportOutcome> {
     let record:T;
     try{
+      if(!validEnvelope(envelope,identity))return{status:"blocked",reason:"The malformed private original is retained; nothing was dispatched."};
+      const original=await store.load();current();
+      if(original?.journal&&!validJournal(original.journal,identity,envelope))return{status:"blocked",reason:"The malformed private journal is retained; nothing was dispatched."};
       record=await held(store,envelope);
       if(!record.journal)return await recover(store,record); // Legacy has no first-dispatch proof.
       const attempt=activeAttempt(record.journal);
       if(attempt.phase==="refused")return{status:"refused",reason:"The original first attempt was refused by the configured service."};
-      if(attempt.phase!=="prepared")return await recover(store,record); // No later POST settles unknown/inflight/recorded.
+      if(readOnly||attempt.phase!=="prepared")return await recover(store,record); // No later POST settles unknown/inflight/recorded.
       if(!options.fetch)return unknown("Trusted submit transport is unavailable; the prepared envelope was not dispatched.");
       record=await save(store,record,markActive(record.journal,"inflight"));
       record=await held(store,envelope);if(!record.journal||activeAttempt(record.journal).phase!=="inflight")throw new Error("The original inflight attempt changed before POST.");
       // This closure is the fresh single-use ticket, minted only after commit. It never survives restore.
-      const exactBody=JSON.stringify({signed:envelope.signed,grants:envelope.grants,...envelope.beside});
+      const exactBody=requestBody(envelope);
       let used=false,responseStatus:number|undefined;
       const transport=httpTransport(identity.origin,{fetch:async(request,init)=>{
-        current();if(used||request!==url||init?.method!=="POST"||init.body!==exactBody||!init.signal)throw new Error("Private request correlation is unavailable.");used=true;
+        current();if(used||request!==url||init?.method!=="POST"||canonicalize(JSON.parse(init.body??"null"))!==canonicalize(JSON.parse(exactBody))||!init.signal)throw new Error("Private request correlation is unavailable.");used=true;
         const response=await options.fetch!(url,{method:"POST",headers:init.headers??{},body:exactBody,signal:init.signal as AbortSignal,redirect:"error"});
         const type=typeof response.headers?.get==="function"?response.headers.get("content-type")?.split(";",1)[0]?.trim().toLowerCase():undefined;
         if(!options.current()||(init.signal as AbortSignal).aborted||response.redirected||response.url!==url||type!=="application/json"){cancel(response.body);throw new Error("Submit response identity is unavailable.");}
@@ -68,5 +71,5 @@ export function attemptDispatcher(options:{identity:ActorIdentity;current():bool
       return unknown();
     }
   }
-  return{run,supported:()=>!!options.fetch};
+  return{run,check:<T extends JournalRecord>(store:JournalStore<T>,envelope:PreparedEnvelope)=>run(store,envelope,true),supported:()=>!!options.fetch};
 }

@@ -1,6 +1,6 @@
 /** Local media custody only. Observations and media callbacks do not decide a count. */
 import type { Beside, Digest, Grant, KeyId, MemberRef, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
-import { activeAttempt, actURL, appendPrepared, contextKey, envelopeKey, fitsPending, MAX_ATTEMPTS, type AttemptJournal } from "./journal.ts";
+import { activeAttempt, appendPrepared, envelopeKey, fitsPending, knownRefusal as validatedRefusal, terminalJournal, validEnvelope, validReport as validatedReport, MAX_ATTEMPTS, type AttemptJournal } from "./journal.ts";
 
 export interface ActorIdentity {
   readonly origin: string;
@@ -36,8 +36,10 @@ export interface PendingStore {
   load(): Promise<PendingReport | null>;
   save(pending: PendingReport): Promise<void>;
   clear(): Promise<void>;
+  /** Atomically preserve the complete resolved record under the existing quota, then remove its active pointer. */
+  archive?(pending: PendingReport): Promise<void>;
 }
-export interface ReportOutcome { readonly status: "recorded" | "refused" | "unknown"; readonly reason?: string }
+export interface ReportOutcome { readonly status: "recorded" | "refused" | "unknown" | "blocked"; readonly reason?: string }
 /** The caller verifies native receipts. A transport reply alone is not a known result. */
 export interface Reporter {
   prepare(completion: Completion): Promise<PreparedEnvelope>;
@@ -47,6 +49,8 @@ export interface Reporter {
   correctionReady?(report: PendingReport): boolean;
   /** Trigger a fresh observation after the controller has fenced a known refusal. */
   refresh?(): void | Promise<void>;
+  /** Fresh native snapshot says this original completion can no longer be current. */
+  obsolete?(completion: Completion): boolean;
 }
 /** Must exclude other controllers using this private pending slot, including other tabs. */
 export interface CustodyLock { run<T>(work: () => Promise<T>): Promise<T> }
@@ -131,25 +135,18 @@ export function createVoiceController(options: {
   };
   const current = (): boolean => !disposed && options.current();
   const sameContext = (t: TurnToken): boolean => identityKey(t) === identityKey(identity);
-  const envelopeBelongs = (e: PreparedEnvelope): boolean => !!e.signed.intent.to &&
-    scopeKey(e.signed.intent.to) === scopeKey(identity.scope) && e.signed.intent.actor === identity.publicKey;
   const usable = (t: TurnToken): boolean => current() && observation.fresh && observation.authorized &&
     !!observation.turn && sameContext(t) && turnKey(t) === turnKey(observation.turn) && now() < t.expiresAt;
-  const knownRefusal = (report: PendingReport): boolean => {
-    if (!report.journal) return false;
-    const attempt = activeAttempt(report.journal);
-    const refusal = attempt.refusal;
-    return attempt.phase === "refused" && !!refusal && refusal.answer.answer === "refused" &&
-      refusal.origin === identity.origin && refusal.url === actURL(identity) &&
-      refusal.context === contextKey(identity) && refusal.request === envelopeKey(report.envelope);
-  };
-  const correctionReady = (): boolean => !!pending && !!pending.journal && pending.outcome === "refused" &&
+  const knownRefusal = (report: PendingReport): boolean => validatedRefusal(report.journal, identity, report.envelope);
+  const validReport = (report: PendingReport): boolean => validatedReport(report, identity);
+  const correctionReady = (): boolean => !!pending && !!pending.journal && pending.outcome === "refused" && validReport(pending) &&
     pending.journal.attempts.length < MAX_ATTEMPTS && knownRefusal(pending) &&
     usable(pending.completion.turn) && options.reporter.correctionReady?.(pending) === true;
   const emit = (phase: VoiceState["phase"], message: string, turn?: TurnToken): void => {
     if (!current()) return;
     view = retained({ phase, message, armed: armedVoice !== null, ...(armedVoice ? { voiceId: armedVoice } : {}), ...(turn ? { turn } : {}),
-      ...(pending ? { pending: pending.outcome, correctionReady: correctionReady() } : {}) });
+      ...(pending && validReport(pending) ? { turn: pending.completion.turn } : {}),
+      ...(pending || custodyBlocked ? { pending: pending?.outcome ?? "unknown", correctionReady: custodyBlocked ? false : correctionReady() } : {}) });
     for (const listener of listeners) { if (current()) listener(view); }
   };
   const stopAudio = (): void => {
@@ -173,7 +170,7 @@ export function createVoiceController(options: {
       const dispatch = await options.lock.run(work);
       if (typeof dispatch === "function" && current()) await dispatch();
     }
-    catch { emit("blocked", "Private custody operation failed; retain and check any signed attempt before continuing."); }
+    catch { custodyBlocked = true; if (pending && !validReport(pending)) pending = retained({ ...pending, outcome: "unknown" }); emit("blocked", "Private custody operation failed; retain and check any signed attempt before continuing."); }
     finally {
       busy = false;
       // CURRENT may have arrived during POST/reconciliation with no later notice.
@@ -184,6 +181,7 @@ export function createVoiceController(options: {
   const sameCompletion = (a: Completion, b: Completion): boolean => turnKey(a.turn) === turnKey(b.turn) &&
     a.voiceId === b.voiceId && a.completedAt === b.completedAt;
   const normalizedPending = (report: PendingReport): PendingReport => {
+    if (!validReport(report)) throw new Error("Private report is malformed; keep the exact bytes blocked.");
     if (!report.journal) return retained({ ...report, outcome: "unknown" });
     const attempt = activeAttempt(report.journal);
     if (!sameEnvelope(attempt.envelope, report.envelope)) throw new Error("active attempt envelope mismatch");
@@ -192,15 +190,14 @@ export function createVoiceController(options: {
   const reloadReport = async (report: PendingReport): Promise<PendingReport | null> => {
     const saved = await options.store.load();
     if (!current()) return null;
-    if (!saved || !sameEnvelope(saved.envelope, report.envelope) || !sameCompletion(saved.completion, report.completion) ||
-        !sameContext(saved.completion.turn) ||
-        !envelopeBelongs(saved.envelope) || !fitsPending(identity, saved)) {
+    if (!saved || !validReport(saved) || !sameEnvelope(saved.envelope, report.envelope) || !sameCompletion(saved.completion, report.completion)) {
       custodyBlocked = true;
+      if (pending) pending = retained({ ...pending, outcome: "unknown" });
       emit("blocked", "The exact signed attempt could not be recovered from private custody.");
       return null;
     }
     // The dispatcher owns attempt phases and service proofs. Adopt its newest journal.
-    pending = normalizedPending(saved);
+    try { pending = normalizedPending(saved); } catch { custodyBlocked = true; pending = retained({ ...saved, outcome: "unknown" }); emit("blocked", "The malformed original remains in private custody; no known refusal was verified."); return null; }
     return pending;
   };
   const settle = async (report: PendingReport, result: ReportOutcome): Promise<boolean> => {
@@ -244,9 +241,10 @@ export function createVoiceController(options: {
       return;
     }
     if (stored) {
+      pending = retained({ ...stored, outcome: "unknown" });
       pending = normalizedPending(stored);
       remember(stored.completion.turn);
-      if (!sameContext(stored.completion.turn) || !envelopeBelongs(stored.envelope) || !fitsPending(identity, stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
+      if (!sameContext(stored.completion.turn) || !validReport(stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
     }
     const completed = correcting ? pending?.completion : completion;
     if (!current() || !loaded || !completed || !usable(completed.turn)) return;
@@ -256,7 +254,7 @@ export function createVoiceController(options: {
     emit("reporting", "Preparing the completed turn's native report.", completed.turn);
     const envelope = retained(await options.reporter.prepare(completed));
     if (!usable(completed.turn) || pending !== oldPending || generation !== audioGeneration) return;
-    if (!envelopeBelongs(envelope)) {
+    if (!validEnvelope(envelope, identity)) {
       emit("blocked", "The prepared report does not match this scope and public key.");
       return;
     }
@@ -277,14 +275,26 @@ export function createVoiceController(options: {
       await finishReport(report, result);
     };
   });
+  const archiveObsolete = async (): Promise<void> => guarded(async () => {
+    if (!pending || !observation.fresh || !observation.authorized || usable(pending.completion.turn) || options.reporter.obsolete?.(pending.completion)!==true ||
+        !terminalJournal(pending.journal, identity, pending.envelope) || !options.store.archive) return;
+    const saved = await options.store.load();
+    if (!current() || !saved || !validReport(saved) || !sameEnvelope(saved.envelope, pending.envelope) ||
+        !sameCompletion(saved.completion, pending.completion) || !terminalJournal(saved.journal, identity, saved.envelope)) return;
+    await options.store.archive(saved);
+    if (!current()) return;
+    pending = null; completion = null; armedVoice = null;
+    emit("idle", "The obsolete terminal report was archived intact. Arm a new turn explicitly.");
+  });
   const ready = options.lock.run(async () => {
     try {
       const saved = await options.store.load();
       if (!current()) return;
       if (saved) {
+        pending = retained({ ...saved, outcome: "unknown" });
         pending = normalizedPending(saved);
         remember(saved.completion.turn);
-        if (!sameContext(saved.completion.turn) || !envelopeBelongs(saved.envelope) || !fitsPending(identity, saved)) {
+        if (!sameContext(saved.completion.turn) || !validReport(saved)) {
           custodyBlocked = true;
           emit("blocked", "Private pending custody belongs to a different context; it was retained.");
           return;
@@ -373,7 +383,8 @@ export function createVoiceController(options: {
       // Observations never settle a pending request, including a snapshot that advanced.
       if (completion && usable(completion.turn) && !pending) void reportCompletion();
       else if (armedVoice) start(armedVoice);
-      if (pending?.outcome === "refused") emit("refused", "A known refusal is retained; correction needs a fresh matching turn and reserved custody room.", pending.completion.turn);
+      if (!custodyBlocked && pending && validReport(pending) && observation.fresh && observation.authorized && options.reporter.obsolete?.(pending.completion)===true && !usable(pending.completion.turn)) void archiveObsolete();
+      if (!custodyBlocked && pending?.outcome === "refused" && knownRefusal(pending)) emit("refused", "A known refusal is retained; correction needs a fresh matching turn and reserved custody room.", pending.completion.turn);
     },
     invalidate,
     disarm() { armedVoice = null; invalidate(); },
@@ -381,9 +392,10 @@ export function createVoiceController(options: {
       const stored = await options.store.load();
       if (!current()) return;
       if (stored) {
+        pending = retained({ ...stored, outcome: "unknown" });
         pending = normalizedPending(stored);
         remember(stored.completion.turn);
-        if (!sameContext(stored.completion.turn) || !envelopeBelongs(stored.envelope) || !fitsPending(identity, stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
+        if (!sameContext(stored.completion.turn) || !validReport(stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
       }
       const report = pending;
       if (!loaded || !report || !sameContext(report.completion.turn) || !current()) return;
