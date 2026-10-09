@@ -1,10 +1,12 @@
 import { afterEach, expect, test } from "vitest";
-import { canonicalize, definitionDigest, digestBytes, keyIdOfSecret, utf8 } from "@generalbusiness/artroom-bytes";
+import { base32, canonicalize, definitionDigest, digestBytes, keyIdOfSecret, utf8 } from "@generalbusiness/artroom-bytes";
 import { DIGESTS } from "@generalbusiness/artroom-lanes";
 import { holdsRulesExtent } from "@generalbusiness/artroom-platform";
 import { PAGES_PRESET, PAGES_PRESET_BYTES, PAGES_PRESET_DIGEST, PAGES_RULES } from "../src/pages-preset.ts";
 import { invitationTask, type InvitationTaskState } from "../src/invitation-task.ts";
-import { setupPages } from "../src/pages-setup.ts";
+import { PAGES_SETUP_RECORD_BYTES, readPagesSetupRecord, setupPages } from "../src/pages-setup.ts";
+import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
+import type { ScopeRef } from "@generalbusiness/artroom-contract";
 import type { Room } from "../src/data.ts";
 
 // Descriptor-only witness; no activation, provider or seeded-fixture readiness claim.
@@ -40,4 +42,26 @@ test("ordinary invitation task delegates one enrollment, has no raw-key fields a
   release();await boundary;await Promise.resolve();await Promise.resolve();
   expect(host.textContent).toContain("Check original request");host.all().find(e=>e.tag==="form")!.event("submit");expect(joins).toBe(1);
   host.all().find(e=>e.tag==="button"&&e.textContent==="Check original request")!.event("click");await Promise.resolve();expect(checks).toBe(1);
+});
+
+
+// Saved-envelope fixture only: signs data in memory; no activation or scope mutation.
+test("saved Pages stages are bounded before parse and reject wrong subjects/order or malformed refused answers",async()=>{
+  const secret=new Uint8Array(32);const actor=keyIdOfSecret(secret);const rules={scope:"sc_"+base32(new Uint8Array(32)),inc:"in_"+base32(new Uint8Array(16)),kind:"rules"} as ScopeRef;
+  const def=PAGES_PRESET.definitions[0]!;
+  const signed=await signedIntent(secretSigner(secret),{to:rules,kind:"activate",on:null,fields:{digest:def.digest,name:def.name},expected:{}});
+  const stage={kind:"activate",name:"issue",signed,beside:{values:[def.bytes]},attempted:true};
+  const record={v:1,binding:"original",descriptor:PAGES_PRESET_DIGEST,rules,steps:[stage]};
+  expect(readPagesSetupRecord(canonicalize(record),"original",rules,actor,0).steps).toHaveLength(1);
+  expect(()=>readPagesSetupRecord(" ".repeat(PAGES_SETUP_RECORD_BYTES+1),"original",rules,actor,0)).toThrow("512 KiB");
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[{...stage,answer:{answer:"refused",reason:"invented",judgedAt:{seq:1,hash:"sha256:"+"0".repeat(64)}}}]}),"original",rules,actor,0)).toThrow("answer is malformed");
+  const accepted={answer:"accepted",receipt:{fact:{at:{...rules,inc:"in_"+base32(new Uint8Array(16).fill(1))},seq:1,hash:"sha256:"+"0".repeat(64)},definition:"platform:rules@2"}};
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[{...stage,answer:accepted}]}),"original",rules,actor,0)).toThrow();
+  const wrong=await signedIntent(secretSigner(secret),{to:rules,kind:"activate",on:9,fields:{digest:def.digest,name:def.name},expected:{}});
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[{...stage,signed:wrong}]}),"original",rules,actor,0)).toThrow("exact subject");
+  const publish=await signedIntent(secretSigner(secret),{to:rules,kind:"publish",on:9,fields:PAGES_RULES as never,expected:{on:1}});
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[{kind:"publish",name:"rules",signed:publish,beside:{},attempted:false}]}),"original",rules,actor,0)).toThrow("exact subject");
+  const change=PAGES_PRESET.definitions[1]!;const second=await signedIntent(secretSigner(secret),{to:rules,kind:"activate",on:null,fields:{digest:change.digest,name:change.name},expected:{}});
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[{kind:"activate",name:"change",signed:second,beside:{values:[change.bytes]},attempted:false},stage]}),"original",rules,actor,0)).toThrow("out of order");
+  expect(()=>readPagesSetupRecord(canonicalize({...record,steps:[stage,{kind:"activate",name:"change",signed:second,beside:{values:[change.bytes]},attempted:false}]}),"original",rules,actor,0)).toThrow("earlier result");
 });
