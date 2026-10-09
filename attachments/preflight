@@ -1,0 +1,380 @@
+{
+  "head": "e5cb520306b6b152650da30b817933d56425e24a",
+  "tree": "e14c3d8900774f0b195641ad3675ef3e92af32c6",
+  "inputs": [
+    {
+      "path": "packages/bytes/src/canonical.ts",
+      "origin": "candidate source",
+      "sha256": "044b761dcdb62b243cc46f7368432c086b47e4ab8e98013e67a09f865eeaaa8a",
+      "bytes": 8303
+    },
+    {
+      "path": "packages/bytes/src/encode.ts",
+      "origin": "candidate source",
+      "sha256": "715cbca448416ed3deb2e24ebe80432751dde35a3b03d21231f81cb68c5f5298",
+      "bytes": 2353
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/utils.js",
+      "origin": "reviewed locked cache",
+      "sha256": "037ad49adb78168b6b699598fd33f85f7877456b1d28b4d032e2a1a16807947c",
+      "bytes": 26035
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/hmac.js",
+      "origin": "reviewed locked cache",
+      "sha256": "fec9f8f3aeda785ea2de91cc4c059d54ef98196261c026c43f48341007ae52c9",
+      "bytes": 3118
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/_u64.js",
+      "origin": "reviewed locked cache",
+      "sha256": "b09da8c07fe8187c07649494cdb7cd0bcf13df90b506a9473d19e4d5f8c2e102",
+      "bytes": 4794
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/_md.js",
+      "origin": "reviewed locked cache",
+      "sha256": "60cf3010fda89e3e4d3f0e7ff1ce249e9c467f34b4fd41b6fd6101d9f69be763",
+      "bytes": 9175
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/sha2.js",
+      "origin": "reviewed locked cache",
+      "sha256": "471746bba6ec4c6238ca41358d1d3b40b6ff31cf3363f0b4d550c649c1a8e83b",
+      "bytes": 18997
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes/legacy.js",
+      "origin": "reviewed locked cache",
+      "sha256": "690553a41af2fdd1e32ff6b534ba8508e95f1861c09c2d62fe762b6b501e09be",
+      "bytes": 12613
+    },
+    {
+      "path": "packages/bytes/src/hash.ts",
+      "origin": "candidate source",
+      "sha256": "8e9157df3cf6d59b671c86ea0762b7f9f3f32911638679e6552f2e09e0afd48f",
+      "bytes": 1334
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/utils.js",
+      "origin": "reviewed locked cache",
+      "sha256": "be9ff86aef76419376e4d66cf01a134f3117f1f8dd62d81f1b79100145503367",
+      "bytes": 23221
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/modular.js",
+      "origin": "reviewed locked cache",
+      "sha256": "9ced3aa10598277a735e54f7b61d88e929d565da884ba5385f9006ebb3b6aab2",
+      "bytes": 39844
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/curve.js",
+      "origin": "reviewed locked cache",
+      "sha256": "dbaeee3b41ff47efb76b78e14170fe4dda7c7ecdc387c402f16c5118e0bac356",
+      "bytes": 35711
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/edwards.js",
+      "origin": "reviewed locked cache",
+      "sha256": "f24a9c221a549a8fff259eb8f245ab0dc17679b13c532c3970d91acc4df9fffd",
+      "bytes": 32323
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/fft.js",
+      "origin": "reviewed locked cache",
+      "sha256": "a4b2ff7ca33f4acc85d61f0e83ec3303c3f6b38ecc19b20d0f6462d820e518cf",
+      "bytes": 26024
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/hash-to-curve.js",
+      "origin": "reviewed locked cache",
+      "sha256": "e3c97e7d0827b728b14e3311ed11d8e386d8a70d8fc77e0b9fd2a3090f19d955",
+      "bytes": 26273
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/frost.js",
+      "origin": "reviewed locked cache",
+      "sha256": "9a95f1fdf7e17b9d93a16049db675ee2967ed2a04cf59b1bd981d4662acbedf5",
+      "bytes": 45399
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/montgomery.js",
+      "origin": "reviewed locked cache",
+      "sha256": "cdafa8816dad5a24475ec51952c5f71fdd5d1b46880ab982694c4f8ff605fc46",
+      "bytes": 14721
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/abstract/oprf.js",
+      "origin": "reviewed locked cache",
+      "sha256": "2ca36b3e4930092db1f91559410e86975816c036e248067bc65a8055aa1c504c",
+      "bytes": 18336
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves/ed25519.js",
+      "origin": "reviewed locked cache",
+      "sha256": "e13f6c50c36feb0d18bf7986d5f881bcefb5f1f5b16de3cc5ee7693254c7a0b5",
+      "bytes": 30058
+    },
+    {
+      "path": "packages/bytes/src/sign.ts",
+      "origin": "candidate source",
+      "sha256": "4d47ee542f81bf6f28e88542092f8923a51fd8468b2cb89f001f60c294c626fe",
+      "bytes": 1750
+    },
+    {
+      "path": "packages/contract/src/intent.ts",
+      "origin": "candidate source",
+      "sha256": "a0c59756d9c6859b0b015d620ee1a60ebaeaf041472ab44da1e14335b907aa4b",
+      "bytes": 2079
+    },
+    {
+      "path": "packages/contract/src/capability.ts",
+      "origin": "candidate source",
+      "sha256": "c1c6eb1cf55c4d644478c1fd5e4fad60bf0834ff7363d5540c7bb39c8713ad5d",
+      "bytes": 6100
+    },
+    {
+      "path": "packages/contract/src/read.ts",
+      "origin": "candidate source",
+      "sha256": "538c4f5c5e8082e05eb05c98a400856ac70a45ade2cf6fe69433fc4c2b33b46f",
+      "bytes": 7271
+    },
+    {
+      "path": "packages/contract/src/bounds.ts",
+      "origin": "candidate source",
+      "sha256": "3754ca8335cbb70e137dd09de7764c63123d35c633ac1f5a5f74e8cc557990af",
+      "bytes": 6124
+    },
+    {
+      "path": "packages/contract/src/session.ts",
+      "origin": "candidate source",
+      "sha256": "10b42a87c4d0aab9ee06990fbe0d76dcf2e280b7be3f637f0adda352d15ff4cb",
+      "bytes": 5316
+    },
+    {
+      "path": "packages/contract/src/index.ts",
+      "origin": "candidate source",
+      "sha256": "f247bf968ab8f061da71fadd8fd67c0b56dbfee04964ed691774ed865d0d3c96",
+      "bytes": 553
+    },
+    {
+      "path": "packages/bytes/src/domains.ts",
+      "origin": "candidate source",
+      "sha256": "2f24d0d38603a3a2e34aaa80765547972642be07398801f55495596209d9c958",
+      "bytes": 4379
+    },
+    {
+      "path": "packages/bytes/src/ids.ts",
+      "origin": "candidate source",
+      "sha256": "f2c4dfe2b0d81b523ef19b1a08f412b61b1f1c960a44f6cd8214ef1bc8a827e4",
+      "bytes": 4092
+    },
+    {
+      "path": "packages/bytes/src/records.ts",
+      "origin": "candidate source",
+      "sha256": "4b254740c52da4a6519361afabf3173524276bd646e9e2a765397da8267a5a04",
+      "bytes": 23654
+    },
+    {
+      "path": "packages/bytes/src/facttext.ts",
+      "origin": "candidate source",
+      "sha256": "646df1ef993d218bb717b89437721b2a75ea2f560ce4c8b78e473ed0838f6b23",
+      "bytes": 5013
+    },
+    {
+      "path": "packages/bytes/src/take.ts",
+      "origin": "candidate source",
+      "sha256": "6ab5f5e0fd752b77bc61c52fc4590f06679d13b47d120349ca87e0ab18ecb498",
+      "bytes": 5405
+    },
+    {
+      "path": "packages/bytes/src/session.ts",
+      "origin": "candidate source",
+      "sha256": "f597fe0f8f22af880cf3abba800f0e23b36870f424c081da6765c3473a2f9ae1",
+      "bytes": 2764
+    },
+    {
+      "path": "packages/bytes/src/index.ts",
+      "origin": "candidate source",
+      "sha256": "38dce69e70c7382251db984534fee98126ff3805375c584d0c64b63bcca578ba",
+      "bytes": 289
+    },
+    {
+      "path": "examples/counting/pin.ts",
+      "origin": "candidate source",
+      "sha256": "cb0d6a6c905060ff680dd77c137235eed40060d0e6195254531981227a1b4411",
+      "bytes": 216
+    },
+    {
+      "path": "packages/client/src/intent.ts",
+      "origin": "candidate source",
+      "sha256": "e681e250e5ee1cbaa04b9649fda6eea3a3b5fccff9bfd91bdacb291b8c5e7b29",
+      "bytes": 5282
+    },
+    {
+      "path": "packages/client/src/handle.ts",
+      "origin": "candidate source",
+      "sha256": "d1ae3172cf63c8252347e2519d10d2de693222647b5231314372cd2e5c1412e9",
+      "bytes": 7921
+    },
+    {
+      "path": "packages/client/src/declared.ts",
+      "origin": "candidate source",
+      "sha256": "f38a8dae2b5251df7eead6c4eeeb2ce0e21e719e8f9da23334f933465a981c20",
+      "bytes": 12591
+    },
+    {
+      "path": "packages/client/src/answers.ts",
+      "origin": "candidate source",
+      "sha256": "8e73fb0bac158df247ef99346fe58b3c23fe9550815aa2a69b606fd1f2915146",
+      "bytes": 4095
+    },
+    {
+      "path": "packages/client/src/http.ts",
+      "origin": "candidate source",
+      "sha256": "8e8973321f361223c7d4c534034ac77c703ca5a30575a18d3e5f9f1351c5810b",
+      "bytes": 7134
+    },
+    {
+      "path": "packages/client/src/binding.ts",
+      "origin": "candidate source",
+      "sha256": "12970d869efc947e4d23023e86ff2ed3055c2a074ada085863df9b3b2950bd86",
+      "bytes": 3066
+    },
+    {
+      "path": "packages/client/src/prepare.ts",
+      "origin": "candidate source",
+      "sha256": "83f893304dc31a2448492686daaaf4b5578ef7d4292dd82f9a6a6fa206cdf797",
+      "bytes": 2523
+    },
+    {
+      "path": "packages/client/src/session.ts",
+      "origin": "candidate source",
+      "sha256": "7c614aac9297c7edfecc4867d03d9d17c065c4f585dabdad8efa07e027ad7cb3",
+      "bytes": 7003
+    },
+    {
+      "path": "packages/client/src/signed-read.ts",
+      "origin": "candidate source",
+      "sha256": "1aa6fe35dafe5c53c1ca4f3ba31f1c9540a3b04dcd0640b7857842c3f5dd2a9a",
+      "bytes": 6460
+    },
+    {
+      "path": "packages/client/src/credential.ts",
+      "origin": "candidate source",
+      "sha256": "6a3c07f6c3b5f7fbcae9719d6079014c545d6a989c48b3cd94fe80e815864261",
+      "bytes": 2497
+    },
+    {
+      "path": "packages/client/src/head-stream.ts",
+      "origin": "candidate source",
+      "sha256": "2b658504fd29220fa738942bb6c505cf38691fe6737603d831d178683dbab5d2",
+      "bytes": 6015
+    },
+    {
+      "path": "packages/client/src/observe.ts",
+      "origin": "candidate source",
+      "sha256": "adbde026fe59f2bfee8e59ef8fa27c43e54d9d68ab07008166926f3feea07be8",
+      "bytes": 12197
+    },
+    {
+      "path": "packages/client/src/index.ts",
+      "origin": "candidate source",
+      "sha256": "f9296e28c25d53540c859384a8bcae2b4264ec3ea45c99994a9d2042b69a5578",
+      "bytes": 337
+    },
+    {
+      "path": "examples/counting/definition.ts",
+      "origin": "candidate source",
+      "sha256": "9019c69ddafbf31e0208deebd54af35eaaa1506f94684a5df18b0cd43de2c006",
+      "bytes": 9344
+    },
+    {
+      "path": "examples/counting/browser/model.ts",
+      "origin": "candidate source",
+      "sha256": "a4f40f1f6a7b66726d20b22b1f5466d3a9cb1818acff57280baf7f4d7f53612f",
+      "bytes": 6801
+    },
+    {
+      "path": "examples/counting/browser/journal.ts",
+      "origin": "candidate source",
+      "sha256": "88ab7bedfad708ad8938d473f9d64885bce3b135a805023fea61c620b8e76ae6",
+      "bytes": 8706
+    },
+    {
+      "path": "examples/counting/browser/dispatcher.ts",
+      "origin": "candidate source",
+      "sha256": "ef5bc0698d486a4b41db5bac47aaa35b5aac1f71407f4fdb1ab254a73cdca2ae",
+      "bytes": 7793
+    },
+    {
+      "path": "examples/counting/browser/client.ts",
+      "origin": "candidate source",
+      "sha256": "8c0fe476f240bc517326644a6004ac7f8326caf100babaae93141ae7aac25da4",
+      "bytes": 14265
+    },
+    {
+      "path": "examples/counting/browser/client.test.ts",
+      "origin": "candidate source",
+      "sha256": "ce7a963fb96cc366f8a0da9b15625f6c0585606bded047dd8660a9723b6095a1",
+      "bytes": 16082
+    },
+    {
+      "path": "examples/counting/browser/voice-controller.ts",
+      "origin": "candidate source",
+      "sha256": "53f5310bf6c7eeb7eea242785b90b186200171f49e5883b1e08025b658b3b596",
+      "bytes": 24353
+    },
+    {
+      "path": "examples/counting/browser/voice-controller.test.ts",
+      "origin": "candidate source",
+      "sha256": "11ee3ec9c52afe908fdd06c6169c3153b5ff984364aab7b31e589c8b309479ac",
+      "bytes": 28174
+    },
+    {
+      "path": "examples/counting/browser/view.ts",
+      "origin": "candidate source",
+      "sha256": "811790c816ae4e16b0aa347757eb628de7bee8c62827e7e390c676d87eed9678",
+      "bytes": 8900
+    },
+    {
+      "path": "examples/counting/browser/app.ts",
+      "origin": "candidate source",
+      "sha256": "44ccc4c865a864fdd8f3941de753ad80366a52c13d4650f1e3d5794530461d76",
+      "bytes": 5797
+    },
+    {
+      "path": "examples/counting/browser/app.test.ts",
+      "origin": "candidate source",
+      "sha256": "15f9868e0e3a6092ff9445aa573300bf2e90df76d4051614878dba825b564c68",
+      "bytes": 9237
+    }
+  ],
+  "outputs": {
+    "examples/counting/browser/client.test.ts": {
+      "output": "/private/tmp/artroom-u1-e5cb-supplemental/node/client.test.mjs",
+      "bytes": 195666,
+      "sha256": "6e38a5a05af1e1004e0f2e90b87a6471ad783b63a17aad6af882e06103d5eb1c"
+    },
+    "examples/counting/browser/voice-controller.test.ts": {
+      "output": "/private/tmp/artroom-u1-e5cb-supplemental/node/voice-controller.test.mjs",
+      "bytes": 156534,
+      "sha256": "a23926790e000f5ffdc29ebeacb5341568090c2ae32a209c0b5f6b4e01ae93ff"
+    },
+    "examples/counting/browser/app.test.ts": {
+      "output": "/private/tmp/artroom-u1-e5cb-supplemental/node/app.test.mjs",
+      "bytes": 154957,
+      "sha256": "37a15363d73b950775b2552fc82d949232bb08c1118c1628979c650e271b9144"
+    }
+  },
+  "metafile_sha256": "99e40233f2d87882091ace3e04d99fed0e2f2a1a62dbe33c25152afdc9f1cdda",
+  "Node_argv": [
+    "node",
+    "--test",
+    "/private/tmp/artroom-u1-e5cb-supplemental/node/client.test.mjs",
+    "/private/tmp/artroom-u1-e5cb-supplemental/node/voice-controller.test.mjs",
+    "/private/tmp/artroom-u1-e5cb-supplemental/node/app.test.mjs"
+  ],
+  "bounded_preflight": "PASS 4MiB/10k exact three source entries; all source Git bytes and retained cache hashes verified"
+}

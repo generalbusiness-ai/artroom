@@ -1,96 +1,98 @@
 {
-  "head": "bb5bf627d6f3765623df45117299953c546a99ee",
-  "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
-  "release": "7b45a08e3484b4248499909b8c535e3e411861e6",
-  "proofs": [
+  "release": "51c5dc894289c4119b77d229a0ade276d07783d1",
+  "head": "e5cb520306b6b152650da30b817933d56425e24a",
+  "tree": "e14c3d8900774f0b195641ad3675ef3e92af32c6",
+  "commands": [
     {
-      "phase": "node-discovery",
       "argv": [
         "node",
-        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
-        "list",
-        "--config",
-        "/tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs",
-        "--json"
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "examples/counting/browser/tsconfig.json"
       ],
-      "cwd": "/private/tmp/artroom-f1-c0-composed",
-      "before": {
-        "head": "bb5bf627d6f3765623df45117299953c546a99ee",
-        "tree": "13069e33cf59230e411d8b127bf6dc2da9f38241",
-        "status": ""
-      },
       "exit": 0,
-      "elapsed": 0.7557899160310626,
-      "cpu": 1.5013029999999998,
-      "log_sha256": "c84f6c7176f0fa54e3e9261971daf5003de848a04a08bcf1d2f85b5feed9ee19"
+      "elapsed": 0.18183187500108033,
+      "cpu": 0.372363,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "phase": "node-body",
       "argv": [
-        "node",
-        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
-        "run",
-        "--config",
-        "/tmp/artroom-f1-bb5-runtime-preparation/node-selection.config.mjs",
-        "--reporter",
-        "verbose",
-        "--bail=1"
+        "/tmp/artroom-counting-stage-node-repairs/node_modules/.bin/esbuild",
+        "examples/counting/browser/client.test.ts",
+        "examples/counting/browser/voice-controller.test.ts",
+        "examples/counting/browser/app.test.ts",
+        "--bundle",
+        "--platform=node",
+        "--format=esm",
+        "--outdir=/tmp/artroom-u1-e5cb-supplemental/node",
+        "--out-extension:.js=.mjs",
+        "--metafile=/tmp/artroom-u1-e5cb-supplemental/metafile.json",
+        "--alias:@generalbusiness/artroom-client=/tmp/artroom-counting-stage-node-repairs/packages/client/src/index.ts",
+        "--alias:@generalbusiness/artroom-bytes=/tmp/artroom-counting-stage-node-repairs/packages/bytes/src/index.ts",
+        "--alias:@generalbusiness/artroom-contract=/tmp/artroom-counting-stage-node-repairs/packages/contract/src/index.ts"
       ],
-      "cwd": "/private/tmp/artroom-f1-c0-composed",
       "exit": 0,
-      "elapsed": 0.8190796250710264,
-      "cpu": 1.8189689999999998,
-      "log_sha256": "63d09a4e3eb111909e8455206a6e8f0dc80c225aac6efca51c17f9f5ab45d1b1"
+      "elapsed": 0.04324283299501985,
+      "cpu": 0.09769599999999999,
+      "log_sha256": "7c6e8c4f3551c154f1ce0666a054e1b711584f40cb99d11739fcb9b3ff03206c"
     },
     {
-      "phase": "native-discovery",
       "argv": [
         "node",
-        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
-        "list",
-        "--config",
-        "/tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs",
-        "--json"
+        "--test",
+        "/private/tmp/artroom-u1-e5cb-supplemental/node/client.test.mjs",
+        "/private/tmp/artroom-u1-e5cb-supplemental/node/voice-controller.test.mjs",
+        "/private/tmp/artroom-u1-e5cb-supplemental/node/app.test.mjs"
       ],
-      "cwd": "/private/tmp/artroom-f1-c0-composed/packages/scope",
       "exit": 0,
-      "elapsed": 2.0088454999495298,
-      "cpu": 2.299807,
-      "log_sha256": "32301d5615ad955c760240cec770fb0dceb710a7f02e55d803bfb75773b7cc11"
-    },
-    {
-      "phase": "native-body",
-      "argv": [
-        "node",
-        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
-        "run",
-        "--config",
-        "/tmp/artroom-f1-bb5-runtime-preparation/native-selection.config.mjs",
-        "--reporter",
-        "verbose",
-        "--bail=1"
-      ],
-      "cwd": "/private/tmp/artroom-f1-c0-composed/packages/scope",
-      "exit": 0,
-      "elapsed": 2.685954040964134,
-      "cpu": 3.2801750000000003,
-      "log_sha256": "89255b8c90cdd3314364db76a73d9a48540ae726d96483b63fe904b18b4d9bc6"
+      "elapsed": 1.7504569579614326,
+      "cpu": 2.53392,
+      "log_sha256": "cb9555939f770a3db6c665796d77f52f93f81e42279b8211fce457a8efbebd1f"
     }
   ],
-  "node": {
-    "files": 4,
-    "passed": 13,
-    "skipped": 0
-  },
-  "native": {
-    "files": 1,
-    "passed": 1,
-    "skipped": 0,
-    "original_expect_calls": 49,
-    "four_proven_replay_assertions_completed": true,
-    "qualification": "Printed uncaught SQL fixture retention fault remains unresolved; pass is qualified.",
-    "error_free": false
-  },
-  "full_gate": false,
-  "source_review": false
+  "titles": [
+    "Roster removal leaves the identity-owned original Check report reachable without signing, POST or speech",
+    "Explicit Resume command fences active playback before dispatch and displays the trusted refusal",
+    "FAKE correlated trusted first refusal commits judgment before terminal control custody clears",
+    "FAKE wrong-route first response stays unknown; later refusal/head cannot settle it, exact accepted history can",
+    "FAKE Check command leaves prepared custody unchanged; concurrent explicit Resume first-dispatches identical bytes once; restored inflight and legacy commands never POST",
+    "FAKE known-refusal journal-save failure fences correction; unavailable local candidate never saves or POSTs",
+    "FAKE changed active journal fences the first ticket and prevents a stale terminal overwrite",
+    "FAKE malformed restored PreparedEnvelope and refusal stay blocked without POST or terminal clear",
+    "FAKE prepared structural mismatch blocks dispatcher before inflight and preserves the whole original",
+    "FAKE read-only dispatcher Check leaves valid prepared custody unsent; original resume consumes it once",
+    "Explicit Arm starts local speech once; duplicate end and snapshots cannot replay the same turn",
+    "Arm while paused or waiting retains the selected voice until a fresh own assignment",
+    "A single arm permits fresh subsequent own turns, while Pause/Start fences the old callbacks",
+    "Complete context binding rejects key, full scope, membership, deployment, member, definition and origin changes",
+    "Reset generation, serial and N changes fence late callbacks before starting a new assignment",
+    "Ordinary refresh holds a completion until a fresh exact token; forbidden or expired turns cancel it",
+    "Private persistence failure blocks POST",
+    "Unknown retains the exact signed envelope, fences signatures and playback, and observations cannot settle it",
+    "Known refusal can prepare a corrected successor using the same completion without speech replay",
+    "Loaded pending custody must match the complete context and blocks replay after restart",
+    "An old controller cannot paint, prepare, or report after losing the shared view",
+    "Invalidation while prepare is in flight prevents even a same-token later observation from reviving that attempt",
+    "A fresh next own assignment arriving during submit or reconciliation starts after custody work releases busy",
+    "The played-token ceiling disarms new speech without discarding unresolved exact custody",
+    "Eight refused attempts retain the original history and prevent a ninth signature or speech replay",
+    "Unavailable correction room blocks signing and an oversized prepared successor cannot replace refused history",
+    "A returned refused enum without retained service proof and a legacy refused slot stay unknown",
+    "Refusal refresh runs after stale fencing even when CURRENT arrived before the reporter returned",
+    "A same-envelope handoff cannot reparent the report to another retained completion",
+    "Obsolete known refusal archives intact, while a valid active unknown history fences archive",
+    "Malformed restored refusal never becomes a known terminal UI classification",
+    "Archive quota failure preserves intact terminal custody and does not unblock new speech",
+    "Restored recorded phase without receipt confirmation remains unresolved and cannot clear or archive",
+    "Check is read-only; explicit Resume dispatches only the exact prepared original without signing or speech"
+  ],
+  "tests": 34,
+  "pass": 34,
+  "fail": 0,
+  "skipped": 0,
+  "cancelled": 0,
+  "todo": 0,
+  "metafile_preflight": "all 58 inputs verified against current Git or prior retained exact cache hashes; three distinct current source entries/outputs",
+  "evidence_scope": "Node memory/fake DOM/gateway/speech; no actual browser/IndexedDB/audio/native/hosted acceptance",
+  "gate": "unrun"
 }
