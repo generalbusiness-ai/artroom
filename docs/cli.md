@@ -313,7 +313,9 @@ one `propose-manifest` that freezes all paths, entry references and byte
 digests on the published base. The destination builds their shared tree
 at reservation and records it before any required check. A check request
 reads that reservation tree; publication waits for every required check's
-authentic pass. While a check is owed, the command prints the change and
+authentic pass. The checker reads a signed, job-bound readonly snapshot
+of the reservation; it does not need the unpublished commit to exist at
+the host, and that read stages no public ref. While a check is owed, the command prints the change and
 reserved tree. A published result prints the room's commit. A policy
 refusal prints its name and the merge command to run after approval.
 

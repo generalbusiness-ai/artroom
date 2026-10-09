@@ -13,6 +13,8 @@ import { READ_BOUNDS, Reader, ZERO_ID, type GitSource } from "@generalbusiness/a
 import { buildPack } from "@generalbusiness/artroom-git/http";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
+import { snapshotReaderOf } from "../src/worker.ts";
+import { env } from "cloudflare:workers";
 import { artifactsOutside, type ArtifactsBindings } from "../src/artifacts-wiring.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import type { Outside, OutsideGiven } from "../src/index.ts";
@@ -195,7 +197,7 @@ export function ownHost(): Stand {
   return {
     host: "artifacts", namespace: NAMESPACE, stand,
     bindings: (registerScope) => ({ ARTIFACTS_CONFIG: canonicalize({ registerScope, namespace: NAMESPACE, host: HOST, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }), ARTIFACTS: stand.ns }),
-    outside: (given, sql, bindings) => artifactsOutside(given, sql, bindings, stand.fetch),
+    outside: (given, sql, bindings) => artifactsOutside(given, sql, bindings, stand.fetch, snapshotReaderOf(env.PLATFORM)),
     secrets: () => [...stand.tokens.keys()],
   };
 }
@@ -211,7 +213,7 @@ export async function gitHub(): Promise<Stand> {
       GITHUB_APP_CONFIG: canonicalize({ issuer: "Iv1.scripted-edit", installationId: 99, account: ACCOUNT, maxBytes: MAX_BYTES, registerScope, privateRepositories: false, publicReads: true, credentialIdentity: "adapter-attempt" }),
       GITHUB_APP_PRIVATE_KEY: privateKey, GITHUB_CREATION_TOKEN: CREATION,
     }),
-    outside: (given, sql, bindings) => gitHubOutside(given, sql, bindings, stand.fetch),
+    outside: (given, sql, bindings) => gitHubOutside(given, sql, bindings, stand.fetch, snapshotReaderOf(env.PLATFORM)),
     secrets: () => [CREATION, privateKey, ...stand.minted],
   };
 }

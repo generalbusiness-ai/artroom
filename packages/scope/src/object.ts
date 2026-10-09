@@ -368,6 +368,17 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
 
+  /** Internal namespace read of one exact job's current state. */
+  async jobState(fact: import("@generalbusiness/artroom-contract").FactRef): Promise<string | null> {
+    this.#first(); const scope = this.#store.scope(); const sealed = this.#store.stored(fact.seq);
+    if (!scope || !sealed || fact.at.scope !== scope.at.scope || fact.at.inc !== scope.at.inc || sealed.hash !== fact.hash) return null;
+    const item = this.#store.item(fact.seq); return item?.type === "job" ? item.state : null;
+  }
+  /** Authenticated by the signed job-read request and current configured checker. */
+  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null> {
+    this.#first(); return this.#outside.snapshot?.(asked) ?? null;
+  }
+
   /**
    * The one-time read of a member's read token at a destination, by its handle (the planner's decision for I5). Only a session
    * may read it, and only the session of the key that signed the `read-token` act whose `mint-read` minted it; the outside port

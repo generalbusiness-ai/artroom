@@ -7,8 +7,8 @@
  * inspection of those objects. For its push it builds the same objects again, with
  * the time of the entry that reserved it, and sends them with the base's closure.
  * Every provider sends them the same way. */
-import type { Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, isOperationId, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, entryHash, isOperationId, isFactRef, verifySignedIntent, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
 import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
@@ -44,7 +44,11 @@ export interface DestinationProvider {
 }
 /** What the one-time credential read answers: the plaintext, its end, and the remote URL it opens. */
 export interface ReadCredential { token: string; ends: string; remote: string }
-export interface DestinationHostOptions { host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
+export interface SnapshotReader {
+  job(fact: FactRef): Promise<{ entry: Entry; under: string; state: string } | null>;
+  key(membership: string, key: KeyId): Promise<unknown>;
+}
+export interface DestinationHostOptions { snapshotReader?: SnapshotReader; host: string; namespace: string; provider: DestinationProvider; custody: Pick<CredentialStore, "put" | "reply" | "live" | "read" | "judged" | "revoked" | "pending" | "expectRevoke" | "revocations" | "held" | "take"> }
 
 /** The byte domain of the nonsecret handle of a member's read credential. */
 const READ_HANDLE = "artroom.read-credential.v1";
@@ -227,6 +231,67 @@ export class DestinationHost implements Outside {
       const taken = this.#options.custody.take(handle, this.#given.clock.read());
       return taken ? { token: taken.plaintext, ends: taken.ends, remote } : null;
     } catch { return null; }
+  }
+
+  /** One readonly snapshot for the requested job's configured checker.
+   * Public object bytes are reconstructed from retained signed sources;
+   * nothing is staged, minted, pushed, or recorded by this read. */
+  async snapshot(asked: SignedIntent): Promise<ReservationSnapshot | null> {
+    const reader = this.#options.snapshotReader;
+    const scope = this.#given.scope();
+    const intent = asked?.intent;
+    if (!reader || scope?.at.kind !== "destination" || this.#given.genesis()?.seed.definition !== "platform:destination@3" || !verifySignedIntent(asked)
+      || intent.kind !== "git-read@1:job-read" || intent.on !== null || Object.keys(intent.expected).length || Object.keys(intent.fields).length !== 1 || !isFactRef(intent.fields["job"])) return null;
+    const jobFact = intent.fields["job"];
+    if (!intent.to || canonicalize(intent.to) !== canonicalize(jobFact.at)) return null;
+    const now = timeMs(this.#given.clock.read()), until = timeMs(intent.notAfter);
+    if (now === null || until === null || until <= now || until - now > 900_000) return null;
+    const jobRead = await reader.job(jobFact);
+    if (!jobRead || jobRead.under !== "change" || jobRead.state !== "requested" || !isEntryOf(jobRead.entry, jobFact) || jobRead.entry.input.type !== "act" || jobRead.entry.input.signed.intent.kind !== "request-check") return null;
+    const job = jobRead.entry;
+    const fields = job.input.type === "act" ? job.input.signed.intent.fields : {};
+    const manifestId = fields["manifest"];
+    const branch = destinationBranch(this.#given.state);
+    const publicationId = branch?.refs["slot"];
+    const publication = typeof publicationId === "number" ? this.#given.state.item(publicationId) : null;
+    const manifestFact = publication?.refs["manifest"];
+    if (!publication || publication.state !== "reserved" || !isFactRef(manifestFact) || manifestFact.seq !== manifestId || canonicalize(manifestFact.at) !== canonicalize(jobFact.at)) return null;
+    const reservedAt = publication.values["reservedAt"];
+    const reservation = typeof reservedAt === "number" ? this.#given.own(reservedAt) : null;
+    const reserve = this.#given.own(publication.id)?.entry;
+    const manifest = reserve ? this.#fact(reserve, manifestFact) : null;
+    const list = this.#list(publication);
+    if (!reservation || !manifest || !list) return null;
+    const recordedRules = reservation.entry.input.type === "outcome" ? reservation.entry.input.observed?.map((use) => use.observation).find((seen) => "subject" in seen && seen.subject === "rules") : null;
+    const check = recordedRules && "content" in recordedRules && recordedRules.content.asked === "rules" ? recordedRules.content.checks.find((check) => check.name === fields["name"] && check.configuration === fields["configuration"]) : null;
+    const membership = branch?.values["membership"];
+    if (!check || typeof membership !== "string") return null;
+    const readAt = timeMs(this.#given.clock.read());
+    const standing = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; at?: unknown; controllerActive?: unknown } | null;
+    if (!standing || standing.key !== intent.actor || standing.keyState !== "active" || standing.memberState !== "active" || standing.member !== check.checker || !Array.isArray(standing.actions) || !standing.actions.includes("change.check") || standing.controllerActive === false) return null;
+    const observedAt = readAt;
+    const afterRead = timeMs(this.#given.clock.read());
+    const deadline = job.effects.find((effect) => effect.effect === "value" && effect.item === job.seq && effect.slot === "deadline");
+    const end = deadline?.effect === "value" ? timeMs(deadline.value) : null;
+    if (observedAt === null || afterRead === null || afterRead < observedAt || afterRead - observedAt > 10_000 || end === null || now >= end) return null;
+    const base = await this.#options.provider.objects(destinationBranch(this.#given.state)!.values["repository"] as unknown as DestinationRepository, list.base);
+    const format = await this.#options.provider.format(branch!.values["repository"] as unknown as DestinationRepository);
+    const built = this.#buildList(format, base, list, reservation.entry.time);
+    if (!built || built.tree !== publication.values["tree"] || built.commit !== publication.values["integration"]) return null;
+    const objects = [...new Map([...base, ...built.objects].map((object) => [object.id, object])).values()];
+    const overlay = new Map(objects.map((object) => [object.id, object]));
+    const reached = new Set<string>();
+    const closureReader = new Reader({ object: async (id) => { const object = overlay.get(id); if (!object) return null; reached.add(id); return { type: object.kind, size: object.body.length, data: object.body }; }, ref: async () => null, refs: async () => [] }, READ_BOUNDS);
+    if (!(await closureReader.closure(built.commit)).complete) return null;
+    const completed = timeMs(this.#given.clock.read());
+    const currentJob = await reader.job(jobFact);
+    const currentKey = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; controllerActive?: unknown } | null;
+    if (completed === null || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
+      || !currentKey || currentKey.key !== intent.actor || currentKey.keyState !== "active" || currentKey.memberState !== "active" || currentKey.member !== check.checker || currentKey.controllerActive === false || !Array.isArray(currentKey.actions) || !currentKey.actions.includes("change.check")) return null;
+    const sources = sourcesOf(manifest)!.map((row) => this.#fact(reserve!, row.entry)!);
+    return { destination: scope.at, job: { entry: job, hash: entryHash(job) }, manifest: { entry: manifest, hash: entryHash(manifest) }, reservation,
+      sources: sources.map((entry) => ({ entry, hash: entryHash(entry) })), base: list.base, tree: built.tree, commit: built.commit,
+      objects: objects.filter((object) => reached.has(object.id)).map((object) => ({ id: object.id, type: object.kind, data: new Uint8Array(object.body) })) };
   }
 
   /** The lifetime that the `read-token` act asked for, in hours, from the entry that opened the `mint-read`. */

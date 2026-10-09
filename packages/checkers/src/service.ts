@@ -63,9 +63,10 @@
  * `not-the-checker`. Nothing is recorded for any of them.
  */
 
-import type { Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, isRecord } from "@generalbusiness/artroom-bytes";
 import { readConfiguration, type Configuration } from "./configuration.ts";
+import { verifyReservationObjects } from "./reservation-snapshot.ts";
 import { manifestOf, originOf, type Job, type NotAJob, type Notice } from "./job.ts";
 import { judge, provenanceOf, readReport, type Details, type Outcome } from "./outcome.ts";
 import { JOB_READ, signJobRead, signResult, type ResultSigner } from "./signing.ts";
@@ -81,6 +82,7 @@ import type { JobRecord, Outcomes } from "./store.ts";
  * one member"; I3 deltas, entry EW15). No notice and no lane names it.
  */
 export interface Scopes {
+  reservationSnapshot?(lane: ScopeRef, signed: SignedIntent): Promise<ReservationSnapshot | null>;
   /** The lane's entry at that position, with the hash that the lane serves for it. Null: the lane has none. */
   entry(lane: ScopeRef, seq: number): Promise<Sealed | null>;
   /** The definition that the lane pins. */
@@ -172,7 +174,16 @@ export class CheckerService {
       const entry = await scopes.entry(notice.lane, notice.job.seq);
       const at = manifestOf(entry, notice.job);
       const pinned = await scopes.pinned(notice.lane);
-      const origin = originOf(notice, { entry, pinned, activated: typeof pinned === "string" && pinned.startsWith("sha256:") ? await scopes.activated(pinned as Digest) : null, manifest: at === null ? null : await scopes.entry(notice.lane, at) });
+      const activated = typeof pinned === "string" && pinned.startsWith("sha256:") ? await scopes.activated(pinned as Digest) : null;
+      const manifest = at === null ? null : await scopes.entry(notice.lane, at);
+      const listManifest = manifest?.entry.input.type === "act" && Array.isArray(manifest.entry.input.signed.intent.fields["files"]);
+      let reservation: ReservationSnapshot | null = null;
+      if (listManifest && scopes.reservationSnapshot) {
+        const asked = await signJobRead(this.#o.signer, { lane: notice.lane, fact: notice.job }, this.#signing());
+        reservation = await scopes.reservationSnapshot(notice.lane, asked);
+      }
+      if (listManifest && (!reservation || !await verifyReservationObjects(reservation))) return { did: "nothing", why: "no-manifest" };
+      const origin = originOf(notice, { ...(reservation ? { reservation } : {}), entry, pinned, activated, manifest });
       if ("not" in origin) return { did: "nothing", why: origin.not };
       job = origin.job;
     } catch {
@@ -238,13 +249,13 @@ export class CheckerService {
       // 4. The read token. Without it no runner starts: the run has no end to find, which is `run-lost`.
       let token: Answer | null = null;
       try {
-        token = await this.#o.scopes.prepare(job.lane, asked, JOB_READ.capability, JOB_READ.step);
+        token = job.snapshot ? null : await this.#o.scopes.prepare(job.lane, asked, JOB_READ.capability, JOB_READ.step);
       } catch {
         this.#log("job-read", "no-answer");
       }
       // The lane's answer is read as data: a value that is no answer is no token, and the log holds one of four fixed words.
       const answered = isRecord(token) ? token["answer"] : null;
-      if (answered === "accepted") {
+      if (job.snapshot || answered === "accepted") {
         ran = true;
         try {
           // 5. The one run of this job.

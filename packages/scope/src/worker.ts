@@ -68,8 +68,8 @@
 
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
-import { definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import { b64url, parseStrict, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isObject, type Item } from "@generalbusiness/artroom-derive";
 import { foundedKind, type Founded } from "./core.ts";
 import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
@@ -99,6 +99,7 @@ export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: Durable
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
+  reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null>;
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
   prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
@@ -123,6 +124,7 @@ const MISSING = { ok: false, reason: "not-found" } as const;
 
 /** The contract's operations, and the four that sessions and the operator's lists add. None of the four writes an entry. */
 export interface Api extends ScopeApi {
+  reservationSnapshot(scope: string, asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | null>;
   session(scope: string, asked: unknown): Promise<SessionAnswer>;
   /** The body is the reader's side of the stream (`relay`): cancelling it releases the scope's subscription at once. */
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;
@@ -181,6 +183,7 @@ export function api(binding: Binding, address: string | null = null): Api {
     },
     async incidents(scope: string, reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { return (await at(scope)?.incidents(reader, cursor)) ?? MISSING; },
     async waiting(scope: string, reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { return (await at(scope)?.waiting(reader, list, cursor)) ?? MISSING; },
+    async reservationSnapshot(scope: string, asked: SignedIntent) { return (await at(scope)?.reservationSnapshot(asked)) ?? null; },
     async credential(scope: string, reader: unknown, handle: string): Promise<Read<ReadCredential>> { return (await at(scope)?.credential(reader, handle)) ?? MISSING; },
   };
 }
@@ -254,7 +257,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
   if ((what === "sessions" || what === "stream" || what === "incidents") && (scope === undefined || which !== undefined)) return json(404, { error: "not-found" });
   const reader = request.headers.get("authorization");
   const cursor = url.searchParams.get("cursor") ?? undefined;
-  const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "preparations" || what === "settle" || what === "sessions") && which === undefined);
+  const posts = (scope === undefined && what === undefined) || ((what === "acts" || what === "preparations" || what === "settle" || what === "sessions" || what === "reservation-snapshot") && which === undefined);
   if (request.method !== (posts ? "POST" : "GET")) return json(405, { error: "method-not-allowed" });
 
   if (posts) {
@@ -263,6 +266,10 @@ export async function route(request: Request, binding: Binding): Promise<Respons
     // What travels beside the intent is untrusted, like the rest of the body: the scope reads each text and each presented fact itself.
     const beside = { ...("texts" in given ? { texts: given["texts"] } : {}), ...("presented" in given ? { presented: given["presented"] } : {}), ...("values" in given ? { values: given["values"] } : {}) } as Beside;
     if (scope === undefined) return answered(await scopes.found(given["founding"] as SignedIntent, given["definition"] as DeclaredDefinition, (given["definitions"] ?? []) as DeclaredDefinition[], beside), 201);
+    if (what === "reservation-snapshot") {
+      const snapshot = await scopes.reservationSnapshot(scope, given["signed"] as SignedIntent);
+      return new Response(JSON.stringify(snapshot ? { ...snapshot, objects: snapshot.objects.map((object) => ({ ...object, data: b64url(object.data) })) } : { error: "forbidden" }), { status: snapshot ? 200 : 403, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    }
     if (what === "acts") return answered(await scopes.submit(scope, given["signed"] as SignedIntent, (given["grants"] ?? []) as Grant[], beside), 200);
     if (what === "sessions") {
       // The whole body is the signed request. The answer holds a credential: it is marked so that nothing between here and the device stores it.
@@ -306,7 +313,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
  * or that records none, gets `NO_OUTSIDE`. Each wiring still checks its own
  * authority.
  */
-export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings & ArtifactsBindings, fetch?: (request: Request) => Promise<Response>): Outside {
+export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings & ArtifactsBindings, fetch?: (request: Request) => Promise<Response>, snapshotReader?: import("./destination-host.ts").SnapshotReader): Outside {
   // The settings are read from the environment at every call, and a host's wiring is made again only when one of its values
   // changed. So a setting that appears in this object's life takes effect at its next call, with no restart.
   const wired = new Map<string, { values: readonly unknown[]; outside: Outside }>();
@@ -319,11 +326,12 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
   };
   const pick = (): Outside => {
     const host = recordedHost(given);
-    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS], () => gitHubOutside(given, sql, env, fetch));
-    if (host === ARTIFACTS_HOST && env.ARTIFACTS_CONFIG) return wiring(host, [env.ARTIFACTS_CONFIG, env.ARTIFACTS], () => artifactsOutside(given, sql, env, fetch));
+    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS], () => gitHubOutside(given, sql, env, fetch, snapshotReader));
+    if (host === ARTIFACTS_HOST && env.ARTIFACTS_CONFIG) return wiring(host, [env.ARTIFACTS_CONFIG, env.ARTIFACTS], () => artifactsOutside(given, sql, env, fetch, snapshotReader));
     return NO_OUTSIDE;
   };
   return {
+    snapshot: (asked) => pick().snapshot?.(asked) ?? Promise.resolve(null),
     accepts: (owner, kind) => pick().accepts(owner, kind),
     send: (request) => pick().send(request),
     judged: (at, sealed) => pick().judged?.(at, sealed),
@@ -369,6 +377,19 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
  * at every use: no session is issued, none is accepted, and no reader may
  * read (authority note, section 5.5).
  */
+export function snapshotReaderOf(binding: Binding): import("./destination-host.ts").SnapshotReader {
+  return {
+    job: async (fact) => {
+      const peer = binding.get(binding.idFromName(fact.at.scope)) as { source(seq: number): Promise<{ bytes: string | null; under: string } | null>; summary(reader: unknown): Promise<unknown>; jobState(fact: FactRef): Promise<string | null> };
+      const read = await peer.source(fact.seq);
+      if (!read?.bytes) return null;
+      const entry = parseStrict(read.bytes) as unknown as Entry;
+      return { entry, under: read.under, state: await peer.jobState(fact) ?? "absent" };
+    },
+    key: async (membership, key) => (binding.get(binding.idFromName(membership)) as { observe(ask: unknown): Promise<unknown> }).observe({ of: { scope: membership, kind: "membership" }, key }),
+  };
+}
+
 export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
   /** The one scope namespace. */
   protected scopes(): Binding { return this.env.SCOPES; }
@@ -377,7 +398,7 @@ export class DeployedScope<E extends Env = Env> extends ScopeObject<E> {
       ports: namespace(this.scopes()),
       authority: (given) => repositoryAuthority({ ...given, reader: membershipIn(this.scopes()) }),
       // Wired whether or not a host is configured now: `outsideOf` reads the settings at each call, and with neither it sends nothing.
-      outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env),
+      outside: (given: OutsideGiven) => outsideOf(given, this.ctx.storage.sql, this.env, undefined, snapshotReaderOf(this.scopes())),
       ...sessionWiring(() => sessionsOf(this.env.SESSION_SECRET, this.env.DEPLOYMENT), this.scopes()),
     };
   }

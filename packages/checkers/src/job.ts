@@ -33,9 +33,9 @@
  * `configuration-unavailable`.
  */
 
-import type { Digest, Effect, FactRef, PlatformDefinition, ScopeRef, Sealed, Timestamp } from "@generalbusiness/artroom-contract";
-import { entryHash, isDigest, isEntry, isFactRef, isLocalId, isScopeRef, timeMs, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { isObjectId, type ObjectId } from "@generalbusiness/artroom-git";
+import type { ReservationSnapshot, Digest, Effect, FactRef, PlatformDefinition, ScopeRef, Sealed, Timestamp } from "@generalbusiness/artroom-contract";
+import { canonicalize, digestBytes, utf8, entryHash, isDigest, isEntry, isFactRef, isLocalId, isScopeRef, timeMs, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { idOf, READ_BOUNDS, parseCommit, isObjectId, type ObjectId } from "@generalbusiness/artroom-git";
 
 /** The name that the rules scope holds an activated `change` definition under (section 3.11: "a `change` definition"). */
 export const CHANGE = "change";
@@ -61,6 +61,7 @@ export interface OriginRead {
   pinned: Digest | PlatformDefinition | null;
   activated: { name: string; state: string } | null;
   manifest: Sealed | null;
+  reservation?: ReservationSnapshot;
 }
 
 /** A job, as the service read it from the lane. Every member is from the lane's own entries. */
@@ -76,6 +77,7 @@ export interface Job {
   /** The manifest's integration commit and its base, which is that commit's first parent (section 12.2). */
   commit: ObjectId;
   base: ObjectId;
+  snapshot?: ReservationSnapshot;
 }
 
 export type NotAJob =
@@ -112,6 +114,7 @@ export function originOf(notice: Notice, read: OriginRead): Origin {
   const at = named.length === 1 && named[0]!.effect === "ref" ? named[0]!.to : null;
   const manifest = isLocalId(at) ? ownEntry(read.manifest, lane, at) : null;
   if (!manifest || !isLocalId(at) || !opens(manifest.effects, at, "manifest")) return { not: "no-manifest" };
+  if (read.reservation) return reservationOrigin(notice, entry, manifest, read.reservation, configuration as Digest, deadline as Timestamp);
   const [commit, base, of] = ["integration", "base", "tree"].map((slot) => valueOf(manifest.effects, at, slot));
   if (!isObjectId(commit) || !isObjectId(base) || of !== tree) return { not: "no-manifest" };
   return { job: { lane, fact, name, tree, configuration, deadline: deadline as Timestamp, commit, base } };
@@ -122,4 +125,45 @@ export function manifestOf(sealed: Sealed | null, job: FactRef): number | null {
   const named = (sealed?.entry?.effects ?? []).filter((e) => e.effect === "ref" && e.item === job.seq && e.slot === "manifest");
   const at = named.length === 1 && named[0]!.effect === "ref" ? named[0]!.to : null;
   return isLocalId(at) ? at : null;
+}
+
+function reservationOrigin(notice: Notice, job: Sealed["entry"], manifest: Sealed["entry"], snapshot: ReservationSnapshot, configuration: Digest, deadline: Timestamp): Origin {
+  const reservation = ownEntry(snapshot.reservation, snapshot.destination, snapshot.reservation.entry.seq);
+  if (!reservation || snapshot.destination.kind !== "destination" || reservation.input.type !== "outcome" || reservation.input.owner !== "platform:destination@3" || reservation.input.kind !== "judge" || reservation.input.result !== "confirmed"
+    || entryHash(snapshot.job.entry) !== snapshot.job.hash || snapshot.job.hash !== notice.job.hash || canonicalize(snapshot.job.entry) !== canonicalize(job)
+    || entryHash(snapshot.manifest.entry) !== snapshot.manifest.hash || canonicalize(snapshot.manifest.entry) !== canonicalize(manifest)) return { not: "no-manifest" };
+  if (!reservation.uses.some((use) => use.fact.hash === snapshot.manifest.hash && sameScope(use.fact.at, notice.lane))) return { not: "no-manifest" };
+  const objectIds = new Set<string>();
+  let bytes = 0;
+  for (const object of snapshot.objects) {
+    if (objectIds.has(object.id) || !["blob", "tree", "commit"].includes(object.type) || !(object.data instanceof Uint8Array)) return { not: "no-manifest" };
+    const limit = object.type === "blob" ? READ_BOUNDS.blobBytes : object.type === "tree" ? READ_BOUNDS.treeBytes : READ_BOUNDS.commitBytes;
+    if (object.data.length > limit || idOf(object.type, object.data) !== object.id) return { not: "no-manifest" };
+    objectIds.add(object.id); bytes += object.data.length;
+  }
+  if (objectIds.size > READ_BOUNDS.closureObjects || bytes > READ_BOUNDS.closureObjects * READ_BOUNDS.blobBytes) return { not: "no-manifest" };
+  const integrationObject = snapshot.objects.find((object) => object.id === snapshot.commit && object.type === "commit");
+  if (!integrationObject) return { not: "no-manifest" };
+  try { const read = parseCommit(integrationObject.data); if (read.tree !== snapshot.tree || read.parents[0] !== snapshot.base) return { not: "no-manifest" }; } catch { return { not: "no-manifest" }; }
+  const publication = reservation.effects.find((effect) => effect.effect === "state" && effect.state === "reserved");
+  if (publication?.effect !== "state") return { not: "no-manifest" };
+  const commit = valueOf(reservation.effects, publication.item, "integration"), tree = valueOf(reservation.effects, publication.item, "tree");
+  const base = manifest.input.type === "act" ? manifest.input.signed.intent.fields["base"] : null;
+  if (!isObjectId(commit) || !isObjectId(base) || tree !== notice.tree || snapshot.commit !== commit || snapshot.base !== base || snapshot.tree !== tree) return { not: "no-manifest" };
+  const files = manifest.input.type === "act" ? manifest.input.signed.intent.fields["files"] : null;
+  if (!Array.isArray(files) || files.length === 0 || files.length > 64 || snapshot.sources.length !== files.length) return { not: "no-manifest" };
+  for (const row of files) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return { not: "no-manifest" };
+    const file = row as { entry?: unknown; path?: unknown; digest?: unknown };
+    if (!isFactRef(file.entry)) return { not: "no-manifest" };
+    const sourceFact = file.entry;
+    if (!reservation.uses.some((use) => use.fact.hash === sourceFact.hash && sameScope(use.fact.at, sourceFact.at))) return { not: "no-manifest" };
+    const source = snapshot.sources.find((source) => source.hash === sourceFact.hash);
+    if (!source || !sameScope(source.entry.at, notice.lane) || source.entry.seq !== file.entry.seq || entryHash(source.entry) !== source.hash || source.entry.input.type !== "act" || !verifySignedIntent(source.entry.input.signed) || source.entry.input.signed.intent.kind !== "propose-file") return { not: "no-manifest" };
+    const fields = source.entry.input.signed.intent.fields;
+    if (fields["base"] !== base || fields["path"] !== file.path || fields["digest"] !== file.digest || typeof fields["content"] !== "string") return { not: "no-manifest" };
+    const bytes = utf8(fields["content"]);
+    if (bytes.length !== fields["size"] || digestBytes(bytes) !== file.digest) return { not: "no-manifest" };
+  }
+  return { job: { lane: notice.lane, fact: notice.job, name: notice.name, tree: notice.tree, configuration, deadline, commit, base, snapshot } };
 }

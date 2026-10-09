@@ -284,10 +284,13 @@ of the hosting's own Git service over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
 tree before a required check, refuses a wrong source digest and wrong job
 tree, and publishes only after a configured checker member signs a pass.
-The destination replays from its retained inputs. The checker pass is
-signed by the test: it runs no checker-service origin read or runner. The
-reservation origin and unpublished object access duties are recorded in
-workroom assertion `1b5b048f718d9d053da821feeab75c7fb81c4672`.
+The destination replays from its retained inputs. The actual CheckerService reads a signed, job-bound snapshot over the
+Worker route, validates the recorded reservation and its object closure,
+and signs the result that the lane admits. Its durable storage and runner
+are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
+the same object-overlay boundary with actual private Git checkout and a
+configured step that reads both files. No container platform or deployed
+checker service is established by these witnesses.
 
 `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
