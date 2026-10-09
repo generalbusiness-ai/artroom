@@ -4,11 +4,11 @@ Work in progress for request `b8c5a3c8d9a8f4b9c34d8609b9e779ceef86419a`
 and builder promise `1721118488413cc0d65f8ab3ef2d28b9c054c02d`.
 This note is not a completed delivery, gate result or deployment claim.
 
-## Current preparation
+## Historical documentation preparation
 
 The composed branch was clean at
 `39a4e8ed0bb922e6e9bd0937d401bcbdb7dd508a`, tree
-`dd1d141c86f5eb7b097ce12c4f8de23f426885f7`. It now carries main
+`dd1d141c86f5eb7b097ce12c4f8de23f426885f7`. That checkpoint carried main
 `248d179a9832a4c3d4c482de2fa6b6134e0253a0` through merge
 `29f394eaba31b4cd44e614ae38ef649cd13fcedf`, tree
 `a8495634dad85fe98b2a1db9ed833c9df0bdc848`. The merge added only the
@@ -17,9 +17,9 @@ files and the CLI, testing and demo guides remained byte-for-byte unchanged.
 The parent source remains clean at
 `809e9513868ccc9f5b70551aed5bafc43f6467d7`.
 
-This preparation updates retained evidence and review handoff information.
-It changes no source, role, cleanup rule or manifest. It runs no tests, gate
-or provider operation and files no review artifact.
+That documentation-only preparation updated retained evidence and handoff
+information without source changes, tests, a gate, provider operations or
+review artifacts. Later source checkpoints below have separate evidence.
 
 ## Implemented source
 
@@ -161,18 +161,16 @@ marked attempt. The final witness retains named unknown cleanup after the
 remaining real attempts. Eleven older platform data values have equal
 canonical bytes; no historical source/admission chronology proof follows.
 
-**Read-trigger boundary remains open.** Ordinary reads currently do not enter
-Scope's timed turn. A proposed pin-specific read hook was removed following
-Root's boundary review; it is not in this source or its claimed validation.
-Only existing ordinary-act and alarm turn triggers are implemented and tested.
-Root requested explicit owner judgment on recorded read-turn preparation
-versus the instruction against hidden read-writes. No cleanup completion is
-claimed by treating a readonly query as an implicit provider operation.
+**Resolved read boundary.** Planner `41e959e76688a19f42b25d72b5eb908727f0d9aa`
+corrected the earlier wording: only an act or alarm causes the next cleanup
+turn. Reads must not prepare a turn. The removed patch is not adopted and
+receives no validation credit. The later pure expiry projection is described
+below; it never runs cleanup or calls the provider.
 
 The exact final source still needs a final gate, an observed hosted proposal
 publication and named refusal, complete independent Source review and landing.
-No final gate or hosted proposal run has occurred for this candidate. UI
-implementation remains with the separate session under the user's instruction.
+No final gate or hosted proposal run has occurred for this candidate. Page v2 is separately landed as `d0a3bdcc`; its approval supplies no manifest
+validation or protocol adoption.
 
 
 ## Independent cleanup duties repair
@@ -245,3 +243,67 @@ The preceding derive, CLI and historical-data evidence still applies to their
 unchanged boundaries. This is bounded implementation feedback and validation,
 not independent Source approval. The ordinary-read owner decision and all
 remaining delivery duties above remain open.
+
+## Current source preparation
+
+The coherent source is `43cae0dbd190cccaf5b32c7763e9e639d9e4d109`, tree
+`d33acc7e885391be1d5932f5a87e57e47d9a354c`. It carries landed Page v2 and
+documentation reconciliation main `4b6d42a7`, without borrowing their approvals.
+Final gate, hosted publication and named refusal, full independent review and
+landing remain owed. The snapshot clock/history-floor protection difference
+in checker `16cc76f7` remains qualified and has been sent to planner as
+`ed2303e9`; no exploit or expired-access claim follows.
+
+Checker `ff599ea1` identified two additional supported defects. Source
+`c374302c` rejects empty production/demo manifests before freezing collection,
+using the existing nonempty-list guard and named `empty-manifest` refusal.
+A refused empty collection remains open; a subsequent one-source manifest
+can complete. Only successor pins changed. Four native scenarios and whole
+new-pin validation pass, and guard omission admits both empty forms and fails
+the assertions. The first test failure was an oracle correction for local
+fact normalization, not a runtime repair.
+
+Source `8d146c6b` retains the known native opening, lane, rules request and
+accepted source/manifest facts on interrupted post-opening exits. It names
+the current request digest and its uncertainty, preserves refusal and mismatch
+categories, and gives inspection guidance before a fresh mutation. It does
+not retain a generic durable outbox or retry a signed request. Eleven focused
+Scope cases pass, including actual acceptance with lost reply and the existing
+link-recovery counterparts; locator omission fails direct assertions. An
+inconclusive package-wrapper control receives no credit. After composition,
+eight targeted repair cases pass at `57a220ad`, with unrelated cases excluded.
+The checker service comment now distinguishes snapshot and legacy-token runs.
+
+Planner `41e959e7` requires write-free expiry reporting. Source `39289ee3`
+adds optional destination@3 Summary.reservationExpiry, with current read clock
+and expired live reservation IDs at the returned head. It compares that clock
+with the last sealed time; behind, malformed or unavailable projection clocks
+supply no expired IDs. Summary.time keeps its recorded meaning. ScopeObject,
+Site, history and old pins remain unchanged. The strict client shape guard
+accepts only the two declared projection variants.
+
+CLI `3d88dff6` reports expired reservations as cleanup pending until the next
+act or alarm, distinct from independent cleanup owed after recorded attempts.
+It reads the projection at the final coherent summary and preserves all
+same-head/live/final/pagination checks. Clock-unavailable output names recorded
+state without an expiry claim. Historical replay consistency remains separate.
+
+At exact `43cae0db`, four native Scope scenarios and one client transport test
+pass; six affected typechecks pass. Native Session reads show valid expiry;
+Session/Signed authorization still refuses behind clocks. A deterministic
+failure limited to the post-authorization projection clock returns recorded
+state and unavailable expiry. Inspector fallback cases are labelled separately.
+All application-owned SQL rows, reached head and outside-send counts stay
+unchanged across reads and actual verify --all; Cloudflare internal tables
+are excluded from the SQL fixture. A subsequent ordinary act records cleanup.
+Omitting the expiry IDs or sealed-clock floor fails direct native assertions,
+with source restored. Initial strict-shape and internal-table probes are
+retained and receive no control credit.
+
+Raw focused logs: `/tmp/artroom-manifest-expiry-43ca-scope.log` SHA-256
+`a53003e2fd80e65fd52d08dd2c7597b63bfe8c6c5f45846be1173eeab48a18ed`,
+`/tmp/artroom-manifest-expiry-43ca-client.log` SHA-256
+`7b447d540a5a2424c6289e0c4849b9d96fa3e79cd7689789f889028f0162d643`.
+Root read these complete logs and both complete assertion-control logs.
+Metadata and earlier-source evidence retain their own exact identities;
+none is relabelled as a final gate or hosted-provider observation.
