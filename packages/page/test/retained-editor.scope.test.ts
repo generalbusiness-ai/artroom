@@ -17,7 +17,15 @@ test("retained text creates a new member proposal with exact bytes and original 
     const source = await loadChange(room, row.scope); const original = source.manifests[0]!;
     const draft = { title: "Member correction", path: "docs/correct.md", content: "\ufeff# café\r\n" };
     const options = { current: () => true, pause: d.pause };
-    const task = await prepareEdit(room, source, original.id, draft, options);
+    const destination = await d.G.stub.summary(room.reader!.reader());
+    expect(destination.ok).toBe(true);
+    if (!destination.ok) throw new Error(destination.reason);
+    expect(destination.value.definition).toBe("platform:destination@3");
+    const publishedBefore = destination.value.items.find((item) => item.type === "branch")!.values["head"];
+    const prepared = await prepareEdit(room, source, original.id, draft, options).then(task => ({ state: "prepared" as const, task }), error => ({ state: "refused" as const, reason: String(error) }));
+    expect(prepared.state).toBe("prepared");
+    if (prepared.state !== "prepared") throw new Error(prepared.reason);
+    const task = prepared.task;
     await continueEdit(room, task, options);
     expect(task.state, task.message).toBe("recorded");
     expect(task.lane).not.toBe(source.scope);
@@ -25,6 +33,8 @@ test("retained text creates a new member proposal with exact bytes and original 
     const file = task.steps[2]!.signed.intent.fields;
     expect(file).toMatchObject({ base: task.base, path: draft.path, content: draft.content, size: utf8(draft.content).length });
     const corrected = await loadChange(room, task.lane!);
+    const afterProposal = await d.G.stub.summary(room.reader!.reader());
+    expect(afterProposal.ok && afterProposal.value.items.find((item) => item.type === "branch")!.values["head"]).toEqual(publishedBefore);
     expect(corrected.state).toBe("open"); expect(corrected.merges).toEqual([]); expect(corrected.manifests[0]!.file?.content).toBe(draft.content);
     expect(corrected.body).toContain(source.scope);
     expect((await loadChange(room, source.scope)).manifests[0]).toEqual(original);
