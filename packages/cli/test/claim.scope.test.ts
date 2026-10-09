@@ -32,8 +32,10 @@ describe("claim resumes a claim it gave up on. The Git host and the scheduler ar
     const close = () => {
       if (closed) return;
       closed = true;
-      for (const cleanup of cleanups.reverse()) cleanup();
-      owner.close();
+      let failed = false;
+      try { for (const cleanup of cleanups.reverse()) { try { cleanup(); } catch { failed = true; } } }
+      finally { owner.close(); }
+      if (failed) throw new Error("The claim fixture could not release every owned resource.");
     };
     onTestFinished(close);
     // Captured, identity-bearing no-op hooks cannot overwrite later fixtures.
@@ -41,13 +43,17 @@ describe("claim resumes a claim it gave up on. The Git host and the scheduler ar
     const installedDeaf = () => !owner.isCurrent();
     net.hold = installedHold; net.deaf = installedDeaf;
     cleanups.push(() => { if (net.hold === installedHold) net.hold = null; if (net.deaf === installedDeaf) net.deaf = null; });
+    const clock = net.clock;
+    const resourcesActive = () => {
+      if (closed || net.clock !== clock || net.hold !== installedHold || net.deaf !== installedDeaf) throw new Error("The claim fixture resources ended before RPC completion.");
+    };
     try {
-      await owner.required(() => resumed(owner, cleanups, () => { owner.active(); net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000); }));
+      await owner.required(() => resumed(owner, cleanups, resourcesActive, () => { owner.active(); net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000); }));
     } finally { close(); }
   });
 });
 
-async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClock: () => void): Promise<void> {
+async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesActive: () => void, advanceClock: () => void): Promise<void> {
   // HTTP fault injection is a STAND-IN only for loss: accepted turns below
   // are still the actual Worker's. Lost replies are cancelled before throwing.
   let beforeFound = false;
@@ -105,14 +111,14 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], advanceClo
       owner.active();
       const stub = super.stub;
       return new Proxy(stub, { get(target, property) {
+        owner.active();
         const method = Reflect.get(target, property, target) as unknown;
         if (typeof method !== "function") return method;
-        return (...args: unknown[]) => owner.required(async () => {
-          owner.active();
-          const answer: unknown = await Reflect.apply(method, target, args);
-          owner.active();
+        return async (...args: unknown[]) => {
+          const answer: unknown = await owner.required(() => Promise.resolve(Reflect.apply(method, target, args) as unknown));
+          resourcesActive();
           return answer;
-        });
+        };
       } });
     }
     override restart() { return owner.required(() => super.restart()); }
