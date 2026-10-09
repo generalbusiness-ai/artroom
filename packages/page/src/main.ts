@@ -26,7 +26,7 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { allowedClaim, claimRoom, type ClaimRegister } from "./claim.ts";
+import { allowedClaim, claimRoom, claimStatus, type ClaimRegister } from "./claim.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
@@ -34,7 +34,8 @@ let roomDraft = "";
 let roomDraftContext = "";
 /** What this browser keeps: the room (no secret of it) and the key. */
 interface LocalLabel { text: string; place: Place; register?: ScopeRef }
-interface Settings { place: Place | null; secret: string; register?: ScopeRef; label?: LocalLabel }
+interface ClaimSelection { operation: string; place: Place; register: ScopeRef; origin: string; key: string }
+interface Settings { place: Place | null; secret: string; register?: ScopeRef; label?: LocalLabel; claimSelection?: ClaimSelection }
 function labelFor(value: unknown, place: Place | null, register?: ScopeRef): LocalLabel | undefined {
   if (!value || typeof value !== "object" || !place) return undefined;
   const label = value as LocalLabel;
@@ -55,7 +56,10 @@ function settings(): Settings | null {
     const place = kept.place ?? null;
     const register = isScopeRef(kept.register) && kept.register.kind === "register" ? kept.register : undefined;
     const label = labelFor(kept.label, place, register);
-    return { place, secret: kept.secret, ...(register ? { register } : {}), ...(label ? { label } : {}) };
+    const selected = kept.claimSelection;
+    const secret = unb64url(kept.secret);
+    const claimSelection = selected && typeof selected.operation === "string" && selected.operation.length > 0 && selected.origin === location.origin && secret?.length === 32 && selected.key === keyIdOfSecret(secret) && labelFor({ text: "selection", place: selected.place, register: selected.register }, place, register) ? selected : undefined;
+    return { place, secret: kept.secret, ...(register ? { register } : {}), ...(label ? { label } : {}), ...(claimSelection ? { claimSelection } : {}) };
   } catch {
     return null;
   }
@@ -138,17 +142,24 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
   const binding = settingsContext(kept);
   if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
   roomDialog?.close(); roomDialog?.remove();
-  const name = h("input", { name: "name", required: "", maxlength: "256", value: claimDrafts.get(binding) ?? "", autocomplete: "off" }) as HTMLInputElement;
+  let status: ReturnType<typeof claimStatus>;
+  try { status = claimStatus(sessionOf(kept), configured, localStorage); }
+  catch (error) { alert(error instanceof Error ? error.message : "The private claim status could not be read."); return; }
+  const selected = status?.state === "complete" && kept.claimSelection?.operation === status.operation;
+  let mode: "new" | "resume" = status && !selected ? "resume" : "new";
+  let operation = status?.operation;
+  const name = h("input", { name: "name", required: "", maxlength: "256", value: mode === "resume" ? status!.label : claimDrafts.get(binding) ?? "", autocomplete: "off" }) as HTMLInputElement;
   const message = h("p", { role: "status", hidden: "" });
-  const submit = h("button", { type: "submit", class: "primary" }, "Create room");
+  const submit = h("button", { type: "submit", class: "primary" }, mode === "resume" ? "Resume creation" : "Create room");
   const cancel = h("button", { type: "button" }, "Cancel");
   const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Room name", name), message, h("div", { class: "form-footer" }, cancel, submit));
   const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-room-title" }, form) as HTMLDialogElement;
   roomDialog = dialog;
-  const close = () => { claimDrafts.set(binding, name.value); dialog.close(); dialog.remove(); if (roomDialog === dialog) roomDialog = null; opener.focus(); };
-  cancel.addEventListener("click", close);
+  const close = (preserveDraft = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); dialog.close(); dialog.remove(); if (roomDialog === dialog) roomDialog = null; opener.focus(); };
+  cancel.addEventListener("click", () => { close(); });
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   name.addEventListener("input", () => { claimDrafts.set(binding, name.value); });
+  if (mode === "resume") name.setAttribute("disabled", "");
   if (claiming.has(binding)) { submit.setAttribute("disabled", ""); name.setAttribute("disabled", ""); }
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -157,23 +168,29 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
     message.textContent = "Creating room"; message.removeAttribute("hidden");
     void (async () => {
       try {
-        const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle, current: () => settingsContext(settings() ?? { place: null, secret: "" }) === binding });
+        const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { mode, ...(operation ? { operation } : {}), handle: room.me!.handle, current: () => settingsContext(settings() ?? { place: null, secret: "" }) === binding });
+        operation = result.operation; mode = "resume";
         if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
         if (result.repository) {
           const place = { directory: result.repository.directory.scope, membership: result.repository.membership };
           const label: LocalLabel = { text: result.label, place, ...(kept.register ? { register: kept.register } : {}) };
-          if (!keep({ ...kept, place, label })) {
+          const claimSelection: ClaimSelection = { operation: result.operation, place, register: configured.register, origin: location.origin, key: keyIdOfSecret(room.session.secret) };
+          if (!keep({ ...kept, place, label, claimSelection })) {
             message.textContent = `Creation is recorded, but storage of the room settings could not be verified. Check the saved room and key before another action. Directory ${result.repository.directory.scope}; membership ${result.repository.membership.scope}. Keep the private claim record. Resume creation to verify the original proof before trying to save again.`;
             submit.textContent = "Resume creation";
             return;
           }
-          opened.clear(); close(); location.hash = "#/"; await draw();
+          opened.clear(); close(false); location.hash = "#/"; await draw();
         } else {
           message.textContent = result.outcome.lines.join(" "); submit.textContent = result.pending ? "Resume creation" : "Create room";
           if (result.pending) name.setAttribute("disabled", ""); else name.removeAttribute("disabled");
         }
       } catch (error) {
         if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+        try {
+          const retained = claimStatus(sessionOf(kept), configured, localStorage);
+          if (retained) { operation = retained.operation; mode = "resume"; name.value = retained.label; name.setAttribute("disabled", ""); }
+        } catch { /* Preserve the original error; private recovery remains unavailable. */ }
         message.textContent = error instanceof Error ? error.message : "Creation could not be confirmed. Resume with the saved request."; submit.textContent = "Resume creation";
       }
       finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
@@ -260,7 +277,9 @@ function settingsScreen(): HTMLElement {
       } catch { tell(false, "The config could not be read."); return null; }
     } else if (typed) register = undefined;
     const label = typed ? undefined : labelFor(kept?.label, place, register);
-    return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}), ...(label ? { label } : {}) };
+    const chosenSecret = newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "");
+    const claimSelection = !typed && chosenSecret === kept?.secret ? kept?.claimSelection : undefined;
+    return { place, secret: chosenSecret, ...(register ? { register } : {}), ...(label ? { label } : {}), ...(claimSelection ? { claimSelection } : {}) };
   };
   const save = (next: Settings) => {
     if (!keep(next)) { tell(false, "Storage of these settings could not be verified. Check the saved room and key before another action."); return; }
@@ -316,6 +335,7 @@ async function draw(focus = false): Promise<void> {
     if (kept.register && room.me?.handle && typeof navigator !== "undefined" && navigator.locks && typeof HTMLDialogElement !== "undefined") {
       try {
         const configured = await allowedClaim(sessionOf(kept), kept.register);
+        claimStatus(sessionOf(kept), configured, localStorage); // A corrupt private recovery record offers no fresh creation.
         if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
         claimOffer = { kept, configured };
       } catch { /* No founding control is offered without a current native eligibility read. */ }
