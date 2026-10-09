@@ -1,0 +1,116 @@
+{
+  "head": "eadb529facd19fa7a7c336da19edb1a9e2c0bd32",
+  "tree": "3a8fe002e7d80d1ec997f003a9551d522863173c",
+  "base": "b4d8025a146bc844f10e5596d5bf750b107ef7c4",
+  "prior": "d182cd5ee4f07ad28122bfa2bbc344294bcc1920",
+  "worktree": "/tmp/artroom-u1-preparation-repairs",
+  "branch": "request/u1-preparation-repairs",
+  "owner": "99453017dd9951526f94821dc23ddc7109072ec2",
+  "paths": [
+    {
+      "path": "examples/counting/browser/app.test.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/00.body.txt",
+      "bytes": 5298,
+      "lines": 46,
+      "sha256": "1aa416ccb84f623df6e26945addcf6f6c4e6a15ef040790761e6547e26d88e2c",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/00.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/00.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/app.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/01.body.txt",
+      "bytes": 5162,
+      "lines": 39,
+      "sha256": "eaa55fb8b37db2049501869870405429539dcc88644622fd39680b7632118d60",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/01.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/01.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/client.test.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/02.body.txt",
+      "bytes": 15111,
+      "lines": 138,
+      "sha256": "b6cac21ea99616c7daf4083d0782f99f8762bb85e51ae745a4c3ce33f0139c49",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/02.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/02.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/client.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/03.body.txt",
+      "bytes": 12271,
+      "lines": 94,
+      "sha256": "80b1e8cbe4495bbd0440b22b1b7cf24c70be5164b49ad8f9a51072e063bd5f1b",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/03.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/03.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/dispatcher.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/04.body.txt",
+      "bytes": 7793,
+      "lines": 75,
+      "sha256": "ef5bc0698d486a4b41db5bac47aaa35b5aac1f71407f4fdb1ab254a73cdca2ae",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/04.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/04.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/journal.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/05.body.txt",
+      "bytes": 8663,
+      "lines": 96,
+      "sha256": "4c0a96b39634ee494d9fcbbc4d307e56537a87f15cff6efcb4b42a7eeb424bb3",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/05.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/05.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/startup.md",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/06.body.txt",
+      "bytes": 16948,
+      "lines": 66,
+      "sha256": "3586091fd32682e941da2ff21c867765b1cffd05e77788ef3bf9079cecb02b4b",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/06.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/06.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/storage.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/07.body.txt",
+      "bytes": 4992,
+      "lines": 45,
+      "sha256": "1168e8295790635d12ca434b5bcf4c2e5f7cc63c9d587edc1748f9df86a6ec65",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/07.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/07.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/view.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/08.body.txt",
+      "bytes": 8610,
+      "lines": 40,
+      "sha256": "6cd20e19f00ccde67704bbc9374a27524527d52ceda434a938e84f034899a55b",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/08.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/08.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/voice-controller.test.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/09.body.txt",
+      "bytes": 27572,
+      "lines": 383,
+      "sha256": "498863e1b7a056bab2884b53461272cb42cced1c4d0d1486edd073ad02f98785",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/09.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/09.successor.diff.txt"
+    },
+    {
+      "path": "examples/counting/browser/voice-controller.ts",
+      "body": "/tmp/artroom-u1-preparation-repairs-eadb-packet/10.body.txt",
+      "bytes": 24292,
+      "lines": 446,
+      "sha256": "fecde474404e982eac714e7735d4cfb817f8570ad1a68989f9a255a72312e83b",
+      "diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/10.diff.txt",
+      "successor_diff": "/tmp/artroom-u1-preparation-repairs-eadb-packet/10.successor.diff.txt"
+    }
+  ],
+  "source_only": true,
+  "project_execution": [],
+  "w1_current_dependency": "45177075a8c2308063ee8b3d10059ac1761fa12e",
+  "w1_composed": false,
+  "prior_evidence": "b4 fake witnesses;629 fake captures remain at their original heads only",
+  "git_status": ""
+}
