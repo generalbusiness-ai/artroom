@@ -64,6 +64,19 @@ test("unknown submission offers only a read refresh and cannot sign another muta
   panel.all().find((node) => node.tag === "button" && node.textContent === "Check status")!.event("click");
   expect([sends, reads]).toEqual([0, 1]);
   expect(panel.all().filter((node) => node.name.startsWith("field:")).every((node) => node.hasAttribute("disabled"))).toBe(true);
+  expect(panel.textContent).toContain("Request outcome unknown");
+});
+
+test("an uncertain subject keeps one status home while its known request remains inspectable", () => {
+  const last = new Element("p");
+  last.append("Accepted merge; subsequent observation unknown");
+  const panel = asElement(actsPanel({ acts: [review], hidden: 0 }, () => expect.fail("must not submit"), last as unknown as HTMLElement, {
+    uncertain: true, statusShown: true, refresh: () => {},
+  }));
+  expect(panel.all().filter((node) => node.attrs.get("role") === "status")).toHaveLength(0);
+  expect(panel.textContent).not.toMatch(/Awaiting confirmation|Request outcome unknown/);
+  expect(panel.all().find((node) => node.attrs.get("class") === "action-record")?.textContent).toContain("Accepted merge; subsequent observation unknown");
+  expect(panel.all().find((node) => node.tag === "button" && node.textContent === "Check status")).toBeDefined();
 });
 
 test("a single eligible choice is fixed and drafts stay with their room, member and exact version", () => {

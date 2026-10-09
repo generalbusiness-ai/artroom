@@ -9,6 +9,8 @@ export interface ActionContext {
   refresh?: () => void;
   /** A submit or its subsequent observation is unsettled. Refresh is read-only. */
   uncertain?: boolean;
+  /** The current subject already shows its uncertainty in its status. */
+  statusShown?: boolean;
   /** Association includes the service, room, member key and scope. Memory only. */
   draftKey?: string;
 }
@@ -49,7 +51,8 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
     const refresh = element("button", { type: "button", class: "primary" }, "Check status");
     if (!context.refresh) refresh.setAttribute("disabled", "");
     refresh.addEventListener("click", () => context.refresh?.());
-    panel.append(element("p", { role: "status" }, "Awaiting confirmation"), refresh);
+    if (!context.statusShown) panel.append(element("p", { role: "status" }, "Request outcome unknown"));
+    panel.append(refresh);
   }
   const ordinary: HTMLElement[] = [], advanced: HTMLElement[] = [];
   for (const act of offered.acts) {
