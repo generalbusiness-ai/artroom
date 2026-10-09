@@ -3,7 +3,7 @@
  * This module never installs a register or imports an operator key. */
 import type { PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, parseStrict, unb64url } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedReads, type Fetch } from "@generalbusiness/artroom-client";
 import { claim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/artroom-cli";
 import { DIRECTORY_OF } from "@generalbusiness/artroom-platform";
 import type { Session } from "./data.ts";
@@ -15,7 +15,14 @@ export interface ClaimStorage { getItem(key: string): string | null; setItem(key
 /** Exclusive across all callers/tabs sharing the private record. Production
  * uses Web Locks; a test supplies its explicitly labelled lock stand-in. */
 export interface ClaimLocks { request<T>(name: string, run: () => Promise<T>): Promise<T> }
-export interface ClaimOptions extends Pick<Context, "pause" | "tries"> { handle?: string; locks?: ClaimLocks }
+export interface ClaimOptions extends Pick<Context, "pause" | "tries"> {
+  handle?: string;
+  locks?: ClaimLocks;
+  /** True only while the Page still selects the captured room, key and register.
+   * Checked after waiting for the lock and immediately before mutation delivery.
+   * A changed context never discards or replaces a saved original envelope. */
+  current?: () => boolean;
+}
 export interface ClaimedRoom {
   outcome: Outcome;
   /** The original local label, kept across a retry; never a native name claim. */
@@ -111,6 +118,10 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
   const locks = options.locks ?? browser.navigator?.locks;
   if (!locks) throw new Error("This browser cannot lock private claim recovery across tabs. Nothing was submitted.");
   return locks.request(`artroom-page-claim:${binding}`, async () => {
+    const checkCurrent = (): void => {
+      if (options.current?.() === false) throw new Error("The Page room, key or register changed. This continuation sends no new mutation. Any saved original claim is kept; its earlier outcome may be accepted or unknown.");
+    };
+    checkCurrent();
     if (!label.trim() || label.length > 256) throw new Error("Enter a local room label of at most 256 characters.");
     const privateStore = storeFor(session, configured, storage, label.trim());
     const before = privateStore.kept();
@@ -119,8 +130,20 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
       if (eligible.definition !== configured.definition) throw new Error("The register read does not match the configured pinned version. Nothing was submitted.");
     }
     if (before.config.repository && !before.completed) throw new Error("The saved room has no exact native claim recovery proof. It is kept; nothing was submitted.");
-    const { handle, locks: _locks, ...waiting } = options;
-    const outcome = await claim({ store: privateStore.store, ...session.fetch ? { fetch: session.fetch } : {}, ...session.now ? { now: session.now } : {}, ...waiting }, before.label, handle !== undefined ? { handle } : {});
+    checkCurrent();
+    const { handle, locks: _locks, current: _current, ...waiting } = options;
+    let blocked = false;
+    const send = session.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
+    const guardedFetch: Fetch = (url, init) => {
+      const path = new URL(url).pathname;
+      if (init?.method === "POST" && (path.endsWith("/acts") || path.endsWith("/preparations") || path === "/v1/scopes")) {
+        try { checkCurrent(); } catch (error) { blocked = true; throw error; }
+      }
+      if (!send) throw new Error("This runtime has no fetch; nothing was sent.");
+      return send(url, init);
+    };
+    const native = await claim({ store: privateStore.store, fetch: guardedFetch, ...session.now ? { now: session.now } : {}, ...waiting }, before.label, handle !== undefined ? { handle } : {});
+    const outcome: Outcome = blocked ? { code: 1, lines: ["The Page room, key or register changed. This continuation sent no new mutation after the context changed. The exact saved original claim is kept; earlier steps may already be accepted or unknown. Inspect or resume only under its original context."] } : native;
     const after = privateStore.kept();
     return { outcome, label: after.label, repository: outcome.code === 0 ? after.config.repository ?? null : null, pending: outcome.code !== 0 && (after.config.claim !== undefined || after.completed !== undefined) };
   });
