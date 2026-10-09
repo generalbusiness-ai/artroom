@@ -141,7 +141,10 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     expect(await verifyReservationObjects(corrupt)).toBe(false);
     expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: corrupt })).toEqual({ not: "no-manifest" });
   }
-  const wrongKey = (await founder.store.secret((await founder.store.config())!.key))!;
+  const otherChecker = person();
+  const otherInvitation = ok(await run(founder, "invite", "@other-checker", "--role", "checker")).lines[1]!.split(": ")[1]!;
+  ok(await run(otherChecker, "join", otherInvitation));
+  const wrongKey = (await otherChecker.store.secret((await otherChecker.store.config())!.key))!;
   const wrongAsk = await signJobRead({ key: keyIdOfSecret(wrongKey), sign: (bytes) => sign(wrongKey, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   expect(await Gsnapshot.reservationSnapshot(wrongAsk)).toBeNull();
   const delivered = await service.deliver({ lane: await L.at(), job: factRefOf(jobEntry.entry), name: "text", tree: manifest.values["tree"] as string });
