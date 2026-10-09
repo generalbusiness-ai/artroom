@@ -109,7 +109,12 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
   const currentJobs = change.jobs.filter((job) => job.manifest === current?.id);
   const version = current ? section("Files", current.file ? h("div", {},
     h("div", { class: "filebar" }, h("code", { class: "filename" }, current.file.path)),
-    h("p", { class: "muted" }, editPath(current.file.path) === null ? "Choose a file path inside this room." : published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
+    editPath(current.file.path) === null ? h("p", { class: "muted" }, "Choose a file path inside this room.") : current.file.content !== null && current.file.content !== undefined ? h("details", { class: "source-preview" },
+      h("summary", {}, "Preview source"),
+      h("p", { class: "version-label" }, `Version ${current.id} · ${current.file.path}`),
+      current.file.digest ? h("p", { class: "record-meta" }, "Digest ", h("code", {}, current.file.digest)) : null,
+      h("pre", { "aria-label": `Source of ${current.file.path}, version ${current.id}` }, h("code", {}, current.file.content)),
+    ) : h("p", { class: "muted" }, published ? "Rendering this published version is not available yet." : "Preview of this version is not available yet."),
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
     h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null))),

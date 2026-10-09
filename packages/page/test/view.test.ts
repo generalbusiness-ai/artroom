@@ -91,3 +91,22 @@ test("merged requirements stay in inspection; active requirements use only the r
   expect(routineText(active)).not.toContain("protected");
   expect(routineText(render(view({ rules: { ...rules, extents: rules.extents.map((extent) => ({ ...extent, approvals: 0 })) } })))).not.toContain("Review requirements");
 });
+
+// Source is selected-version text from the verified projection, never HEAD or HTML.
+test("source preview preserves the selected manifest identity and treats markup as text", () => {
+  const current = view().manifests[0]!;
+  const source = "<script>window.pwned = true</script>\n# Selected content";
+  const selected = { ...current, file: { ...current.file!, content: source } };
+  const older = { ...current, id: 11, state: "superseded", file: { ...current.file!, content: "Older content", digest: "sha256:older" } };
+  const screen = render(view({ manifests: [older, selected] }));
+  const preview = screen.all("details").find((node) => node.attributes["class"] === "source-preview")!;
+  expect(preview.all("summary")[0]!.textContent).toBe("Preview source");
+  expect(preview.textContent).toContain("Version 12 · guide.md");
+  expect(preview.textContent).toContain("sha256:full-file-digest");
+  expect(preview.all("pre")[0]!.textContent).toBe(source);
+  expect(preview.textContent).not.toContain("Older content");
+  expect(screen.all("script")).toEqual([]);
+  expect(screen.all("a").some((node) => node.attributes["href"] === selected.file.page)).toBe(false);
+  expect(render(view()).all("details").some((node) => node.attributes["class"] === "source-preview")).toBe(false);
+  expect(render(view({ manifests: [{ ...selected, file: { ...selected.file, content: "" } }] })).all("pre")[0]!.textContent).toBe("");
+});
