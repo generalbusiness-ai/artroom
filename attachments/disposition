@@ -1,0 +1,62 @@
+# Source-only test-economy disposition after failed d026
+
+Planner critical thread 16 requests a bounded disposition from retained evidence. No source edit, deletion, typecheck, test, discovery, benchmark, gate, mutation sweep, provider, browser or audio execution was performed. Full product acceptance and failed-gate repair remain intact; no minimal-green replacement is proposed.
+
+## Retained cost evidence
+
+| Exact failed candidate | Test-phase wall | Test-phase CPU | Result |
+|---|---:|---:|---|
+| 676f23d1794cb2fa4d7c52b5287933a808dcf653 | 408.6 s | 451.7 s | 968 passed, 4 failed, 2 skipped |
+| 270ed0ee1ba9b11c8e31a1e4302aa22a624cd3c8 | 280.4 s | 321.5 s | 969 passed, 5 failed, 2 skipped |
+| d026c4f29278f139c3e85e973a753202f5ee818e | 287.89 s | 328.49 s | 970 passed, 5 failed, 2 skipped |
+
+All three stopped before active-source checks. These are separate changed candidates on a shared machine, not controlled paired before/after measurements or a 10x result. The observed difference cannot be assigned to a source optimization, failure, order, cache, cleanup or timeout cause.
+
+Complete retained 676/270 evidence JSON and wrapper logs were read, as was the complete d026 raw phase log/evidence in the earlier disposition. 676 RefcountedCanceler output identifies no actor; 270/d026 contain no uncaught section. A timeout is incomplete acceptance, not an inexpensive substitute for the intended witness.
+
+The copied duration caches are mutable post-run file-duration attributions, NOT per-case wall, start order, exclusive Worker execution time, attributed CPU or benchmark data. d026 cache SHA-256 238453849a22a329afad036f25421f101b090341df2fe7b00406e82b91793d0c; 270 cache SHA-256 241b0b4e4344ee4b7eaf76bcd6b60cf55d4eeaa6b66a2c349d6a8917324db294. d026's cache also contains counting and observe entries not present at the failed head, demonstrating why cache contents alone cannot prove which tests the gate ran. Rankings below are filtered to files actually present at d026; they remain attribution hints only.
+
+| Native family | 270 copied file ms | d026 copied file ms |
+|---|---:|---:|
+| manifest-tree.scope | 25,514 | 35,979 |
+| wiring.scope | 15,262 | 28,109 |
+| editor-list1.scope | 13,430 | 22,970 |
+| demo.scope | 36,781 | 20,616 |
+| issues.scope | 12,196 | 19,148 |
+| site-route | — | 14,648 |
+
+Do not sum these into observed gate cost or subtract them to claim savings. These data justify inspecting the setup-heavy families first, not deleting their tests.
+
+Source hashes at failed d026 are in /tmp/artroom-d026-test-economy-source-map.json, SHA-256 8e11be3a853f86403450ce103c0d22143f279e33b687b0272ee50a532369fde3. Complete editor-list1, wiring, issues and room fixture source was read; complete Page demo helper was already read in the access disposition. Manifest wrapper/setup and previous complete invariant matrices were read, but this task has not re-audited all 976 lines of the manifest mega-story. Demo story and stage/recorder source were read in bounded ranges; one top-level combined output was truncated, so no independent full-demo redundancy clearance is claimed. Site-route remains an attribution pointer, not a reviewed removal target.
+
+## Prioritized concrete work
+
+1. **Finish the already approved OwnGit immutable pack reuse preparation.** It targets packages/scope/test/hosts.ts upload-pack construction, reused across the large native CLI/Page/manifest families. The approved source in /tmp/artroom-owngit-pack-cache snapshots ordered actual objects before await, keys IDs/type/length/raw digest, shares only immutable buildPack byte promise, clears only failed current promise, and still authenticates each request and constructs fresh Responses/advertisements. This avoids repeated compression without sharing rooms, credentials, SQL authority or native mutable state. Do not add another competing cache implementation or assume GitHub Hub reuse has the same contract. **The separately commissioned 17-file affected selection remains owed**; source approval alone does not establish those file results, gate improvement or landing. The Scripted Site pack cache already has its own distinct retained witness; it is not proof for OwnGit.
+
+2. **Make Page editor fixtures pay only their required setup.** Current editor-list1 fixture (12–22) calls full demo, publishes an initial one-file change, joins the invited member, reads its source/current manifest, then activates LIST1. Full demo (163–177) also joins Paul as maintainer and leaves Una's invitation, and activates both issue and change. The four editor scenarios need a real enrolled member and retained original source plus LIST1 activation; they do not inspect Paul, issue actions or an activated issue definition. A source commission can parameterize fixture setup to omit unused maintainer/issue setup for this file while retaining the real directory, native membership session, actual initial source and native activation. Keep a fresh room/host/key/store for each mutable scenario. Do not share a mutable pre-founded room or synthesize the original manifest. Potential cost is unmeasured. Page demo's ordinary full setup must remain the default for story/tasks/list/issue witnesses that need it.
+
+3. **Avoid blanket member enrollment in the wiring room helper.** room.ts 241–282 enrolls Una, Vic and Paul for every W1–W5. W1 uses Vic's actual selected report and therefore needs all; W3 uses Vic's extentless verdict and needs all. W2, W4 and W5 do not use Vic. A source commission can add an explicit fixture roster parameter while preserving fresh native membership/history and the common founding/publication setup. This avoids only the unused Vic invitation/join/inbox in those three scenarios. Do not remove W2 replay or replace native membership with scripted authority. Do not change default callers, legacy version witnesses or their roster without a complete affected caller map. This is a concrete small setup reduction, not claimed material or 10x savings.
+
+4. **Retain manifest scenario diversity; specialize setup only after a full current body audit.** Its 19 native cases still use fresh mutable rooms. The previous accepted matrix already removed seven CLI category foundings and repeated snapshot/read controls while retaining native acceptance/reply-loss, two partial-work custody stages, one-element real checker origin and cleanup variants. Do not mechanically merge flag-based stories or delete cleanup cases. A later bounded setup specialization may omit checker enrollment/job steps for early nonempty/custom-required/unknown-stage paths ONLY where the body proves the target assertion never needs them. This disposition authorizes no such omission because the full current mega-story was not reread here. Prior matrix and notes/2026-10-09-test-cost-delivery.md identify actual surviving witnesses, including a correction that one-file already returned before the downstream tail; do not claim another invented tail cut.
+
+## Same-boundary invariant map
+
+| Setup optimization | Required surviving named native witness | Why it is not replaced by a cheaper approximation |
+|---|---|---|
+| OwnGit immutable compression reuse | Existing affected native manifest/edit/issues/demo/Page/Site families remain; dedicated OwnGit cache witness verifies fresh wire/authentication/content invalidation/rejection retry | Only derived immutable bytes reused; every native turn, read-session and decoded push remains real. 17-file selection owed. |
+| Editor unused setup omitted | “the known LIST1 member editor freezes exactly one authenticated source; source receipts are not versions” | Actual original source, member session, collected-source fact versus frozen manifest, exact BOM/CRLF bytes and unchanged branch remain native. |
+| Same editor fixture | “an extra collected source stops the bounded editor before freeze without silently including it” | Actual extra native collection and no current manifest must remain; positive freeze does not imply this guard. |
+| Same editor fixture | “unknown propose-file … no next signature until native settlement” | Loss before delivery has no accepted receipt; original envelope is explicitly later delivered, then settled natively. Cannot fold into accepted-freeze lost reply. |
+| Same editor fixture | “unknown propose-manifest … no next signature until native settlement” | Accepted freeze with lost reply is different recorded work; native settle and exact original signature remain. |
+| Omit unused Vic only | W2 mixed source/rules extent refusal then controller approval, native publication, whole retained replay and resealed wrong merger mismatch | W1 source-only positive is not this mixed extent/native replay boundary. |
+| Omit unused Vic only | W4 single-controller exception undeclared refusal then declared admission and reason | W2 independent controller approval does not prove self-author exception. |
+| Omit unused Vic only | W5 required job pending refusal, nonchecker unauthorized, admitted checker result and native destination publication | Manifest-tree actual CheckerService is a different origin/snapshot/runner boundary; it does not replace this standing/extent combination. |
+| Keep full roster | W1 selected native report, approving extent, destination reserve/report association and issue closes once; W3 wrong/absent extent refuses then corrected verdict publishes | Vic participates in these actual invariants. |
+| No deletion cleared | issues.scope issue open/comment/triage refusal, edit --closes and merge --closes, stale directory advisory versus real lane state, full CLI verify and known accepted proposal on lost link read | Demo transcription/output rehearsal shares commands but has its own 26/30-shot sequencing and host journeys; it does not cover all exact issue controls. |
+| No deletion cleared | demo.scope own/GitHub rehearsal and manifest-list two-file published/refused scripts | Provider-specific host wiring, transcript/script expected outputs, pacing, capture correspondence and every-scope verification remain; one generic edit does not prove this. |
+
+There is **no newly identified native scenario deletion with a proven same-functional/same-native-boundary surviving witness** in this disposition. The prior accepted category compression is already in source; do not count it again.
+
+## Execution and filing limits
+
+Proceed with the already commissioned OwnGit preparation first and obtain its complete 17-file affected result before cost claims. New fixture-specialization implementation requires planner selection and exact caller/invariant review. Run only its justified affected selection after frozen source and discovery, original timeouts/retry policy unchanged. A later single authorized exact composed gate and complete Source review remain necessary. No broad suites, unchanged retries, timeout widening, failing-case exclusion or runtime downgrade are proposed here.
