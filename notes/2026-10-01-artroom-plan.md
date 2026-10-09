@@ -53,6 +53,12 @@ Revision 4 answers review `bce3646e`:
 | Non-blocking: input isolation for scoped reuse | Section 7, items 3 and 5 |
 | Non-blocking: runner example | Section 5 |
 
+Revised 2026-10-04 under request `50d7806a`: one paragraph of section 3,
+the comparison with jj, is replaced. The new text is the reviewed
+paragraph in section 6 of `plans/011-2026-10-04-jj-clarification.md`,
+applied on the planner's direction `fceb27d0`. Nothing else in revision
+4 is changed.
+
 ## 1. The competition
 
 **Sources:** the official rules ("Build the Next-Gen Git Platform on
@@ -188,8 +194,21 @@ in section 15.
   it exists.
 
 **Agent-context tools.** Entire records agent sessions with commits.
-GitButler separates parallel agents' edits into virtual branches. jj
-offers first-class conflicts and an operation log.
+GitButler separates parallel agents' edits into virtual branches.
+
+jj is a local version control client with a Git backend and history
+editing tools. Its operation-log views reconcile divergent local
+operations, while working-copy mutations and backend I/O have separate
+constraints. Artroom instead records shared, authorized acts and their
+outcomes. A supported jj client can work in a code lane, with immutable
+commits and author-supplied change headers carried through the ordinary
+proposal path; those headers do not confer Room authority or review.
+
+This paragraph on jj is a planning comparison against jj v0.45.1
+documentation, retrieved 2026-10-04. It does not change the general
+contract for declared acts, and it does not promise that every client
+is compatible. Compatibility with a deployed client is **untested**.
+The sources and limits are in `notes/2026-10-01-research-jj.md`.
 
 **Published research.** arXiv 2607.04697 (July 2026) studied 33,596 agent
 pull requests. It reports conflict rates of 41.7% for co-active pairs
