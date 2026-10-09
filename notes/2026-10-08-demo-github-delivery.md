@@ -75,9 +75,48 @@ manifest/lockfile change. An over-specific write-token count in the test
 was replaced with the actual invariant: the initial write/read order and
 one member read mint. The final gate below covers the composed source.
 
-One final `npm run gate` is required before review. Its exact head,
-result and retained raw logs will be recorded here after that run.
-Independent full source/evidence review and normal landing remain owed.
+One final `npm run gate` ran at clean source
+`b332e519a9d69e1918391140b0c446a91ed2e229`, tree
+`35e801ef843c8297a1f6314a15b0a67f89fba7e6`. The command exited 0:
+845 Vitest tests passed, two opt-in recorders were skipped, and all six
+active-source checks passed. The gate performed its normal locked
+`npm ci` because the previous installation stamp did not match this
+lockfile. It changed no manifest, lockfile or tracked source.
+
+| Phase | Exit | Elapsed seconds | CPU seconds |
+|---|---|---:|---:|
+| Locked install | 0 | 12.1 | 4.6 |
+| Whitespace | 0 | 0.0 | 0.0 |
+| Types | 0 | 6.9 | 15.7 |
+| Tests and active-source checks | 0 | 69.9 | 100.5 |
+
+These are the gate's printed phase costs, not a separately measured
+whole-process elapsed figure. It ran on Hugh's macOS machine with the
+manifest/checker implementation work active in another worktree. The
+dependency installation was renewed; no cold-cache claim is made.
+
+**The exit and tally are qualified by an uncaught runtime diagnostic.**
+The raw test log reports `Cannot perform I/O on behalf of a different
+Durable Object`, I/O type `RefcountedCanceler`, in Vitest's
+`abortContextSignal` / `abortIfTimeout` / `rejectTimeoutError` path.
+No test or object owner is identified. This resembles a previously held
+timeout-abort family, but this run proves neither the same cause nor a
+fix, physical drain or clean runtime. The diagnostic is retained despite
+exit 0. No timeout, skip or warning was suppressed, and no whole suite
+was repeated to obtain a different log. Planner disposition was requested
+in `d2fa6fdd` before final Source filing or landing.
+
+The gate output is `/tmp/artroom-demo-github-gate.log`, SHA-256
+`d831634f081f10c577c4f636f5decf307a280cae61b67c9b7e296408c4195025`.
+Raw phase logs are in
+`/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.vb9gDv4HYN`.
+Root read the complete test and type logs. The test log's SHA-256 is
+`0220af8dc642324e4a0e5612b043874490e8234664071fb4eae34d4aca60aabe`;
+the type log's is
+`b05ed3728460487c42438640e0ac5e1f38c1944c2c38137be5294ffcecabf447`.
+This later delivery-note update changes documentation only; source and
+test identity remain equal to the gated head. Independent full
+source/evidence review and normal landing remain owed.
 
 ## Limits
 
