@@ -135,8 +135,14 @@ legacy bytes remain retained. The client journal stops at 64 operations and
 evicts none. Three real-Scope witnesses prove two distinct creations, original
 resume without new POSTs, stale-context prevention, pending preservation and
 legacy migration. Eight affected UI/asset checks and Page types pass. A narrow
-peer re-read found no further defect in this lifecycle; the replacement's
-focused browser recheck and full Source review remain separate obligations.
+peer re-read found no further defect in this lifecycle. The replacement's
+focused Chromium recheck passes: stale queued New sends no POST, explicit
+Resume reuses the original operation and envelope, and a changed queued
+context sends no additional mutation while retaining the original journal
+bytes. The public evidence identifies its source and exports only operation
+IDs, digests and observations. Founding delivery is deliberately intercepted
+without Scope admission; the native two-room/settlement witness is separate.
+Full independent Source review remains owed.
 
 A narrow peer read found and verified the repair of a late-draw label race.
 Final DOM publication checks the original room context; the displayed local
