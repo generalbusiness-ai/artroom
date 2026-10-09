@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, definitionDigest, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/artroom-platform";
@@ -9,12 +9,11 @@ import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
-import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { Platform, rita, routed, sam, settle } from "./repository.ts";
 import { reader } from "./support.ts";
-import { platformNet, platformOutside } from "./worker.ts";
+import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
 
 const SERVICE = "https://scopes.test";
 
@@ -22,25 +21,44 @@ const SERVICE = "https://scopes.test";
 // clock and read inspector are labelled stand-ins. The SQL trigger is an explicit
 // retention-fault control; it writes no invented native entry or authority.
 test("explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant", async () => {
-  const prior = { hold: net.hold, deaf: net.deaf, clock: net.clock.now, secret: platformNet.secret, sessions: platformNet.sessions, inspector: platformNet.inspector };
+  const lifetime = siteFixtureLifetime();
+  let releaseRegister = () => {};
+  onTestFinished(() => releaseRegister());
+  // Guard every actual RPC boundary, including nested Platform helpers. An
+  // already-started RPC cannot be cancelled; a released continuation cannot
+  // start another one or mutate the shared clock/settings.
+  class OwnedPlatform extends Platform {
+    override get stub() {
+      const target = super.stub;
+      return new Proxy(target, { get(source, key) {
+        const value: unknown = Reflect.get(source, key, source);
+        return typeof value === "function" ? (...args: unknown[]) => lifetime.wait(() => Promise.resolve(Reflect.apply(value, source, args))) : value;
+      } });
+    }
+    override async created(seq: number, n = 0): Promise<Platform> {
+      const made = await lifetime.wait(() => super.created(seq, n));
+      return new OwnedPlatform(made.name);
+    }
+  }
   const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {},
     fields: { host: "git.example", namespace: "application", policy: "keys", founders: [rita.key] },
     idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
-  const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register, creator: null, cause: intentDigest(install), ordinal: 0 }));
+  const R = new OwnedPlatform(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register, creator: null, cause: intentDigest(install), ordinal: 0 }));
   let D: Platform | undefined, C: Platform | undefined;
   try {
-    net.hold = net.deaf = null;
     const host = outsideOf(R.name);
-    wired.set(R.name, () => ({ outside: host }));
+    const ports = () => { lifetime.active(); return { outside: host }; };
+    wired.set(R.name, ports);
+    releaseRegister = () => { if (wired.get(R.name) === ports) wired.delete(R.name); };
     expect(await R.stub.found(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
     const claim = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
-    D = new Platform(scopeIdOf(directorySeed));
+    D = new OwnedPlatform(scopeIdOf(directorySeed));
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(directorySeed), 1), id: "application-fixture" } } });
     expect(await R.stub.submit(claim, [])).toMatchObject({ answer: "accepted" });
     await (R.stub as unknown as { effect(): Promise<number> }).effect();
     await settle(R, D);
-    const children = (await D.entries())[0]!.sends.map((send) => new Platform(scopeIdOf(send.to as Seed)));
+    const children = (await D.entries())[0]!.sends.map((send) => new OwnedPlatform(scopeIdOf(send.to as Seed)));
     const [M, Q, G] = children as [Platform, Platform, Platform];
     await settle(R, D, M, Q, G);
     expect((await D.summary()).value.definition).toBe(APPLICATION_COHORT.directory);
@@ -51,13 +69,10 @@ test("explicit supporting cohort establishes Counting with native authority and 
 
     // Actual authenticated birth-session reads must select directory@5 even
     // though its destination@2 pin is also used by the legacy directory@2.
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
-    const issued = await requestSession(SERVICE, M.name, sessionRequest(membership, rita.secret, soon(60), crypto.randomUUID()), { fetch: routed as unknown as Fetch });
+    const issued = await lifetime.wait(() => requestSession(SERVICE, M.name, sessionRequest(membership, rita.secret, soon(60), crypto.randomUUID()), { fetch: routed as unknown as Fetch }));
     expect(issued.ok).toBe(true);
     if (!issued.ok) throw new Error("the actual admin receives a read session");
-    expect((await routed(`${SERVICE}/v1/scopes/${G.name}`, { headers: { authorization: issued.session.reader() } })).status).toBe(200);
+    expect((await lifetime.wait(() => routed(`${SERVICE}/v1/scopes/${G.name}`, { headers: { authorization: issued.session.reader() } }))).status).toBe(200);
 
     const secret = "native-member-invitation";
     const invitation = await M.did(rita, "invite-member", { fields: { handle: "@sam", role: "member", inviteHash: textDigest(secret), inviteEnds: soon(60) } });
@@ -93,19 +108,19 @@ test("explicit supporting cohort establishes Counting with native authority and 
     // application and outbox together. No dispatcher can escape that seal.
     const failed = await ask(fields);
     const failedSeed: Seed = { v: 1, kind: "lane", definition: COUNTING_DEFINITION, creator: await D.at(), cause: intentDigest(failed.intent), ordinal: 0 };
-    const counts = () => runInDurableObject(D!.object, (_instance, state) => state.storage.sql.exec("SELECT (SELECT COUNT(*) FROM entry) AS entries, (SELECT COUNT(*) FROM outbox) AS duties, (SELECT COUNT(*) FROM retained_input) AS inputs").one());
+    const counts = () => lifetime.wait(() => runInDurableObject(D!.object, (_instance, state) => state.storage.sql.exec("SELECT (SELECT COUNT(*) FROM entry) AS entries, (SELECT COUNT(*) FROM outbox) AS duties, (SELECT COUNT(*) FROM retained_input) AS inputs").one()));
     const beforeFailure = await counts();
-    await runInDurableObject(D.object, (_instance, state) => state.storage.sql.exec("CREATE TRIGGER application_retention_fault BEFORE INSERT ON retained_input WHEN NEW.kind = 'definition' BEGIN SELECT RAISE(ABORT, 'fixture retention fault'); END"));
+    await lifetime.wait(() => runInDurableObject(D!.object, (_instance, state) => state.storage.sql.exec("CREATE TRIGGER application_retention_fault BEFORE INSERT ON retained_input WHEN NEW.kind = 'definition' BEGIN SELECT RAISE(ABORT, 'fixture retention fault'); END")));
     try { await expect(D.stub.submit(failed, [], { values: [bytes] })).rejects.toThrow(); }
-    finally { await runInDurableObject(D.object, (_instance, state) => state.storage.sql.exec("DROP TRIGGER application_retention_fault")); }
+    finally { await lifetime.wait(() => runInDurableObject(D!.object, (_instance, state) => state.storage.sql.exec("DROP TRIGGER application_retention_fault"))); }
     expect(await counts()).toEqual(beforeFailure);
-    expect((await new Platform(scopeIdOf(failedSeed)).stub.summary(reader)).ok).toBe(false);
+    expect((await new OwnedPlatform(scopeIdOf(failedSeed)).stub.summary(reader)).ok).toBe(false);
 
     const signed = await ask(fields);
     const childSeed: Seed = { v: 1, kind: "lane", definition: COUNTING_DEFINITION, creator: await D.at(), cause: intentDigest(signed.intent), ordinal: 0 };
-    C = new Platform(scopeIdOf(childSeed));
-    platformOutside.set(C.name, () => NO_OUTSIDE);
-    net.hold = (envelope) => "definition" in envelope.to && envelope.to.definition === COUNTING_DEFINITION;
+    C = new OwnedPlatform(scopeIdOf(childSeed));
+    lifetime.wire(C.name, () => NO_OUTSIDE);
+    lifetime.setHold((envelope) => "definition" in envelope.to && envelope.to.definition === COUNTING_DEFINITION);
     const accepted = await D.stub.submit(signed, [], { values: [bytes] });
     expect(accepted.answer).toBe("accepted");
     if (accepted.answer !== "accepted") throw new Error("the authorized native application entry is recorded");
@@ -120,8 +135,8 @@ test("explicit supporting cohort establishes Counting with native authority and 
     await D.restart();
     expect(await D.stub.submit(signed, [], { values: [bytes] })).toEqual(accepted);
     expect((await D.stub.outbox(reader)).ok).toBe(true);
-    net.hold = null;
-    net.clock.now = soon(2);
+    lifetime.setHold(() => false);
+    lifetime.advance(2);
     await settle(D, C);
     expect(await D.item(accepted.receipt.fact.seq)).toMatchObject({ state: "created", refs: { scope: await C.at() } });
     expect((await C.summary()).value).toMatchObject({ definition: COUNTING_DEFINITION, status: "active", items: [{ type: "configuration", state: "ready", values: { target: 7 }, parties: { controller: { membership, member: "@rita" } } }] });
@@ -129,7 +144,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     expect((await C.entries())[0]!.input).toMatchObject({ type: "genesis", seed: childSeed, source: accepted.receipt.fact });
     expect((await C.act(rita, "initialize", { expected: await C.expected({ configuration: 0 }) })).answer).toBe("refused");
     await M.did(rita, "set-actions", { on: 0, expected: await M.expected({ on: 0 }), fields: { role: "admin", actions: [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "counting.control"] } });
-    net.clock.now = soon(301); // The old grant reuse window must end; no immediate-revocation claim.
+    lifetime.advance(301); // The old grant reuse window must end; no immediate-revocation claim.
     await C.did(rita, "initialize", { expected: await C.expected({ configuration: 0 }) });
     expect((await C.summary()).value.items.find((item) => item.type === "board")).toMatchObject({ state: "paused", values: { target: 7 } });
     expect((await C.entries()).flatMap((entry) => entry.effects.filter((effect) => effect.effect === "operation"))).toEqual([]);
@@ -147,12 +162,13 @@ test("explicit supporting cohort establishes Counting with native authority and 
       expect(await D.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
       expect(await A.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
     }
-    const replay = await verify(httpSource(SERVICE, { fetch: routed }), { mode: "replay", platform, grants: "proven", scope: C.name, head: (await C.summary()).at });
-    expect([replay.report.result, replay.why]).toEqual(["consistent", null]);
+    for (const node of [D, C]) {
+      const head = (await node.summary()).at;
+      const replay = await lifetime.wait(() => verify(httpSource(SERVICE, { fetch: routed }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
+      expect([replay.report.result, replay.why]).toEqual(["consistent", null]);
+    }
   } finally {
-    net.hold = prior.hold; net.deaf = prior.deaf; net.clock.now = prior.clock;
-    platformNet.secret = prior.secret; platformNet.sessions = prior.sessions; platformNet.inspector = prior.inspector;
-    wired.delete(R.name);
-    if (C) platformOutside.delete(C.name);
+    lifetime.release();
+    releaseRegister();
   }
 });
