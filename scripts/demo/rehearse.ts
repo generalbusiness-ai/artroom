@@ -264,9 +264,9 @@ function shots(stage: Stage): Shot[] {
     {
       title: "The verifier, every scope", scene: "12", who: "member",
       typed: () => ["artroom", "verify", "--all"],
-      expect: { code: 0, lines: () => [
+      expect: { code: 0, lines: (v) => [
         ...[["register", "register"], ["directory", "directory"], ["membership", "membership"], ["rules", "rules"], ["destination", "destination"], ["lane", "issue"], ["lane", "published"], ["lane", "controlled"], ["lane", "refused"], ["inbox", "founderInbox"], ["inbox", "memberInbox"], ["inbox", "maintainerInbox"]]
-          .map(([kind, name]) => `${kind} {${name}}, entry <seq>: consistent.`),
+          .flatMap(([kind, name]) => [`${kind} {${name}}, entry <seq>: consistent.`, ...(kind === "destination" && v["registerDefinition"] === "platform:register@3" ? ["Cleanup status: destination {destination}, entry <seq>: no reservation is recorded as cleanup-owed."] : [])]),
         "All consistent: 12 scopes.",
       ] },
     },
@@ -316,7 +316,11 @@ function shots(stage: Stage): Shot[] {
     merged.expect.lines = () => ["Published: commit <controlledCommit>, by the merge {controlled}:<seq>."];
     const verify = list.find((shot) => shot.title === "The verifier, every scope")!;
     const before = verify.expect.lines;
-    verify.expect.lines = (v) => [...before(v).slice(0, 7), "lane {manifestPublished}, entry <seq>: consistent.", "lane {manifestRefused}, entry <seq>: consistent.", ...before(v).slice(7, -1), "All consistent: 14 scopes."];
+    verify.expect.lines = (v) => {
+      const lines = before(v);
+      const afterPublished = lines.findIndex((line) => line.startsWith("lane {published},")) + 1;
+      return [...lines.slice(0, afterPublished), "lane {manifestPublished}, entry <seq>: consistent.", "lane {manifestRefused}, entry <seq>: consistent.", ...lines.slice(afterPublished, -1), "All consistent: 14 scopes."];
+    };
   }
   return list;
 }
