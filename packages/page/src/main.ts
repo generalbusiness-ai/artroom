@@ -319,7 +319,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
   const message = h("p", { role: "status", hidden: "" });
   const submit = h("button", { type: "submit", class: "primary" }, mode === "resume" ? "Resume creation" : "Create room");
   const cancel = h("button", { type: "button" }, "Cancel");
-  const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Room name", name), message, h("div", { class: "form-footer" }, cancel, submit));
+  const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Personal label", name), message, h("div", { class: "form-footer" }, cancel, submit));
   const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-room-title" }, form) as HTMLDialogElement;
   roomDialog = dialog;
   roomDialogBinding = { settings: binding, route: location.hash };
