@@ -45,6 +45,7 @@ const consoleErrors = [];
 const expectedNetworkRefusals = [];
 const layoutChecks = [];
 const contexts = [];
+const previewChecks = [];
 const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
 mkdirSync(out, { recursive: true });
@@ -66,6 +67,9 @@ async function as(person, { width = 1024, height = 800, colorScheme = "light" } 
   });
   await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { place: record.place, secret: record.people[person] });
   const tab = await context.newPage();
+  const requests = [];
+  tab.on("request", (request) => requests.push({ method: request.method(), url: request.url() }));
+  tab.recordedRequests = requests;
   tab.on("pageerror", (error) => consoleErrors.push(error.message));
   tab.on("console", (message) => {
     if (message.type() !== "error") return;
@@ -166,6 +170,16 @@ await paul.goto(`${record.service}/page/#/change/${record.readme}`);
 await paul.getByRole("heading", { name: /Write the handbook/ }).waitFor();
 
 await shot(paul, "change-published");
+const sourcePreview = paul.locator("details.source-preview");
+const selectedVersion = await sourcePreview.locator(".version-label").textContent();
+if (!/^Version \d+ · README\.md$/.test(selectedVersion ?? "")) throw new Error("Source preview did not preserve its selected version and file.");
+const requestCountBeforePreview = paul.recordedRequests.length;
+await sourcePreview.locator("summary").click();
+const sourceCode = await sourcePreview.locator("pre code").textContent();
+if (sourceCode !== "# The handbook\n\nWritten by the room.\n") throw new Error("Source preview did not show the retained selected-version bytes.");
+if (paul.recordedRequests.length !== requestCountBeforePreview) throw new Error("Opening source preview performed another network read.");
+previewChecks.push({ selectedVersion, path: "README.md", exactContent: true, extraRequests: 0 });
+await shot(paul, "change-source-preview");
 
 await paul.goto(`${record.service}/page/#/rules`);
 await paul.getByRole("heading", { name: "Rules", exact: true }).waitFor();
@@ -203,7 +217,7 @@ if (consoleErrors.length > 0) throw new Error(`Browser errors: ${JSON.stringify(
 writeFileSync(join(out, "checks.json"), `${JSON.stringify({
   source, sourceTree, playwrightVersion, browserVersion,
   executablePath: browserPath, fallback: "Browser plugin not available", layoutChecks,
-  consoleErrors, expectedNetworkRefusals, unanswered,
+  consoleErrors, expectedNetworkRefusals, unanswered, previewChecks,
 }, null, 2)}\n`);
 if (unanswered.length > 0) throw new Error(`The browser asked for what the recorder did not read: ${unanswered.join("; ")}`);
 for (const [name, size] of sizes) if (size > MOST) throw new Error(`${name}.png is ${size} bytes, over ${MOST}.`);
@@ -212,7 +226,8 @@ const shows = {
   issue: "Signed in as @una (who joined on the page with an invitation link): the issue she opened through the page, paul's comment, and the acts she may sign on it.",
   "change-refused": "Signed in as @paul: the change that AGENTS.md is, waiting for the rules extent's approval (policy not met), its one-file version, the merge the destination refused (rules-not-met:rules), and paul's own review refused by the lane, author-cannot-review.",
   "change-refused-record": "The same refusal with Inspect change record expanded, retaining native policy refusal and outside operation history separately from the main condition.",
-  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version and recorded publication commit; immutable version rendering is unavailable, with separate Pages navigation to the latest site.",
+  "change-published": "Signed in as @paul: the change that rita's artroom edit README.md made, merged and published, its one-file version and recorded publication commit; retained source preview is bound to its selected version; Pages remains separate latest-site navigation.",
+  "change-source-preview": "The selected README.md version’s authenticated retained source text, opened locally without an additional network read; this is not a rendered GitHub-Flavored Markdown or HEAD preview.",
   rules: "Signed in as @paul: the rules of this room, who may change them, and that paul may sign no act that changes them.",
   "site-readme": "README.md as the site route renders the latest published branch, reached by the separate Pages navigation; this is not an immutable version preview.",
   "issues-mobile": "The room’s Issues list at 390 CSS pixels, from the same recorded native room answers.",
@@ -248,7 +263,7 @@ writeFileSync(join(out, "README.md"), [
   "| 4. Requirements at decisions | change-refused exercises the actual author-cannot-review answer. `actions.test.ts` “unknown submission offers only a read refresh” blocks mutations in an unknown result; this recorder does not invent a native unknown outcome. |",
   "| 5. Content over notices | issue records Paul’s real comment and the actual room’s issue; visual inspection checks presentation. `view.test.ts` “ordinary screens omit empty record panels” covers empty metadata. Native creation and rule-save interactions are outside this recorder. |",
   "| 6. Real affordances | Pages is separate latest navigation. No exact-version Open page is shown because immutable selected-version rendering is unsupported in this source. `actions.test.ts` “a single eligible choice is fixed” covers removal of a false picker. |",
-  "| 7. Preserve subject | Review form is checked against the recorded manifest and rules extent before sending. Published screenshot identifies the selected recorded version; latest Pages makes no immutable claim. `shell.test.ts` “a late read from the previous room cannot replace the active room” and the comment-draft navigation interaction cover scope preservation. |",
+  "| 7. Preserve subject | Review form is checked against the recorded manifest and rules extent before sending. Published/source-preview screenshots identify and check the selected recorded version and retained content, opening without new network reads; latest Pages makes no immutable claim. `shell.test.ts` “a late read from the previous room cannot replace the active room” and the comment-draft navigation interaction cover scope preservation. |",
   "| 8. Designed narrow layouts | issues/issue at 390px and 320px, dark Rules at 390px; checks.json records overflow and editable-text checks. Touch target and keyboard checks remain separate. |",
   "",
 ].join("\n"));
