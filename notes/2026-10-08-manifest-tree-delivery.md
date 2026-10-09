@@ -236,9 +236,10 @@ sixteen slots exceed the bound of twelve
 implementation probe, not control credit. The late-answer API rejects unknown
 answers, so the counter witness uses an admissible late refused answer.
 
-The ordinary-read turn boundary, final gate, hosted observation, independent
-Source review and landing remain owed as stated above. No read hook, deployed
-claim or completed delivery is introduced by this repair.
+At this historical checkpoint, the ordinary-read boundary and final delivery
+steps were still owed. Planner41e later resolved the read boundary; the
+current handoff above states the remaining duties. No read hook or deployment
+claim was introduced by this repair.
 
 
 ## Confirmed ref removal and late refusal
@@ -261,8 +262,9 @@ source SHA256 is
 `54cc005b6c0a0d99ca63e8588f233f7d50e916614ebd38695cbceac399b09355`.
 The preceding derive, CLI and historical-data evidence still applies to their
 unchanged boundaries. This is bounded implementation feedback and validation,
-not independent Source approval. The ordinary-read owner decision and all
-remaining delivery duties above remain open.
+not independent Source approval. The ordinary-read owner decision was open
+at that checkpoint and is now resolved by41e. Remaining delivery duties are
+listed in the current handoff above.
 
 ## Historical source preparation at 43ca
 
