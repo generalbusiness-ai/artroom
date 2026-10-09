@@ -1,10 +1,10 @@
 {
-  "source": "346aec0a8201376f2c7e8adb24219f6df50d388e",
-  "sourceTree": "c34f6e00ad12e088df1da27cfc497da5d2beb9bf",
+  "source": "e46bd87b341bd720498bba1db5fa871e7ea483f2",
+  "sourceTree": "5c434baf7dd6fe569b890e909335c12f59f4a108",
   "mode": "production Page UI; actor-bound native readonly eligibility; founding transport loss STAND-IN with no Scope admission",
   "register": {
-    "scope": "sc_exrm3a4uv2ia2rwlkbyaragteayue7345recxlf53ywzkql37ogq",
-    "inc": "in_giwpozstsfq72ctxlfpkqbh6ly",
+    "scope": "sc_jhz6izswgd4a7xcgajjt56t6vu77azyj45sdt2t67dcfdpzyuipq",
+    "inc": "in_65lciax2wfx63kopxdheomb6e4",
     "kind": "register"
   },
   "definition": "platform:register@2",
@@ -27,20 +27,30 @@
   "pendingDoubleClickBlocked": true,
   "attemptedRequests": 3,
   "exactSavedEnvelopeReused": true,
-  "envelopeDigest": "sha256:99a9e4a5a68ca626aab516a3bcfaa95ef797ee5e2d6df2e017217a923b5a6249",
+  "operation": "e38a05eb-99cc-4615-b661-cced89f3bb9a",
+  "retainedOperations": 1,
+  "staleNewPredecessorRefusedWithoutPost": true,
+  "explicitResumeRequired": true,
+  "reopeningDiscoversOriginalOperation": true,
+  "changedSettingsQueuedMutationBlocked": true,
+  "changedSettingsAttemptedRequests": 1,
+  "originalJournalBytesUnchanged": true,
+  "originalJournalDigest": "sha256:b5a9f87b6639e0ecdb2446f98c64c28132cf45834f5f72cf63f896468db408b5",
+  "envelopeDigest": "sha256:1612650b660f14750bc336e02de70082ad59a62ea7e0ca1a777677bbf66edcec",
   "originalLabelPreserved": true,
   "screenshots": [
     {
       "name": "create-room-mobile",
-      "bytes": 34942
+      "bytes": 34501
     },
     {
       "name": "create-room-pending-mobile",
-      "bytes": 44368
+      "bytes": 43870
     }
   ],
   "explainedNetwork": [
     "Member register read refused in its own native record.",
+    "Intercepted founding request: transport loss stand-in, no Scope admission.",
     "Intercepted founding request: transport loss stand-in, no Scope admission.",
     "Intercepted founding request: transport loss stand-in, no Scope admission.",
     "Intercepted founding request: transport loss stand-in, no Scope admission."
