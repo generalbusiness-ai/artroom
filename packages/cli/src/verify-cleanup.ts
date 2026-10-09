@@ -40,11 +40,18 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
       if (!end.ok) return unavailable(end.reason);
       if (!end.complete || end.next !== undefined || !sameHead(end.at) || canonicalize(end.value.scope) !== canonicalize(target.at) || end.value.definition !== "platform:destination@3") return unavailable("the destination changed before cleanup enumeration completed");
       const owed = [...items.values()].filter((item) => item.state === "cleanup-owed").sort((a, b) => a.id - b.id);
-      const lines = owed.map((item) => {
-        const reason = typeof item.values["cleanupReason"] === "string" ? item.values["cleanupReason"] : "reason not recorded";
-        const attempts = typeof item.values["cleanupAttempts"] === "number" ? String(item.values["cleanupAttempts"]) : "not recorded";
+      const lines = owed.flatMap((item) => {
+        const independent = Object.hasOwn(item.values, "cleanupRefReason") || Object.hasOwn(item.values, "cleanupTokenReason");
+        const duties = independent ? [
+          { reason: item.values["cleanupRefReason"], attempts: item.values["cleanupAttempts"] },
+          { reason: item.values["cleanupTokenReason"], attempts: item.values["cleanupTokenAttempts"] },
+        ].filter((duty) => typeof duty.reason === "string") : [{ reason: item.values["cleanupReason"], attempts: item.values["cleanupAttempts"] }];
         const integration = typeof item.values["integration"] === "string" ? `; integration commit ${item.values["integration"]}` : "";
-        return `Owed cleanup: destination ${target.at.scope}, reservation ${item.id}, entry ${target.seq}: ${reason}; attempts ${attempts}${integration}; custody remains ${reason.includes("unknown") ? "unknown" : "owed"}.`;
+        return (duties.length ? duties : [{ reason: "reason not recorded", attempts: null }]).map((duty) => {
+          const reason = typeof duty.reason === "string" ? duty.reason : "reason not recorded";
+          const attempts = typeof duty.attempts === "number" ? String(duty.attempts) : "not recorded";
+          return `Owed cleanup: destination ${target.at.scope}, reservation ${item.id}, entry ${target.seq}: ${reason}; attempts ${attempts}${integration}; custody remains ${reason.includes("unknown") ? "unknown" : "owed"}.`;
+        });
       });
       return { lines: lines.length ? lines : [`Cleanup status: destination ${target.at.scope}, entry ${target.seq}: no reservation is recorded as cleanup-owed.`], finding: lines.length ? `Owed cleanup: ${owed.length} reservation(s) at destination ${target.at.scope}; historical replay consistency does not settle cleanup.` : null };
     }

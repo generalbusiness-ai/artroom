@@ -378,7 +378,8 @@ artroom verify --all
 
 For rooms pinned to `platform:destination@3`, this command also reports
 recorded reservation cleanup at the same destination head that replay reached.
-It names each reservation marked `cleanup-owed`, its reason and attempt count;
+It names each reservation marked `cleanup-owed`, with separate ref and token
+duties and their actual recorded attempt counts;
 unknown custody stays unknown. This separate observation does not turn a
 consistent history into a claim that cleanup finished. An incomplete or moving
 cleanup read is reported as unread, and owed or unread cleanup exits nonzero.
