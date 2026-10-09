@@ -8,7 +8,7 @@
  */
 import { expect } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
-import { canonicalize, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { READ_BOUNDS, Reader, ZERO_ID, type GitSource } from "@generalbusiness/artroom-git";
 import { buildPack } from "@generalbusiness/artroom-git/http";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
@@ -44,6 +44,9 @@ export class OwnGit {
   readonly tokens = new Map<string, "read" | "write">();
   readonly revoked = new Set<string>();
   readonly pushes: { ref: string; old: string; commit: string }[] = [];
+  /** Actual constructions, for the fixture's cache witness; not HTTP reads. */
+  packBuilds = 0;
+  #packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
   readonly remote = (name: string) => `https://${HOST}/git/${NAMESPACE}/${name}.git`;
   readonly ns: ArtifactsNamespace = {
     get: async (name) => ({
@@ -71,6 +74,21 @@ export class OwnGit {
     return new Response(join(pkt(`# service=${service}\n`), utf8("0000"), ...lines, utf8("0000")), { headers: { "content-type": `application/x-${service}-advertisement` } });
   }
 
+  /** Reuse only immutable pack bytes for the map's actual ordered content.
+   * Authentication and Responses are still fresh for every request. */
+  #pack(): Promise<Uint8Array> {
+    const snapshot = [...this.objects].map(([key, object]) => ({ key, id: object.id, type: object.type, data: new Uint8Array(object.data) }));
+    const key = digestBytes(utf8(canonicalize(snapshot.map(object => [object.key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
+    if (this.#packed?.key === key) return this.#packed.bytes;
+    this.packBuilds++;
+    // Key and construction use the same owned snapshot, before any await.
+    // The cast does not bypass buildPack's runtime type/hash/size validation.
+    const made = buildPack(snapshot.map(object => ({ id: object.id, type: object.type as "blob" | "tree" | "commit", data: object.data })), { maxBytes: MAX_BYTES });
+    this.#packed = { key, bytes: made };
+    void made.catch(() => { if (this.#packed?.bytes === made) this.#packed = null; });
+    return made;
+  }
+
   readonly fetch = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     expect(url.origin + url.pathname.replace(/\/(info\/refs|git-upload-pack|git-receive-pack)$/, "")).toBe(this.remote(this.name!));
@@ -80,7 +98,7 @@ export class OwnGit {
     const service = url.searchParams.get("service");
     if (request.method === "GET" && (service === "git-upload-pack" || service === "git-receive-pack")) return this.#advertisement(service);
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
-      const pack = await buildPack([...this.objects.values()].map((o) => ({ id: o.id, type: o.type as "blob" | "tree" | "commit", data: o.data })), { maxBytes: MAX_BYTES });
+      const pack = await this.#pack();
       return new Response(join(pkt("NAK\n"), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     if (request.method === "POST" && url.pathname.endsWith("/git-receive-pack")) {
