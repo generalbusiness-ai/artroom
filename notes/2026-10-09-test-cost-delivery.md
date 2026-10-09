@@ -15,7 +15,7 @@ host, key and authority fixture remains separate. No timeout changed.
 | Invariant | Surviving witness |
 |---|---|
 | Multi-file reservation before checks; no early push; wrong source/tree; snapshot history floor, current key, corrupt objects, foreign checker and missing/moved ref | Main manifest-tree native story retains every control. |
-| One-element reservation, authenticated source, checker origin, actual check admission and publication/result tree | One-file native story verifies one source, objects and origin, one runner/pass, no preparation mint, receipt cleanup and README plus one.md tree. |
+| One-element reservation, authenticated source, checker origin, actual check admission and publication/result tree | One-file native story verifies one source, objects and origin, one runner/pass, no preparation mint, reservation ref cleanup and README plus one.md tree. |
 | Lost checker submission, restart, retained result and no duplicate runner; later failure/fence/cancel/expiry/replay | Main native story, unchanged. |
 | Expiry reads do not write SQL or send effects; authentic session/signed reads, unavailable/behind clock, pending cleanup | Complete real read-boundary block in ref cleanup case; four repeated copies become one. |
 | Ref/token refusal, token unknown, late mint, attempt ceilings and late answers | Separate native cleanup fixtures/outcomes and replay remain. |
@@ -74,3 +74,26 @@ gate and complete independent source review remain owed. Any final source
 repairs or the separate Site test-only pack optimization need their own focused
 checks before that gate. No provider or hosted evidence transfers from these
 local stand-ins.
+
+## Site stand-in pack reuse
+
+Request `024ea5da`, promise `8cce0dbf`: the local Scripted Git host now reuses
+one immutable pack byte promise while its exact ordered object-map content is
+unchanged. The key includes map keys, object IDs/types/lengths and raw-byte
+digests. Object records/data are copied before asynchronous construction;
+changed content rebuilds, and only the failed current promise is cleared.
+Fresh responses/ref advertisements, token/revocation accounting and every
+oversized fixture remain. This avoids repeated compression; hashing is still
+linear and production code has no cache change.
+
+The direct Scripted witness verifies equal wire/fresh responses, same-count
+replacement, in-place hash corruption and retry, restoration/add/delete/clear,
+and revoked-token refusal. Existing actual route and real register/directory
+witnesses remain. Exact source `a65b794930d861c90d6b0e97562f27d326e241c0`,
+tree `bc4836c0cb1d52b73c2e0065f68630c675a60eb1`, ran one focused file:
+15 passed, tests 9.40 s, Vitest 10.51 s, wall 11.10 s, user 11.28 s and
+system 0.47 s. Logs are `site.log` and `site-time.log` in the same evidence
+directory; exact discovery selected fifteen cases. No controlled speedup is
+claimed against the historical post-gate 10.96-second cache attribution.
+The sole review gate remains held until the checker's blocking source findings
+are repaired and the actual final candidate is frozen.
