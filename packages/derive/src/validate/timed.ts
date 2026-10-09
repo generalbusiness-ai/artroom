@@ -4,7 +4,7 @@
  * static size of the entry a rule writes (section 7.5).
  */
 
-import type { Bounds, TimedRule } from "@generalbusiness/artroom-contract";
+import type { Bounds, PlatformTimedRule, TimedRule } from "@generalbusiness/artroom-contract";
 import { isObject } from "../values.ts";
 import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effectBytes, effects } from "./effects.ts";
@@ -64,15 +64,25 @@ export function timedKinds(d: Defining, acts: unknown, receives: unknown): void 
  * Every timed rule. Returns each rule that was read whole, as the graph
  * reads it, and adds each rule's type to `timedTypes`.
  */
-export function timedRules(d: Defining, v: unknown, timedTypes: Set<string>): TimedMove[] {
+export function timedRules(d: Defining, v: unknown, timedTypes: Set<string>, outcomes?: unknown): TimedMove[] {
   const { bounds, types, bad, rec, entries, names } = d;
   const moves: TimedMove[] = [];
   for (const [name, rv] of entries(v, "timed", bounds.timedRules)) {
     const path = at("timed", name);
-    const o = rec(rv, path, ["on", "states", "deadline", "effects", "attention"]);
+    const o = rec(rv, path, ["on", "states", "deadline", "effects", "attention"], d.platform && d.name === "platform:destination" ? ["opens"] : []);
     if (!o) continue;
     const t = typeof o["on"] === "string" ? types.get(o["on"]) : undefined;
     if (!t) { bad("name", at(path, "on"), "names no item type"); continue; }
+    if (o["opens"] !== undefined) {
+      const opens = d.list(o["opens"], at(path, "opens"), 2);
+      if (opens.length !== 2 || !isObject(opens[0]) || opens[0]["kind"] !== "reservation-delete" || opens[0]["attempts"] !== 3 || !isObject(opens[1]) || opens[1]["kind"] !== "mint" || opens[1]["attempts"] !== 1) bad("shape", at(path, "opens"), "opens only the held three-attempt reservation deletion and its first mint");
+      for (const [n, open] of opens.entries()) {
+        rec(open, at(at(path, "opens"), n), ["kind", "attempts"]);
+        const kind = isObject(open) && typeof open["kind"] === "string" && isObject(outcomes) ? outcomes[open["kind"]] : null;
+        if (!isObject(kind) || typeof kind["attempts"] !== "number" || !isObject(open) || typeof open["attempts"] !== "number" || open["attempts"] > kind["attempts"]) bad("name", at(at(path, "opens"), n), "names an owned outcome kind within its stated attempts");
+      }
+      if (t.name !== "publication") bad("name", at(path, "on"), "the timed cleanup opener belongs to publication");
+    }
     timedTypes.add(t.name);
     const states = names(o["states"], at(path, "states"), t.states, "state");
     // Section 5.2: a deadline is held by a live item.
@@ -233,5 +243,6 @@ export function timedEntryBytes(name: string, rule: TimedRule, type: Type, bound
   let bytes = ENTRY_BYTES + stated(name);
   for (const e of rule.effects) bytes += RECORD_BYTES + effectBytes(e, held, bounds);
   for (const notice of rule.attention) bytes += notifyBytes(notice, held);
+  for (const open of (rule as PlatformTimedRule).opens ?? []) bytes += 2 * RECORD_BYTES + stated(open.kind) + stated("platform:destination@3") + 60;
   return bytes;
 }

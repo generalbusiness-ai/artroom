@@ -1273,7 +1273,7 @@ class Verifier {
         judged = judgeDiagnosis(state, definition, { of: input.of, attempts: input.attempts }, { ...reading, prepared: [], origin: sealed(input.of.seq) });
         break;
       case "timed":
-        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities });
+        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities, platform: run.platform ?? undefined });
         break;
       case "preparation": {
         // Section 9.3, the row "Preparation", and point E13: the entry is derived with the rules of its step, which the capability's

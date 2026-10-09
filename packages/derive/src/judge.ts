@@ -11,7 +11,7 @@
  * or `deriveEffects`, and returns a `Draft`.
  */
 
-import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, PlatformTimedRule, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { withinCounts } from "./draws.ts";
@@ -154,7 +154,7 @@ export type ActJudgment =
 export type TimedJudgment =
   | { result: "write"; draft: Draft }
   | { result: "dropped"; failed: "held" | "reached" | "next" }   // which of the three checks of step 6.3 failed
-  | { result: "unavailable"; reason: "clock-behind" };
+  | { result: "unavailable"; reason: "clock-behind" | "unavailable" };
 
 /**
  * What the judge of a genesis, a delivery, a diagnosis, an outcome or a
@@ -404,7 +404,7 @@ function actJudged(view: StateView, definition: ValidDefinition, signed: SignedI
  * has no signer, and these effects need none. A timed rule writes no
  * capability form, so nothing else of the rules is asked.
  */
-export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds" | "capabilities">): TimedJudgment {
+export function judgeTimed(view: StateView, definition: ValidDefinition, selected: Due, context: Pick<JudgeContext, "clock" | "bounds" | "capabilities" | "platform">): TimedJudgment {
   const { clock, bounds } = context;
   const scope = view.scope();
   const rule = own(definition.declared.timed, selected.rule);
@@ -422,7 +422,14 @@ export function judgeTimed(view: StateView, definition: ValidDefinition, selecte
   // written, and its item is not due again under this rule: the drain makes progress. A refusal here is a fault of the validator,
   // and is never answered by passing over the due item.
   if (!effects.ok) throw new Error(`timed rule ${selected.rule} cannot apply: ${"unavailable" in effects ? effects.unavailable : effects.reason}`);
-  return { result: "write", draft: { input: { type: "timed", item: selected.item, rule: selected.rule, due: selected.due }, uses: [], prepared: [], effects: effects.effects, sends: [], judgesTime: true } };
+  const opened: Effect[] = [];
+  const opens = (rule as PlatformTimedRule).opens ?? [];
+  if (opens.length && (context.platform?.named !== "platform:destination@3" || scope.at.kind !== "destination")) return { result: "unavailable", reason: "unavailable" };
+  for (const [k, open] of opens.entries()) opened.push(
+    { effect: "operation", k, owner: "platform:destination@3", kind: open.kind, attempts: open.attempts, for: selected.item },
+    { effect: "attempt", operation: { k }, attempt: 1, result: "opened", selected: null },
+  );
+  return withinCounts(view, definition, { result: "write", draft: { input: { type: "timed", item: selected.item, rule: selected.rule, due: selected.due }, uses: [], prepared: [], effects: [...effects.effects, ...opened], sends: [], judgesTime: true } } as TimedJudgment);
 }
 
 /**

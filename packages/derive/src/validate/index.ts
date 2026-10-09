@@ -200,7 +200,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   timedKinds(d, top["acts"], top["receives"]);
   const timedTypes = new Set<string>(d.holdTypes);
   /** Each timed rule that was read whole: its type, the states it applies in, and the state it leaves its item in. */
-  const moves = timedRules(d, top["timed"], timedTypes);
+  const moves = timedRules(d, top["timed"], timedTypes, top["outcomes"]);
 
   // Section 17.2, a chain of timed rules. A timed entry is never refused, so the room for every rule of a chain is reserved with
   // the first deadline. When the rules of one type lead to one another in a cycle no chain is finite, and the drain of such an
