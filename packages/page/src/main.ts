@@ -96,6 +96,8 @@ const opened = new RoomOpening<Room>();
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
+const joining = new ScopeSending();
+const joinAnswers = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
@@ -250,6 +252,9 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
 
 function settingsScreen(): HTMLElement {
   const kept = settings();
+  const selectedContext = settingsContext(kept ?? { place: null, secret: "" });
+  const joinKey = `join:${selectedContext}`;
+  const screenDraw = drawing;
   const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null, kept?.register ?? null]);
   if (roomDraftContext !== context) { roomDraft = ""; roomDraftContext = context; }
   const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
@@ -292,16 +297,43 @@ function settingsScreen(): HTMLElement {
   room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
   form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
-  form.querySelector("#join")!.addEventListener("click", () => {
+  const joinButton = form.querySelector("#join")!;
+  const previousRecord = joinAnswers.get(joinKey);
+  const previousJoin = previousRecord?.result;
+  if (previousJoin?.answer.answer === "accepted") {
+    joinButton.setAttribute("disabled", "");
+    const select = h("button", { type: "button" }, "Use joined room");
+    select.addEventListener("click", () => {
+      if (settingsContext(settings() ?? { place: null, secret: "" }) !== selectedContext) return;
+      save({ ...previousRecord!.settings, place: previousJoin.place });
+    });
+    form.append(select);
+  }
+  if (joining.get(joinKey)) { joinButton.setAttribute("disabled", ""); tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room"); }
+  if (previousJoin) tell(previousJoin.answer.answer === "accepted", previousJoin.answer.answer === "accepted" ? `Joining was accepted by membership ${previousJoin.place.membership.scope}. The saved room was not changed after the settings context changed. Inspect that membership before choosing this room.` : `${nonacceptedAnswerText(previousJoin.answer)} Inspect membership ${previousJoin.place.membership.scope} and the original request.`);
+  joinButton.addEventListener("click", () => {
     void (async () => {
       const next = read(null);
       if (!next) return;
+      const invitation = (room as HTMLTextAreaElement).value;
+      const current = () => settingsContext(settings() ?? { place: null, secret: "" }) === selectedContext;
+      if (!current() || joinAnswers.get(joinKey)?.result.answer.answer === "accepted" || !joining.begin(joinKey, "join")) return;
+      joinButton.setAttribute("disabled", "");
       try {
-        const joined = await joinRoom(sessionOf(next), (room as HTMLTextAreaElement).value);
+        const joined = await joinRoom(sessionOf(next), invitation, () => {
+          if (!current()) throw new Error("The room or key changed before joining. Nothing was sent.");
+          joining.submitting(joinKey);
+        });
+        joinAnswers.set(joinKey, { result: joined, settings: next });
+        if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(joinKey); else joining.answered(joinKey);
+        if (!current() || screenDraw !== drawing) return;
         if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);
         save({ ...next, place: joined.place });
       } catch (error) {
-        tell(false, error instanceof Error ? error.message : String(error));
+        joining.failed(joinKey);
+        if (current() && screenDraw === drawing) tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!joining.get(joinKey) && joinAnswers.get(joinKey)?.result.answer.answer !== "accepted") joinButton.removeAttribute("disabled");
       }
     })();
   });
