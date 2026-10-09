@@ -119,3 +119,29 @@ whitespace passed. Evidence `/tmp/artroom-graph-transport-evidence/evidence.json
 No old paired workload, per-stage timing, global savings or gate cause is
 inferred. The failed 676 gate remains failed; clock-lifetime patch preparation
 and any next execution retain planner disposition and independent review.
+
+## Bounded Site fixture lifetime successor
+
+Planner `fcb895a7` authorized one serialized two-case selection and one
+old-guard control at source `3d0cfc3047d2c9e5613fa9365b4b52f18dcacb5a`,
+tree `ca7e182163dab3e8061ef19d83e218f6e44cca4e`. A released Site
+continuation now checks its lifetime before and after each awaited step and
+before advancing the shared clock. Release preserves the same clock and its
+advanced reading; it does not rewind retained history's clock floors.
+
+Both native tests passed with no skips at the original 5,000 ms deadline:
+1.19 s tests, 2.42 s Vitest, 3.0054 s wall and 3.7182 s CPU. Removing the
+active guard made the new native offer fail with `expired`; the control took
+0.105 s tests, 1.8326 s wall and 2.2976 s CPU. Both control edits were restored
+byte for byte. Root read the full source preparation, result, logs, configuration
+and restoration evidence. Evidence is
+`/tmp/artroom-site-clock-lifetime-evidence/evidence.json`, SHA-256
+`38122d857f18dd8536867be1b67a558143d552fd64502c309de49926ccdc6a3e`,
+durable result `ba7e7d84`.
+
+The guard cannot cancel an already-started native RPC and does not establish
+ownership of opaque foreign factories or independently attribute same-value
+session/inspector writes. It proves this lifetime mechanism, not the actual
+chronology or cause of the failed 676 gate. That gate remains failed. No
+unchanged retry, wider deadline, whole gate, deployment or landing follows
+without the next owner decision.
