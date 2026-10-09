@@ -61,12 +61,12 @@ interface Tab {
   setViewportSize(size: { width: number; height: number }): Promise<void>;
 }
 interface Route { abort(reason: string): Promise<void>; request(): { url(): string; method(): string; postData(): string | null; headers(): Record<string, string> }; fulfill(answer: { status: number; headers?: Record<string, string>; contentType?: string; body: string }): Promise<void> }
-interface BrowserContext { route(pattern: string, handler: (route: Route) => unknown): Promise<void>; addInitScript<A>(f: (arg: A) => void, arg: A): Promise<void>; newPage(): Promise<Tab> }
+interface BrowserContext { close(): Promise<void>; route(pattern: string, handler: (route: Route) => unknown): Promise<void>; addInitScript<A>(f: (arg: A) => void, arg: A): Promise<void>; newPage(): Promise<Tab> }
 interface Browser { newContext(options: object): Promise<BrowserContext>; close(): Promise<void> }
 interface Chromium { launch(options: { executablePath: string }): Promise<Browser> }
 
 /** What the browser needs: the service's base URL, the room, the key, and the recorded answers when there is no service. */
-interface ClaimActorRecord { place: { directory: string; membership: unknown }; secret: string; actor: string; answers: NonNullable<Sitting["answers"]> }
+interface ClaimActorRecord { recordedName?: string | null; place: { directory: string; membership: unknown }; secret: string; actor: string; answers: NonNullable<Sitting["answers"]> }
 interface Sitting { claimWitness?: { register: ScopeRef; definition: string; founder: ClaimActorRecord; member: ClaimActorRecord & { refusal: string } }; service: string; place: { directory: string; membership: unknown }; room: Room; secret: string; answers: Record<string, { status: number; headers: Record<string, string>; body: string }> | null; observation?: { source: string; config: string; actor: string } }
 
 function browserPath(): string | null {
@@ -353,6 +353,79 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
   } finally { release?.(); await browser.close(); }
 }
 
+/** A retained local label on an already recorded native room. This does not
+ * synthesize claim completion or change any native room name. */
+async function labelWitness(chromium: Chromium, executablePath: string, sitting: Sitting, out: string): Promise<void> {
+  const native = sitting.claimWitness;
+  if (!native?.founder.recordedName) throw new Error("The native recorder supplied no recorded repository name.");
+  const actor = native.founder;
+  const browser = await chromium.launch({ executablePath });
+  const checks: unknown[] = [], errors: string[] = [], unanswered: string[] = [];
+  const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: ROOT, encoding: "utf8" }).trim();
+  try {
+    for (const colorScheme of ["light", "dark"]) {
+      const context = await browser.newContext({ viewport: { width: 320, height: 844 }, deviceScaleFactor: 1, colorScheme });
+      await context.route(`${sitting.service}/**`, async (route) => {
+        const request = route.request(), path = request.url().slice(sitting.service.length);
+        if (request.method() === "GET" && path === `/v1/scopes/${native.register.scope}`) {
+          const header = request.headers()["authorization"];
+          const signed = header?.startsWith("Signed ") ? JSON.parse(Buffer.from(header.slice(7), "base64url").toString("utf8")) as SignedRead : null;
+          if (!signed || !verifySignedRead(signed) || signed.request.actor !== actor.actor || signed.request.to !== native.register.scope) throw new Error("Label witness register response has another signed caller or subject.");
+        }
+        const caller = path.endsWith("/sessions") ? ` ${(JSON.parse(request.postData() ?? "{}") as { request?: { actor?: string } }).request?.actor}` : "";
+        const answer = actor.answers[`${request.method() === "POST" ? "POST" : "GET"} ${path}${caller}`];
+        if (!answer || request.method() === "POST" && !path.endsWith("/sessions")) { unanswered.push(`${request.method()} ${path}`); await route.abort("failed"); return; }
+        await route.fulfill({ status: answer.status, headers: answer.headers, body: answer.body });
+      });
+      await context.addInitScript((kept) => {
+        if (location.origin !== kept.service || location.pathname !== "/page/" || window.top !== window) return;
+        if (localStorage.getItem("artroom-page") === null) localStorage.setItem("artroom-page", JSON.stringify({ place: kept.place, secret: kept.secret, register: kept.register, label: { text: "Field notebook", place: kept.place, register: kept.register } }));
+      }, { service: sitting.service, place: actor.place, secret: actor.secret, register: native.register });
+      const tab = await context.newPage();
+      tab.on("pageerror", (error) => errors.push(error.message));
+      tab.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+      await tab.goto(`${sitting.service}/page/#/`);
+      await tab.getByRole("heading", { name: "Issues" }).waitFor({ state: "attached" });
+      const shown = await tab.evaluate(() => {
+        const switches = [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0);
+        const current = switches[0];
+        const recorded = current?.querySelector(".room-recorded-name");
+        return { title: document.title, origin: location.origin, visibleSwitches: switches.length,
+          local: current?.querySelector('[title="Local room label"]')?.textContent,
+          recorded: recorded?.textContent, recordedTitle: recorded?.getAttribute("title"),
+          switchHeight: current?.getBoundingClientRect().height,
+          overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          editableFontSizes: [...document.querySelectorAll("input:not([type=hidden]),textarea,select")].map((element) => parseFloat(getComputedStyle(element).fontSize)),
+        };
+      });
+      if (shown.title !== "Artroom" || shown.origin !== sitting.service || shown.visibleSwitches !== 1 || shown.local !== "Field notebook" || shown.recorded !== actor.recordedName || shown.recordedTitle !== "Recorded repository name" || shown.overflow || shown.editableFontSizes.some((size) => size < 16) || (shown.switchHeight ?? 0) < 44) throw new Error(`The local-label layout lost its native name or narrow-layout contract: ${JSON.stringify(shown)}`);
+      await tab.screenshot({ path: join(out, `local-label-${colorScheme}-320.png`) });
+      // Change only the label's binding, not the actual configured native room.
+      await tab.evaluate(() => {
+        const kept = JSON.parse(localStorage.getItem("artroom-page")!);
+        kept.label.place.membership.inc = kept.register.inc;
+        localStorage.setItem("artroom-page", JSON.stringify(kept));
+      });
+      await tab.reload();
+      await tab.getByRole("heading", { name: "Issues" }).waitFor({ state: "attached" });
+      const ignored = await tab.evaluate(() => [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0).map((element) => ({ name: element.querySelector(".room-name")?.textContent, local: !!element.querySelector('[title="Local room label"]') })));
+      if (ignored.length !== 1 || ignored[0]!.local || ignored[0]!.name !== actor.recordedName) throw new Error("A local label bound to another membership incarnation leaked into the native room switch.");
+      checks.push({ colorScheme, width: 320, ...shown, staleLabelBindingIgnored: true });
+      await context.close();
+    }
+    if (errors.length || unanswered.length) throw new Error(`Label browser errors: ${JSON.stringify({ errors, unanswered })}`);
+    const screenshots = ["light", "dark"].map((scheme) => ({ name: `local-label-${scheme}-320.png`, bytes: statSync(join(out, `local-label-${scheme}-320.png`)).size }));
+    if (screenshots.some((shot) => shot.bytes > MOST)) throw new Error("A local-label screenshot exceeds the byte bound.");
+    writeFileSync(join(out, "label-checks.json"), `${JSON.stringify({ source, sourceTree,
+      mode: "production Page over actor-bound native reads of an existing room; local label seeded only in private browser settings",
+      recordedName: actor.recordedName, localLabel: "Field notebook", checks, screenshots, errors, unanswered,
+      limit: "No claim completion is fabricated, no founding or native name mutation is submitted. Label persistence after native completion is covered separately at the native adapter and Page boundaries.",
+    }, null, 2)}\n`);
+    process.stdout.write("Local label browser witness: native recorded name retained, one room switch,320px light/dark,stale membership label ignored; no founding or native name mutation.\n");
+  } finally { await browser.close(); }
+}
+
 const SHOWS: Record<string, string> = {
   room: "The room’s Issues destination, with the All filter showing the recorded closed issue and the actions the signed-in person may sign on the directory.",
   issue: "Observed issue screen for the rehearsal's issue lane.",
@@ -367,13 +440,13 @@ async function main(argv: readonly string[]): Promise<number> {
   const flags = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--recorded" || arg === "--claim-witness") flags.set(arg.slice(2), "true");
+    if (arg === "--recorded" || arg === "--claim-witness" || arg === "--label-witness") flags.set(arg.slice(2), "true");
     else if (arg.startsWith("--")) { const value = argv[++i]; if (value === undefined) { process.stderr.write(`${arg} needs a value.\n${USAGE}\n`); return 2; } flags.set(arg.slice(2), value); }
     else words.push(arg);
   }
   const recorded = flags.has("recorded");
   const out = flags.get("out");
-  if (flags.has("claim-witness") && !recorded) { process.stderr.write("--claim-witness requires --recorded.\n"); return 2; }
+  if ((flags.has("claim-witness") || flags.has("label-witness")) && !recorded) { process.stderr.write("--claim-witness requires --recorded.\n"); return 2; }
   if (!out || (recorded ? words.length > 0 || flags.has("home") || flags.has("room") : words.length !== 1 || !flags.get("home") || !flags.get("room"))) { process.stderr.write(`${USAGE}\n`); return 2; }
   const executablePath = browserPath();
   const chromium = chromiumOf();
@@ -383,6 +456,7 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   const sitting = recorded ? recordedSitting() : await liveSitting(words[0]!, flags.get("home")!, flags.get("room")!);
   mkdirSync(resolve(out), { recursive: true });
+  if (flags.has("label-witness")) { await labelWitness(chromium, executablePath, sitting, resolve(out)); return 0; }
   if (flags.has("claim-witness")) { await claimWitness(chromium, executablePath, sitting, resolve(out)); return 0; }
   const sizes = await captures(chromium, executablePath, sitting, resolve(out));
   writeFileSync(join(resolve(out), "captures.md"), [

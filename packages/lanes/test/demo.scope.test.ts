@@ -139,7 +139,7 @@ async function record(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const kept = {
     service: SERVICE, place, room: rehearsal.room, secret: b64url(secret), answers: founderAnswers,
     claimWitness: { register: configured.register, definition: configured.definition,
-      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), answers: founderAnswers },
+      founder: { place, secret: b64url(secret), actor: keyIdOfSecret(secret), recordedName: room.name, answers: founderAnswers },
       member: { place: memberPlace, secret: b64url(memberSecret), actor: keyIdOfSecret(memberSecret), answers: { ...assets, ...Object.fromEntries(recording) }, refusal: memberRefusal },
     },
   };
