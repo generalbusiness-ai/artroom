@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { RoomOpening, roomContext, routeOf } from "../src/shell.ts";
+import { RoomOpening, ScopeSending, roomContext, routeOf } from "../src/shell.ts";
 
 test("navigation keeps lane identity and separates the room's Issues and Changes lists", () => {
   expect(routeOf("#/")).toEqual({ destination: "issues", scope: null });
@@ -7,6 +7,25 @@ test("navigation keeps lane identity and separates the room's Issues and Changes
   expect(routeOf("#/change/sc_exact?kind=issue")).toEqual({ destination: "changes", scope: "sc_exact" });
   expect(routeOf("#/issue/sc_other")).toEqual({ destination: "issues", scope: "sc_other" });
   expect(routeOf("#/rules")).toEqual({ destination: "rules", scope: null });
+});
+
+test("a scope fence permits pre-submit correction but never a fresh signature after an attempted request loses its reply", async () => {
+  const fences = new ScopeSending();
+  const association = "origin/room/member/scope";
+  expect(fences.begin(association, "comment")).toBe(true);
+  expect(fences.begin(association, "merge")).toBe(false);
+  fences.failed(association); // Typing/signing failed before the submission boundary.
+  expect(fences.begin(association, "comment")).toBe(true);
+  fences.submitting(association);
+  fences.failed(association); // The transport may have delivered the signed request.
+  expect(fences.get(association)).toEqual({ kind: "comment", state: "unknown" });
+  expect(fences.begin(association, "comment")).toBe(false);
+  expect(fences.begin("origin/another-room/member/scope", "comment")).toBe(true);
+  // A readable newer head is not a reply to this request: reads do not clear it.
+  await Promise.resolve({ seq: 7 });
+  expect(fences.begin(association, "merge")).toBe(false);
+  fences.answered(association); // Only the original submission's real answer settles the fence.
+  expect(fences.begin(association, "merge")).toBe(true);
 });
 
 test("a late read from the previous room cannot replace the active room or reuse another membership incarnation", async () => {

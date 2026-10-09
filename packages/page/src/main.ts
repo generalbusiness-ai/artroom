@@ -22,7 +22,7 @@ import type { Answer, FieldValue, ScopeId } from "@generalbusiness/artroom-contr
 import { b64url, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
-import { RoomOpening, roomContext, routeOf, type Destination } from "./shell.ts";
+import { RoomOpening, ScopeSending, roomContext, routeOf, type Destination } from "./shell.ts";
 import type { ActionContext } from "./actions.ts";
 
 const KEPT = "artroom-page";
@@ -72,6 +72,10 @@ const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
 const opened = new RoomOpening<Room>();
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
+const sending = new ScopeSending();
+function unknownRequest(kind: string): HTMLElement {
+  return h("p", { class: "muted" }, `The ${kind} request may have been recorded. Checking status only reads the scope; a changed head does not settle this request. This page does not retain the exact signed request for automatic recovery. Keep this session open and inspect the original request before recovery; do not send a replacement.`);
+}
 
 async function roomOf(kept: Settings, place: Place): Promise<Room> {
   return opened.get(roomContext(location.origin, place, kept.secret), () => openRoom(sessionOf(kept), place));
@@ -100,32 +104,39 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
 async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}): Promise<HTMLElement> {
+  const association = actAssociation(room, scope);
   const currentContext = () => {
     const current = settings();
     return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
   const send = (kind: string, on: string, typed: Record<string, string>) => {
+    if (!sending.begin(association, kind)) return;
+    void draw(); // Every form on this scope is fenced, including after navigation and redraw.
     void (async () => {
       try {
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         const offered = (await actsOn(room, scope)).acts.find((a) => a.kind === kind);
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
-        const fields: Record<string, FieldValue> = {};
-        for (const [name, text] of Object.entries(typed)) fields[name] = fieldValue(room, offered?.fields.find((f) => f.name === name)?.type ?? "text", text);
+        const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
-        const association = actAssociation(room, scope);
-        const result = await act(room, scope, kind, { on: target, fields }, (known) => lastActs.set(association, known));
+        const result = await act(room, scope, kind, { on: target, fields }, (known) => { lastActs.set(association, known); sending.answered(association); }, () => { sending.submitting(association); });
         lastActs.set(association, result);
       } catch (error) {
-        alert(error instanceof Error ? error.message : String(error));
+        sending.failed(association);
+        if (sending.get(association)?.state !== "unknown") alert(error instanceof Error ? error.message : String(error));
       }
       await draw();
     })();
   };
-  const last = lastActs.get(actAssociation(room, scope));
-  const uncertain = context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
-  return actsPanel(await actsOn(room, scope), send, last ? answerLine(last) : null, { ...context, uncertain, draftKey: actAssociation(room, scope), refresh: () => { void draw(); } });
+  const offered = await actsOn(room, scope);
+  const last = lastActs.get(association);
+  const fence = sending.get(association);
+  const pending = !!fence && fence.state !== "unknown";
+  const uncertain = fence?.state === "unknown" || context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
+  const panel = actsPanel(offered, send, last ? answerLine(last) : null, { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } });
+  if (fence?.state === "unknown") panel.append(unknownRequest(fence.kind));
+  return panel;
 }
 
 function settingsScreen(): HTMLElement {
@@ -206,20 +217,25 @@ async function draw(focus = false): Promise<void> {
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
+      const blockedKinds = change.state === "merged" ? ["merge", "review-verdict", "ready-own", "ready-any", "request-review-own", "request-review-any"] : [];
+      const primary = ["comment", "review-verdict", "merge", "request-review-own", "ready-own"].filter((kind) => !blockedKinds.includes(kind));
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
       const mergeAnswer = lastAct && ["merge", "cancel-merge"].includes(lastAct.kind) ? last(scope) : null;
-      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary: ["comment", "review-verdict", "merge", "request-review-own", "ready-own"], choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
+      return show(...shell(destination, room, changeScreen(room, change, mergeAnswer, lastAct?.kind), await panelFor(room, scope as ScopeId, { ...(defaults ? { defaults } : {}), uncertain, statusShown: uncertain, primary, blockedKinds, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "request-changes" }] } } })));
     }
     if (destination === "rules") return show(...shell(destination, room, rulesScreen(room, await loadRules(room)), await panelFor(room, room.rules, { primary: ["publish"] })));
     return show(...shell(destination, room, roomScreen(room, await listLanes(room), destination === "changes" ? "change" : "issue"), await panelFor(loaded, loaded.directory, { primary: [destination === "changes" ? "open-pr" : "open-issue"] })));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];
+    let fence: ReturnType<ScopeSending["get"]>;
     try {
       const context = { session: sessionOf(kept), directory: kept.place.directory, membership: kept.place.membership };
       known = [...lastActs.entries()].filter(([association, result]) => association === actAssociation(context, result.scope)).map(([, result]) => result);
+      const scope = route.scope ?? (route.destination === "rules" ? room?.rules : kept.place.directory);
+      fence = scope ? sending.get(actAssociation(context, scope as ScopeId)) : undefined;
     } catch { /* Invalid current settings cannot match a known result. */ }
-    show(...shell(route.destination, room, failureScreen(error, known)));
+    show(...shell(route.destination, room, failureScreen(error, known), ...(fence?.state === "unknown" ? [unknownRequest(fence.kind)] : [])));
   }
 }
 

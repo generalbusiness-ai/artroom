@@ -28,3 +28,25 @@ export class RoomOpening<T> {
     return pending.value;
   }
 }
+
+export type SendingState = "preparing" | "submitting" | "unknown";
+/** One mutation per room/member/scope. An attempted request is never replaced after an unknown outcome. */
+export class ScopeSending {
+  private states = new Map<string, { kind: string; state: SendingState }>();
+  get(key: string): { kind: string; state: SendingState } | undefined { return this.states.get(key); }
+  begin(key: string, kind: string): boolean {
+    if (this.states.has(key)) return false;
+    this.states.set(key, { kind, state: "preparing" });
+    return true;
+  }
+  submitting(key: string): void {
+    const current = this.states.get(key);
+    if (current?.state === "preparing") current.state = "submitting";
+  }
+  answered(key: string): void { this.states.delete(key); }
+  failed(key: string): void {
+    const current = this.states.get(key);
+    if (current?.state === "preparing") this.states.delete(key);
+    else if (current) current.state = "unknown";
+  }
+}
