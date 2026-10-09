@@ -34,12 +34,12 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, entryHash, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { DEFINITION_DOMAIN, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -316,7 +316,9 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
  */
 export interface Manifest {
   id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
-  file: { path: string; digest: string | null; size: number | null; page: string } | null;
+  file: { path: string; digest: string | null; size: number | null; page: string;
+    /** Exact retained proposal text, verified for the selected version; null when unavailable. Never read from HEAD. */
+    content?: string | null } | null;
 }
 export interface Review { id: number; state: string; reviewer: string | null; manifest: number | null; verdict: string | null; extent: string | null }
 export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null }
@@ -340,6 +342,27 @@ export interface ChangeView {
 
 const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
 
+/** Item IDs are their opening entry positions (contract 4.1). Read just that
+ * authenticated entry and bind its signed bytes to the selected manifest.
+ * A missing, redacted or inconsistent source offers no preview. */
+async function manifestContent(handle: ScopeHandle, scope: Summary["scope"], manifest: Item): Promise<string | null> {
+  try {
+    const read = await handle.entry(manifest.id);
+    if (!read.ok || !read.complete || read.next !== undefined) return null;
+    const { entry, hash } = read.value;
+    if (entry.seq !== manifest.id || canonicalize(entry.at) !== canonicalize(scope) || entryHash(entry) !== hash || hash !== manifest.opened) return null;
+    if (!entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id)) return null;
+    const input = entry.input;
+    if (input.type !== "act" || input.signed.intent.kind !== "propose-file" || !verifySignedIntent(input.signed) || canonicalize(input.signed.intent.to) !== canonicalize(scope)) return null;
+    const author = input.authority.length === 1 ? input.authority[0] : null;
+    const authors = manifest.parties["authors"];
+    if (!author || author.key !== input.signed.intent.actor || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(authors) || !authors.some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { path, digest, size, content } = input.signed.intent.fields;
+    if (typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || path !== manifest.values["path"] || digest !== manifest.values["digest"] || size !== manifest.values["size"] || !fileSound({ path, digest, size, content })) return null;
+    return content;
+  } catch { return null; }
+}
+
 /**
  * A change lane, and for each of its merges the destination's publication
  * and that publication's outside operations, read from the destination's
@@ -357,14 +380,17 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   if (!proposal) throw new Unreadable(`${scope} holds no proposal.`);
   const rulesItem = summary.items.find((item) => item.type === "rules");
   const publications = await publicationsOf(room, scope);
+  const manifests = await all("manifest");
+  const selected = manifests.find((m) => m.state === "current") ?? manifests.at(-1);
+  const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
   return {
     scope, definition: summary.definition, head: at, proposal: proposal.id,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
-    manifests: (await all("manifest")).map((m) => ({
+    manifests: manifests.map((m) => ({
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
       file: typeof m.values["path"] === "string" ? {
-        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]),
+        path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]), ...(m === selected ? { content } : {}),
       } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
