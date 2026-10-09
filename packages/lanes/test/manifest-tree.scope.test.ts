@@ -451,17 +451,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect([retry.code, retry.lines[0]]).toEqual([1, expect.stringContaining("resend-not-due")]);
     return;
   }
-  const invitation = ok(await run(founder, "invite", "@check", "--role", "checker")).lines[1]!.split(": ")[1]!;
-  ok(await run(checker, "join", invitation));
-  const checkMember = { membership: repository.membership, member: "@check" };
-  const checkConfig = { name: "text", image: `sha256:${"7".repeat(64)}`, environment: [], steps: [["check", "text"]], judged: { passed: { status: 0, line: "ok" }, failed: { status: 1, line: "bad" } }, limits: { seconds: 60, outputBytes: 65536 } };
-  files["config.json"] = utf8(canonicalize(checkConfig));
-  const configuration = valueDigest(CONFIGURATION_DOMAIN, checkConfig);
-  ok(await run(founder, "act", "keep-configuration", "--on", "rules", "--set", `digest=${configuration}`, "--set", "name=text", "--value", "config.json"));
-  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
-  ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
-  founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
   if (nonemptyProfile) {
+    ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
     const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(activeChange)}`, "--set", "title=nonempty admission", "--set", "draft=false", "--value", "change3.json"));
     const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
     const D = new Platform(repository.directory.scope); await pause([D.name]);
@@ -479,6 +470,16 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect([closed.code, closed.lines[0]]).toEqual([1, expect.stringContaining("collection-closed")]);
     return;
   }
+  const invitation = ok(await run(founder, "invite", "@check", "--role", "checker")).lines[1]!.split(": ")[1]!;
+  ok(await run(checker, "join", invitation));
+  const checkMember = { membership: repository.membership, member: "@check" };
+  const checkConfig = { name: "text", image: `sha256:${"7".repeat(64)}`, environment: [], steps: [["check", "text"]], judged: { passed: { status: 0, line: "ok" }, failed: { status: 1, line: "bad" } }, limits: { seconds: 60, outputBytes: 65536 } };
+  files["config.json"] = utf8(canonicalize(checkConfig));
+  const configuration = valueDigest(CONFIGURATION_DOMAIN, checkConfig);
+  ok(await run(founder, "act", "keep-configuration", "--on", "rules", "--set", `digest=${configuration}`, "--set", "name=text", "--value", "config.json"));
+  ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", `checks=${JSON.stringify([{ name: "text", configuration, required: true, checker: checkMember }])}`, "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [{ name: "text", required: true }] }))}`));
+  ok(await run(founder, "act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(activeChange)}`, "--set", "name=change", "--value", "change3.json"));
+  founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: first, files: [{ path: "one.md", bytes: files["one.md"]! }, { path: "docs/two.md", bytes: files["two.md"]! }] }) };
   if ((exhaustCleanup && !unknownStageOnly) || unknownMintOnly) {
     const proposed = ok(await run(founder, "propose", "cleanup-exhausted"));
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
@@ -962,7 +963,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
 test("a native version-2 room refuses branch list proposals before local Git capture", async () => {
   const owner = beginSessionFixture({ secret: null, sessions: false, inspector: null });
   onTestFinished(owner.close);
-  const old = await legacyRoom();
+  const old = await legacyRoom({ roster: [] });
   expect((await old.G.summary()).value.reservationExpiry).toBeUndefined();
   const directory = await old.D.at(), membership = await old.M.at();
   owner.configure({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
