@@ -34,7 +34,7 @@ async function fixture(category: Category) {
   const summaries = new Map<string, Summary>([
     [D.scope, { scope: D, definition: "platform:directory@3", status: "active", time: TIME, counts: [], items: [item("lane", 1, "created", { kind: "issue" }, { scope: I })] }],
     [R.scope, { scope: R, definition: "platform:rules@2", status: "active", time: TIME, counts: [], items: [item("definition", 1, "active", { name: "change", digest: PIN })] }],
-    [G.scope, { scope: G, definition: "platform:destination@3", status: "active", time: TIME, counts: [], items: [item("branch", 0, "ready", { head: BASE })] }],
+    [G.scope, { scope: G, definition: "platform:destination@3", status: "active", time: TIME, counts: [], items: [item("branch", 0, "ready", { head: BASE, repository: { host: "artifacts", namespace: "test", name: "proposal", id: "scripted-repository" } })] }],
     [I.scope, { scope: I, definition: PIN, status: "active", time: TIME, counts: [], items: [item("intent", 0, "open", { number: 1, title: "Missing page" }, {}, { requester: { membership: M, member: "@rita" }, assignees: [] })] }],
   ]);
   const entries = new Map<string, Entry[]>();
