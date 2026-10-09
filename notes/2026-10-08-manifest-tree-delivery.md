@@ -6,13 +6,13 @@ This note is not a completed delivery, gate result or deployment claim.
 
 ## Current handoff status
 
-Current code checkpoint is `679d7a96d9e25f1ff666969215e820bf91480ffc`, tree
+The last coordinated gate ran at `679d7a96d9e25f1ff666969215e820bf91480ffc`, tree
 `264dfea43404cd2228c38faf4f3de5e597f08e8c`. Its coordinated gate failed:
 three five-second story timeouts and one legacy manifest not-staged refusal;
 927 passed and two recorders skipped. No canceler diagnostic occurred in that
 run. The authorized five-test ordered Scope cohort passed separately; it
 excludes only that short sequence, not longer pool accumulation or a cause.
-A4's next discriminating check remains proposed. Earlier856 failed-gate and
+A4's subsequent trace is qualified below. Earlier856 failed-gate and
 isolated/structural results below retain their own heads.
 
 Planner `041deabaf0dbe27c8aa6c8084483111453326e3b` resolves the three
@@ -28,6 +28,39 @@ write-free projection and separate CLI pending/owed reports.
 
 The sections below preserve exact historical checkpoints and their evidence.
 Their earlier open statuses are superseded where later sections say so.
+
+The current composition is `842eae593eb829bbeea6ef872a650ee93123ad1f`,
+tree `8aecfc7ad4570c23abd9f2a1789f6ca6c806dd5d`. It incorporates A1's
+native immutable publication proof and actual @3 compatibility witness from
+`590c09d7`, and the fixture cleanup repair `3420940b`, `e6c4f243` and
+`d02e34f1`. Page task source and authenticated task data are still being
+composed; no new coordinated gate or deployment has run.
+
+A4's intended single preview trace accidentally selected 42 files and 148
+tests because inherited include arrays were merged. The process passed, but
+earns no single-test selection or whole-gate credit. The preview took 1,049 ms;
+all 310 traced awaits paired, with cleanup active count zero. This negative
+result identifies no gate or canceler cause. Root parsed the safe trace and
+read the compact evidence, configuration, source diff and all test-result
+lines; it does not claim to have read every verbose raw-log line. Frozen
+metadata is `/tmp/artroom-a4-lifecycle-plan/evidence-aada580.json`, SHA-256
+`aada580ece8e51dbf079343517fb8ec1f7754268fc6efe588b9cf3b149f1c21b`.
+Records `606aeab3` and `7ea3f36e` retain the selection mistake and metadata
+successor. No instrumentation rerun followed.
+
+Planner `e15af790` separately authorized a concrete fixture repair: setup
+could throw before returning its cleanup handle. The helper now registers
+idempotent cleanup before installing state, releases only its owned globals
+and provider functions, and checks release after awaited setup work before
+starting another step. The compact actual-helper exception witness passed;
+removing catch cleanup exposed the secret/session leak. Its producer retained
+tool output rather than raw log files, so no raw-file hash is claimed. The
+last changed witness reported one test, 4 ms test time and 1.20 s total; the
+final one-line preservation of the original `effects > 0` test was typechecked.
+This repairs setup-exception custody. It does not cancel an unresolved await,
+prove timeout ownership or establish that the failed gate's cause is fixed.
+Tokenless foreign writes of the same global values cannot be attributed;
+the helper's owner chain and unique secret protect its own overlapping calls.
 
 ## Historical documentation preparation
 

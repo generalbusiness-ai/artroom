@@ -335,3 +335,12 @@ publication facts and provider advertisements do not create naming authority.
 This joint source satisfies neither that contract gap nor the original deployed
 positive/refusal observation, final coordinated gate, independent Source review
 and normal landing. No full A1 completion is claimed.
+
+Planner `3ddeeaff1350a077ffa1fc1a818e9b738d716ad8` permits this immutable
+source delivery to proceed with the named-version contract explicitly owed.
+The bounded label proposal is `/tmp/artroom-site-version-label-plan/handoff.md`,
+SHA-256 `ad27c6303fb8f1a043bdbfc62a00e6bd84cd5f906072113663e51c899db44960`.
+Planning defaults select a separate admin naming grant, immutable labels and
+a `version~` selector. Native proof observation, replay, compatibility and
+bounds still require exact design review and adoption with shared-name owner
+`576411c5`; no label or provider-tag implementation is claimed here.
