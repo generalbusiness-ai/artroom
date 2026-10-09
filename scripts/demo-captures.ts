@@ -34,11 +34,20 @@ const MOST = 300 * 1024;
 const USAGE = "Usage: scripts/demo-captures.ts <base-url> --home <config directory> --room <room.json> --out <directory>, or scripts/demo-captures.ts --recorded --out <directory>";
 
 /** The few parts of playwright-core that this script uses. */
-interface Locator { waitFor(options?: { timeout?: number; state?: "attached" | "visible" }): Promise<void>; first(): Locator }
+interface Locator {
+  waitFor(options?: { timeout?: number; state?: "attached" | "visible" | "hidden" }): Promise<void>;
+  first(): Locator; click(): Promise<void>; fill(value: string): Promise<void>;
+  inputValue(): Promise<string>; textContent(): Promise<string | null>;
+  locator(selector: string): Locator;
+  getByRole(role: string, options: { name: string | RegExp; exact?: boolean }): Locator;
+}
 interface Tab {
   url(): string;
   on(event: "pageerror", listener: (error: Error) => void): void;
   on(event: "console", listener: (message: { type(): string; text(): string }) => void): void;
+  on(event: "request", listener: (request: { method(): string; url(): string }) => void): void;
+  reload(): Promise<unknown>;
+  locator(selector: string): Locator;
   goto(url: string): Promise<unknown>;
   getByRole(role: string, options: { name: string | RegExp }): Locator;
   getByText(text: string | RegExp): Locator;
@@ -102,6 +111,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   const sizes: { name: string; bytes: number }[] = [];
   const consoleErrors: string[] = [];
   const checks: unknown[] = [];
+  const interactions: unknown[] = [];
   const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
   const sourceTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: ROOT, encoding: "utf8" }).trim();
   try {
@@ -123,6 +133,8 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
     // The page's settings, as it keeps them: the page's own origin, the room, and the key.
     await context.addInitScript(initializeCapture, { service, place: sitting.place, secret: sitting.secret });
     const tab = await context.newPage();
+    const posted: string[] = [];
+    tab.on("request", (request) => { if (request.method() === "POST") posted.push(request.url()); });
     tab.on("pageerror", (error) => consoleErrors.push(error.message));
     tab.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
     // The whole content, down to its lowest element and at most 1,400 pixels: the viewport is set to that height for the capture.
@@ -146,6 +158,30 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
       if (new URL(tab.url()).origin !== new URL(service).origin || new URL(tab.url()).pathname !== new URL(`${service}/page/`).pathname) throw new Error("Capture document left the configured page address.");
       await tab.getByRole("heading", { name: heading }).first().waitFor({ timeout: 30_000, state: "attached" });
       await tab.getByRole("navigation", { name: "Room" }).first().waitFor({ timeout: 30_000, state: "attached" });
+      if (name === "room") {
+        await tab.getByRole("button", { name: "All" }).click();
+        await tab.getByRole("link", { name: /Add a getting-started page/ }).waitFor({ timeout: 30_000 });
+        interactions.push({ name: "show recorded closed issue in All filter", scope: room.issue });
+      }
+      if (name === "rules") {
+        const form = tab.locator("form.rules-editor");
+        const approvals = form.locator('[name="approvals"]');
+        const before = await approvals.inputValue();
+        const after = String(Number(before) + 1);
+        const requestsBefore = posted.length;
+        await approvals.fill(after);
+        await form.getByRole("button", { name: "Save changes", exact: true }).click();
+        const confirmation = form.locator(".rules-confirmation");
+        await confirmation.waitFor({ timeout: 30_000 });
+        if (!(await confirmation.textContent())?.includes(`${before}\n→ ${after}`)) throw new Error("Rule confirmation does not name its observed before and edited after values.");
+        await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+        await confirmation.waitFor({ state: "hidden" });
+        if (posted.length !== requestsBefore) throw new Error("Cancelled rule edit sent a POST request.");
+        await tab.reload();
+        await tab.getByRole("heading", { name: "Rules" }).waitFor({ timeout: 30_000 });
+        if (await tab.locator('form.rules-editor [name="approvals"]').inputValue() !== before) throw new Error("Cancelled rules edit changed the recorded approval count.");
+        interactions.push({ name: "rule edit confirmation cancelled", before, after, extraPosts: 0, rereadOriginal: true });
+      }
       await shot(name);
     };
     await screen("/", "Issues", "room");
@@ -163,7 +199,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
   if (consoleErrors.length > 0) throw new Error(`Browser errors: ${consoleErrors.join("; ")}`);
   writeFileSync(join(out, "checks.json"), `${JSON.stringify({ source, sourceTree, service,
     mode: sitting.answers ? "recorded native Worker answers; Git host and scheduler stand-ins" : "deployment",
-    browserFallback: "Browser plugin not available", checks, consoleErrors, unanswered,
+    browserFallback: "Browser plugin not available", checks, interactions, consoleErrors, unanswered,
   }, null, 2)}\n`);
   if (unanswered.length > 0) throw new Error(`The browser asked for what the recorder did not read: ${unanswered.join("; ")}`);
   const over = sizes.filter((size) => size.bytes > MOST);
@@ -172,7 +208,7 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
 }
 
 const SHOWS: Record<string, string> = {
-  room: "The room’s Issues destination, with recorded issue states and the actions the signed-in person may sign on the directory.",
+  room: "The room’s Issues destination, with the All filter showing the recorded closed issue and the actions the signed-in person may sign on the directory.",
   issue: "Observed issue screen for the rehearsal's issue lane.",
   "change-refused": "Observed change screen for the rehearsal's outside.md lane.",
   "change-published": "Observed change screen for the rehearsal's guide/start.md lane.",
