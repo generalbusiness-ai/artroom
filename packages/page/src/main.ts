@@ -340,7 +340,7 @@ function settingsScreen(): HTMLElement {
       let enrollment: string;
       try { enrollment = joinAssociation(sessionOf(next), invitation); }
       catch (error) { tell(false, error instanceof Error ? error.message : "The invitation could not be read."); return; }
-      if (!current() || joinRepliesByContext.get(selectedContext)?.result.answer.answer === "accepted" || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
+      if (!current() || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
       joinButton.setAttribute("disabled", "");
       try {
         const joined = await joinRoom(sessionOf(next), invitation, () => {
