@@ -48,11 +48,14 @@ function settings(): Settings | null {
   }
 }
 
-function keep(kept: Settings): void {
+function keep(kept: Settings): boolean {
   try {
-    localStorage.setItem(KEPT, JSON.stringify(kept));
+    const bytes = JSON.stringify(kept);
+    localStorage.setItem(KEPT, bytes);
+    if (localStorage.getItem(KEPT) !== bytes) throw new Error("The browser did not retain these settings.");
+    return true;
   } catch {
-    alert("This browser does not let the page keep its settings.");
+    return false;
   }
 }
 
@@ -142,7 +145,11 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
         const result = await claimRoom(sessionOf(kept), configured, localStorage, name.value, { handle: room.me!.handle });
         if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
         if (result.repository) {
-          keep({ ...kept, place: { directory: result.repository.directory.scope, membership: result.repository.membership } });
+          if (!keep({ ...kept, place: { directory: result.repository.directory.scope, membership: result.repository.membership } })) {
+            message.textContent = `Creation is recorded, but this browser could not save the room settings. Directory ${result.repository.directory.scope}; membership ${result.repository.membership.scope}. Keep the private claim record. Resume creation to verify the original proof and try saving again.`;
+            submit.textContent = "Resume creation";
+            return;
+          }
           opened.clear(); close(); location.hash = "#/"; await draw();
         } else {
           message.textContent = result.outcome.lines.join(" "); submit.textContent = result.pending ? "Resume creation" : "Create room";
@@ -232,14 +239,15 @@ function settingsScreen(): HTMLElement {
     return { place, secret: newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || ""), ...(register ? { register } : {}) };
   };
   const save = (next: Settings) => {
-    keep(next); roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
+    if (!keep(next)) { tell(false, "This browser could not save the settings. Your previous room and key remain selected."); return; }
+    roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
     const sameRoute = location.hash === "#/";
     location.hash = "#/";
     if (sameRoute) queueMicrotask(() => { void draw(); });
   };
   form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
   room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); keep(next); opened.clear(); void draw(); } });
+  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "This browser could not save a new key. The existing key remains selected."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
   // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
   form.querySelector("#join")!.addEventListener("click", () => {
     void (async () => {

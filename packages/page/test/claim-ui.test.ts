@@ -23,7 +23,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   const root = new Element("div");
   const register = { kind: "register", scope: "register", inc: "one" };
   let settings = { place: { directory: "room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device", register };
-  let eligible = true, locked = true;
+  let eligible = true, locked = true, failSave = false;
   let redraw!: () => void;
   let finish!: (value: unknown) => void;
   let attempted = gate();
@@ -37,7 +37,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   vi.doMock("../src/view.ts", () => ({ h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); element.children = children.flat().filter((child) => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; }, roomScreen: () => new Element("main"), actsPanel: () => new Element("section"), failureScreen: () => new Element("main"), changeScreen: vi.fn(), issueScreen: vi.fn(), rulesScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn() }));
   vi.stubGlobal("document", { getElementById: () => root }); vi.stubGlobal("HTMLDialogElement", Element);
   vi.stubGlobal("location", { origin: "https://page.test", hash: "#/" });
-  const save = vi.fn((_key: string, value: string) => { settings = JSON.parse(value) as typeof settings; });
+  const save = vi.fn((_key: string, value: string) => { if (failSave) throw new Error("Storage full"); settings = JSON.parse(value) as typeof settings; });
   vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(settings), setItem: save });
   vi.stubGlobal("navigator", { get locks() { return locked ? {} : undefined; } });
   vi.stubGlobal("window", { addEventListener: (_key: string, callback: () => void) => { redraw = callback; } });
@@ -55,6 +55,17 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     attempted = gate(); form.fire("submit"); await attempted.promise;
     expect(claim).toHaveBeenCalledTimes(2);
     expect(claim.mock.calls[1]).toEqual(claim.mock.calls[0]); // Same adapter/binding/label, no --again or new key.
+    failSave = true;
+    finish({ repository: { directory: { scope: "created-room" }, membership: settings.place.membership }, pending: false, outcome: { code: 0, lines: [] } });
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    expect(settings.place.directory).toBe("room");
+    expect(dialog.textContent).toContain("Creation is recorded, but this browser could not save");
+    expect(dialog.textContent).toContain("created-room");
+    expect(root.find((element) => element.tag === "dialog")).toBe(dialog);
+    expect(save).toHaveBeenCalledTimes(1);
+    failSave = false; save.mockClear();
+    attempted = gate(); form.fire("submit"); await attempted.promise;
+    expect(claim).toHaveBeenCalledTimes(3);
     settings = { ...settings, place: { ...settings.place, directory: "another-room" } };
     finish({ repository: { directory: { scope: "new-room" }, membership: settings.place.membership }, pending: false, outcome: { code: 0, lines: [] } });
     for (let turn = 0; turn < 10; turn++) await Promise.resolve();
