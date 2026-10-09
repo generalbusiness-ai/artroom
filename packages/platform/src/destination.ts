@@ -543,7 +543,7 @@ export const destination2: PlatformData = {
 export const destination3: PlatformData = {
   ...destination2,
   items: { ...destination2.items,
-    publication: { ...destination2.items["publication"]!, states: { ...destination2.items["publication"]!.states, published: { final: false }, "cleanup-aborted": { final: false }, cleaned: { final: true } }, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32, "reservation-stage": 1, "reservation-delete": 1 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
+    publication: { ...destination2.items["publication"]!, states: { ...destination2.items["publication"]!.states, published: { final: false }, "cleanup-aborted": { final: false }, "cleanup-deleted": { final: false }, cleaned: { final: true } }, holds: { ...destination2.items["publication"]!.holds!, operations: { ...destination2.items["publication"]!.holds!.operations, "check-judge": 32, "reservation-stage": 1, "reservation-delete": 1 }, decisions: { withdraw: 1, checked: 32, "check-fence": 32 } }, values: {
       ...destination2.items["publication"]!.values,
       tree: { fixed: false, required: false, of: { type: "tree" } },
       checkDeadline: { fixed: false, required: false, of: { type: "time" } },
@@ -558,6 +558,7 @@ export const destination3: PlatformData = {
     { state: "cleanup-aborted" }, { value: { slot: "reason", from: { const: "required-check-timeout" } } },
   ], attention: [] } },
   outcomes: { ...destination2.outcomes,
+    revoke: { ...destination2.outcomes["revoke"]!, most: { effects: 1, operations: [] } },
     judge: { ...destination2.outcomes["judge"]!, most: { effects: 12, operations: ["reservation-stage", "push", "mint", "judge"] } },
     receipt: { ...destination2.outcomes["receipt"]!, most: { effects: 9, operations: ["revoke", "mint", "read", "reservation-delete"] } },
     "reservation-delete": { code: "reservation-delete", row: "P19", attempts: 1, most: { effects: 4, operations: ["revoke"] } },
@@ -2218,17 +2219,24 @@ export const destinationRules3: Rules = (() => {
     const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"];
     const publication = typeof publicationId === "number" ? given.state.item(publicationId) : null;
     if (!publication?.values["tree"]) return base;
+    if (!stagedOwn(given, publication, given.resolved.self)) return base;
     return { ...base, opens: [...base.opens, opening(given, "reservation-delete", 1, publication.id), opening(given, "mint", 1, publication.id)] };
   } } };
   const judgeRule3 = rules["judge"] as Extract<PlatformRule, { place: "outcome" }>;
   const checked = rules["checked-result"]!;
   return { ...rules,
     receipt: receiptCleanup,
+    revoke: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(WRITTEN["revoke"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 1, requests: 0, operations: 0 }, derives: (given, operation) => {
+      const mint = mintRevoked(given.state, given.own, operation);
+      const served = mint ? servedBy(given.state, given.own, mint) : null;
+      const target = served ? targetOf(given.state, given.own, served.write) : null;
+      return { effects: given.input.type === "outcome" && given.input.result === "confirmed" && served?.write.kind === "reservation-delete" && target?.state === "cleanup-deleted" ? [{ effect: "state", item: target.id, state: "cleaned" }] : [], sends: [], opens: [] };
+    } } },
     "reservation-delete": { place: "outcome", rules: {
       selects: false, read: false, most: { effects: 4, requests: 0, operations: 1 }, retries: () => false,
       ready: (state, write, attempt) => (mintOf(state, write, attempt)?.attempts[0]?.outcomes.length ?? 0) > 0,
       wellFormed: (result, evidence) => isObject(evidence.body) && SENDS[result]!.includes(evidence.body["send"] as string) && isSeen(evidence.body["seen"]), unknown: () => ({ send: "unknown", seen: "failed" }),
-      derives: (given, operation) => { const target = targetOf(given.state, given.own, operation); if (!target) return { effects: [], opens: [], sends: [] }; const token = tokenStep(given, operation); const body = given.input.type === "outcome" ? given.input.evidence.body as { seen: unknown } : null; return { effects: [...token.effects, { effect: "state", item: target.id, state: body?.seen === "absent" ? "cleaned" : target.state }], opens: token.opens, sends: [] }; },
+      derives: (given, operation) => { const target = targetOf(given.state, given.own, operation); if (!target) return { effects: [], opens: [], sends: [] }; const token = tokenStep(given, operation); const body = given.input.type === "outcome" ? given.input.evidence.body as { seen: unknown } : null; return { effects: [...token.effects, { effect: "state", item: target.id, state: body?.seen === "absent" ? "cleanup-deleted" : target.state }], opens: token.opens, sends: [] }; },
     } },
     judge: { ...judgeRule3, rules: { ...judgeRule3.rules, most: { effects: 12, requests: 1, operations: 2 } } },
     "publication-update": { place: "send", run: (given) => {
