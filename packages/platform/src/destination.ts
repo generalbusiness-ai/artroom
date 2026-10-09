@@ -1476,7 +1476,7 @@ const judgeDecides = (reads: Reads, list = false): Decides => (given) => {
       ...(list ? [{ effect: "value", item: publication.id, slot: "tree", value: evidence.tree! } as const, ...(requiredChecks.length ? [{ effect: "value", item: publication.id, slot: "requiredChecks", value: requiredChecks } as const] : [])] : []),
     ],
     opens: list && requiredChecks.length > 0 ? [] : [opening(given, DESTINATION_KINDS.push, DESTINATION_ATTEMPTS.push, publication.id), opening(given, DESTINATION_KINDS.mint, DESTINATION_ATTEMPTS.mint, publication.id)],
-    update: { ...(list ? { tree: evidence.tree! } : {}), publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
+    update: { ...(list ? { tree: evidence.tree!, commit: judged.integration } : {}), publication, state: "reserved", outcome: "committed", ...(judged.reason === null ? {} : { reason: judged.reason }), rules },
   };
 };
 

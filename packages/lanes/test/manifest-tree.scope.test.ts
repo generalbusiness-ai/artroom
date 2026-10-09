@@ -14,6 +14,8 @@ import { command, memoryStore, type Context, type Outcome } from "../../cli/src/
 import { changeDemo3 } from "../src/index.ts";
 
 
+// The checker pass is signed by its real member in this test. No checker
+// service origin read or runner is exercised; gap 1b5b048f records those duties.
 const SERVICE = "https://scopes.test";
 const reader = "a test reader";
 test("a manifest-list reservation records both files before the configured checker passes; no branch push occurs before that pass (real scopes, STAND-IN Git host and scheduler)", async () => {
@@ -85,7 +87,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const [lane, version] = [matched[1]!, Number(matched[2])];
   const L = new Platform(lane as ScopeId);
   const manifest = await L.item(version);
-  expect([manifest.values["tree"], host.refs.get("refs/heads/main")]).toEqual([expect.stringMatching(/^[0-9a-f]{40}$/), first]);
+  expect([manifest.values["tree"], manifest.values["integration"], host.refs.get("refs/heads/main")]).toEqual([expect.stringMatching(/^[0-9a-f]{40}$/), expect.stringMatching(/^[0-9a-f]{40}$/), first]);
   expect(proposed.lines[1]).toMatch(/^Reserved: merge/);
   const requested = ok(await run(founder, "act", "request-check", "--on", lane, "--set", `manifest=${version}`, "--set", "name=text", "--set", `configuration=${configuration}`));
   const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
