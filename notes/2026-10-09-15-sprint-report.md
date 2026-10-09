@@ -54,8 +54,9 @@ native admission proof or counting-app screenshot.
 | Six manual pages, index and ledger | `25467a369` | Reviewed introductory and first-change documentation; the full manual and release acceptance remain open |
 
 The checker verified that each of the last three landings contains the
-reviewed document bytes and leaves package trees unchanged. Their original
-implementation and full-documentation commitments remain open.
+reviewed document bytes and leaves package trees unchanged. Those scoped
+publication tasks are complete. Their corresponding runtime implementation
+and full-manual/acceptance duties remain open.
 
 Jam's separate repository also landed its reviewed, application-owned
 synthetic demo material at `990dcbf3`. Symbolic checks passed. This is a
