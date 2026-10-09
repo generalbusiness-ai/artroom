@@ -313,12 +313,14 @@ one `propose-manifest` that freezes all paths, entry references and byte
 digests on the published base. The destination builds their shared tree
 at reservation and records it before any required check. A check request
 reads that reservation tree; publication waits for every required check's
-authentic pass. The destination stages the recorded integration on the canonical host
+authentic pass. The destination stages the recorded integration on the
+canonical host
 under `refs/artroom/reservations/<reservation id>` before it reports the
 reservation to the lane. The checker reads that reservation and fetches
 its exact ref, then checks its integration ID, tree and first parent. A
 missing or mismatched stage gives `reservation-stage-missing` or
-`reservation-stage-mismatch` and starts no run. While a check is owed, the command prints the change and
+`reservation-stage-mismatch` and starts no run. While a check is owed, the
+command prints the change and
 reserved tree. A published result prints the room's commit. A policy
 refusal prints its name and the merge command to run after approval.
 
