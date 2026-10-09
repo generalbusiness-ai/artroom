@@ -275,3 +275,44 @@ chronology, timeout cause, production exposure or global savings. All
 execution stopped. Source-only failure disposition proceeds; no retry,
 deadline increase, suite omission, approval or landing follows this result.
 This result-note successor changes no source or test bytes from d026.
+
+## Affected verification at cca558d9: stopped after failure
+
+The next source candidate composed owned CLI/Page continuations, passive
+signed-read diagnostics, exact child completion, immutable OwnGit pack reuse
+and opt-in fixture setup. W2 retained Vic for its active wrong-merger control;
+only W4/W5 omitted that unused enrollment. All original case deadlines remain.
+
+Planner `bebe7510` authorized three affected compilers and conditional
+discovery at `cca558d920f6e23d8b268ec041f15c75a6156874`, tree
+`216b416877c1767c7a08de87be21751ed43ebb0f`. Scope tests, Page scope and
+lanes scope compiled successfully. Unchanged Scope source and CLI checks
+were not repeated. The strict 23-file discovery listed 65 active cases;
+the two existing recorder opt-ins remained disabled. Source and dependencies
+were clean and exact throughout. Root read every discovered title and proof.
+
+Planner `b027345a` then authorized one affected run with bail after the first
+failure. It stopped on Page source-preview's original five-second timeout:
+47 cases passed, one failed and two recorders were skipped. Seventeen required
+active cases were unrun. The observed command took 129.46 s wall and
+133.42 s CPU. No uncaught section or failure-stage chronology appears.
+
+CLI claim and clone, all 21 manifest cases, five wiring cases, three Page
+claim cases, four LIST1 editor cases, LIST1 source and retained editor passed
+their own assertions. Page story, task data, tasks, the OwnGit cache witness,
+generic Reads, nine signed-read cases and both Site cases remain unrun.
+The active-source companion did not run because the native selection failed.
+
+Root read the complete raw log and matched all 65 discovery titles to the
+executed/unrun ledger. Evidence:
+`/tmp/artroom-critical-cca558-native/complete-result.json`, SHA-256
+`127b822e067ed9f11bcc2d5e3dd4c58429d1952d0c45063e72d781fba74a014e`,
+durable result `639879ca`. Raw log SHA-256:
+`6aa617591ef27f9326fc9bbb94c82590f8c3e8ef0dd6846927355555ce241024`.
+The post-run duration cache was unchanged from d026 and is stale; it supplies
+no cost attribution for this run.
+
+No unchanged retry, deadline increase, assertion waiver, full gate, approval
+or landing follows. Source-only preview disposition proceeds. This is not
+a paired savings measurement or proof of the 10x goal. The result-note
+successor changes no source or tests from the failed affected head.
