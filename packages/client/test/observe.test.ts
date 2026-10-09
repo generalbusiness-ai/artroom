@@ -1,0 +1,58 @@
+import { expect, test } from "vitest";
+import type { Head, ScopeRef } from "@generalbusiness/artroom-contract";
+import { base32, keyIdOfSecret, timeOf, utf8, type ByteStream } from "@generalbusiness/artroom-bytes";
+import { Session } from "../src/session.ts";
+import { headLines, openHttpHeadStream } from "../src/head-stream.ts";
+import { observeScope, type CompleteSnapshot, type ObservationState } from "../src/observe.ts";
+const gate=<T=void>()=>{let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return{promise,resolve};};
+const scope={scope:`sc_${base32(new Uint8Array(32))}`,inc:`in_${base32(new Uint8Array(16))}`,kind:"lane"} as ScopeRef;
+const membership={...scope,kind:"membership"} as ScopeRef;const key=keyIdOfSecret(new Uint8Array(32));const definition="sha256:"+"1".repeat(64) as `sha256:${string}`;
+const context={origin:"https://scope.test",scope,membership,definition,member:"@member" as const,key};
+const head=(seq:number):Head=>({seq,hash:`sha256:${String(seq).padStart(64,"0")}`});
+const session=()=>new Session("private-token",{v:1,deployment:"test",membership,member:"@member",key,reads:["summary"],ends:timeOf(Date.now()+60_000)});
+const snapshot=(seq:number):CompleteSnapshot<number>=>({scope,definition,at:head(seq),value:seq});
+function stream(){const queue:Uint8Array[]=[];let waiting:ReturnType<typeof gate<{done:boolean;value?:Uint8Array}>>|undefined;let cancelled=0;return{body:{getReader:()=>({read:()=>queue.length?Promise.resolve({done:false,value:queue.shift()!}):(waiting=gate()).promise,cancel:async()=>{cancelled++;waiting?.resolve({done:true});}})} as ByteStream,send(value:Uint8Array){if(waiting){const w=waiting;waiting=undefined;w.resolve({done:false,value});}else queue.push(value);},notice(seq:number){this.send(utf8(JSON.stringify({at:head(seq)})+"\n"));},end(){waiting?.resolve({done:true});},get cancelled(){return cancelled;}};}
+const drain=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
+
+test("head codec accepts fragmented frames but rejects oversized raw bytes, malformed UTF8 and truncated frames before yielding",async()=>{
+ const body=stream(),abort=new AbortController(),lines=headLines(body.body,abort.signal);const first=lines.next();const bytes=utf8(JSON.stringify({at:head(1)})+"\n");body.send(bytes.slice(0,12));body.send(bytes.slice(12));expect((await first).value).toEqual(head(1));abort.abort();await lines.return(undefined);expect(body.cancelled).toBeGreaterThan(0);
+ for(const bytes of[new Uint8Array(1025).fill(97),new Uint8Array([255,10]),utf8('{"at":')]){const broken=stream(),stop=new AbortController(),reading=headLines(broken.body,stop.signal).next();broken.send(bytes);await drain();if(bytes.length===6)broken.end();await expect(reading).rejects.toThrow();}
+});
+
+test("subscribe handshake precedes snapshot; newer notices during a read coalesce and publish useful retained data without regressing",async()=>{
+ const body=stream(),first=gate<ReturnType<typeof snapshot>>(),second=gate<ReturnType<typeof snapshot>>(),states:ObservationState<number>[]=[];let reads=0;const started=gate();
+ const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{reads++;started.resolve();const value=await(reads===1?first.promise:second.promise);return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s)});
+ await drain();expect(reads).toBe(0);body.notice(1);await started.promise;body.notice(2);body.notice(3);await drain();expect(reads).toBe(1);first.resolve(snapshot(1));await drain();
+ expect(states.some(s=>s.status==="retained"&&s.snapshot.value===1&&s.reason==="newer-notice")).toBe(true);
+ // The single coalesced reread starts after yielding once to the timer queue.
+ await new Promise(resolve=>setTimeout(resolve,0));expect(reads).toBe(2);second.resolve(snapshot(3));await drain();expect(states.at(-1)).toEqual({status:"current",snapshot:snapshot(3)});observer.cancel();await observer.done;expect(body.cancelled).toBeGreaterThan(0);
+});
+
+test("context cancellation rejects a late complete read and resolves despite an upstream reader ignoring cancel",async()=>{
+ const read=gate<ReturnType<typeof snapshot>>(),reading=gate(),states:ObservationState<number>[]=[];let current=true;let cancelled=0;
+ const body={getReader:()=>({read:()=>{if(cancelled===0){cancelled=-1;return Promise.resolve({done:false,value:utf8(JSON.stringify({at:head(1)})+"\n")});}return new Promise<{done:boolean}>(()=>{});},cancel:async()=>{cancelled=1;}})} as ByteStream;
+ const observer=observeScope({context,current:()=>current,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body}),snapshot:async()=>{reading.resolve();const value=await read.promise;return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s)});
+ await reading.promise;current=false;observer.refresh();expect(states.at(-1)).toEqual({status:"cancelled"});observer.cancel();await observer.done;read.resolve(snapshot(2));await drain();expect(states.at(-1)).toEqual({status:"cancelled"});expect(states.some(s=>s.status==="current")).toBe(false);expect(cancelled).toBe(1);
+});
+
+test("HTTP opener uses header custody and reports unsupported without binding or signed-read fallback",async()=>{
+ let url="",authorization="";const opened=await openHttpHeadStream(context.origin,scope,session(),new AbortController().signal,{fetch:async(u,init)=>{url=u;authorization=init?.headers?.["authorization"]??"";return{status:404,body:null};}});
+ expect(opened).toEqual({ok:false,reason:"unsupported"});expect(url).toBe(`${context.origin}/v1/scopes/${scope.scope}/stream`);expect(url).not.toContain("token");expect(authorization).toBe("Session private-token");
+});
+
+test("EOF reconnects with new authentication and a complete current snapshot, then a denied renewal remains visible",async()=>{
+ const first=stream(),second=stream(),states:ObservationState<number>[]=[];let auths=0,opens=0;const current1=gate(),current2=gate();
+ const observer=observeScope({context,current:()=>true,authenticate:async()=>{auths++;return auths<3?{ok:true,session:session()}:{ok:false,reason:"unauthorized"};},open:async()=>({ok:true,body:++opens===1?first.body:second.body}),snapshot:async()=>{const value=snapshot(opens===1?1:5);return{ok:true,at:value.at,value,complete:true};},reconnectDelay:async()=>{},emit:s=>{states.push(s);if(s.status==="current")(s.snapshot.value===1?current1:current2).resolve();}});
+ await drain();first.notice(1);await current1.promise;first.end();await drain();second.notice(5);await current2.promise;second.end();await observer.done;
+ expect(auths).toBe(3);expect(opens).toBe(2);expect(states.at(-1)).toEqual({status:"forbidden",reason:"unauthorized",retained:snapshot(5)});expect(states.some(s=>s.status==="reconnecting")).toBe(true);
+});
+
+test("same sequence different hash and wrong snapshot incarnation are visible failures, never current views",async()=>{
+ for(const changed of["hash","incarnation"]){const body=stream(),states:ObservationState<number>[]=[];const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{const value=snapshot(1);if(changed==="hash")value.at={...value.at,hash:("sha256:"+"9".repeat(64)) as `sha256:${string}`};else value.scope={...scope,inc:`in_${base32(new Uint8Array(16).fill(1))}`};return{ok:true,at:value.at,value,complete:true};},emit:s=>states.push(s)});await drain();body.notice(1);await observer.done;expect(states.at(-1)?.status).toBe("error");expect(states.some(s=>s.status==="current")).toBe(false);}
+});
+
+test("first head waiting has a bound and cancels its body rather than waiting indefinitely",async()=>{
+ const body=stream(),states:ObservationState<number>[]=[];let observer:ReturnType<typeof observeScope<number>>;
+ observer=observeScope<number>({context,current:()=>true,seconds:0.01,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{throw new Error("No head means no snapshot");},emit:s=>states.push(s),reconnectDelay:async()=>{observer.cancel();}});
+ await observer.done;expect(states.some(s=>s.status==="unavailable"&&s.reason==="read-timeout")).toBe(true);expect(body.cancelled).toBeGreaterThan(0);
+});
