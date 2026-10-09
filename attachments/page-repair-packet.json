@@ -1,0 +1,93 @@
+{
+  "base": "0db7c5113dceba3ebfacd7133dd1c403e83668df",
+  "head": "7544ce67dc379eb73eff85bd3989effd06e8be14",
+  "tree": "53f7b261da1e84dcfa3ad7ba4a94df27f2b30b30",
+  "paths": [
+    {
+      "path": "packages/page/src/main.ts",
+      "bytes": 38756,
+      "sha256": "1ce1fa0939f28acc42e05077e46d7779d10588fc870bffa19bc1ce32e228f91c"
+    },
+    {
+      "path": "packages/page/src/retained-editor.ts",
+      "bytes": 6552,
+      "sha256": "b7d8ab5c293f8d6e0716523e7e83858b2df6998fa24df5ee7966416dabbda023"
+    },
+    {
+      "path": "packages/page/src/tasks.ts",
+      "bytes": 5414,
+      "sha256": "32b66c868540c328bfdfe3c13f97df296aeeadddcbd4ce5b388320502c97c399"
+    },
+    {
+      "path": "packages/page/src/view.ts",
+      "bytes": 21968,
+      "sha256": "3e327fa6db0c333509c088313dc13c535c2c0a8b89932b8e69365f9e115caead"
+    },
+    {
+      "path": "packages/page/test/actions.test.ts",
+      "bytes": 16989,
+      "sha256": "e978a1da9f159763e685cc609ed0d7a26530dc729e3f5b8eba5059960adf2f96"
+    },
+    {
+      "path": "packages/page/test/correction-main.test.ts",
+      "bytes": 5181,
+      "sha256": "580689001c8ecfee0555b5bacadd8e31a4e1536ef6b372533604d5fe5cc356e9"
+    },
+    {
+      "path": "packages/page/test/retained-editor.test.ts",
+      "bytes": 6776,
+      "sha256": "40153a1b71c5ebe9c6434ed7bbaee5056b8b383c4c3b263638faf4e27cf232f3"
+    },
+    {
+      "path": "packages/page/test/view.test.ts",
+      "bytes": 14273,
+      "sha256": "508b0b1592de924363dd6d45310682d3e3a88fde82de8f119f0acb38b17500bd"
+    }
+  ],
+  "logs": {
+    "discovery": {
+      "path": "/tmp/artroom-correctness-page-discovery.log",
+      "bytes": 181,
+      "sha256": "908a675e6fc565ca8c6277887f1c1d3b78756cb4f291488726e98c7be054d50d"
+    },
+    "focus": {
+      "path": "/tmp/artroom-correctness-page-focus.log",
+      "bytes": 2942,
+      "sha256": "51fa4cf6c79a314d92be847e7231ed788d3ebcd333d77d95427e56794ce874e6"
+    },
+    "main-repair": {
+      "path": "/tmp/artroom-correctness-page-main-repair.log",
+      "bytes": 1544,
+      "sha256": "a1b0224cc0f5bb62df0f276a6a925e040a1b5b5f2a2c77a37f349c29aea6ed68"
+    },
+    "main-repair-2": {
+      "path": "/tmp/artroom-correctness-page-main-repair-2.log",
+      "bytes": 221,
+      "sha256": "c8abe1cb972cacd8501ec10700949b595b52685d5b94396fbc1b33e6ad7b5f4e"
+    },
+    "newline-control": {
+      "path": "/tmp/artroom-correctness-page-newline-control.log",
+      "bytes": 1432,
+      "sha256": "d8a47d3b9b681427f340955ce145c1c8363268d37f6b1715c3a3c29078680065"
+    },
+    "mount-control": {
+      "path": "/tmp/artroom-correctness-page-mount-control.log",
+      "bytes": 1184,
+      "sha256": "659e470acb45f2ebbef25eb76d4892317adac4f3b71f91870e431a274365543e"
+    },
+    "final": {
+      "path": "/tmp/artroom-correctness-page-final.log",
+      "bytes": 253,
+      "sha256": "21155999fd10f3b6b8f9895f135fed890153a318afccc355e5518ed8c0e64f12"
+    }
+  },
+  "final": "4files26PageNodepass;no browser/native/gate/assets/provider",
+  "controls": {
+    "newline": "oldhandler -> retained CRLF/CR becomes LF assertion failure",
+    "mount": "validpathonlymount -> actualMain editor0expected1"
+  },
+  "failure_dispositions": [
+    "Initial Main mock lacked Unreadable export then prepend; fixture fixed without source behavior change or timeout increase"
+  ],
+  "remaining": "root compose/rebuild/finalgate/full Source; actual browser newline optional directed QA"
+}

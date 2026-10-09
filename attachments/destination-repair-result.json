@@ -1,0 +1,76 @@
+{
+  "base": "0db7c5113dceba3ebfacd7133dd1c403e83668df",
+  "head": "f7976a4fe28f0eaf40c6ab9e940b5fe4f5fbcafc",
+  "tree": "951b55b654f4b5abdc8e5a3e4470a8a92bb38f5c",
+  "clean": true,
+  "branch": "request/correctness-destination",
+  "paths": [
+    "packages/platform/src/destination.ts",
+    "packages/lanes/test/manifest-tree.scope.test.ts"
+  ],
+  "selectedNative": {
+    "passed": 1,
+    "filteredSkipped": 19,
+    "bodySeconds": 1.19,
+    "vitestSeconds": 2.45
+  },
+  "finalExecution": {
+    "exit": 0,
+    "wall": 3.0225310410605744,
+    "combinedChildrenUser": 9.103405,
+    "combinedChildrenSystem": 1.355894,
+    "command": [
+      "node",
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "packages/lanes/test/manifest-tree.scope.test.ts",
+      "--config",
+      "/tmp/artroom-correctness-destination-evidence/vitest.config.mjs",
+      "--testNamePattern",
+      "^eligible resend opens recovery and late receipt-token outcomes settle the publication holder \\(real scopes; host and scheduler STAND-INs\\)$"
+    ]
+  },
+  "controls": {
+    "results": [
+      {
+        "control": "missing-recovery-effect",
+        "exit": 1,
+        "wall": 2.700019415933639
+      },
+      {
+        "control": "receipt-slot-holder",
+        "exit": 1,
+        "wall": 2.7726027090102434
+      }
+    ],
+    "restoredSHA256": "397be25b73ec715fe5d70a3423370fbb2321ef64a28f9ad1b0129db8e99ff94a"
+  },
+  "types": {
+    "platform": 0,
+    "lanesScope": 0
+  },
+  "gateRun": false,
+  "providerRun": false,
+  "hashes": {
+    "/tmp/artroom-correctness-destination-evidence/positive-final.log": "0ede1c23334069ced1e66092487017b0a52f2720a3f421765e7b8e3992baed29",
+    "/tmp/artroom-correctness-destination-evidence/controls.py": "275c9629c9cb45b7af4fc6e7ed2c11decc0e9a23aba9d062c764a098f32409ee",
+    "/tmp/artroom-correctness-destination-evidence/controls.json": "931daa57c2fb29a64908f8a5eff91db0b1a4c80401ae73da2fd0e8c4219ec382",
+    "/tmp/artroom-correctness-destination-evidence/positive-restored-execution.json": "3f7966f7a55c51e10c7c44cd9e0d0770c545d821dcc49b26092663bc2c742f81",
+    "/tmp/artroom-correctness-destination-evidence/positive-staged-accounting-execution.json": "e70e67ff06323a97f1583b00afcbc37ce04e1b4c69e3fbc4bae12d63ae2e93c3",
+    "/tmp/artroom-correctness-destination-evidence/receipt-slot-holder.log": "ffc244ff476de1e3a9656f95b86f7529e457887057b02b19373a6a8fa5be1121",
+    "/tmp/artroom-correctness-destination-evidence/positive-final-execution.json": "79e63afbd28e718855384e4c772460fb3117ea073f1014c481533e029bd20196",
+    "/tmp/artroom-correctness-destination-evidence/missing-recovery-effect.log": "3aaa0bcdb5c74e3fb1c02c0f19b5e665c703a8524c4f86c19a613fa75326496b",
+    "/tmp/artroom-correctness-destination-evidence/positive-staged-accounting.log": "deb40c5ca4cfa9c9aa4838c64244594137dbf7a84d55f9b0fafa4995a11b23d7",
+    "/tmp/artroom-correctness-destination-evidence/positive-restored.log": "ec155ce8f277ee3cb8b0521e8d0b1a72655c9b1d3be9a152b43a44cc96deeae3",
+    "/tmp/artroom-correctness-destination-evidence/final.patch": "9ea54b60aed606676cfedbc007f2b87ee9b7b42e00944729046d466aaf8be36f",
+    "/tmp/artroom-correctness-destination-evidence/discovery.json": "962c7fc385451c0ea8265a4e90921850d8c9e03adae8bca086a02cbb2b6f3687",
+    "/tmp/artroom-correctness-destination-evidence/positive-repaired.log": "e8b44b370224a34e160bc544dd52362cd748c32d7dda7f4d1b8414a813dc1b15",
+    "/tmp/artroom-correctness-destination-evidence/positive-repaired-execution.json": "5e82f9b3274ce12309d76dfdfb2500f0236cb791c8fd3b3a6f3273906bdc285b",
+    "/tmp/artroom-correctness-destination-evidence/vitest.config.mjs": "8b12048924d2e1330e26544ba699baec335f5277aaab8974270aa2e910efda6a",
+    "/tmp/artroom-correctness-destination-evidence/positive-initial.log": "4f1649f011466907dad9ef759c181ac394c85764e6a78718ac1fa04b66bab1c5",
+    "/tmp/artroom-correctness-destination-evidence/handoff.md": "24ae9aeb7624dc49ed0e23fb2b6057b091abb366723dce0420911787205246f7",
+    "/tmp/artroom-correctness-destination-evidence/positive-initial-execution.json": "cc6dfd51463f56d663b3655cb591e9ccc63de26502f7126ee78b77c23addec92",
+    "/tmp/artroom-correctness-destination-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/artroom-correctness-destination-platform-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
