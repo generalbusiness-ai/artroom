@@ -19,15 +19,17 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
   const root = new Element("div");
-  const context = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
+  let context = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
   const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: null };
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
   const rejects: ((error: Error) => void)[] = [];
+  const posts = vi.fn();
   const attempt = gate();
   const dataAct = vi.fn(async (...args: unknown[]) => {
     (args[5] as () => void)();
+    posts();
     attempt.resolve();
     return new Promise<never>((_resolve, reject) => { rejects.push(reject); });
   });
@@ -50,6 +52,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   vi.stubGlobal("location", location);
   vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(context) });
   vi.stubGlobal("window", { addEventListener: (_name: string, callback: () => void) => { redraw = callback; } });
+  vi.stubGlobal("alert", vi.fn());
   try {
     await import("../src/main.ts");
     await rendered.promise;
@@ -92,6 +95,22 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     send("merge", "", {});
     await drain();
     expect(dataAct).toHaveBeenCalledTimes(1);
+    const beforeSubmit = gate(), release = gate();
+    dataAct.mockImplementationOnce(async (...args: unknown[]) => {
+      beforeSubmit.resolve();
+      await release.promise; // Models data.act's awaited reads/intent before POST.
+      (args[5] as () => void)();
+      posts();
+      throw new Error("This would be a POST if the callback did not reject");
+    });
+    send("comment", "", {});
+    await beforeSubmit.promise;
+    context = { ...context, place: { ...context.place, directory: "another-room" }, secret: "another-key" };
+    rendered = gate(); release.resolve(); await rendered.promise;
+    expect(posts).toHaveBeenCalledTimes(1); // Only the earlier lost-reply submission.
+    expect(panels.at(-1)?.pending).toBe(false);
+    expect(panels.at(-1)?.uncertain).toBe(false);
+    expect(alert).toHaveBeenCalledWith("The room or key changed before submission. Nothing was sent.");
   } finally {
     // Controls may admit forbidden extra attempts. Reject and drain every
     // one while its DOM remains installed, so a distinguishing assertion
