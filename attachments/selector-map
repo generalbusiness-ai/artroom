@@ -1,0 +1,117 @@
+{
+  "unchanged_configuration": [
+    {
+      "path": "vitest.config.ts",
+      "bytes": 3161,
+      "sha256": "06ccec2c20ff0ec6dbee7124c5205f8f96d7fd37078c1dffe6b18ba8b2876f78",
+      "unchanged": true
+    },
+    {
+      "path": "packages/cli/vitest.config.ts",
+      "bytes": 395,
+      "sha256": "5291165a9e5d07978c8ce065a5df83890a9480b7e3615f88cc82550eeaecd8d7",
+      "unchanged": true
+    },
+    {
+      "path": "packages/scope/vitest.worker.config.ts",
+      "bytes": 657,
+      "sha256": "9b375fa731bbd204d402d3f9fcd865936df6a45fa8f12d258013a6611cd402b0",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/vitest.config.ts",
+      "bytes": 413,
+      "sha256": "1a26586e67bbe764d50f3c6aa19af1757b95411e8bc9241acab3979bcfdc4dc2",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/vitest.scope.config.ts",
+      "bytes": 616,
+      "sha256": "ff4ef6408001e0af200eef5f80e2f8cccf08a1b2a481e8238fb40cc44b01339c",
+      "unchanged": true
+    },
+    {
+      "path": "packages/cli/tsconfig.test.json",
+      "bytes": 127,
+      "sha256": "ba4a0563118ca2ebc1eaaab34a0ff3574b06e4ebf508ed6d848c309ca73aab72",
+      "unchanged": true
+    },
+    {
+      "path": "packages/scope/tsconfig.test.json",
+      "bytes": 287,
+      "sha256": "5277eb7f0e6e39ababe48d6921e004e63fabb632e446e86ffc823c46e29719ee",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/tsconfig.test.json",
+      "bytes": 219,
+      "sha256": "133ea2f28a74ed8aa4808a6ce9816b6e75cafb56b0da3e20e1a40c37c442a4a8",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/tsconfig.scope.json",
+      "bytes": 428,
+      "sha256": "2d5767c755a41af4e6c014f82f93a5fa97574e31d238dbac980e4d4265f9dfa1",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/wrangler.test.jsonc",
+      "bytes": 781,
+      "sha256": "d055de5a3d1862795e67ef38a39b935e2297a5ba56285ec9a254bc50ae497790",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/test/support/worker.ts",
+      "bytes": 616,
+      "sha256": "e0117c7e1153e5edc4f62b7008b078fef9df24996deab8f66a066fe032c75078",
+      "unchanged": true
+    },
+    {
+      "path": "packages/lanes/test/support/env.d.ts",
+      "bytes": 632,
+      "sha256": "ec85c6dd0fcf00d93c73b35cffaa94db334ad44b9f87813d940b748e1ae05ebf",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/active-source.test.mjs",
+      "bytes": 7147,
+      "sha256": "6cbbdcd1fe2a72b027d355434bf2dbeebb562db2c658511522076d2511e9e6b3",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/measure-tests.sh",
+      "bytes": 3847,
+      "sha256": "64943cef11a2abd4397f0d02e2615ca3a394588391c9f79287d6b5453d58c2d9",
+      "unchanged": true
+    },
+    {
+      "path": "scripts/control.mjs",
+      "bytes": 9972,
+      "sha256": "bff307713ec86853c65815f5d7911cdff03bbfcb42d75c7c0d6647bdcf30bc87",
+      "unchanged": true
+    },
+    {
+      "path": "package.json",
+      "bytes": 523,
+      "sha256": "9121537cb2a12c8693fa2184c251c2f05b3625b88fa3d922893493bf6ce027c2",
+      "unchanged": true
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 127495,
+      "sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "unchanged": true
+    }
+  ],
+  "active_oldpath_hits": [],
+  "body_import_consumers": "No test imports any moved testfile; only counterpart comment updated",
+  "node_selector": "root lanes project /package lanesNode recursive *.test excludes *.scope",
+  "native_selector": "root scope project lanes*.scope glob sameScopeWorker once; package lanesNative sameexportedclasses NET/PLATFORM",
+  "minimal_types": [
+    "packages/lanes/tsconfig.test.json",
+    "packages/lanes/tsconfig.scope.json"
+  ],
+  "execution": "None",
+  "inbound_old_module_imports": [],
+  "search_qualification": "Exactoldfull/originalrelativepath and importbasename matches; cli-proposal-outcomes substring NOTmistakenoldpath"
+}

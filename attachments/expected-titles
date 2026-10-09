@@ -1,0 +1,58 @@
+{
+  "node": [
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI linking link-summary retains known proposal and stops before merge (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI linking link-request retains known proposal and stops before merge (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI linking link-unavailable retains known proposal and stops before merge (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "a valid custom required rules input refuses the fixed CLI workflow before opening (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "a local callback failure retains known opening/rules locators without exposing its text or signing the next step (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "an accepted merge keeps the protected reservation observation after merge-final-read (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "an accepted merge keeps the protected reservation observation after merge-read-error (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI partial proposal source-unavailable retains known work and stops the next phase (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI partial proposal source-refused retains known work and stops the next phase (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI partial proposal source-mismatch retains known work and stops the next phase (HTTP STAND-IN)"
+    },
+    {
+      "file": "packages/lanes/test/cli-proposal-outcomes.test.ts",
+      "name": "CLI partial proposal rules-read retains known work and stops the next phase (HTTP STAND-IN)"
+    }
+  ],
+  "native": [
+    {
+      "file": "packages/lanes/test/site-clock-lifetime.scope.test.ts",
+      "name": "a released Site continuation cannot advance the shared clock past a new native offer deadline"
+    },
+    {
+      "file": "packages/lanes/test/site-native3-publication.scope.test.ts",
+      "name": "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it"
+    }
+  ]
+}

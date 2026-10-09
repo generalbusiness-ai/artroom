@@ -1,0 +1,109 @@
+diff --git a/docs/testing.md b/docs/testing.md
+index 828919218..704edd977 100644
+--- a/docs/testing.md
++++ b/docs/testing.md
+@@ -429,7 +429,10 @@ gate.
+ The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+ the root inside the `scope` project: the same test Worker, loaded once.
+ The root `vitest.config.ts` adds them, and no file of the scope package
+-names the lanes package. The lanes package keeps
++names the lanes package. The Site publication and clock lifetime scenarios
++also live in the lanes package: they need its definition or graph. They use
++the Scope package's existing host, repository and lifetime helpers, with no
++copy of a fixture or change to the native Worker classes. The lanes package keeps
+ `vitest.scope.config.ts` and `wrangler.test.jsonc`, which run the same
+ files alone, in a Worker of its own with the same classes: for `npm test`
+ in the package, for `scripts/control.mjs` and for
+@@ -440,8 +443,10 @@ scenario is about a route. The reason is cost: in the workerd pool a call
+ through the Worker's entrypoint takes longer the more of them one run has
+ made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
+ 
+-The `lanes` project is the four tests of
+-`packages/lanes/test/definitions.test.ts`. They read the four byte files
++The Node `lanes` project checks the definitions and the scripted CLI proposal
++outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
++witness has no native admission or authority; its native counterparts stay in
++`manifest-tree.scope.test.ts`. The four definition tests read the four byte files
+ under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
+ without importing them. So, by the rule above, a change to one of those
+ files alone is not selected by `npm run test:changed`; the gate runs it.
+diff --git a/packages/cli/test/proposal-outcomes.test.ts b/packages/lanes/test/cli-proposal-outcomes.test.ts
+similarity index 99%
+rename from packages/cli/test/proposal-outcomes.test.ts
+rename to packages/lanes/test/cli-proposal-outcomes.test.ts
+index 73145a5fd..4c241c898 100644
+--- a/packages/cli/test/proposal-outcomes.test.ts
++++ b/packages/lanes/test/cli-proposal-outcomes.test.ts
+@@ -1,9 +1,9 @@
+ import { expect, test } from "vitest";
+ import { PROPOSED_BOUNDS, type DeclaredDefinition, type DutyId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
+ import { canonicalize, definitionDigest, entryHash, factRefOf, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
++import { changeDemo3 } from "../src/index.ts";
+ import { validateDefinition } from "@generalbusiness/artroom-derive";
+-import { command, memoryStore, type Context } from "../src/index.ts";
++import { command, memoryStore, type Context } from "../../cli/src/index.ts";
+ 
+ // CLI/HTTP boundary STAND-IN: summaries and accepted work are scripted, not
+ // native admission or authority. The real client still shapes and signs every
+diff --git a/packages/lanes/test/manifest-tree.scope.test.ts b/packages/lanes/test/manifest-tree.scope.test.ts
+index ba800c642..6f47de594 100644
+--- a/packages/lanes/test/manifest-tree.scope.test.ts
++++ b/packages/lanes/test/manifest-tree.scope.test.ts
+@@ -74,7 +74,7 @@ test("artroom edit uses a one-element reservation tree as the real checker servi
+   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
+ }, 120_000);
+ // CLI category formatting/pre-send routing lives at the cheaper HTTP boundary
+-// in cli/test/proposal-outcomes.test.ts; keep actual acceptance and lost reply.
++// in lanes/test/cli-proposal-outcomes.test.ts; keep actual acceptance and lost reply.
+ test.each(["reply", "accepted"] as const)("manifest edit --closes retains its recorded proposal when linking is %s (real scopes; transport fault, host and scheduler STAND-INs)", async (linkFault) => {
+   net.hold = net.deaf = null;
+   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+diff --git a/packages/scope/test/site-clock-lifetime.test.ts b/packages/lanes/test/site-clock-lifetime.scope.test.ts
+similarity index 88%
+rename from packages/scope/test/site-clock-lifetime.test.ts
+rename to packages/lanes/test/site-clock-lifetime.scope.test.ts
+index 6eaf1aae9..3ec56aeb6 100644
+--- a/packages/scope/test/site-clock-lifetime.test.ts
++++ b/packages/lanes/test/site-clock-lifetime.scope.test.ts
+@@ -1,8 +1,8 @@
+ import { expect, test } from "vitest";
+ import { timeMs } from "@generalbusiness/artroom-bytes";
+-import { Gate, net } from "../src/testing.ts";
+-import { graph, onCode, rita, una } from "../../lanes/test/support/graph.ts";
+-import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
++import { Gate, net } from "../../scope/src/testing.ts";
++import { graph, onCode, rita, una } from "./support/graph.ts";
++import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
+ 
+ // Deterministic lifetime model, not a reproduction of the 676 timeout.
+ // Native offer admission; scripted authority/clock and peer rules.
+diff --git a/packages/scope/test/site-native3-publication.test.ts b/packages/lanes/test/site-native3-publication.scope.test.ts
+similarity index 95%
+rename from packages/scope/test/site-native3-publication.test.ts
+rename to packages/lanes/test/site-native3-publication.scope.test.ts
+index 4e65c5bf0..9c5e5d992 100644
+--- a/packages/scope/test/site-native3-publication.test.ts
++++ b/packages/lanes/test/site-native3-publication.scope.test.ts
+@@ -3,14 +3,14 @@ import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
+ import { expect, test } from "vitest";
+ import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
+ import { canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+-import { command, memoryStore, type Context, type Outcome } from "@generalbusiness/artroom-cli";
+-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
++import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
++import { changeDemo3 } from "../src/index.ts";
+ import { firstExtents } from "@generalbusiness/artroom-platform";
+-import { net } from "../src/testing.ts";
+-import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
+-import { ownHost } from "./hosts.ts";
+-import { Platform, routed } from "./repository.ts";
+-import { site } from "../src/site/route.ts";
++import { net } from "../../scope/src/testing.ts";
++import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
++import { ownHost } from "../../scope/test/hosts.ts";
++import { Platform, routed } from "../../scope/test/repository.ts";
++import { site } from "../../scope/src/site/route.ts";
+ 
+ // Real @3 CLI/register/directory/lane/rules/destination admission and cleanup.
+ // Only the Git provider, scheduler, clock and local key store are STAND-INs.

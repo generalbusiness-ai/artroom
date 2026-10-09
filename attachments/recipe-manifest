@@ -1,0 +1,26 @@
+{
+  "expected-titles.json": {
+    "bytes": 2580,
+    "sha256": "9960cc8bc5c15c08b5389bdb153f146186b7c88988de8590ffcbdd296e3248d3"
+  },
+  "identity.json": {
+    "bytes": 34115,
+    "sha256": "4e76ccdb5f43942ee8aaee31bb59074d8758e3929bee380ea36c9865fdb5604e"
+  },
+  "native.config.mjs.recipe": {
+    "bytes": 1759,
+    "sha256": "6489e3bd4ede994a030ec39afee800e3388d241745db62be41c84e6d2cf59d3d"
+  },
+  "node.config.mjs.recipe": {
+    "bytes": 1601,
+    "sha256": "de60ba7f21a2bb9ac95a8bf9b5e450f9c58bdad8e6d2feb6347f2691229639d1"
+  },
+  "plan.md": {
+    "bytes": 4816,
+    "sha256": "6e85ff8607f53934b8c337fd1a82cd40ba5c2d6385abd392b4ec19b4f053ba87"
+  },
+  "rename-aware.diff": {
+    "bytes": 7186,
+    "sha256": "502f0ea4d2263a880db202f6348691b95f5a7fc31b8e04c5567f2792ce254fcb"
+  }
+}
