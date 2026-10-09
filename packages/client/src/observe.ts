@@ -76,7 +76,9 @@ export function observeScope<T>(options:ObservationOptions<T>):Observation{
         if(!opened.ok)throw new ObservationFailure(opened.reason==="forbidden"?"forbidden":opened.reason==="unsupported"?"unsupported":"unavailable",opened.reason);
         const lines=headLines(opened.body,active.signal);latest=undefined;
         readerOwned=true;const first=await bounded(()=>lines.next(),active.signal,seconds);check(at);
-        if(first.done)throw new ObservationFailure("unavailable","stream-ended-before-head");latest=first.value;
+        if(first.done)throw new ObservationFailure("unavailable","stream-ended-before-head");
+        if(last&&first.value.seq===last.at.seq&&first.value.hash!==last.at.hash)throw new ObservationFailure("error","head-hash-conflict");
+        latest=first.value;
         let streamFailure:ObservationFailure|undefined;
         const pump=(async()=>{try{for await(const notice of lines){check(at);if(latest&&notice.seq===latest.seq&&notice.hash!==latest.hash||last&&notice.seq===last.at.seq&&notice.hash!==last.at.hash)throw new ObservationFailure("error","head-hash-conflict");if(!latest||notice.seq>latest.seq){latest=notice;refreshAgain?.();}}}catch(error){if(!(error instanceof Stopped)&&!active.signal.aborted)streamFailure=error instanceof ObservationFailure?error:new ObservationFailure("error","malformed-head-stream");}finally{streamAlive=false;active.abort();streamEnd();}})();
         const refresh=async()=>{

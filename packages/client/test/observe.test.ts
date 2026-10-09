@@ -124,3 +124,12 @@ test("a conflicting head notice at the retained snapshot sequence fails even whe
  const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>({ok:true,body:body.body}),snapshot:async()=>{reads++;const value=snapshot(reads===1?5:6);return{ok:true,at:value.at,value,complete:true};},emit:state=>{states.push(state);if(state.status==="current")current.resolve();}});
  await drain();body.notice(1);await current.promise;body.send(utf8(JSON.stringify({at:{seq:5,hash:"sha256:"+"9".repeat(64)}})+"\n"));await observer.done;expect(reads).toBe(1);expect(states.at(-1)).toEqual({status:"error",reason:"head-hash-conflict",retained:snapshot(5)});
 });
+
+
+test("a conflicting FIRST reconnect head cannot be hidden by an offered newer snapshot",async()=>{
+ const first=stream(),second=stream(),initial=gate(),reopened=gate();const states:ObservationState<number>[]=[];let opens=0,reads=0;
+ const observer=observeScope({context,current:()=>true,authenticate:async()=>({ok:true,session:session()}),open:async()=>{opens++;if(opens===2)reopened.resolve();return{ok:true,body:opens===1?first.body:second.body};},snapshot:async()=>{const value=snapshot(++reads===1?5:6);return{ok:true,at:value.at,value,complete:true};},emit:state=>{states.push(state);if(state.status==="current")initial.resolve();},reconnectDelay:async()=>{}});
+ await drain();first.notice(1);await initial.promise;first.end();await reopened.promise;
+ second.send(utf8(JSON.stringify({at:{seq:5,hash:"sha256:"+"9".repeat(64)}})+"\n"));await observer.done;
+ expect(reads).toBe(1);expect(states.filter(state=>state.status==="current")).toHaveLength(1);expect(states.at(-1)).toEqual({status:"error",reason:"head-hash-conflict",retained:snapshot(5)});expect(second.cancelled).toBe(1);
+});
