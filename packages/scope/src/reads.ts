@@ -30,7 +30,7 @@
 
 import { DOMAINS, ENTRY_READ_BYTES, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, OUTBOX_PAGE_DUTIES, RETAINED_INPUT_BYTES, RETAINED_ITEMS_PAGE } from "@generalbusiness/artroom-contract";
 import type { Cursor, Digest, DutyId, Entry, FieldValue, KeyId, LogPage, OperationId, Read, ReadRefusal, RetainedInput, Summary } from "@generalbusiness/artroom-contract";
-import { isDigest, isDutyId, isOperationId, isSeed, positionOf, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { isDigest, isDutyId, isOperationId, isSeed, positionOf, retainedReadArgument, timeMs } from "@generalbusiness/artroom-bytes";
 import { bound, byteOrder, creationFields, evidenceValues, inputTexts, namedBy, own, placesOf, retainsOf, same, type Item, type Owners, type ScopeState, type ValidDefinition } from "@generalbusiness/artroom-derive";
 import type { Pinned } from "./core.ts";
 import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
@@ -210,7 +210,21 @@ export class Reads {
       if (live.more) complete = false;
     }
     items.sort((a, b) => a.id - b.id);
-    return { ok: true, at: scope.head, value: { scope: scope.at, status: scope.status, definition: pinned.named, time: scope.time, items, counts }, complete };
+    // Projection only: no timed judgment, write, alarm or provider call.
+    // Read one clock after collecting the recorded state at this same head.
+    let reservationExpiry: Summary["reservationExpiry"];
+    if (pinned.named === "platform:destination@3") {
+      reservationExpiry = { clock: "unavailable" };
+      try {
+        const reading = this.#signed?.clock.read();
+        const now = timeMs(reading), sealed = timeMs(scope.time);
+        if (reading !== undefined && now !== null && sealed !== null && now >= sealed) reservationExpiry = {
+          clock: "available", time: reading,
+          expired: items.filter((item) => item.type === "publication" && typeof item.values["checkDeadline"] === "string" && timeMs(item.values["checkDeadline"]) !== null && timeMs(item.values["checkDeadline"])! <= now).map((item) => item.id),
+        };
+      } catch { /* Recorded state remains readable; an absent clock is no expiry proof. */ }
+    }
+    return { ok: true, at: scope.head, value: { scope: scope.at, status: scope.status, definition: pinned.named, time: scope.time, items, counts, ...(reservationExpiry === undefined ? {} : { reservationExpiry }) }, complete };
   }
 
   /** A page of the retained final items of one type, by ID. Their total is not bounded; each page is. */
