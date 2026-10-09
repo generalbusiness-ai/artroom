@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
+import { changeTaskContext, createIssue, taskForm } from "../src/tasks.ts";
 import type { Offered } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -10,6 +11,12 @@ class Element {
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
+  removeAttribute(name: string) { this.attrs.delete(name); }
+  showModal() {} close() {} remove() {} focus() {}
+  querySelector<T>(selector: string): T | null {
+    const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
+    return (name ? this.all().find((node) => node.name === name) : this.all().find((node) => ["input", "textarea", "button"].includes(node.tag))) as T ?? null;
+  }
   hasAttribute(name: string) { return this.attrs.has(name); }
   append(...children: (Element | string)[]) { this.children.push(...children); }
   addEventListener(name: string, listener: (event: { preventDefault(): void }) => void) {
@@ -136,4 +143,59 @@ test("a pending signed request prevents fresh submission without claiming its ou
   expect(panel.textContent).not.toContain("Request outcome unknown");
   panel.all().find((node) => node.tag === "form")!.event("submit");
   expect(sends).toBe(0);
+});
+
+test("only the exact accepted comment draft retires; delayed acceptance preserves newer edits and other subjects", () => {
+  const comment: Offered = { kind: "comment", step: "open", on: "comment", line: "Comment", fields: [{ name: "body", type: "text", required: true }] };
+  const callbacks: (() => void)[] = [];
+  const form = (subject: string) => asElement(actsPanel({ acts: [comment], hidden: 0 }, (_kind, _on, _typed, accepted) => { callbacks.push(accepted!); }, null, { primary: ["comment"], draftKey: subject })).all().find((node) => node.tag === "form")!;
+  const edit = (shown: Element, value: string) => { shown.all().find((node) => node.name === "field:body")!.value = value; shown.event("input"); };
+  const first = form("room/key/first-subject"); edit(first, "Accepted text"); first.event("submit"); callbacks[0]!();
+  expect(form("room/key/first-subject").all().find((node) => node.name === "field:body")!.value).toBe("");
+  const delayed = form("room/key/first-subject"); edit(delayed, "Old submission"); delayed.event("submit");
+  const newer = form("room/key/first-subject"); edit(newer, "Newer unsent edit");
+  const other = form("room/key/other-subject"); edit(other, "Other subject draft");
+  callbacks[1]!();
+  expect(form("room/key/first-subject").all().find((node) => node.name === "field:body")!.value).toBe("Newer unsent edit");
+  expect(form("room/key/other-subject").all().find((node) => node.name === "field:body")!.value).toBe("Other subject draft");
+  const repeated = form("room/key/same-text-subject"); edit(repeated, "Repeated text"); repeated.event("submit");
+  const changedBack = form("room/key/same-text-subject"); edit(changedBack, "Different text"); edit(changedBack, "Repeated text");
+  callbacks[2]!();
+  expect(form("room/key/same-text-subject").all().find((node) => node.name === "field:body")!.value).toBe("Repeated text");
+  const unknown = form("room/key/unknown-subject"); edit(unknown, "Unknown or refused submission"); unknown.event("submit");
+  expect(form("room/key/unknown-subject").all().find((node) => node.name === "field:body")!.value).toBe("Unknown or refused submission");
+});
+
+test("a Merge task uses the exact observed manifest and selected issue reports without asking for protocol fields", () => {
+  const merge: Offered = { kind: "merge", step: "open", on: "merge", line: "Merge", fields: [{ name: "manifest", type: "item", required: true }, { name: "reports", type: "list", required: true }] };
+  const missing = asElement(taskForm(merge, () => {}, { defaults: { merge: { fields: { manifest: "12" } } } }, [], "Merge change"));
+  expect(missing.textContent).toContain("selected issue-report evidence"); expect(missing.all().filter((node) => node.tag === "input")).toEqual([]);
+  const reports = '[{"at":{"kind":"lane","scope":"recorded-issue","inc":"recorded"},"seq":8,"hash":"recorded-hash"}]';
+  const sent: unknown[] = [];
+  const ready = asElement(taskForm(merge, (...args) => sent.push(args), { defaults: { merge: { fields: { manifest: "12", reports } } } }, [], "Merge change"));
+  expect(ready.all().filter((node) => node.tag === "label")).toEqual([]);
+  expect(ready.all().filter((node) => node.tag === "input").map((node) => node.attrs.get("type"))).toEqual(["hidden", "hidden"]);
+  ready.event("submit"); expect(sent[0]).toEqual(["merge", "", { manifest: "12", reports }]);
+});
+
+test("task defaults retain selected issue-report order and never fall back to an older manifest or checker jobs", () => {
+  const reports = [{ at: { kind: "lane", scope: "second-issue", inc: "second" }, seq: 9, hash: "second-hash" }, { at: { kind: "lane", scope: "first-issue", inc: "first" }, seq: 4, hash: "first-hash" }];
+  const change = { currentManifest: 12, proposal: 0, manifests: [{ id: 11, state: "superseded", selectedReports: [] }, { id: 12, state: "current", selectedReports: reports }], jobs: [{ id: 99, state: "passed" }], reviewExtents: [{ label: "Docs", value: "docs" }], reviewMembers: [{ label: "@reviewer", value: "@reviewer" }] } as never;
+  expect(changeTaskContext(change).defaults?.["merge"]?.fields).toEqual({ manifest: "12", reports: JSON.stringify(reports) });
+  const unreadable = { ...change as object, currentManifest: null } as never;
+  expect(changeTaskContext(unreadable).defaults?.["merge"]).toBeUndefined();
+});
+
+test("Create issue asks for title and description and intentionally uses the title as its native condition", () => {
+  const body = new Element("body");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: (tag: string) => new Element(tag), body } });
+  const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "authenticated-definition" }] }, { name: "title", type: "text", required: true }, { name: "body", type: "text", required: false }, { name: "conditions", type: "list", required: true }] };
+  const sent: unknown[] = [];
+  const create = asElement(createIssue(open, (...args) => sent.push(args), {})); create.event("click");
+  const form = body.all().find((node) => node.tag === "form")!;
+  expect(form.all().filter((node) => node.tag === "label").map((node) => node.textContent)).toEqual(["Title", "Description"]);
+  form.all().find((node) => node.name === "field:title")!.value = "Fix the handbook";
+  form.all().find((node) => node.name === "field:body")!.value = "The introduction is missing.";
+  form.event("submit");
+  expect((sent[0] as unknown[]).slice(0, 3)).toEqual(["open-issue", "", { definition: "authenticated-definition", title: "Fix the handbook", body: "The introduction is missing.", conditions: '["Fix the handbook"]' }]);
 });

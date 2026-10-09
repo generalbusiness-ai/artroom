@@ -1,16 +1,25 @@
 import { afterEach, expect, test, vi } from "vitest";
 import type { Answer } from "@generalbusiness/artroom-contract";
 import type { ChangeView, Room } from "../src/data.ts";
-import { changeCondition, changeScreen, issueScreen, rulesScreen } from "../src/view.ts";
+import { changeCondition, changeScreen, issueScreen, roomScreen, rulesScreen } from "../src/view.ts";
+import type { ListState } from "../src/list-context.ts";
 
 // A DOM-construction stand-in, not a browser. It witnesses the facts the view
 // exposes and link destinations; responsive layout is checked by the recorder.
 class Element {
   readonly children: (Element | string)[] = [];
   readonly attributes: Record<string, string> = {};
+  readonly listeners = new Map<string, () => void>();
   constructor(readonly tagName: string) {}
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   append(...children: (Element | string)[]) { this.children.push(...children); }
+  replaceChildren(...children: (Element | string)[]) { this.children.splice(0, this.children.length, ...children); }
+  addEventListener(name: string, listener: () => void) { this.listeners.set(name, listener); }
+  fire(name: string) { this.listeners.get(name)?.(); }
+  getAttribute(name: string) { return this.attributes[name] ?? null; }
+  get value() { return this.attributes["value"] ?? ""; }
+  set value(value: string) { this.attributes["value"] = value; }
+  querySelectorAll(tag: string) { return this.all(tag); }
   get textContent(): string { return this.children.map((c) => typeof c === "string" ? c : c.textContent).join(""); }
   all(tag: string): Element[] { return [...(this.tagName === tag ? [this] : []), ...this.children.flatMap((c) => typeof c === "string" ? [] : c.all(tag))]; }
 }
@@ -26,6 +35,23 @@ const view = (over: Partial<ChangeView> = {}): ChangeView => ({
 const merge = (over: Partial<ChangeView["merges"][number]> = {}): ChangeView["merges"][number] => ({ id: 15, state: "unknown", manifest: 12, reason: null, commit: null,
   publication: { id: 16, state: "unresolved", reason: null, operations: [{ id: "17:0", kind: "push", attempts: ["confirmed"] }] }, ...over });
 const render = (change: ChangeView, last: Answer | null = null, kind?: string): Element => { vi.stubGlobal("document", document); return changeScreen(room, change, last, kind) as unknown as Element; };
+
+test("list handlers restore query and filter through detail/back while literal query text remains an input value", () => {
+  vi.stubGlobal("document", document);
+  let kept: ListState = { query: "", filter: "open" };
+  const lanes = { issues: [{ scope: "sc_issue", number: 12, kind: "issue", title: "<script>Guide</script>", state: "closed", draft: false }], changes: [] } as never;
+  const show = () => roomScreen(room, lanes, "issue", { state: kept, changed: (next) => { kept = next; } }) as unknown as Element;
+  const first = show();
+  first.all("button").find((button) => button.attributes["data-filter"] === "closed")!.fire("click");
+  const query = first.all("input")[0]!; query.value = "<script>Guide"; query.fire("input");
+  const returned = show();
+  expect(returned.all("input")[0]!.value).toBe("<script>Guide");
+  expect(returned.all("button").find((button) => button.attributes["data-filter"] === "closed")!.attributes["aria-pressed"]).toBe("true");
+  expect(returned.textContent).toContain("<script>Guide</script>");
+  expect(returned.all("script")).toEqual([]);
+  kept = { query: "", filter: "open" };
+  expect(show().textContent).toContain("No matches.");
+});
 
 test("one current condition follows the selected version, never an internally confirmed operation or an older version", () => {
   expect(changeCondition(view({ merges: [merge()] }))).toBe("Awaiting confirmation");
