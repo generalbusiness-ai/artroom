@@ -1,0 +1,78 @@
+{
+  "source": "efb5c56d9598ef14831287d9e9d31f06f0592554",
+  "sourceTree": "e19db41a8ee6b6071266335d8847304ba6eb390f",
+  "service": "https://scopes.test",
+  "mode": "recorded native Worker answers; Git host and scheduler stand-ins",
+  "browserFallback": "Browser plugin not available",
+  "checks": [
+    {
+      "name": "room",
+      "url": "https://scopes.test/page/#/",
+      "width": 1000,
+      "title": "Artroom",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    },
+    {
+      "name": "issue",
+      "url": "https://scopes.test/page/#/issue/sc_knva7snnrpbkhrzs74z4myxd5vzg7nojpstlxgycskclerfat4tq",
+      "width": 1000,
+      "title": "Artroom",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    },
+    {
+      "name": "change-refused",
+      "url": "https://scopes.test/page/#/change/sc_utggtge3ous5cy6dxotxqjlkzpfqklveayk7skjbsjrlmb4ntbtq",
+      "width": 1000,
+      "title": "Artroom",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    },
+    {
+      "name": "change-published",
+      "url": "https://scopes.test/page/#/change/sc_f5lw7wrz5gmpxecsrdg723c7hl5vex32bu6mi3fsdj3vyreakfta",
+      "width": 1000,
+      "title": "Artroom",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    },
+    {
+      "name": "rules",
+      "url": "https://scopes.test/page/#/rules",
+      "width": 1000,
+      "title": "Artroom",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    },
+    {
+      "name": "site-page",
+      "url": "https://scopes.test/site/sc_3vlx5xevos5fjqbpoumwfgxvuzuegf6ijda3tr3xiuhqzudh35wq/HEAD/guide/start.md",
+      "width": 1000,
+      "title": "Getting started",
+      "meaningful": true,
+      "horizontalOverflow": false,
+      "overlay": false
+    }
+  ],
+  "interactions": [
+    {
+      "name": "show recorded closed issue in All filter",
+      "scope": "sc_knva7snnrpbkhrzs74z4myxd5vzg7nojpstlxgycskclerfat4tq"
+    },
+    {
+      "name": "rule edit confirmation cancelled",
+      "before": "0",
+      "after": "1",
+      "extraPosts": 0,
+      "rereadOriginal": true
+    }
+  ],
+  "consoleErrors": [],
+  "unanswered": []
+}
