@@ -230,7 +230,14 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
       spendPush = outcome === "confirmed";
       const before = await G.summary();
       const knownPublications = new Set(before.value.items.filter(item => item.type === "publication").map(item => item.id));
-      ok(await run(founder, "propose", `receipt-${outcome}`));
+      const proposed = await run(founder, "propose", `receipt-${outcome}`);
+      if (spendPush) {
+        expect(proposed.code).toBe(1);
+        expect(proposed.lines.some(line => line.startsWith("Accepted merge:"))).toBe(true);
+        expect(proposed.lines.join("\n")).toContain("Observation unknown: wait-exhausted");
+        expect(proposed.lines.join("\n")).toContain("do not resubmit this merge");
+        expect(host.refs.get("refs/heads/main")).toBe(first);
+      } else ok(proposed);
       await pause([repository.destination]);
       let publication = (await G.summary()).value.items.find(item => item.type === "publication" && !knownPublications.has(item.id))!;
       if (spendPush) {
