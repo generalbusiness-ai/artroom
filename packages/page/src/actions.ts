@@ -5,6 +5,8 @@ import { controlKey } from "./focus.ts";
 export interface ActionContext {
   /** Task copy derived from the actual subject/choice, never an extra act. */
   submitLabel?: string;
+  /** Same selected room/key/route; a dialog never follows a new context. */
+  current?: () => boolean;
   /** Exact subjects read by the shell, never guessed from a display number. */
   defaults?: Record<string, { on?: number; fields?: Record<string, string> }>;
   primary?: readonly string[];

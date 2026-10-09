@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { changeTaskContext, createIssue, nextChangeAction, taskForm } from "../src/tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, taskForm } from "../src/tasks.ts";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -9,13 +9,22 @@ class Element {
   children: (Element | string)[] = [];
   attrs = new Map<string, string>();
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
+  closed = false;
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
   removeAttribute(name: string) { this.attrs.delete(name); }
-  showModal() {} close() {} remove() {} focus() {}
+  showModal() { this.closed = false; } close() { this.closed = true; } remove() {} focus() {}
+  querySelectorAll(selector: string): Element[] {
+    return this.all().filter(node => selector.split(",").some(part => {
+      const simple = part.trim(), attribute = /^\[([^=\]]+)\]$/.exec(simple)?.[1];
+      if (attribute) return node.hasAttribute(attribute);
+      if (simple === 'button[type=submit]') return node.tag === "button" && node.attrs.get("type") === "submit";
+      return node.tag === simple;
+    }));
+  }
   querySelector<T>(selector: string): T | null {
     const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
-    return (name ? this.all().find((node) => node.name === name) : this.all().find((node) => ["input", "textarea", "button"].includes(node.tag))) as T ?? null;
+    return (name ? this.all().find((node) => node.name === name) : this.querySelectorAll(selector)[0]) as T ?? null;
   }
   hasAttribute(name: string) { return this.attrs.has(name); }
   append(...children: (Element | string)[]) { this.children.push(...children); }
@@ -237,4 +246,26 @@ test("one authenticated reviewer is named directly without a false picker", () =
   expect(form.all().find(node => node.tag === "button")?.textContent).toBe("Request review from @controller");
   form.event("submit");
   expect(sent[0]).toEqual(["request-review-own", "", { requested: "@controller" }]);
+});
+
+test("a refused creation keeps its draft editable; unknown creation offers a read-only status check without another send", () => {
+  const body = new Element("body");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElementNS: (_namespace: string, tag: string) => new Element(tag), createElement: (tag: string) => new Element(tag), body, querySelectorAll: (selector: string) => body.querySelectorAll(selector) } });
+  const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "native-pin" }] }, { name: "title", type: "text", required: true }, { name: "conditions", type: "list", required: true }] };
+  const sent: unknown[] = [];
+  let reads = 0;
+  const creator = asElement(createIssue(open, (...args) => sent.push(args), { draftKey: "creation-original-context", current: () => true, refresh: () => reads++ }));
+  creator.event("click");
+  const dialog = body.all().find(node => node.tag === "dialog")!;
+  const form = dialog.all().find(node => node.tag === "form")!;
+  form.all().find(node => node.name === "field:title")!.value = "Keep these words";
+  form.event("input"); form.event("submit");
+  issueDialogOutcome("creation-original-context", "editable", "The native request was refused.");
+  expect(form.all().find(node => node.name === "field:title")?.value).toBe("Keep these words");
+  expect(form.all().find(node => node.tag === "button")?.hasAttribute("disabled")).toBe(false);
+  issueDialogOutcome("creation-original-context", "unknown", "The original request remains unknown.");
+  form.event("submit");
+  expect(sent).toHaveLength(1);
+  dialog.all().find(node => node.hasAttribute("data-check-original"))!.event("click");
+  expect([reads, sent.length, dialog.closed]).toEqual([1, 1, true]);
 });

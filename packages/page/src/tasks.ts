@@ -7,6 +7,29 @@ import { editPath, matches } from "@generalbusiness/artroom-platform";
 import { controlKey } from "./focus.ts";
 export { changeTaskContext } from "./task-values.ts";
 
+interface IssueDialog { dialog: HTMLDialogElement; form: HTMLElement; message: HTMLElement; context: ActionContext; close(restore?: boolean): void; initialDisabled: Set<HTMLElement> }
+const issueDialogs = new Map<string, IssueDialog>();
+
+/** UI lifetime only. Drafts and the shell's original submission fence stay owned there. */
+export function reconcileIssueDialogs(): void {
+  for (const [key, shown] of issueDialogs) if (shown.context.current?.() === false) { shown.close(false); issueDialogs.delete(key); }
+}
+
+export function issueDialogOutcome(key: string, state: "editable" | "unknown", message: string): void {
+  const shown = issueDialogs.get(key);
+  if (!shown || shown.context.current?.() === false) return;
+  shown.message.textContent = message; shown.message.removeAttribute("hidden");
+  for (const control of shown.form.querySelectorAll<HTMLElement>("input, textarea, select, button[type=submit]")) {
+    if (state === "unknown") control.setAttribute("disabled", "");
+    else if (!shown.initialDisabled.has(control)) control.removeAttribute("disabled");
+  }
+  if (state === "unknown" && !shown.dialog.querySelector("[data-check-original]")) {
+    const check = h("button", { type: "button", "data-check-original": "" }, "Check status");
+    check.addEventListener("click", () => { if (shown.context.current?.() === false) return; shown.close(); shown.context.refresh?.(); });
+    shown.dialog.append(check);
+  }
+}
+
 function missingFields(act: Offered, context: ActionContext, fields: readonly string[]): string[] {
   const fixed = context.defaults?.[act.kind];
   const missing = act.fields.filter((field) => field.required && !fields.includes(field.name) && fixed?.fields?.[field.name] === undefined && (context.choices?.[act.kind]?.[field.name] ?? field.choices)?.length !== 1).map((field) => field.name);
@@ -72,18 +95,22 @@ export function createIssue(act: Offered, send: Send, context: ActionContext): H
   const button = h("button", { type: "button", class: "button primary", "data-task-act": act.kind, "data-focus-key": openerKey, "aria-label": "Create issue" }, h("span", { class: "full-label" }, "Create issue"), h("span", { class: "short-label" }, icon("plus"), "Create"));
   if (context.uncertain || context.pending) button.setAttribute("disabled", "");
   button.addEventListener("click", () => {
+    if (button.hasAttribute("disabled") || context.current?.() === false) return;
     let dialog!: HTMLDialogElement;
     const capturedDefinitions = definitionChoices?.map(choice => ({ ...choice }));
     const submit: Send = (kind, on, typed, accepted) => {
       if (capturedDefinitions && !capturedDefinitions.some(choice => choice.value === typed["definition"])) return;
-      send(kind, on, issueTaskValues(typed), () => { accepted?.(); dialog.close(); dialog.remove(); returnFocus(); });
+      send(kind, on, issueTaskValues(typed), () => { accepted?.(); closeDialog(); });
     };
     const form = taskForm(taskAct, submit, context, fields, "Create issue");
     const close = h("button", { type: "button" }, "Cancel");
-    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, close) as HTMLDialogElement;
+    const message = h("p", { role: "status", "aria-live": "polite", hidden: "" });
+    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, message, close) as HTMLDialogElement;
     const returnFocus = () => { [...document.querySelectorAll<HTMLElement>("[data-focus-key]")].find(node => node.getAttribute("data-focus-key") === openerKey)?.focus(); };
-    close.addEventListener("click", () => { dialog.close(); dialog.remove(); returnFocus(); });
-    dialog.addEventListener("cancel", (event) => { event.preventDefault(); dialog.close(); dialog.remove(); returnFocus(); });
+    const closeDialog = (restore = true) => { dialog.close(); dialog.remove(); if (context.draftKey && issueDialogs.get(context.draftKey)?.dialog === dialog) issueDialogs.delete(context.draftKey); if (restore && context.current?.() !== false) returnFocus(); };
+    close.addEventListener("click", () => closeDialog());
+    dialog.addEventListener("cancel", (event) => { event.preventDefault(); closeDialog(); });
+    if (context.draftKey) issueDialogs.set(context.draftKey, { dialog, form, message, context, close: closeDialog, initialDisabled: new Set([...form.querySelectorAll<HTMLElement>("[disabled]")]) });
     document.body.append(dialog); dialog.showModal(); dialog.querySelector<HTMLElement>("input, textarea, button")?.focus();
   });
   return button;

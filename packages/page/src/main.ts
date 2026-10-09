@@ -26,7 +26,7 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import type { ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { changeTaskContext, createIssue, nextChangeAction, taskForm, taskReviewExtents } from "./tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, taskForm, taskReviewExtents } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
@@ -417,8 +417,11 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
           sending.submitting(association);
         });
         lastActs.set(association, result);
+        if (result.answer.answer === "refused" && result.observation === null) issueDialogOutcome(association, "editable", nonacceptedAnswerText(result.answer));
+        else if (result.answer.answer !== "accepted" || result.observation !== null) issueDialogOutcome(association, "unknown", "The original request remains unresolved. Check status without sending a replacement.");
       } catch (error) {
         sending.failed(association);
+        issueDialogOutcome(association, sending.get(association)?.state === "unknown" ? "unknown" : "editable", sending.get(association)?.state === "unknown" ? "Request outcome unknown. Check status without sending a replacement." : error instanceof Error ? error.message : "The request could not be prepared.");
         if (sending.get(association)?.state === "unknown") showLocally(unknownRequest(kind), true, "Request outcome unknown");
         else if (activeView()) showLocally(h("p", { role: "status" }, error instanceof Error ? error.message : String(error)), false, error instanceof Error ? error.message : "The request could not be prepared.");
       }
@@ -430,7 +433,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const fence = sending.get(association);
   const pending = !!fence && fence.state !== "unknown";
   const uncertain = fence?.state === "unknown" || context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
-  const taskContext = { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } };
+  const taskContext = { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); }, current: () => location.hash === capturedRoute && currentContext() };
   const represented = options.tasks?.(offered, send, taskContext) ?? [];
   const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind) && !represented.includes(act.kind)) };
   const advancedContext = { ...taskContext };
@@ -568,6 +571,7 @@ function settingsScreen(): HTMLElement {
 async function draw(focus = false): Promise<void> {
   const currentDraw = ++drawing;
   claimOffer = undefined;
+  reconcileIssueDialogs();
   if (roomDialog && (roomDialogBinding?.settings !== settingsContext(settings() ?? { place: null, secret: "" }) || roomDialogBinding?.route !== location.hash)) {
     roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
   }
