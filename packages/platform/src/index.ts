@@ -10,6 +10,9 @@
  * it.
  */
 
+import { APPLICATION_COHORT, directory5, directoryRules5 } from "./application.ts";
+export { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, directory5, directoryRules5 } from "./application.ts";
+
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { DESTINATION, destination, destination2, destinationMembership, destinationRules, destinationRules2, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
@@ -18,7 +21,7 @@ import { DIRECTORY, REGISTER, register, registerRules } from "./register.ts";
 import { directory, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScopeRules } from "./rules-scope.ts";
+import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
 export { inbox, membership, register, directory, directory2, destination, destination2 };
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
@@ -110,6 +113,10 @@ export interface Platform {
  */
 export const VERSIONS: Readonly<Record<string, Platform>> = {
   "platform:inbox@1": { data: inbox, rules: inboxRules },
+  [APPLICATION_COHORT.register]: { data: register, rules: registerRules },
+  [APPLICATION_COHORT.directory]: { data: directory5, rules: directoryRules5, membership: directoryMembership, rulesScope: directoryRulesScope },
+  [APPLICATION_COHORT.membership]: { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, APPLICATION_COHORT.membership) },
+  [APPLICATION_COHORT.rules]: { data: rulesScope2, rules: rulesScopeRules3, observed: (state, asked) => rulesAnswer(state, asked, APPLICATION_COHORT.rules), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:register@1": { data: register, rules: registerRules },
   "platform:register@2": { data: register, rules: registerRules },
   "platform:directory@1": { data: directory, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
@@ -122,7 +129,7 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
 };
 
-/** The newest version of each platform definition, by name without the version: the one under which a new scope is founded. */
+/** Default legacy founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {
   "platform:inbox": "platform:inbox@1", "platform:membership": MEMBERSHIP, "platform:register": REGISTER, "platform:directory": DIRECTORY, "platform:rules": RULES_SCOPE, "platform:destination": DESTINATION,
 };

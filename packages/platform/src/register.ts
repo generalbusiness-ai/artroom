@@ -54,7 +54,7 @@ import { pinnedBy } from "./versions.ts";
  * `platform:directory@2` (`versions.ts`). The `operation` effects of its
  * rules state the scope's own version as their owner.
  */
-export const DIRECTORY_OF: Readonly<Record<string, PlatformDefinition>> = { "platform:register@1": "platform:directory@1", "platform:register@2": "platform:directory@2" };
+export const DIRECTORY_OF: Readonly<Record<string, PlatformDefinition>> = { "platform:register@1": "platform:directory@1", "platform:register@2": "platform:directory@2", "platform:register@5": "platform:directory@5" };
 /** The newest version of the register: the one under which `install` founds a register. */
 export const REGISTER = "platform:register@2" satisfies PlatformDefinition;
 /** The directory that the newest register creates. */

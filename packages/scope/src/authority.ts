@@ -329,7 +329,7 @@ export function ownStanding(random: Random, genesis: Repository["genesis"]): Aut
         membership: scope,
         held(view, clock) {
           const named = genesis()?.seed.definition;
-          const observation = (named === "platform:membership@1" || named === "platform:membership@2") && platform(named)
+          const observation = (named === "platform:membership@1" || named === "platform:membership@2" || named === "platform:membership@4") && platform(named)
             ? observationOf(standingOf(view, { of: scope, key }, named), clock.reading) : null;
           // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
           if (!observation) return null;
@@ -397,16 +397,16 @@ export const fixedMembership = (config: Pick<Repository, "genesis" | "state">, s
 
 /** The actual directory of a rules scope or destination, recorded by its judged creation. A
  * session's claims cannot select this target or substitute its incarnation. */
-function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef; definition: string } | null {
+function repositorySessionBirth(config: Pick<Repository, "genesis" | "state">, scope: ScopeRef): { directory: ScopeRef; membership: RecordedRef; definitions: readonly string[] } | null {
   const genesis = config.genesis();
   const state = config.state;
   // The directory/child cohort is the exact supported catalog, never a name alias or newest fallback.
-  const definition = Object.keys(SIBLINGS_OF).find((named) => platform(named) && (scope.kind === "destination" || scope.kind === "rules") && SIBLINGS_OF[named]![scope.kind] === genesis?.seed.definition);
-  if (!definition || !state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind) return null;
+  const definitions = Object.keys(SIBLINGS_OF).filter((named) => platform(named) && (scope.kind === "destination" || scope.kind === "rules") && SIBLINGS_OF[named]![scope.kind] === genesis?.seed.definition);
+  if (!definitions.length || !state || !same(state.scope()?.at, scope) || genesis?.decision !== "applied" || genesis.seed.kind !== scope.kind) return null;
   const directory = genesis.seed.creator;
   const held = (scope.kind === "destination" ? destinationBranch(state) : state.page("rules", ["current"], null, 1).items[0])?.refs["directory"];
   const membership = recordedMembership(config, scope);
-  return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership, definition } : null;
+  return directory?.kind === "directory" && isScopeRef(held) && same(held, directory) && genesis.source?.seq === 0 && same(genesis.source.at, directory) && genesis.message?.class === "request" && genesis.message.type === "create" && membership?.kind === "membership" ? { directory, membership, definitions } : null;
 }
 
 /** Resolve only the session reference of a rules scope or destination that has not retained
@@ -421,7 +421,7 @@ export function repositorySessionMembership(config: Pick<Repository, "genesis" |
         if (!birth) return null;
         const reply = await read(birth.directory, reader);
         const value = isRecord(reply) && reply["ok"] === true && isRecord(reply["value"]) ? reply["value"] : null;
-        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || value["definition"] !== birth.definition || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
+        if (!value || !isScopeRef(value["scope"]) || !same(value["scope"], birth.directory) || (typeof value["definition"] !== "string" || !birth.definitions.includes(value["definition"])) || value["status"] !== "active" || !Array.isArray(value["items"])) return null;
         const repositories = value["items"].filter((item: unknown) => isRecord(item) && item["type"] === "repository" && item["state"] === "open");
         if (repositories.length !== 1) return null;
         const refs = repositories[0]["refs"];
