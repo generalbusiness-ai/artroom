@@ -479,11 +479,13 @@ export async function loadSite(room: Pick<Room, "session" | "directory">, path: 
 // ---------------------------------------------------------------- the rules
 
 export interface RulesView {
+  /** The actual rules item, used by publish transitions. */
+  item?: number;
   scope: ScopeId; head: Head;
   /** The position of the last `publish` in the rules scope's history: the revision of the rules. Null before the first. */
   revision: number | null;
   approvals: number | null; ownerMayReview: boolean | null; singleControllerException: boolean | null;
-  checks: { name: string; required: boolean; checker?: unknown }[]; labels: string[]; extents: Extent[] | null;
+  checks: { name: string; required: boolean; checker?: unknown; configuration?: string }[]; labels: string[]; extents: Extent[] | null;
   definitions: { name: string; digest: string; state: string }[];
   /** The members whose role holds `rules.publish`, the action a change of the rules needs. */
   controllers: string[];
@@ -499,7 +501,7 @@ export async function loadRules(room: Room): Promise<RulesView> {
   // The slot holds the position of the last `publish` in this scope's history: the revision of the rules (`revisionOf`).
   const published = rules.refs["published"];
   return {
-    scope: room.rules, head: at, revision: typeof published === "number" ? published : null,
+    scope: room.rules, item: rules.id, head: at, revision: typeof published === "number" ? published : null,
     approvals: localId(rules.values["approvals"]), ownerMayReview: typeof rules.values["ownerMayReview"] === "boolean" ? rules.values["ownerMayReview"] : null,
     singleControllerException: typeof rules.values["singleControllerException"] === "boolean" ? rules.values["singleControllerException"] : null,
     checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
@@ -587,7 +589,7 @@ export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offere
   return {
     acts: acts.map(([kind, a]) => ({
       kind, step: a.step, on: a.on, line: describe(kind, a),
-      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions.filter((definition) => kind !== "open-issue" && kind !== "open-pr" || definition.name === (kind === "open-issue" ? "issue" : "change")) } : {}) })),
+      fields: Object.entries(a.fields).map(([name, f]) => ({ name, type: f.type ?? f.code ?? "code", required: f.required === true, ...(domainOf(f) === DEFINITION_DOMAIN ? { choices: definitions.filter((definition) => kind !== "open-issue" && kind !== "open-pr" || definition.name === (kind === "open-issue" ? "issue" : "change")) } : f.type === "enum" && Array.isArray((f as { of?: unknown }).of) ? { choices: ((f as { of: string[] }).of).map((value) => ({ label: value.replace(/-/g, " "), value })) } : {}) })),
     })),
     hidden,
   };
