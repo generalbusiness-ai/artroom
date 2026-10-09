@@ -344,60 +344,66 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
     const lane = new Platform(matched[1] as ScopeId), version = Number(matched[2]);
     const manifest = await lane.item(version), ref = manifest.values["reservationRef"] as string;
-    const beforeRead = await G.summary();
-    const databaseDigest = () => runInDurableObject(G.object, async (_instance, state) => {
-      const tables = state.storage.sql.exec("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' ORDER BY name").toArray();
-      const rows = tables.map((table) => { const name = table["name"] as string; return [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]; });
-      return digestBytes(utf8(canonicalize(rows)));
-    });
-    const beforeDatabase = await databaseDigest(), sendsBeforeRead = outsideSends;
-    const expiring = beforeRead.value.items.find((item) => item.type === "publication" && item.state === "reserved")!;
-    expect(beforeRead.value.reservationExpiry).toEqual({ clock: "available", time: net.clock.now, expired: [] });
-    net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
-    const expiredClock = net.clock.now;
-    const founderConfig = (await founder.store.config())!;
-    const founderSecret = (await founder.store.secret(founderConfig.key))!;
-    const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, founderSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
-    expect(session.ok).toBe(true);
-    if (!session.ok) throw new Error("native session unavailable");
-    const sessionRead = await G.stub.summary(session.session.reader());
-    expect(sessionRead.ok && sessionRead.value.reservationExpiry).toEqual({ clock: "available", time: expiredClock, expired: [expiring.id] });
-    // Script the final projection reading after authentic Session authorization.
-    // Count the real warm path, without bypassing or changing that authorization.
-    const readClock = net.clock.read;
-    let sessionClockReads = 0;
-    net.clock.read = () => { sessionClockReads++; return expiredClock; };
-    try { expect((await G.stub.summary(session.session.reader())).ok).toBe(true); }
-    finally { net.clock.read = readClock; }
-    expect(sessionClockReads).toBeGreaterThan(1);
-    let fallibleReads = 0;
-    net.clock.read = () => { if (++fallibleReads === sessionClockReads) throw new Error("scripted final projection clock unavailable"); return expiredClock; };
-    try {
-      const fallible = await G.stub.summary(session.session.reader());
-      expect(fallible.ok && fallible.value.reservationExpiry).toEqual({ clock: "unavailable" });
-    } finally { net.clock.read = readClock; }
-    const signed = await signedReader({ key: keyIdOfSecret(founderSecret), sign: (bytes) => sign(founderSecret, bytes) }, G.name, "summary", "summary", { now: () => timeMs(expiredClock)! });
-    const expiredRead = await G.summary();
-    expect([expiredRead.at, expiredRead.value.items.find((item) => item.id === expiring.id)?.state, expiredRead.value.reservationExpiry]).toEqual([beforeRead.at, "reserved", { clock: "available", time: expiredClock, expired: [expiring.id] }]);
-    net.clock.now = timeOf(timeMs(beforeRead.value.time)! - 1);
-    const behindRead = await G.summary();
-    expect(await G.stub.summary(session.session.reader())).toEqual({ ok: false, reason: "clock-behind" });
-    expect(await G.stub.summary(signed)).toEqual({ ok: false, reason: "clock-behind" });
-    expect([behindRead.at, behindRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
-    net.clock.now = "unavailable-test-clock" as typeof net.clock.now;
-    const unavailableRead = await G.summary();
-    expect([unavailableRead.at, unavailableRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
-    const clockRead = net.clock.read;
-    net.clock.read = () => { throw new Error("scripted unavailable clock"); };
-    try { expect((await G.summary()).value.reservationExpiry).toEqual({ clock: "unavailable" }); }
-    finally { net.clock.read = clockRead; }
-    net.clock.now = expiredClock;
-    const pendingCleanup = await run(founder, "verify", "--all");
-    expect(pendingCleanup.code, pendingCleanup.lines.join("\n")).toBe(1);
-    expect(pendingCleanup.lines.join("\n")).toContain(`reservation ${expiring.id}`);
-    expect(pendingCleanup.lines.join("\n")).toContain("waits for the next act or alarm");
-    expect(pendingCleanup.lines.join("\n")).not.toContain("Owed cleanup:");
-    expect([await databaseDigest(), outsideSends]).toEqual([beforeDatabase, sendsBeforeRead]);
+    const expiring = (await G.summary()).value.items.find((item) => item.type === "publication" && item.state === "reserved")!;
+    if (exhaustCleanup === "ref") {
+      // One real read-boundary witness; the other cleanup variants retain
+      // their own native expiry/outcomes below, without repeating this proof.
+      const beforeRead = await G.summary();
+      const databaseDigest = () => runInDurableObject(G.object, async (_instance, state) => {
+        const tables = state.storage.sql.exec("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' ORDER BY name").toArray();
+        const rows = tables.map((table) => { const name = table["name"] as string; return [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]; });
+        return digestBytes(utf8(canonicalize(rows)));
+      });
+      const beforeDatabase = await databaseDigest(), sendsBeforeRead = outsideSends;
+      expect(beforeRead.value.reservationExpiry).toEqual({ clock: "available", time: net.clock.now, expired: [] });
+      net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
+      const expiredClock = net.clock.now;
+      const founderConfig = (await founder.store.config())!;
+      const founderSecret = (await founder.store.secret(founderConfig.key))!;
+      const session = await requestSession(SERVICE, repository.membership.scope, sessionRequest(repository.membership, founderSecret, timeOf(timeMs(expiredClock)! + 60_000), "expiry-read-session"), { fetch });
+      expect(session.ok).toBe(true);
+      if (!session.ok) throw new Error("native session unavailable");
+      const sessionRead = await G.stub.summary(session.session.reader());
+      expect(sessionRead.ok && sessionRead.value.reservationExpiry).toEqual({ clock: "available", time: expiredClock, expired: [expiring.id] });
+      // Script the final projection reading after authentic Session authorization.
+      // Count the real warm path, without bypassing or changing that authorization.
+      const readClock = net.clock.read;
+      let sessionClockReads = 0;
+      net.clock.read = () => { sessionClockReads++; return expiredClock; };
+      try { expect((await G.stub.summary(session.session.reader())).ok).toBe(true); }
+      finally { net.clock.read = readClock; }
+      expect(sessionClockReads).toBeGreaterThan(1);
+      let fallibleReads = 0;
+      net.clock.read = () => { if (++fallibleReads === sessionClockReads) throw new Error("scripted final projection clock unavailable"); return expiredClock; };
+      try {
+        const fallible = await G.stub.summary(session.session.reader());
+        expect(fallible.ok && fallible.value.reservationExpiry).toEqual({ clock: "unavailable" });
+      } finally { net.clock.read = readClock; }
+      const signed = await signedReader({ key: keyIdOfSecret(founderSecret), sign: (bytes) => sign(founderSecret, bytes) }, G.name, "summary", "summary", { now: () => timeMs(expiredClock)! });
+      const expiredRead = await G.summary();
+      expect([expiredRead.at, expiredRead.value.items.find((item) => item.id === expiring.id)?.state, expiredRead.value.reservationExpiry]).toEqual([beforeRead.at, "reserved", { clock: "available", time: expiredClock, expired: [expiring.id] }]);
+      net.clock.now = timeOf(timeMs(beforeRead.value.time)! - 1);
+      const behindRead = await G.summary();
+      expect(await G.stub.summary(session.session.reader())).toEqual({ ok: false, reason: "clock-behind" });
+      expect(await G.stub.summary(signed)).toEqual({ ok: false, reason: "clock-behind" });
+      expect([behindRead.at, behindRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
+      net.clock.now = "unavailable-test-clock" as typeof net.clock.now;
+      const unavailableRead = await G.summary();
+      expect([unavailableRead.at, unavailableRead.value.reservationExpiry]).toEqual([beforeRead.at, { clock: "unavailable" }]);
+      const clockRead = net.clock.read;
+      net.clock.read = () => { throw new Error("scripted unavailable clock"); };
+      try { expect((await G.summary()).value.reservationExpiry).toEqual({ clock: "unavailable" }); }
+      finally { net.clock.read = clockRead; }
+      net.clock.now = expiredClock;
+      const pendingCleanup = await run(founder, "verify", "--all");
+      expect(pendingCleanup.code, pendingCleanup.lines.join("\n")).toBe(1);
+      expect(pendingCleanup.lines.join("\n")).toContain(`reservation ${expiring.id}`);
+      expect(pendingCleanup.lines.join("\n")).toContain("waits for the next act or alarm");
+      expect(pendingCleanup.lines.join("\n")).not.toContain("Owed cleanup:");
+      expect([await databaseDigest(), outsideSends]).toEqual([beforeDatabase, sendsBeforeRead]);
+    } else {
+      net.clock.now = timeOf(timeMs(net.clock.now)! + 1800_000);
+    }
     await run(founder, "act", "add-room", "--on", "destination", "--target", String(expiring.id));
     expect((await G.entries()).filter((entry) => entry.input.type === "timed" && entry.input.item === expiring.id && entry.effects.some((effect) => effect.effect === "operation" && effect.kind === "reservation-delete" && effect.attempts === 3))).toHaveLength(1);
     for (let attempt = 0; attempt < 4; attempt++) { await pause([repository.destination]); net.clock.now = timeOf(timeMs(net.clock.now)! + 2000); }
@@ -513,17 +519,19 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(publications.some((item) => ["publishing", "unresolved"].includes(item.state))).toBe(true);
     return;
   }
-  // Freeze the wrong-source controls on a separately opened collection.
-  const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(changeDemo3)}`, "--set", "title=source controls", "--set", "draft=false", "--value", "change3.json"));
-  const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
-  const D = new Platform(repository.directory.scope); await pause([D.name]);
-  const controlLane = await D.created(openSeq); await pause([controlLane.name]);
-  const source = ok(await run(founder, "act", "propose-file", "--on", controlLane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
-  const sourceSeq = Number(/entry \S+:(\d+),/.exec(source.lines[0]!)![1]);
-  const sourceEntry = (await controlLane.entries())[sourceSeq]!;
-  const row = { path: "one.md", entry: factRefOf(sourceEntry), digest: digestBytes(files["one.md"]!) };
-  const mismatch = await run(founder, "act", "propose-manifest", "--on", controlLane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([{ ...row, digest: `sha256:${"e".repeat(64)}` }])}`);
-  expect([mismatch.code, mismatch.lines[0]]).toEqual([1, expect.stringContaining("source-mismatch")]);
+  if (!oneFileOnly) {
+    // Freeze the wrong-source controls on a separately opened collection.
+    const opened = ok(await run(founder, "act", "open-pr", "--on", "directory", "--set", `definition=${definitionDigest(changeDemo3)}`, "--set", "title=source controls", "--set", "draft=false", "--value", "change3.json"));
+    const openSeq = Number(/entry \S+:(\d+),/.exec(opened.lines[0]!)![1]);
+    const D = new Platform(repository.directory.scope); await pause([D.name]);
+    const controlLane = await D.created(openSeq); await pause([controlLane.name]);
+    const source = ok(await run(founder, "act", "propose-file", "--on", controlLane.name, "--set", `base=${first}`, "--set", "path=one.md", "--set", `digest=${digestBytes(files["one.md"]!)}`, "--set", `size=${files["one.md"]!.length}`, "--set", "content=# One\n"));
+    const sourceSeq = Number(/entry \S+:(\d+),/.exec(source.lines[0]!)![1]);
+    const sourceEntry = (await controlLane.entries())[sourceSeq]!;
+    const row = { path: "one.md", entry: factRefOf(sourceEntry), digest: digestBytes(files["one.md"]!) };
+    const mismatch = await run(founder, "act", "propose-manifest", "--on", controlLane.name, "--set", `base=${first}`, "--set", `files=${JSON.stringify([{ ...row, digest: `sha256:${"e".repeat(64)}` }])}`);
+    expect([mismatch.code, mismatch.lines[0]]).toEqual([1, expect.stringContaining("source-mismatch")]);
+  }
   const proposed = oneFileOnly ? await run(founder, "edit", "one.md", "--file", "one.md") : await run(founder, "propose", "topic");
   ok(proposed);
   const matched = /as change (sc_\S+), version (\d+)\./.exec(proposed.lines[0]!)!;
@@ -538,8 +546,10 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const job = Number(/entry \S+:(\d+),/.exec(requested.lines[0]!)![1]);
   await pause([lane, repository.destination]);
   expect((await L.item(job)).values["tree"]).toBe(manifest.values["tree"]);
-  const badTree = await run(checker, "act", "check", "--on", lane, "--set", `job=${job}`, "--set", `tree=${"e".repeat(40)}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
-  expect([badTree.code, badTree.lines[0], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("not-this-job"), first]);
+  if (!oneFileOnly) {
+    const badTree = await run(checker, "act", "check", "--on", lane, "--set", `job=${job}`, "--set", `tree=${"e".repeat(40)}`, "--set", `configuration=${configuration}`, "--set", "outcome=passed");
+    expect([badTree.code, badTree.lines[0], host.refs.get("refs/heads/main")]).toEqual([1, expect.stringContaining("not-this-job"), first]);
+  }
   const checkerSecret = (await checker.store.secret((await checker.store.config())!.key))!;
   const checkerKey = keyIdOfSecret(checkerSecret);
   const Gsnapshot = { reservationSnapshot: async (asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> => {
@@ -571,6 +581,24 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   const snapshot = await Gsnapshot.reservationSnapshot(readAsk);
   expect(snapshot).not.toBeNull();
+  if (oneFileOnly) {
+    if (!snapshot || "refused" in snapshot) expect.fail("The one-file checker origin must read its actual reservation");
+    expect(snapshot.sources).toHaveLength(1);
+    expect(snapshot.sources[0]!.entry.input).toMatchObject({ type: "act", signed: { intent: { kind: "propose-file", fields: { path: "one.md", digest: digestBytes(files["one.md"]!) } } } });
+    expect(await verifyReservationObjects(snapshot)).toBe(true);
+    expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: (await L.sealed())[version]!, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
+    loseSubmit = false;
+    expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
+    expect([runs, prepares, snapshots]).toEqual([1, 0, 1]);
+    await pause([lane, repository.destination]);
+    const published = host.refs.get("refs/heads/main")!;
+    expect(published).not.toBe(first);
+    expect(host.refs.has(reservationRef)).toBe(false);
+    const git = readerOf(host); const commit = await git.commit(published);
+    expect(commit.tree).toBe(manifest.values["tree"]);
+    expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "one.md"]);
+    return;
+  }
   // The signed job-read route obeys the destination's retained history floor,
   // including a rollback between the two existing key-observation pairs.
   const snapshotClock = net.clock.now, snapshotHead = await G.summary();
@@ -625,7 +653,6 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const git = readerOf(host); const commit = await git.commit(published);
   expect(commit.tree).toBe(manifest.values["tree"]);
   expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(oneFileOnly ? ["README.md", "one.md"] : ["README.md", "docs", "one.md"]);
-  if (oneFileOnly) return;
   // The same command also waits for a publication when no check is owed.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
