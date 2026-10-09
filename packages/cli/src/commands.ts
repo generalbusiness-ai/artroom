@@ -41,6 +41,7 @@ const NEW_REGISTER = NEWEST["platform:register"]!;
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
 import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
 import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
+import { observeCleanup } from "./verify-cleanup.ts";
 
 export interface Context {
   store: Store;
@@ -1031,6 +1032,17 @@ function verifyAll(ctx: Context): Promise<Outcome> {
         const { report, why } = await replayOf(ctx, config, reader, scope);
         lines.push(`${kind} ${scope}, entry ${report.target.seq}: ${report.result}.`);
         if (report.result !== "consistent") first ??= `First finding: ${kind} ${scope} is ${report.result}${why ? `: ${why}` : ""}.`;
+        if (kind === "destination" && report.result === "consistent") {
+          try {
+            const cleanup = await observeCleanup(await handleOf(ctx, config, scope, reader), report.target, ctx.historyPages ?? 1000);
+            lines.push(...cleanup.lines);
+            first ??= cleanup.finding;
+          } catch (error) {
+            if (!(error instanceof SourceError) && !(error instanceof TransportError)) throw error;
+            const finding = `Cleanup status not read: destination ${scope}: ${error.message}.`;
+            lines.push(finding); first ??= finding;
+          }
+        }
       } catch (error) {
         if (!(error instanceof SourceError)) throw error;
         lines.push(`${kind} ${scope}: not read.`);
