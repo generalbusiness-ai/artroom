@@ -752,8 +752,13 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
   } else {
     // The shaping helper reads only the actual act declaration. Platform
     // fields use the same typed inputs and detached-text transport as lanes.
-    const shaped = shapeDeclaredAct(shape as unknown as DeclaredDefinition, kind as never, { on, fields } as never);
-    const signed = await signedIntent(signer, { to: summary.scope, kind, on: shaped.on, fields: shaped.fields, expected: expectedOf(declaration, summary.items, shaped.on, shaped.fields) }, signing);
+    const ordinary = Object.fromEntries(Object.entries(declaration.fields).filter(([, field]) => field.type !== undefined && field.type !== "code"));
+    if (Object.keys(fields).some((name) => !Object.hasOwn(declaration.fields, name)) || Object.entries(declaration.fields).some(([name, field]) => field.required && !Object.hasOwn(fields, name))) throw new Unreadable("The fields do not match this native action's declaration.");
+    const typedFields = Object.fromEntries(Object.entries(fields).filter(([name]) => Object.hasOwn(ordinary, name)));
+    const shaped = shapeDeclaredAct({ ...shape, acts: { ...shape.acts, [kind]: { ...declaration, fields: ordinary } } } as unknown as DeclaredDefinition, kind as never, { on, fields: typedFields } as never);
+    const marked = Object.fromEntries(Object.entries(fields).filter(([name]) => !Object.hasOwn(ordinary, name)));
+    const signedFields = { ...shaped.fields, ...marked };
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on: shaped.on, fields: signedFields, expected: expectedOf(declaration, summary.items, shaped.on, signedFields) }, signing);
     submitting?.();
     answer = await handle.submit(signed, [], values.length > 0 ? { ...shaped.beside, values } : shaped.beside);
   }
