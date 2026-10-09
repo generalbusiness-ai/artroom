@@ -113,6 +113,11 @@ in `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.azGmMU9FdF`.
 Planner's local-label display correction `59a6744c` arrived after this gate
 started. The follow-up changes the browser settings label binding, switcher
 presentation, its focused handler witness and rebuilt assets. Seven affected
-handler tests and Page source/test types pass. Its focused browser label
-observation is still owed. The gate is not relabelled as the later head. Complete
+handler tests and Page source/test types pass. A focused 320px light/dark
+browser observation retains both names in one switcher, verifies 16px editing
+and a 50px target, and rejects a label bound to another membership incarnation.
+It uses actor-bound native reads of an existing room and an explicitly seeded
+private local label; no claim completion is fabricated. The after-gate evidence
+code adds one recorder mode and the native recorded-name field to its fixture.
+The gate is not relabelled as the later head. Complete
 independent Source review and landing remain owed.
