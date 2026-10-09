@@ -145,3 +145,30 @@ session/inspector writes. It proves this lifetime mechanism, not the actual
 chronology or cause of the failed 676 gate. That gate remains failed. No
 unchanged retry, wider deadline, whole gate, deployment or landing follows
 without the next owner decision.
+
+## Two immutable checker openings per fresh fixture
+
+Planner `263a621f` authorized a test-only capture of the actual native checker
+job and manifest opening records. The fixture now reads that initial history
+page once and serves fresh clones of only those two records, keyed by exact
+scope, incarnation, kind and sequence. It derives identity from the captured
+records and adds no clock or summary read. Standing, snapshots, keys, job
+generation, scope heads, provider refs, outcomes and authority remain fresh.
+All 21 literal scenarios and their existing early returns remain.
+
+Exact source `c8e94332ff19e27b918ccb61dc2a03daecd4289f`, tree
+`63a2783b504cde368d04278d63bee04bf75363d7`, passed the two configured
+checker-service stories: 4.92 s tests, 6.19 s Vitest, 6.7656 s wall and
+7.8156 s CPU. Nineteen cases were filtered by that selection. One missing
+manifest control confirmed `no-manifest` and zero runner starts, then failed
+the existing successful-submission assertion; source was restored exactly.
+Types passed. Root read the complete patch, map, discovery, configuration,
+result and logs. Evidence:
+`/tmp/artroom-manifest-opening-records-evidence/evidence.json`, SHA-256
+`bf33698578fc58aded9a4698d7a7132efadf71f0fe4fac0de9535af8226e0619`,
+durable result `b226b42f`.
+
+The main path changes 13 initial-page reads to one, and the one-file path
+changes four to one. These are source-path counts, not sampled costs or
+paired savings. No global cache, whole-gate speedup or cause of the failed
+676 gate is claimed. No additional gate or unchanged retry ran.
