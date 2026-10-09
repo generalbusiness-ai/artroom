@@ -1,0 +1,82 @@
+{
+  "authorization": "b027345ab23e8eb67e7cf2926d5d7cb89402fb8e",
+  "before": {
+    "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+    "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:16:44.073118+00:00",
+    "load": [
+      2.02197265625,
+      1.55859375,
+      1.69091796875
+    ]
+  },
+  "source_binding": {
+    "scope": "/private/tmp/artroom-correctness-composed/packages/scope",
+    "cli": "/private/tmp/artroom-correctness-composed/packages/cli",
+    "page": "/private/tmp/artroom-correctness-composed/packages/page",
+    "lanes": "/private/tmp/artroom-correctness-composed/packages/lanes",
+    "bytes": "/private/tmp/artroom-correctness-composed/packages/bytes",
+    "contract": "/private/tmp/artroom-correctness-composed/packages/contract",
+    "derive": "/private/tmp/artroom-correctness-composed/packages/derive",
+    "platform": "/private/tmp/artroom-correctness-composed/packages/platform",
+    "client": "/private/tmp/artroom-correctness-composed/packages/client"
+  },
+  "config": "/tmp/artroom-critical-cca558-checks/affected-native.config.mjs",
+  "config_sha256": "d055b2584f7082ef261c60aff4d57851dbdfff68f8a29744488085209acb8381",
+  "argv": [
+    "/usr/bin/time",
+    "-lp",
+    "node",
+    "/tmp/artroom-correctness-composed/node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "/tmp/artroom-critical-cca558-checks/affected-native.config.mjs",
+    "--reporter",
+    "verbose",
+    "--bail=1"
+  ],
+  "cwd": "/tmp/artroom-correctness-composed/packages/scope",
+  "barrier": "Root fresh all-idle: F1 terminal, U1/C1 source-only, sole execution lane",
+  "discovery_required_active": 65,
+  "selected_source_files": 23,
+  "original_recorder_skips": 2,
+  "native": {
+    "exit": 1,
+    "observed_wall_seconds": 129.4678206249373,
+    "log": "/tmp/artroom-critical-cca558-native/native.log",
+    "bytes": 20955,
+    "sha256": "6aa617591ef27f9326fc9bbb94c82590f8c3e8ef0dd6846927355555ce241024",
+    "time": "/usr/bin/time -lp totals retained at end of full log"
+  },
+  "after_native": {
+    "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+    "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:18:53.572744+00:00",
+    "load": [
+      2.015625,
+      1.861328125,
+      1.8017578125
+    ]
+  },
+  "active_source": "NOT RUN: native nonzero or full65pass/2skip reporter requirement not established",
+  "after": {
+    "head": "cca558d920f6e23d8b268ec041f15c75a6156874",
+    "tree": "216b416877c1767c7a08de87be21751ed43ebb0f",
+    "status": "",
+    "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "stamp": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "utc": "2026-10-09T21:18:53.600059+00:00",
+    "load": [
+      2.015625,
+      1.861328125,
+      1.8017578125
+    ]
+  },
+  "qualification": "ONE native run/bail1; no retry/control/gate/source edit; full runtime obligations/result require complete raw review"
+}
