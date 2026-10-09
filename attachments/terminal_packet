@@ -1,0 +1,112 @@
+{
+  "authorization": "7a156b7562d9d44f83bc1888b76f8ae8f6643430 conditional native after root full selection review",
+  "timestamp_utc": "2026-10-09T21:01:43.658383+00:00",
+  "command": "/usr/bin/time -lp node ../../node_modules/vitest/vitest.mjs run test/application-establish.test.ts --config /tmp/artroom-f1-native-selection-v7/vitest.config.mjs > /tmp/artroom-f1-native-selection-v7/run.log 2>&1",
+  "cwd": "/tmp/artroom-application-establish/packages/scope",
+  "source_head_before": "fb2432dea91f13c3811d2ab1b1d07b7b276b50f8",
+  "source_tree_before": "61af8c19f53b07b5b1e53c6464cdf76c05db7d3e",
+  "status_before": "",
+  "configuration_sha256": "f24a1b66766654a6eb33fb5f2796115da024904e2705fd4649427164d845e32a",
+  "vitest_entry_realpath": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+  "vitest_entry_sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+  "timestamp_terminal_utc": "2026-10-09T21:01:46.349650+00:00",
+  "terminal_exit": 0,
+  "source_head_after": "fb2432dea91f13c3811d2ab1b1d07b7b276b50f8",
+  "source_tree_after": "61af8c19f53b07b5b1e53c6464cdf76c05db7d3e",
+  "status_after": "",
+  "log_bytes": 5224,
+  "log_sha256": "c04980caf74661d080483ea1625e23ac60091a86a61aa73db7940baae667e9c4",
+  "real_seconds": 2.6,
+  "user_seconds": 2.91,
+  "sys_seconds": 0.37,
+  "cpu_seconds": 3.28,
+  "selection": {
+    "files": 1,
+    "cases": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests_body_ms": 848,
+    "vitest_duration_seconds": 1.9,
+    "timeout_ms": 5000
+  },
+  "all_original_assertions": {
+    "expect_calls": 49,
+    "completed": true,
+    "native_replays": [
+      "D consistent/null",
+      "C consistent/null",
+      "A consistent/null",
+      "nested consistent/null"
+    ],
+    "scope": "ONE affected native scenario; not full gate"
+  },
+  "native_qualification": {
+    "SQL_fault_diagnostic": "uncaught exception; source=Uncaught(in promise); fixture retention fault SQLITE_CONSTRAINT_TRIGGER",
+    "stack": "SqliteStore.retain / Turns.#seal / transactionSync",
+    "rollback_assertions": "Caught submit rejection, counts rollback, failedchildnotcreated all completed; diagnostic remains",
+    "provenance": "Unknown native runtime/bridge reporting. Sourcehandledawaitchain/Queuecatch observed; no productionfix or suppression",
+    "error_free_claim": false
+  },
+  "qualifications": [
+    "ONE authorized native selection after exact root reviewed discovery",
+    "Original5s/title/all49/fourprovenreplays preserved",
+    "Native process terminal and post-run no Vitest/workerd remains",
+    "Clean exacthead/tree beforeafter",
+    "Priorfailures rawlogs/proofs retained immutable",
+    "Two nonfataloptionalimport warnings retained",
+    "No types/retry/control/gate/sourceedit/landing/hosted execution",
+    "Not formal Source approval, full F1/full4073/578 acceptance or deployment"
+  ],
+  "attachments": {
+    "source-packet.md": {
+      "path": "/tmp/artroom-f1-native-selection-v7/source-packet.md",
+      "bytes": 1336,
+      "sha256": "a760b14f382ae1eb16998024c98846ca847023d16d7750bfb13dae8e0fb5e5fa"
+    },
+    "source-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v7/source-proof.json",
+      "bytes": 1297,
+      "sha256": "cbd934836b5d55f02e0115223b7999fd0d82da352266da976d11530571f6c451"
+    },
+    "vitest.config.mjs": {
+      "path": "/tmp/artroom-f1-native-selection-v7/vitest.config.mjs",
+      "bytes": 1957,
+      "sha256": "f24a1b66766654a6eb33fb5f2796115da024904e2705fd4649427164d845e32a"
+    },
+    "reader-authority-preflight.md": {
+      "path": "/tmp/artroom-f1-native-selection-v7/reader-authority-preflight.md",
+      "bytes": 4251,
+      "sha256": "2b262753084b59bc718aa1127b32d557d1e82fd4b09fff11266db7ea7f2dafd3"
+    },
+    "sql-uncaught-source-disposition.md": {
+      "path": "/tmp/artroom-f1-native-selection-v7/sql-uncaught-source-disposition.md",
+      "bytes": 5035,
+      "sha256": "c6f9fce91a7d22074fdc66998fc2a099d2e8ec81500c733be2c2efb072b49ffd"
+    },
+    "discovery.json": {
+      "path": "/tmp/artroom-f1-native-selection-v7/discovery.json",
+      "bytes": 315,
+      "sha256": "1f9fb60e4f69d33f6cc2fd81d8b622b7220ed8446040a86c437efede8b05bed2"
+    },
+    "discovery-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v7/discovery-proof.json",
+      "bytes": 1846,
+      "sha256": "fd6d0e5cf5e0d21245a1d99ab14d6f9e8f0beea1a9445386f7b5424c7c16563e"
+    },
+    "native-before.json": {
+      "path": "/tmp/artroom-f1-native-selection-v7/native-before.json",
+      "bytes": 909,
+      "sha256": "866592a0d3ed821411a1de520abca6d39b148ed23a49d37f84f177ec9dd3a9b8"
+    },
+    "native-proof.json": {
+      "path": "/tmp/artroom-f1-native-selection-v7/native-proof.json",
+      "bytes": 1349,
+      "sha256": "4c3a36ba666085e03e98a44c510e869391d1a02a13d0a93311dc5a8ec14d3a92"
+    },
+    "run.log": {
+      "path": "/tmp/artroom-f1-native-selection-v7/run.log",
+      "bytes": 5224,
+      "sha256": "c04980caf74661d080483ea1625e23ac60091a86a61aa73db7940baae667e9c4"
+    }
+  }
+}
