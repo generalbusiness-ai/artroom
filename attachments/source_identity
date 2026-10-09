@@ -1,0 +1,40 @@
+{
+  "authorization": "bba2408a54ddb1b058909c58df7c6ac9a189540d",
+  "base": "315198c938b1fcc6b8562e82e468472160272e5d",
+  "head": "3dc37d54f1787c5221c028f3816814dc69d80c25",
+  "tree": "654f1025894d42c5756be56556ca52ffab2fceab",
+  "branch": "request/native-setup-specialization",
+  "status": "",
+  "authored": [
+    {
+      "path": "packages/lanes/test/support/room.ts",
+      "bytes": 20807,
+      "sha256": "5f4338f323d60221860a801c7ddce7daa3c768332ea66f0430439c3b1137e52a",
+      "git_blob": "217d1e0612a644fab1360c9482e2ebbfddcbfef7"
+    },
+    {
+      "path": "packages/lanes/test/wiring.scope.test.ts",
+      "bytes": 16846,
+      "sha256": "4995378351587c87cdb9ea2898787aa731070799de30b2115dffdbe19c4a0f68",
+      "git_blob": "64d51cb809cd7c699c842d7f97443e3f7b36d664"
+    },
+    {
+      "path": "packages/page/test/editor-list1.scope.test.ts",
+      "bytes": 7940,
+      "sha256": "83481061a6d6fa7c778e360891cabf5c1219cd585b51c0db277e6c815b8721d9",
+      "git_blob": "0e5173fd0409db93ed48dd624fa914397e50bae8"
+    },
+    {
+      "path": "packages/page/test/support/demo.ts",
+      "bytes": 11429,
+      "sha256": "0ff40aed652092caccd7a8fa1ee0ba77e6b3550a88f4d109b22ec0cfe8961a09",
+      "git_blob": "1c746913281a9e7e6dacd952690859ef5f2c85be"
+    }
+  ],
+  "diff": {
+    "bytes": 8419,
+    "sha256": "da1c0a154485816fe6d2aa0d9f82a78bbadd9c7725ef9567e5211d873224ed0b"
+  },
+  "checks": "whitespace and source-only body normalization; no runtime/types/discovery",
+  "W2_exception": "Vic retained as active wrong-merger replay control; only W4/W5 leanroster"
+}
