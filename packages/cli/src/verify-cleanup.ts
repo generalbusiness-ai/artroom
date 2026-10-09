@@ -41,10 +41,11 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
       if (!end.complete || end.next !== undefined || !sameHead(end.at) || canonicalize(end.value.scope) !== canonicalize(target.at) || end.value.definition !== "platform:destination@3") return unavailable("the destination changed before cleanup enumeration completed");
       const owed = [...items.values()].filter((item) => item.state === "cleanup-owed").sort((a, b) => a.id - b.id);
       const lines = owed.flatMap((item) => {
-        const independent = Object.hasOwn(item.values, "cleanupRefReason") || Object.hasOwn(item.values, "cleanupTokenReason");
+        const cleanup = item.values["cleanupReason"];
+        const independent = cleanup !== null && typeof cleanup === "object" && !Array.isArray(cleanup) ? cleanup as Record<string, unknown> : null;
         const duties = independent ? [
-          { reason: item.values["cleanupRefReason"], attempts: item.values["cleanupAttempts"] },
-          { reason: item.values["cleanupTokenReason"], attempts: item.values["cleanupTokenAttempts"] },
+          { reason: independent["refReason"], attempts: item.values["cleanupAttempts"] },
+          { reason: independent["tokenReason"], attempts: independent["tokenAttempts"] },
         ].filter((duty) => typeof duty.reason === "string") : [{ reason: item.values["cleanupReason"], attempts: item.values["cleanupAttempts"] }];
         const integration = typeof item.values["integration"] === "string" ? `; integration commit ${item.values["integration"]}` : "";
         return (duties.length ? duties : [{ reason: "reason not recorded", attempts: null }]).map((duty) => {
