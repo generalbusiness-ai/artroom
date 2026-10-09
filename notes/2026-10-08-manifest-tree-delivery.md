@@ -221,3 +221,27 @@ answers, so the counter witness uses an admissible late refused answer.
 The ordinary-read turn boundary, final gate, hosted observation, independent
 Source review and landing remain owed as stated above. No read hook, deployed
 claim or completed delivery is introduced by this repair.
+
+
+## Confirmed ref removal and late refusal
+
+Source `1a3663c7504b39d410c6b4a312737eca1708083f`, tree
+`0fd24985d9a6703a3e0c3bf2d411650cb63d95fc`, additionally preserves known
+ref removal when an older deletion answer arrives while token custody keeps
+the reservation live. The actual host's first confirmed deletion answer is
+held while all three attempts become unknown. Its exact late proof removes
+the ref duty. A later refusal for attempt three preserves that proof and the
+delete count of three; only the independent token duty remains. A distinct
+late confirmed stage still explicitly opens any remaining ref cleanup.
+
+The new native witness and the full affected eighteen-test Scope family pass
+(`/tmp/artroom-manifest-monotonic-1a366-scope.log`, 21.61 seconds). Three
+changed-source type configurations pass. Omitting the preservation guard fails
+its direct assertion: refRemoved becomes false and reservation-ref-unknown
+reappears (`/tmp/artroom-manifest-monotonic-ref-control.log`). The restored
+source SHA256 is
+`54cc005b6c0a0d99ca63e8588f233f7d50e916614ebd38695cbceac399b09355`.
+The preceding derive, CLI and historical-data evidence still applies to their
+unchanged boundaries. This is bounded implementation feedback and validation,
+not independent Source approval. The ordinary-read owner decision and all
+remaining delivery duties above remain open.
