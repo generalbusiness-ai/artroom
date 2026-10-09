@@ -1,7 +1,8 @@
 import { answerText, nonacceptedAnswerText } from "../src/view.ts";
 import { expect, test } from "vitest";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { b64url, definitionDigest, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { changeDemo } from "@generalbusiness/artroom-lanes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { joinAssociation, joinRoom, placeOf, type Session } from "../src/index.ts";
 
@@ -79,6 +80,7 @@ test("incomplete projections stay unreadable and a real returned submit answer s
   const ref = (letter: string, kind: string) => ({ scope: `sc_${letter.repeat(51)}a` as const, inc: newIncarnation(new Uint8Array(16).fill(3)), kind });
   const M = ref("b", "membership"), R = ref("c", "rules"), G = ref("d", "destination"), C = ref("e", "lane");
   const head = { seq: 0, hash: textDigest("scripted head") };
+  const changeDigest = definitionDigest(changeDemo);
   const item = (type: string, id = 0, refs = {}) => ({ id, type, state: "open", revision: 1, opened: null, attributed: [], parties: {}, values: {}, refs });
   let mode: "complete" | "item-refused" | "item-budget" | "destination-incomplete" | "history-incomplete" | "act-refresh" = "complete";
   let itemReads = 0, submits = 0;
@@ -108,11 +110,11 @@ test("incomplete projections stay unreadable and a real returned submit answer s
       return new Response(JSON.stringify({ ok: false, reason: "forbidden" }));
     }
     const scope = path.endsWith(M.scope) ? M : path.endsWith(R.scope) ? R : path.endsWith(G.scope) ? G : C;
-    const definition = scope === C ? textDigest("scripted change") : `platform:${scope.kind}@1`;
+    const definition = scope === C ? changeDigest : `platform:${scope.kind}@1`;
     const items = scope === M ? [item("roster")] : scope === R ? [item("rules")] : scope === C ? [item("proposal")] : [item("publication", 3, { operation: { at: C, seq: 5, hash: textDigest("scripted merge") } })];
     return read({ scope, status: "active", definition, time: "2026-10-08T12:00:00Z", counts: [], items }, !(scope === G && mode === "destination-incomplete"));
   };
-  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", definitions: new Map([[textDigest("scripted change"), { name: "change" } as Room["definitions"] extends Map<string, infer T> ? T : never]]) };
+  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", definitions: new Map([[changeDigest, changeDemo]]) };
   expect((await loadRules(room)).definitions).toEqual([]); // Distinguishing complete empty enumeration.
   mode = "item-refused";
   await expect(loadRules(room)).rejects.toThrow("forbidden");
