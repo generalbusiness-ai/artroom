@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "paths": {
+      "@generalbusiness/artroom-contract": ["../../../packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-bytes": ["../../../packages/bytes/src/index.ts"],
+      "@generalbusiness/artroom-client": ["../../../packages/client/src/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}
