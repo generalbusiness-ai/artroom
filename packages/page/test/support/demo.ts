@@ -13,7 +13,7 @@
  * | The clock | The scripted clock of the namespaces. |
  */
 import { env } from "cloudflare:workers";
-import { expect } from "vitest";
+import { expect, onTestFinished } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -58,75 +58,118 @@ export interface Demo {
 }
 
 const ok = (outcome: Outcome): Outcome => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
+interface FixtureOwner { released: boolean; previous: FixtureOwner | null; before: { hold: typeof net.hold; deaf: typeof net.deaf; secret: typeof platformNet.secret; sessions: typeof platformNet.sessions } }
+let fixtureOwner: FixtureOwner | null = null;
+const providerOwners = new WeakMap<NonNullable<ReturnType<typeof platformOutside.get>>, FixtureOwner>();
 
 /** Founds the room. `wrap` may stand between the page and the routes, as the recorder does. */
 export async function demo(wrap: (fetch: Fetch) => Fetch = (f) => f): Promise<Demo> {
-  net.hold = net.deaf = null;
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  platformNet.sessions = true;
-  const wired = new Set<ScopeId>();
-  const at = ownHost();
-  let R: Platform | null = null;
-  let siteEnv: SiteEnv | null = null;
-  const bindings = () => at.bindings(R!.name);
-  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => at.outside(given, sql, bindings())); };
-  const known: Platform[] = [];
-  // STAND-IN for the scheduler: each pass drives the operations of every scope named, and of the register and the destination,
-  // then their dispatchers, until nothing is due.
-  const pause = async (waiting: readonly string[] = []) => {
-    const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => new Platform(scope as never))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of nodes) {
-        while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
-        made += await node.stub.dispatch();
-      }
-      if (made === 0) return;
+  const before = { hold: net.hold, deaf: net.deaf, secret: platformNet.secret, sessions: platformNet.sessions };
+  const owner: FixtureOwner = { released: false, previous: fixtureOwner, before };
+  fixtureOwner = owner;
+  const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  let released = false;
+  let held: typeof net.hold = null;
+  const wired = new Map<ScopeId, { previous: ReturnType<typeof platformOutside.get>; installed: NonNullable<ReturnType<typeof platformOutside.get>> }>();
+  const done = () => {
+    if (released) return;
+    const currentOwner = fixtureOwner === owner;
+    released = owner.released = true;
+    let restore = owner;
+    while (restore.previous?.released) restore = restore.previous;
+    if (fixtureOwner === owner) fixtureOwner = restore.previous;
+    if (currentOwner && platformNet.secret === secret) { platformNet.secret = restore.before.secret; if (platformNet.sessions === true) platformNet.sessions = restore.before.sessions; }
+    if (currentOwner && net.hold === held) net.hold = restore.before.hold;
+    // `deaf` has no owner token; never overwrite a later non-null setting.
+    if (currentOwner && net.deaf === null) net.deaf = restore.before.deaf;
+    for (const [name, wiring] of wired) if (platformOutside.get(name) === wiring.installed) {
+      if (wiring.previous && !providerOwners.get(wiring.previous)?.released) platformOutside.set(name, wiring.previous); else platformOutside.delete(name);
     }
-    await settle(...nodes);
   };
-  const routes = (async (url: string, init?: RequestInit) =>
-    (siteEnv && new URL(url).pathname.startsWith("/site/") ? site(new Request(url, init), siteEnv, at.stand.fetch) : routed(url, init))) as unknown as Fetch;
-  const fetch = wrap(routes);
-  const now = () => timeMs(net.clock.now)!;
-  const person = (): Context => ({ store: memoryStore(), fetch: routes, now, pause, read: async (path) => FILES[path] ?? null });
-  const rita = person();
-  const paul = person();
-  const run = (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
+  const active = () => { if (released) throw new Error("The demo fixture was released before setup completed."); };
+  onTestFinished(done);
+  try {
+    net.hold = net.deaf = null;
+    platformNet.secret = secret;
+    platformNet.sessions = true;
+    const at = ownHost();
+    let R: Platform | null = null;
+    let siteEnv: SiteEnv | null = null;
+    const bindings = () => at.bindings(R!.name);
+    const wire = (name: ScopeId) => {
+      if (released) return;
+      const installed: NonNullable<ReturnType<typeof platformOutside.get>> = (given, sql) => at.outside(given, sql, bindings());
+      providerOwners.set(installed, owner);
+      if (!wired.has(name)) wired.set(name, { previous: platformOutside.get(name), installed });
+      else wired.get(name)!.installed = installed;
+      platformOutside.set(name, installed);
+    };
+    const known: Platform[] = [];
+    // STAND-IN for the scheduler: each pass drives the operations of every scope named, and of the register and the destination,
+    // then their dispatchers, until nothing is due.
+    const pause = async (waiting: readonly string[] = []) => {
+      active();
+      const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => new Platform(scope as never))];
+      for (let pass = 0; pass < 64; pass++) {
+        let made = 0;
+        for (const node of nodes) {
+          while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
+          active();
+          made += await node.stub.dispatch();
+          active();
+        }
+        if (made === 0) return;
+      }
+      await settle(...nodes);
+    };
+    const routes = (async (url: string, init?: RequestInit) =>
+      (siteEnv && new URL(url).pathname.startsWith("/site/") ? site(new Request(url, init), siteEnv, at.stand.fetch) : routed(url, init))) as unknown as Fetch;
+    const fetch = wrap(routes);
+    const now = () => timeMs(net.clock.now)!;
+    const person = (): Context => ({ store: memoryStore(), fetch: routes, now, pause, read: async (path) => FILES[path] ?? null });
+    const rita = person();
+    const paul = person();
+    const run = (who: Context, ...argv: string[]): Promise<Outcome> => command(who, argv);
 
-  ok(await run(rita, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
-  R = new Platform((await rita.store.config())!.register!.scope);
-  wire(R.name);
-  await R.restart();
-  known.push(R);
-  net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
-  ok(await run(rita, "claim", "demo", "--handle", "@rita"));
-  const config = (await rita.store.config())!;
-  const repository = config.repository!;
-  const [D, G, M, rules] = [new Platform(repository.directory.scope), new Platform(repository.destination), new Platform(repository.membership.scope), new Platform(repository.rules)];
-  known.push(G);
-  await pause();
-  siteEnv = { SCOPES: env.PLATFORM, ...bindings() };
+    ok(await run(rita, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
+    active();
+    R = new Platform((await rita.store.config())!.register!.scope);
+    wire(R.name);
+    await R.restart();
+    active();
+    known.push(R);
+    held = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
+    net.hold = held;
+    ok(await run(rita, "claim", "demo", "--handle", "@rita"));
+    active();
+    const config = (await rita.store.config())!;
+    const repository = config.repository!;
+    const [D, G, M, rules] = [new Platform(repository.directory.scope), new Platform(repository.destination), new Platform(repository.membership.scope), new Platform(repository.rules)];
+    known.push(G);
+    await pause();
+    active();
+    siteEnv = { SCOPES: env.PLATFORM, ...bindings() };
 
-  // paul, a maintainer, joins on the command line; una's invitation is left for the page.
-  ok(await run(paul, "join", ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!));
-  const link = ok(await run(rita, "invite", "@una", "--role", "member")).lines[1]!.split(": ")[1]!;
+    // paul, a maintainer, joins on the command line; una's invitation is left for the page.
+    ok(await run(paul, "join", ok(await run(rita, "invite", "@paul", "--role", "maintainer")).lines[1]!.split(": ")[1]!));
+    active();
+    const link = ok(await run(rita, "invite", "@una", "--role", "member")).lines[1]!.split(": ")[1]!;
+    active();
 
-  // The rules: the first extents, with no approval for the source extent; the rules extent asks one from the controller, rita.
-  // The demo profile's two definitions, activated with their bytes beside the act.
-  ok(await run(rita, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
-  ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"));
-  ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"));
+    // The rules: the first extents, with no approval for the source extent; the rules extent asks one from the controller, rita.
+    // The demo profile's two definitions, activated with their bytes beside the act.
+    ok(await run(rita, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
+    active();
+    ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"));
+    active();
+    ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"));
+    active();
 
-  return {
-    at, fetch, pause, run, rita, paul, config, D, G, M, rules, link,
-    as: (secret) => ({ service: SERVICE, secret, fetch, now }),
-    secretOf: async (who) => (await who.store.secret((await who.store.config())!.key))!,
-    done: () => {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      net.hold = null;
-      for (const name of wired) platformOutside.delete(name);
-    },
-  };
+    return {
+      at, fetch, pause, run, rita, paul, config, D, G, M, rules, link,
+      as: (secret) => ({ service: SERVICE, secret, fetch, now }),
+      secretOf: async (who) => (await who.store.secret((await who.store.config())!.key))!,
+      done,
+    };
+  } catch (error) { done(); throw error; }
 }
