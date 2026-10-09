@@ -42,6 +42,7 @@ const browserVersion = browser.version();
 const unanswered = [];
 const sizes = [];
 const consoleErrors = [];
+const expectedNetworkRefusals = [];
 const layoutChecks = [];
 const contexts = [];
 const source = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
@@ -66,7 +67,18 @@ async function as(person, { width = 1024, height = 800, colorScheme = "light" } 
   await context.addInitScript((kept) => localStorage.setItem("artroom-page", JSON.stringify(kept)), { place: record.place, secret: record.people[person] });
   const tab = await context.newPage();
   tab.on("pageerror", (error) => consoleErrors.push(error.message));
-  tab.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  tab.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const location = message.location();
+    const path = location.url?.startsWith(record.service) ? location.url.slice(record.service.length) : null;
+    const answer = path ? record.answers[`POST ${path}`] : null;
+    let body = null;
+    try { body = answer ? JSON.parse(answer.body) : null; } catch { /* HTML/script responses are not a refusal. */ }
+    const refusal = body?.answer ?? body;
+    if (answer?.status === 422 && refusal?.answer === "refused" && refusal?.name === "author-cannot-review" && /^Failed to load resource: the server responded with a status of 422/.test(message.text())) {
+      expectedNetworkRefusals.push({ text: message.text(), url: location.url, status: answer.status, refusal });
+    } else consoleErrors.push({ text: message.text(), location });
+  });
   return tab;
 }
 /** A screenshot of the whole page, or of its top `height` pixels. */
@@ -187,11 +199,11 @@ await shot(dark, "rules-mobile-dark");
 
 for (const context of contexts) await context.close();
 await browser.close();
-if (consoleErrors.length > 0) throw new Error(`Browser errors: ${consoleErrors.join("; ")}`);
+if (consoleErrors.length > 0) throw new Error(`Browser errors: ${JSON.stringify(consoleErrors)}`);
 writeFileSync(join(out, "checks.json"), `${JSON.stringify({
   source, sourceTree, playwrightVersion, browserVersion,
   executablePath: browserPath, fallback: "Browser plugin not available", layoutChecks,
-  consoleErrors, unanswered,
+  consoleErrors, expectedNetworkRefusals, unanswered,
 }, null, 2)}\n`);
 if (unanswered.length > 0) throw new Error(`The browser asked for what the recorder did not read: ${unanswered.join("; ")}`);
 for (const [name, size] of sizes) if (size > MOST) throw new Error(`${name}.png is ${size} bytes, over ${MOST}.`);
