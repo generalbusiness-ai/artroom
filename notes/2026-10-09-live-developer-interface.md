@@ -1,9 +1,11 @@
 # Observe a scope, invoke acts, stay current
 
-9 October 2026. Draft 1 for independent design review under request
+9 October 2026. Draft 2 for independent design review under request
 `785a5447`, planner promise `0b4676c6`. The note selects the public API,
 shared contract and builder slices. Source adoption, implementation,
 runtime proof and publication remain separate from this design verdict.
+This successor reconciles the four P2 and one P3 findings in complete
+Draft 1 review `c2527bc7`; none of its new types or routes is deployed.
 
 Use one application handle. It discovers the pinned application, reads an
 authorized view, invokes an act and watches that view. The application code
@@ -53,13 +55,15 @@ for all execution regions and transports.
 
 ```ts
 type Position =
-  | { execution: "recorded-do"; scope: ScopeRef; definition: Digest;
+  | { execution: "recorded-do"; scope: ScopeRef; definition: Digest | PlatformDefinition;
       head: Head }
   | { execution: "live"; scope: ScopeRef; application: Digest;
       region: string; generation: string; revision: number };
 
-type Selection = { kind: "summary" }
-  | { kind: "query"; name: string; arguments: Record<string, FieldValue> };
+type SummarySelection = { kind: "summary" };
+type QuerySelection = { kind: "query"; name: string;
+  arguments: Record<string, LiveValue> };
+type Selection = SummarySelection | QuerySelection;
 
 type Snapshot<T> = {
   position: Position;
@@ -90,7 +94,8 @@ interface Watch { close(): void; readonly done: Promise<void> }
 
 interface Application<D extends ApplicationDefinition> {
   discover(): Promise<Discovery>;
-  read(selection?: Selection): Promise<ReadView<StateOf<D>>>;
+  read(selection?: SummarySelection): Promise<ReadView<StateOf<D>>>;
+  read(selection: QuerySelection): Promise<ReadView<unknown>>;
   invoke<K extends ActKind<D>>(kind: K, asked: ActInput<D, K>): Promise<Invoked>;
   watch(listener: (view: View<StateOf<D>>) => void): Watch;
   watch(selection: Selection, listener: (view: View<unknown>) => void): Watch;
@@ -108,6 +113,8 @@ never inhabits today's native integer `on`. No successful implementation
 typecheck is claimed by this design.
 
 ```ts
+type LiveValue = null | boolean | number | string | readonly LiveValue[]
+  | { readonly [name: string]: LiveValue };
 type LiveItemRef = {
   scope: ScopeRef; application: Digest; region: string;
   generation: string; id: number;
@@ -137,7 +144,10 @@ type ActInput<D extends ApplicationDefinition, K extends ActKind<D>> =
 type StateOf<D extends ApplicationDefinition> =
   D extends DeclaredDefinition ? Summary : LiveViewValue;
 type LiveViewValue = {items:readonly LiveItem[]; effectiveReading:Timestamp};
-type Discovery = {v:1; target:TargetBinding; definition:ApplicationDefinition;
+type Discovery = {v:1; target:TargetBinding;
+  definition:ApplicationDefinition|PlatformData;
+  applications:readonly {application:Digest; document:ApplicationDocument;
+    regions:readonly string[]}[];
   operations:readonly ("discover"|"read"|"invoke"|"watch"|"wait")[];
   selections:readonly SelectionSchema[];
   acts:readonly {kind:string; schema:ActSchema; action:string}[]};
@@ -152,6 +162,39 @@ names no existing primary/also item. The ordinary facade supplies captured
 G/session/pin, not expected revisions. The live extension to `ValueOf`
 maps address/session/live-item/nullable exactly as the shared-language
 validator, without changing recorded `FieldValue` or native fact types.
+The concrete recursive mapping is:
+
+```ts
+type LiveAtom<F> =
+  F extends {type:"address"} ? ContentAddress :
+  F extends {type:"session"} ? string :
+  F extends {type:"live-item"} ? LiveItemRef :
+  F extends {type:"list";of:infer E} ? readonly LiveValueOf<E>[] :
+  F extends {type:"record";of:infer M} ? LiveMembers<M> : ValueOf<F>;
+type LiveValueOf<F> = LiveAtom<F> | (F extends {nullable:true} ? null : never);
+type LiveMembers<M> =
+  { -readonly [K in keyof M as M[K] extends {required:true} ? K : never]:
+      LiveValueOf<M[K]> } &
+  { -readonly [K in keyof M as M[K] extends {required:true} ? never : K]?:
+      LiveValueOf<M[K]> };
+type LiveOn<A> = A extends {step:"open"} ? {on?:null} :
+  A extends {step:"transition"} ? {on:LiveItemRef} : {on?:LiveItemRef|null};
+type LiveAskedOf<D extends LiveRegionDefinition,K extends keyof D["acts"]> =
+  LiveOn<D["acts"][K]> & {expected:LiveExpected;
+    fields:LiveMembers<D["acts"][K]["fields"]>};
+```
+
+This live input always supplies a fields record, even `{}`. An omitted
+optional key stays omitted; explicit null is accepted only by nullable
+schema, and `[]` is a supplied empty list. Strict canonical JSON rejects
+undefined, holes, non-finite numbers, malformed strings and duplicate keys.
+Native `ValueOf` supplies unchanged scalar/reference mappings; live list/
+record recursion takes precedence so null remains valid at every declared
+nested nullable position. Named query argument schemas use LiveMembers.
+Their results are schema-decoded projections, returned by the query overload
+as unknown until narrowed by that schema. They are never asserted to be
+native Summary merely because the handle is recorded.
+
 `StateOf<D>` is native Summary for a recorded D; for a live region it is
 `{items: readonly LiveItem[]; effectiveReading: Timestamp}`. Each LiveItem
 has its full LiveItemRef, declared type/state, item revision, permitted
@@ -194,6 +237,25 @@ auto selects a supported socket after checked discovery, otherwise HTTP.
 Selection happens before sending a request. It is not failover after an
 unknown invocation, nor a change to execution guarantees. No connection,
 session or transport factory class is required in application code.
+
+Live opening additionally selects the exact installed application digest
+and region in that same authority configuration. The native host's
+authenticated discover result carries its authorized installed application
+documents/region names; an empty list means no live support. Check their
+canonical application digests and actual recorded host pin before selecting
+the supplied region literal. This bootstrap request uses RecordedBinding,
+so it needs no invented G. Then obtain the live challenge/open answer for
+that exact application/region and use its checked G in LiveBinding. Missing
+or mismatched installation refuses, never guesses a latest region. The
+ordinary opened handle's discover returns its selected declaration; the
+catalog is adapter bootstrap detail, not another manager or public language.
+Builtin native scopes expose their actual supported PlatformData under the
+named PlatformDefinition pin; do not hash that name into a declared digest.
+Typed openApplication for a supplied application declaration stays separate
+from this builtin discovery/read path. Cap bootstrap catalog at16 application
+entries and1MiB total encoded response. Exhaustion returns unavailable rather
+than an empty or silently truncated catalog; exact selected-app lookup may
+use the same authorized installed registry without claiming full enumeration.
 
 The opener is `openApplication(scopeHandle, definition, authority)` and
 returns a checked result containing `application`. The authority is one
@@ -363,8 +425,8 @@ Use hibernatable sockets with only bounded public routing metadata in their
 attachments, not application state, dedup results or private credentials.
 Before private output or act admission, require fresh authentication. Send
 a payload-free reset/reauthentication control to attached sockets; clients
-discard volatile data and never renew or Enter by implication. The detailed
-challenge, refresh and attachment schema remains to be completed in this draft.
+discard volatile data and never renew or Enter by implication. The selected
+challenge, refresh and attachment schemas are below.
 [Cloudflare hibernation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).
 
 Existing read sessions stay read-only. Recorded acts remain signed. Live
@@ -478,6 +540,93 @@ The source implementation and its evidence remain separate work.
 
 ## Exact adapter contract and implementation mechanics
 
+Draft 2 closes the common port and wire result schemas below. These types
+are selected contracts, not new implementations of the existing ScopeApi.
+
+```ts
+type PortFailure = {ok:false; reason:"access"|"expired"|"invalid-input"
+  |"unsupported"|"unavailable"|"incomplete"|"gap"};
+type PortResult<T> = {ok:true; value:T} | PortFailure;
+type SnapshotDescriptor = {
+  id:string; target:TargetBinding; selection:Selection; position:Position;
+  readAt:Timestamp; validUntil:Timestamp; complete:boolean;
+  parts:number; bytes:number; digest:Digest;
+};
+type WatchOpened = {watch:string; target:TargetBinding; selection:Selection;
+  initial:Position; snapshot:SnapshotDescriptor};
+type Waited =
+  | {end:"changed"|"timeout"; snapshot:SnapshotDescriptor}
+  | {end:"reset"};
+type Closed = {closed:"watch"|"request"; id:string; released:true};
+type OperationResults = {
+  discover:PortResult<Discovery>;
+  read:PortResult<SnapshotDescriptor>;
+  invoke:PortResult<Invoked>;
+  watch:PortResult<WatchOpened>;
+  wait:PortResult<Waited>;
+  close:PortResult<Closed>;
+};
+interface ApplicationPort {
+  discover(body:OperationBodies["discover"]):Promise<OperationResults["discover"]>;
+  read(body:OperationBodies["read"]):Promise<OperationResults["read"]>;
+  invoke(body:OperationBodies["invoke"]):Promise<OperationResults["invoke"]>;
+  observe(body:OperationBodies["watch"]):Promise<OperationResults["watch"]>;
+  wait(body:OperationBodies["wait"]):Promise<OperationResults["wait"]>;
+  close(body:OperationBodies["close"]):Promise<OperationResults["close"]>;
+}
+```
+
+The port is a flat dispatch contract. A transport-owned output channel
+delivers parts/notices using the watch/read IDs below; there is no second
+public event-bus or application-facing channel class. Service bindings
+initially use discover/read/invoke/wait/close; observe is unsupported until
+its actual output channel exists. A PortFailure discloses no position,
+subscription or existence details. Reset likewise carries no G until a
+new authorized read/session establishes it. Native Answer.refused remains
+inside a successful invocation result; it is not a framing PortFailure.
+Local transport loss after sending returns unknown in the facade, not
+PortFailure as proof that nothing occurred.
+
+A wait timeout returns a freshly authorized bounded snapshot, not an empty
+success or a count of events. It may be incomplete and must remain labelled
+so. A changed result covers current state only. A close result acknowledges
+once-only local observation release; unknown or already-closed IDs return
+the same released result without revealing another connection's resources.
+Close of an in-flight read stops output/work as practical. Invoke cannot be
+withdrawn by close: an already sent act remains owned by its result/custody
+path. The connection's public facade close suppresses future callbacks first.
+
+**Watch identity:** the watch ID equals the initiating watch request's ID.
+That ID is reserved before asynchronous authorization and never reused on
+that connection, including after close. The client knows what to cancel
+before acknowledgment. WatchOpened returns that exact ID, full target,
+selection, initial position and descriptor. The native subscription ID
+stays private to the adapter and is never substituted as application ID.
+An unacknowledged watch receives exactly its failed reply or its opened
+reply; it receives no private part/notice first.
+
+Successful ordering is: one correlated WatchOpened reply, indexed frozen
+snapshot parts, then invalidation/control notices buffered after the initial
+watermark. A gap/reset/access failure may interrupt the transfer after the
+opening reply, discarding incomplete data; it is never deferred merely to
+finish a stale/private snapshot. Recheck permission before each part. If
+acknowledgment or buffered change cannot fit the selected queue reservation,
+fail/end the watch explicitly rather than output an unlinked snapshot.
+
+Each part names the same initiating ID, watch ID when applicable, snapshot
+ID, full Position, part index/count, total raw byte count and digest. Count
+is1…64, indices0…count-1, unique and in order; one part holds at most20KiB
+raw bytes and32KiB encoded frame bytes. The descriptor freezes one canonical
+UTF-8 snapshot value, capped at1MiB. Its ID is a fresh128-bit opaque value.
+Validate all identities, target/pin/G binding, position, count/length/digest
+and bounded decoded schema before making any assembled view visible. Bytes
+must sum exactly to the descriptor byte length; missing/duplicate/out-of-order/
+extra parts, digest mismatch or mixed positions fail the transfer. A read
+uses the same assembly with no watch ID. Concurrent transfers are keyed by
+connection + initiating ID + snapshot ID, not a global current buffer.
+Incomplete authorized selection remains complete:false after assembly;
+complete transfer is not a claim of complete application history.
+
 The proposed versioned `ApplicationPort` is one flat service value with
 `discover`, `read`, `invoke`, `observe` and `wait`. Keep current `ScopeApi`
 unchanged: HTTP and binding transports that implement only it continue to
@@ -505,7 +654,7 @@ Proposed HTTP extension under the current scope route family:
 | `POST /v1/scopes/:scope/live-sessions` | Bounded challenge/proof/refresh for an installed live region |
 | `POST /v1/scopes/:scope/live-acts` | Exact signed live invocation and private session credential |
 
-Recorded invocation continues to use `/acts` and `/settlements` and native
+Recorded invocation continues to use `/acts` and `/settle` and native
 ScopeApi methods. WebSocket forwards those same values to the same methods;
 it does not turn its authenticated read token into the signer. Existing
 routes retain their old shapes and meanings. All new routes are proposed;
@@ -535,27 +684,36 @@ type OperationBodies = {
 type RequestFrame = {[K in keyof OperationBodies]:{
   v:1; id:string; op:K; body:OperationBodies[K]
 }}[keyof OperationBodies];
-type ReplyFrame = { v: 1; id: string; result: OperationResult };
-type NoticeFrame = { v: 1; watch: string;
-  notice: "invalidate" | "reset" | "blocked" | "closed";
-  position?: Position };
+type ReplyFrame = {[K in keyof OperationResults]:{
+  v:1; id:string; op:K; result:OperationResults[K]
+}}[keyof OperationResults];
+type NoticeFrame =
+  | {v:1; watch:string; notice:"invalidate"; position:Position}
+  | {v:1; watch:string; notice:"reset"; reason:"generation"|"gap"}
+  | {v:1; watch:string; notice:"blocked"; reason:"access"|"expired"|"unavailable"}
+  | {v:1; watch:string; notice:"closed"};
 type PartFrame = { v: 1; id: string; watch?: string; snapshot: string;
+  position:Position;
   part: number; parts: number; bytes: number; digest: Digest;
   data: string }; // bounded unpadded base64url raw snapshot part
 ```
 
-OperationBodies and OperationResult are the tagged common port types, not
-arbitrary topic payloads. IDs are at most64 ASCII characters; new invocation
-IDs are independently random128-bit values, while a native idempotency key
-keeps its current native constraints. A pending frame ID cannot be reused.
+OperationBodies and OperationResults are the tagged common port types, not
+arbitrary topic payloads. Socket frame IDs are canonical positive decimal
+strings, allocated consecutively by the SDK's single socket writer, starting
+at1 after each new connection. The server retains one last-accepted integer
+and requires the next ID exactly; no unbounded retired-ID set is needed.
+Close/reopen the connection before safe-integer overflow. Domain invocation
+IDs remain independently random128-bit values; a native idempotency key
+keeps its current native constraints. A frame ID is never a domain retry ID.
 Record answers by that ID, never by last frame received. Watch notice order
 is per region/position; a connection supplies no order across regions.
 Close names its watch or pending read ID. Unknown version/binary/oversize/
 duplicate-key/wrong-shape frames close as protocol errors without invocation.
-Authenticate frames use a separate fixed schema `{v:1,auth:{...}}`, cap8KiB,
+Authenticate frames use the separate closed schemas below, cap16KiB,
 and never enter public reply/debug serialization.
 
-Each OperationResult is exactly the discover/read/invoked/view/wait/closed
+Each OperationResults member is exactly the discover/read/invoked/view/wait/closed
 result defined here; decode it against its correlated operation, not a
 permissive union. Close requires exactly one watch or request ID. Wait uses
 integer0…30000ms and an exact same-binding Position; movement returns reset/
@@ -647,12 +805,12 @@ type LiveChallenge = {v:1; deployment:string; scope:ScopeRef;
   application:Digest; region:string; generation:string;
   challenge:string; nonce:string; ends:Timestamp};
 type LiveSessionRequest = {v:1; challenge:LiveChallenge; actor:KeyId;
-  actions:readonly string[]; operation:string};
+  nativeReader:Digest; actions:readonly string[]; operation:string};
 type SignedLiveSessionRequest = {request:LiveSessionRequest; sig:Base64Url};
 type LiveIntent = {v:1; deployment:string; scope:ScopeRef;
   application:Digest; region:string; generation:string; session:string;
   actor:KeyId; requestId:string; kind:string; on:LiveItemRef|null;
-  expected:LiveExpected; fields:Record<string,FieldValue>; notAfter:Timestamp};
+  expected:LiveExpected; fields:Record<string,LiveValue>; notAfter:Timestamp};
 type SignedLiveIntent = {intent:LiveIntent; sig:Base64Url};
 ```
 
@@ -668,6 +826,102 @@ decide permission. Protocol/source owners validate the exact canonical bytes
 and size/depth bounds before interpreting them. N and item revisions are
 safe nonnegative integers; item allocation begins at1; overflow resets G
 before unsafe arithmetic rather than wrapping an old reference.
+
+### Closed authentication, refresh and attachment forms
+
+```ts
+type RecordedBinding = Extract<TargetBinding,{execution:"recorded-do"}>;
+type LiveBinding = Extract<TargetBinding,{execution:"live"}>;
+type AuthMaterial =
+  | {kind:"read"; target:RecordedBinding; reader:string}
+  | {kind:"live"; target:LiveBinding; reader:string; credential:string};
+type AuthRequest = {v:1; id:string; op:"auth"|"refresh-auth";
+  auth:AuthMaterial};
+type AuthFailure = {ok:false; reason:"access"|"expired"|"invalid-input"
+  |"unsupported"|"unavailable"};
+type AuthResult<T> = {ok:true;value:T}|AuthFailure;
+type AuthAcknowledgment =
+  | {kind:"read"; connection:string; target:RecordedBinding;
+      readEnds:Timestamp}
+  | {kind:"live"; connection:string; target:LiveBinding;
+      readEnds:Timestamp; session:string; sessionEnds:Timestamp};
+type AuthReply = {v:1; id:string; op:"auth"|"refresh-auth";
+  result:AuthResult<AuthAcknowledgment>};
+type LiveSessionClaims = {
+  v:1; deployment:string; target:LiveBinding; session:string;
+  membership:ScopeRef; member:MemberRef; key:KeyId;
+  principal:MemberRef; delegation?:FactRef;
+  nativeReader:Digest; reads:readonly string[];
+  actions:readonly {name:string; ends:Timestamp; membershipHead:Head}[];
+  ends:Timestamp;
+};
+type LiveSessionAnswer =
+  | {ok:true; credential:string; claims:LiveSessionClaims}
+  | AuthFailure;
+type SocketAttachment = {v:1; connection:string; watches:readonly string[]};
+type ReauthenticateControl = {v:1; control:"reauthenticate"};
+```
+
+Read authentication verifies the actual existing native session MAC,
+deployment, membership, allowed read, full target/pin and actual native
+windows; it grants no live invocation authority. Live authentication verifies
+both the native subject reader and the separate live MAC claims. Their actual
+membership/member/key must match, and the native reader digest binds the
+live proof's private reader without exposing it. An expired reader cannot
+be rescued by a socket ID or public live session handle. Successful auth
+acknowledges only authorized target/session metadata; failure has no target,
+position, session ID or partial snapshot. Credential/token strings never
+appear in AuthAcknowledgment, attachment, view or logs.
+Native reader strings retain their existing bounded token form. Live
+credentials are bounded ASCII MAC tokens of at most8KiB; auth routing
+metadata is capped at3KiB, within the16KiB whole auth frame. Check these
+encoded limits before parsing/copying; refuse claims that cannot fit before
+minting a live credential. A32-action count ceiling is not a promise that
+every maximum-length claim fits. These limits reuse the native session
+answer16KiB scale and remain subordinate to actual byte/field bounds.
+
+The live session-open body is the SignedLiveSessionRequest already defined
+above, plus the native reader in its private Authorization channel. Its
+signed request adds `nativeReader:Digest`, computed over that exact reader.
+The server verifies the digest and actual native claims before resolving
+member/principal/delegation/action windows from the existing authority owner.
+The MAC signs exactly LiveSessionClaims in the selected live-token domain.
+Reads/actions are bounded exact names, not wildcard capabilities. No caller
+member/principal/permission list is copied as a grant. These are retained
+in-memory session claims for this G, not a durable member or delegations log.
+
+Initial auth must be the first frame, and auth acknowledgment precedes any
+other reply, snapshot part or notice. For refresh-auth, suspend private
+watch output and new invocation admission immediately. Retire old watches
+before replacing authentication; reply success/failure before any reopened
+watch output. The SDK opens replacement observations after success using
+fresh read requests. It never resubmits a domain act. Failure releases
+old observations and blocks the connection for application operations;
+another explicit refresh-auth may recover before the five-second handshake
+deadline, otherwise close. Already-admitted native work retains its normal
+result/custody duty; a dropped or old-context reply stays unknown in the
+client. Exact receipt settlement remains session-free through its own API.
+
+The live-session HTTP endpoint has two closed operation bodies:
+`{v:1,op:"challenge",binding:{scope,application,region},actor,operation}`
+and `{v:1,op:"open",signed:SignedLiveSessionRequest}`. Both use the native
+reader in Authorization; challenge returns AuthResult<LiveChallenge>, and
+open returns LiveSessionAnswer. Challenge refusals use AuthFailure rather
+than observation gap/incomplete errors. Refresh uses a new challenge/open proof
+and new public session, not a renewal of old-G identity. Old leases end at
+their earlier expiry; an explicit new session never owns or renews them.
+Native reader renewal uses the existing new-request issuance semantics.
+
+Attachment fields are connection-local opaque IDs only: one128-bit
+connection ID and at mostfour64-character watch IDs. It stores no target
+selection, private credential, G/N, application state, dedup result or
+authority decision. Reject unknown attachment version/shape and close that
+socket. A new object run reads those IDs only to associate close/reset
+cleanup, sends payload-free ReauthenticateControl first, and permits no
+application output/admission until fresh auth succeeds. It restores no
+subscription from those IDs; after auth the client sends new watch requests
+and reassembles new authorized snapshots. A surviving socket therefore
+cannot make old-G values current or replay speech.
 
 Native reconciliation remains existing session-free `ScopeApi.settle` over
 HTTP or service binding, even when the original submit used a socket.
