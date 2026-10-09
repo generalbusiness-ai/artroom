@@ -8,6 +8,7 @@ import { changeDemo3 } from "../src/index.ts";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { net } from "../../scope/src/testing.ts";
 import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
+import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { ownHost } from "../../scope/test/hosts.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { site } from "../../scope/src/site/route.ts";
@@ -24,15 +25,7 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
   const wire = (name: ScopeId) => { lifetime.active(); lifetime.wire(name, (given, sql) => at.outside(given, sql, at.bindings(register!.name))); };
   const pause = async (waiting: readonly string[]) => {
     const known = [...nodes, ...waiting.filter(name => !nodes.some(n => n.name === name)).map(name => new Platform(name as ScopeId))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of known) {
-        while ((await lifetime.wait(() => (node.stub as unknown as { effect(): Promise<number> }).effect())) > 0) made++;
-        made += await lifetime.wait(() => node.stub.dispatch());
-      }
-      if (!made) return;
-    }
-    throw new Error("Native fixture scheduler exceeded its finite passes");
+    await driveFixture(known, lifetime.wait);
   };
   const files = { "change3.json": utf8(canonicalize(changeDemo3)), "one.md": utf8("# First published\n\n[Self](README.md)\n"), "two.md": utf8("# Second published\n"), "check.json": utf8(canonicalize({ image: `sha256:${"7".repeat(64)}`, steps: [["fixture-check"]] })) };
   const ctx: Context = { store: memoryStore(), fetch: ((url: string, init?: RequestInit) => lifetime.wait(() => routed(url, init))) as never, now: () => timeMs(net.clock.now)!, pause, read: async name => files[name as keyof typeof files] ?? null };

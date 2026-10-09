@@ -11,7 +11,8 @@ import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { outsideOf, wired } from "./outside.ts";
-import { Platform, rita, routed, sam, settle } from "./repository.ts";
+import { Platform, rita, routed, sam } from "./repository.ts";
+import { dispatchFixture } from "./support/native-fixture-lifetime.ts";
 import { reader } from "./support.ts";
 import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
 
@@ -22,6 +23,7 @@ const SERVICE = "https://scopes.test";
 // retention-fault control; it writes no invented native entry or authority.
 test("explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant", async () => {
   const lifetime = siteFixtureLifetime();
+  const settle = (...nodes: readonly Platform[]) => dispatchFixture(nodes, lifetime.wait);
   let releaseRegister = () => {};
   onTestFinished(() => releaseRegister());
   // Guard every actual RPC boundary, including nested Platform helpers. An

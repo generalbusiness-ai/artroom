@@ -23,6 +23,8 @@ export function sessionSettings(): Readonly<SessionSettings> {
 export class SessionOwner {
   constructor(parent: SessionOwner | null, settings: SessionSettings) { owned.set(this, { parent, root: parent ? stateOf(parent).root : this, settings: { ...settings }, leases: new Set(), closed: false, superseded: false }); }
   isCurrent(): boolean { return live(this) && current === this; }
+  /** Live ownership ancestry only; it grants no read mode or required lease. */
+  belongsTo(ancestor: SessionOwner): boolean { return live(this) && within(ancestor, this); }
   active(): void { if (!this.isCurrent()) throw new Error("Session fixture ownership ended before its continuation completed."); }
   close = (): void => {
     const state = stateOf(this); state.closed = true; state.leases.clear();
