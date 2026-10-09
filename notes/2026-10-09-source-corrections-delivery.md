@@ -241,3 +241,37 @@ chronology, production exposure, the four timeout causes, a full 23-path
 regression or global savings. No retry, extra positive or whole gate ran.
 The source is composed for the next exact filing decision; final gate and
 independent complete Source review remain owed.
+
+## Coordinated gate at d026c4f2: failed
+
+Planner `3dafaf7d` authorized one complete gate at
+`d026c4f29278f139c3e85e973a753202f5ee818e`, tree
+`d2fc03a22ec3440ac5602ee80008a3c067aeab32`. F1 discovery was terminal,
+and every other execution owner was idle. The dependency stamp matched;
+the checkout was clean before and after. No optional selection ran.
+
+Whitespace and types passed; types took 5.4 s wall and 17.4 s CPU.
+Tests failed: 970 passed, five failed and two skipped across 166 files.
+The test phase took 287.89 s wall and 328.49 s CPU; the whole command took
+293.56 s wall and 346.11 s CPU. Three cases reached their original
+five-second timeout: CLI clone, Page explicit-new claim and Site native3.
+CLI claim expected the saved-request mismatch message but received a
+register-read refusal at its resumed assertion. Page task data found no
+matching issue row, then failed while reading its scope. No uncaught section
+appears. The six active-source checks did not run after Vitest failed.
+
+Root read the complete wrapper, raw phase logs, timing and result packet.
+Evidence: `/tmp/artroom-critical-d026-gate-evidence/complete-evidence.json`,
+SHA-256 `c341e4b38b5a9b9e99613904881174192235caf99d27d94fec244d20f33185fd`,
+durable result `033edc36`. Raw test log SHA-256:
+`b6f7fc8f12d614179b6c1e6b437c3b6328c96e126aa098fcabe9f2341310a426`.
+The duration cache was copied before another execution; it gives no start
+order or attributed CPU. An environment transition removed the tool handle,
+but the same surviving process tree and original terminal files were checked.
+No replacement run started.
+
+These failures establish no exact session tuple, response body, writer
+chronology, timeout cause, production exposure or global savings. All
+execution stopped. Source-only failure disposition proceeds; no retry,
+deadline increase, suite omission, approval or landing follows this result.
+This result-note successor changes no source or test bytes from d026.
