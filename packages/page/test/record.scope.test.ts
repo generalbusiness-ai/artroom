@@ -74,8 +74,10 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     };
     for (const secret of [unas, pauls, ritas]) await screens(await openRoom(d.as(secret), place));
     const seen = await openRoom(d.as(pauls), place);
-    // The explicit native @2 fixture supports read-only editor preparation;
-    // this is not evidence that the @3 destination supports this editor.
+    // This fixture uses the current CLI founding cohort (@3 destination)
+    // with the legacy demo change declaration and its one-file manifest.
+    // Preparation requires the separately implemented exact compatibility;
+    // it does not exercise manifest-list or branch-proposal orchestration.
     // Read-only editor preparation records its original-source/authority/base
     // reads. No browser proposal POST or native admission is fabricated.
     const selected = await loadChange(seen, readme);
@@ -91,7 +93,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
 
     const record = {
-      service: SERVICE, place, issue, readme, agents, manifest, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
+      service: SERVICE, place, issue, readme, agents, manifest, fixture: { destinationDefinition: (await d.G.summary()).value.definition, changeDefinition: selected.definition, workflow: "legacy one-file manifest on current CLI cohort; no manifest-list proposal" }, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
     };
     recording = null;
     // In lines of at most 64 KiB, which the test runner prints whole.
