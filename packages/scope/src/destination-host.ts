@@ -256,8 +256,9 @@ export class DestinationHost implements Outside {
       || intent.kind !== "git-read@1:job-read" || intent.on !== null || Object.keys(intent.expected).length || Object.keys(intent.fields).length !== 1 || !isFactRef(intent.fields["job"])) return null;
     const jobFact = intent.fields["job"];
     if (!intent.to || canonicalize(intent.to) !== canonicalize(jobFact.at)) return null;
-    const now = timeMs(this.#given.clock.read()), until = timeMs(intent.notAfter);
-    if (now === null || until === null || until <= now || until - now > 900_000) return null;
+    // Match ordinary signed reads: retained history is the clock floor.
+    const now = timeMs(this.#given.clock.read()), until = timeMs(intent.notAfter), previous = timeMs(scope.time);
+    if (now === null || previous === null || now < previous || until === null || until <= now || until - now > 900_000) return null;
     const jobRead = await reader.job(jobFact);
     if (!jobRead || jobRead.under !== "change" || jobRead.state !== "requested" || !isEntryOf(jobRead.entry, jobFact) || jobRead.entry.input.type !== "act" || jobRead.entry.input.signed.intent.kind !== "request-check") return null;
     const job = jobRead.entry;
@@ -307,8 +308,9 @@ export class DestinationHost implements Outside {
     const currentJob = await reader.job(jobFact);
     const finalReadAt = timeMs(this.#given.clock.read());
     const currentKey = await reader.key(membership, intent.actor) as { key?: unknown; keyState?: unknown; member?: unknown; memberState?: unknown; actions?: unknown; controllerActive?: unknown } | null;
-    const completed = timeMs(this.#given.clock.read());
-    if (!generationFits() || completed === null || finalReadAt === null || completed < finalReadAt || completed - finalReadAt > 10_000 || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
+    // Recheck after the awaits, against the current retained history.
+    const completed = timeMs(this.#given.clock.read()), retained = timeMs(this.#given.scope()?.time);
+    if (!generationFits() || completed === null || retained === null || completed < retained || finalReadAt === null || completed < finalReadAt || completed - finalReadAt > 10_000 || completed >= end || completed >= until || !currentJob || currentJob.state !== "requested" || this.#given.state.item(publication.id)?.state !== "reserved"
       || !currentKey || currentKey.key !== intent.actor || currentKey.keyState !== "active" || currentKey.memberState !== "active" || currentKey.member !== check.checker || currentKey.controllerActive === false || !Array.isArray(currentKey.actions) || !currentKey.actions.includes("change.check")) return null;
     const sources = sourcesOf(manifest)!.map((row) => this.#fact(reserve!, row.entry)!);
     return { destination: scope.at, job: { entry: job, hash: entryHash(job) }, manifest: { entry: manifest, hash: entryHash(manifest) }, reservation,

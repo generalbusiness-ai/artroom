@@ -123,6 +123,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const bindings = () => at.bindings(R!.name);
   let holdCheckAnswer = false, holdPush = false, slowFinalKey = false;
   let outsideSends = 0;
+  let rollbackSnapshotAt: number | null = null;
   let pendingCheck: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let pendingStage: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   let confirmedDelete: { request: import("../../scope/src/operations.ts").EffectRequest; answer: import("../../scope/src/operations.ts").EffectAnswer; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
@@ -132,8 +133,12 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   let earlierDelete: { request: import("../../scope/src/operations.ts").EffectRequest; late: import("../../scope/src/operations.ts").LateAnswers | null } | null = null;
   const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => {
     const nativeReader = snapshotReaderOf(env.PLATFORM);
-    let keyReads = 0;
-    const outside = artifactsOutside(given, sql, bindings(), at.stand.fetch, { ...nativeReader, key: async (membership, key) => {
+    let keyReads = 0, jobReads = 0;
+    const outside = artifactsOutside(given, sql, bindings(), at.stand.fetch, { ...nativeReader, job: async (fact) => {
+      const answer = await nativeReader.job(fact);
+      if (++jobReads % 2 === 0 && rollbackSnapshotAt !== null) { net.clock.now = timeOf(rollbackSnapshotAt); rollbackSnapshotAt = null; }
+      return answer;
+    }, key: async (membership, key) => {
       const answer = await nativeReader.key(membership, key);
       if (slowFinalKey && ++keyReads % 2 === 0) net.clock.now = timeOf(timeMs(net.clock.now)! + 11_000);
       return answer;
@@ -566,6 +571,19 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const readAsk = await signJobRead({ key: checkerKey, sign: (bytes) => sign(checkerSecret, bytes) }, { lane: await L.at(), fact: jobFact }, { now: now(), nonce: crypto.getRandomValues(new Uint8Array(16)) });
   const snapshot = await Gsnapshot.reservationSnapshot(readAsk);
   expect(snapshot).not.toBeNull();
+  // The signed job-read route obeys the destination's retained history floor,
+  // including a rollback between the two existing key-observation pairs.
+  const snapshotClock = net.clock.now, snapshotHead = await G.summary();
+  const belowHistory = timeMs(snapshotHead.value.time)! - 1;
+  net.clock.now = timeOf(belowHistory);
+  expect((await Gsnapshot.reservationSnapshot(readAsk)) === null).toBe(true);
+  net.clock.now = snapshotClock;
+  rollbackSnapshotAt = belowHistory;
+  expect((await Gsnapshot.reservationSnapshot(readAsk)) === null).toBe(true);
+  expect(rollbackSnapshotAt).toBeNull();
+  net.clock.now = snapshotClock;
+  expect((await G.summary()).at).toEqual(snapshotHead.at);
+  expect(await Gsnapshot.reservationSnapshot(readAsk)).not.toBeNull();
   if (snapshot && !("refused" in snapshot) && inject("demoRecord")) console.log("RESERVATION_RECORD", canonicalize({ snapshot: { ...snapshot, objects: snapshot.objects.map((object) => ({ ...object, data: b64url(object.data) })) }, configuration: checkConfig, configurationDigest: configuration, readAsk, destinationHead: (await G.summary()).at, laneHead: (await L.summary()).at }));
   const beforeSlow = net.clock.now;
   slowFinalKey = true;
