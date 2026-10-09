@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
 import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest, isSeed, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/artroom-platform";
@@ -36,8 +36,12 @@ test("explicit supporting cohort establishes Counting with native authority and 
       } });
     }
     override async created(seq: number, n = 0): Promise<Platform> {
-      const made = await lifetime.wait(() => super.created(seq, n));
-      return new OwnedPlatform(made.name);
+      const entry = (await lifetime.wait(() => this.entries()))[seq];
+      const send = entry?.sends.find((candidate) => candidate.n === n);
+      if (!send || send.message.class !== "request" || send.message.type !== "create" || !isSeed(send.to)) {
+        throw new Error("a created scope requires an actual create request with a validated seed");
+      }
+      return new OwnedPlatform(scopeIdOf(send.to));
     }
   }
   const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {},
@@ -58,8 +62,25 @@ test("explicit supporting cohort establishes Counting with native authority and 
     expect(await R.stub.submit(claim, [])).toMatchObject({ answer: "accepted" });
     await (R.stub as unknown as { effect(): Promise<number> }).effect();
     await settle(R, D);
-    const children = (await D.entries())[0]!.sends.map((send) => new OwnedPlatform(scopeIdOf(send.to as Seed)));
-    const [M, Q, G] = children as [Platform, Platform, Platform];
+    const creates = (await D.entries())[0]!.sends.filter((send) => send.message.class === "request" && send.message.type === "create");
+    expect(creates).toHaveLength(3);
+    const creator = await D.at();
+    const cohort = [
+      { kind: "membership", definition: APPLICATION_COHORT.membership },
+      { kind: "rules", definition: APPLICATION_COHORT.rules },
+      { kind: "destination", definition: APPLICATION_COHORT.destination },
+    ] as const;
+    const [M, Q, G] = cohort.map(({ kind, definition }, ordinal) => {
+      const selected = creates.filter((send) => isSeed(send.to) && send.to.kind === kind);
+      expect(selected).toHaveLength(1);
+      const send = selected[0];
+      if (!send || !isSeed(send.to)) throw new Error("one actual create request supplies each validated sibling seed");
+      // Native result/control fullrefs are not seeds. Send numbers are1/2/3;
+      // creation ordinals are0/1/2 under this exact directory genesis cause.
+      expect([send.n, send.to]).toEqual([ordinal + 1, { v: 1, kind, definition, creator, cause: seedDigest(directorySeed), ordinal }]);
+      return new OwnedPlatform(scopeIdOf(send.to));
+    });
+    if (!M || !Q || !G) throw new Error("the complete three-child cohort is required");
     await settle(R, D, M, Q, G);
     expect((await D.summary()).value.definition).toBe(APPLICATION_COHORT.directory);
     expect([(await M.summary()).value.definition, (await Q.summary()).value.definition, (await G.summary()).value.definition]).toEqual([APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, APPLICATION_COHORT.destination]);
@@ -155,7 +176,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     if (contained.answer !== "accepted") throw new Error("the complete bound container is admitted");
     const A = await D.created(contained.receipt.fact.seq);
     await settle(D, A);
-    const nested = await A.created(0);
+    const nested = await A.created(0, 1);
     await settle(D, A, nested);
     expect((await A.entries())[0]!.input).toMatchObject({ type: "genesis", message: { body: { fields: { peer: { membership, member: "@sam" } } } } });
     for (const [digest, value] of [[containerDigest, containerBytes], [COUNTING_DEFINITION, bytes]] as const) {
