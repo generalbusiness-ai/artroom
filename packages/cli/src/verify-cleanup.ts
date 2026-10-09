@@ -20,7 +20,9 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
   // historical output without adding any absence or cleanup-complete claim.
   if (summary.value.definition !== "platform:destination@3") return { lines: [], finding: null };
   if (!Number.isSafeInteger(pages) || pages < 1) return unavailable("the cleanup page bound must be a positive integer");
-  const items = new Map<number, Item>();
+  // The summary contains live items; the items route enumerates retained
+  // final items. An owed cleanup keeps custody and is deliberately live.
+  const items = new Map<number, Item>(summary.value.items.filter((item) => item.type === "publication").map((item) => [item.id, item]));
   let cursor: string | undefined;
   for (let page = 0; page < pages; page++) {
     const read = await reader.items("publication", cursor);
