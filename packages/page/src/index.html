@@ -50,6 +50,8 @@
   .wordmark { font-size: 20px; line-height: 1.4; font-weight: 600; letter-spacing: -.7px; padding: 0 2px; }
   .room-switch { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: transparent; border-radius: 6px; min-height: 44px; padding: 9px 10px; text-align: left; width: 100%; font-size: 14px; text-decoration: none; color: var(--ink); }
   .room-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-name > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-recorded-name { color: var(--muted-ink); font-size: 14px; font-weight: 400; }
   .room-switch svg:last-child { width: 14px; height: 14px; }
   .navigation { display: flex; flex-direction: column; gap: 6px; }
   .nav-item { display: flex; align-items: center; gap: 12px; min-height: 44px; border: 0; border-radius: 6px; background: transparent; padding: 9px 10px; text-align: left; font-size: 14px; color: var(--ink); text-decoration: none; }
@@ -197,6 +199,7 @@
     .mobile-header { display: block; border-bottom: 1px solid var(--line); padding: 12px 16px 0; }
     .mobile-context { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
     .mobile-context .room-switch { border: 0; padding: 4px 0; font-size: 16px; width: auto; max-width: calc(100% - 60px); }
+    .mobile-context .room-name { font-size: 14px; }
     .mobile-context .account { padding: 6px; min-width: 44px; justify-content: center; }
     .mobile-context .avatar { width: 32px; height: 32px; }
     .mobile-context .account-label { display: none; }
