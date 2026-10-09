@@ -4,11 +4,13 @@ import { b64url, scopeIdOf, timeMs, timeOf } from "@generalbusiness/artroom-byte
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
-import { claimRoom, type ClaimStorage } from "../src/claim.ts";
+import { claimRoom, claimStatus, type ClaimOptions, type ClaimStorage } from "../src/claim.ts";
 import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { command, memoryStore, type Context } from "@generalbusiness/artroom-cli";
 import { reader } from "../../scope/test/support.ts";
-import { ownHost } from "../../scope/test/hosts.ts";
+import { OwnGit, ownHost } from "../../scope/test/hosts.ts";
+import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
+import type { ArtifactsNamespace } from "../../scope/src/artifacts-host.ts";
 import type { ClaimLocks } from "../src/claim.ts";
 
 async function registerFixture() {
@@ -17,9 +19,22 @@ async function registerFixture() {
   platformNet.sessions = true;
   platformNet.inspector = reader;
   const host = ownHost();
+  // STAND-IN namespace: each repository uses the existing OwnGit fixture;
+  // a register can create more than one repository in this namespace.
+  const repositories = new Map<string, OwnGit>();
+  const namespace: ArtifactsNamespace = {
+    create: async (name) => { if (repositories.has(name)) throw new Error("ALREADY_EXISTS"); const repo = new OwnGit(); repositories.set(name, repo); return repo.ns.create(name); },
+    get: async (name) => { const repo = repositories.get(name); if (!repo) throw new Error("repository not created"); return repo.ns.get(name); },
+    delete: async () => false,
+  };
+  const hostFetch = async (request: Request) => {
+    const name = new URL(request.url).pathname.split("/")[3]?.replace(/\.git$/, "");
+    const repo = name ? repositories.get(name) : undefined;
+    return repo ? repo.fetch(request) : new Response("no repository", { status: 404 });
+  };
   const wired = new Set<ScopeId>();
   let R: Platform;
-  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => host.outside(given, sql, host.bindings(R.name))); };
+  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => artifactsOutside(given, sql, { ...host.bindings(R.name), ARTIFACTS: namespace }, hostFetch)); };
   const pause = async (waiting: readonly ScopeId[] = []) => {
     const nodes = [R, ...waiting.filter((name) => name !== R.name).map((name) => new Platform(name))];
     for (let pass = 0; pass < 64; pass++) {
@@ -50,6 +65,10 @@ function testLocks(): ClaimLocks {
   } };
 }
 
+function activeKept(bytes: string): any {
+  const journal = JSON.parse(bytes);
+  return journal.v === 1 ? journal : JSON.parse(journal.claims[journal.active]);
+}
 // Invariant: the browser founds through native configured-register policy and
 // enrollment, retaining exact signed requests before delivery and across loss;
 // wrong pins, ineligible keys and failed private storage cannot submit a found.
@@ -82,7 +101,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
       return response;
     }) as unknown as Fetch;
     const session = { ...d.session, fetch };
-    const options = { pause: d.pause, tries: 16, locks: testLocks() };
+    const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks() };
     const kinds = () => sent.map((signed) => signed.intent.kind);
     await expect(claimRoom(session, { ...configured, definition: "platform:register@1" }, storage, "My local label", options)).rejects.toThrow("pinned version");
     await expect(claimRoom({ ...session, secret: crypto.getRandomValues(new Uint8Array(32)) }, configured, storage, "My local label", options)).rejects.toThrow("cannot be read");
@@ -98,7 +117,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
     lose = "before-found";
     const first = claimRoom(session, configured, storage, "My local label", options);
     await blocked;
-    const second = claimRoom(session, configured, storage, "An edited label must not replace the request", options);
+    const second = claimRoom(session, configured, storage, "An edited label must not replace the request", { ...options, mode: "resume" });
     // A second caller waits outside the durable record while the first found
     // is in flight; it cannot replace the recovery key or envelope.
     await Promise.resolve();
@@ -109,16 +128,17 @@ test("the browser's native claim survives lost founding and enrollment replies w
     lose = "after-seat";
     release();
     const unknown = await first;
+    options.mode = "resume";
     expect([unknown.outcome.code, unknown.pending, unknown.repository, unknown.label]).toEqual([1, true, null, "My local label"]);
     const original = sent[0]!;
     const savedBefore = inFlight;
-    expect(JSON.parse(savedBefore).config.claim.found.signed).toEqual(original);
+    expect(activeKept(savedBefore).config.claim.found.signed).toEqual(original);
     expect(savedBefore).not.toContain(b64url(secret));
-    expect(JSON.stringify(unknown)).not.toContain(JSON.parse(savedBefore).recovery);
+    expect(JSON.stringify(unknown)).not.toContain(activeKept(savedBefore).recovery);
     const uncertainSeat = await second;
     expect(uncertainSeat.outcome.lines.join("\n")).toMatch(/^No answer:/);
     expect([uncertainSeat.outcome.code, uncertainSeat.pending, uncertainSeat.repository]).toEqual([1, true, null]);
-    const seatRecord = JSON.parse([...values.values()][0]!);
+    const seatRecord = activeKept([...values.values()][0]!);
     expect(seatRecord.label).toBe("My local label");
     expect(sent.filter((signed) => signed.intent.kind === "found")).toEqual([original, original]);
     const M = new Platform(seatRecord.config.claim.repository.membership.scope);
@@ -144,7 +164,9 @@ test("the browser's native claim survives lost founding and enrollment replies w
     expect(values.get(storageKey)).toBe(completeBytes);
     unavailableSettlement = false;
     const tampered = JSON.parse(completeBytes);
-    tampered.completed.repository.membership.scope = configured.register.scope;
+    const badRecord = activeKept(completeBytes);
+    badRecord.completed.repository.membership.scope = configured.register.scope;
+    tampered.claims[tampered.active] = JSON.stringify(badRecord);
     values.set(storageKey, JSON.stringify(tampered));
     const substituted = await claimRoom(session, configured, storage, "Retry", options);
     expect([substituted.outcome.code, substituted.repository]).toEqual([1, null]);
@@ -170,7 +192,7 @@ test("a changed Page context stops queued and prepared native claims before deli
       getItem: (key) => values.get(key) ?? null,
       setItem: (key, value) => {
         values.set(key, value);
-        const step = invalidate === null ? null : JSON.parse(value).config.claim?.[invalidate];
+        const step = invalidate === null ? null : activeKept(value).config.claim?.[invalidate];
         if (step?.signed && !step.accepted) { selected = false; invalidate = null; }
       },
     };
@@ -182,7 +204,7 @@ test("a changed Page context stops queued and prepared native claims before deli
       return routed(url, init);
     }) as unknown as Fetch;
     const session = { ...d.session, fetch };
-    const options = { pause: d.pause, tries: 16, locks: testLocks(), current: () => selected };
+    const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks(), current: () => selected };
     let release!: () => void;
     const queuedGate = new Promise<void>((resolve) => { release = resolve; });
     let entered!: () => void;
@@ -203,11 +225,12 @@ test("a changed Page context stops queued and prepared native claims before deli
       expect([stopped.outcome.code, stopped.pending, stopped.repository]).toEqual([1, true, null]);
       expect(stopped.outcome.lines.join("\n")).toContain("earlier steps may already be accepted or unknown");
       expect(sent.map((signed) => signed.intent.kind)).toEqual(earlier);
-      const kept = JSON.parse([...values.values()][0]!);
+      const kept = activeKept([...values.values()][0]!);
       originals[step] = kept.config.claim[step].signed;
       expect(kept.config.claim[step].accepted).toBeUndefined();
       expect(originals[step]!.intent.kind).toBe(kind);
       for (const prior of Object.keys(originals) as (keyof typeof originals)[]) expect(kept.config.claim[prior].signed).toEqual(originals[prior]);
+      options.mode = "resume";
       // A new stale invocation does not rewrite the prepared record or read.
       const saved = [...values.values()][0]!;
       const before = reads;
@@ -220,5 +243,81 @@ test("a changed Page context stops queued and prepared native claims before deli
     expect([complete.outcome.code, complete.pending, complete.label]).toEqual([0, false, "Original label"]);
     expect(sent).toEqual([originals.found, originals.seat, originals.firstKey]);
     expect(complete.repository).not.toBeNull();
+  } finally { d.done(); net.clock.now = clock; }
+});
+
+// Invariant: explicit New creates a distinct durable operation and native room
+// only after the previous native creation is verified complete. Resume targets
+// one original operation, and neither pending work nor an archived proof is
+// replaced by a label edit, a queued duplicate New action, or another context.
+test("explicit new creates another native directory while exact operation resume, pending conflict, stale new and legacy migration preserve original proofs (Git host, scheduler, storage and locks STAND-INs)", async () => {
+  const clock = net.clock.now;
+  const d = await registerFixture();
+  try {
+    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const values = new Map<string, string>();
+    const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
+    let loseFound = true;
+    const sent: SignedIntent[] = [];
+    const fetch = (async (url: string, init?: RequestInit) => {
+      const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? JSON.parse(init.body).signed as SignedIntent : undefined;
+      if (signed) sent.push(structuredClone(signed));
+      if (signed?.intent.kind === "found" && loseFound) { loseFound = false; throw new Error("scripted loss before found"); }
+      return routed(url, init);
+    }) as unknown as Fetch;
+    const session = { ...d.session, fetch };
+    const options = { pause: d.pause, tries: 16, locks: testLocks() };
+    expect(claimStatus(session, configured, storage)).toBeNull();
+    const pending = await claimRoom(session, configured, storage, "First local label", { ...options, mode: "new" });
+    expect([pending.pending, pending.repository]).toEqual([true, null]);
+    expect(claimStatus(session, configured, storage)).toEqual({ operation: pending.operation, label: "First local label", state: "pending" });
+    const beforeConflict = [...values.values()][0]!;
+    const conflict = await claimRoom(session, configured, storage, "Changed label cannot replace it", { ...options, mode: "new", operation: pending.operation });
+    expect([conflict.operation, conflict.pending, conflict.repository]).toEqual([pending.operation, true, null]);
+    expect(conflict.outcome.lines.join("\n")).toContain("already in progress");
+    expect([[...values.values()][0]!, sent.length]).toEqual([beforeConflict, 1]);
+    const first = await claimRoom(session, configured, storage, "Edited label", { ...options, mode: "resume", operation: pending.operation });
+    expect([first.outcome.code, first.label]).toEqual([0, "First local label"]);
+    const firstBytes = JSON.parse([...values.values()][0]!).claims[first.operation];
+    expect(claimStatus(session, configured, storage)?.state).toBe("complete");
+    const count = sent.length;
+    const [second, staleNew] = await Promise.allSettled([
+      claimRoom(session, configured, storage, "Second local label", { ...options, mode: "new", operation: first.operation }),
+      claimRoom(session, configured, storage, "Unsolicited third", { ...options, mode: "new", operation: first.operation }),
+    ]);
+    expect(second.status).toBe("fulfilled");
+    if (second.status !== "fulfilled") return;
+    expect([second.value.outcome.code, second.value.label]).toEqual([0, "Second local label"]);
+    expect(second.value.operation).not.toBe(first.operation);
+    expect(second.value.repository!.directory.scope).not.toBe(first.repository!.directory.scope);
+    expect(staleNew).toMatchObject({ status: "rejected", reason: expect.objectContaining({ message: expect.stringContaining("Another creation changed") }) });
+    expect(sent.slice(count).map((signed) => signed.intent.kind)).toEqual(["found", "seat", "first-key"]);
+    const journal = JSON.parse([...values.values()][0]!);
+    expect([journal.active, Object.keys(journal.claims).length, journal.claims[first.operation]]).toEqual([second.value.operation, 2, firstBytes]);
+    expect(JSON.parse(journal.claims[second.value.operation]).recovery).not.toBe(JSON.parse(firstBytes).recovery);
+    const beforeResume = sent.length;
+    const old = await claimRoom(session, configured, storage, "Again edited", { ...options, mode: "resume", operation: first.operation });
+    expect([old.operation, old.repository, old.label, sent.length]).toEqual([first.operation, first.repository, first.label, beforeResume]);
+    expect(claimStatus(session, configured, storage)?.operation).toBe(second.value.operation);
+    // A completed legacy v1 record remains a single exact operation; migration
+    // neither invents a found nor loses the original recovery/proof bytes.
+    const legacyRaw = JSON.stringify(JSON.parse(firstBytes), null, 2);
+    const legacyValues = new Map<string, string>([[[...values.keys()][0]!, legacyRaw]]);
+    const legacyStorage: ClaimStorage = { getItem: (key) => legacyValues.get(key) ?? null, setItem: (key, value) => { legacyValues.set(key, value); } };
+    expect(claimStatus(session, configured, legacyStorage)).toEqual({ operation: "legacy", label: first.label, state: "complete" });
+    const legacy = await claimRoom(session, configured, legacyStorage, "No replacement", { ...options, mode: "resume", operation: "legacy" });
+    expect([legacy.repository, sent.length]).toEqual([first.repository, beforeResume]);
+    const migrated = JSON.parse([...legacyValues.values()][0]!);
+    expect([migrated.v, migrated.active]).toEqual([2, "legacy"]);
+    expect(migrated.claims.legacy === firstBytes).toBe(true);
+    expect(migrated.originalLegacy === legacyRaw).toBe(true);
+    // Saturation is a named client bound; archived/unknown data is never evicted.
+    const full = JSON.parse([...values.values()][0]!);
+    while (Object.keys(full.claims).length < 64) full.claims[crypto.randomUUID()] = firstBytes;
+    values.set([...values.keys()][0]!, JSON.stringify(full));
+    const saturated = [...values.values()][0]!;
+    await expect(claimRoom(session, configured, storage, "Another", { ...options, mode: "new", operation: full.active })).rejects.toThrow("journal is full");
+    expect(sent).toHaveLength(beforeResume);
+    expect([...values.values()][0]! === saturated).toBe(true);
   } finally { d.done(); net.clock.now = clock; }
 });
