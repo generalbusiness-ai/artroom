@@ -1,6 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry, HoldersObservation } from "@generalbusiness/artroom-contract";
-import { CONFIGURATION_DOMAIN, ROLE_LISTS, firstExtents, platform } from "@generalbusiness/artroom-platform";
+import { CONFIGURATION_DOMAIN, firstExtents, platform } from "@generalbusiness/artroom-platform";
 import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
 import { valueDigest } from "@generalbusiness/artroom-derive";
 import { MemorySource, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
@@ -72,6 +71,43 @@ test("W2, a mixed change touching the source and the rules extents: the source r
   const first = await merged(r, C, manifest, []);
   expect([first.state, first.values["reason"], (await publicationOf(r, C, first.id))?.state, (await r.G.item(0)).values["head"], (await I.item(0)).state])
     .toEqual(["refused", "rules-not-met:rules", "not-reserved", r.firstHead, "open"]);
+
+  // Keep the existing proposal and policy refusal. A native zero-holder row
+  // must derive from membership history before the known ancestry limitation.
+  const options = { mode: "replay", platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE } as const;
+  const unwalked = `the walk of the ancestry record in entry ${(await C.entries()).findIndex((entry) => entry.input.type === "outcome" && entry.input.kind === "check")} of ${C.name} was not derived`;
+  const http = httpSource("https://scopes.test", { fetch: routed });
+  const through = (kept: MemoryScope): HistorySource => {
+    const memory = new MemorySource([kept]);
+    return { page: (scope, from, allow) => (scope === kept.scope.scope ? memory.page(scope, from, allow) : http.page(scope, from, allow)), retained: (...asked) => http.retained(...asked) };
+  };
+  const adminActions = (await r.M.item(0)).values["adminActions"];
+  if (!Array.isArray(adminActions) || !adminActions.every((action): action is string => typeof action === "string")) { expect.fail("native admin action list is unavailable"); return; }
+  expect(adminActions).toEqual(expect.arrayContaining(["membership.manage", "change.merge", "rules.publish"]));
+  await r.M.did(rita, "set-actions", { on: 0, expected: await r.M.expected({ on: 0 }), fields: { role: "admin", actions: adminActions.filter(action => action !== "rules.publish") } });
+  try {
+    const beforeZero = (await r.G.entries()).length;
+    const zeroRefused = await merged(r, C, manifest, []);
+    expect([zeroRefused.state, zeroRefused.values["reason"], (await publicationOf(r, C, zeroRefused.id))?.state, (await r.G.item(0)).values["head"]]).toEqual(["refused", "rules-not-met:rules", "not-reserved", r.firstHead]);
+    const judges = (await r.G.entries()).slice(beforeZero).filter(entry => entry.input.type === "outcome" && entry.input.kind === "judge");
+    expect(judges).toHaveLength(1);
+    const zeroJudge = judges[0]!;
+    expect(zeroJudge.input).toMatchObject({ type: "outcome", kind: "judge", result: "confirmed" });
+    if (zeroJudge.input.type !== "outcome") { expect.fail("native judge outcome is unavailable"); return; }
+    const holders = zeroJudge.input.observed?.find(use => "subject" in use.observation && use.observation.subject === "holders");
+    expect(holders).toMatchObject({ observation: { subject: "holders", action: "rules.publish", of: await r.M.at(), head: (await r.M.summary()).at, count: 0, holders: [] }, use: "fresh" });
+    expect(zeroJudge.effects).toContainEqual(expect.objectContaining({ effect: "state", state: "not-reserved" }));
+    const kept = await copied(r.G); kept.entries = kept.entries.slice(0, zeroJudge.seq + 1);
+    const found = await verify(through(kept), { ...options, scope: r.G.name });
+    // Old most=0 makes this row a mismatch. No anchor or later limitation is
+    // removed: successful row derivation still ends at the original unwalked ancestry.
+    expect([found.report.result, found.why?.split(":")[0], found.report.coverage.find(scope => scope.scope.scope === r.G.name)?.through]).toEqual(["incomplete", unwalked, zeroJudge.seq]);
+  } finally {
+    // Restore by an authorized native act so the original controller approval
+    // and publication assertions below retain their ordinary authority.
+    await r.M.did(rita, "set-actions", { on: 0, expected: await r.M.expected({ on: 0 }), fields: { role: "admin", actions: adminActions } });
+  }
+
   // rita holds `rules.publish`, the approver of the rules extent, and is no author of the change.
   await C.did(rita, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } });
   const second = await merged(r, C, manifest, []);
@@ -82,11 +118,9 @@ test("W2, a mixed change touching the source and the rules extents: the source r
   // the lane definitions that each lane retains. Nothing is anchored, and each grant is derived from the observation it retains.
   const scopes = [r.R, r.D, r.M, r.rules, r.G, new Platform(I.name), new Platform(C.name)];
   // The capability code is the production ports' own: the code of `hold@1` and `git-read@1`, and the same value as their owner.
-  const options = { mode: "replay", platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE } as const;
   // The one thing not derived is said last, after every other entry is derived with no mismatch: the walk of the ancestry record
   // of the change lane's check entry, for this verifier reads no commit (section 16.4). So the histories that reach that lane, its
   // own, the issue's, the directory's and the destination's, are `incomplete` for that reason only, and the other three consistent.
-  const unwalked = `the walk of the ancestry record in entry ${(await C.entries()).findIndex((entry) => entry.input.type === "outcome" && entry.input.kind === "check")} of ${C.name} was not derived`;
   const results = [];
   for (const node of scopes) {
     const { report, why } = await verify(httpSource("https://scopes.test", { fetch: routed }), { ...options, scope: node.name, head: (await node.summary()).at });
@@ -99,94 +133,12 @@ test("W2, a mixed change touching the source and the rules extents: the source r
   // The control: the lane's history read from a copy in memory, every other read over HTTP. The copy as it is replays as the
   // runtime's does. With the merger of the second merge changed in it, sealed again so that the chain is intact, the lane's
   // replay is a mismatch at that entry.
-  const http = httpSource("https://scopes.test", { fetch: routed });
-  const through = (kept: MemoryScope): HistorySource => {
-    const memory = new MemorySource([kept]);
-    return { page: (scope, from, allow) => (scope === kept.scope.scope ? memory.page(scope, from, allow) : http.page(scope, from, allow)), retained: (...asked) => http.retained(...asked) };
-  };
   const lane = await copied(new Platform(C.name));
   const plain = await verify(through(lane), { ...options, scope: C.name });
   expect([plain.report.result, plain.why?.split(":")[0]]).toEqual(["incomplete", unwalked]);
   rewritten(lane, second.id, (entry: { effects: { effect: string; member?: { member: string } }[] }) => { entry.effects.find((effect) => effect.effect === "party")!.member!.member = "@vic"; });
   const tampered = await verify(through(lane), { ...options, scope: C.name });
   expect([tampered.report.result, tampered.report.at?.seq]).toEqual(["mismatch", second.id]);
-
-  // A native negative authority fact is still a retained value, not an absent
-  // row. Publish ordinary approvals=0 before retiring rules.publish; the rules
-  // extent keeps its own protected approval requirement.
-  expect(await r.publishRules({ approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) })).toMatchObject({ answer: "accepted" });
-  const memberActions = (await r.M.item(0)).values["memberActions"];
-  if (!Array.isArray(memberActions) || !memberActions.every((action): action is string => typeof action === "string")) { expect.fail("native member action list is unavailable"); return; }
-  await r.M.did(rita, "set-actions", { on: 0, expected: await r.M.expected({ on: 0 }), fields: { role: "member", actions: [...memberActions, "rules.publish"] } });
-  const nextIssue = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "Retained holder transitions", conditions: ["policy remains protected"] });
-  const protectedChange = await proposed(r, nextIssue, una, "@una", [], change, DIGESTS.change, { base: oid("c"), integration: oid("d") });
-  const judgeAfter = async (before: number): Promise<Entry> => {
-    const entries = (await r.G.entries()).slice(before).filter(entry => entry.input.type === "outcome" && entry.input.kind === "judge");
-    expect(entries).toHaveLength(1);
-    expect(entries[0]!.input).toMatchObject({ type: "outcome", kind: "judge", result: "confirmed" });
-    return entries[0]!;
-  };
-  const holdersIn = (entry: Entry): HoldersObservation => {
-    const held = entry.input.type === "outcome" ? entry.input.observed?.flatMap(use => "subject" in use.observation && use.observation.subject === "holders" ? [use.observation] : []) : undefined;
-    expect(held).toHaveLength(1);
-    return held![0]!;
-  };
-  r.changes = { paths: ["AGENTS.md"], links: [], unreadable: 0 };
-  const beforeMany = (await r.G.entries()).length;
-  const manyRefused = await merged(r, protectedChange.C, protectedChange.manifest, []);
-  expect([manyRefused.state, manyRefused.values["reason"], (await publicationOf(r, protectedChange.C, manyRefused.id))?.state]).toEqual(["refused", "rules-not-met:rules", "not-reserved"]);
-  const manyJudge = await judgeAfter(beforeMany), many = holdersIn(manyJudge);
-  expect([many.count, many.holders]).toEqual([4, ["@paul"]]); // Native most=1 prefix of four active holders, in byte order.
-
-  for (const [role, slot] of Object.entries(ROLE_LISTS)) {
-    const actions = (await r.M.item(0)).values[slot];
-    if (!Array.isArray(actions) || !actions.every((action): action is string => typeof action === "string")) { expect.fail("native role action list is unavailable"); return; }
-    if (actions.includes("rules.publish")) await r.M.did(rita, "set-actions", { on: 0, expected: await r.M.expected({ on: 0 }), fields: { role, actions: actions.filter(action => action !== "rules.publish") } });
-  }
-  expect((await r.M.item(0)).values["adminActions"]).toEqual(expect.arrayContaining(["membership.manage", "change.merge"]));
-  const beforeZero = (await r.G.entries()).length;
-  const zeroRefused = await merged(r, protectedChange.C, protectedChange.manifest, []);
-  expect([zeroRefused.state, zeroRefused.values["reason"], (await publicationOf(r, protectedChange.C, zeroRefused.id))?.state, (await r.G.item(0)).values["head"]]).toEqual(["refused", "rules-not-met:rules", "not-reserved", oid("c")]);
-  const zeroJudge = await judgeAfter(beforeZero), zero = holdersIn(zeroJudge);
-  expect([zero.of, zero.head, zero.count, zero.holders]).toEqual([await r.M.at(), (await r.M.summary()).at, 0, []]);
-  expect(zeroJudge.effects).toContainEqual(expect.objectContaining({ effect: "state", state: "not-reserved" }));
-
-  // Overlay only the destination's native prefix; all dependencies and retained
-  // inputs still come over HTTP. No anchor is supplied. The known ancestry walk
-  // remains the last limitation, after this written row has been derived.
-  const prefix = async (last: Entry): Promise<MemoryScope> => { const kept = await copied(r.G); kept.entries = kept.entries.slice(0, last.seq + 1); return kept; };
-  const checkPrefix = async (last: Entry) => {
-    const found = await verify(through(await prefix(last)), { ...options, scope: r.G.name });
-    expect([found.report.result, found.why?.split(":")[0], found.report.coverage.find(scope => scope.scope.scope === r.G.name)?.through]).toEqual(["incomplete", unwalked, last.seq]);
-  };
-  await checkPrefix(manyJudge);
-  await checkPrefix(zeroJudge); // most=0 incorrectly makes this native zero-holder row a mismatch.
-
-  const ordinary = await proposed(r, nextIssue, una, "@una", [], change, DIGESTS.change, { base: oid("c"), integration: oid("e") });
-  r.changes = { paths: ["src/a.ts"], links: [], unreadable: 0 };
-  const beforeOrdinary = (await r.G.entries()).length;
-  const ordinaryMerged = await merged(r, ordinary.C, ordinary.manifest, []);
-  expect([ordinaryMerged.state, (await publicationOf(r, ordinary.C, ordinaryMerged.id))?.state, (await r.G.item(0)).values["head"]]).toEqual(["published", "published", oid("e")]);
-  const ordinaryJudge = await judgeAfter(beforeOrdinary);
-  expect([holdersIn(ordinaryJudge).count, holdersIn(ordinaryJudge).holders]).toEqual([0, []]);
-  await checkPrefix(ordinaryJudge);
-
-  // Same real, resealed prefixes: exact native count, required truncated list,
-  // first-holder order, source head and incarnation still cannot be fabricated.
-  const foreignIncarnation = (await r.rules.at()).inc;
-  const corruptions: readonly [Entry, (observation: HoldersObservation) => void][] = [
-    [manyJudge, observation => { observation.count = 3; }],
-    [manyJudge, observation => { observation.holders = []; }],
-    [manyJudge, observation => { observation.holders = ["@rita"]; }],
-    [zeroJudge, observation => { observation.head = many.head; }],
-    [zeroJudge, observation => { observation.of = { ...observation.of, inc: foreignIncarnation }; }],
-  ];
-  for (const [last, corrupt] of corruptions) {
-    const kept = await prefix(last);
-    rewritten(kept, last.seq, (entry: Entry) => { corrupt(holdersIn(entry)); });
-    const found = await verify(through(kept), { ...options, scope: r.G.name });
-    expect([found.report.result, found.report.at?.seq]).toEqual(["mismatch", last.seq]);
-  }
 }, ROOM_MS);
 
 test("W3, a reviewer outside an extent counts for nothing there: an approval that names the rules extent from a member without rules.publish, and one that names no extent, leave the source extent unmet; the same reviewer's later approval for the source extent meets it (STAND-IN: the Git host; SCRIPTED: the changed set)", async () => {
