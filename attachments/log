@@ -1,0 +1,95 @@
+
+> test
+> vitest run && node --test scripts/active-source.test.mjs
+
+
+ RUN  v4.1.11 /private/tmp/artroom-initial-editor-assets
+
+uncaught exception; source = Uncaught; stack = Error: Cannot perform I/O on behalf of a different Durable Object. I/O objects (such as streams, request/response bodies, and others) created in the context of one Durable Object cannot be accessed from a different Durable Object in the same isolate. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: RefcountedCanceler)
+    at abortContextSignal (private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:2346:19)
+    at abortIfTimeout (private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:2341:3)
+    at private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1787:176
+    at rejectTimeoutError (private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:2281:16)
+    at private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:2275:5
+uncaught exception; source = Uncaught (in promise); stack = Error: fixture retention fault: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+    at Object.exec (/private/tmp/artroom-initial-editor-assets/packages/scope/src/object.ts:130:53)
+    at SqliteStore.#run (/private/tmp/artroom-initial-editor-assets/packages/scope/src/sqlite.ts:131:66)
+    at SqliteStore.retain (/private/tmp/artroom-initial-editor-assets/packages/scope/src/sqlite.ts:397:10)
+    at Turns.#seal (/private/tmp/artroom-initial-editor-assets/packages/scope/src/turn.ts:348:45)
+    at Turns.#judged (/private/tmp/artroom-initial-editor-assets/packages/scope/src/turn.ts:312:29)
+    at /private/tmp/artroom-initial-editor-assets/packages/scope/src/turn.ts:288:89
+    at Object.transaction (/private/tmp/artroom-initial-editor-assets/packages/scope/src/object.ts:131:45)
+    at SqliteStore.transaction (/private/tmp/artroom-initial-editor-assets/packages/scope/src/sqlite.ts:135:55)
+    at /private/tmp/artroom-initial-editor-assets/packages/scope/src/turn.ts:288:46
+    at Turns.#telling (/private/tmp/artroom-initial-editor-assets/packages/scope/src/turn.ts:167:18)
+ ❯ |scope| ../page/test/task-data.scope.test.ts (2 tests | 1 failed) 5485ms
+   × native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices 5009ms
+ ❯ |scope| test/site-immutable-publication.test.ts (1 test | 1 failed) 5012ms
+   × two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes 5012ms
+ ❯ |scope| ../lanes/test/site-native3-publication.scope.test.ts (1 test | 1 failed) 5016ms
+   × native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it 5016ms
+console warning; message = Called .text() on an HTTP body which does not appear to be text. The body's Content-Type is "application/x-git-upload-pack-advertisement". The result will probably be corrupted. Consider checking the Content-Type header before interpreting entities as text.
+console warning; message = Called .text() on an HTTP body which does not appear to be text. The body's Content-Type is "application/x-git-upload-pack-advertisement". The result will probably be corrupted. Consider checking the Content-Type header before interpreting entities as text.
+ ❯ |scope| ../page/test/source-preview.scope.test.ts (1 test | 1 failed) 5022ms
+   × exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback 5022ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |scope| ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ ../lanes/test/site-native3-publication.scope.test.ts:19:1
+     17| // Only the Git provider, scheduler, clock and local key store are STA…
+     18| // No SQL state is fabricated, no host/deployment/browser executes.
+     19| test("native @3 cleaned publication retains immutable Site eligibility…
+       | ^
+     20|   const lifetime = siteFixtureLifetime();
+     21|   const at = ownHost();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |scope| ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ ../page/test/source-preview.scope.test.ts:10:1
+      8| // repository has moved. Missing or forged opening bytes never become …
+      9| // Real Scope/HTTP/session reads; STAND-IN Git host and scheduler.
+     10| test("exact retained proposal source survives later publication; missi…
+       | ^
+     11|   let failure: "none" | "missing" | "tampered" | "resealed" = "none";
+     12|   let entryReads = 0;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |scope| ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ ../page/test/task-data.scope.test.ts:128:1
+    126| // Actual membership, sessions, rules activation and directory creatio…
+    127| // The Git host, scheduler and clock are the Page demo's stand-ins.
+    128| test("native task data supplies active issue choices, detached Descrip…
+       | ^
+    129|   let badSelection = false, unavailableMembers = false, unavailableExt…
+    130|   let membershipPath = "";
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |scope| test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/site-immutable-publication.test.ts:10:1
+      8| // OwnGit/scheduler/clock/memory stores are labelled STAND-INs in the …
+      9| // No provider or browser runs. Published authority is never fabricate…
+     10| test("two native publications retain older immutable content and deny …
+       | ^
+     11|   const d = await demo(undefined, null, { editorOnly: true, invitation…
+     12|   const snapshot = () => d.wait(() => runInDurableObject(d.G.object, (…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  4 failed | 167 passed | 1 skipped (172)
+      Tests  4 failed | 1001 passed | 2 skipped (1007)
+   Start at  21:44:59
+   Duration  319.31s (transform 15.78s, setup 0ms, import 26.24s, tests 341.20s, environment 5ms)
+
