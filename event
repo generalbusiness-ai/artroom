@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e0459ddd785f4bfd74e77d2b2689c8a7bbf3a9d3","text":"Merge retired a covered predecessor; the successor is at packages/client/src/index.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e07937c0d98367e53e80ee496ff1ccee7ac6eeb3","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/issues-desktop.png."}
