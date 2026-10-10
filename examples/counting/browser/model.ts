@@ -30,7 +30,7 @@ export type Control = "initialize"|"participate"|"activate"|"deactivate"|"force-
 export interface ProposalOptions { participant?:number; reason?:FailureReason }
 export interface Proposal { kind:Control; on:number|null; fields:Record<string,FieldValue>; expected:Record<string,number> }
 export const same = (a:unknown,b:unknown):boolean => canonicalize(a)===canonicalize(b);
-const invalid = ():never => { throw new Error("The counting snapshot has invalid values."); };
+function invalid():never { throw new Error("The counting snapshot has invalid values."); }
 const numeric = (v:unknown,min=0,max=Number.MAX_SAFE_INTEGER):number => typeof v==="number"&&Number.isSafeInteger(v)&&v>=min&&v<=max?v:invalid();
 const member = (v:unknown):MemberRef|null => v===null||v===undefined?null:isMemberRef(v)?v:invalid();
 const requiredMember = (v:unknown):MemberRef => member(v)??invalid();
@@ -93,7 +93,7 @@ export function assignedTurn(view:CountingView,actor:ActorIdentity):TurnToken|un
   return{...actor,generation:p.generation,serial:p.serial,N:p.n,expiresAt:p.until};
 }
 const basis=(roster:Participant[]):FieldValue[]=>roster.filter(p=>p.state==="active").sort((a,b)=>a.id-b.id).map(p=>({id:p.id,member:p.member}));
-const unavailable=(message:string):never=>{throw new Error(message);};
+function unavailable(message:string):never {throw new Error(message);}
 /** No proposal mutates this snapshot or grants permission to the signing device. */
 export function proposal(view:CountingView,actor:ActorIdentity,kind:Control,completion?:Completion,options:ProposalOptions={}):Proposal {
   if(!matchesIdentity(view,actor))unavailable("This device does not match the counting scope.");

@@ -36,9 +36,11 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
   let owned = true;
   let clock = 100;
   let prepareWait: Promise<void> | null = null;
+  let saveWait:Promise<void>|null=null,failStart=false,wrongStartRead=false;
   let duringSubmit: (() => void) | null = null;
   let duringReconcile: (() => void) | null = null;
   let roomReserved = true, obsolete = false;
+  let audioObsoleteTurn:string|null=null;
   let preparedBytes: string | null = null;
   const archives: PendingReport[] = [];
   let retainRefusalProof = true;
@@ -73,10 +75,10 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     current: () => owned,
     store: {
       load: async () => custody.saved,
-      loadStart:async()=>custody.start??null,
-      saveStart:async marker=>{assert.equal(custody.saved,null);assert.equal(custody.start??null,null);custody.start=structuredClone(marker);},
-      archiveStart:async marker=>{assert.equal(obsolete,true);assert.deepEqual(custody.start,marker);custody.start=null;},
-      save: async p => { if (failSave) throw new Error("fake private storage failure"); custody.saved = p; custody.start=null; },
+      loadStart:async()=>custody.start&&wrongStartRead?{...custody.start,audioId:"x".repeat(22)}:custody.start??null,
+      saveStart:async marker=>{if(failStart)throw new Error("FAKE start save failed");assert.equal(custody.saved,null);assert.equal(custody.start??null,null);custody.start=structuredClone(marker);},
+      archiveStart:async marker=>{assert.equal(JSON.stringify(marker.turn),audioObsoleteTurn);assert.deepEqual(custody.start,marker);custody.start=null;},
+      save: async p => {if(saveWait)await saveWait; if (failSave) throw new Error("fake private storage failure"); custody.saved = p; custody.start=null; },
       clear: async () => { custody.saved = null; },
       archive: async (p,confirmed) => { assert.equal(terminalJournal(p.journal,identity,p.envelope,confirmed),true); if(failArchive)throw new Error("FAKE archive quota full"); assert.deepEqual(custody.saved,p); archives.push(structuredClone(p)); custody.saved=null; },
     },
@@ -94,7 +96,7 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
       resume: async e => custody.lock.run(async()=>{submitted.push(e);const saved=custody.saved!;custody.saved={...saved,journal:markActive(saved.journal!,"inflight")};persistOutcome(e);return{...result,custody:structuredClone(custody.saved!)};}),
       reconcile: async e => custody.lock.run(async () => { reconciled.push(e); duringReconcile?.(); persistOutcome(e); return{...result,custody:structuredClone(custody.saved!)}; }),
       obsolete: () => obsolete,
-      audioObsolete:()=>obsolete,
+      audioObsolete:marker=>JSON.stringify(marker.turn)===audioObsoleteTurn,
       correctionReady: p => roomReserved && !!p.journal && p.journal.attempts.length < 8,
       refresh: async () => { refreshObservation?.(); },
     },
@@ -104,10 +106,12 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     result: (r: ReportOutcome) => { result = r; }, saveFails: () => { failSave = true; }, archiveFails: () => { failArchive=true; },
     loseView: () => { owned = false; }, time: (n: number) => { clock = n; },
     waitPrepare: (p: Promise<void>) => { prepareWait = p; },
+    waitSave:(p:Promise<void>)=>{saveWait=p;}, startSaveFails:()=>{failStart=true;}, startReadbackFails:()=>{wrongStartRead=true;},
     duringSubmit: (work: () => void) => { duringSubmit = work; },
     duringReconcile: (work: () => void) => { duringReconcile = work; },
     reserveRoom: (available: boolean) => { roomReserved = available; },
     obsolete: (value:boolean) => { obsolete=value; },
+    audioObsolete:()=>{audioObsoleteTurn=custody.start?JSON.stringify(custody.start.turn):null;},
     preparedBytes: (bytes: string) => { preparedBytes = bytes; },
     retainRefusalProof: (retain: boolean) => { retainRefusalProof = retain; },
     refreshObservation: (refresh: () => void) => { refreshObservation = refresh; } };
@@ -138,7 +142,7 @@ test("Pause fences callbacks and retains uncertain audio until native resolution
   f.controller.invalidate(); assert.equal(f.calls[0]!.canceled, true);
   f.calls[0]!.end(); await drain(); assert.equal(f.submitted.length, 0);
   f.observe(turn({ serial: 2 })); await drain(); assert.equal(f.calls.length, 1);
-  assert.ok(f.custody.start);f.obsolete(true);await f.controller.checkPending();assert.equal(f.custody.start,null);f.controller.arm("fake");await drain();assert.equal(f.calls.length,2);
+  assert.ok(f.custody.start);f.audioObsolete();await f.controller.checkPending();assert.equal(f.custody.start,null);f.controller.arm("fake");await drain();assert.equal(f.calls.length,2);
   f.calls[0]!.end(); assert.equal(f.submitted.length, 0);
   f.calls[1]!.end(); await drain(); f.observe(turn({ serial: 3, N: 2 })); await drain();
   assert.deepEqual(f.calls.map(c => c.text), ["1", "1", "2"]);
@@ -401,7 +405,17 @@ test("Durable audio start is retained before speech and an interrupted restart c
   const restored=fixture(null,f.custody);await restored.controller.ready;restored.observe();
   assert.equal(restored.controller.arm("fake"),false);await restored.controller.checkPending();
   assert.deepEqual(restored.custody.start,original);assert.deepEqual([restored.calls.length,restored.prepared.length,restored.submitted.length],[0,0,0]);
-  restored.obsolete(true);restored.observe(turn({serial:2}));await restored.controller.checkPending();
+  restored.audioObsolete();restored.observe(turn({serial:2}));await restored.controller.checkPending();
   assert.equal(restored.custody.start,null);assert.equal(restored.controller.state().armed,false);
   assert.equal(restored.controller.arm("fake"),true);await drain();assert.equal(restored.calls.length,1);
+});
+
+
+test("Audio start failure and mismatched readback block sound; voice switch retains uncertainty and exact report transfer remains checkable",async()=>{
+  for(const failure of ["save","readback"] as const){const f=fixture();await f.controller.ready;f.observe();if(failure==="save")f.startSaveFails();else f.startReadbackFails();f.controller.arm("fake");await drain();assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[0,0,0]);assert.equal(f.controller.state().phase,"blocked");}
+  const changed=fixture();await changed.controller.ready;changed.observe();changed.controller.arm("fake");await drain();const start=structuredClone(changed.custody.start);
+  assert.equal(changed.controller.arm("second"),false);assert.equal(changed.calls[0]!.canceled,true);assert.deepEqual(changed.custody.start,start);assert.equal(changed.controller.state().audioUncertain,true);assert.equal(changed.calls.length,1);
+  const f=fixture();let release!:()=>void;f.waitSave(new Promise<void>(resolve=>{release=resolve;}));f.result({status:"unknown"});await f.controller.ready;f.observe();f.controller.arm("fake");await drain();f.calls[0]!.end();await drain();assert.equal(f.prepared.length,1);assert.ok(f.custody.start);
+  f.controller.invalidate();f.observe();release();await drain();assert.ok(f.custody.saved);assert.equal(f.custody.start,null);assert.equal(f.controller.state().pending,"unknown");assert.equal(f.controller.state().audioUncertain,undefined);assert.equal(f.submitted.length,0);
+  const exact=structuredClone(f.custody.saved!.envelope);await f.controller.checkPending();assert.deepEqual(f.reconciled,[exact]);assert.deepEqual(f.custody.saved!.envelope,exact);assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[1,1,0]);
 });

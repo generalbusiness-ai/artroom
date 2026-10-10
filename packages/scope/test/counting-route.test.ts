@@ -6,7 +6,7 @@ import { COUNTING_ASSETS } from "../src/counting-assets.ts";
 // The production Worker entry serves static generated files without a scope binding.
 // This witnesses route/security behavior, not browser startup, native counting or speech.
 test("the Worker serves only the three public Counting assets under one same-origin policy and refuses URL credentials before static dispatch", async () => {
-  const request = (path: string, method = "GET", headers?: HeadersInit) => new Request(`https://scopes.test${path}`, { method, headers });
+  const request = (path: string, method = "GET", headers?: HeadersInit) => new Request(`https://scopes.test${path}`, { method, ...(headers ? {headers} : {}) });
   const get = (path: string, method = "GET", headers?: HeadersInit) => worker.fetch(request(path, method, headers), {} as Env);
   const policy = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
   const checkHeaders = (response: Response, type: string) => {

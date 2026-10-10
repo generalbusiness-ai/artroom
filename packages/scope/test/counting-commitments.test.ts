@@ -2,7 +2,7 @@ import { runDurableObjectAlarm } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Answer, FieldValue, Intent, Item, Read, ScopeId, Seed, SignedIntent, SignedReadName } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, intentDigest, isSeed, scopeIdOf, seedDigest, signIntent, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
-import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
+import { requestSession, secretSigner, sessionRequest, signedReader } from "@generalbusiness/artroom-client";
 import { keys, type Actor } from "@generalbusiness/artroom-derive/testing";
 import { COUNTING_COHORT, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -24,7 +24,7 @@ const SERVICE = "https://scopes.test";
 // a refused competitor has no native pledge; physical silence is a browser duty.
 test("native Counting admits one competing pledge, fulfills its exact holder, applies current activity and fairness, then expires board before promise and resets without losing proven history", async () => {
   const owner=beginSessionFixture({secret:b64url(crypto.getRandomValues(new Uint8Array(32))),sessions:true,inspector:null});
-  const lifetime=nativeFixtureLifetime(owner),fetch:Fetch=(url,init)=>lifetime.wait(()=>routed(url,init));
+  const lifetime=nativeFixtureLifetime(owner),fetch=(url:string,init?:RequestInit)=>lifetime.wait(()=>routed(url,init));
   // The bootstrap uses actual signed birth-chain reads, never the fixture inspector.
   // Later reads use the founder's real requested membership session.
   class Native extends Platform {

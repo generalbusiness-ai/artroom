@@ -142,7 +142,10 @@ export function createVoiceController(options: {
   let loaded = false;
   let busy = false;
   let custodyBlocked = false;
+  let audioOnlyBlock = false;
   let replayMemoryFull = false;
+  const blockCustody = ():void => {custodyBlocked=true;audioOnlyBlock=false;};
+  const blockAudio = ():void => {if(!custodyBlocked||audioOnlyBlock){custodyBlocked=true;audioOnlyBlock=true;}};
   const remember = (t: TurnToken): void => {
     const key = turnKey(t);
     if (attempted.has(key)) return;
@@ -177,8 +180,9 @@ export function createVoiceController(options: {
   const invalidate = (): void => {
     stopAudio();
     completion = null;
+    if (audioStart) blockAudio();
     observation = { ...observation, fresh: false };
-    if (current()) emit(custodyBlocked ? "blocked" : pending?.outcome ?? "idle", custodyBlocked ? view.message : pending ? "A signed report remains in private custody." : "Arm a fresh assigned turn to speak.");
+    if (current()) emit(custodyBlocked ? "blocked" : pending?.outcome ?? "idle", audioStart ? "An interrupted audio start remains in private custody; resolve its native pledge and Check report without replay." : custodyBlocked ? view.message : pending ? "A signed report remains in private custody." : "Arm a fresh assigned turn to speak.");
   };
   const guarded = async (work: () => Promise<void | (() => Promise<void>)>): Promise<void> => {
     if (!current() || busy || custodyBlocked) return;
@@ -187,7 +191,7 @@ export function createVoiceController(options: {
       const dispatch = await options.lock.run(work);
       if (typeof dispatch === "function" && current()) await dispatch();
     }
-    catch { custodyBlocked = true; if (pending && !validReport(pending)) pending = retained({ ...pending, outcome: "unknown" }); emit("blocked", "Private custody operation failed; retain and check any signed attempt before continuing."); }
+    catch { blockCustody(); if (pending && !validReport(pending)) pending = retained({ ...pending, outcome: "unknown" }); emit("blocked", "Private custody operation failed; retain and check any signed attempt before continuing."); }
     finally {
       busy = false;
       // CURRENT may have arrived during POST/reconciliation with no later notice.
@@ -208,18 +212,18 @@ export function createVoiceController(options: {
     const saved = await options.store.load();
     if (!current()) return null;
     if (!saved || !validReport(saved) || expected&&canonicalize(expected)!==canonicalize(saved) || !sameEnvelope(saved.envelope, report.envelope) || !sameCompletion(saved.completion, report.completion)) {
-      custodyBlocked = true;
+      blockCustody();
       if (pending) pending = retained({ ...pending, outcome: "unknown" });
       emit("blocked", "The exact signed attempt could not be recovered from private custody.");
       return null;
     }
     // The dispatcher owns attempt phases and service proofs. Adopt its newest journal.
-    try { pending = normalizedPending(saved); } catch { custodyBlocked = true; pending = retained({ ...saved, outcome: "unknown" }); emit("blocked", "The malformed original remains in private custody; no known refusal was verified."); return null; }
+    try { pending = normalizedPending(saved); } catch { blockCustody(); pending = retained({ ...saved, outcome: "unknown" }); emit("blocked", "The malformed original remains in private custody; no known refusal was verified."); return null; }
     return pending;
   };
   const settle = async (report: PendingReport, result: ReportOutcome): Promise<boolean> => {
     if (!current() || pending !== report) return false;
-    if(result.status==="blocked"){custodyBlocked=true;emit("blocked",result.reason??"The original request remains blocked in private custody.");return false;}
+    if(result.status==="blocked"){blockCustody();emit("blocked",result.reason??"The original request remains blocked in private custody.");return false;}
     const attempt = report.journal ? activeAttempt(report.journal) : null;
     if (attempt?.phase === "recorded" && result.status === "recorded" && result.custody) {
       // A failed clear retains the exact attempt; reconcile it again, never re-sign.
@@ -256,7 +260,7 @@ export function createVoiceController(options: {
     const stored = await options.store.load();
     if (!current()) return;
     if (!stored && pending) {
-      custodyBlocked = true;
+      blockCustody();
       emit("blocked", "The retained attempt is missing from private custody; no correction was signed.");
       return;
     }
@@ -264,7 +268,7 @@ export function createVoiceController(options: {
       pending = retained({ ...stored, outcome: "unknown" });
       pending = normalizedPending(stored);
       remember(stored.completion.turn);
-      if (!sameContext(stored.completion.turn) || !validReport(stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
+      if (!sameContext(stored.completion.turn) || !validReport(stored)) { blockCustody(); emit("blocked", "Private custody belongs to another context."); return; }
     }
     const completed = correcting ? pending?.completion : completion;
     if (!current() || !loaded || !completed || !usable(completed.turn)) return;
@@ -285,7 +289,12 @@ export function createVoiceController(options: {
     if (!validReport(report)) { emit("blocked", "The exact pending report is malformed or exceeds private custody limits."); return; }
     // Nothing may be posted unless these exact signed bytes are privately retained.
     await options.store.save(report);
+    const committed=await options.store.load();
+    if(!committed||canonicalize(committed)!==canonicalize(report))throw new Error("The exact completed report did not read back.");
     pending = report;
+    // A successful exact transfer consumes the start into signed pending custody.
+    // Clear only cancellation's audio-only block, never a storage/malformed block.
+    if(audioOnlyBlock){custodyBlocked=false;audioOnlyBlock=false;}
     audioStart = null;
     completion = null;
     if (!usable(completed.turn) || generation !== audioGeneration) { emit("unknown", "The saved attempt awaits reconciliation after a context change."); return; }
@@ -315,7 +324,7 @@ export function createVoiceController(options: {
       if (!current()) return;
       if (marker) {
         if (!validAudioStart(marker,identity)) throw new Error("The audio start is malformed.");
-        audioStart=retained(marker);remember(marker.turn);custodyBlocked=true;loaded=true;
+        audioStart=retained(marker);remember(marker.turn);blockAudio();loaded=true;
         emit("blocked", "An interrupted audio attempt is retained. Do not speak it again; resolve its native pledge and Check report.",marker.turn);return;
       }
       const saved = await options.store.load();
@@ -325,7 +334,7 @@ export function createVoiceController(options: {
         pending = normalizedPending(saved);
         remember(saved.completion.turn);
         if (!sameContext(saved.completion.turn) || !validReport(saved)) {
-          custodyBlocked = true;
+          blockCustody();
           emit("blocked", "Private pending custody belongs to a different context; it was retained.");
           return;
         }
@@ -333,10 +342,10 @@ export function createVoiceController(options: {
       loaded = true;
       emit(pending?.outcome ?? "idle", pending ? "A signed report remains in private custody." : "Arm a fresh assigned turn to speak.");
     } catch {
-      custodyBlocked = true;
+      blockCustody();
       emit("blocked", "Private pending custody could not be read; speech and reporting are blocked.");
     }
-  }).catch(() => { custodyBlocked = true; emit("blocked", "The private custody lock could not be acquired."); });
+  }).catch(() => { blockCustody(); emit("blocked", "The private custody lock could not be acquired."); });
 
   const start = (voiceId: string): boolean => {
       const t = observation.turn;
@@ -357,6 +366,7 @@ export function createVoiceController(options: {
         turnKey(active) === turnKey(turn) && observation.authorized && sameContext(turn) && now() < turn.expiresAt &&
         (!observation.turn || turnKey(observation.turn) === turnKey(turn));
       busy = true;
+      let effectEntered=false;
       void options.lock.run(async () => {
         if (!options.store.saveStart || !options.store.loadStart) throw new Error("Durable audio-start custody is unavailable.");
         const prior = await options.store.load();
@@ -368,8 +378,9 @@ export function createVoiceController(options: {
         audioStart = marker;
         const readback = await options.store.loadStart();
         if (!readback || canonicalize(readback)!==canonicalize(marker)) throw new Error("Audio-start custody did not read back exactly.");
-        if (!usable(turn) || generation !== audioGeneration) { custodyBlocked=true;emit("blocked","The retained audio start became uncertain before playback; do not replay it.");return; }
+        if (!usable(turn) || generation !== audioGeneration) { blockAudio();emit("blocked","The retained audio start became uncertain before playback; do not replay it.");return; }
         emit("speaking", "Speaking the pledged number locally.", turn);
+        effectEntered=true;
         const stop = options.speech.play(String(turn.N), voiceId, {
           end() {
             if (!validCallback()) return;
@@ -380,12 +391,12 @@ export function createVoiceController(options: {
           },
           error() {
             if (!validCallback()) return;
-            stopAudio();completion=null;custodyBlocked=true;
+            stopAudio();completion=null;blockAudio();
             emit("blocked", "Local speech failed or became uncertain. Its start is retained; resolve the pledge without repeating audio.");
           },
         });
         if (generation === audioGeneration && active) cancel = stop;
-      }).catch(() => { stopAudio();completion=null;custodyBlocked=true;emit("blocked","Private audio-start custody or playback failed. No fulfillment was sent; do not replay the attempt."); }).finally(() => {
+      }).catch(() => { stopAudio();completion=null;if(effectEntered)blockAudio();else blockCustody();emit("blocked","Private audio-start custody or playback failed. No fulfillment was sent; do not replay the attempt."); }).finally(() => {
         busy=false;
         if (completion && usable(completion.turn) && !pending && !custodyBlocked) void reportCompletion();
       });
@@ -398,7 +409,8 @@ export function createVoiceController(options: {
           (observation.turn && (!sameContext(observation.turn) || now() >= observation.turn.expiresAt)) ||
           !options.speech.voices().some(v => v.id === voiceId)) return false;
       if (armedVoice !== voiceId && armedVoice !== null) {
-        stopAudio(); completion = null;
+        invalidate();
+        if(audioStart){armedVoice=null;emit("blocked","The interrupted voice's audio start is retained; resolve and Check before a new Arm.");return false;}
         emit("idle", "Voice changed; awaiting a fresh unseen turn.");
       }
       armedVoice = voiceId;
@@ -428,7 +440,7 @@ export function createVoiceController(options: {
     invalidate,
     disarm() { armedVoice = null; invalidate(); },
     checkPending: async () => {
-      if (audioStart && custodyBlocked) {
+      if (audioStart && audioOnlyBlock) {
         const marker=audioStart;
         if (!observation.fresh || !observation.authorized || options.reporter.audioObsolete?.(marker)!==true || !options.store.archiveStart) { emit("blocked","The original audio is uncertain. Resolve its pledge natively before archiving; it will not be repeated.",marker.turn);return; }
         try { await options.lock.run(async()=>{
@@ -437,7 +449,7 @@ export function createVoiceController(options: {
           if (!observation.fresh || !observation.authorized || options.reporter.audioObsolete?.(marker)!==true) return;
           await options.store.archiveStart!(marker);
           if (!current()) return;
-          audioStart=null;custodyBlocked=false;armedVoice=null;emit("idle","The resolved native pledge's uncertain audio history was archived intact. Arm a new pledge explicitly.");
+          audioStart=null;custodyBlocked=false;audioOnlyBlock=false;armedVoice=null;emit("idle","The resolved native pledge's uncertain audio history was archived intact. Arm a new pledge explicitly.");
         }); } catch {emit("blocked","The uncertain original audio remains in private custody.");}
         return;
       }
@@ -448,7 +460,7 @@ export function createVoiceController(options: {
         pending = retained({ ...stored, outcome: "unknown" });
         pending = normalizedPending(stored);
         remember(stored.completion.turn);
-        if (!sameContext(stored.completion.turn) || !validReport(stored)) { custodyBlocked = true; emit("blocked", "Private custody belongs to another context."); return; }
+        if (!sameContext(stored.completion.turn) || !validReport(stored)) { blockCustody(); emit("blocked", "Private custody belongs to another context."); return; }
       }
       const report = pending;
       if (!loaded || !report || !sameContext(report.completion.turn) || !current()) return;
