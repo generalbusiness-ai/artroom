@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, taskForm } from "../src/tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, taskForm } from "../src/tasks.ts";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -226,15 +226,25 @@ test("the next task follows the selected file's recorded requirements and curren
   const change = { state: "open", author: "@author", currentManifest: 12,
     manifests: [{ id: 12, state: "current", authors: ["@author"], file: { path: "AGENTS.md" } }],
     reviews: [], rules: { approvals: 0, extents: [
-      { name: "rules", patterns: ["AGENTS.md"], approvals: 1 }, { name: "source", patterns: [], approvals: 0 },
+      { name: "rules", approvals: 1, approver: "rules.publish", checks: [], class: "authority" },
+      { name: "source", approvals: 0, approver: "change.review", checks: [], class: "content" },
     ] }, reviewMembersByExtent: { rules: [{ label: "@controller", value: "@controller" }], source: [{ label: "@reader", value: "@reader" }] },
+    // Synthetic presentation input; task-data proves the actual native binding.
+    reviewPolicy: { manifest: 12, source: { at: { scope: "rules", kind: "rules", inc: "one" }, seq: 1, hash: "hash" }, extents: [
+      { name: "rules", patterns: ["AGENTS.md"], approvals: 1, approver: "rules.publish", checks: [], class: "authority" },
+      { name: "source", patterns: [], approvals: 0, approver: "change.review", checks: [], class: "content" },
+    ] },
   } as unknown as ChangeView;
   const offered = ["merge", "request-review-own", "review-verdict"].map(kind => ({ kind, fields: [] })) as unknown as Offered[];
   const room = { me: { handle: "@author" } } as unknown as Room;
   const allowed = offered.map(act => act.kind);
   expect(nextChangeAction(room, change, offered, allowed)?.kind).toBe("request-review-own");
+  expect(requestedReviewCandidates(change)).toEqual(change.reviewMembersByExtent?.["rules"]);
   const content = { ...change, manifests: [{ ...change.manifests[0]!, file: { ...change.manifests[0]!.file!, path: "README.md" } }] };
   expect(nextChangeAction(room, content, offered, allowed)?.kind).toBe("merge");
+  expect(requestedReviewCandidates(content)).toEqual(change.reviewMembersByExtent?.["source"]);
+  expect(nextChangeAction(room, { ...content, reviewPolicy: null }, offered, allowed)).toBeNull();
+  expect(nextChangeAction(room, { ...content, reviewPolicy: { ...content.reviewPolicy!, manifest: 11 } }, offered, allowed)).toBeNull();
   const stranger = { me: { handle: "@unqualified" } } as unknown as Room;
   expect(nextChangeAction(stranger, change, offered.filter(act => act.kind === "review-verdict"), allowed)).toBeNull();
   expect(nextChangeAction(room, { ...change, state: "closed" }, offered, allowed)).toBeNull();

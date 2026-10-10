@@ -1,11 +1,11 @@
 /** Task controls use actual offered declarations; the shell owns signing and custody. */
-import type { ChangeView, Offered, Room } from "./data.ts";
+import type { Offered } from "./data.ts";
 import { actionForm, type ActionContext, type Send } from "./actions.ts";
 import { h, icon } from "./view.ts";
 import { issueTaskValues } from "./task-values.ts";
-import { editPath, matches } from "@generalbusiness/artroom-platform";
 import { controlKey } from "./focus.ts";
 export { changeTaskContext } from "./task-values.ts";
+export { nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskReviewExtents } from "./task-values.ts";
 
 interface IssueDialog { dialog: HTMLDialogElement; form: HTMLElement; message: HTMLElement; context: ActionContext; close(restore?: boolean): void; initialDisabled: Set<HTMLElement> }
 const issueDialogs = new Map<string, IssueDialog>();
@@ -37,47 +37,6 @@ function missingFields(act: Offered, context: ActionContext, fields: readonly st
   return missing;
 }
 const missingCondition = (field: string): string => ({ definition: "the active issue definition", conditions: "the issue conditions", reports: "the selected issue-report evidence", manifest: "the selected version", requested: "an eligible reviewer", extent: "the review requirements", "exact subject": "the exact subject" })[field] ?? "a required recorded value";
-
-/** Only a known one-file path can narrow held requirements; a tree remains advisory. */
-export function taskReviewExtents(change: ChangeView): NonNullable<ChangeView["rules"]>["extents"] {
-  const current = change.manifests.find(manifest => manifest.id === change.currentManifest);
-  const extents = change.rules?.extents ?? [];
-  const path = current?.file?.path;
-  if (!path || editPath(path) === null || extents.some(extent => extent.patterns === undefined)) return extents;
-  const matching = extents.filter(extent => extent.patterns!.some(pattern => matches(pattern, path)));
-  return matching.length ? matching : extents.filter(extent => extent.patterns!.length === 0);
-}
-
-/** A retained ordinary review must keep its selected version AND requirement.
- * This is presentation qualification; the native lane/destination still judge it. */
-export function reviewSelectionProblem(room: Room, change: ChangeView, manifest: number, extent: string): string | null {
-  if (change.currentManifest !== manifest) return "This version is no longer current. Keep this draft and choose the new version explicitly.";
-  if (change.state !== "open") return "This change is no longer open for ordinary review. This draft keeps its original version.";
-  if (!extent) return "Choose a review requirement before submitting this version.";
-  if (!taskReviewExtents(change).some(row => row.name === extent)) return "This requirement is no longer available for the selected file. Keep the draft and choose a requirement explicitly.";
-  const candidates = change.reviewMembersByExtent?.[extent];
-  if (!candidates || !room.me) return "Current reviewer authority could not be read for this requirement. This draft is kept.";
-  if (!candidates.some(candidate => candidate.value === room.me!.handle)) return "You are no longer eligible to review this requirement. Keep the draft and choose an eligible requirement explicitly.";
-  return null;
-}
-
-/** A single prominent task; native declarations remain the final authority. */
-export function nextChangeAction(room: Room, change: ChangeView, offered: readonly Offered[], allowed: readonly string[]): Offered | null {
-  const current = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
-  if (["merged", "closed", "cancelled"].includes(change.state)) return null;
-  if (change.state === "draft") return ["ready-own", "ready-any"].map(kind => offered.find(act => act.kind === kind && allowed.includes(kind))).find(act => act !== undefined) ?? null;
-  if (!current || current.file && editPath(current.file.path) === null) return null;
-  const author = !!room.me && (current?.authors.includes(room.me.handle) || change.author === room.me.handle);
-  const applicable = taskReviewExtents({ ...change, currentManifest: current.id });
-  const approving = change.reviews.filter(review => review.manifest === current.id && review.state === "submitted" && review.verdict === "approve");
-  // This selects a useful task from held records; the destination still judges fresh rules and evidence.
-  const needsReview = (change.rules?.approvals ?? 0) > approving.length || applicable.some(extent => approving.filter(review => review.extent === extent.name).length < extent.approvals)
-    || change.reviews.some(review => review.manifest === current.id && review.state === "submitted" && review.verdict === "request-changes");
-  const canReview = change.reviewMembersByExtent === undefined || !!room.me && applicable.some(extent => change.reviewMembersByExtent?.[extent.name]?.some(member => member.value === room.me!.handle));
-  const requests = ["request-review-own", "request-review-any"];
-  const order = author ? needsReview ? [...requests, "merge"] : ["merge", ...requests] : canReview ? ["review-verdict", "merge"] : ["merge"];
-  return order.map((kind) => offered.find((act) => act.kind === kind && allowed.includes(kind))).find((act) => act !== undefined) ?? null;
-}
 
 /** Technical requirements must be fixed from authenticated facts, never typed by the person. */
 export function taskForm(act: Offered, send: Send, context: ActionContext, fields: readonly string[], label: string): HTMLElement {

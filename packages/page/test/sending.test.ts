@@ -253,7 +253,9 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   const issue={scope:'issue',definition:'definition',head:{seq:1,hash:'head'},intent:0,title:'Native issue',number:1,body:null,state:'open',requester:'@author',assignees:[],conditions:[],comments:[],closeReason:null};
   const change={scope:'change',definition:'definition',head:{seq:2,hash:'head'},proposal:0,title:'Selected change',number:2,body:null,state:'open',author:'@author',currentManifest:12,
     manifests:[{id:12,state:'current',authors:['@author'],integrator:'@author',base:'a'.repeat(40),integration:null,tree:null,complete:true,selectedReports:[],file:{path:'AGENTS.md',digest:'digest',size:4,page:'latest',content:'Text'}}],
-    reviews:[],requests:[],jobs:[],links:[],merges:[],comments:[],rules:{approvals:0,ownerMayReview:false,revision:1,checks:[],extents:[{name:'rules',patterns:['AGENTS.md'],approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
+    reviews:[],requests:[],jobs:[],links:[],merges:[],comments:[],rules:{approvals:0,ownerMayReview:false,revision:1,checks:[],extents:[{name:'rules',approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
+    // Synthetic presentation fixture; the native task-data case proves the real policy binding.
+    reviewPolicy:{manifest:12,source:{at:{scope:'rules',kind:'rules',inc:'one'},seq:1,hash:'hash'},extents:[{name:'rules',patterns:['AGENTS.md'],approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
     reviewExtents:[{label:'rules',value:'rules'}],reviewMembers:[{label:'@reader',value:'@reader'}],reviewMembersByExtent:{rules:[{label:'@reader',value:'@reader'}]},
   };
   const comment={kind:'comment',step:'open',on:'comment',line:'Comment',fields:[{name:'body',type:'text',required:true}]};

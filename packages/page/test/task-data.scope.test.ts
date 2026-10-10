@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes } from "@generalbusiness/artroom-bytes";
+import { digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { act, actsOn, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
@@ -9,10 +9,13 @@ import type { ScopeId, FactRef } from "@generalbusiness/artroom-contract";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { Platform } from "../../scope/test/repository.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
+import { nextChangeAction, requestedReviewCandidates, taskReviewExtents } from "../src/task-values.ts";
+import { changeActions } from "../src/shell.ts";
 const oid = (c: string) => c.repeat(40);
 
 /** Scheduler provenance uses the same authenticated room transport; no inspector. */
-async function completeIssue(d: Demo, room: Room, fact: FactRef): Promise<ScopeId> {
+async function completeIssue(d: Demo, room: Room, fact: FactRef, kind: "open-issue" | "open-pr" = "open-issue"): Promise<ScopeId> {
+  const definition = kind === "open-issue" ? DEMO_DIGESTS.issue : DEMO_DIGESTS.change;
   const owner = d.sessionOwner;
   const transport = signedReads(httpTransport(room.session.service, room.session.fetch ? { fetch: room.session.fetch } : {}), secretSigner(room.session.secret), room.session.now ? { now: room.session.now } : {});
   const handle = (name: ScopeId) => new ScopeHandle(transport, name, room.reader?.reader() ?? null);
@@ -23,12 +26,12 @@ async function completeIssue(d: Demo, room: Room, fact: FactRef): Promise<ScopeI
   expect([entryHash(entry), entry.at]).toEqual([fact.hash, fact.at]);
   expect(entry.input.type).toBe("act");
   if (entry.input.type !== "act") throw new Error("Accepted opening is not an act");
-  expect(entry.input.signed.intent.kind).toBe("open-issue");
+  expect(entry.input.signed.intent.kind).toBe(kind);
   const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
   expect(creates).toHaveLength(1);
   const seed = creates[0]!.to;
   if (!isSeed(seed)) throw new Error("Recorded create has no valid seed");
-  expect([seed.kind, seed.definition, seed.creator, seed.cause, seed.ordinal]).toEqual(["lane", DEMO_DIGESTS.issue, fact.at, intentDigest(entry.input.signed.intent), 0]);
+  expect([seed.kind, seed.definition, seed.creator, seed.cause, seed.ordinal]).toEqual(["lane", definition, fact.at, intentDigest(entry.input.signed.intent), 0]);
   const child = scopeIdOf(seed);
   // Native effect/dispatch needs no read inspector. All parent/child reads below
   // are authenticated. The original known register/destination remain included.
@@ -48,7 +51,7 @@ async function completeIssue(d: Demo, room: Room, fact: FactRef): Promise<ScopeI
   expect(row, "Accepted opening must retain its native directory lane row").toBeDefined();
   expect(["refused", "conflict"]).not.toContain(row?.state);
   expect(row?.refs["scope"], "Parent must have confirmed its actual child after scheduler idle").toEqual(childRead.value.scope);
-  expect([childRead.value.scope.scope, childRead.value.scope.kind, childRead.value.definition]).toEqual([child, "lane", DEMO_DIGESTS.issue]);
+  expect([childRead.value.scope.scope, childRead.value.scope.kind, childRead.value.definition]).toEqual([child, "lane", definition]);
   return child;
 }
 
@@ -183,6 +186,47 @@ test("native task data supplies active issue choices, detached Description, exac
     expect(change.reviewMembers?.map((member) => member.value)).toContain("@paul");
     expect(change.reviewMembers?.map((member) => member.value)).not.toContain("@rita");
     expect(change.reviewMembersByExtent?.["source"]?.map((member) => member.value)).toContain("@paul");
+    // Keep the CLI's actual completed publication above. The supported open
+    // workflow below uses another real native child, without intercepting merge.
+    const base = change.merges.find(merge => merge.state === "published")?.commit;
+    expect(typeof base).toBe("string");
+    if (typeof base !== "string") throw new Error("Completed publication has no native commit");
+    const taskFor = async (path: string) => {
+      const openedTask = await act(room, room.directory, "open-pr", { fields: { definition: DEMO_DIGESTS.change, title: `Native task ${path}`, draft: true } });
+      expect(openedTask.answer.answer).toBe("accepted");
+      if (openedTask.answer.answer !== "accepted") throw new Error("Native change opening unavailable");
+      const scope = await completeIssue(d, room, openedTask.answer.receipt.fact, "open-pr");
+      expect((await act(room, scope, "ask-rules", { on: 0 })).answer.answer).toBe("accepted");
+      await d.pause([scope, room.rules]);
+      const content = "A recorded native task.\n", bytes = utf8(content);
+      expect((await act(room, scope, "propose-file", { fields: { base, path, digest: digestBytes(bytes), size: bytes.length, content } })).answer.answer).toBe("accepted");
+      expect((await act(room, scope, "ready-own", { on: 0 })).answer.answer).toBe("accepted");
+      return { scope, change: await loadChange(room, scope), acts: await actsOn(room, scope) };
+    };
+    // propose-file's native one-version guard requires a separate child for each path.
+    const { change: readmeTask, acts: taskActs } = await taskFor("README.md");
+    expect(readmeTask.state).toBe("open");
+    expect(readmeTask.rules?.extents.every(extent => !Object.hasOwn(extent, "patterns"))).toBe(true);
+    expect(readmeTask.reviewPolicy?.manifest).toBe(readmeTask.currentManifest);
+    expect(taskReviewExtents(readmeTask)?.map(extent => extent.name)).toEqual(["source"]);
+    expect(taskActs.acts.map(value => value.kind)).toEqual(expect.arrayContaining(["merge", "request-review-own"]));
+    expect(nextChangeAction(room, readmeTask, taskActs.acts, changeActions(readmeTask.state, false).primary)?.kind).toBe("merge");
+    expect(requestedReviewCandidates(readmeTask)).toEqual(readmeTask.reviewMembersByExtent?.["source"]);
+    expect(requestedReviewCandidates(readmeTask)?.map(member => member.value)).toContain("@paul");
+    const { scope: rulesTaskScope, change: rulesTask, acts: rulesActs } = await taskFor("AGENTS.md");
+    expect(taskReviewExtents(rulesTask)?.map(extent => extent.name)).toEqual(["rules"]);
+    expect(nextChangeAction(room, rulesTask, rulesActs.acts, changeActions(rulesTask.state, false).primary)?.kind).toBe("request-review-own");
+    expect(requestedReviewCandidates(rulesTask)).toEqual(rulesTask.reviewMembersByExtent?.["rules"]);
+    // A real later publish can change patterns without changing any held field.
+    // Its current policy cannot silently replace this version's recorded policy.
+    const changedPatterns = extents.map(extent => extent.name === "rules" ? { ...extent, patterns: [...extent.patterns, "README.md"] } : extent);
+    expect((await act(room, room.rules, "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: fieldValue(room, "code", JSON.stringify(changedPatterns)) } })).answer.answer).toBe("accepted");
+    const stalePolicy = await loadChange(room, rulesTaskScope);
+    const staleActs = await actsOn(room, rulesTaskScope);
+    expect(stalePolicy.rules?.extents).toEqual(rulesTask.rules?.extents);
+    expect(stalePolicy.reviewPolicy).toBeNull();
+    expect(nextChangeAction(room, stalePolicy, staleActs.acts, changeActions(stalePolicy.state, false).primary)).toBeNull();
+    expect(requestedReviewCandidates(stalePolicy)).toBeNull();
     console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "publication-and-review-choices");
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "fresh-review-faults", lastCompleted);
     badSelection = true;

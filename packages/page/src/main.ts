@@ -26,7 +26,7 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, reviewSelectionProblem, taskForm, taskReviewExtents } from "./tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, requestedReviewCandidates, reviewSelectionProblem, taskForm, taskReviewExtents } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
@@ -676,12 +676,13 @@ async function draw(focus = false): Promise<void> {
       const taskContext = changeTaskContext(change);
       const applicable = taskReviewExtents(change);
       if (change.reviewMembersByExtent !== undefined && taskContext.choices["review-verdict"]) {
-        taskContext.choices["review-verdict"] = { ...taskContext.choices["review-verdict"], extent: (change.reviewExtents ?? []).filter(extent => applicable.some(row => row.name === extent.value) && change.reviewMembersByExtent?.[extent.value]?.some(member => member.value === loaded.me?.handle)) };
-        const required = applicable.filter(extent => extent.approvals > 0);
-        const relevant = required.length ? required : applicable;
-        const recipients = new Map<string, { label: string; value: string }>();
-        for (const extent of relevant) for (const candidate of change.reviewMembersByExtent?.[extent.name] ?? []) recipients.set(candidate.value, candidate);
-        for (const kind of ["request-review-own", "request-review-any"]) taskContext.choices[kind] = { requested: [...recipients.values()] };
+        if (applicable === null) delete taskContext.choices["review-verdict"];
+        else taskContext.choices["review-verdict"] = { ...taskContext.choices["review-verdict"], extent: (change.reviewExtents ?? []).filter(extent => applicable.some(row => row.name === extent.value) && change.reviewMembersByExtent?.[extent.value]?.some(member => member.value === loaded.me?.handle)) };
+      }
+      const recipients = requestedReviewCandidates(change);
+      for (const kind of ["request-review-own", "request-review-any"]) {
+        if (recipients === null) delete taskContext.choices[kind];
+        else taskContext.choices[kind] = { requested: recipients };
       }
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
       const { primary, blockedKinds } = changeActions(change.state, !!current?.file && editPath(current.file.path) === null);
@@ -708,6 +709,7 @@ async function draw(focus = false): Promise<void> {
           if (control.hasAttribute("data-act")) represented.push("comment");
         }
         const next = nextChangeAction(loaded, change, acts.acts, primary);
+        if (!next && change.state === "open" && applicable === null) screen.querySelector('[data-action-slot="next"]')?.append(h("p", { class: "muted", role: "status" }, "The rules policy for this recorded version could not be verified. Native actions remain in Advanced."));
         reconcileReview(association, loaded, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"));
         if (next && !context.pending && !context.uncertain) {
           const label = next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change";
