@@ -1,0 +1,56 @@
+{
+  "actual_handle": 30831,
+  "terminal_exit": 1,
+  "release": "55aac389cab1def8e26571b6c9356254342219b5",
+  "mutant_head": "70dc62cbb2b830258b4a3490cde6221de6c0d274",
+  "mutant_tree": "85bbfc247056791749b052391c74583d00a35c16",
+  "baseline_head": "f241168dade37cf859151f4b7021afb95464d77e",
+  "manifest": {
+    "path": "/tmp/artroom-pool-f241-cleanup-control-r2-result/manifest.json",
+    "sha256": "eacd26c9c2e26434384d801262bd998203b3379c8aa0deca483bdead2a7eb0eb"
+  },
+  "raw_outer": [
+    {
+      "path": "/tmp/artroom-pool-f241-cleanup-control-r2-outer.log",
+      "sha256": "466db67d3a3637eebb2b84ac12108f8a09bbe0c0c1e8571b1a3607a0e735f455"
+    },
+    {
+      "path": "/tmp/artroom-pool-f241-cleanup-control-r2-outer.time",
+      "sha256": "723f859ad0c148c37d4114cf6427ce7d033a3148516c5c23c4c0a17d74c82239"
+    }
+  ],
+  "classification": "distinguishes",
+  "coverage": {
+    "cases": [
+      "the actual pinned pool factory keeps one lazy prototype across early and late constructions, preserving receiver and later prototype methods",
+      "compatibility privately copies cache-linked bytes, is idempotent, and refuses unknown versions or bundles before changing that view"
+    ],
+    "passed": 1,
+    "failed": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "intended_assertion": {
+      "file": "scripts/cloudflare-pool-compat.test.mjs",
+      "line": 87,
+      "source": "assert.equal(existsSync(sentinel), true);",
+      "expected": "Second case AssertionError[ERR_ASSERTION]/codeERR_ASSERTION/operatorstrictEqual, false versus true at87; first semantic factory casePASS; no ENOENT, timeout/cancellation/skip/todo."
+    }
+  },
+  "intended_assertion": "AssertionError[ERR_ASSERTION] strictEqual false!==true at87:12 (sentinel removed underoldcleanup), firstactualfactoryPASS",
+  "restoration": {
+    "head": "f241168dade37cf859151f4b7021afb95464d77e",
+    "tree": "991666851df01d6e93d6f57a2457beb1e7f48e8f",
+    "clean": true,
+    "sources": 1272,
+    "cache_files": 3898,
+    "cache_unchanged": true,
+    "workspaces": 12,
+    "pool_owned": true,
+    "pool_bundle_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+    "pool_tool_realpath": "/private/tmp/artroom-pool-f241-cleanup-control/node_modules/@cloudflare/vitest-pool-workers/dist/pool/index.mjs",
+    "verified": true
+  },
+  "baseline_reused": "5b6e17d15b5834c54093bb6a8c584dc08f61e6f6",
+  "qualification": "P2unownedcleanup meaningfulfilesystemboundary; no native/newgate/global10x/fullSource approval claim."
+}
