@@ -12,6 +12,7 @@ class Element {
   closed = false;
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
+  getAttribute(name: string) { return this.attrs.get(name) ?? null; }
   removeAttribute(name: string) { this.attrs.delete(name); }
   showModal() { this.closed = false; } close() { this.closed = true; } remove() {} focus() {}
   querySelectorAll(selector: string): Element[] {
