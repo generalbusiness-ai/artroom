@@ -1,5 +1,33 @@
 # Initial combined source delivery — 2026-10-09
 
+The initial delivery is landed on main at
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, tree
+`7f9bf06ee29e56b040e5cce07408ad240a2401fe`. The builder verified the
+pushed head against the live remote and retained landing receipt
+`732ca210b84469513b3a53b618b2867ca92a71e0`; request `60e591` is satisfied
+and landed. The earlier failed gates and qualified successful evidence
+below remain attributed to their exact source.
+
+This candidate normally merges the frozen five-path test-economy donor
+`f027d949b9c7d0b064c1cb3c23dc88284de67fe3` and eight-path SDK donor
+`d2a39598f56708a4523bdfde2ad98a82dd843cb7` onto receiving main
+`cf6c9ce6277f6eb840dc4e96d6943c2b87fe53ba`, tree
+`d855f91866f66a9d396b1c3098f8f307d4791d22`. Main retains the landed
+initial delivery and its later six-document guide increment. The two
+merges have no conflict. All thirteen paths are disjoint; donor code and
+all other receiving-main modes and blobs remain exact. Only this existing
+note's provenance and outcome accounting differ from the economy donor.
+Names, C4, the separate P3 checklist corrections, UI and new optimizations
+are outside this composition.
+
+The affected economy and local SDK outcomes below remain evidence for
+their actual frozen heads. They do not establish a passing gate or public
+SDK acceptance for this new candidate. One ordinary changed-head gate and
+normal independent review remain owed. No project runtime ran during this
+source composition or its inert gate preparation.
+
+## Historical initial delivery and evidence (retained)
+
 This candidate joins the current critical corrections, explicit application establishment, the pinned Counting definition, complete client observation and the enrolled-device counting stage. It lets an authorized controller establish Counting under the supporting cohort, while an independently enrolled device observes the native count and keeps its own exact signed requests in private custody. The native scope remains the authority for counts, membership and every act.
 
 The original application and test preparation was frozen at composition 7ed2670b6c440cba638e6c18624d55b582892eb3, tree d2d53ffc0ff2d0b9965e86ae8cf2650cce400f26, from main 8479057c1ce50f01a5de488c2f6c029b45be65e7. This note is added before the final gate; the gate and normal review evidence will bind the resulting exact head. No final gate, formal Source approval or landing is claimed in this note. Earlier evidence remains attributed to its actual source head. The final sections describe the current editor and focused-check successor.
@@ -212,3 +240,183 @@ The complete log retains the RefcountedCanceler cross-object timeout-abort diagn
 All 1,272 guarded source hashes, twelve workspace links, tool bindings, 3,898 shared-cache files and 28 links remained unchanged, as did the private 23-file pool copy with its permanent corrected cd50d18a helper. The candidate stayed clean. Complete sealed logs are retained at /tmp/artroom-poolb7ee-normal-gate; the complete proof is /tmp/artroom-poolb7ee-gate-complete-result.json, SHA256 8640e81fc2720ddb1d2d656d1698c524ebaf6d600e45979fd2694b7ab4c4bc37.
 
 This outcome amendment changes only this note. Executable source, tests, configuration, dependencies and built assets are unchanged from the successful b7ee subject/tree 8df68d174e474c71e1a237271222059b3ef18cfb. No checks or build were rerun for this documentation-only successor, per docs/testing.md. Formal retirement of the P2 finding, complete Source/evidence approval, request delivery and landing remain owed; manual/product acceptance, a complete causal account and the tenfold objective remain open.
+
+
+Hub fixture pack reuse — source successor, validation pending
+
+Under request `4bb53d024c7b7da058b25c01b71b793454d321af` and promise
+`254f392fdae077dce25642ac494745d40b527967`, this isolated successor of
+`0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` lets the scripted Hub reuse an
+owned ordered-content pack promise through the existing OwnGit mechanism.
+Only immutable wire bytes are reused; responses, refs, public reads and
+write credential/receive decisions remain per request. The same cache
+witness retains its OwnGit assertions and adds Hub public repeats, mutation,
+rejection/recovery and fresh responses/refs using the actual bounded Git codec.
+No live GitHub behavior, timing gain or full 10x outcome is claimed.
+Affected compilation, the complete cache and Demo files, a distinguishing
+Hub-only control and a changed-head gate remain unrun and owed. Prior gates
+and native results qualify their exact earlier heads; they do not accept this
+new source. The frozen initial `0e595` filing remains separate.
+
+
+Hub known-refusal allocation — source successor, validation pending
+
+This separate successor of `c8d989305f6a1ed9b8a2570a28232c34c9599145`
+implements request `74b810cd1dd75fbfff0f481c77e290409fc85e32`, resting on
+promise `660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa` and adopted choice
+`0e527840fd86f43dd3d4a2d03a3fd5ca63e0353d`. Only Hub enables the shared
+helper's cheap count/raw-length failure selector. It sends necessarily
+failing ordered object references to the unchanged real codec before any
+fixture payload copy; that codec retains its own first-error ordering.
+OwnGit's inherited path and every accepted owned snapshot remain unchanged.
+Known failing Hub uploads may each call the codec rather than coalescing
+rejected promises. Actual build counting and identity-guarded failed-slot
+retirement remain explicit; no auth, refs, response or receive decision is
+cached. The same cache case observes construction of the exact oversized
+payload and restores the real constructor in `finally`, then checks repair
+and reuse. Constructor interception is unproved until an actual old-path
+control distinguishes it; unsupported interception is not acceptance.
+All new compilation, native bodies, controls and the changed-head gate are
+unrun and remain separately owned. No measured allocation gain, timing
+factor, live GitHub behavior or full tenfold outcome is claimed. Frozen c8
+and the initial `0e595` filing remain unchanged and separate.
+
+
+Hub and manifest economy composition — source, validation pending
+
+Request `5ade75228f4ed9d2f4e0b1523bdfd2e46f494692`, resting on promise
+`2511667df4d7333402f8af8b34d82cb958ecbc43`, composes only the reviewed Hub
+successor `ee7d213113805d8375f2bf7e6e8651f9c0b655b5` and manifest successor
+`bdf64bdde4afc26485963e76bb409a01a4c9347c` onto actual receiving main
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, whose tree matches the landed
+initial `0e595` source. Both normal merges completed without conflict and
+preserve exact donor code bytes. SDK, UI, Counting and other setup work are
+excluded. The initial delivery is landed; these test changes are a new,
+separate source subject and inherit no validation pass.
+
+The manifest change removes two duplicate object verifications while the
+real checker boundary and corruption refusal remain. Its advisory cleanup
+removes an unreachable alternate tree expectation after the one-file
+branch returns; both reachable one-file and two-file expectations remain
+unchanged. The Hub
+change and its allocation/coalescing qualifications stand as recorded
+above. The complete cache, Demo and manifest files retain all 27 cases,
+including the original optional recorder. The smallest direct compiler
+closure, one same-run native body, any separately released controls and a
+changed-head normal gate remain unrun. No timing factor, native authority,
+provider or complete tenfold acceptance is claimed by this composition.
+
+
+Three-donor economy successor — source, all checks unrun
+
+Request `e4c871d0e0ddf04c4e6b400a503cfefe19b563ae`, resting on promise
+`fcb08d0449eebb3dcdfa9c17dc3ed399c378e428`, adds only reviewed CLI donor
+`92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44` to the isolated Hub `ee7d`
+and manifest `bdf64` composition on published receiving main `a1277d`.
+The normal merge has no conflict and retains the complete donor fixture
+bytes. The CLI helper supplies fixed test author/committer identity only
+for its real local commit process instead of two persistent setup commands
+per fixture. All 15 cases, production capture code and original deadlines
+remain. The 28-command reduction is static, not a measured saving.
+
+The new single affected run owns CLI Node/threads group 0 and the original
+Scope Worker group 1: complete CLI Git 15, cache 1, Demo 5 and manifest 21,
+42 cases with 41 active and one original recorder skip. ScopeTEST,
+LanesScope and CLItest each run once only after independent integration
+and recipe review and a separate execution release. No old 27-case run,
+separate CLI baseline, discovery, filter, retry or deadline change is
+introduced. All tests, controls and the coordinated changed-head gate are
+unrun; no SDK source or failed SDK stage belongs to this composition.
+
+
+## Combined SDK and economy candidate — gate pending
+
+Preparation under request `5427e4d24fc85957e07398efd1508cd631b7740b` and
+builder promise `8150ab2a264f13672bc6b0632b554af07a9ff54a`. This composition
+preserves the exact frozen donor code and current main's six guide blobs;
+it adds no outcome file, test matrix, dependency or configuration change.
+The earlier source-writing “unrun” sections are historical preparation
+records. The current observed outcomes are qualified as follows.
+
+At exact economy `f027`/tree `6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c`,
+handle 68074 passed all three compiler contexts and its whole four-file
+body: 41 cases passed and the original optional recorder was skipped.
+The wrapper exited 1 because its added project-order assertion rejected
+the actual callback order. The baseline component was accepted under
+`4aa`; this does not relabel the failed wrapper. Complete retained proof:
+`/tmp/artroom-economy-f027-one-run-complete-proof.json`, SHA-256
+`4ce0355912e938938601371eb7da613a10b7ddc255102fe0bfc2350e43b6862b`.
+
+The reuse control at that same source, handle 49862, ran the unchanged
+whole cache case once under the Hub-only control. It failed the intended
+pack-count assertion at line 106:26: two builds instead of one, after both
+responses had been awaited and decoded. There was no other case, module
+error, reported unhandled error or retry. Source, cache and permanent pool
+were restored. As reported by the primary builder session, its component
+was accepted under `5bb`; the original
+wrapper still exited 1 as “not-distinguished” because its Ready callback
+incorrectly required zero errors even though Vitest had already updated
+the task's final result. No unchanged baseline or control is repeated by
+this composition.
+
+The separately released early-refusal control at that same frozen source,
+handle 64535, distinguished the intended assertion at line 146:27: one
+oversized payload construction instead of zero. Its wrapper exited 0 and
+its unchanged one-case body exited 1 with that one intended failure.
+The real codec refusal was awaited and the constructor observer restored
+in `finally` before the assertion. There were no extra cases, module or
+reported unhandled errors, skips, retries or repeats. Full source, shared
+cache and permanent pool restoration passed. Later recovery assertions
+were not reached and are not credited by this control. The outer invocation
+used 4.90 seconds wall and 5.24 seconds CPU; the body used 2.75 seconds wall
+and 3.22 seconds CPU. These are separate actual observations, not a speedup
+or complete tenfold result.
+
+The primary builder session read and filed that outcome as report
+`2dea513c54c9a0c80696fee45912be16c81c4a5d`, accepted by the owner under
+`514e39b4cfb9e90ff4e7121524c20895aa39bb6f` and ratified under
+`9d8b6532f2040d4941d724b2b9293fb8c4a383c7`. Complete proof:
+`/tmp/artroom-hub-early-e307-complete-proof.json`, SHA-256
+`fda3cb828d42b69aeac212ef9f69927079e2c95aaddd6f3329f40ebe709c753d`.
+The recipe author's retained mechanical audit is
+`/tmp/artroom-hub-early-e307-independent-outcome/packet.json`, SHA-256
+`67cd82d6aca2e76f354f5f49261bd0be144c528deb77f058c2fa0e908906a095`;
+it is not formal approval or an independent source review. This bounded
+control establishes assertion sensitivity only, not live provider behavior
+or approval of the combined candidate.
+
+At exact SDK `d2a3`/tree `1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f`,
+handle 22393 exited 0: the whole reader case, all four packages' actual
+resolution and emission, offline packs, complete compiled-output journey
+and all three strict consumer contexts passed. The native Node clone call
+and private type erasure were checked, nested clone changes were validated,
+and the original fixture's canonical bytes were preserved. All 264 child
+commands completed: 22 producer and 242 checker children. The complete
+local proof is `/private/tmp/artroom-sdk-d2a3-complete-success-proof.json`,
+SHA-256 `31bf3a57bdc33c96dbb2f4e22e4a567b02b90a749abc84ff2f789bf636f99c40`;
+its explicit public evidence metadata is
+`/tmp/artroom-sdk-d2a3-independent-actual-result/public-proof-r2.json`,
+SHA-256 `2525bde54e2a5b4999f51b79a8b52de7b9c14d2b5d94810a228762f825e63704`.
+The primary builder session's SDK report
+`fc7b5f947b70f6995e005087664485cc9cf82918` and acceptance `364ede`, ratified
+under `a35bb4c4674e9af48b57afc961a5770285ccc716`, concern that local result.
+The four archives and extracted member records remain opaque hash evidence.
+The observed outer time was 4.21 seconds wall and 5.14 seconds CPU; this is
+one local invocation, not a speedup or whole-gate result.
+
+These outputs are owned local stages, not published registry packages,
+installed outside consumers or a deployed service. The failed `5e1f`,
+`c4bd` and `7695` stages remain immutable and supply no borrowed artifacts.
+The SDK guide's preparation statements remain attributed to their original
+source stage; this paragraph records the later successful local outcome.
+No prior source approval transfers to this combined head.
+
+The inert gate recipe retains the ordinary `npm run gate`, unchanged root
+configuration, original 1,007 Vitest cases and two optional recorder skips,
+and the existing active-source and compatibility Node checks. It adds no
+filter, reporter, discovery, compiler/body repeat, `--ci` or SDK stage run.
+Fresh output and exact current source/tool/cache/workspace guards are
+required before a separately released single gate. Complete source and
+evidence review, ordinary landing, public SDK
+publication and outsider/browser/hosted/Jam acceptance, and the full
+measured tenfold objective remain open.
