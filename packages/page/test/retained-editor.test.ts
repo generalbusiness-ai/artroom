@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { canonicalize, definitionDigest, digestBytes, keyIdOfSecret, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
+import type { ScopeRef } from "@generalbusiness/artroom-contract";
 import { changeDemo } from "@generalbusiness/artroom-lanes";
 import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { actAssociation, type ChangeView, type Room } from "../src/data.ts";
@@ -25,8 +26,16 @@ afterEach(()=>{if(descriptor)Object.defineProperty(globalThis,"document",descrip
 test("invalid retained path keeps its corrected draft through explicit unsent recovery; attempted or partial tasks keep their original custody",async()=>{
   vi.mocked(prepareEdit).mockClear(); vi.mocked(continueEdit).mockReset();
   descriptor=Object.getOwnPropertyDescriptor(globalThis,"document"); Object.defineProperty(globalThis,"document",{configurable:true,value:{createElement:(t:string)=>new Element(t)}});
-  const secret=new Uint8Array(32); const room={session:{service:"https://room.test",secret},directory:"sc_dir",membership:{scope:"sc_members",inc:"sha256:"+"1".repeat(64),kind:"membership"},rules:"sc_rules",destination:"sc_destination",key:keyIdOfSecret(secret)} as unknown as Room;
-  const change={scope:"sc_change",manifests:[{id:4,state:"current",file:{path:"../outside.md",digest:digestBytes(utf8("<script>literal</script>")),size:24,content:"<script>literal</script>"}}]} as unknown as ChangeView;
+  const secret=new Uint8Array(32), opening=digestBytes(utf8("scripted retained opening")), digest=definitionDigest(changeDemo);
+  // Structurally valid identities only; these scripted seeds assert no native authority.
+  const directory:ScopeRef={scope:scopeIdOf({v:1,kind:"directory",definition:"platform:directory@1",creator:null,cause:opening,ordinal:0}),inc:newIncarnation(new Uint8Array(16)),kind:"directory"};
+  const sourceScope:ScopeRef={scope:scopeIdOf({v:1,kind:"lane",definition:digest,creator:directory,cause:opening,ordinal:3}),inc:newIncarnation(new Uint8Array(16).fill(3)),kind:"lane"};
+  const room:Room={session:{service:"https://room.test",secret},directory:directory.scope,
+    membership:{scope:scopeIdOf({v:1,kind:"membership",definition:"platform:membership@1",creator:directory,cause:opening,ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(1)),kind:"membership"},
+    rules:scopeIdOf({v:1,kind:"rules",definition:"platform:rules@1",creator:directory,cause:opening,ordinal:1}),
+    destination:scopeIdOf({v:1,kind:"destination",definition:"platform:destination@1",creator:directory,cause:opening,ordinal:2}),
+    key:keyIdOfSecret(secret),me:null,reader:null,unsessioned:null,definitions:new Map()};
+  const change={scope:sourceScope.scope,manifests:[{id:4,state:"current",file:{path:"../outside.md",digest:digestBytes(utf8("<script>literal</script>")),size:24,content:"<script>literal</script>"}}]} as unknown as ChangeView;
   let current=true;
   let rendered=retainedEditor(room,change,{current:()=>current}) as unknown as Element;
   expect(rendered.textContent).toContain("Create corrected proposal"); rendered.all().find(e=>e.tag==="button")!.event("click"); expect(rendered.textContent).toContain("Current file comparison is unavailable"); expect(rendered.textContent).toContain("Reloading or closing it loses");
@@ -39,9 +48,6 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
 
   // Lifecycle/DOM STAND-IN: native source/authority/base rejection and zero
   // mutation POSTs remain exercised unchanged in retained-editor.scope.test.ts.
-  const digest=definitionDigest(changeDemo), opening=digestBytes(utf8("scripted retained opening"));
-  const directory={scope:room.directory,inc:opening,kind:"directory" as const};
-  const sourceScope={scope:change.scope,inc:opening,kind:"lane" as const};
   const draft={title:"Edit ../outside.md",path:"inside.md",content:"<script>literal</script>"};
   const makeTask=(base:string):EditTask=>({association:actAssociation(room,change.scope),
     source:{definition:digest,manifestFact:{at:sourceScope,seq:4,hash:opening},sourceFact:{at:sourceScope,seq:4,hash:opening},scope:sourceScope,manifest:4,opened:opening,base:"c".repeat(40),path:"../outside.md",digest:digestBytes(utf8(draft.content)),size:24,content:draft.content},
@@ -65,7 +71,7 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
   rendered.all().find(e=>e.tag==="form")!.event("submit");await flush();
   expect(rendered.textContent).toContain(fresh.base);expect(vi.mocked(prepareEdit).mock.calls[1]![3]).toEqual(draft);
   expect(continueEdit).toHaveBeenCalledTimes(1); // Prepare never confirms.
-  const signed=await signedIntent(secretSigner(secret),{to:directory,kind:"open-pr",on:null,fields:{definition:digest,title:draft.title,body:"scripted source reference",draft:false},expected:[]});
+  const signed=await signedIntent(secretSigner(secret),{to:directory,kind:"open-pr",on:null,fields:{definition:digest,title:draft.title,body:"scripted source reference",draft:false},expected:{}});
   vi.mocked(continueEdit).mockImplementationOnce(async(_room,task)=>{task.steps.push({kind:"open-pr",target:directory,signed,grants:[],beside:{},attempted:false});task.state="stopped";task.message="The first task-room read failed before submission.";});
   button("Confirm new proposal")!.event("click");await flush();
   expect(fresh.steps[0]!.attempted).toBe(false);expect(rendered.textContent).toContain("read failed");
@@ -91,7 +97,7 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
   const redraw=()=>{rendered=retainedEditor(room,change,{current:()=>current}) as unknown as Element;};
   redraw();expect(button("Back to edit")).toBeUndefined();
   step.answer={answer:"accepted",receipt:{fact:{at:directory,seq:1,hash:opening},definition:"platform:directory@1",intent:null,effects:[],sends:[],epoch:0}};
-  uncertain.lane="sc_partial";uncertain.proposal=1;
+  uncertain.lane=scopeIdOf({v:1,kind:"lane",definition:digest,creator:directory,cause:opening,ordinal:4});uncertain.proposal=1;
   const partial=JSON.stringify(uncertain);redraw();expect(button("Back to edit")).toBeUndefined();offered.event("click");expect(JSON.stringify(uncertain)).toBe(partial);
   step.attempted=false;redraw();expect(button("Back to edit")).toBeUndefined(); // Answer alone still fences recovery.
   delete step.answer;step.receiptVerified=true;redraw();expect(button("Back to edit")).toBeUndefined();
