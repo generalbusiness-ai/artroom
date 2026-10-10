@@ -1,0 +1,25 @@
+{
+  "request": "63cc585c20856b74313d424d49572c426da1a280",
+  "promise": "5b8bb2ec3df6792c3207d8a78b5c4a94d7d81ffc",
+  "actual_command": [
+    "git",
+    "worktree",
+    "remove",
+    "/Users/hughpyle/play/artroom-worktrees/planner-sprint14-20261009"
+  ],
+  "actual_exit": 0,
+  "removed_path": "/Users/hughpyle/play/artroom-worktrees/planner-sprint14-20261009",
+  "path_absent": true,
+  "registry_absent": true,
+  "preserved_branch": "planner/sprint14-report-20261009",
+  "preserved_head": "6ad49bdc64dc23477de011df37ef137d150b516a",
+  "commit_object_present": true,
+  "all_other_worktree_head_records_unchanged": true,
+  "fresh_checks": {
+    "path": "/tmp/artroom-one-worktree-cleanup-fresh.json",
+    "sha256": "8d1070e3b04b3e3b026f438d57f716a8c77b6832d7700ed7399d2ed6e8facad2"
+  },
+  "remaining_registered_worktrees": 233,
+  "epoch": 1791629747.88238,
+  "qualification": "Only explicitly released single checkout removed. No force, branch/ref/object/workroom/evidence removal, runtime/provider/privatecontent probe. Other held paths and c7 fullmaintenance remain open."
+}
