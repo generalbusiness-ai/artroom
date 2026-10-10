@@ -39,6 +39,7 @@ class Element {
   }
   set value(value: string) { this.attrs.set("value", value); }
   get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(""); }
+  set textContent(value: string) { this.children = [value]; }
   all(): Element[] { return [this, ...this.children.flatMap((child) => typeof child === "string" ? [] : child.all())]; }
   event(name: string) { for (const listener of this.listeners.get(name) ?? []) listener({ preventDefault() {} }); }
 }
