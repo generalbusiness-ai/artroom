@@ -1,0 +1,47 @@
+{
+  "request": "60e59173a14827d5017d89e217a6c8e2cf8d3cde",
+  "promise": "11ffa485a8f1c066471b2a1a5b92d78627db0b54",
+  "original_landing_handle": 4918,
+  "actual_terminal": 0,
+  "candidate": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "merge_head": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53",
+  "tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "source_clean": true,
+  "candidate_ancestor_exit": 0,
+  "live_remote_query": {
+    "command": [
+      "git",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "exit": 0,
+    "stdout": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53\trefs/heads/main\n",
+    "observed_utc": "2026-10-10T08:23:26.463811+00:00",
+    "qualification": "Captured terminal output from one live remote query, not just tracking ref."
+  },
+  "sealed_receipt": {
+    "event": "732ca210b84469513b3a53b618b2867ca92a71e0",
+    "decision": "effective",
+    "path": "/tmp/artroom-initial-sealed-landing-receipt.json",
+    "sha256": "0d6c1321ed39c072aa1425fcbdcadc666203d0511787596e54a8f617b611412b",
+    "changed_paths": 229,
+    "paths_match_frozen_inventory": true
+  },
+  "commitment": {
+    "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:60e59173a14827d5017d89e217a6c8e2cf8d3cde",
+    "requester": "20db43a245e9780b92a587425d387d393b17ffc90b89e036ff752399f88fc517",
+    "performer": "feb90d36627c7f4466ef9473c4fa0bbaf91699d16b93d832a37629988dfba6de",
+    "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:11ffa485a8f1c066471b2a1a5b92d78627db0b54",
+    "report": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:23eaef7b1806a3def74a490e88cec8681df9ed5f",
+    "status": "satisfied",
+    "stale": true,
+    "target_repo": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3",
+    "target_ref": "refs/heads/main",
+    "approval": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2a41bb06e7e115aea92c8a2de4a409f98aeda328",
+    "candidate": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+    "terminal": "landed",
+    "landing_receipt": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:732ca210b84469513b3a53b618b2867ca92a71e0"
+  },
+  "qualification": "Only bounded initial source increment landed; full product/test10x/Counting/Jam/manual/hosted/browser/device duties remain open. No cleanup or gate repeat."
+}
