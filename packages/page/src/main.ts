@@ -116,6 +116,7 @@ let roomDialogBinding: { settings: string; route: string } | null = null;
 interface WorkbenchDialog {
   dialog: HTMLDialogElement; body: HTMLElement; context: string; route: string; kind: "record" | "review" | "source";
   opener: string; manifest?: number; action?: string; message: HTMLElement; binding: string;
+  reviewDisabled?: Set<HTMLElement>;
   review?: { room: Room; change: Awaited<ReturnType<typeof loadChange>>; blocked: boolean; offered: boolean };
 }
 let workbenchDialog: WorkbenchDialog | null = null;
@@ -212,7 +213,7 @@ function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send:
     }), context, fields, label);
     openWorkbench(`Review version ${manifest}`, content, association, key, "review", { manifest: Number(manifest), action: act.kind });
     owned = workbenchDialog;
-    if (owned) owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true };
+    if (owned) { owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true }; owned.reviewDisabled = new Set(content.querySelectorAll<HTMLElement>("[disabled]")); }
     content.addEventListener("input", () => { if (workbenchDialog === owned && owned?.review) reconcileReview(association, owned.review.room, owned.review.change, owned.review.blocked, owned.review.offered); });
   });
   return button;
@@ -226,6 +227,11 @@ function reconcileReview(context: string, room: Room, change: Awaited<ReturnType
   const requestBlocked = blocked || !!sending.get(context) || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
   const extent = selected.body.querySelector<HTMLInputElement | HTMLSelectElement>('[name="field:extent"]')?.value ?? "";
   const problem = reviewSelectionProblem(room, change, selected.manifest!, extent);
+  // A failed preparation has no submitted original to fence. Keep the exact
+  // draft editable for deliberate correction; initially unavailable controls stay unavailable.
+  if (!requestBlocked) for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select")) {
+    if (!selected.reviewDisabled?.has(control)) control.removeAttribute("disabled");
+  }
   if (requestBlocked || !offered || problem) {
     selected.message.textContent = requestBlocked ? "Check the original request before another action. This review still names its original version." : !offered ? "Review is no longer available to this member. This draft still names its original version." : problem!;
     selected.message.removeAttribute("hidden");
@@ -234,7 +240,7 @@ function reconcileReview(context: string, room: Room, change: Awaited<ReturnType
     if (last?.kind === selected.action && last.answer.answer === "refused") {
       selected.message.textContent = nonacceptedAnswerText(last.answer);
       selected.message.removeAttribute("hidden");
-      for (const control of selected.body.querySelectorAll("input, textarea, select, button[type=submit]")) control.removeAttribute("disabled");
+      for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select, button[type=submit]")) if (!selected.reviewDisabled?.has(control)) control.removeAttribute("disabled");
     } else if (!sending.get(context)) {
       selected.message.setAttribute("hidden", "");
       for (const button of selected.body.querySelectorAll("button[type=submit]")) button.removeAttribute("disabled");

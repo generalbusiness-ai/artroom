@@ -19,7 +19,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     focus() {}
     removeAttribute(name: string) { delete this.attrs[name]; }
     hasAttribute(name: string) { return Object.hasOwn(this.attrs, name); }
-    querySelector(selector: string) { return selector.includes("data-action-slot") ? new Element("div") : null; }
+    querySelector(selector: string) { return selector.includes("data-action-slot") ? new Element("div") : this.querySelectorAll(selector)[0] ?? null; }
     getAttribute(name: string) { return this.attrs[name] ?? null; }
     all(): Element[] { return [this, ...this.children.flatMap(child => typeof child === "string" ? [] : child.all())]; }
     querySelectorAll(selector: string) {
@@ -71,6 +71,9 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     await import("../src/main.ts");
     await rendered.promise;
     expect(panels.length).toBeGreaterThan(0);
+    // Main owns these public association hosts; the view stand-in must expose them.
+    expect(root.querySelectorAll('[data-request-context]').map(node=>node.getAttribute('data-request-context'))).toEqual(['room/member/directory']);
+    expect(root.querySelectorAll('[data-task-context]').map(node=>node.getAttribute('data-task-context'))).toEqual(['room/member/directory']);
     const beforePending = panels.length;
     send("comment", "", Object.fromEntries([["__proto__", "literal field"]]));
     await attempt.promise;
@@ -287,6 +290,19 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     root.querySelector<Node>('[data-task-act="review-verdict"]')!.emit('click');dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="review-verdict"]')!;
     edit(form,'body','Keep this selected review');await refresh();
     const before=act.mock.calls.length;
+    // FIRST failure has no prior native refusal whose branch could repair the controls.
+    change.reviewMembersByExtent={rules:[]};rendered=gate();form.emit('submit');await rendered.promise;
+    expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
+    expect(form.querySelector<Node>('[name="field:body"]')!.hasAttribute('disabled')).toBe(false);
+    expect(form.querySelector<Node>('[name="field:extent"]')!.hasAttribute('disabled')).toBe(false);
+    expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(true);
+    expect(form.querySelector<Node>('[name="field:manifest"]')!.value).toBe('12');
+    expect(form.querySelector<Node>('[name="field:extent"]')!.value).toBe('rules');
+    edit(form,'body','Corrected definitely-unsent review');
+    change.reviewMembersByExtent={rules:[{label:'@reader',value:'@reader'}]};await refresh();
+    expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(false);
+    expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Corrected definitely-unsent review');
+    edit(form,'body','Keep this selected review');
     // Generic change.review remains offered while the specific requirement loses eligibility.
     change.reviewMembersByExtent={rules:[]};await refresh();
     expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(true);
@@ -311,6 +327,14 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     change.state='open';await refresh();
     attempted=gate();form.emit('submit');await attempted.promise;await done(7,'accepted');
     expect(dialog.open).toBe(false);expect(root.textContent).toContain('Selected change');
+    // A submitted unknown report remains fenced; definite-unsent recovery does not release it.
+    root.querySelector<Node>('[data-task-act="review-verdict"]')!.emit('click');dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="review-verdict"]')!;
+    edit(form,'body','Keep unknown original review');attempted=gate();form.emit('submit');await attempted.promise;
+    rendered=gate();attempts[8]!.lose();await rendered.promise;
+    expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Keep unknown original review');
+    expect(form.querySelector<Node>('[name="field:body"]')!.hasAttribute('disabled')).toBe(true);
+    expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(true);
+    const unknownAttempts=act.mock.calls.length;form.emit('submit');await refresh();expect(act).toHaveBeenCalledTimes(unknownAttempts);expect(posts).toHaveBeenCalledTimes(unknownAttempts);
   } finally {
     // Every held fake attempt is drained before removing its document.
     for(const attempt of attempts)attempt.lose();for(let n=0;n<30;n++)await Promise.resolve();
