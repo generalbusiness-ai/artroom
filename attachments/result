@@ -1,0 +1,47 @@
+{
+  "head": "66ce1125c00a15242f5b277de8d5b580e5ed81ba",
+  "tree": "0cebf0f372e752c50028d18b8b7f6b2fffad8ea9",
+  "release": "e0ed62aa3b98facf1471e4e7c5a6efbfb1bf6495",
+  "actual_handle": 43824,
+  "actual_exit": 0,
+  "compilers": "ReplaySOURCE/TEST,LanesScope eachoncePASS",
+  "cases": "whole5 wiring PASS; exact same-runScope selection accepted; no errors/skips/retries/repeats",
+  "manifest_verified": {
+    "files": {
+      "body.log": {
+        "sha256": "0a645e2b8ad511ab3983104c362bbbc9df3b1777fa466b9a43bce597e6e693c7"
+      },
+      "coverage-ledger.json": {
+        "sha256": "8234946f18005eb8921cf24534877031d3d0ec1a50a60d0578deb60e9fa4918f"
+      },
+      "coverage.jsonl": {
+        "sha256": "be5e2819d3028403b2af0375626467de176e9e6f1f4b3c3f38cb89f546e83f10"
+      },
+      "lanes-scope.log": {
+        "sha256": "ae0866bbb319255d67e2845110a277eb83f93f47b9d2aae8a2aa0cc11738a5ef"
+      },
+      "plan.json": {
+        "sha256": "80ac9da10e3d82d2235f37e167aea03066d9a0f0a1035002ae59378bb82f3fc4"
+      },
+      "replay-source.log": {
+        "sha256": "12a717b84e19c8ee0eaf025e72c5801eee5b4e441079c5561f9e371eeb787fbc"
+      },
+      "replay-test.log": {
+        "sha256": "25cebe20691767fc584951e233eb4ea933ba2eef6fa6822ae7a51871e2e62cdf"
+      },
+      "result.json": {
+        "sha256": "6b046a45745f7ac0ad4d092efa02ee78cb4bea827f3abbaa0ab8fe5e1009a699"
+      },
+      "vitest.json": {
+        "sha256": "ca91395547d198c451652fe241db2bdb60296f2cb3271d59a0332d8f4de8b2e5"
+      }
+    },
+    "verificationExitCode": 0,
+    "completionRule": "Actual pipeline exit is authoritative; a sealing failure is not a complete run."
+  },
+  "outer_wall_seconds": 8.48,
+  "outer_cpu_seconds": 11.32,
+  "body_wall_seconds": 7.42,
+  "body_cpu_seconds": 8.41,
+  "limits": "Real nativeScopes/SQLite/authorizedHTTP, stand-inGitHost/scriptedchangedsets/checker-signature. Exact known ancestry-only incomplete retained; not wholeconsistentreplay/longpooltimeoutcause/fullSource/gate."
+}
