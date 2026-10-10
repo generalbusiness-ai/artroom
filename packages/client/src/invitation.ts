@@ -104,6 +104,7 @@ function v2(value: unknown): value is InvitationV2 {
   if (!fields(value, ["v", "service", "deployment", "repository", "definition", "invitation", "secret", "handle", "application"]) || value["v"] !== 2) return false;
   const repository = value["repository"], application = value["application"];
   return origin(value["service"]) && text(value["deployment"], 1, 128) && common(value, 32) && membershipDefinition(value["definition"])
+    && typeof value["invitation"] === "number" && value["invitation"] <= 1_000_000_000
     && fields(repository, ["directory", "membership", "rules", "destination"])
     && ref(repository["directory"], "directory") && ref(repository["membership"], "membership")
     && ref(repository["rules"], "rules") && ref(repository["destination"], "destination")
