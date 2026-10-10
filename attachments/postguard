@@ -1,0 +1,12 @@
+{
+  "status": "readonly-current-correspondence-passed",
+  "source": "/private/tmp/artroom-sdk-clone-witness-range-repair",
+  "head": "d2a39598f56708a4523bdfde2ad98a82dd843cb7",
+  "tree": "1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f",
+  "tracked_inputs": 124,
+  "packages": 7,
+  "files_per_side": 809,
+  "npm_records": 1953,
+  "tools_and_locks": "matched",
+  "qualification": "Root separate post-terminal comparison; actual runner final guard also passed. No public or native acceptance."
+}

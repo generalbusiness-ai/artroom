@@ -1,0 +1,39 @@
+{
+  "kind": "Independent actualSDKd2a3 complete localresult evidence audit and explicit PUBLICwhitelist",
+  "source": "d2a39598f56708a4523bdfde2ad98a82dd843cb7",
+  "tree": "1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f",
+  "original_handle": 22393,
+  "actual_terminal_exit": 0,
+  "execution_request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:58d4d169f4da4b1f25ebd7ab58a6efef50882c35",
+  "execution_promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5029248c9450ea80a3ae9d834a56ee20854ab346",
+  "reader": "1PASS0fail0skip0cancel0todo",
+  "producer": "4localpackages sealed,notpublished",
+  "checker": "Completeclonejourney and3strictcontextsPASS",
+  "child_counts": {
+    "producer": 22,
+    "checker": 242
+  },
+  "public_whitelist_entries": 1369,
+  "opaque_member_streams": 225,
+  "opaque_tarballs": 4,
+  "root_postguard": {
+    "path": "/tmp/artroom-sdk-d2a3-success-postguard.json",
+    "sha256": "d589c764722490399a53ed7e237fcfbe32f0db6d07365077980672f44d156de0",
+    "status": "readonly-current-correspondence-passed",
+    "qualification": "Root actual separate post-terminal124-source/7packages809files/1953npm/tools/locks comparison read; not freshly duplicated here."
+  },
+  "new_runtime": "NONE",
+  "concrete_evidence_findings": [],
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-sdk-d2a3-independent-actual-result/public-proof-r2.json",
+      "bytes": 430154,
+      "sha256": "2525bde54e2a5b4999f51b79a8b52de7b9c14d2b5d94810a228762f825e63704"
+    },
+    {
+      "path": "/tmp/artroom-sdk-d2a3-independent-actual-result/review.md",
+      "bytes": 3855,
+      "sha256": "62b7c600c5507bb9e30ece25bc8c1ffb1b9f0111bbb96523c11b961743aed3b3"
+    }
+  ]
+}
