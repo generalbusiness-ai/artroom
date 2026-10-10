@@ -1,0 +1,64 @@
+{
+  "request": "74b810cd1dd75fbfff0f481c77e290409fc85e32",
+  "rests_on": [
+    "660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa",
+    "0e527840fd86f43dd3d4a2d03a3fd5ca63e0353d"
+  ],
+  "cwd": "/tmp/artroom-hub-early-refusal",
+  "branch": "request/hub-early-refusal",
+  "base": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "head": "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+  "tree": "04d63dad5044fd911d501f99164adff1867bcb81",
+  "clean": true,
+  "pushed": "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+  "changed_paths": [
+    "notes/2026-10-09-initial-combined-delivery.md",
+    "packages/scope/test/hosts-pack-cache.test.ts",
+    "packages/scope/test/hosts.ts"
+  ],
+  "original_c8_case_body_byte_identical": true,
+  "case_body_sha256": "1ea8361ff3fa333cc7c25d56b25fc91d400e2698393fb23e8ebd93e26e24134d",
+  "constructor_count_assertion_line": 146,
+  "reuse_count_assertion_line": 106,
+  "whole_file_titles": 6,
+  "original_optional_recorders": 1,
+  "execution": "ALLruntime/validation/control/view/gateUNRUN; Sourceauthoringonly",
+  "qualifications": [
+    "Hub-only failures no longer coalesce; actual builder accounting/identity eviction explicit",
+    "accepted bytes and OwnGit default path retained",
+    "constructor observer interception/control distinction unproved",
+    "no fullSourceapproval/timing/10x/authority/provider/Productclaim"
+  ],
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/delta.patch",
+      "bytes": 7640,
+      "sha256": "0ac3709f2e4b28f912debcf66ac82433e2fa534abc58ccc72c1c71809ab6d5fc"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/source-and-check-plan.md",
+      "bytes": 6976,
+      "sha256": "dbfdc1896dd1c832915804fb7d997353b631de392c1b6279bcdfb6f183ae6d93"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/source-and-dependency-inventory.json",
+      "bytes": 2849,
+      "sha256": "609ee93d2f28d8b8ca45a46eb0b32a0024459fa90e05edec6c69dd8848c5c7b1"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/source-bodies/hosts-pack-cache.test.ts",
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/source-bodies/hosts.ts",
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-packet/whole-file-title-ledger.json",
+      "bytes": 2801,
+      "sha256": "1c0df070bbc6af7039f3d7703c03484abaffc47b4cb8288db1b994384d1c844f"
+    }
+  ]
+}

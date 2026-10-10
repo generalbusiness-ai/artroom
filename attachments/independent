@@ -1,0 +1,23 @@
+{
+  "head": "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+  "tree": "04d63dad5044fd911d501f99164adff1867bcb81",
+  "base": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "request": "74b810cd1dd75fbfff0f481c77e290409fc85e32",
+  "promise": "660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa",
+  "source_packet": "/tmp/artroom-hub-early-refusal-source-packet/packet.json",
+  "source_packet_sha256": "853073a20cae0dcfa5e25e107f32b6d8f04e489baff4fc8c6e91468813e18d8e",
+  "full_changed_bodies_read": 3,
+  "complete_note_bytes": 57025,
+  "own_git_class_byte_preserved": true,
+  "original_c8_case_body_byte_preserved": true,
+  "original_c8_case_body_sha256": "1ea8361ff3fa333cc7c25d56b25fc91d400e2698393fb23e8ebd93e26e24134d",
+  "hub_body_preserved_except_optin": true,
+  "note_prefix_preserved": true,
+  "blocking_findings": [],
+  "nonblocking_qualification": "Packet shorthand must limit changed failed coalescing to selected count/raw failures; ordinary small hash failures retain old path.",
+  "findings": "/tmp/artroom-hub-ee7-independent-source-review/findings.txt",
+  "findings_sha256": "f27a54d56a84721fe21151cfac3e12054c56b6d6363f8637d8e2b4902b11510b",
+  "runtime_or_formal_approval": false,
+  "execution": [],
+  "head_unchanged_clean": true
+}
