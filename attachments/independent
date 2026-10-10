@@ -1,0 +1,39 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0da42a1126c471750cec1ccaf3adf17f4c94ee7c",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694fa7a6b5005d72c3085c1ca037a4a21cc49ec",
+  "adoption": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5bdb4183391917025edeb8c9b23786e625034360",
+  "source": {
+    "path": "/private/tmp/artroom-sdk-clone-boundary-repair",
+    "head": "769566a17b3a11b505acb2a08ddfe92ee5b3530f",
+    "tree": "fe5c9c1bd30200eb7ffb7306193c09c34db1ea4f",
+    "clean": true,
+    "base": "c4bd3f256d6f5cab4038ee9d8c178fbc25a2ee21"
+  },
+  "source_packet": {
+    "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/packet.json",
+    "sha256": "394a36be4ef704f3019de5c8e24f7b695d47df6fcad6038e27bd0138ed8ff230"
+  },
+  "read_scope": "Full three changed bodies, complete delta, full request/adoption and source/check plan; narrow supporting manifest/prior partial ABI. No whole SDK audit.",
+  "disposition": "No concrete blocker in adopted bounded source repair; all runtime unrun; not formal approval",
+  "changed_paths": [
+    "docs/public-sdk-release.md",
+    "packages/derive/test/fixtures.ts",
+    "scripts/check-public-release.mjs"
+  ],
+  "preservation": {
+    "exact_fixture_original_after_declaration_removal": true,
+    "unchanged_guard_paths": 8,
+    "only_three_tracked_paths_changed": true,
+    "prior_partial_abi": "Supporting read only; failed artifacts not reused or promoted"
+  },
+  "proposal_roots_absent": {
+    "stage": true,
+    "evidence": true,
+    "outer": true
+  },
+  "findings": {
+    "path": "/tmp/artroom-sdk-7695-independent-source-review/findings.txt",
+    "sha256": "e9a5ce555e98f26d051fec3b263db67c831085c597fd1a9ce4fba3a28b0053f4"
+  },
+  "execution": []
+}

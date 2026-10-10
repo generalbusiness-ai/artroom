@@ -1,0 +1,118 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0da42a1126c471750cec1ccaf3adf17f4c94ee7c",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694fa7a6b5005d72c3085c1ca037a4a21cc49ec",
+  "adoption": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5bdb4183391917025edeb8c9b23786e625034360",
+  "source": "/private/tmp/artroom-sdk-clone-boundary-repair",
+  "branch": "request/sdk-clone-boundary-repair",
+  "base": "c4bd3f256d6f5cab4038ee9d8c178fbc25a2ee21",
+  "head": "769566a17b3a11b505acb2a08ddfe92ee5b3530f",
+  "tree": "fe5c9c1bd30200eb7ffb7306193c09c34db1ea4f",
+  "clean": true,
+  "pushed": "769566a17b3a11b505acb2a08ddfe92ee5b3530f",
+  "changed_paths": [
+    "docs/public-sdk-release.md",
+    "packages/derive/test/fixtures.ts",
+    "scripts/check-public-release.mjs"
+  ],
+  "source_bodies": [
+    {
+      "path": "docs/public-sdk-release.md",
+      "bytes": 10712,
+      "sha256": "0653c775b44b3bf5e86a924f0b4740808d0c28ced701522a969e507d9befeb78"
+    },
+    {
+      "path": "packages/derive/test/fixtures.ts",
+      "bytes": 38705,
+      "sha256": "38277148a00f52c1972498c59735854fd369b8fbfe9e3cf264308690c424a3e6"
+    },
+    {
+      "path": "scripts/check-public-release.mjs",
+      "bytes": 11928,
+      "sha256": "3269c0bce1ee7cc4f518132b98e89f5307bd43fb06ab3dcf10cbf5860db737d9"
+    }
+  ],
+  "unchanged_guards": [
+    {
+      "path": "scripts/public-release.mjs",
+      "sha256": "f0ac3d01f7d0e144edec1423108b7eb3d1023564cd0a9f9cab8c92ba89c32be0",
+      "byte_unchanged": true
+    },
+    {
+      "path": "scripts/public-release-lib.mjs",
+      "sha256": "ecc290e03d8af858f632f1e78705b85d422cbd0ba8c3a8ee1042b97320c93997",
+      "byte_unchanged": true
+    },
+    {
+      "path": "scripts/public-release-modules.mjs",
+      "sha256": "f547cd2a570e234f7d5e62e793933dce5e27767c780f555fff240f8033e09849",
+      "byte_unchanged": true
+    },
+    {
+      "path": "scripts/public-release-modules.test.mjs",
+      "sha256": "67268adb8632ebf7bdbaa503e485329abd7922b60b70b13353bf05b5045ba020",
+      "byte_unchanged": true
+    },
+    {
+      "path": "scripts/public-release.json",
+      "sha256": "86684da056dbc4dbb522d557aa3e22224d7cc5222c0fff5041032a4d1f33849d",
+      "byte_unchanged": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "byte_unchanged": true
+    },
+    {
+      "path": "packages/bytes/src/web.d.ts",
+      "sha256": "19719f1ff1cbab5304c5dfc9e35665b352a12604f937b6045685f829ad79f07b",
+      "byte_unchanged": true
+    },
+    {
+      "path": "packages/derive/package.json",
+      "sha256": "6e15cc7ef35481713d37d8210e73bd545242660305e9448be1480b925a77af45",
+      "byte_unchanged": true
+    }
+  ],
+  "original_fixture_body_equal_after_exact_declaration_removal": true,
+  "all_runtime_unrun": true,
+  "execution": [],
+  "new_tool_view": "absent, future separate preparation",
+  "future_recipe_roots_absent_proposals_only": {
+    "stage": "/private/tmp/artroom-sdk-7695-localdev2-stage-next-one",
+    "evidence": "/private/tmp/artroom-sdk-7695-localdev2-evidence-next-one",
+    "outer": "/private/tmp/artroom-sdk-7695-localdev2-outer-next-one"
+  },
+  "independent_review": "Root independently reads frozen complete3body/delta/plan after this author packet; no author formal approval",
+  "preservation": [
+    "old5e1/c4bd failed stages and original diagnostics",
+    "private conditional four-body alternative",
+    "main/current naming preparation"
+  ],
+  "artifacts": [
+    {
+      "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/delta.patch",
+      "bytes": 7831,
+      "sha256": "5c7a1f11fb55076d52b212e9d6a7580accc247e7bbd73f0d728507e1f0264cdc"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/source-and-check-plan.md",
+      "bytes": 6987,
+      "sha256": "fe7e3cb1fef2e2fdf574578363563a25d3f2b0a96dc5cb0de379333ac9019f60"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/source-bodies/docs/public-sdk-release.md",
+      "bytes": 10712,
+      "sha256": "0653c775b44b3bf5e86a924f0b4740808d0c28ced701522a969e507d9befeb78"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/source-bodies/packages/derive/test/fixtures.ts",
+      "bytes": 38705,
+      "sha256": "38277148a00f52c1972498c59735854fd369b8fbfe9e3cf264308690c424a3e6"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-clone-boundary-source-packet/source-bodies/scripts/check-public-release.mjs",
+      "bytes": 11928,
+      "sha256": "3269c0bce1ee7cc4f518132b98e89f5307bd43fb06ab3dcf10cbf5860db737d9"
+    }
+  ]
+}
