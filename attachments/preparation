@@ -1,0 +1,73 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e84d064d623f5355e6af81be54b906bd4e7b6b9b",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:732a27695d9b5903f59dd4c7ecc1bf5434f54a52",
+  "head": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "tree": "11412d5e08fbbd61e13a5479d5bb66f20a8faf68",
+  "root": "/private/tmp/artroom-hub-pack-reuse",
+  "clean": true,
+  "source_hash_count": 1272,
+  "workspaces": 12,
+  "aliases": 24,
+  "exports": 25,
+  "cache": {
+    "path": "/tmp/artroom-hub-c8-static-preparation/shared-cache-snapshot.json",
+    "sha256": "b6d1822dc82db05d261865fea24011cb60b5a8740cdadd27c4e0e79e14e5bd21",
+    "files": 3898,
+    "links": 28,
+    "unchanged_after": true
+  },
+  "pool": {
+    "owned": "/private/tmp/artroom-hub-pack-reuse/node_modules/@cloudflare/vitest-pool-workers",
+    "files": 23,
+    "bundle_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39"
+  },
+  "whole_file_cases": 6,
+  "active_required": 5,
+  "original_recorder_skipped": 1,
+  "compiler_roots": [
+    "packages/scope/tsconfig.test.json"
+  ],
+  "held": "ad12 refusal-allocation Source choice plus Root exact recipe/release; no execution",
+  "final_recipes": [
+    "affected-r2.config.mjs.recipe",
+    "run-affected-r2.py.recipe"
+  ],
+  "artifacts": {
+    "proof.json": {
+      "bytes": 259663,
+      "sha256": "9af05d50a0ddadb39df92686418c6fe3bd2f996d27dc197fb0329ae2f57f637b"
+    },
+    "shared-cache-snapshot.json": {
+      "bytes": 628897,
+      "sha256": "b6d1822dc82db05d261865fea24011cb60b5a8740cdadd27c4e0e79e14e5bd21"
+    },
+    "plan.json": {
+      "bytes": 5969,
+      "sha256": "ff2c182329ba54024fe85150501f7af00d58c9e237359e09dad99eaa07ed1a8f"
+    },
+    "affected-r2.config.mjs.recipe": {
+      "bytes": 3826,
+      "sha256": "a5df53c5dd80571959b8b77d47760c2bc66d56ecc24753a9d2879e8e3c75cc83"
+    },
+    "run-affected-r2.py.recipe": {
+      "bytes": 10542,
+      "sha256": "20e19c6889ff6b60bb097226e22a9fbfb5e358d75b6e75bce4d8b7b33bd0c508"
+    },
+    "future-control-plan.json": {
+      "bytes": 1396,
+      "sha256": "66fca28815d0d12837e7a377d4a0abc5c45c2052f3fbeef74ef24473295a2fed"
+    },
+    "execution-inputs.json": {
+      "bytes": 956,
+      "sha256": "8a7178a38fc035d5c269b7c2294019c430bf276829288e4c0c5c4b6921bebdde"
+    },
+    "preparation.md": {
+      "bytes": 5440,
+      "sha256": "23ef40730d3a36172a904b176ed299ae19a909f830b08be6ed112437829091c1"
+    }
+  },
+  "execution": "NONE; static filesystem view preparation and external inert recipe authoring only",
+  "checkout_or_shared_source_changed": false,
+  "other_lanes": "229/99684 and SDK untouched",
+  "formal_approval": false
+}
