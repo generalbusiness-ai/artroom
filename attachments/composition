@@ -1,0 +1,204 @@
+{
+  "status": "INERT composition preparation only; no checkout/ref/source merge/build performed",
+  "base": {
+    "head": "059853a20a025282deef06dee9d6ebfa9b110693",
+    "tree": "7ae6f450d48b3303d83519cd439b0cf6e98e22e1",
+    "frozen_failed_gate": "/tmp/artroom-059-final-gate",
+    "qualified_outcome": "1001 PASS,4 original5000ms native timeout FAIL,2 optional recorder skips; active-source UNRUN; exit1; causes remain unknown"
+  },
+  "subjects": [
+    {
+      "label": "publication",
+      "head": "941b113f4134c34019f80a176f28587cef49425e",
+      "tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+      "worktree": "/private/tmp/artroom-publication-final-trees",
+      "clean_at_map": true,
+      "merge_base": "059853a20a025282deef06dee9d6ebfa9b110693",
+      "paths": [
+        {
+          "path": "packages/platform/src/destination-objects.ts",
+          "blob": "9b1b83d4c16f1c382ac4b20274273014a7873ff7",
+          "sha256": "3882f9990dfbdec724bfb5d9e09f7893dff58f6afaac0c3bd3f92f84fe08bd39"
+        },
+        {
+          "path": "packages/platform/test/edit.test.ts",
+          "blob": "0b37e8dceb1c3f83b011529f4b2e7e37907d765e",
+          "sha256": "6eff7fd51d00f10d6b876d90f57e6fa4bc79688d9185dd87ff6346c65a5c948e"
+        },
+        {
+          "path": "packages/scope/src/github-host.ts",
+          "blob": "3fb88d4e988bd75d472ae170abc332c6fa61020c",
+          "sha256": "f17b321200e94ef3ab4a9420bafd7885b7bb4da2e8e89d0f1ae442fdb15683fd"
+        },
+        {
+          "path": "packages/scope/test/artifacts-host.test.ts",
+          "blob": "754cd2691d09522b1b13835a782fcd8dd707a78a",
+          "sha256": "23f287029c5c94d03870f30fcd5a2c6bb037dfd782b6a19469a5d594100d944b"
+        }
+      ],
+      "delta": "/tmp/artroom-059-three-branch-composition-plan/publication-from059.patch",
+      "delta_sha256": "26c0da7e8406d90339347190ca37a22e21a9a7a9826ccb1f646dd2f1ac45999d"
+    },
+    {
+      "label": "replay",
+      "head": "66ce1125c00a15242f5b277de8d5b580e5ed81ba",
+      "tree": "0cebf0f372e752c50028d18b8b7f6b2fffad8ea9",
+      "worktree": "/private/tmp/artroom-replay-empty-holders-focused",
+      "clean_at_map": true,
+      "merge_base": "059853a20a025282deef06dee9d6ebfa9b110693",
+      "paths": [
+        {
+          "path": "packages/lanes/test/wiring.scope.test.ts",
+          "blob": "cf21f71c3ece568c845602c194b989739adc9836",
+          "sha256": "54dfd1a30f110b73a4b83ab674b8e37265e0e696c639449605d2fff516e455a3"
+        },
+        {
+          "path": "packages/replay/src/verify.ts",
+          "blob": "d94f28edbd25626afebfd610027b02d923e94aff",
+          "sha256": "b0d785e6d2ea199a345c535a541621a63dad7dd0f0ff17b9a6afb4aed2bb05c7"
+        }
+      ],
+      "delta": "/tmp/artroom-059-three-branch-composition-plan/replay-from059.patch",
+      "delta_sha256": "007e91f889f060afcbe8b9f2e9741a4cc4739b8d6f1b0fcf79c8c375722da245"
+    },
+    {
+      "label": "native",
+      "head": "fc0f4e04220f03fb9f86734c09a8a52e5f6509f3",
+      "tree": "9d222d5fa6d22511dc03dd4b796329673588bb3a",
+      "worktree": "/private/tmp/artroom-native-direct-stage-markers",
+      "clean_at_map": true,
+      "merge_base": "059853a20a025282deef06dee9d6ebfa9b110693",
+      "paths": [
+        {
+          "path": "packages/lanes/test/site-native3-publication.scope.test.ts",
+          "blob": "9bf47e0f82342caa2067eb99aae1bf61fef1ecb2",
+          "sha256": "2e43475889f435734a6c8ff2ed54029fb7ef45cb96d07fb5ea56ed727892ac06"
+        },
+        {
+          "path": "packages/page/test/source-preview.scope.test.ts",
+          "blob": "f7ee1022cf602d10fb66979a32dcdbaccf3a921c",
+          "sha256": "56b65c2466b2f30cc0f0df8acc26adf3489e387f8904351b4b311dba1fd41a0c"
+        },
+        {
+          "path": "packages/page/test/task-data.scope.test.ts",
+          "blob": "ca4303cb9901bdf76a5174a3bbc66a405a439453",
+          "sha256": "6cd393d03aca2d1d194b238617a89f45455f24279c7ed404f07b65eb312a98ef"
+        },
+        {
+          "path": "packages/scope/test/site-immutable-publication.test.ts",
+          "blob": "fbb886e766c68dca27b409a6eb0c9732b515b0b2",
+          "sha256": "a8994103580be7a9091f9eb68189d5e70ff044b42318f7d253f9bd8b80cdd5dc"
+        }
+      ],
+      "delta": "/tmp/artroom-059-three-branch-composition-plan/native-from059.patch",
+      "delta_sha256": "08ef763a2336231736511333ca1169607273b3e5fd8177dd29f79c333aabc12d"
+    }
+  ],
+  "conflicts": {
+    "path_intersections": [
+      {
+        "between": [
+          "publication",
+          "replay"
+        ],
+        "paths": []
+      },
+      {
+        "between": [
+          "publication",
+          "native"
+        ],
+        "paths": []
+      },
+      {
+        "between": [
+          "replay",
+          "native"
+        ],
+        "paths": []
+      }
+    ],
+    "prediction": "All three normal descendants of exact059 modify disjoint10paths, with only M status and no renames/mode changes. No textual merge conflict predicted; actual normal merge result still must be inspected. No merge-tree or trial merge executed.",
+    "semantic_interfaces": [
+      "Publication retains all64 source bindings, exact tree/hash/order/modes/parents/authority/CAS/custody; lower object retention only.",
+      "Replay carries positive holder bound with current REDUCED66ce W2. Do not substitute full92 witness extras or claim removed ordinary/multiple-holder negative cases were executed.",
+      "Nativefc0 carries direct fixed stage statements (no finish hook) plus actual task-data response retirement/bounded read and invitation:false fixture adaptation. No production ownership/session APIs change.",
+      "No shared source helper/config/pin/default catalog path is modified by any subject; they depend on the same actual059 base."
+    ]
+  },
+  "proposed_normal_merges": {
+    "new_worktree": "/tmp/artroom-initial-three-repairs-composed",
+    "new_branch": "request/initial-three-repairs-composed",
+    "start_exact": "059853a20a025282deef06dee9d6ebfa9b110693",
+    "order": [
+      "941b113f4134c34019f80a176f28587cef49425e",
+      "66ce1125c00a15242f5b277de8d5b580e5ed81ba",
+      "fc0f4e04220f03fb9f86734c09a8a52e5f6509f3"
+    ],
+    "mode": "Normal merges preserving ancestry, e.g. --no-ff; never cherry-pick control mutants, use inherited mixed-base copies, or merge92 instead of selected66ce.",
+    "after_each": "Inspect conflict/status/rename-aware delta and all resolved changed bodies; preserve isolated parents/evidence. Before build freeze exact clean composition identity/source inventory."
+  },
+  "expected_source_delta": {
+    "from059_paths": [
+      "packages/lanes/test/site-native3-publication.scope.test.ts",
+      "packages/lanes/test/wiring.scope.test.ts",
+      "packages/page/test/source-preview.scope.test.ts",
+      "packages/page/test/task-data.scope.test.ts",
+      "packages/platform/src/destination-objects.ts",
+      "packages/platform/test/edit.test.ts",
+      "packages/replay/src/verify.ts",
+      "packages/scope/src/github-host.ts",
+      "packages/scope/test/artifacts-host.test.ts",
+      "packages/scope/test/site-immutable-publication.test.ts"
+    ],
+    "count": 10,
+    "production_paths": [
+      "packages/platform/src/destination-objects.ts",
+      "packages/scope/src/github-host.ts",
+      "packages/replay/src/verify.ts"
+    ],
+    "test_paths": [
+      "packages/lanes/test/site-native3-publication.scope.test.ts",
+      "packages/lanes/test/wiring.scope.test.ts",
+      "packages/page/test/source-preview.scope.test.ts",
+      "packages/page/test/task-data.scope.test.ts",
+      "packages/platform/test/edit.test.ts",
+      "packages/scope/test/artifacts-host.test.ts",
+      "packages/scope/test/site-immutable-publication.test.ts"
+    ],
+    "case_titles_deadlines": "Unchanged original complete whole-file ledgers/deadlines; final normal gate retains1007 cases unless a separately authorized source change establishes another count."
+  },
+  "assets_build_closure": {
+    "current_tracked_asset": {
+      "path": "packages/scope/src/page-assets.ts",
+      "blob_059": "b6c0ea1f01d244a9acda7248006a2df8f59ff198",
+      "sha256_059": "ffa8bdb488acd03665989cc13c9a8c7e2d245e6c105acbcc548e99925ffd6985",
+      "same_in_all_three_subjects": true
+    },
+    "actual_generator": "packages/page/scripts/assets.mjs; entry packages/page/src/main.ts; esbuild browser/esm/es2022/minified; writes ignoredPage dist/index.html and dist/page.js plus tracked Scope page-assets.ts. Normal CLI invocation internally calls pageFiles and pageAssets; do not invent a different generator.",
+    "normal_build": "npm run build --workspace @generalbusiness/artroom-page, only after exact composed-source release/current owned dependency view; no install or pin/default changes",
+    "source_graph_effect": "Page main/data/retained editor/view import platform (including destination-objects editPath), and Page data/claim import CLI index; CLI commands imports Replay verifier. Therefore both changed Platform/Replay modules are in its import graph. Whether changed functions survive esbuild tree shaking and alter emitted bytes cannot be concluded statically. Shared Scope github-host and native/test changes belong to server/test closure, not Page entry.",
+    "truthful_output_rule": "Generate normally and inspect actual resulting tracked diff/hash. If page-assets bytes stay identical, record equality rather than manufacture a change; if changed, retain whole generated module hash/identity and review its source graph. Do not print opaque generated bundle payload.",
+    "parity_witness": "Unchanged packages/page/test/assets.test.ts compares complete current pageAssets() output against tracked module; final gate owns normal parity. No import/build/parity execution in this task."
+  },
+  "truthful_delivery_note": {
+    "path": "notes/2026-10-09-initial-combined-delivery.md",
+    "current_byte_identical_all_subjects": true,
+    "required_topics": [
+      "Carry failed059 baseline and costs325.93wall/382.97CPU plus diagnostic/unknown-cause/unrunactive-source qualification.",
+      "Describe publication final-only construction/pre-copy aggregate and scope of preserved rules; cite four compiler +4 Node +3 scripted-port baseline and both distinguishing controls at exact941b, without transferring to composed head or claiming OOM/factor/native admission.",
+      "Describe reduced66ce holder correction/W2 and source coverage. Keep exact ancestry-only incomplete qualification and dropped unexecuted92 extras; cite only actual selected66ce validation/control evidence available when note is written.",
+      "Describe nativefc0 bounded task-data response handling and direct stages. Its short5case3compiler PASS is diagnostic; retained Site receipt hash-mismatch and observer cost remain, no longpool/timeout-cause/physicaldrain/error-free/global10x claim.",
+      "Record composition/build asset identity and actual current future gate outcome, phases/counts/deadlines/recorders/costs/machine/load/cache/unhandled diagnostics/unrun steps. Before gate use pending language; amend only with actual terminal evidence.",
+      "Keep whole Source/evidence review, planner/normal request/delivery and landing owed; no earlier isolated approval/pass transfer or acceptance by note."
+    ]
+  },
+  "later_validation_limits": [
+    "Prepare fresh owned dependency namespace/current12source bindings/aliases and exact head/tree/config/tool/source guards for composed subject. Existing parent views/recipes are bound to parent identities and cannot silently run on new composition.",
+    "Do not repeat whole isolated baselines/discovery/controls just to compose disjoint proven source; Root must select meaningful affected checks if new edits/conflicts/build outputs create a changed concern.",
+    "Run one appropriate normal same-head gate only after all known source blockers and exact composition review; retain complete result and no unchanged failed059 native/gate retry.",
+    "If a final documentation-only outcome amendment follows, record source tree sameness and both head/tree identities per testing instructions; no false same-head result claim."
+  ],
+  "runtime": [],
+  "approval": "No source mutation, merge/build/import/compiler/test/discovery/control/gate/filing or whole Source approval in this preparation."
+}
