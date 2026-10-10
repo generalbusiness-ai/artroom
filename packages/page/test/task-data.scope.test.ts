@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
-import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { act, actsOn, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
 import { demo, type Demo } from "./support/demo.ts";
-import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedReads, REPLY_BYTES, REPLY_SECONDS } from "@generalbusiness/artroom-client";
 import type { ScopeId, FactRef } from "@generalbusiness/artroom-contract";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { Platform } from "../../scope/test/repository.ts";
@@ -128,18 +128,23 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
 test("native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices", async () => {
   let badSelection = false, unavailableMembers = false, unavailableExtents = false, noCurrent = false;
   let membershipPath = "";
-  const d = await demo((fetch) => async (url, init) => {
+  const d = await demo((fetch, owner) => async (url, init) => {
     const response = await fetch(url, init);
-    if (unavailableMembers && new URL(url).pathname === membershipPath && init?.method !== "POST") return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    if (unavailableMembers && new URL(url).pathname === membershipPath && init?.method !== "POST") {
+      await owner.required(async () => { await response.body?.getReader().cancel(); });
+      return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
     if ((!badSelection && !unavailableExtents && !noCurrent) || init?.method === "POST" || !new URL(url).pathname.match(/\/v1\/scopes\/[^/]+$/)) return response;
-    const read = await (response as unknown as Response).clone().json() as { ok?: boolean; value?: { items?: { type: string; values: Record<string, unknown> }[] } };
+    const bytes = response.body ? await owner.required(() => takeBytes(response.body!, REPLY_BYTES, AbortSignal.timeout(REPLY_SECONDS * 1000))) : null;
+    if (!(bytes instanceof Uint8Array)) throw new Error("The task-data witness received no whole summary reply.");
+    const read = JSON.parse(new TextDecoder().decode(bytes)) as { ok?: boolean; value?: { items?: { type: string; values: Record<string, unknown> }[] } };
     for (const item of read.value?.items ?? []) {
       if (badSelection && item.type === "manifest") item.values["selected"] = "not a native selection";
       if (unavailableExtents && item.type === "rules") item.values["extents"] = "unavailable extents";
       if (noCurrent && item.type === "manifest") (item as unknown as { state: string }).state = "superseded";
     }
     return Response.json(read);
-  });
+  }, null, { invitation: false });
   try {
     const room = await openRoom(d.as(await d.secretOf(d.rita)), placeOf(JSON.stringify(d.config))!);
     membershipPath = `/v1/scopes/${d.M.name}`;
