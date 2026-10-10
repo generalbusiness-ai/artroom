@@ -1,0 +1,47 @@
+{
+  "head": "66ce1125c00a15242f5b277de8d5b580e5ed81ba",
+  "tree": "0cebf0f372e752c50028d18b8b7f6b2fffad8ea9",
+  "clean": true,
+  "effective_request": "3024ef222c3448013f99790285b09cfc7e03a1d4",
+  "author_packet": "/tmp/artroom-replay-empty-holders-focused-packet/packet.json",
+  "author_packet_sha256": "de71d3e90de07ccca6ba4b1077162dba7c1de0c8123c81f692f8c31a3378dd71",
+  "coverage": [
+    {
+      "path": "packages/lanes/test/wiring.scope.test.ts",
+      "sha256": "54dfd1a30f110b73a4b83ab674b8e37265e0e696c639449605d2fff516e455a3",
+      "coverage": "FULL204-line current body through accumulated bounded reads; complete92-to66 delta assessed; standalone full92 body not reread"
+    },
+    {
+      "path": "packages/replay/src/verify.ts",
+      "sha256": "b0d785e6d2ea199a345c535a541621a63dad7dd0f0ff17b9a6afb4aed2bb05c7",
+      "coverage": "PARTIAL856\u2013935 standing and grants span; full059-to66 executable delta read; full verifier not claimed"
+    },
+    {
+      "path": "packages/platform/src/membership.ts",
+      "sha256": "2aa96958b8bbe000f785148275587bea7027a6d4ce98b3505ca12857d5622c62",
+      "coverage": "PARTIAL487\u2013501 authorized set-actions and795\u2013842 holders contract/positive bound/value derivation"
+    },
+    {
+      "path": "packages/lanes/test/support/room.ts",
+      "sha256": "5f4338f323d60221860a801c7ddce7daa3c768332ea66f0430439c3b1137e52a",
+      "coverage": "PARTIAL271\u2013288 actual founder admin and default native member roster; full fixture not claimed"
+    }
+  ],
+  "static_preservation": {
+    "other4_original_bodies": {
+      "1": true,
+      "3": true,
+      "4": true,
+      "5": true
+    },
+    "all5_titles": true,
+    "all5_ROOM_MS60000": true,
+    "all_original_W2_expect_lines_remain": true,
+    "verify_byte_identical_to92": true,
+    "only_wiring_changed_since92": true
+  },
+  "findings": [],
+  "control_limit": "Root must retain all5 execution; reviewed failstop driver bail1 is not automatically a complete mutant-body recipe",
+  "runtime": "NONE; no imports/types/tests/native/control/Sourceapproval",
+  "review_sha256": "50b74cf1efedfd21dd0007d2348d003f47a6c8c660be60c8647c380095e3ccf0"
+}
