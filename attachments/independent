@@ -1,0 +1,27 @@
+{
+  "kind": "Independent bounded currente307 early-only inertcontrol review",
+  "input_packet": "/tmp/artroom-hub-early-e307-preparation/packet.json",
+  "input_sha256": "7c6f6129218c89bcb4684ed4255df052a7b3b6675bb2de48437da3796ceda78b",
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e30791de95c340f2b196d7805e794afb8c3f905d",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fb2cef9555846864100142ed85908b55b6a1c52f",
+  "source": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "active_labels": [
+    "early"
+  ],
+  "reuse_refused_before_mutation": true,
+  "classification_delta_only_result_errors1": true,
+  "Ready0_suggestion": "Withdrawn; current task.result snapshot may already report failed/errors1 at Ready delivery",
+  "module0_result_case1_and_intended146_preserved": true,
+  "all_hashes_match": true,
+  "source_clean_original": true,
+  "fresh_roots_materializations_absent": true,
+  "toolview_review": "Qualified unchangedproof reuse; no resurvey",
+  "concrete_blockers": [],
+  "runtime": "NONE",
+  "review": {
+    "path": "/tmp/artroom-hub-early-e307-independent-preparation-review/review.md",
+    "bytes": 3200,
+    "sha256": "934ad2b5d1685eb213bc52e7ed656c024390cf4a3f7b9226307303586ea9ab7c"
+  }
+}

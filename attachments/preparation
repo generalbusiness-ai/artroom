@@ -1,0 +1,144 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e30791de95c340f2b196d7805e794afb8c3f905d",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fb2cef9555846864100142ed85908b55b6a1c52f",
+  "subject_head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "subject_tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "source_clean_unchanged": true,
+  "runtime": "NONE in R3; EARLY UNRUN; actual R2 reuse retained, no repeat",
+  "baseline": {
+    "path": "/tmp/artroom-economy-f027-one-run-complete-proof.json",
+    "sha256": "4ce0355912e938938601371eb7da613a10b7ddc255102fe0bfc2350e43b6862b",
+    "qualification": "actual wrapper1 retained; three compilers0, body0, exact41PASS1originalSKIP, cache1PASS; independent nonoverlap/order reconciliation73b97+268014 retained; no new baseline"
+  },
+  "mutants": {
+    "early": {
+      "path": "/tmp/artroom-hub-early-e307-preparation/hosts.early.ts.mutant",
+      "sha256": "f44cc5c41987d2be29e2e37e9eeb91cfcf81ab3acfb8ae8862c2ba529887276c",
+      "intended_line": 146,
+      "actual": 1,
+      "expected": 0
+    }
+  },
+  "body": {
+    "whole_files": 1,
+    "whole_cases": 1,
+    "original_title": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+    "original_deadline_ms": 5000,
+    "retry": 0,
+    "bail": 0
+  },
+  "future_order": [
+    "early"
+  ],
+  "execution_release": "OWED",
+  "predecessor": {
+    "packet": "/tmp/artroom-economy-f027-hub-controls-preparation-r3/packet.json",
+    "sha256": "e4a302c643ad0d719898e6e9cfca0e6e3c486409372d8f8532b9a30dd13a9b58",
+    "preserved": true
+  },
+  "revision": "R3 external-only unsupported Ready snapshot criterion correction",
+  "unchanged_artifacts": [
+    "proof.json",
+    "run-control.py.recipe",
+    "control.config.mjs.recipe",
+    "hosts.original.ts",
+    "hosts.reuse.ts.mutant",
+    "hosts.early.ts.mutant",
+    "r3-runner.diff"
+  ],
+  "historical_reuse": {
+    "proof": "/tmp/artroom-hub-reuse-r2-complete-stopped-proof.json",
+    "sha256": "a3104385a1392b446116464c05139455dcbd3e5c29bee5513bb60222a892c87c",
+    "original_handle": 49862,
+    "original_wrapper_exit": 1,
+    "component": "Actual intended line106 AssertionError2vs1/module0/restorePASS; independent disposition e2a697 and public proof523b retained",
+    "repeat": "FORBIDDEN by this proposal"
+  },
+  "files": {
+    "binding-status.txt": {
+      "bytes": 142,
+      "sha256": "9e4ae12588a78b91c63ef87def36fbe946980127b7b340827fe1e0bb5cac9f2f"
+    },
+    "control.config.mjs.recipe": {
+      "bytes": 4271,
+      "sha256": "ad1bc5103cd8a40623b155f15531371feaf248370925808e7b8e066157390472"
+    },
+    "control.json": {
+      "bytes": 2010,
+      "sha256": "e047d33de432bcf108783537fe86edb7c04635274cdc1dfb83155b94b29791c5"
+    },
+    "early.diff": {
+      "bytes": 689,
+      "sha256": "a3682886a14611d4ab5dad4a7d2d94e87e434a29ff2fbfa346ea6874d066500f"
+    },
+    "execution-inputs.json": {
+      "bytes": 2074,
+      "sha256": "5e70cbbf2cb1c5ae68928e66e63e5451cc0017b46d88f63f76f61947f5c985c9"
+    },
+    "guard-fragment.txt": {
+      "bytes": 2685,
+      "sha256": "bf0edffd006fa0b3cca4cc5cc7b41980f212027a9b906ad55ee9f11f7ee45804"
+    },
+    "historical-r2-packet.json": {
+      "bytes": 4109,
+      "sha256": "2a71b9f262b7c1980b1d65afa8dd1faf26d0bb1986bdadda538e89e4530befa3"
+    },
+    "historical-r2-preparation.md": {
+      "bytes": 6516,
+      "sha256": "f41a21e28d93cd0a7524cf2d45009b2b2975b3107afb3c978d2e0adeed741ddf"
+    },
+    "historical-r3-lineage-packet.json": {
+      "bytes": 4706,
+      "sha256": "e4a302c643ad0d719898e6e9cfca0e6e3c486409372d8f8532b9a30dd13a9b58"
+    },
+    "hosts.early.ts.mutant": {
+      "bytes": 17281,
+      "sha256": "f44cc5c41987d2be29e2e37e9eeb91cfcf81ab3acfb8ae8862c2ba529887276c"
+    },
+    "hosts.original.ts": {
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    "hosts.reuse.ts.mutant": {
+      "bytes": 17317,
+      "sha256": "a274ab1f5cb85fbfd6f68b4fa80cb65138c97f20dd1db6a0505f0e4d81b15b14"
+    },
+    "plan.json": {
+      "bytes": 2014,
+      "sha256": "7eab63d4af613ac2019b5a956d80194507f2ec9616287024c1eaadecc1fae083"
+    },
+    "preparation-request.json": {
+      "bytes": 2886,
+      "sha256": "63f48f21db73fa072de55ec177983d3b2bce989e5a7c3bd120a96b62ad23a14b"
+    },
+    "preparation.md": {
+      "bytes": 2603,
+      "sha256": "cc796dc6dedcf486bc228e1274e1341752be7c2aba3fbb7d0bba8ddfeebcf835"
+    },
+    "proof.json": {
+      "bytes": 260592,
+      "sha256": "0ae1a948bb69328bac43f59896eddf2f1b91da7fac8495b5d0347c1a32889038"
+    },
+    "r2-runner.diff": {
+      "bytes": 1491,
+      "sha256": "3d73e25bbdb571bb34de286e6c3bbbf46362c1a58836eae8dca1ec5d116a64bb"
+    },
+    "r3-runner.diff": {
+      "bytes": 1010,
+      "sha256": "d9e933ad856084d6a5b506b48a69a5dde71369a142194832add90b0ced53e8e3"
+    },
+    "reuse.diff": {
+      "bytes": 816,
+      "sha256": "f17ffeedec8bf4f2679a247b3e4f189ce24859373a1a35c886d344c317e2afd3"
+    },
+    "run-control.py.recipe": {
+      "bytes": 10968,
+      "sha256": "4f0f9221fe14ac419c58ff1a48fc066a09b356ecd9629fa9218f967c785ae01c"
+    }
+  },
+  "source_lineage": {
+    "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e4c871d0e0ddf04c4e6b400a503cfefe19b563ae",
+    "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fcb08d0449eebb3dcdfa9c17dc3ed399c378e428"
+  },
+  "current_output": "/private/tmp/artroom-hub-early-e307-output-one"
+}

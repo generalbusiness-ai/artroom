@@ -1,0 +1,21 @@
+{
+  "proof": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/public-proof.json",
+    "bytes": 9404,
+    "sha256": "523b2e6ad3319c37bf5a4cdb33f7f00018e0b4481ea5db87a7dc6c8653e6aafa",
+    "scope": "independent public metadata proof"
+  },
+  "findings": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/findings.txt",
+    "bytes": 2801,
+    "sha256": "c21cc2d5edad0034f35329a6bc7eb6ed38895326da288de94dc832af5e07673e",
+    "scope": "bounded independent findings"
+  },
+  "future_criterion": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/future-criterion.txt",
+    "bytes": 990,
+    "sha256": "1883398ef09faf89c8c01b91884039c9f695dfe70eeb58d88bbb3c68c55ac2f6",
+    "scope": "unexecuted proposal only"
+  },
+  "qualification": "Original wrapper1 immutable; separate component distinction only; no runtime/state/Source changes"
+}
