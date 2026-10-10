@@ -237,7 +237,7 @@ function reconcileReview(context: string, room: Room, change: Awaited<ReturnType
     selected.message.removeAttribute("hidden");
     for (const button of selected.body.querySelectorAll("button[type=submit]")) button.setAttribute("disabled", "");
   } else {
-    if (last?.kind === selected.action && last.answer.answer === "refused") {
+    if (last && last.kind === selected.action && last.answer.answer === "refused") {
       selected.message.textContent = nonacceptedAnswerText(last.answer);
       selected.message.removeAttribute("hidden");
       for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select, button[type=submit]")) if (!selected.reviewDisabled?.has(control)) control.removeAttribute("disabled");
@@ -429,7 +429,8 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   };
   const currentContext = () => {
     const current = settings();
-    return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
+    if (!current?.place) return false;
+    return roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
   const send: Send = (kind, on, typed, accepted, beforeSign) => {
     const previous = lastActs.get(association);
