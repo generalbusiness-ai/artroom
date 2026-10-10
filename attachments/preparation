@@ -1,0 +1,51 @@
+{
+  "status": "INERT r2 classifier corrected to actual pinned Node26 output; r1 remains unrun/frozen",
+  "head": "70dc62cbb2b830258b4a3490cde6221de6c0d274",
+  "tree": "85bbfc247056791749b052391c74583d00a35c16",
+  "root": "/private/tmp/artroom-pool-f241-cleanup-control",
+  "branch": "control/pool-staging-ownership-cleanup",
+  "plan": "/tmp/artroom-pool-f241-cleanup-control-preparation-r2/plan.json",
+  "plan_sha256": "02e03aa3493490f42477b7a71265f5a8d1eb26dcc448d2077a7ca9deceefb22f",
+  "runner": "/tmp/artroom-pool-f241-cleanup-control-r2-run.py",
+  "runner_sha256": "1e909524d35722ed53817962eabe19488d9a3038df653c26e4ef7daa091ce17b",
+  "mutation": "if (ownsStaged && existsSync(staged)) unlinkSync(staged); -> if (existsSync(staged)) unlinkSync(staged);",
+  "fixed_pool_unchanged": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "intended_assertion": {
+    "file": "scripts/cloudflare-pool-compat.test.mjs",
+    "line": 87,
+    "source": "assert.equal(existsSync(sentinel), true);",
+    "expected": "Second case AssertionError[ERR_ASSERTION]/codeERR_ASSERTION/operatorstrictEqual, false versus true at87; first semantic factory casePASS; no ENOENT, timeout/cancellation/skip/todo."
+  },
+  "original_helper_sha256": "f3c258f26eaf591ef36b5ca96d7e379ec1c27440cd0f5d07566b124a111e26e3",
+  "source_restoration": "Atomic original-helper write then detached baseline f241 with discard restricted to this isolated, fully guarded known mutation; preserve local mutant branch and verify whole clean1272-source/cache/view/pkg state.",
+  "baseline_reused": {
+    "path": "/tmp/artroom-pool-f241-staging-baseline-result",
+    "files": {
+      "result.json": "df0c45f18591ebf47b18f669a63e35478302c577f6052494ad3b90d40e03799b",
+      "test.log": "9a434e46ad13e26fffca4c8a932707353795a1b79b2681f1c5381617410b2819",
+      "test.time": "e67604fabf16a043b18a970173447e14a74d8a7270f66ed1909498b146151b27",
+      "manifest.json": "4d88065604394a764e11f0f0e79a46a3d1794fc52b3ca7eb4e1dddf91baf8afc"
+    }
+  },
+  "output": "/tmp/artroom-pool-f241-cleanup-control-r2-result",
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool-f241-cleanup-control-r2-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool-f241-cleanup-control-r2-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool-f241-cleanup-control-r2-outer.log"
+  },
+  "execution": [],
+  "classifier_evidence": {
+    "path": "/tmp/artroom-pool53b-oldfactory-result/test.log",
+    "sha256": "5078ca85bd4bef41c479bdf4f5d0a3af185d10e17cc6a9ed16882379d1cc84b5",
+    "read_lines": "12\u201336; actual AssertionError[ERR_ASSERTION], codeERR_ASSERTION, operatorstrictEqual"
+  },
+  "runner_diff": "/tmp/artroom-pool-f241-cleanup-control-preparation-r2/runner-r1-to-r2.diff",
+  "runner_diff_sha256": "4855d2d6efa28a3ff1bc05e6e5085943dc4c3b03ba955d7f555143d0722f630e"
+}
