@@ -1,0 +1,45 @@
+{
+  "actual_handle": 61085,
+  "terminal_exit": 0,
+  "release": "4df001832eb98f4c5e4ba08cb69da60b012bfe8c",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "result_manifest": {
+    "path": "/tmp/artroom-pool53b-corrected-native-r3-result/manifest.json",
+    "sha256": "1d395d88ebed6373d34e5bb8846512da12a03b227f471d507c5b0689ac980315"
+  },
+  "raw_outer": [
+    {
+      "path": "/tmp/artroom-pool53b-corrected-native-r3-outer.log",
+      "sha256": "dea12051ed1800310fd49e2fa73c9cbafc7264bd56fe5c161c0979d7d11717c7"
+    },
+    {
+      "path": "/tmp/artroom-pool53b-corrected-native-r3-outer.time",
+      "sha256": "3126c4a898db08e7cebf1554e443e4772bd63b317df2c09132398dcc32a988fa"
+    }
+  ],
+  "coverage": {
+    "cases": 5,
+    "passed": 5,
+    "skipped": 0,
+    "retries": 0,
+    "unhandled": 0
+  },
+  "observations": {
+    "real_session": 3,
+    "prepare": 1,
+    "allows": 2,
+    "owned_required": 3,
+    "inspector": 0,
+    "self_worker_early": 18,
+    "self_worker_late": 33,
+    "self_installations": 1,
+    "max_fetch_depth": 1,
+    "platform_early": 1,
+    "platform_late": 16,
+    "platform_installations": 1,
+    "max_summary_depth": 1
+  },
+  "restore_verified": true,
+  "qualification": "Native accumulating-wrapper mechanism; not current full-gate cause/physical drain/global10x. Signed pair excludes session hooks; one unsigned denial verifies owned real prepare/allows."
+}
