@@ -1,0 +1,75 @@
+{
+  "kind": "Immediate demo/Jam deployment readiness inventory and actionable handoff",
+  "priority_assertion": "5be4288a7e3acc7846d015a9da76a6b91ab38797",
+  "convergence_request": "e60a3ca5ce320ba4af84478ff5f88ff4d6be63fe",
+  "Artroom_main": {
+    "root": "/Users/hughpyle/play/artroom",
+    "head": "9a419849d57c2a18d6aa69741c0a232e1f3bd65d",
+    "tree": "ebf79f1f0abcd706e88f766de4481e3e22e64de3",
+    "branch": "main",
+    "clean": true
+  },
+  "SDK_candidate": {
+    "root": "/private/tmp/artroom-combined13-candidate",
+    "head": "62c99630346d57085dfca2292e245140e458ab7d",
+    "tree": "d09cd7a468a3ef230abf93591fb807f05a3bdf12",
+    "branch": "request/combined13-candidate",
+    "clean": true
+  },
+  "Jam_main": {
+    "root": "/private/tmp/artroom-jam-main",
+    "head": "990dcbf3ffd15d44c9fccdd88c671866dd5e7218",
+    "tree": "b3ad255b5a53d6df243704abbf5b9441f8386d14",
+    "branch": "main",
+    "clean": true
+  },
+  "Jam_pending_native_source": {
+    "root": "/private/tmp/artroom-jam-contributions-v1",
+    "head": "635786ac9a4923e02363ae5b0a35e3686a244775",
+    "tree": "6e840fb55f993e2cf0a1c2d6515b34a889cf2965",
+    "branch": "request/jam-contributions-v1",
+    "clean": true
+  },
+  "main_ready": "Jam main contains procedural/local symbolic/audio/page demo; recorded contribution native source is unlanded and unvalidated, pending normal Jam review/Artroom hosting instructions. SDK62c is tested/review candidate, absent from9a419 main at inventory.",
+  "deploy_ready": false,
+  "current_actual_deployment": "No fresh deployment ID/main-head-bound URL or real Jam native room proof inspected; absence of such proof is not a provider status assertion.",
+  "concrete_blockers": [
+    "Public consumable exact SDK release/installation route and real authenticated deployed room URL",
+    "Declaration/codec key-label coherence choice + validated activated pin",
+    "Actual full native genesis/control/act provenance/history adapter (no seq renumber/drop)",
+    "Complete native instrument/pattern/solo/mood/say acts + authorized human/agent lifecycle",
+    "Jam has no Cloudflare config/built static bundle; current page uses localhost Node TS stripping and local record/player stand-ins",
+    "Real microphone/browser/audio gesture/timing/listening + model-backed agents and deployed history/unknown recovery witnesses"
+  ],
+  "next_actions_in_order": [
+    "Root land reviewed/tested62c through ordinary review; SDK owner provide actual supported public release, exact versions/integrities and verifier route, no staged alias",
+    "Ratify b8 minimum wire-key choice and native-only entry projection; authorize Jam-owned source amendment/adapter without platform changes",
+    "Deployment owner deploy exact current completed main Worker with SCOPES migration, DEPLOYMENT+SESSION_SECRET and configured host port; preserve vars; verify actual native authority/routes then provide URL/identity metadata",
+    "Jam owner validate/activate definition, establish/enroll real role-limited actors; implement complete native musical acts using supported fields",
+    "Build Jam browser assets for HTTPS Cloudflare hosting from its own repository, bind real room/service and public SDK; replace local-only model in native route while retaining explicit offline/demo mode",
+    "Run meaningful deployed native/browser/audio/agent sequence with authentic cues and one controlled unknown; obtain Hugh listening judgment/recording without repeating completed hum sample"
+  ],
+  "Cloudflare_current_procedure": {
+    "scope_config": "packages/scope/wrangler.jsonc name artroom-scope, src/worker.ts, nodejs_compat, SCOPES DeployedScope SQLite v1, remote ARTIFACTS namespace artroom-demo",
+    "secrets_only_by_name": [
+      "SESSION_SECRET",
+      "GITHUB_APP_PRIVATE_KEY",
+      "GITHUB_CREATION_TOKEN",
+      "GITHUB_READ_TOKEN if private reads",
+      "GITHUB_CLEANUP_TOKENS if configured"
+    ],
+    "nonsecret_settings": [
+      "DEPLOYMENT",
+      "ARTIFACTS_CONFIG or GITHUB_APP_CONFIG registerScope/host/namespace settings"
+    ],
+    "operator_order": "Deploy with valid session bindings; plan install register, set host configuration to exactplanned register, installplanned within window, claim once/reconcile exact pending intent. Use reviewed pinned Wrangler scratch tool and --keep-vars when appropriate. No deployment/tool invocation performed here.",
+    "page": "Scope Worker serves committed Page assets under/page; Jam separate frontend currently needs its own static build/deploy config."
+  },
+  "one_singer": "Accepted one-singer amendment retained (current J0 note names387ed...; Root/user d068 direction preserved). Hugh fivephrases scored4/10,5/10,others8/10 as useful inspiration; no second singer blocker or new listening proof.",
+  "counter_workroom_scope": "Only deployment/config/package/readiness seams inventoried; other current owners must supply C1/I2/W1/UI delivered-head/deployed witness map, not inferred from this Jam inventory or stale C0 README.",
+  "b8_handoff": {
+    "path": "/tmp/artroom-jam-b8-native-handoff/handoff.json",
+    "sha256": "1d81d7135354cdaca74da559711e4996f2c0edc00cbb9e9a58ed51c0d5bd2dca"
+  },
+  "execution": "READONLY; no Source/provider/credential content mutation, import/runtime/test/gate/probe or state filing."
+}
