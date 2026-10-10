@@ -57,19 +57,35 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
   const button=(label:string)=>rendered.all().find(e=>e.tag==="button"&&e.textContent===label);
   const flush=async()=>{await Promise.resolve();await Promise.resolve();};
   const fields=()=>rendered.all().filter(e=>e.tag==="input"||e.tag==="textarea");
+  const discarded=makeTask("a".repeat(40));vi.mocked(prepareEdit).mockResolvedValueOnce(discarded);
+  rendered.all().find(e=>e.tag==="form")!.event("submit");await flush();
+  const retiredConfirm=button("Confirm new proposal")!;
+  button("Back to edit")!.event("click");
+  expect(fields().every(e=>!e.disabled)).toBe(true);expect(fields().map(e=>e.value)).toEqual([draft.title,draft.path,draft.content]);
+  retiredConfirm.event("click");await flush();
+  expect(continueEdit).not.toHaveBeenCalled();expect(prepareEdit).toHaveBeenCalledTimes(1);expect(discarded.steps).toEqual([]);
+  draft.title="Fresh deliberate correction";
+  const correctedTitle=rendered.all().find(e=>e.attrs.get("aria-label")==="Proposal title")!;correctedTitle.value=draft.title;correctedTitle.event("input");
+
   const moved=makeTask("a".repeat(40));vi.mocked(prepareEdit).mockResolvedValueOnce(moved);
   rendered.all().find(e=>e.tag==="form")!.event("submit");await flush();
   expect(fields().every(e=>e.disabled)).toBe(true);expect(continueEdit).not.toHaveBeenCalled();
+  expect(vi.mocked(prepareEdit).mock.calls[1]![3]).toEqual(draft);
+  retiredConfirm.event("click");await flush();expect(continueEdit).not.toHaveBeenCalled();expect(moved.steps).toEqual([]);
+  const freshConfirm=button("Confirm new proposal")!;
+  current=false;freshConfirm.event("click");await flush();expect(continueEdit).not.toHaveBeenCalled();
+  current=true;moved.busy=true;freshConfirm.event("click");await flush();expect(continueEdit).not.toHaveBeenCalled();
+  moved.busy=false;
   vi.mocked(continueEdit).mockImplementationOnce(async(_room,task)=>{task.state="stopped";task.message="The published base moved. Nothing new was sent.";});
   button("Confirm new proposal")!.event("click");await flush();
   expect(moved.steps).toEqual([]);expect(rendered.textContent).toContain("published base moved");
   button("Back to edit")!.event("click");
   expect(fields().every(e=>!e.disabled)).toBe(true);expect(fields().map(e=>e.value)).toEqual([draft.title,draft.path,draft.content]);
-  expect(prepareEdit).toHaveBeenCalledTimes(1);expect(continueEdit).toHaveBeenCalledTimes(1);
+  expect(prepareEdit).toHaveBeenCalledTimes(2);expect(continueEdit).toHaveBeenCalledTimes(1);
 
   const fresh=makeTask("b".repeat(40));vi.mocked(prepareEdit).mockResolvedValueOnce(fresh);
   rendered.all().find(e=>e.tag==="form")!.event("submit");await flush();
-  expect(rendered.textContent).toContain(fresh.base);expect(vi.mocked(prepareEdit).mock.calls[1]![3]).toEqual(draft);
+  expect(rendered.textContent).toContain(fresh.base);expect(vi.mocked(prepareEdit).mock.calls[2]![3]).toEqual(draft);
   expect(continueEdit).toHaveBeenCalledTimes(1); // Prepare never confirms.
   const signed=await signedIntent(secretSigner(secret),{to:directory,kind:"open-pr",on:null,fields:{definition:digest,title:draft.title,body:"scripted source reference",draft:false},expected:{}});
   vi.mocked(continueEdit).mockImplementationOnce(async(_room,task)=>{task.steps.push({kind:"open-pr",target:directory,signed,grants:[],beside:{},attempted:false});task.state="stopped";task.message="The first task-room read failed before submission.";});
@@ -89,7 +105,7 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
   button("Confirm new proposal")!.event("click");await flush();
   const original=JSON.stringify(uncertain.steps);offered.event("click");
   expect(button("Back to edit")).toBeUndefined();expect(fields().every(e=>e.disabled)).toBe(true);expect(JSON.stringify(uncertain.steps)).toBe(original);
-  expect(prepareEdit).toHaveBeenCalledTimes(3);expect(continueEdit).toHaveBeenCalledTimes(3);
+  expect(prepareEdit).toHaveBeenCalledTimes(4);expect(continueEdit).toHaveBeenCalledTimes(3);
 
   // Even a stopped tag cannot discard attempted/answered/unverified work or
   // partial native locators. Retain the same task; there is no fresh Prepare.
@@ -105,7 +121,7 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
   delete uncertain.lane;delete uncertain.proposal;uncertain.version={at:sourceScope,seq:4,hash:opening};redraw();expect(button("Back to edit")).toBeUndefined();
   delete uncertain.version;uncertain.collectedSource={at:sourceScope,seq:4,hash:opening};redraw();expect(button("Back to edit")).toBeUndefined();
   delete uncertain.collectedSource;uncertain.state="refused";redraw();expect(button("Back to edit")).toBeUndefined();
-  expect(prepareEdit).toHaveBeenCalledTimes(3);expect(continueEdit).toHaveBeenCalledTimes(3);
+  expect(prepareEdit).toHaveBeenCalledTimes(4);expect(continueEdit).toHaveBeenCalledTimes(3);
 });
 
 test("text limits count UTF-8 bytes losslessly, preserve BOM and allow empty file without delete",()=>{

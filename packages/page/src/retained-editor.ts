@@ -57,11 +57,14 @@ export function retainedEditor(room: Room, change: ChangeView, options: Retained
       const label = task.state === "prepared" ? "Confirm new proposal" : task.state === "unknown" ? "Check original request" : "Continue checking progress";
       const go = h("button", { type: "button", class: "primary" }, task.busy ? "Waiting…" : label) as HTMLButtonElement;
       go.disabled = task.busy || ["recorded","refused","stopped"].includes(task.state);
-      go.addEventListener("click", () => { void (async () => {
-        const opts = { current: options.current, changed: draw };
-        if (task.state === "unknown") await checkEditRequest(room, task, opts); else await continueEdit(room, task, opts);
-        draw();
-      })(); });
+      go.addEventListener("click", () => {
+        if (record.task !== task || record.preparing || task.busy || !options.current()) return;
+        void (async () => {
+          const opts = { current: options.current, changed: draw };
+          if (task.state === "unknown") await checkEditRequest(room, task, opts); else await continueEdit(room, task, opts);
+          draw();
+        })();
+      });
       controls.append(go);
       if (canReturnToDraft(task)) {
         const cancel = h("button", { type: "button" }, "Back to edit");
