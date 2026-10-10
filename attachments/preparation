@@ -1,0 +1,50 @@
+{
+  "status": "INERT preparation only; Root owns actual execution",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "root": "/private/tmp/artroom-cloudflare-pool-prototype-once",
+  "plan": "/tmp/artroom-pool53b-static-preparation/plan.json",
+  "plan_sha256": "a6c10a6dd76ebdb0f08d72f01ca43748aba9f1c29e930d6fe7e48631ac835774",
+  "runner": "/tmp/artroom-pool53b-permanent-run.py",
+  "runner_sha256": "15a6229656ba546b74c9a221724a0a58335448fa851960eb18bc6eaea6069394",
+  "source_pins": 1272,
+  "workspace_count": 12,
+  "alias_count": 24,
+  "shared_cache_regular_files": 3898,
+  "shared_cache_links": 28,
+  "package_files": 23,
+  "private_copy_guard": "Before preparation pool symlink resolves to unchanged cache; afterward real private pool directory and actual index tool resolve inside owned worktree. All23 files exactly original except declared test-internal before/after hashes. Other namespace links and all cache files/links stay unchanged.",
+  "before_bundle_sha256": "8d3d115037c749cce1e8cb26bc70ba08e215aaaa357e4eae9f0c1577277c5855",
+  "after_bundle_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "commands": [
+    [
+      "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+      "scripts/cloudflare-pool-compat.mjs"
+    ],
+    [
+      "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+      "--test",
+      "scripts/cloudflare-pool-compat.test.mjs"
+    ]
+  ],
+  "cases": [
+    "the actual pinned pool factory keeps one lazy prototype across early and late constructions, preserving receiver and later prototype methods",
+    "compatibility privately copies cache-linked bytes, is idempotent, and refuses unknown versions or bundles before changing that view"
+  ],
+  "output": "/tmp/artroom-pool53b-permanent-result",
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool53b-permanent-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool53b-permanent-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool53b-permanent-outer.log",
+    "note": "Root can retain full launcher outer capture separately and seal its hashes after actual terminal; inner runner seals preparation/test raw logs/time/results without predicting outer output while running."
+  },
+  "execution": [],
+  "imports_or_install": false
+}
