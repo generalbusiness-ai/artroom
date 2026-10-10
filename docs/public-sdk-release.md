@@ -35,8 +35,9 @@ verifies their bytes. Every package compiles from its actual copied source
 ancestry. That root contains copied, pinned third-party dependencies and
 only the preceding completed Artroom JavaScript/declaration stages. There
 are no source-workspace aliases or Artroom fallback links. Compiler file
-lists are confined to the owned inputs/stages/dependencies and pinned
-compiler package. Source HEAD, clean state and copied bytes are checked
+lists are confined to the owned inputs/stages/dependencies and the exact
+pinned compiler wrapper and native package directories, including the native
+package's standard libraries. No whole-cache root is allowed. Source HEAD, clean state and copied bytes are checked
 again before the release manifest is sealed.
 
 Build order is contract, bytes, client, derive. TypeScript 7.0.2 emits ES2022

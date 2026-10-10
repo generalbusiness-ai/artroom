@@ -146,6 +146,8 @@ export function compile(tool, config, cwd, allowed, log) {
   catch (error) { writeFileSync(log, `${error.stdout ?? ""}${error.stderr ?? ""}`, { flag: "wx" }); refusal("compiler-failed"); }
   writeFileSync(log, result, { flag: "wx" });
   const files = result.split(/\r?\n/).map(line => line.trim()).filter(line => existsSync(line) && lstatSync(line).isFile());
-  if (!files.length || files.some(file => !allowed.some(root => contained(root, realpathSync(file))))) refusal("compiler-source-ancestry");
+  // TS7's standard libraries belong to its exact guarded native package.
+  const roots = [...new Set([...allowed, tool.dir, tool.native.dir])];
+  if (!files.length || files.some(file => !roots.some(root => contained(root, realpathSync(file))))) refusal("compiler-source-ancestry");
   return files.map(file => ({ path: realpathSync(file), sha256: digest(readFileSync(file)) }));
 }
