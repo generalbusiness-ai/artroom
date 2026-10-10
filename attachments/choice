@@ -1,0 +1,22 @@
+{
+  "head": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "tree": "11412d5e08fbbd61e13a5479d5bb66f20a8faf68",
+  "cwd": "/tmp/artroom-hub-pack-reuse",
+  "clean": true,
+  "source_edits": false,
+  "execution": "NONE",
+  "choice": "Hub-only opt-in known-failure selector; actual codec delegation, nonreusable rejected key; accepted path/OwnGit unchanged",
+  "qualification": "Failed concurrent coalescing changes for Hub only; constructor allocation witness/control unrun; no runtime/authority/performance claim",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-choice/decision.md",
+      "bytes": 6890,
+      "sha256": "5f58cdc571a7028a2e3c2c339dc48c55123aa2fb78ca837799cfdce69f6763bd"
+    },
+    {
+      "path": "/tmp/artroom-hub-early-refusal-source-choice/source-inventory.json",
+      "bytes": 1168,
+      "sha256": "6ec39ad6911a98ce2ecb3477f4d03cc2f38283041a0ddf85ac2de82ca2ada236"
+    }
+  ]
+}
