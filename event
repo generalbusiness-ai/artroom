@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6ad461312b4263c53f1cfd61eb93ca32b7cbacb8","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-08-manifest-tree-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6b5eb0b55d7d1265b9c885b36a92e51a43092e63","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/index.ts."}
