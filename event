@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:62ff280aa83e25ee21e621a1830318995ae9e442","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/editor-final-checks.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6335a62021695429bb9a762da757ca96e8af9014","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/support/site-fixture-lifetime.ts."}
