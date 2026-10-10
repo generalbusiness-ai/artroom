@@ -333,6 +333,15 @@ answers, and nothing about a real host, a real tree or a runner.
 
 ## While you work
 
+Root `npm test` and `npm run test:changed` first apply the narrow Cloudflare
+pool compatibility backport in `scripts/cloudflare-pool-compat.mjs`. It accepts
+only the pinned 0.22.0 package and complete known bundle hashes. Cache-linked
+views receive a private physical copy; the shared cache is never patched.
+The backport installs the upstream prototype Proxy once per wrapper class,
+keeping native introspection and RPC behavior. It changes no pool settings.
+Before a direct package or Vitest invocation, run this same script from the
+repository root. Unknown package versions or bytes stop preparation.
+
 Run the tests of what you changed, not the repository.
 
 ```
@@ -416,7 +425,10 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `scope-denial`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `scope-denial`, `lanes`, `cli` and `page`), then the built-in Node
+checks in `scripts/active-source.test.mjs` and `scripts/cloudflare-pool-compat.test.mjs`.
+The compatibility witness uses the guarded actual pool factory and private-copy
+workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
