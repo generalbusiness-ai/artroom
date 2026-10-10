@@ -118,3 +118,31 @@ read custody, durable adapters, browser hosting and local-versus-hosted
 fidelity remain separately owned and open. Browser cross-origin access is
 not established by packaging. This producer adds no CORS, grant, hosting,
 onboarding or universal durable-outbox protocol.
+
+## Module-reference Source repair
+
+Request `0c3828a0ca7b50dda540dc1c9023950c03b72668` rests on Artroom
+promise `git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4291f1e6caa20c865f5c2c983418c408b9d65895`. The original one-run
+`5e1f` producer failed before compiler/pack; its generic diagnostic did not
+name the specific refusal. Static inspection and the retained lexical
+reproduction locate false module references in quoted `from` capability
+data. The failed attempt and its partial stage remain immutable.
+
+The producer and output checker now share an internal token/span reader.
+It recognizes literal import/export/type/dynamic module references without
+reading data strings or comments as module clauses. Declaration rewriting
+uses only those literal offsets, leaving other bytes unchanged. Unsupported
+computed module forms refuse explicitly. No parser dependency, SDK source,
+manifest, lockfile or compiler ancestry guard changed. This source-specific
+reader is not a JavaScript evaluator or general code-security boundary.
+
+One coherent own Node witness uses the actual capability data, genuine
+module clauses and an owned declaration rewrite/refusal journey:
+
+```
+node --test scripts/public-release-modules.test.mjs
+```
+
+The case, syntax checks, new-head producer and output checker are all
+unrun. Old `5e1f` must not be retried; any later execution needs the new
+reviewed source, a fresh canonical owned stage and its own release.

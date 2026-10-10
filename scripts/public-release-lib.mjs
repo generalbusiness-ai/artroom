@@ -1,5 +1,6 @@
 // Four portable SDK packages only. No package loading or external service calls here.
 import { createHash } from "node:crypto";
+import { moduleSpecifierSpans } from "./public-release-modules.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -88,9 +89,7 @@ export function publishManifest(spec, source, selected) {
   };
 }
 export function references(text) {
-  // Emitted SDK ESM/declaration import specifiers; comments are not dependencies.
-  const clean = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  return [...clean.matchAll(/\b(?:from\s*|import\s*\(\s*|import\s+)["']([^"']+)["']/g)].map(match => match[1]);
+  return moduleSpecifierSpans(text).map(span => span.value);
 }
 /** Rewrite only relative declaration module specifiers; JavaScript is the compiler's output. */
 export function rewriteDeclarationRefs(stage) {
@@ -98,8 +97,14 @@ export function rewriteDeclarationRefs(stage) {
   for (const row of inventory(stage)) {
     if (!row.path.endsWith(".d.ts")) continue;
     const file = join(stage, row.path), before = readFileSync(file, "utf8");
-    const after = before.replace(/(\b(?:from\s*|import\s*\(\s*|import\s+))(["'])(\.[^"']+)\2/g,
-      (all, prefix, quote, path) => path.endsWith(".ts") && !path.endsWith(".d.ts") ? `${prefix}${quote}${path.slice(0, -3)}.js${quote}` : all);
+    let after = before;
+    for (const span of moduleSpecifierSpans(before).reverse()) {
+      if (!span.value.startsWith(".") || !span.value.endsWith(".ts") || span.value.endsWith(".d.ts")) continue;
+      const value = span.value.slice(0, -3) + ".js";
+      let encoded = JSON.stringify(value).slice(1, -1).replace(/'/g, span.quote === "'" ? "\\'" : "'");
+      if (span.quote === "`") encoded = encoded.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+      after = after.slice(0, span.start) + encoded + after.slice(span.end);
+    }
     if (before !== after) { writeFileSync(file, after); changes.push({ path: row.path, before: digest(before), after: digest(after) }); }
   }
   return changes;

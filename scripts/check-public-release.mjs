@@ -14,7 +14,7 @@ export function check(manifestFile) {
   if (!Array.isArray(release.packages) || release.packages.length !== PLAN.packages.length) refusal("package-set");
   const tool = compilerTool(ROOT);
   if (JSON.stringify(tool) !== JSON.stringify(release.tools.compiler) || process.version !== release.tools.node || digest(readFileSync(process.execPath)) !== release.tools.nodeSha256) refusal("check-tools");
-  const producerPaths = ["scripts/public-release.mjs", "scripts/public-release-lib.mjs", "scripts/public-release.json", "scripts/check-public-release.mjs"];
+  const producerPaths = ["scripts/public-release.mjs", "scripts/public-release-lib.mjs", "scripts/public-release-modules.mjs", "scripts/public-release.json", "scripts/check-public-release.mjs"];
   if (JSON.stringify(release.producerInputs?.map(input => input.path)) !== JSON.stringify(producerPaths)) refusal("producer-input-set");
   for (const input of release.producerInputs) if (digest(readFileSync(join(ROOT, input.path))) !== input.sha256) refusal("producer-input-integrity");
   for (const input of release.inputs) {

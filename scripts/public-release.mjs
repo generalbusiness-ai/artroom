@@ -19,7 +19,7 @@ export function produce(options) {
   const npmUser = join(output, "npm-user.conf"), npmGlobal = join(output, "npm-global.conf");
   writeFileSync(npmUser, "", { flag: "wx" }); writeFileSync(npmGlobal, "", { flag: "wx" });
   const inputs = [], dependencies = [], compiled = [], packages = [];
-  const producerInputs = ["scripts/public-release.mjs", "scripts/public-release-lib.mjs", "scripts/public-release.json", "scripts/check-public-release.mjs"].map(path => ({ path, sha256: digest(readFileSync(join(source, path))) }));
+  const producerInputs = ["scripts/public-release.mjs", "scripts/public-release-lib.mjs", "scripts/public-release-modules.mjs", "scripts/public-release.json", "scripts/check-public-release.mjs"].map(path => ({ path, sha256: digest(readFileSync(join(source, path))) }));
   const thirdParty = Object.fromEntries(PLAN.packages.flatMap(spec => Object.entries(spec.dependencies).filter(([, pin]) => pin !== "coordinated")));
   for (const [name, pin] of Object.entries({ ...thirdParty, ...PLAN.checkDependencies })) dependencies.push(copiedDependency(source, output, name, pin, lock));
   for (const spec of PLAN.packages) {
