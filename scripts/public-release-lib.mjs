@@ -141,13 +141,26 @@ export function compilerTool(root) {
     native: { name: nativeName, dir: nativeDir, bin: nativeBin, files: inventory(nativeDir) } };
 }
 export function compile(tool, config, cwd, allowed, log) {
-  let result;
-  try { result = execFileSync(tool.native.bin, ["-p", config, "--listFiles"], { cwd, env: childEnv(cwd), encoding: "utf8" }); }
-  catch (error) { writeFileSync(log, `${error.stdout ?? ""}${error.stderr ?? ""}`, { flag: "wx" }); refusal("compiler-failed"); }
-  writeFileSync(log, result, { flag: "wx" });
-  const files = result.split(/\r?\n/).map(line => line.trim()).filter(line => existsSync(line) && lstatSync(line).isFile());
   // TS7's standard libraries belong to its exact guarded native package.
   const roots = [...new Set([...allowed, tool.dir, tool.native.dir])];
-  if (!files.length || files.some(file => !roots.some(root => contained(root, realpathSync(file))))) refusal("compiler-source-ancestry");
-  return files.map(file => ({ path: realpathSync(file), sha256: digest(readFileSync(file)) }));
+  const capture = (result) => {
+    const files = result.split(/\r?\n/).map(line => line.trim()).filter(line => existsSync(line) && lstatSync(line).isFile());
+    if (!files.length || files.some(file => !roots.some(root => contained(root, realpathSync(file))))) refusal("compiler-source-ancestry");
+    const recorded = files.map(file => ({ path: realpathSync(file), sha256: digest(readFileSync(file)) })).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    if (new Set(recorded.map(file => file.path)).size !== recorded.length) refusal("compiler-file-duplicates");
+    return recorded;
+  };
+  const run = (flags, targetLog) => {
+    let result;
+    try { result = execFileSync(tool.native.bin, ["-p", config, ...flags], { cwd, env: childEnv(cwd), encoding: "utf8" }); }
+    catch (error) { writeFileSync(targetLog, `${error.stdout ?? ""}${error.stderr ?? ""}`, { flag: "wx" }); refusal("compiler-failed"); }
+    writeFileSync(targetLog, result, { flag: "wx" });
+    return result;
+  };
+  const emitting = json(config).compilerOptions.noEmit !== true;
+  const before = emitting ? capture(run(["--listFilesOnly", "--noEmit"], `${log}.resolution`)) : null;
+  // No emit is dispatched until actual canonical resolution and hashes passed.
+  const after = capture(run(["--listFiles"], log));
+  if (before && JSON.stringify(before) !== JSON.stringify(after)) refusal("compiler-input-changed");
+  return after;
 }
