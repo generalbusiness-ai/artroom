@@ -144,5 +144,33 @@ node --test scripts/public-release-modules.test.mjs
 ```
 
 The case, syntax checks, new-head producer and output checker are all
-unrun. Old `5e1f` must not be retried; any later execution needs the new
-reviewed source, a fresh canonical owned stage and its own release.
+unrun at that Source delivery. A later guarded `c4bd` attempt passed the
+one reader case, then compiled and packed contract, bytes and client. Derive
+emission failed with `TS2304: Cannot find name 'structuredClone'` in its
+exported testing fixture. Its resolution-only pass was not semantic type
+acceptance. The complete checker was never dispatched; all three packs and
+derive's partial output remain unvalidated local artifacts. Neither failed
+attempt may be retried or reused as a completed release.
+
+## Fixture clone type boundary
+
+Repair request `0da42a1126c471750cec1ccaf3adf17f4c94ee7c` rests on promise
+`git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694fa7a6b5005d72c3085c1ca037a4a21cc49ec`.
+Planner adopted the module-local boundary in
+`git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5bdb4183391917025edeb8c9b23786e625034360`.
+The existing testing fixture now declares only its native one-argument clone
+of `DeclaredDefinition`, privately inside the same module. It supplies no
+implementation, polyfill or replacement clone semantics. It adds no global
+augmentation or public clone API. Manifests, exports, lock, bytes/web and
+compiler options/ancestry remain unchanged.
+
+The complete checker now inspects actual emitted fixture JavaScript and
+declarations for the existing native call, erased private declaration and
+unchanged exported `variant` signature. Its existing compiled-output journey
+calls the real compiled helper, changes a nested cloned value and checks
+that the original small fixture retains exactly its canonical bytes.
+
+All repaired-head imports, cases, compilers, packing and complete output
+checks remain unrun. A future attempt needs its own exact reviewed source,
+fresh owned stage and release. One changed-head gate and normal independent
+review are still owed before landing; no public publication follows.

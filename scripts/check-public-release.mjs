@@ -44,6 +44,14 @@ export function check(manifestFile) {
     if (JSON.stringify(names.slice().sort()) !== JSON.stringify(files.map(row => `package/${row.path}`).sort())) refusal("tarball-files");
     for (const row of files) if (digest(execFileSync("/usr/bin/tar", ["-xOzf", tarball, `package/${row.path}`])) !== row.sha256) refusal("tarball-content");
   }
+  // The fixture's private host type must erase without changing its public ABI.
+  const fixtureJs = readFileSync(join(output, "packages/derive/dist/test/fixtures.js"), "utf8");
+  const fixtureTypes = readFileSync(join(output, "packages/derive/dist/test/fixtures.d.ts"), "utf8");
+  if ((fixtureJs.match(/\bstructuredClone\s*\(/g) ?? []).length !== 1
+    || !fixtureJs.includes("const definition = structuredClone(base);")
+    || /\b(?:function|const|let|var|class)\s+structuredClone\b/.test(fixtureJs)
+    || /\bstructuredClone\b|\bdeclare\s+global\b/.test(fixtureTypes)
+    || !fixtureTypes.includes("export declare function variant(base: DeclaredDefinition, change: (definition: any) => void): ValidDefinition;")) refusal("fixture-clone-abi");
   // One coherent real compiled-output journey, not a native/auth SDK or registry consumer.
   const consumer = join(output, "checks");
   mkdirSync(consumer); writeJson(join(consumer, "package.json"), { private: true, type: "module" });
@@ -53,10 +61,15 @@ import { canonicalBytes, keyIdOfSecret, sign, verify, verifySignedIntent } from 
 import { secretSigner, signedIntent, shapeDeclaredAct } from '@generalbusiness/artroom-client';
 import { validateDefinition } from '@generalbusiness/artroom-derive';
 import { RULE_PROFILES, evaluate, assertEngine } from '@generalbusiness/artroom-derive/rule';
-import { small } from '@generalbusiness/artroom-derive/testing';
+import { small, variant } from '@generalbusiness/artroom-derive/testing';
 const secret = new Uint8Array(32).fill(9), message = canonicalBytes({ b:2, a:1 });
 assert.equal(verify(keyIdOfSecret(secret), sign(secret,message),message),true);
 assert.equal(validateDefinition(small,PROPOSED_BOUNDS,RULE_PROFILES).ok,true);
+const originalSmall = canonicalBytes(small);
+const cloned = variant(small, definition => { definition.name = 'compiled-clone'; definition.items.note.values.text.of.max = 39; });
+assert.equal(cloned.declared.name,'compiled-clone');
+assert.equal(cloned.declared.items.note.values.text.of.max,39);
+assert.deepEqual(canonicalBytes(small),originalSmall);
 const refused = structuredClone(small); refused.rules = { bad:'$now()' };
 assert.equal(validateDefinition(refused,PROPOSED_BOUNDS,RULE_PROFILES).ok,false);
 await assertEngine(); assert.equal((await evaluate('a + b',{a:1,b:2})).value,3);
@@ -95,7 +108,7 @@ canonicalBytes({result:!!result, valid:!!valid});
   writeJson(config, { compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "ESNext.Disposable"], types: ["@generalbusiness/artroom-bytes/web"], strict: true, skipLibCheck: false, noEmit: true }, files: [ambient] });
   compilerProof.push({ mode: "ambient-only-no-DOM-no-Node", files: compile(tool, config, consumer, [consumer, join(output, "packages"), tool.dir], join(consumer, "ambient.log")) });
   sourceIdentity(ROOT, release.source.head);
-  const result = { format: "artroom-public-sdk-output-check-1", releaseManifestSha256: digest(readFileSync(file)), packages: release.packages.map(p => ({ name: p.name, version: p.version, integrity: p.integrity })), compiledOutputJourney: "passed", compilerProof, qualification: "Owned staged output only. Public install/browser execution/native authorization/Jam/deployment/adoption remain unproved." };
+  const result = { format: "artroom-public-sdk-output-check-1", releaseManifestSha256: digest(readFileSync(file)), packages: release.packages.map(p => ({ name: p.name, version: p.version, integrity: p.integrity })), compiledOutputJourney: "passed", testingFixtureClone: "native call preserved; private type erased; public variant signature unchanged; nested clone leaves original intact", compilerProof, qualification: "Owned staged output only. Public install/browser execution/native authorization/Jam/deployment/adoption remain unproved." };
   writeJson(join(consumer, "result.json"), result);
   return result;
 }
