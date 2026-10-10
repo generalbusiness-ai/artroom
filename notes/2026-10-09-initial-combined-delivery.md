@@ -212,3 +212,43 @@ The complete log retains the RefcountedCanceler cross-object timeout-abort diagn
 All 1,272 guarded source hashes, twelve workspace links, tool bindings, 3,898 shared-cache files and 28 links remained unchanged, as did the private 23-file pool copy with its permanent corrected cd50d18a helper. The candidate stayed clean. Complete sealed logs are retained at /tmp/artroom-poolb7ee-normal-gate; the complete proof is /tmp/artroom-poolb7ee-gate-complete-result.json, SHA256 8640e81fc2720ddb1d2d656d1698c524ebaf6d600e45979fd2694b7ab4c4bc37.
 
 This outcome amendment changes only this note. Executable source, tests, configuration, dependencies and built assets are unchanged from the successful b7ee subject/tree 8df68d174e474c71e1a237271222059b3ef18cfb. No checks or build were rerun for this documentation-only successor, per docs/testing.md. Formal retirement of the P2 finding, complete Source/evidence approval, request delivery and landing remain owed; manual/product acceptance, a complete causal account and the tenfold objective remain open.
+
+
+Hub fixture pack reuse — source successor, validation pending
+
+Under request `4bb53d024c7b7da058b25c01b71b793454d321af` and promise
+`254f392fdae077dce25642ac494745d40b527967`, this isolated successor of
+`0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` lets the scripted Hub reuse an
+owned ordered-content pack promise through the existing OwnGit mechanism.
+Only immutable wire bytes are reused; responses, refs, public reads and
+write credential/receive decisions remain per request. The same cache
+witness retains its OwnGit assertions and adds Hub public repeats, mutation,
+rejection/recovery and fresh responses/refs using the actual bounded Git codec.
+No live GitHub behavior, timing gain or full 10x outcome is claimed.
+Affected compilation, the complete cache and Demo files, a distinguishing
+Hub-only control and a changed-head gate remain unrun and owed. Prior gates
+and native results qualify their exact earlier heads; they do not accept this
+new source. The frozen initial `0e595` filing remains separate.
+
+
+Hub known-refusal allocation — source successor, validation pending
+
+This separate successor of `c8d989305f6a1ed9b8a2570a28232c34c9599145`
+implements request `74b810cd1dd75fbfff0f481c77e290409fc85e32`, resting on
+promise `660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa` and adopted choice
+`0e527840fd86f43dd3d4a2d03a3fd5ca63e0353d`. Only Hub enables the shared
+helper's cheap count/raw-length failure selector. It sends necessarily
+failing ordered object references to the unchanged real codec before any
+fixture payload copy; that codec retains its own first-error ordering.
+OwnGit's inherited path and every accepted owned snapshot remain unchanged.
+Known failing Hub uploads may each call the codec rather than coalescing
+rejected promises. Actual build counting and identity-guarded failed-slot
+retirement remain explicit; no auth, refs, response or receive decision is
+cached. The same cache case observes construction of the exact oversized
+payload and restores the real constructor in `finally`, then checks repair
+and reuse. Constructor interception is unproved until an actual old-path
+control distinguishes it; unsupported interception is not acceptance.
+All new compilation, native bodies, controls and the changed-head gate are
+unrun and remain separately owned. No measured allocation gain, timing
+factor, live GitHub behavior or full tenfold outcome is claimed. Frozen c8
+and the initial `0e595` filing remain unchanged and separate.
