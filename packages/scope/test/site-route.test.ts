@@ -75,7 +75,7 @@ async function wantedObject(request: Request): Promise<string> {
   if (!(data instanceof Uint8Array)) throw new GitRefusal("unreadable", "fixture upload request");
   const lines: (string | null)[] = [];
   for (let at = 0; at < data.length;) {
-    const digits = new TextDecoder("ascii", { fatal: true }).decode(data.subarray(at, at + 4));
+    const digits = new TextDecoder("ascii", { fatal: true, ignoreBOM: false }).decode(data.subarray(at, at + 4));
     if (!/^[0-9a-f]{4}$/.test(digits)) throw new GitRefusal("unreadable", "fixture upload pkt-line");
     const size = Number.parseInt(digits, 16);
     if (size === 0) { lines.push(null); at += 4; continue; }
