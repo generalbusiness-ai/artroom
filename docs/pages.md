@@ -219,11 +219,15 @@ bytes, or one that is not UTF-8, cannot be edited this way.
 ## Who can read a site
 
 **Published files are public.** Anyone with the room's directory scope
-ID can read every file at its recorded published branch head, with no
-session, including files published from a private backing repository.
-Other branches, tags and commit names are refused before acquiring provider
-access. The Worker reads only the selected commit with its existing host
-credentials: a temporary read token on the hosting's own Git service, or
+ID can read every file at its current recorded published branch head, or
+at an eligible immutable native publication addressed by its complete
+40-character lowercase commit ID with a written receipt. No session is
+needed, including for files published from a private backing repository.
+`HEAD` and the published branch name provide current recorded navigation;
+an eligible immutable URL continues to name that published result. Arbitrary
+or unproved commits and provider-only branches or tags are refused before
+acquiring provider access. The Worker reads only the selected commit with its
+existing host credentials: a temporary read token on the hosting's own Git service, or
 the deployment's existing GitHub read token. GitHub's stable repository ID
 must match the room's record before any Git source is acquired. Knowing a
 room address does not publish its private repository's other branches.

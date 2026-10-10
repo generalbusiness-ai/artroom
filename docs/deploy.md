@@ -123,10 +123,12 @@ reads them with no token, and `GITHUB_READ_TOKEN` is not needed.
 
 ## Published repository sites
 
-The `/site/<directory>/<ref>/<path>` route serves only the destination's
-recorded published branch head. `HEAD` and that branch name read the exact
-recorded commit; the Git host's newer head is not substituted. Other branch,
-tag and commit names answer `not-published` before acquiring provider access.
+The `/site/<directory>/<ref>/<path>` route serves recorded publications.
+`HEAD` and the published branch name read the destination's current recorded
+commit; the Git host's newer head is not substituted. A complete 40-character
+lowercase commit ID can also read an eligible immutable native publication
+with a written receipt. Arbitrary or unproved commits and provider-only
+branches or tags answer `not-published` before acquiring provider access.
 The versions page lists only room-recorded publications. The current room
 model records one branch and no tag or named-version registry.
 
