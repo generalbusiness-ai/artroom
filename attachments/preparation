@@ -1,0 +1,33 @@
+{
+  "status": "INERT baseline bound to observed exactclean f241; no Source/code edit",
+  "head": "f241168dade37cf859151f4b7021afb95464d77e",
+  "tree": "991666851df01d6e93d6f57a2457beb1e7f48e8f",
+  "root": "/private/tmp/artroom-pool-staging-ownership",
+  "plan": "/tmp/artroom-pool-f241-staging-preparation/plan.json",
+  "plan_sha256": "b6c14556a71c6aa8737688ab52d949a9e5f2da6daa4edfbdf4399742e1dcab61",
+  "runner": "/tmp/artroom-pool-f241-staging-baseline-run.py",
+  "runner_sha256": "6442b8f5e7970632ee2c15a4627ced03c91fbca8b2e5a0cbc0506a8eb800d95c",
+  "owned_workspaces": 12,
+  "aliases": 24,
+  "physical_pool_files": 23,
+  "fixed_bundle_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "source_pins": 1272,
+  "shared_cache_manifest_reused": "/tmp/artroom-pool53b-static-preparation/shared-cache-all-files.json",
+  "shared_cache_files": 3898,
+  "shared_cache_links": 28,
+  "cases": 2,
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool-f241-staging-baseline-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool-f241-staging-baseline-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool-f241-staging-baseline-outer.log"
+  },
+  "output": "/tmp/artroom-pool-f241-staging-baseline-result",
+  "execution": []
+}
