@@ -1,0 +1,63 @@
+# Counter C1/M1 demo integration
+
+This candidate integrates the actual Counting commitments declaration and explicit
+Counting cohort with the browser stage and same-origin Worker assets. It starts
+from published main 9a419849d57c2a18d6aa69741c0a232e1f3bd65d and preserves the later
+normal merge of main f722bc22d484c16fc73eae31e4c4a8eae94a546a. It includes C1
+2c7a650b6a76f88ea99d48f6a29bb29a7045d081 and validated M1
+2961d8c031c5f3de4a7b0dbc2c036ec04fce6c1a. The old C0 data, shipped platform
+versions, default cohort, lockfile and sprint reports remain intact.
+
+The browser commits the next number through C1 before speech, persists and reads
+back its exact audio-start marker under the existing private lock before making
+sound, then prepares Fulfill after actual completion. A cancelled or interrupted
+start stays uncertain. Check archives it only after fresh native proof that the
+original pledge is no longer live. A successful exact report transfer clears
+only audio uncertainty; failed custody remains blocked. Reload and unknown replies
+never authorize another sound or fresh signature. The real Worker serves exactly
+three public production assets at /counting/ on its own origin, with a self-only
+CSP. The local fake preview remains excluded from that route.
+
+The recorded focused subject is 84d3b39eaeca84a9395d290fafb617f995bb01e8,
+tree 79d3c8b91ee697edef31ea44294f49ddcd98eddf. The asset builder completed and
+its freshness case matched a fresh write-free build. Browser, Counting,
+Platform TEST, CLI TEST, Page TEST and Scope TEST compiler contexts passed after
+retained initial type failures were corrected. The final browser compiler passed
+after the audio repair. Three complete bundled browser Node files passed all
+37 cases, including durable start/readback failure, interrupted reload, voice
+change, exact report transfer during invalidation and separate native-shaped
+report/audio obsolescence. These use labeled DOM, transport, storage and speech
+stand-ins; they do not prove physical sound or a deployed three-device interaction.
+
+The first native command stopped before setup or bodies because the focused
+Reporter rejects --project as a filter. Removing that flag in a fresh output
+ran the same two whole Worker files: both passed. The real C1/M1 journey exercised
+factory establishment, actual agent enrollment, separate grants, three identities,
+competing pledges, fulfillment, all fourteen acts including genesis, ordered
+30-second expiry, restart, preserved history and authenticated HTTP reads. Its
+Git host and monotonic test clock remain labeled fixtures. Five further complete
+pure files passed all ten cases: C1 declaration and refolding, cohort/version
+preservation, CLI install custody and generated-asset freshness. Same-run Reporter
+and built-in JSON agreed, with no retries, skips or unhandled errors. That command
+used 1.24 seconds wall and 2.64 seconds CPU on this machine; native Vitest reported
+1.95 seconds, not a separately measured CPU figure.
+
+Earlier Node attempts are retained: the removed Node transform flag refused
+before bodies; direct TypeScript execution exposed one module-loader limitation
+and the audio uncertainty defect; two bundle preflight attempts stopped before
+bodies; the first bundled body had 36 passes and one fixture-obsolescence failure.
+The corrected final bundled body had 37 passes. These attempts are separate from
+the successful native and pure outcomes and are not erased by them.
+
+Evidence is retained in /tmp/artroom-counter-browser-node-{one,two,three,four,five,six}.log,
+/tmp/artroom-counter-native-{one,two}/ and /tmp/artroom-counter-pure-one/.
+A normal same-head gate, independent full source review, main landing, actual
+Cloudflare Counter deployment and three independent devices with distinguishable
+usable voices remain owed. The final natural recording and deployed recovery,
+peer-update and unknown-reply checks remain owed. This note-only successor does
+not change the checked code, fixtures, configuration or generated assets.
+
+Tracked under gitseq request c612acc60c1b02577c7814b8026ad6d398f54023 and builder
+promise 96ce76dbe95b0247193bf7ac5d4df47937915350, in convergence
+e60a3ca5ce320ba4af84478ff5f88ff4d6be63fe. Economy work is superseded by the
+adopted two-sprint deployment schedule, not completed as a measured global speedup.
