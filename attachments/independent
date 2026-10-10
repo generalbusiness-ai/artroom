@@ -1,0 +1,38 @@
+{
+  "kind": "Independent full inert SDK7695 recipe review and bounded static correspondence",
+  "input_packet": "/private/tmp/artroom-sdk-7695-validation-preparation/packet.json",
+  "input_packet_sha256": "73f493313e999edf6854cd8640e137803740ab6efe4a3b8da05da037f249b5a5",
+  "head": "769566a17b3a11b505acb2a08ddfe92ee5b3530f",
+  "tree": "fe5c9c1bd30200eb7ffb7306193c09c34db1ea4f",
+  "source_review_reused": "/tmp/artroom-sdk-7695-independent-source-review/packet.json SHA5e11c4ee6c80923b87eb2acf80d1a44f958ed5066be140d542c1fb624ed6378f",
+  "full_recipe_reads": [
+    "run-sdk.mjs",
+    "run-once.sh",
+    "measure-child.mjs",
+    "handoff.md",
+    "driver-delta.patch",
+    "recipe-seal.json"
+  ],
+  "bindings_coverage": "All124 source,809 package ordinary files per side,1953 npm file/link records checked statically; bindings schema reviewed without fresh wholeSource semantic credit",
+  "exact_driver_delta_verified": true,
+  "measurement_preloader_unchanged": true,
+  "source_input_count": 124,
+  "owned_packages": 7,
+  "files_per_package_side_total": 809,
+  "npm_records": 1953,
+  "fresh_roots_absent": true,
+  "concrete_blocking_findings": [],
+  "runtime": "NONE; no imports, syntax probes, reader/producer/checker/compiler/build/pack/install/registry/provider/gate/native runtime or state filing",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-sdk-7695-independent-recipe-review/static-correspondence.json",
+      "bytes": 905,
+      "sha256": "307b89491b51748fe58813262f2be2830523eeb8c875246d4fb6afbc2c5986ae"
+    },
+    {
+      "path": "/tmp/artroom-sdk-7695-independent-recipe-review/review.md",
+      "bytes": 4676,
+      "sha256": "996fae79d83350ad3d222102a21db35c3093d09d1e0d5e7fa3ba73d0f92af292"
+    }
+  ]
+}
