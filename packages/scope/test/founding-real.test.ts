@@ -2,7 +2,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, inject, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, platformName, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
@@ -313,7 +313,12 @@ describe("a founding on real scopes under the deployed class (authority note, se
       });
       const use = genesisEntry.uses.find((candidate) => canonicalize(candidate.fact) === canonicalize(genesis.source));
       if (!use) throw new Error("The native rules genesis must retain its actual directory fact.");
-      expect(scopes.find((scope) => scope.scope.scope === target.scope)!.retained).toContainEqual({ kind: "entry", digest: use.content, bytes: canonicalize((await D.entries())[genesis.source.seq]), under: "directory" });
+      const directory = scopes.find((scope) => scope.scope.scope === D.name);
+      if (!directory) throw new Error("The native directory prefix is missing.");
+      const directoryGenesis = JSON.parse(directory.entries[0]!.bytes) as Entry;
+      expect(directoryGenesis.input.type === "genesis" && directoryGenesis.input.seed.definition).toBe(DIRECTORY);
+      expect((await D.summary()).value.definition).toBe(DIRECTORY);
+      expect(scopes.find((scope) => scope.scope.scope === target.scope)!.retained).toContainEqual({ kind: "entry", digest: use.content, bytes: canonicalize((await D.entries())[genesis.source.seq]), under: platformName(DIRECTORY) });
       const text = canonicalize({ format: "artroom-native-replay-capture-1", target, scopes, missing: { scope: D.name, fact: genesis.source }, limits,
         provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/founding-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
           namespace: "PLATFORM", storedBytes: "native HTTP history and retained-input routes", grants: "proven", anchors: [],

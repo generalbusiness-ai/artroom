@@ -129,6 +129,13 @@ with the exact tested source, target and native run proof before checker use.
 The ordinary gate leaves recording off. No private log body becomes public
 because it contains this channel.
 
+The captured directory genesis and summary must match the exact `DIRECTORY`
+pin. A retained entry's `under` states `platformName(DIRECTORY)`, preserving
+the platform prefix and omitting the version; its digest and canonical bytes
+remain exact. The first body attempt's mistaken bare name was retained as a
+capture assertion failure; its positive native replay ran before that failure
+and no capture was emitted.
+
 The block rejects the entire capture before any marker if decoded canonical
 entries or retained inputs contain credential fields, or if its text contains
 known fixture secrets or the current session secret/header. It never redacts
