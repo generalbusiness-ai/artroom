@@ -3,13 +3,13 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type InstallCohort, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
-  "  artroom install <base-url> [--host <git-host>] [--namespace <name>]",
-  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]",
-  "  artroom install --planned",
+  "  artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort counting-commitments]",
+  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort counting-commitments]",
+  "  artroom install --planned [--cohort counting-commitments]",
   "  artroom claim <name> [--handle @you] [--branch main] [--again]",
   "  artroom invite <@member> --role <role> [--hours 24]",
   "  artroom join <link>",
@@ -58,7 +58,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -74,8 +74,12 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
   const needs = (what: string): Outcome => ({ code: 2, lines: [`${name} needs ${what}.`, USAGE] });
   switch (name) {
     case "install": {
-      const where = { ...(flag("host") ? { host: flag("host")! } : {}), ...(flag("namespace") ? { namespace: flag("namespace")! } : {}) };
-      if (flag("planned")) return first !== undefined || flag("plan") || flag("host") || flag("namespace") ? { code: 2, lines: ["install --planned takes no base URL and no other flag: the plan holds them.", USAGE] } : installPlanned(ctx);
+      const cohorts = parsed.flags.get("cohort");
+      if (cohorts && (cohorts.length !== 1 || cohorts[0] !== "counting-commitments")) return { code: 2, lines: ["--cohort takes exactly one value: counting-commitments.", USAGE] };
+      const cohort = cohorts?.[0] as InstallCohort | undefined;
+      const host = flag("host"), namespace = flag("namespace");
+      const where = { ...((cohort ? host !== undefined : !!host) ? { host: host! } : {}), ...((cohort ? namespace !== undefined : !!namespace) ? { namespace: namespace! } : {}), ...(cohort ? { cohort } : {}) };
+      if (flag("planned")) return first !== undefined || flag("plan") || flag("host") !== undefined || flag("namespace") !== undefined ? { code: 2, lines: ["install --planned takes no base URL, host or namespace: the original plan holds them.", USAGE] } : installPlanned(ctx, cohort ? { cohort } : {});
       if (first === undefined) return needs("a base URL");
       return flag("plan") ? planInstall(ctx, first, where) : install(ctx, first, where);
     }
