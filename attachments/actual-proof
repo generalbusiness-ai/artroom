@@ -1,0 +1,35 @@
+{
+  "actual_handle": 78537,
+  "terminal_exit": 0,
+  "release": "e162f7df1803c3bcee37ff7eddb128af5cb11f64",
+  "head": "f241168dade37cf859151f4b7021afb95464d77e",
+  "tree": "991666851df01d6e93d6f57a2457beb1e7f48e8f",
+  "manifest": {
+    "path": "/tmp/artroom-pool-f241-staging-baseline-result/manifest.json",
+    "sha256": "4d88065604394a764e11f0f0e79a46a3d1794fc52b3ca7eb4e1dddf91baf8afc"
+  },
+  "raw_outer": [
+    {
+      "path": "/tmp/artroom-pool-f241-staging-baseline-outer.log",
+      "sha256": "d7c583bc5855702ac358add57702e6efe6b85729f91c2ff70d2e053aca16de93"
+    },
+    {
+      "path": "/tmp/artroom-pool-f241-staging-baseline-outer.time",
+      "sha256": "2b492f2b5a4e2a8041efb3caecff99f34b22f607e2a36c5aa16e13d56356a4c3"
+    }
+  ],
+  "coverage": {
+    "exact_whole_file_titles": [
+      "the actual pinned pool factory keeps one lazy prototype across early and late constructions, preserving receiver and later prototype methods",
+      "compatibility privately copies cache-linked bytes, is idempotent, and refuses unknown versions or bundles before changing that view"
+    ],
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0,
+    "reporter": "Unchanged Node default spec terminal output"
+  },
+  "clean_source_cache_tool_guards": true,
+  "qualification": "Real existing filesystem case collision/refusal preservation and recovery at f241; labelledfixture/cache. No native re-execution or oldgate transfer, control/newgate stillpending."
+}
