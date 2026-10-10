@@ -1,0 +1,49 @@
+{
+  "head": "c292f670623e57fe15fb2805004ebb9ed6f4872a",
+  "tree": "8758c17faf22f166925d1962cf176feab1f7e9a4",
+  "parent": "3ea06044fa70c589b1a63886fc750f21156077a0",
+  "worktree": "/tmp/artroom-ux1-dom-boundary-fix",
+  "branch": "request/ux1-dom-boundary-fix",
+  "request": "94b932355c4ad6c4270ddaf4231c1d4ac329b2c2",
+  "promise": "919649f327066d2ac06411e24ae4c48171018a13",
+  "repair_paths": [
+    "packages/page/test/join-ui.test.ts",
+    "packages/page/test/sending.test.ts"
+  ],
+  "files": {
+    "0-body.txt": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/0-body.txt",
+      "bytes": 9824,
+      "sha256": "2f4e2e7d2f445a4d54adb6e037a21781f58a4b5455dfe49dc2e52c7863da0aa7"
+    },
+    "0-repair.patch": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/0-repair.patch",
+      "bytes": 1806,
+      "sha256": "bdf3a99a3c31999dca2b4a5e1e604e1bdf6117a2147dad0bde0cd58d55ec050e"
+    },
+    "1-body.txt": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/1-body.txt",
+      "bytes": 30633,
+      "sha256": "8ea497c0c3f1cbd095305df7bf70574f2c594ae3b3fa2a1a1b402af67bb72410"
+    },
+    "1-repair.patch": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/1-repair.patch",
+      "bytes": 6111,
+      "sha256": "f9786d93d2f49f9a6ad5a5dcda9e4fa27e4e4932d2bc464007721981388aef1c"
+    },
+    "preservation.json": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/preservation.json",
+      "bytes": 159568,
+      "sha256": "cd8f755d92332a9b925cc37bc0dadaab33b320f4d7dff346c307cb907cc4abcb"
+    },
+    "disposition.md": {
+      "path": "/tmp/artroom-ux1-dom-boundary-fix-packet/disposition.md",
+      "bytes": 2534,
+      "sha256": "866864e8e4cdc988832b72ae46de65aa231e37194c439959992267d602f8fa33"
+    }
+  },
+  "recipe": "/tmp/artroom-ux1-c292-node-preparation/recipe-packet.json",
+  "recipe_sha256": "d6a187ec70166fcb5a9fea375e6d4c614d903efe8004ab2cfcad80e0285befaa",
+  "clean": true,
+  "execution": []
+}
