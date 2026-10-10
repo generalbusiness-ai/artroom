@@ -252,3 +252,26 @@ All new compilation, native bodies, controls and the changed-head gate are
 unrun and remain separately owned. No measured allocation gain, timing
 factor, live GitHub behavior or full tenfold outcome is claimed. Frozen c8
 and the initial `0e595` filing remain unchanged and separate.
+
+
+Hub and manifest economy composition — source, validation pending
+
+Request `5ade75228f4ed9d2f4e0b1523bdfd2e46f494692`, resting on promise
+`2511667df4d7333402f8af8b34d82cb958ecbc43`, composes only the reviewed Hub
+successor `ee7d213113805d8375f2bf7e6e8651f9c0b655b5` and manifest successor
+`bdf64bdde4afc26485963e76bb409a01a4c9347c` onto actual receiving main
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, whose tree matches the landed
+initial `0e595` source. Both normal merges completed without conflict and
+preserve exact donor code bytes. SDK, UI, Counting and other setup work are
+excluded. The initial delivery is landed; these test changes are a new,
+separate source subject and inherit no validation pass.
+
+The manifest change removes two duplicate object verifications while the
+real checker boundary and corruption refusal remain, and corrects the
+published tree expectation to retain the existing docs folder. The Hub
+change and its allocation/coalescing qualifications stand as recorded
+above. The complete cache, Demo and manifest files retain all 27 cases,
+including the original optional recorder. The smallest direct compiler
+closure, one same-run native body, any separately released controls and a
+changed-head normal gate remain unrun. No timing factor, native authority,
+provider or complete tenfold acceptance is claimed by this composition.
