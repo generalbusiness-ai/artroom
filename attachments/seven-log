@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-initial-native-cleanup-fix/packages/scope
+
+ ✓ |scope| ../cli/test/story.scope.test.ts > the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs > install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it 625ms
+ ✓ |scope| ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it 1141ms
+ ✓ |scope| ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback 742ms
+uncaught exception; source = Uncaught (in promise); stack = Error: fixture retention fault: SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)
+    at Object.exec (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/object.ts:130:53)
+    at SqliteStore.#run (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/sqlite.ts:131:66)
+    at SqliteStore.retain (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/sqlite.ts:397:10)
+    at Turns.#seal (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/turn.ts:348:45)
+    at Turns.#judged (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/turn.ts:312:29)
+    at /private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/turn.ts:288:89
+    at Object.transaction (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/object.ts:131:45)
+    at SqliteStore.transaction (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/sqlite.ts:135:55)
+    at /private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/turn.ts:288:46
+    at Turns.#telling (/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/src/turn.ts:167:18)
+ ✓ |scope| test/application-establish.test.ts > explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant 971ms
+ ✓ |scope| test/founding-real.test.ts > a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN > an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check 713ms
+stderr | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+site objects: GitRefusal: hash-mismatch: pack object; last request: POST https://service.invalid/git/artroom-demo/hwykag7ojrnalodj2pvo7s3agpuytf4bptkk2tvztm2d2sowa5xa-1.git/git-upload-pack -> GitRefusal
+
+ ✓ |scope| test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes 890ms
+ ✓ |scope| test/versions.test.ts > a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN > a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code 465ms
+
+ Test Files  7 passed (7)
+      Tests  7 passed (7)
+   Start at  20:31:51
+   Duration  7.13s (transform 582ms, setup 0ms, import 1.24s, tests 5.55s, environment 0ms)
+
