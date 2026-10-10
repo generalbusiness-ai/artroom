@@ -99,8 +99,8 @@ public registry, device or full product acceptance.
 
 The reduced pipeline measured 28.18 seconds elapsed and 33.43 seconds CPU;
 its test body measured 25.38 seconds elapsed and 28.13 seconds CPU. These
-are separate measurements, not a sum. The normal Page build, one ordinary
-changed-source gate and independent Source review still remain.
+are separate measurements, not a sum. At that point, the normal Page build,
+ordinary changed-source gate and independent Source review remained.
 
 The normal Page build (52663) passed. It emitted 558,411 bytes of Page
 JavaScript and the 598,623-byte generated Worker module, SHA-256
@@ -109,7 +109,8 @@ Its pre/post guards preserved product Source, tests, tools and dependencies;
 only this pinned note and the expected generated module changed. The outer
 run measured 1.47 seconds elapsed and 1.36 seconds CPU; the build child
 measured 0.28 seconds elapsed and 0.19 seconds CPU. No focused checks were
-repeated. The ordinary changed-source gate and independent review remain.
+repeated. At that point, the ordinary changed-source gate and independent
+review remained.
 
 ## First ordinary gate outcome
 
@@ -127,5 +128,28 @@ five-minute lifetime. The repaired witness includes a deliberate subsecond
 advance and checks the exact rounded deadline. Its released-continuation,
 native acceptance and unchanged-clock assertions remain intact. Production
 code, deadlines, the shared clock and all other tests are unchanged.
-The repaired file and previously unrun Node checks remain to be checked;
-the whole suite will not be repeated.
+At that point, the repaired file and previously unrun Node checks remained
+to be checked. The whole suite was not repeated.
+
+## Bounded completion after the gate failure
+
+The bounded completion (72721), at
+`25104ecb0cac33a6d62f807db1b0c4333ca02a82`, passed the Lanes Scope compiler
+and the whole repaired Site file: one native case, no skips or retries.
+It then ran the two original Node commands that the failed gate had not
+reached. Active-source and pool-compatibility tests passed all eight cases;
+Counting browser Node tests passed all 37, with no failures, skips,
+cancellations or todo cases. These are Node tests, not browser acceptance.
+
+The bounded pipeline measured 8.23 seconds elapsed and 10.67 seconds CPU.
+The Site body measured 1.80 seconds elapsed and 2.27 seconds CPU. The other
+1,027 passing Vitest cases and two original skips stay bound to their
+unchanged Source from the failed gate; the repaired test and this note are
+the only subsequent changes. All production code, generated assets, other
+tests, configurations and dependencies are unchanged.
+
+The original `npm run gate` still has exit 1. The repaired witness and its
+previously unrun Node checks now pass; this does not relabel that command
+green or claim another whole gate. The final note update changes documents
+only. Independent Source review and normal main landing remain, along with
+the separate full browser, registry, provider, device and deployment duties.
