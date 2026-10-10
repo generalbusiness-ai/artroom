@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7c5a5c8e1691b6a7c9797acc870f609e82467d5e","text":"Merge retired a covered predecessor; the successor is at packages/page/src/main.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7ca0ca542698b2d5799937a8d7744dda20e403b0","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/support/room.ts."}
