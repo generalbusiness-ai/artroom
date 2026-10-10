@@ -1,4 +1,4 @@
-// Four portable SDK packages only. No package loading or external service calls here.
+// Six portable SDK packages only. No package loading or external service calls here.
 import { createHash } from "node:crypto";
 import { moduleSpecifierSpans } from "./public-release-modules.mjs";
 import { execFileSync } from "node:child_process";
@@ -71,8 +71,12 @@ export function copiedDependency(sourceRoot, outputRoot, name, expected, lock) {
   return { name, version: expected, lockIntegrity: locked.integrity, source: physical, files: before };
 }
 export function publishManifest(spec, source, selected) {
+  const excluded = spec.excludedSourceExports ?? {};
+  if (JSON.stringify(excluded) !== JSON.stringify(spec.dir === "platform" ? { "./testing": "./test/support.ts" } : {})) refusal("source-export-exclusions");
   const keys = Object.keys(source.exports ?? {});
-  if (JSON.stringify(keys.sort()) !== JSON.stringify(Object.keys(spec.exports).sort()) || source.name !== nameOf(spec.dir) || source.type !== "module" || source.license !== "Apache-2.0") refusal("unsupported-source-manifest");
+  if (JSON.stringify(keys.sort()) !== JSON.stringify([...Object.keys(spec.exports), ...Object.keys(excluded)].sort()) || source.name !== nameOf(spec.dir) || source.type !== "module" || source.license !== "Apache-2.0") refusal("unsupported-source-manifest");
+  for (const [key, value] of Object.entries(excluded)) if (source.exports[key] !== value) refusal("unsupported-source-export");
+  if (spec.dir === "replay" && JSON.stringify(source.bin) !== JSON.stringify({ "artroom-replay": "./src/bin.ts" })) refusal("unsupported-source-bin");
   for (const [key, path] of Object.entries(spec.exports)) {
     const old = source.exports[key];
     if (path.endsWith(".d.ts") ? JSON.stringify(old) !== JSON.stringify({ types: `./${path}` }) : old !== `./${path}.ts`) refusal("unsupported-source-export");
@@ -87,6 +91,14 @@ export function publishManifest(spec, source, selected) {
     files: ["dist", "README.md", "LICENSE", "NOTICE"], publishConfig: { access: "public" },
     ...(Object.keys(spec.dependencies).length ? { dependencies: Object.fromEntries(Object.entries(spec.dependencies).map(([name, pin]) => [name, pin === "coordinated" ? selected : pin])) } : {}),
   };
+}
+/** The only omitted production input is the Node process wrapper, not library code. */
+export function productionInputs(spec, tracked) {
+  const excluded = spec.excludedInputs ?? [];
+  if (JSON.stringify(excluded) !== JSON.stringify(spec.dir === "replay" ? ["src/bin.ts"] : [])) refusal("source-input-exclusions");
+  const omitted = excluded.map(path => `packages/${spec.dir}/${path}`);
+  if (omitted.some(path => !tracked.includes(path))) refusal("missing-excluded-source");
+  return { names: tracked.filter(path => !omitted.includes(path)), omitted };
 }
 export function references(text) {
   return moduleSpecifierSpans(text).map(span => span.value);
@@ -114,6 +126,7 @@ export function outputClosure(stage, spec, selected) {
   if (expected.name !== nameOf(spec.dir) || expected.version !== selected || expected.type !== "module") refusal("stage-manifest");
   const rows = inventory(stage);
   for (const row of rows) {
+    if (spec.dir === "replay" && /^dist\/src\/bin\.(?:js|d\.ts)$/.test(row.path)) refusal("excluded-output");
     if (!["package.json", "README.md", "LICENSE", "NOTICE"].includes(row.path) && (!row.path.startsWith("dist/") || !/\.(?:js|d\.ts)$/.test(row.path))) refusal("unplanned-output");
     if (row.path.startsWith("dist/test/") && !(spec.dir === "derive" && /^dist\/test\/fixtures\.(?:js|d\.ts)$/.test(row.path))) refusal("unplanned-testing-output");
     if (!row.path.startsWith("dist/") || !/\.(?:js|d\.ts)$/.test(row.path)) continue;

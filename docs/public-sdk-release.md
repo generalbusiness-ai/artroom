@@ -1,9 +1,15 @@
 # Producing the public SDK
 
-This is the active four-package producer boundary. It builds and inspects
-JavaScript and declarations for contract, bytes, client and derive. It does
+This is the active six-package producer boundary. It builds and inspects
+JavaScript and declarations for contract, bytes, client, derive, platform and replay. It does
 not publish, install application packages, configure accounts or deploy a
 service. The earlier release guide is historical and inactive.
+
+The six-package amendment is request `fecf7160fd4a8c4b9219d7713a11036ff48db85e`,
+promise `ffae23e0f56d0a17d773264588f98940f04cd963`. It follows the public
+verifier handoff reported in `008c3cfd35443d23c44ad13a64af867282aee2c8`.
+Its source, capture, producer, checker, browser bundle and gate outcomes are
+unrun at this source delivery. Frozen four-package attempts remain separate.
 
 The source-authoring request is `23e6d5e8e2773f11c2271f86d3c1cbf019dd5cf0`,
 promise `a01fe0506ee046908c7a9d97c18df388223c02a0`, under public-release
@@ -21,7 +27,7 @@ reviewed version. Commands below are execution recipes, not recorded runs.
 
 ```
 node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-commit> --version <reviewed-version> --output /private/tmp/fresh-sdk-stage --npm-cli /absolute/npm/bin/npm-cli.js --npm-version <exact-npm-version>
-node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json
+node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json --native-capture /private/tmp/reviewed-native-capture.json --native-capture-sha256 <reviewed-SHA256> --esbuild /absolute/pinned-native-esbuild/bin/esbuild --esbuild-sha256 <reviewed-SHA256>
 ```
 
 The proposed coordinated version `0.1.0-dev.2` is conditional. It is neither
@@ -45,12 +51,23 @@ its file set and input hashes must match that preflight. Consumer `noEmit`
 checks keep their single pass. Source HEAD, clean state and copied bytes are
 checked again before the release manifest is sealed.
 
-Build order is contract, bytes, client, derive. TypeScript 7.0.2 emits ES2022
+Build order is contract, bytes, client, derive, platform, replay. TypeScript 7.0.2 emits ES2022
 ESM plus declarations without maps. Relative JavaScript extensions are
 rewritten by the compiler. Relative declaration module specifiers are
 converted to `.js` where needed and checked against real `.d.ts` files in
 the same stage. The manifest records each such declaration rewrite. Neither
 an extension flag nor a source typecheck proves declaration closure.
+
+Platform publishes only its production root. The source manifest's exact
+`./testing` export is accounted for but excluded; an extra source export still
+refuses. Replay publishes its existing portable library and pure command
+function. Its Node process wrapper `src/bin.ts` is copied only into an
+excluded evidence directory, hashed, and omitted from compiler ancestry and
+public output. This release supplies no `artroom-replay` executable. The checker
+compares the complete included source inventory and that one exclusion. Both
+packages depend on the coordinated contract, bytes and derive stages. Their
+input compilation uses the opt-in bytes/web declaration, as client and derive
+do; it does not inject default consumer globals or broad Node/DOM types.
 
 Exports have `types` before JavaScript `default`. bytes/web remains a
 **types-only, opt-in ambient declaration**, with no exported types or
@@ -87,6 +104,51 @@ and the actual engine, and checks NodeNext, bundler and opt-in ambient
 resolution. It neither loads raw SDK TypeScript nor installs tarballs.
 It records a separate check result; producer output alone is not a pass.
 
+The same compiled-output journey now replays a separately reviewed public
+native-history capture with proven grants, a known target head and a foreign
+fact. It compares target identity, full target coverage, verified foreign
+dependencies and trust labels. Removing the directory source must give the
+exact missing-dependency fact; no anchor or test-authority grant is substituted.
+The capture's original and owned copy are bound to the supplied SHA-256 and
+remain unchanged through the checker. Actual replay reports are kept in its
+result, including coverage, trusts and the negative outcome.
+
+The capture comes from the existing `founding-real.test.ts` first rules
+publication, before scripted lane facts. Select that whole file alone with
+the existing `DEMO_RECORD=1` flag in the reviewed native capture plan. The
+opt-in block wraps the actual HTTP history and retained-input source and keeps
+only complete prefixes the successful native replay covered. It emits numbered
+`PUBLIC-SDK-NATIVE-CAPTURE` chunks and a terminal marker. The owner extracts only
+that explicitly public channel into a fresh external file and seals its bytes
+with the exact tested source, target and native run proof before checker use.
+The ordinary gate leaves recording off. No private log body becomes public
+because it contains this channel.
+
+The block rejects the entire capture before any marker if decoded canonical
+entries or retained inputs contain credential fields, or if its text contains
+known fixture secrets or the current session secret/header. It never redacts
+hashed bytes. Public keys and signatures remain. The fixture's real Durable
+Objects, SQLite, platform rules and membership authority are labeled, along
+with the stand-in Git host, clock/transport and test-secret read provisioning.
+This is a recorded local native fixture, not a deployed service or Jam proof.
+
+After the three strict contexts, the checker uses the supplied physical native
+esbuild 0.28.1 binary and reviewed SHA-256 to bundle the same compiled replay
+journey for the browser. Its bounded metafile must show only the owned journey,
+compiled stages and copied exact dependencies, including actual replay and
+platform code, with no external modules. The binary is checked before and
+after use. This is a real browser closure build; it does not prove browser
+execution, public installation or physical sound.
+
+The public platform catalog must match every selected target and foreign
+genesis pin. Main f722 supports the explicit F1 register5/directory5/membership4
+cohort, not Counting register6/directory6/membership5. If Jam selects later
+versions, publish matching reviewed platform code first. Do not infer a cohort
+from `NEWEST`. Supply the actual `hold@1`/`git-read@1` code as both capabilities
+and owners where needed, with the deployed parameters; absent versions or
+owners remain unsupported. The verifier's mode, coverage, foreign facts,
+redactions, limits, incomplete outcomes and external-world trusts remain intact.
+
 Later verification must still include the affected source/compiler checks,
 one build/output check and one changed-head normal gate before independent
 review. Do not repeat platform permutations. On failure retain the owned
@@ -97,7 +159,7 @@ The release owner assembles and verifies source/artifacts. A separately
 verified namespace administrator/publisher controls publication. A deployed
 operator controls the HTTPS URL, version, bindings, migration and real
 membership/definition/read provisioning. GitHub App authority does not
-establish npm publishing rights. Publishing four packages is not atomic;
+establish npm publishing rights. Publishing six packages is not atomic;
 complete the set and verify all public versions/integrities before calling
 it an available coordinated release.
 

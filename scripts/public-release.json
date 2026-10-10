@@ -5,7 +5,9 @@
     { "dir": "contract", "exports": { ".": "src/index" }, "dependencies": {} },
     { "dir": "bytes", "exports": { ".": "src/index", "./web": "src/web.d.ts" }, "dependencies": { "@generalbusiness/artroom-contract": "coordinated", "@noble/curves": "2.4.0", "@noble/hashes": "2.4.0" } },
     { "dir": "client", "exports": { ".": "src/index" }, "dependencies": { "@generalbusiness/artroom-bytes": "coordinated", "@generalbusiness/artroom-contract": "coordinated" } },
-    { "dir": "derive", "exports": { ".": "src/index", "./rule": "src/rule/index", "./testing": "test/fixtures" }, "dependencies": { "@generalbusiness/artroom-bytes": "coordinated", "@generalbusiness/artroom-contract": "coordinated", "jsonata": "2.2.2" } }
+    { "dir": "derive", "exports": { ".": "src/index", "./rule": "src/rule/index", "./testing": "test/fixtures" }, "dependencies": { "@generalbusiness/artroom-bytes": "coordinated", "@generalbusiness/artroom-contract": "coordinated", "jsonata": "2.2.2" } },
+    { "dir": "platform", "exports": { ".": "src/index" }, "excludedSourceExports": { "./testing": "./test/support.ts" }, "dependencies": { "@generalbusiness/artroom-bytes": "coordinated", "@generalbusiness/artroom-contract": "coordinated", "@generalbusiness/artroom-derive": "coordinated" } },
+    { "dir": "replay", "exports": { ".": "src/index" }, "excludedInputs": ["src/bin.ts"], "dependencies": { "@generalbusiness/artroom-bytes": "coordinated", "@generalbusiness/artroom-contract": "coordinated", "@generalbusiness/artroom-derive": "coordinated" } }
   ],
   "checkDependencies": { "@types/node": "26.6.3", "undici-types": "8.9.0" }
 }

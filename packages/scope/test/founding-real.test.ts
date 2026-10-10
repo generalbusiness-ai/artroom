@@ -1,24 +1,28 @@
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, inject, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest, timeOf } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
 import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
 import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
-import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";
 import { Platform, rita, routed, sam } from "./repository.ts";
 import { reader } from "./support.ts";
-import { beginSessionChild, beginSessionFixture } from "./session-settings.ts";
+import { beginSessionChild, beginSessionFixture, sessionSettings } from "./session-settings.ts";
 import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 const { paul } = keys;
 const SERVICE = "https://scopes.test";
+
+declare module "vitest" {
+  interface ProvidedContext { demoRecord: boolean }
+}
 
 /** The freshness proof that an act's entry retains in its grant. */
 const proof = (entry: Entry): ObservationUse & { observation: Observation } => {
@@ -252,6 +256,103 @@ describe("a founding on real scopes under the deployed class (authority note, se
     expect(await publish(2)).toMatchObject({ answer: "accepted" });
     const first = proof(await rulesScope!.last());
     expect(first).toMatchObject({ observation: { of: membership, key: rita.key, keyState: "active", role: "admin", within: { membership } }, use: "fresh", prior: null });
+    // Optional public SDK fixture capture, using the existing DEMO_RECORD=1
+    // channel and this file alone. These are actual native bytes, before any
+    // scripted lane facts. No reader, session secret or key secret is emitted.
+    if (inject("demoRecord")) {
+      const target = { scope: rulesScope!.name, head: (await rulesScope!.summary()).at };
+      const source = httpSource(SERVICE, { fetch, reader: issued.session.reader() });
+      const recorded = new Map<string, MemoryScope>();
+      const capture: HistorySource = {
+        async page(scope, from, allow) {
+          const got = await source.page(scope, from, allow);
+          if (got.ok) {
+            let held = recorded.get(scope);
+            if (!held) { held = { scope: got.page.scope, entries: [], retained: [] }; recorded.set(scope, held); }
+            expect(held.scope).toEqual(got.page.scope);
+            for (const entry of got.page.entries) {
+              const prior = held.entries.find((candidate) => candidate.seq === entry.seq);
+              if (prior) expect(prior).toEqual(entry);
+              else held.entries.push({ ...entry });
+            }
+          }
+          return got;
+        },
+        async retained(scope, kind, digest, allow, domain) {
+          const got = await source.retained(scope, kind, digest, allow, domain);
+          if (got.ok) {
+            const held = recorded.get(scope);
+            if (!held) throw new Error("A retained input needs its captured native scope.");
+            const prior = held.retained.find((candidate) => candidate.kind === kind && candidate.digest === digest && (kind !== "value" || candidate.domain === domain));
+            if (prior) expect(prior).toEqual(got.input);
+            else held.retained.push({ ...got.input });
+          }
+          return got;
+        },
+      };
+      const limits = { scopes: 64, entries: 8192, bytes: 16 * 1024 * 1024, depth: 16 };
+      const replay = await real(() => verify(capture, { mode: "replay", platform, grants: "proven", ...target, limits }));
+      expect([replay.report.result, replay.why, replay.report.target]).toEqual(["consistent", null, { at: rules, ...target.head }]);
+      expect(replay.report.coverage).toContainEqual({ scope: rules, from: 0, through: target.head.seq });
+      expect(replay.report.dependencies.verified).toBeGreaterThan(0);
+      expect([replay.report.dependencies.anchored, replay.report.dependencies.missing, replay.report.anchors]).toEqual([0, [], []]);
+      expect(replay.report.trusts).not.toContain(TRUSTS.authority);
+      expect(replay.report.trusts).not.toContain(TRUSTS.anchors);
+      expect(replay.report.trusts).not.toContain(TRUSTS.head);
+      const genesisEntry = (await rulesScope!.entries())[0]!;
+      const genesis = genesisEntry.input;
+      if (genesis.type !== "genesis" || !genesis.source || genesis.source.at.scope !== D.name) throw new Error("The native rules genesis requires its actual directory fact.");
+      // Keep only prefixes the successful replay covered, never later fixture
+      // outcomes returned on the same page. Stored bytes and hashes stay exact.
+      const scopes = replay.report.coverage.map(({ scope, from, through }) => {
+        const held = recorded.get(scope.scope);
+        if (!held || from !== 0) throw new Error("The native capture needs each complete replayed prefix.");
+        const entries = held.entries.filter((entry) => entry.seq <= through).sort((a, b) => a.seq - b.seq);
+        expect(entries.map((entry) => entry.seq)).toEqual(Array.from({ length: through + 1 }, (_, seq) => seq));
+        return { scope: held.scope, entries, retained: held.retained };
+      });
+      const use = genesisEntry.uses.find((candidate) => canonicalize(candidate.fact) === canonicalize(genesis.source));
+      if (!use) throw new Error("The native rules genesis must retain its actual directory fact.");
+      expect(scopes.find((scope) => scope.scope.scope === target.scope)!.retained).toContainEqual({ kind: "entry", digest: use.content, bytes: canonicalize((await D.entries())[genesis.source.seq]), under: "directory" });
+      const text = canonicalize({ format: "artroom-native-replay-capture-1", target, scopes, missing: { scope: D.name, fact: genesis.source }, limits,
+        provenance: { request: "fecf7160fd4a8c4b9219d7713a11036ff48db85e", sourcePath: "packages/scope/test/founding-real.test.ts", boundary: "first rules publish, after fresh grant proof and before scripted lane facts",
+          namespace: "PLATFORM", storedBytes: "native HTTP history and retained-input routes", grants: "proven", anchors: [],
+          labels: ["recorded local native fixture; no deployed service", "real Durable Objects, SQLite, production platform rules and membership authority", "Git host OutsideDouble is a stand-in", "clock and transport are test boundaries; reads use a real session under a TEST SECRET", "fixture public keys and signatures only; no reader or secret exported"] },
+        observed: replay });
+      // Corpus-specific publication guards only: reject the whole capture,
+      // never redact native bytes or print an offending value. Secret settings
+      // and headers are read only in memory and are not added to the artifact.
+      if (utf8(text).byteLength > limits.bytes) throw new Error("The public native capture exceeds its byte bound.");
+      const credentialFields = new Set(["secret", "privatekey", "authorization", "reader", "session", "accesstoken", "password", "credential", "credentials", "bearer", "token"]);
+      const rejectCredentials = (value: unknown): void => {
+        if (Array.isArray(value)) { for (const child of value) rejectCredentials(child); }
+        else if (value !== null && typeof value === "object") for (const [name, child] of Object.entries(value)) {
+          if (credentialFields.has(name.toLowerCase().replace(/[_-]/g, ""))) throw new Error("A credential field prevents public native capture.");
+          rejectCredentials(child);
+        }
+      };
+      for (const scope of scopes) {
+        for (const entry of scope.entries) {
+          let decoded: unknown;
+          try { decoded = JSON.parse(entry.bytes); }
+          catch { throw new Error("A native entry could not be checked for public capture."); }
+          rejectCredentials(decoded);
+        }
+        for (const input of scope.retained) {
+          let decoded: unknown;
+          try { decoded = JSON.parse(input.bytes); }
+          catch { continue; } // Detached text need not be JSON; all bytes are scanned below.
+          rejectCredentials(decoded);
+        }
+      }
+      const knownSecrets = Object.values(keys).flatMap(({ secret }) => [b64url(secret), hex(secret)]);
+      const sessionSecret = sessionSettings().secret;
+      if (sessionSecret !== null) knownSecrets.push(sessionSecret);
+      knownSecrets.push(issued.session.reader());
+      if (knownSecrets.some((secret) => secret.length > 0 && text.includes(secret))) throw new Error("A known secret prevents public native capture.");
+      for (let offset = 0, part = 0; offset < text.length; offset += 65536, part++) console.log(`PUBLIC-SDK-NATIVE-CAPTURE ${part} ${text.slice(offset, offset + 65536)}`);
+      console.log("PUBLIC-SDK-NATIVE-CAPTURE end");
+    }
     // From then on the incarnation is a function of the folded state: the rules scope records the reference with it, and accepts the
     // session. A later read states it: after a restart the object holds no observation in memory, records the same reference from
     // its store, reads again, and is answered by the same incarnation.

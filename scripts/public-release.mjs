@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ROOT, PLAN, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, publishManifest, references, refusal, rewriteDeclarationRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
+import { ROOT, PLAN, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, productionInputs, publishManifest, references, refusal, rewriteDeclarationRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
 
 export function produce(options) {
   const source = realpathSync(options.source), selected = version(options.version);
@@ -18,14 +18,19 @@ export function produce(options) {
   mkdirSync(join(output, "tmp")); mkdirSync(join(output, "tarballs"));
   const npmUser = join(output, "npm-user.conf"), npmGlobal = join(output, "npm-global.conf");
   writeFileSync(npmUser, "", { flag: "wx" }); writeFileSync(npmGlobal, "", { flag: "wx" });
-  const inputs = [], dependencies = [], compiled = [], packages = [];
+  const inputs = [], excludedInputs = [], dependencies = [], compiled = [], packages = [];
   const producerInputs = ["scripts/public-release.mjs", "scripts/public-release-lib.mjs", "scripts/public-release-modules.mjs", "scripts/public-release.json", "scripts/check-public-release.mjs"].map(path => ({ path, sha256: digest(readFileSync(join(source, path))) }));
   const thirdParty = Object.fromEntries(PLAN.packages.flatMap(spec => Object.entries(spec.dependencies).filter(([, pin]) => pin !== "coordinated")));
   for (const [name, pin] of Object.entries({ ...thirdParty, ...PLAN.checkDependencies })) dependencies.push(copiedDependency(source, output, name, pin, lock));
   for (const spec of PLAN.packages) {
     const input = join(output, "inputs", spec.dir), stage = join(output, "packages", spec.dir);
     mkdirSync(input, { recursive: true }); mkdirSync(stage, { recursive: true });
-    const names = execFileSync("git", ["ls-files", "-z", `packages/${spec.dir}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
+    const tracked = execFileSync("git", ["ls-files", "-z", `packages/${spec.dir}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
+    const { names, omitted } = productionInputs(spec, tracked);
+    for (const path of omitted) {
+      const copy = join(output, "excluded", path);
+      excludedInputs.push({ path, copy, ...copyFileVerified(join(source, path), copy) });
+    }
     if (!names.length || names.some(name => !name.endsWith(".ts"))) refusal("unplanned-input");
     for (const name of names) {
       const relativeName = name.slice(`packages/${spec.dir}/`.length);
@@ -56,8 +61,7 @@ export function produce(options) {
     // Build inputs have their own module marker, never an inherited workspace manifest.
     writeJson(join(input, "package.json"), { private: true, type: "module" });
     const files = names.map(name => join(input, name.slice(`packages/${spec.dir}/`.length)));
-    if (spec.dir === "client") files.push(join(output, "packages/bytes/dist/src/web.d.ts"));
-    if (spec.dir === "derive") files.push(join(output, "packages/bytes/dist/src/web.d.ts"));
+    if (["client", "derive", "platform", "replay"].includes(spec.dir)) files.push(join(output, "packages/bytes/dist/src/web.d.ts"));
     const config = join(input, "tsconfig.build.json");
     writeJson(config, { compilerOptions: {
       target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "ESNext.Disposable"],
@@ -81,11 +85,11 @@ export function produce(options) {
     packages.push({ name: manifest.name, dir: spec.dir, version: selected, manifest, declarationRewrites, files: stageFiles, packedFiles: packed[0].files, tarball: packed[0].filename, bytes: data.length, sha256: digest(data), integrity });
   }
   sourceIdentity(source, options.head);
-  if (inputs.some(input => digest(readFileSync(join(source, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256)) refusal("input-changed");
+  if ([...inputs, ...excludedInputs].some(input => digest(readFileSync(join(source, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256)) refusal("input-changed");
   const result = { format: "artroom-public-sdk-release-1", status: "producer-output-only-not-published", source: identity, version: selected,
     lockSha256: digest(readFileSync(join(source, "package-lock.json"))), planSha256: digest(readFileSync(join(ROOT, "scripts/public-release.json"))),
     tools: { node: process.version, nodePath: process.execPath, nodeSha256: digest(readFileSync(process.execPath)), compiler: tool, npm: { version: npmPackage.version, cli: npmCli, sha256: digest(readFileSync(npmCli)) } },
-    producerInputs, inputs, dependencies, compiled, packages };
+    producerInputs, inputs, excludedInputs, dependencies, compiled, packages };
   writeJson(join(output, "release-manifest.json"), result);
   return result;
 }

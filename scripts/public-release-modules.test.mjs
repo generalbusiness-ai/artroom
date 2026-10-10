@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
+import { PLAN, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
 
 const root = new URL("../", import.meta.url);
 test("SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules", () => {
@@ -39,5 +39,20 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     assert.deepEqual(references(rewritten), expected.map(value => value.startsWith(".") ? value.slice(0, -3) + ".js" : value));
     for (const line of source.split("\n").slice(8)) assert.ok(rewritten.includes(line));
     assert.deepEqual(rewriteDeclarationRefs(dir), []);
+    // The six-package amendment omits only the known source-only boundaries.
+    const platform = PLAN.packages.find(spec => spec.dir === "platform");
+    const replay = PLAN.packages.find(spec => spec.dir === "replay");
+    const platformManifest = JSON.parse(readFileSync(new URL("packages/platform/package.json", root), "utf8"));
+    const published = publishManifest(platform, platformManifest, "0.1.0-dev.2");
+    assert.deepEqual(Object.keys(published.exports), ["."]);
+    assert.throws(() => publishManifest(platform, { ...platformManifest, exports: { ...platformManifest.exports, "./private": "./src/private.ts" } }, "0.1.0-dev.2"), /unsupported-source-manifest/);
+    assert.deepEqual(productionInputs(replay, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), { names: ["packages/replay/src/index.ts"], omitted: ["packages/replay/src/bin.ts"] });
+    assert.throws(() => productionInputs({ ...replay, excludedInputs: ["src/index.ts"] }, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), /source-input-exclusions/);
+    const stage = join(dir, "production"); mkdirSync(join(stage, "dist/src"), { recursive: true });
+    writeFileSync(join(stage, "package.json"), JSON.stringify({ name: "@generalbusiness/artroom-replay", version: "0.1.0-dev.2", type: "module", exports: { ".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" } } }));
+    writeFileSync(join(stage, "dist/src/index.js"), "export {};\n"); writeFileSync(join(stage, "dist/src/index.d.ts"), "export {};\n");
+    assert.equal(outputClosure(stage, replay, "0.1.0-dev.2").length, 3);
+    writeFileSync(join(stage, "dist/src/bin.js"), "process.exitCode = 0;\n");
+    assert.throws(() => outputClosure(stage, replay, "0.1.0-dev.2"), /excluded-output/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
