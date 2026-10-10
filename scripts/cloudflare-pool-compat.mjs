@@ -4,7 +4,7 @@
  * No installation, runtime upgrade, cache write or native authority change.
  */
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, cpSync, existsSync, lstatSync, mkdtempSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,10 +91,14 @@ export function preparePool(root = projectRoot) {
     const target = join(packageRoot, compatibility.relative_bundle);
     if (realpathSync(dirname(target)) !== dirname(target)) throw new Error("Cloudflare pool bundle parent must be a private physical directory.");
     const staged = `${target}.artroom-${process.pid}`;
+    let ownsStaged = false;
     try {
-      writeFileSync(staged, after, { flag: "wx", mode: lstatSync(target).mode & 0o777 });
+      const fd = openSync(staged, "wx", lstatSync(target).mode & 0o777);
+      ownsStaged = true;
+      try { writeFileSync(fd, after); } finally { closeSync(fd); }
       renameSync(staged, target); // Also avoids writing through a shared hardlink.
-    } finally { if (existsSync(staged)) unlinkSync(staged); }
+      ownsStaged = false;
+    } finally { if (ownsStaged && existsSync(staged)) unlinkSync(staged); }
   }
   const after = inspectPool(packageRoot);
   if (after.hash !== compatibility.after_sha256) throw new Error("Cloudflare pool compatibility final bundle differs.");

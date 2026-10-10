@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -76,6 +76,21 @@ test("compatibility privately copies cache-linked bytes, is idempotent, and refu
     assert.equal(readFileSync(join(owned, "node_modules", "@cloudflare", "workers-types", "retained.d.ts"), "utf8"), "retained\n");
     assert.equal(sha256(readFileSync(bundle)), compatibility.before_sha256);
     assert.deepEqual([preparePool(owned).copied, inspectPool(prepared.packageRoot).hash], [false, compatibility.after_sha256]);
+    // An existing staging name belongs to someone else. EEXIST must leave
+    // both their sentinel and the old target intact, not fail later at ENOENT.
+    const ownedBundle = join(prepared.packageRoot, compatibility.relative_bundle);
+    writeFileSync(ownedBundle, original);
+    const sentinel = `${ownedBundle}.artroom-${process.pid}`;
+    const sentinelBytes = "owned by the caller, not compatibility preparation\n";
+    writeFileSync(sentinel, sentinelBytes, { flag: "wx" });
+    assert.throws(() => preparePool(owned), { code: "EEXIST" });
+    assert.equal(existsSync(sentinel), true);
+    assert.equal(readFileSync(sentinel, "utf8"), sentinelBytes);
+    assert.equal(sha256(readFileSync(ownedBundle)), compatibility.before_sha256);
+    unlinkSync(sentinel); // The witness created and owns this sentinel.
+    assert.equal(preparePool(owned).after, compatibility.after_sha256);
+    assert.deepEqual([preparePool(owned).copied, inspectPool(prepared.packageRoot).hash], [false, compatibility.after_sha256]);
+    assert.equal(sha256(readFileSync(bundle)), compatibility.before_sha256);
     const refused = view("refused");
     writeFileSync(join(source, "package.json"), JSON.stringify({ ...metadata, version: "0.23.0" }));
     assert.throws(() => preparePool(refused), /exact pinned package\/version/);
