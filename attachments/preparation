@@ -1,0 +1,24 @@
+{
+  "root": "/private/tmp/artroom-economy-final-candidate",
+  "head": "2a06ab581ebb4149482668782d627406f0eba5b2",
+  "tree": "6d928063bc563a4c96da4a8d146816f6890900be",
+  "clean_before_after": true,
+  "head_unchanged": true,
+  "status": "INERT; Root owns exact-head release and sole runtime",
+  "input_proof": "/tmp/artroom-economy2a-gate-preparation/input-proof.json",
+  "input_proof_sha256": "5e6e94a63fd3e7c72c6163f412e8a13f3b2234eded5acc832e91a71ea37e2877",
+  "runner": "/tmp/artroom-economy2a-normal-gate-run.py",
+  "runner_sha256": "933a48cd1c6e44a8a301766dd3b91b7b01126241a84a614d61cbb8264de2e8e1",
+  "tracked_source_count": 1269,
+  "workspace_count": 12,
+  "alias_count": 24,
+  "normal_command": [
+    "npm",
+    "run",
+    "gate"
+  ],
+  "fresh_output": "/tmp/artroom-economy2a-final-gate",
+  "postguard": "Same complete source/tool/view/lock/alias/export/link guards as before run; terminal sealed original raw outer/phase/timing evidence",
+  "execution": [],
+  "normal_npm_resolution": "Prepend pinned Node bin to PATH; require normal npm executable realpath to equal reviewed npm-cli.js before and after gate."
+}
