@@ -1,0 +1,19 @@
+{
+  "source": "/private/tmp/artroom-sdk-clone-witness-range-repair",
+  "head": "d2a39598f56708a4523bdfde2ad98a82dd843cb7",
+  "tree": "1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f",
+  "base": "769566a17b3a11b505acb2a08ddfe92ee5b3530f",
+  "source_packet": {
+    "path": "/private/tmp/artroom-sdk-clone-witness-range-source-packet/packet.json",
+    "sha256": "b9f0ca6bedfdb8849450861a19677ccc5ed5d08154c6d7187f73da59ccfd8443"
+  },
+  "disposition": "No concrete blocker in bounded source review; all successor runtime unrun; not formal approval",
+  "read_scope": "Full two changed bodies/delta/plan; supporting actual source type/effect/fixture/bound seams; no whole SDK/generated-body review",
+  "exact_checker_only_two_replacements": true,
+  "unchanged_declared_paths": 13,
+  "findings": {
+    "path": "/private/tmp/artroom-sdk-d2a3-independent-source-review/findings.txt",
+    "sha256": "82ba78b8159459cfb3ca7b79101500bb154aa7d722458c5758f52b7a9fa7d02f"
+  },
+  "execution": []
+}
