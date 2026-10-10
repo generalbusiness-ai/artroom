@@ -152,6 +152,17 @@ platform code, with no external modules. The binary is checked before and
 after use. This is a real browser closure build; it does not prove browser
 execution, public installation or physical sound.
 
+The first complete six-package stage built and packed all six packages, and
+its checker reached consistent compiled replay, the exact missing-directory
+control, all three strict contexts and the browser build. It then refused
+JSONata's synthetic `<runtime>` input edge. The pinned esbuild 0.28.1 parser
+inserts that already-resolved helper import; this edge is not a module left
+in the output. The successor accepts only its exact path/kind/three-field
+shape on the byte-bound copied JSONata input. Every other external input,
+every external output import and every emitted module reference still
+refuses. The earlier stage and refusal stay immutable; this source delivery
+does not claim a successful successor checker.
+
 The public platform catalog must match every selected target and foreign
 genesis pin. Main f722 supports the explicit F1 register5/directory5/membership4
 cohort, not Counting register6/directory6/membership5. If Jam selects later

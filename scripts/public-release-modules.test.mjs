@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { PLAN, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
+import { browserRuntimeEdge } from "./check-public-release.mjs";
 
 const root = new URL("../", import.meta.url);
 test("SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules", () => {
@@ -54,5 +55,10 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     assert.equal(outputClosure(stage, replay, "0.1.0-dev.2").length, 3);
     writeFileSync(join(stage, "dist/src/bin.js"), "process.exitCode = 0;\n");
     assert.throws(() => outputClosure(stage, replay, "0.1.0-dev.2"), /excluded-output/);
+    const jsonataInput = "/owned/node_modules/jsonata/jsonata.js";
+    const synthetic = { path: "<runtime>", kind: "import-statement", external: true };
+    assert.equal(browserRuntimeEdge(jsonataInput, synthetic, jsonataInput), true);
+    assert.equal(browserRuntimeEdge(jsonataInput, { ...synthetic, path: "https://foreign.invalid/runtime.js" }, jsonataInput), false);
+    assert.equal(browserRuntimeEdge("/owned/another.js", synthetic, jsonataInput), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

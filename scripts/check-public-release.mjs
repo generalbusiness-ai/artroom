@@ -5,6 +5,14 @@ import { dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PLAN, ROOT, args, childEnv, compile, compilerTool, contained, digest, inventory, json, nameOf, outputClosure, productionInputs, publishManifest, references, refusal, sourceIdentity, writeJson } from "./public-release-lib.mjs";
 
+/** esbuild 0.28.1's parser inserts its already-resolved helper import. Only
+ * this exact edge of the pinned copied JSONata input is synthetic metadata.
+ * https://github.com/evanw/esbuild/blob/v0.28.1/internal/js_parser/js_parser.go#L17227-L17233 */
+export function browserRuntimeEdge(input, edge, jsonataInput) {
+  return input === jsonataInput && JSON.stringify(Object.keys(edge).sort()) === JSON.stringify(["external", "kind", "path"]) &&
+    edge.path === "<runtime>" && edge.kind === "import-statement" && edge.external === true;
+}
+
 export function check(manifestFile, captureFile, captureSha256, browserTool, browserToolSha256) {
   const file = realpathSync(manifestFile), output = dirname(file), release = json(file);
   if (!lstatSync(output).isDirectory() || lstatSync(output).isSymbolicLink() || contained(ROOT, output)) refusal("check-output-ownership");
@@ -173,7 +181,8 @@ void replayResult;
   if (!browserInputs.length || browserInputs.length > 10000 || browserOutputs.length !== 1 || realpathSync(join(consumer,browserOutputs[0][0])) !== browserFile || realpathSync(join(consumer,browserOutputs[0][1].entryPoint)) !== replayFile || browserOutputs[0][1].imports.some(ref=>ref.external)) refusal("browser-inventory");
   const browserProof = browserInputs.map(path => {const supplied = realpathSync(join(consumer,path)); if (supplied !== replayFile && !contained(join(output,"packages"),supplied) && !release.dependencies.some(dep=>contained(join(output,"node_modules",dep.name),supplied))) refusal("browser-source-ancestry"); return {path:supplied,sha256:digest(readFileSync(supplied))};});
   for (const dir of ["replay","platform","derive","bytes"]) if (!browserProof.some(input=>contained(join(output,"packages",dir),input.path))) refusal("browser-missing-package");
-  if (Object.values(meta.inputs).some(input=>input.imports.some(ref=>ref.external)) || references(readFileSync(browserFile,"utf8")).length) refusal("browser-external-module");
+  const jsonataInput = realpathSync(join(output,"node_modules/jsonata/jsonata.js"));
+  if (Object.entries(meta.inputs).some(([name,input])=>input.imports.some(ref=>ref.external && !browserRuntimeEdge(realpathSync(join(consumer,name)),ref,jsonataInput))) || references(readFileSync(browserFile,"utf8")).length) refusal("browser-external-module");
   if (digest(readFileSync(capturePath)) !== captureSha256 || digest(readFileSync(captureCopy)) !== captureSha256) refusal("native-capture-changed");
   if (digest(readFileSync(binary)) !== browserToolSha256) refusal("browser-tool-changed");
   sourceIdentity(ROOT, release.source.head);
