@@ -1,0 +1,86 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e4c871d0e0ddf04c4e6b400a503cfefe19b563ae",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fcb08d0449eebb3dcdfa9c17dc3ed399c378e428",
+  "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "canonical_root": "/private/tmp/artroom-economy-three-donors",
+  "branch": "request/economy-three-donors",
+  "clean": true,
+  "pushed_upstream_exact": true,
+  "receiving_head": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53",
+  "source_paths": 1272,
+  "changed_paths": 5,
+  "runtime": "NONE; all current compiler/body/control/gate work UNRUN",
+  "expected": {
+    "whole_files": 4,
+    "whole_projects": 2,
+    "whole_cases": 42,
+    "required_active": 41,
+    "original_skipped": 1
+  },
+  "source_independent_review": "OWED",
+  "execution_release": "OWED; recipes inert",
+  "historical_preparation": "8c967/5ade/27 R2 remains immutable and UNRUN",
+  "files": {
+    "affected.config.mjs.recipe": {
+      "bytes": 4736,
+      "sha256": "f5f1d802477f52482c73099daceee3bec569f4f8734573e08721cef1c64b52b4"
+    },
+    "cli-composition.diff": {
+      "bytes": 4729,
+      "sha256": "90a6af82bc612ad107523b3ddde490a3b07d6439827ec755ec27c9a4e7539298"
+    },
+    "execution-inputs.json": {
+      "bytes": 713,
+      "sha256": "2603bba05da1c940a08acdf025d96b353e5d2239ad8c92f7a948435c70a92f7e"
+    },
+    "plan.json": {
+      "bytes": 22599,
+      "sha256": "34beea55228f7e716972bba5d2e2055e575179edae04b12c5b1e158bf7af5973"
+    },
+    "preparation.md": {
+      "bytes": 7021,
+      "sha256": "a69f0d2ea52d4ed7d44a8e3b0bae954748c8ec3ade207a452088612f4bca3303"
+    },
+    "proof.json": {
+      "bytes": 260592,
+      "sha256": "0ae1a948bb69328bac43f59896eddf2f1b91da7fac8495b5d0347c1a32889038"
+    },
+    "receiving-main.diff": {
+      "bytes": 25996,
+      "sha256": "90f5bda2fdb46022ecc24870ec6f173e9e5dab82f8d32a17624a215eb4cf0173"
+    },
+    "run-affected.py.recipe": {
+      "bytes": 12611,
+      "sha256": "32c8604e628215fdd0ee9854be67be8ce5726d7b694bc449908ecdfea213eff8"
+    },
+    "shared-cache-snapshot.json": {
+      "bytes": 628897,
+      "sha256": "b6d1822dc82db05d261865fea24011cb60b5a8740cdadd27c4e0e79e14e5bd21"
+    },
+    "source-bodies/notes/2026-10-09-initial-combined-delivery.md": {
+      "bytes": 60801,
+      "sha256": "ec5f7fb36c135042f6da32a4bee28d07d7eeb32a175e02b532b4cc1c08e49ce1"
+    },
+    "source-bodies/packages/cli/test/git.test.ts": {
+      "bytes": 10357,
+      "sha256": "7ac9b8288a1bb9c086b8144a8eeebe61da279603c7a71efaf6a59d700065198e"
+    },
+    "source-bodies/packages/lanes/test/manifest-tree.scope.test.ts": {
+      "bytes": 91747,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+    },
+    "source-bodies/packages/scope/test/hosts-pack-cache.test.ts": {
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    "source-bodies/packages/scope/test/hosts.ts": {
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    "source-correspondence.json": {
+      "bytes": 3595,
+      "sha256": "f97a08f4598d8ec7e4a066760be6db76e711ad28d6746df56ed737e2816dbf4b"
+    }
+  }
+}

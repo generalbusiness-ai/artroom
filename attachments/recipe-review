@@ -1,0 +1,40 @@
+{
+  "kind": "Independent FULL inert42 recipe review and static owned-view correspondence",
+  "input_packet": "/tmp/artroom-economy-three-donors-preparation/packet.json",
+  "input_packet_sha256": "a51726694bec9dc82851dea45dcdba40af5ea42997348e8ede8d85f9331427be",
+  "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "full_reads": [
+    "affected.config.mjs.recipe",
+    "run-affected.py.recipe",
+    "plan.json",
+    "preparation.md",
+    "execution-inputs.json",
+    "source-correspondence.json"
+  ],
+  "source_reuse": "Completedf027 bounded integration plus exact8c/CLI92 donor correspondence; not fresh whole legacy semantic audit",
+  "reporter_reuse": "Prior full source/API/native review with unchanged current source hash; no new import/probe",
+  "cases": 42,
+  "active_required": 41,
+  "optional_original_skip": 1,
+  "compiler_roots": [
+    "packages/scope/tsconfig.test.json",
+    "packages/lanes/tsconfig.scope.json",
+    "packages/cli/tsconfig.test.json"
+  ],
+  "concrete_blocking_findings": [],
+  "nonblocking_advisory": "Preserve manifest unreachable-arm simplification qualification in later outcome prose",
+  "runtime": "NONE; no tool/application/config import, compiler, discovery, test, gate, profile, probe, install, Source/cache edits or state filing",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-economy-f027-independent-recipe-review/static-correspondence.json",
+      "bytes": 1027,
+      "sha256": "6683dd2a4d55661b24982ce17d33521e6b91b4597d7a373cd4f3920b1b4a1714"
+    },
+    {
+      "path": "/tmp/artroom-economy-f027-independent-recipe-review/review.md",
+      "bytes": 4705,
+      "sha256": "20a249da00b1ca585a4eb7f1c4abe0d5b96ff8d89c301490d64b2f1b9d485474"
+    }
+  ]
+}
