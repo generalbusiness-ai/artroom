@@ -10,10 +10,12 @@ import { rita } from "./support-founding.ts";
 // judged and replayed by it for as long as it exists. Supporting application cohort pins require explicit selection. Plain functions: the rules are called with what a judge would give them, and no scope is run.
 
 /** The digest of each version's data, in the definition's own domain. Version 1 matches actual main1eed91aa, including gate1 definition-byte places. */
-// M1 directory@6 and membership@5 canonical digest bindings remain pending
-// owner-released generation. Keep this complete equality witness; do not filter
-// those versions out or claim it passed before their exact bytes are bound.
+// D6/M5 digests were validated from the complete actual catalog at f1455d940.
+// Evidence: /tmp/artroom-m1-f145-generation-execution/complete-catalog-validation.json
+// SHA-256: 47545c46bbc0b5fd6c577aa8635d518b76a8416a020fe988d30755eb6a5a950c. Generation is not a test or gate pass.
 const DIGESTS: Readonly<Record<string, string>> = {
+  "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
+  "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155",
   "platform:register@6": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:register@5": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@5": "sha256:db86423258d5de0df43956187460d5ade0d3e878371c24d89c33ecd51c2b1bd5",
