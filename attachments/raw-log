@@ -1,0 +1,10 @@
+packages/page/src/main.ts(240,43): error TS18048: 'last' is possibly 'undefined'.
+packages/page/src/main.ts(241,60): error TS18048: 'last' is possibly 'undefined'.
+packages/page/src/main.ts(475,54): error TS2379: Argument of type '{ submitLabel?: string; defaults?: Record<string, { on?: number; fields?: Record<string, string>; }>; primary?: readonly string[]; choices?: Record<string, Record<string, readonly { label: string; value: string; }[]>>; ... 6 more ...; current: () => boolean | ... 1 more ... | undefined; }' is not assignable to parameter of type 'ActionContext' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  The types returned by 'current()' are incompatible between these types.
+    Type 'boolean | null | undefined' is not assignable to type 'boolean'.
+      Type 'undefined' is not assignable to type 'boolean'.
+packages/page/src/main.ts(479,76): error TS2379: Argument of type '{ submitLabel?: string; defaults?: Record<string, { on?: number; fields?: Record<string, string>; }>; choices?: Record<string, Record<string, readonly { label: string; value: string; }[]>>; ... 7 more ...; primary: never[]; }' is not assignable to parameter of type 'ActionContext' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  The types returned by 'current()' are incompatible between these types.
+    Type 'boolean | null | undefined' is not assignable to type 'boolean'.
+      Type 'undefined' is not assignable to type 'boolean'.

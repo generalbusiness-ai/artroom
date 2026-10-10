@@ -1,50 +1,46 @@
 {
-  "release": "b48ecb99acc686fb65f81282bc8b89abafb2ca46",
-  "subject_head": "f1455d9401d8d806e129524ed5655381bc4cb8e5",
-  "subject_tree": "9d52d768a8e9faa23a3a1dbb19607019b0adf586",
-  "cwd": "/private/tmp/artroom-m1-counting-cohort",
-  "clean_before_after": true,
-  "source_files_unchanged": 148,
-  "bundling_invocations": 1,
-  "semantic_invocations": 1,
-  "bundle_phase": {
-    "terminal": 0,
-    "wall_seconds": 0.17,
-    "user_seconds": 0.1,
-    "system_seconds": 0.04,
-    "cpu_seconds": 0.14
-  },
-  "semantic_phase": {
-    "terminal": 0,
-    "wall_seconds": 0.15,
-    "user_seconds": 0.13,
-    "system_seconds": 0.03,
-    "cpu_seconds": 0.16
-  },
-  "timing_note": "Rounded /usr/bin/time -lp observations; separate commands, not an observed pipeline duration",
-  "catalog_count": 21,
-  "old_literal_bindings_equal": 19,
-  "new_bindings": {
-    "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
-    "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155"
-  },
-  "new_canonical_bytes": {
-    "platform:directory@6": 13235,
-    "platform:membership@5": 13134
-  },
-  "definition_budget": 262144,
-  "validation_contract": "Actual complete VERSIONS, validateDefinition platform:true + outcomeValueDomains, PROFILES + RULE_PROFILES, runnable actual rules, canonical definitionDigest == validator digest, canonical bytes <= PROPOSED_BOUNDS; old/default symbolic pins and M5 member16/key32 checked inside actual invocation",
-  "metafile_input_origins": {
-    "SOURCE": 95,
-    "ENTRY": 1,
-    "CACHE": 17
-  },
-  "metafile_import_edges": 510,
-  "all_metafile_input_paths_reviewed_before_semantic": true,
-  "qualifications": [
-    "Two initial read-only inspection predicates failed: generated esbuild <runtime> marker; unused testing export alias missing from original 148 source hash list. Logs preserved. Static context/source ownership resolved without rebuilding or semantic retry.",
-    "Original full catalog JSON output attempt was truncated; all 21 digest/byte/mark-count/deadline/pending summaries and complete new D6/M5 results were read separately. Full raw catalog retained; no claim of visually rereading every old mark/duty row."
+  "head": "4b1f4b9c64d015b4b4faee1f7729a85be0d30ac6",
+  "tree": "ec721fe7c3d9e6d5b0a223f148d1d9e465e29a83",
+  "owner": "c42cf55e416fe78f322d44d0b4f49f273197eb42",
+  "preflight_sha256": "5980eb859962a2a5f2c2e1917bfc2239cffc80c84ddd276b3601548a7d377a35",
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "load_start": [
+    1.8720703125,
+    2.21044921875,
+    2.15283203125
   ],
-  "source_binding_performed": false,
-  "other_checks_run": false
+  "cache_state": "existing exact-lock cached dependencies; no install; local source-owned workspace links",
+  "started_utc": "2026-10-10T00:17:57Z",
+  "phases": [
+    {
+      "name": "page-source",
+      "command": [
+        "node",
+        "/tmp/artroom-ux1-final-source-repairs/node_modules/typescript/bin/tsc",
+        "-p",
+        "packages/page/tsconfig.json"
+      ],
+      "exit": 1,
+      "wall_seconds": 0.2342780000763014,
+      "cpu_seconds": 0.656589,
+      "log": "/tmp/artroom-ux1-4b1-compiler-preparation/page-source.log",
+      "log_bytes": 1564,
+      "log_sha256": "a630a15d059858d3913d4697d5f03b49c2fb0104f9f5ae283333c64885737132"
+    }
+  ],
+  "terminal_exit": 1,
+  "head_after": "4b1f4b9c64d015b4b4faee1f7729a85be0d30ac6",
+  "tree_after": "ec721fe7c3d9e6d5b0a223f148d1d9e465e29a83",
+  "status_after": "",
+  "finished_utc": "2026-10-10T00:17:57Z",
+  "checks_not_run": [
+    "Node import/discovery/body",
+    "build",
+    "browser",
+    "native",
+    "gate",
+    "install",
+    "provider",
+    "audio"
+  ]
 }
