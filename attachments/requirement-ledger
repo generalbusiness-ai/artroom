@@ -1,0 +1,487 @@
+[
+  {
+    "id": "H01",
+    "originalRequirement": "Contract/types/protocol/roster/client transport for hosted coding and device continuity",
+    "currentSource": "contract/intent34\u201347,session32\u201359,transport47\u201382",
+    "status": "primitives only",
+    "requiredAmendmentOrQualification": "No hosted control/resource/input/lifecycle types; docs/protocol historical Room labels are not executable current code.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H02",
+    "originalRequirement": "Admin-authorized separate agent member and named controlling human",
+    "currentSource": "platform/membership259\u2013270,431\u2013465",
+    "status": "native primitive",
+    "requiredAmendmentOrQualification": "add-member/membership.manage creates agent-kind with active person controller; fixed controller and separate key enrollment exist, but no automatic hosted task registration.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H03",
+    "originalRequirement": "Separate agent/task/conversation/lane; one DO/conversation/lane per task initially",
+    "currentSource": "platform/directory279\u2013303;platform/index114\u2013133;scope/worker395\u2013408",
+    "status": "unsupported task/supervisor",
+    "requiredAmendmentOrQualification": "Directory declares platform:task@1; catalog supplies none. Generic DeployedScope is not an Agent DO/conversation/runtime.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H04",
+    "originalRequirement": "Immutable controller; no in-place owner reassignment",
+    "currentSource": "platform/membership264,431\u2013465;directory588\u2013604",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Membership controller is fixed; open-task worker-standing checks signer/admin but does not establish hosted resource ownership or bind supplied task controller to immutable worker controller. Adopt resource binding.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H05",
+    "originalRequirement": "Authenticated Scope-to-Agent boundary; no authority from viewer/site login",
+    "currentSource": "scope/authority319\u2013338,471\u2013485;scope/worker28\u201354",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Scope native grant authority exists; no resource-specific Agent route/service/RPC boundary or site-login-to-native permission conversion exists.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H06",
+    "originalRequirement": "Signed domain binds room/agent/resource/action/body/expiry/nonce",
+    "currentSource": "contract/intent12\u201347;client/intent53\u201399",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Intent domain binds exact scope incarnation/kind/on/expected/fields/key/expiry; adopt exact hosted resource/control schema and replay domain, not an unsigned browser control.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H07",
+    "originalRequirement": "Trusted service binding result and HTTPS/RPC resource routing",
+    "currentSource": "client/http45\u201382;head-stream19\u201328;scope/worker245\u2013280",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Generic transport bounds/decodes but does not itself enforce redirects/response URL. Stream does. New private/control endpoint owner must enforce fixed no-redirect origin/RPC/resource; no global SDK patch implied.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H08",
+    "originalRequirement": "Owner/admin start, steer, pause, resume, cancel only the named resource",
+    "currentSource": "membership role lists119\u2013126;directory279\u2013303",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "task.control is only an action grant/name; no runnable task control lifecycle or current owner/admin resource check.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H09",
+    "originalRequirement": "Separate read-only sessions from signed controls",
+    "currentSource": "contract/session1\u20134,19\u201341;scope/sessions61\u201363;worker31\u201343",
+    "status": "primitive retained",
+    "requiredAmendmentOrQualification": "Native sessions sign/control nothing; do not reuse Session header as mutating host command authorization.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H10",
+    "originalRequirement": "Direct-device owner/admin raw-resource privacy; handle-only authenticateRead insufficient",
+    "currentSource": "contract/session32\u201341;scope/sessions351\u2013375",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Issuance verifies signed key/member/controller but not key.kind=device or resource owner/admin. Claims do not recheck current role/key on reads. Trusted private boundary must derive exact direct device provenance and resource authority.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H11",
+    "originalRequirement": "Deny delegation-issued raw reads by default; later private capability explicit",
+    "currentSource": "derive/grant134\u2013142;contract/session32\u201341",
+    "status": "delegation absent",
+    "requiredAmendmentOrQualification": "Current grant principal=null; no delegation-issued session provenance exists. Do not translate historical delegated Room API mechanically; keep default denial and conditional later design.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H12",
+    "originalRequirement": "Recheck current key/member/role/delegation at controls and tools",
+    "currentSource": "derive/grant29\u201358,243\u2013310;scope/authority",
+    "status": "gap with windows",
+    "requiredAmendmentOrQualification": "Native ordinary grants may reuse 300s; hold/export/check use once10s; task windows are not implemented. Hosted current-boundary semantics require adopted resource-specific authority policy, not guessed fresh-per-POST or instantaneous global revoke.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H13",
+    "originalRequirement": "Revoke private streams/sessions on lost authorization",
+    "currentSource": "scope/sessions43\u201350,235\u2013294,469\u2013510",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Issued sessions survive up to600s plus clock difference; streams recheck that token at send, not current member/key/role. Need explicit private resource revocation mechanism/policy without falsely claiming current instantaneous revocation.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H14",
+    "originalRequirement": "Input ack follows durable receipt",
+    "currentSource": "scope/turn284\u2013321;store62\u201375",
+    "status": "native primitive only",
+    "requiredAmendmentOrQualification": "Transactional native entry/retained input/receipt exists; no durable conversation-input ack/host workspace receipt boundary.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H15",
+    "originalRequirement": "Repeats recover same receipt; same ID with conflicting bytes refuses",
+    "currentSource": "scope/core542\u2013582,740\u2013750;contract/result44\u201345",
+    "status": "native primitive only",
+    "requiredAmendmentOrQualification": "Native accepted actor/idempotency/intent digest recovery exists; hosted conversation/control exact-body receipts still need defined schema. Do not credit every HTTP side byte as native idempotency identity.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H16",
+    "originalRequirement": "Conversation input, applied steering and admitted acts separate records",
+    "currentSource": "contract/entry49\u201375",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Native act/delivery/outcome records exist; no hosted conversation/input/application records. Keep raw private content separate from sanitized public references.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H17",
+    "originalRequirement": "Lifecycle waiting/active/attention/paused/cancelled-pending/reconciliation/proposal/landed/published-through",
+    "currentSource": "scope/store47\u201359;lanes/change",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Native duty pending/unknown/settled and proposal/merge/publication states are not hosted lifecycle. Adopt explicit projection and retry types without conflating ack/application/publication.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H18",
+    "originalRequirement": "Expiry/unavailable is distinct from unknown external effect",
+    "currentSource": "contract/result41\u201370;scope/operations1\u201332",
+    "status": "primitive retained",
+    "requiredAmendmentOrQualification": "Unavailable answer records no native decision; marked outside mutation is never blindly sent again and unknown remains a duty. Hosted command/save/push/release/cleanup must preserve that distinction.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H19",
+    "originalRequirement": "Declared act binding and signed current expected state preserved",
+    "currentSource": "contract/intent34\u201343;scope/core542\u2013588;turn296\u2013321",
+    "status": "primitive retained",
+    "requiredAmendmentOrQualification": "Use actual pinned declarations/head/expected fields; resource/action schema still missing. No type-only endpoint with broad viewer authority.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H20",
+    "originalRequirement": "R-IDEM exact replay and R-ADM key-bound delegation rules preserved",
+    "currentSource": "core542\u2013558,740\u2013750;derive/grant134\u2013142",
+    "status": "partial/historical gap",
+    "requiredAmendmentOrQualification": "Native intent idempotency supported; legacy delegated grantor model not supplied. Explicitly reconcile historical rules with current signed grants; optional mode deferred, never count human delegation as distinct author.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H21",
+    "originalRequirement": "R-REV evidence/reservation and existing Git/cleanup ownership preserved",
+    "currentSource": "turn312\u2013318;platform/extents476\u2013506;scope/host-wiring22\u201356",
+    "status": "primitive retained",
+    "requiredAmendmentOrQualification": "Current native reservation/evidence/host binding belongs to existing owners; hosted layer must not bypass it or redefine publication/cleanup.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "existing I3/Git/cleanup owners"
+    ]
+  },
+  {
+    "id": "H22",
+    "originalRequirement": "Independent human review through separate agent author identity",
+    "currentSource": "membership431\u2013465;extents476\u2013499",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Independent MemberRef and author/controller exclusion primitives exist; actual hosted author attribution/review must use them and keep configured native independence. No waiver to make demo pass.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H23",
+    "originalRequirement": "Finalize renewal policy active/waiting/review/paused and deadlines",
+    "currentSource": "scope/sessions81\u201385,351\u2013375;derive/hold",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "600s read session issuance is not host lease renewal policy. Active/waiting/review budgets/deadlines and renewal operations need adoption.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H24",
+    "originalRequirement": "Pause/attention stop renewals; review renews only within visible window/budget",
+    "currentSource": "scope/ports300;hold243\u2013261",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "No hosted pause/attention state or review renewal budget implemented; do not infer from native holds/token count.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H25",
+    "originalRequirement": "One controller device revoke with another active key preserves independent agent work",
+    "currentSource": "membership593\u2013596,819\u2013854;derive/grant309",
+    "status": "native predicate only",
+    "requiredAmendmentOrQualification": "controllerActive requires active controller member with any active enrolled key. Actual host continuation/privacy tests still absent; direct device kind must be checked separately.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H26",
+    "originalRequirement": "Last active owner key or owner removal stops new tools/broker writes/renewals while agent remains active",
+    "currentSource": "membership500\u2013531,819\u2013854;issueSession367\u2013368",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "New native issuance/ordinary noncomment grant eventually refuses inactive controller; cached windows and old sessions persist. No actual host/broker stop mechanism. Keep separate owner-remove and last-key acceptance.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H27",
+    "originalRequirement": "Agent-key revoke differs from owner device loss; optional grantor revoke stops delegated mode",
+    "currentSource": "membership515\u2013531;grant61\u201375,305\u2013309",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Native key revocation exists; hosted stop/settlement and optional grantor binding/replacement authority remain separate. Never silently replace authority.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H28",
+    "originalRequirement": "Admin private export/settlement and same-active-member lost-key recovery only",
+    "currentSource": "membership375\u2013430,749\u2013759;core740\u2013750",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "invite-key/enrol and recovery-key path cannot restore removed final member; last-admin guard retained. No hosted private export/settlement API. Admin/none/offline/removed cases remain.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H29",
+    "originalRequirement": "Inert repository/command output in key-owning origin; minimal sanitized activity to others",
+    "currentSource": "page/view8\u201315;worker streams43;sessions469\u2013510",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "DOM text primitive and head-only stream exist; no command-output renderer, private transcript store or public sanitized hosted activity schema.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H30",
+    "originalRequirement": "Project payload/Git closure \u2192 immutable integrity manifest",
+    "currentSource": "derive/capability/hold stagedSource;platform destination objects",
+    "status": "primitive only",
+    "requiredAmendmentOrQualification": "Native staged refs/retained inputs/Git closure are not full dirty workspace payload/checkpoint manifests. Host supervisor freeze/copy/readback premises need adopted design.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H31",
+    "originalRequirement": "Epoch/instance/base-guarded durable receipt + current pointer \u2192 ack",
+    "currentSource": "contract/entry21;turn296\u2013321;hold capability",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Native epoch is0 and commit-head CAS exists; no hosted instance/base workspace receipt/current pointer transaction. Do not relabel native checkpoint as acknowledged workspace save.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H32",
+    "originalRequirement": "Old callback settles original without replacing current state",
+    "currentSource": "core740\u2013750;operations late/recovery;Page retained-editor specialization",
+    "status": "partial",
+    "requiredAmendmentOrQualification": "Native exact settlement supports immutable old request; page specializations are not durable host pointer protocol. Explicit stale/detached callback fence remains.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H33",
+    "originalRequirement": "Linked new attempts retain first unknown duty; no reset/pointer replacement erasure",
+    "currentSource": "operations1\u201332,96\u2013130;store47\u201359",
+    "status": "primitive retained",
+    "requiredAmendmentOrQualification": "New native attempts are entries; marked old unknown never resends/clears. Hosted linked-attempt/durable receipt records still absent; expiry/new attempt is not effect absence.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H34",
+    "originalRequirement": "Checkpoint/export purge-root expiry and unresolved-effect pins",
+    "currentSource": "hold243\u2013261,713\u2013731;ports300;core758\u2013763",
+    "status": "gap with primitive",
+    "requiredAmendmentOrQualification": "Pure root/pin retirement guards exist but production rootRetentionSeconds=null: roots never retired by deadline. Native folded-state checkpoint is not hosted workspace export; physical purge/spend/retention choice and host implementation still owed.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "existing capacity/physical cleanup owners",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H35",
+    "originalRequirement": "Direct private read current role/resource vs session identity; deny delegated session raw defaults",
+    "currentSource": "sessions15\u201316,43\u201350,351\u2013375;grant142",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Signed key issuance alone is not direct-device + current owner/admin provenance. Membership key kind/member/resource must be trusted-boundary checked; no raw private scopes currently served.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700"
+    ]
+  },
+  {
+    "id": "H36",
+    "originalRequirement": "Real HTTPS/RPC/session projection/wire behavior, not types alone",
+    "currentSource": "worker28\u201354,245\u2013280;contract/transport47\u201382",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Actual APIs are /v1/scopes. Historical packages/room/requests and scope/requests absent; implement adopted new endpoint semantics under actual Scope ports, not mechanical rename.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21"
+    ]
+  },
+  {
+    "id": "H37",
+    "originalRequirement": "Review/adopt exact amendment before dependent runtime",
+    "currentSource": "b538 delivery/acceptance;current ecd reconciliation",
+    "status": "owed",
+    "requiredAmendmentOrQualification": "This ledger grants no implementation approval. Reconcile current IA amendment cited as d55 by I6 to exact canonical adopted text before authoring; do not infer evidence-only design approval as Source authority.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "planner/checker"
+    ]
+  },
+  {
+    "id": "H38",
+    "originalRequirement": "Preserve saved dated reviewed plan/commissioning index/private-read clarification",
+    "currentSource": "b538 references Draft2 artifact209a5ec9/fc77cf82/0f358e52",
+    "status": "owed",
+    "requiredAmendmentOrQualification": "Historical planning evidence stays historical and must be carried verbatim into isolated future source checkout; no contract reduction.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H39",
+    "originalRequirement": "No provider operation for contract review; preserve economy/acts/Jam order, no first-Jam gate",
+    "currentSource": "b538 dependencies;ecd conditions",
+    "status": "retained",
+    "requiredAmendmentOrQualification": "Current read-only reconciliation performs no provider/runtime/credential action and launches no new first-Jam readiness gate.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e"
+    ]
+  },
+  {
+    "id": "H40",
+    "originalRequirement": "Unauthorized/uninvited/foreign/stale/revoked must not read private workspace or dispatch",
+    "currentSource": "native scope grant/session primitives;no Agent endpoints",
+    "status": "acceptance owed",
+    "requiredAmendmentOrQualification": "Native foreign scope/inc checks are necessary but insufficient for hosted private/command authority. Keep compact real boundary variants; no fixture product claim.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H41",
+    "originalRequirement": "Cross-device B discovers/watches/steers same member task; recovery after storage clear",
+    "currentSource": "client/intent33\u201337;page/main53\u201376;C4 current1bed",
+    "status": "gap",
+    "requiredAmendmentOrQualification": "Nonextractable in-memory signer primitive exists, but Page stores raw secret string in localStorage and Session takes Uint8Array. Nonextractable IndexedDB credential refs/transactional journal/device UI and discovery are not delivered by memory editor/claim.",
+    "owners": [
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H42",
+    "originalRequirement": "Current examples/types agree with authority, proper focused validation then one exact-head gate",
+    "currentSource": "actual Scope/client/compiler source;historical npm Room runners absent",
+    "status": "owed after Source",
+    "requiredAmendmentOrQualification": "No old @artroom-room/UI commands can run here. Future promise selects actual affected contract/platform/client/Scope/Page roots and meaningful native authority/device/receipt boundaries after adoption; no test inventory or per-guard sweep.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  },
+  {
+    "id": "H43",
+    "originalRequirement": "Isolated request branch, exact path artifacts, independent normal review/landing",
+    "currentSource": "b538 delivery",
+    "status": "retained",
+    "requiredAmendmentOrQualification": "Reconciliation is noGit/evidence-only. Future Source uses current reviewed receiving base, full authored paths and normal independent exact-head review; fb6 pending changes are not main.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "checker/planner"
+    ]
+  },
+  {
+    "id": "H44",
+    "originalRequirement": "Report unsupported provider/storage/authority design discrepancy; never silently narrow full scope",
+    "currentSource": "b538 last paragraph;I6 whole3stories",
+    "status": "retained",
+    "requiredAmendmentOrQualification": "Unsupported task/host/private privacy/retention mechanisms remain owned gaps. C4 whole identity/import/device duties, I6 whole three-stories/all68 recovery/manual/removal obligations retained; one Jam fixture or component report closes none.",
+    "owners": [
+      "b538c5eace50a1de82a8bdf8a8f19764548af15e",
+      "18815307e6c306d63766230ed7eb7ddbf94d1f21",
+      "1bed6a1961fd17d1b6de2ae55154256102ced700",
+      "7c67653cd27f87c54b09c4a3301ea9bc5f98ccf0"
+    ]
+  }
+]
