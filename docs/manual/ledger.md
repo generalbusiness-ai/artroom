@@ -4,6 +4,14 @@
 
 The approved plan at `1c27b35a` contains 67 unique section-4 pages. Every page below remains owed until its complete outcome and acceptance are met. Five model explanations now have complete draft prose; the current command-line guide remains a draft capability increment. Neither is a substituted quickstart or complete manual. Original page names and order are retained from [the current inventory](../../plans/025-2026-10-06-current-manual-inventory.md).
 
+Current four-guide increment: request `f1ee379395398cebc907a984d2cae43130174134`,
+own promise `db728db7b6ba2418d62b152b6feba04bcbdf2d81`, from receiving main
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. The cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8`
+is incorporated there; initial landing receipt `732ca210b84469513b3a53b618b2867ca92a71e0`
+is a source-publication fact, not public package, hosted or manual acceptance.
+The four new guides and revised ledger/index await their own exact review;
+all samples remain UNRUN. Historical source labels below are preserved.
+
 Writer: builder/lane M coordinates the manual; the named feature owners retain their related guides and evidence. A row does not claim they have delivered it. Tested public release: none established for this increment; current workspace `0.1.0-dev.1` is source metadata. The historical draft review is recorded below. Sample CI, style automation, cold-reader/agent acceptance and review of revised bytes remain pending.
 
 | No. | Approved page | Writer | Status / artifact | Feature dependencies | Tested release / acceptance |
@@ -23,12 +31,12 @@ Writer: builder/lane M coordinates the manual; the named feature owners retain t
 | 13 | From idea to landed change | Builder M + feature owner | Planned; full outcome owed | R1, R2, I3, I5 | No tested public release; exact page review and applicable conditions below pending |
 | 14 | Design before code | Builder M + feature owner | Planned; full outcome owed | R2, I3, I5, Extents | No tested public release; exact page review and applicable conditions below pending |
 | 15 | Working in a lane | Builder M + feature owner | Planned; full outcome owed | R2, I3, IA, I5 | No tested public release; exact page review and applicable conditions below pending |
-| 16 | Reviewing | Builder M + feature owner | Draft capability increment: [one text change](first-change.md); full outcome owed | R2, I3, I5, Extents | No tested public release; historical guide review recorded; full page outcome and applicable conditions below pending |
+| 16 | Reviewing | Builder M + feature owner | [New source guide](reviewing.md); exact independent review pending; all samples UNRUN; full outcome owed | R2, I3, I5, Extents | No tested public release; source publication qualified above; page review, sample CI and full outcome/applicable conditions pending |
 | 17 | Checks | Builder M + feature owner | Planned; full outcome owed | I3, Extents, R4 | No tested public release; exact page review and applicable conditions below pending |
-| 18 | Landing | Builder M + feature owner | Draft capability increment: [one text change](first-change.md); full outcome owed | R2, I3, I5 | No tested public release; historical guide review recorded; full page outcome and applicable conditions below pending |
+| 18 | Landing | Builder M + feature owner | [New source guide](landing.md); exact independent review pending; all samples UNRUN; full outcome owed | R2, I3, I5 | No tested public release; source publication qualified above; page review, sample CI and full outcome/applicable conditions pending |
 | 19 | Conflicts and recuts | Builder M + feature owner | Planned; full outcome owed | R2, I3, I5 | No tested public release; exact page review and applicable conditions below pending |
 | 20 | Writing your room's policy | Builder M + feature owner | Planned; full outcome owed | R1, I3, Extents | No tested public release; exact page review and applicable conditions below pending |
-| 21 | Roles and membership | Builder M + feature owner | Draft capability increment: [one text change](first-change.md); full outcome owed | I3, I5, Security | No tested public release; historical guide review recorded; full page outcome and applicable conditions below pending |
+| 21 | Roles and membership | Builder M + feature owner | [New source guide](roles-and-membership.md); exact independent review pending; all samples UNRUN; full outcome owed | I3, I5, Security | No tested public release; source publication qualified above; page review, sample CI and full outcome/applicable conditions pending |
 | 22 | The record | builder (manual/source); planner (contract/feature authority) | [Complete draft prose](record.md); full acceptance owed; [historical draft review](#review-and-publication-history) recorded | R1 implementation promise `170ed74f`; I3 commission `bcf5ec17`; I5 commissions `18815307` / `20dd4a48` | Main `9d7e4c27`; no tested public release; [page evidence](record.md#source-and-acceptance), historical draft review recorded; any revised bytes require new review |
 | 23 | Secrets | Builder M + feature owner | Planned; full outcome owed | Security, I3, IA, I5 | No tested public release; exact page review and applicable conditions below pending |
 | 24 | Moving from pull requests | Builder M + feature owner | Planned; full outcome owed | R2, I3, I5, Mirror | No tested public release; exact page review and applicable conditions below pending |
@@ -64,7 +72,7 @@ Writer: builder/lane M coordinates the manual; the named feature owners retain t
 | 54 | Consume the log | Builder M + feature owner | Planned; full outcome owed | R1, I3, I5, N3 | No tested public release; exact page review and applicable conditions below pending |
 | 55 | Extend the UI | Builder M + feature owner | Planned; full outcome owed | I5, I6, N3 | No tested public release; exact page review and applicable conditions below pending |
 | 56 | Self-host and operate | Builder M + feature owner | Planned; full outcome owed | I3, IA, I5, N3, Security | No tested public release; exact page review and applicable conditions below pending |
-| 57 | Contribute | Builder M + feature owner | Planned; full outcome owed | Docs, R4, N3 | No tested public release; exact page review and applicable conditions below pending |
+| 57 | Contribute | Builder M + feature owner | [New source guide](contribute.md); exact independent review pending; all samples UNRUN; full outcome owed | Docs, R4, N3 | No tested public release; source publication qualified above; page review, sample CI and full outcome/applicable conditions pending |
 | 58 | CLI commands | Builder M + feature owner | Existing [CLI reference](../cli.md) reused; generated drift evidence owed | I5, N3, Docs | No tested public release; exact page review and applicable conditions below pending |
 | 59 | MCP tools | Builder M + feature owner | Planned; full outcome owed | I5, R1, R2, N3, Docs | No tested public release; exact page review and applicable conditions below pending |
 | 60 | Declarations and bindings | Builder M + feature owner | Planned; full outcome owed | R1, R2, I5, N3 | No tested public release; exact page review and applicable conditions below pending |
@@ -78,20 +86,31 @@ Writer: builder/lane M coordinates the manual; the named feature owners retain t
 
 ## Material beyond the 67 pages
 
-These are additional obligations, not a page-count cap. Each remains planned, writer builder M with its feature owner, no tested release and no new acceptance evidence.
+These 21 outcome families are additional obligations, not a page-count cap. Each remains planned, writer builder M with its feature owner, no tested release and no new acceptance evidence. Common-refusal pages and later feature guides may expand a family; this is not a fixed total-page cap.
 
 | Material | Writer / dependency | Status |
 |---|---|---|
-| Common-refusal troubleshooting pages and contextual explanations | M + current authority/refusal owners | Planned; generated catalogue and real examples owed |
-| Stuck landing / unresolved publication | M + I3/R2 | Planned; original effect/receipt recovery, no duplicate mutation |
-| Lost workspace / expiry / handover | M + IA/C3 | Planned; actual custody and lifecycle evidence |
-| FAQ: pricing/limits, data location, offline use, jj/other Git clients, GitHub mirror | M + R4/IA/B2/Mirror | Planned; measured facts and explicit unsupported limits |
-| llms.txt documentation map | M + hosting owner | Planned |
-| Per-room AGENTS.md instruction generator | Lane J/C4 + M | Planned; public room/role references, no private keys |
-| Agent guide under 1,500 words | M + C3/C5/N3 | Planned; discovery, binding, retry, attention, actual app workflow |
-| Claude Code skill and instruction block | M + Harness | Planned; current primary docs and cold run required |
-| pi skill / optional extension | M + Harness | Planned; actual CLI/MCP route and cold run required |
-| Codex instructions and supported harness equivalents | M + Harness | Planned; current primary docs and cold run required |
+| One contextual page per common refusal | M + current operation/authority/refusal owner | Planned; generated catalogue and real contextual examples owed; full release/review/acceptance owed |
+| Stuck landing / unresolved publication | M + I3/I5 | Planned; original effect/receipt recovery without duplicate mutation owed; full release/review/acceptance owed |
+| Lost workspace / expiry / handover | M + IA/I5/I6 (inherited C3/C5/C6) | Planned; actual custody and lifecycle evidence owed; full release/review/acceptance owed |
+| Unknown command/push | M + IA/I3/I5 | Planned; full outcome, actual release/review/acceptance owed |
+| Lost reply / disconnect | M + I3/I5 | Planned; full outcome, actual release/review/acceptance owed |
+| Pause / cancellation | M + IA/I5/I6 | Planned; full outcome, actual release/review/acceptance owed |
+| Device/key loss and enrollment | M + I3/I5/Security | Planned; full outcome, actual release/review/acceptance owed |
+| Expiry / revocation | M + IA/I3/I5/Security | Planned; full outcome, actual release/review/acceptance owed |
+| Save failure / missing evidence | M + IA/I6 | Planned; full outcome, actual release/review/acceptance owed |
+| FAQ: pricing and limits | M + R4/IA | Planned; measured facts and explicit unsupported limits; full release/review/acceptance owed |
+| FAQ: data location | M + I3/IA/host owner | Planned; measured facts and explicit unsupported limits; full release/review/acceptance owed |
+| FAQ: offline use | M + R1/I5 | Planned; measured facts and explicit unsupported limits; full release/review/acceptance owed |
+| FAQ: jj and other Git clients | M + I3/I5/N3 | Planned; measured facts and explicit unsupported limits; full release/review/acceptance owed |
+| FAQ: GitHub mirroring | M + Mirror/I3/I5 | Planned; measured facts and explicit unsupported limits; full release/review/acceptance owed |
+| llms.txt documentation map | M + docs hosting owner | Planned; discoverable current documentation map owed; full release/review/acceptance owed |
+| Per-room AGENTS.md instruction block/generator | M + onboarding I5/IA (inherited Lane J/C4) | Planned; public room/role references, no private keys; full release/review/acceptance owed |
+| Agent guide under 1,500 words | M + I5/IA/N3 | Planned; discovery, binding, retry, attention and actual application workflow owed; full release/review/acceptance owed |
+| Claude Code instructions/skill | M + inherited harness owner IA/I5/I6 | Planned; current primary docs and cold run required; full release/review/acceptance owed |
+| pi skill / optional extension | M + inherited harness owner IA/I5/I6 | Planned; actual CLI/MCP route and cold run required; full release/review/acceptance owed |
+| Codex and other supported harness instruction equivalents | M + inherited harness owner IA/I5/I6 | Planned; current primary docs and cold run required; full release/review/acceptance owed |
+| Unfamiliar-application working examples | M + R1/R2/I5/N3/I6 | Planned; full outcome, actual release/review/acceptance owed |
 
 All six harness guides and six infrastructure guides remain explicit rows 32–43; none is replaced by this CLI guide. pi-durable keeps Workers AI as the adopted default, pending its owned integration/spike and measured evidence. Historical harness research is not current support. Hugh retains documentation hosting and cold-reader tester choices.
 
@@ -99,13 +118,13 @@ All six harness guides and six infrastructure guides remain explicit rows 32–4
 
 | No. | Required outcome | Current evidence / remaining work |
 |---|---|---|
-| 1 | Accurate independently reviewed pages for every delivered capability; complete remaining inventory retained | All 67 plus extras retained. Five model pages have complete draft prose; one contribution guide is a capability increment. Historical review of the six draft pages recorded below; complete outcomes and remaining pages owed |
+| 1 | Accurate independently reviewed pages for every delivered capability; complete remaining inventory retained | All 67 plus 21 additional families retained. Five model drafts and the historical first-change increment keep their recorded reviews; four new source guides await exact independent review. Complete outcomes and remaining pages owed |
 | 2 | Every command and code sample runnable in CI against a faithful current test Room | Existing CLI/lane fixtures referenced with stand-ins; this increment executes nothing. Per-sample CI integration and exact release proof owed |
 | 3 | New reader lands first hosted change in 15 minutes without help, recorded | No cold-reader run; target remains unmeasured. Hugh chooses tester |
 | 4 | Cold Claude Code, Codex and pi runs; pi-durable spike reports | All owed; verify dated inputs against primary docs when guides are written |
 | 5 | Generated CLI/MCP/refusal/error references; CI fails on meaningful drift | CLI commands compared statically only. Generator/drift-failure integration remains owed |
 | 6 | Plain-language style check passes every delivered page | Manual plain-language review of the source guide and five model drafts; automated style and full inventory coverage owed |
-| 7 | Checker approves each page for accuracy/plain language at exact artifacts | Six draft pages plus ledger/index approved at exact `f17b259d` bytes; other pages and revised bytes require their own independent review |
+| 7 | Checker approves each page for accuracy/plain language at exact artifacts | Historical exact `f17b259d` and `128a83be` reviews are recorded below. The four new guides and successor ledger/index require their own independent review; no approval transfers |
 | 8 | Unfamiliar-app discovery and binding-change/stale-intent/retirement/name-reuse working examples with exact release and honest legacy/v2/planned labels | Full scope remains owed. Current @2 one-file guide makes no old Room/v2 API or unlanded branch-workflow claim |
 
 ## Review and publication history
@@ -117,12 +136,20 @@ The original increment at `39782012f2f87f8585ee8f5e2929b025ac2a69de` drafted `fi
 
 Merge `25467a36901817f18c792d350dede9765546168e` published those reviewed bytes. The original `39782012` increment is an ancestor of that publication and main `8479057c1ce50f01a5de488c2f6c029b45be65e7`.
 
-That approval covers accuracy and plain English for those exact draft bytes. It does not complete any full page outcome or any of the eight acceptance conditions across the manual. All 67 outcomes, extras, tested public release, per-sample CI, automated style checks, cold-reader, agent and hosted acceptance remain open. This status correction and the two clarity edits produce revised document bytes; those bytes require their own exact independent review, with no approval transferred from `f17b259d`.
+The five revised maintenance documents at `128a83be3e6c4e5075f33c05caf331c71b9a4947`
+received their own checker approval `d1e734f149478eb09357fee73a8c37fe9d876c0b`,
+ratified by `179c34ba57d799201b85bbddd565af42a4eefca0`. Those exact bytes are
+incorporated in receiving main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`.
+The review covered the revised ledger, index, first-change guide, record and
+life-of-an-act maintenance only. It did not close the full manual or approve
+these new four guides and this successor ledger/index.
+
+That approval covers accuracy and plain English for those exact draft bytes. It does not complete any full page outcome or any of the eight acceptance conditions across the manual. All 67 outcomes, extras, tested public release, per-sample CI, automated style checks, cold-reader, agent and hosted acceptance remain open. The previous status/clarity edits received the separate 128a review just recorded. These new four guides and successor ledger/index require their own exact independent review; no earlier approval is transferred.
 
 ## These increments and static checks
 
-This maintenance changes only review/publication accounting and the two nonblocking clarity suggestions from the historical review. Original dates, source baseline and capability qualifications are retained. No application source, assets, dependencies, test configuration or package release is changed.
+This increment adds four source guides and changes only the existing ledger/index to locate them and record truthful publication status. Original dates, historical source baselines and capability qualifications are retained. No application source, assets, dependencies, test configuration or package release is changed.
 
-Model pages describe actual main `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`, whose native intent is v1 and whose newest founding cohort is @2. Coupled v2, b8 LIST1, immutable Site followups and the current unlanded Page/editor candidates are not represented as released. Original ten beginner terms are preserved with explicit current meanings for claim and land. Each page's evidence section links the actual contracts/runtime boundary; existing fixtures are reusable source evidence, not new runs or page acceptance.
+Model pages describe actual main `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`, whose native intent is v1 and whose newest founding cohort is @2. At that historical baseline, coupled v2, b8 LIST1, immutable Site followups and the then-unlanded Page/editor candidates were not represented as released. Original ten beginner terms are preserved with explicit current meanings for claim and land. Each page's evidence section links the actual contracts/runtime boundary; existing fixtures are reusable source evidence, not new runs or page acceptance.
 
 Structure checks must retain 67 ordered unique names and all eight conditions. Local Markdown targets and each illustrated command are compared with current files/help source. These checks do not establish executable samples, page approval, hosted acceptance or complete manual delivery. No test suite, gate, install, provider or harness run belongs to this prose-only increment.
