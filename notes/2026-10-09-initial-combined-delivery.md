@@ -331,8 +331,8 @@ unrun; no SDK source or failed SDK stage belongs to this composition.
 
 ## Combined SDK and economy candidate — gate pending
 
-Preparation request `5427e4d24fc85957e07398efd1508cd631b7740b` rests on
-promise `8150ab2a264f13672bc6b0632b554af07a9ff54a`. This composition
+Preparation under request `5427e4d24fc85957e07398efd1508cd631b7740b` and
+builder promise `8150ab2a264f13672bc6b0632b554af07a9ff54a`. This composition
 preserves the exact frozen donor code and current main's six guide blobs;
 it adds no outcome file, test matrix, dependency or configuration change.
 The earlier source-writing “unrun” sections are historical preparation
@@ -352,11 +352,38 @@ whole cache case once under the Hub-only control. It failed the intended
 pack-count assertion at line 106:26: two builds instead of one, after both
 responses had been awaited and decoded. There was no other case, module
 error, reported unhandled error or retry. Source, cache and permanent pool
-were restored. Its component was accepted under `5bb`; the original
+were restored. As reported by the primary builder session, its component
+was accepted under `5bb`; the original
 wrapper still exited 1 as “not-distinguished” because its Ready callback
 incorrectly required zero errors even though Vitest had already updated
-the task's final result. The separate early-refusal control remains
-unrun. No unchanged baseline or control is repeated by this composition.
+the task's final result. No unchanged baseline or control is repeated by
+this composition.
+
+The separately released early-refusal control at that same frozen source,
+handle 64535, distinguished the intended assertion at line 146:27: one
+oversized payload construction instead of zero. Its wrapper exited 0 and
+its unchanged one-case body exited 1 with that one intended failure.
+The real codec refusal was awaited and the constructor observer restored
+in `finally` before the assertion. There were no extra cases, module or
+reported unhandled errors, skips, retries or repeats. Full source, shared
+cache and permanent pool restoration passed. Later recovery assertions
+were not reached and are not credited by this control. The outer invocation
+used 4.90 seconds wall and 5.24 seconds CPU; the body used 2.75 seconds wall
+and 3.22 seconds CPU. These are separate actual observations, not a speedup
+or complete tenfold result.
+
+The primary builder session read and filed that outcome as report
+`2dea513c54c9a0c80696fee45912be16c81c4a5d`, accepted by the owner under
+`514e39b4cfb9e90ff4e7121524c20895aa39bb6f` and ratified under
+`9d8b6532f2040d4941d724b2b9293fb8c4a383c7`. Complete proof:
+`/tmp/artroom-hub-early-e307-complete-proof.json`, SHA-256
+`fda3cb828d42b69aeac212ef9f69927079e2c95aaddd6f3329f40ebe709c753d`.
+The recipe author's retained mechanical audit is
+`/tmp/artroom-hub-early-e307-independent-outcome/packet.json`, SHA-256
+`67cd82d6aca2e76f354f5f49261bd0be144c528deb77f058c2fa0e908906a095`;
+it is not formal approval or an independent source review. This bounded
+control establishes assertion sensitivity only, not live provider behavior
+or approval of the combined candidate.
 
 At exact SDK `d2a3`/tree `1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f`,
 handle 22393 exited 0: the whole reader case, all four packages' actual
@@ -370,7 +397,9 @@ SHA-256 `31bf3a57bdc33c96dbb2f4e22e4a567b02b90a749abc84ff2f789bf636f99c40`;
 its explicit public evidence metadata is
 `/tmp/artroom-sdk-d2a3-independent-actual-result/public-proof-r2.json`,
 SHA-256 `2525bde54e2a5b4999f51b79a8b52de7b9c14d2b5d94810a228762f825e63704`.
-Acceptance `364ede`/ratification `a35fc7` concern that local result.
+The primary builder session's SDK report
+`fc7b5f947b70f6995e005087664485cc9cf82918` and acceptance `364ede`, ratified
+under `a35bb4c4674e9af48b57afc961a5770285ccc716`, concern that local result.
 The four archives and extracted member records remain opaque hash evidence.
 The observed outer time was 4.21 seconds wall and 5.14 seconds CPU; this is
 one local invocation, not a speedup or whole-gate result.
@@ -388,6 +417,6 @@ and the existing active-source and compatibility Node checks. It adds no
 filter, reporter, discovery, compiler/body repeat, `--ci` or SDK stage run.
 Fresh output and exact current source/tool/cache/workspace guards are
 required before a separately released single gate. Complete source and
-evidence review, early-refusal distinction, ordinary landing, public SDK
+evidence review, ordinary landing, public SDK
 publication and outsider/browser/hosted/Jam acceptance, and the full
 measured tenfold objective remain open.
