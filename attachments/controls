@@ -1,0 +1,1067 @@
+{
+  "baseline": {
+    "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+    "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795"
+  },
+  "controls": [
+    {
+      "label": "cli",
+      "root": "/private/tmp/artroom-f5-signer-cli-control",
+      "head": "9ae795e5f5e567c7809f4bd9b3590e98ac8d9804",
+      "tree": "8410dc0f78e344241df6a3b0f2c9d4b7d5a06dc3",
+      "branch": "control/f5-signer-cli",
+      "source": "packages/cli/src/commands.ts",
+      "source_sha256": "453ec9abd6d4286d45faf0d8f04ad44cd938dd2749080598450e6d74e2b93d5b",
+      "witness": "packages/cli/test/clone.test.ts",
+      "witness_sha256": "963b70be497ff0db344629458caac720968a7640f624ebe39f67a79df7bd3a73",
+      "mutation": {
+        "before": "return typeof reader === \"string\" ? transport : signedReads(transport, secretSigner(secret), readSigning(ctx));",
+        "after": "return signedReads(transport, secretSigner(secret), readSigning(ctx));",
+        "changed_lines": 1
+      },
+      "selection": [
+        {
+          "path": "packages/cli/test/clone.test.ts",
+          "project": "cli",
+          "pool": "threads",
+          "cases": [
+            "remote reads the recorded repository; missing Git and the pinned @1 without read-token both sign nothing"
+          ]
+        }
+      ],
+      "plan": "/tmp/artroom-f5-signer-controls-preparation/cli-plan.json",
+      "plan_sha256": "36042aa6f06fb9b5721c6b73f56dcc6b68257f875e48220cce2ef68ea90a3c65",
+      "config_sha256": "a67713426f37183455c50cb26fdf5a937aaeb9ee4634694fe90f8bba279e2388",
+      "baseline_reused": {
+        "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+        "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+        "result": "/tmp/artroom-f5-signer-node-result/result.json",
+        "ledger": "/tmp/artroom-f5-signer-node-result/coverage-ledger.json",
+        "body_log": "/tmp/artroom-f5-signer-node-result/body.log",
+        "manifest": "/tmp/artroom-f5-signer-node-result/manifest.json",
+        "result_sha256": "7a2d49089fee157f52f28c7f68249a19d5b4edb6dd2224e0feff3fb0d29eb7a4",
+        "ledger_sha256": "ed67d672a8745e9a14a7104f30725b0512eddd1439ba403971be1e1964318263",
+        "body_log_sha256": "b70963aedb659a862e889f4a9ff91474d209104945755ec49303c9e7daf1dff4",
+        "manifest_sha256": "b353ee8c8111616da042092d0ab5fb326f58fd40515589a507316efebe9c190e"
+      },
+      "inert_cwd": "/private/tmp/artroom-f5-signer-cli-control",
+      "inert_environment": {
+        "ARTROOM_FOCUSED_PLAN": "/tmp/artroom-f5-signer-controls-preparation/cli-plan.json",
+        "ARTROOM_FOCUSED_OUTPUT": "/tmp/artroom-f5-signer-cli-control-result"
+      },
+      "inert_argv": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-f5-signer-cli-control/packages/cli/test/clone.test.ts",
+        "--config",
+        "/tmp/artroom-f5-signer-controls-preparation/cli-body.config.mjs",
+        "--bail=0",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-f5-signer-cli-control/scripts/focused-check.mjs",
+        "--outputFile.json=/tmp/artroom-f5-signer-cli-control-result/vitest.json"
+      ],
+      "restore_after_own_run": {
+        "argv": [
+          "git",
+          "switch",
+          "--detach",
+          "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec"
+        ],
+        "expected_head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+        "expected_tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+        "source_sha256": "50be23900b1afb89a6ec03a425d2d442d1abd454b582dc14d96bd9a9a40b5994",
+        "witness_sha256": "963b70be497ff0db344629458caac720968a7640f624ebe39f67a79df7bd3a73"
+      },
+      "expected_classification": {
+        "intended_failed_title": "remote reads the recorded repository; missing Git and the pinned @1 without read-token both sign nothing",
+        "failed_cases": 1,
+        "passed_cases": 0,
+        "total_cases": 1,
+        "required": "Assertion at actual derivation-count boundary; all selected cases run once; no skip/todo/retry/error/timeout/unrun; no native authority claim"
+      },
+      "owned_view": {
+        "workspace_count": 12,
+        "alias_count": 24,
+        "links": [
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cloudflare/kv-asset-handler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/kv-asset-handler"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cloudflare/unenv-preset",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/unenv-preset"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cloudflare/vitest-pool-workers",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cloudflare/workerd-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workerd-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cloudflare/workers-types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workers-types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@cspotcode/source-map-support",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cspotcode/source-map-support"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@esbuild/darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild/darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@img/colour",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/colour"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@img/sharp-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@img/sharp-libvips-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-libvips-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@jridgewell/resolve-uri",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/resolve-uri"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@jridgewell/sourcemap-codec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/sourcemap-codec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@jridgewell/trace-mapping",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/trace-mapping"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@noble/curves",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@noble/hashes",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@oxc-project/types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@oxc-project/types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@poppinss/colors",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/colors"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@poppinss/dumper",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/dumper"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@poppinss/exception",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/exception"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@rolldown/binding-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/binding-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@rolldown/pluginutils",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/pluginutils"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@sindresorhus/is",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@sindresorhus/is"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@speed-highlight/core",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@speed-highlight/core"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@standard-schema/spec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@standard-schema/spec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@types/chai",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/chai"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@types/deep-eql",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/deep-eql"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@types/estree",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/estree"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@types/node",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/node"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@typescript/typescript-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@typescript/typescript-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/expect",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/expect"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/mocker",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/mocker"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/pretty-format",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/pretty-format"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/runner",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/runner"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/snapshot",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/snapshot"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/spy",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/spy"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/@vitest/utils",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/utils"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/assertion-error",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/assertion-error"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/blake3-wasm",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/blake3-wasm"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/chai",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/chai"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/cjs-module-lexer",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/cjs-module-lexer"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/convert-source-map",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/convert-source-map"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/cookie",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/cookie"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/detect-libc",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/detect-libc"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/error-stack-parser-es",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/error-stack-parser-es"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/es-module-lexer",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/es-module-lexer"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/esbuild",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/estree-walker",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/estree-walker"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/expect-type",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/expect-type"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/fdir",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/fdir"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/fsevents",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/fsevents"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/get-tsconfig",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/get-tsconfig"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/jsonata",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/jsonata"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/kleur",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/kleur"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/lightningcss",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/lightningcss-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/magic-string",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/magic-string"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/miniflare",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/miniflare"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/nanoid",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/obug",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/obug"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/path-to-regexp",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/path-to-regexp"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/pathe",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/pathe"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/picocolors",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/picocolors"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/picomatch",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/picomatch"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/postcss",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/postcss"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/resolve-pkg-maps",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/resolve-pkg-maps"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/rolldown",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/semver",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/semver"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/sharp",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/sharp"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/siginfo",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/siginfo"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/source-map-js",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/source-map-js"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/stackback",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/stackback"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/std-env",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/std-env"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/supports-color",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/supports-color"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/tinybench",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinybench"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/tinyexec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyexec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/tinyglobby",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyglobby"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/tinyrainbow",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyrainbow"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/tsx",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/typescript",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/undici",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/undici"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/undici-types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/undici-types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/unenv",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/unenv"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/vite",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vite"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/vitest",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/why-is-node-running",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/workerd",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/ws",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/ws"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/youch",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/youch"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/youch-core",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/youch-core"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/zod",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/zod"
+          }
+        ],
+        "bins": [
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/artroom",
+            "target": "/private/tmp/artroom-f5-signer-cli-control/packages/cli/bin/artroom.js",
+            "sha256": "600d405b47f9f9f4ecc29c639273e98cb749d225e721e434fa0035279dc7c9a7"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/artroom-replay",
+            "target": "/private/tmp/artroom-f5-signer-cli-control/packages/replay/src/bin.ts",
+            "sha256": "05c20a545ef57de1927f518aad723c64e18ad5a9ba7bc33b4ef184ae97627cdb"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/cf-wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/cf-wrangler.js",
+            "sha256": "ac876131b2b0215090d17d36b3e8f9f54edb39418c55b69b24c9c0241d16e33e"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/esbuild",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/bin/esbuild",
+            "sha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/nanoid",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid/bin/nanoid.cjs",
+            "sha256": "e4eb9be1a3e3feb3f8979ef08c3bf3ef8430f4f22df9c4e427353a1577accbe8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/rolldown",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown/bin/cli.mjs",
+            "sha256": "98d6df62aa3c84284db17944a2a8017f911640e9c4d3de907a9f93b467ee47c8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/semver",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/semver/bin/semver.js",
+            "sha256": "bd6c871026985937dc945011fc54b74b47f5998154216d7b8d40d5ed782e4402"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/tsc",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+            "sha256": "2219f428a7e55aaf1f7ad85b9b0f0cf5078aeb76ccc9a7c6036c92d48f492ffd"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/tsx",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx/dist/cli.mjs",
+            "sha256": "8729ecfb90d9d568939e4190e6f1d3317c946583b7d37a776e0c23a21c021cf8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/vite",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vite/bin/vite.js",
+            "sha256": "de5833362e640673962f16e255bf8738d4380a68601b9af26217eee4e1bac36d"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/vitest",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+            "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/why-is-node-running",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running/cli.js",
+            "sha256": "ca1863b7fa8aa29ad949be5e7a2caa7dbe9edcc1b41c278b3d4a0af1f35a4220"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/workerd",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd/bin/workerd",
+            "sha256": "1136b482136aa93d67b0f77d4987a338a64a725b209ad1b889b8ae975dc7f388"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+            "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-cli-control/node_modules/.bin/wrangler2",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+            "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+          }
+        ]
+      },
+      "execution": []
+    },
+    {
+      "label": "page",
+      "root": "/private/tmp/artroom-f5-signer-page-control",
+      "head": "cb317ec7998276c22e6d42797469deb27969f36f",
+      "tree": "afc0abf4110ac336b4e5f083e3c37ae6883fd77e",
+      "branch": "control/f5-signer-page",
+      "source": "packages/page/src/data.ts",
+      "source_sha256": "5de6769ae74060b159c8024e6d732030088cb31dcb12d49a2c5117e8abfe0fda",
+      "witness": "packages/page/test/join.test.ts",
+      "witness_sha256": "0c4ae95c1cf45903bed8a153cac6b2f8397a080ae4db0a027a3d59baf84849f6",
+      "mutation": {
+        "before": "return typeof reader === \"string\" ? transport : signedReads(transport, secretSigner(session.secret), session.now ? { now: session.now } : {});",
+        "after": "return signedReads(transport, secretSigner(session.secret), session.now ? { now: session.now } : {});",
+        "changed_lines": 1
+      },
+      "selection": [
+        {
+          "path": "packages/page/test/join.test.ts",
+          "project": "page",
+          "pool": "threads",
+          "cases": [
+            "page join refuses mismatched encoding before submission and accepts scripted native/@2 replies on the configured service",
+            "incomplete projections stay unreadable and a real returned submit answer survives refresh and view failure with one submission"
+          ]
+        }
+      ],
+      "plan": "/tmp/artroom-f5-signer-controls-preparation/page-plan.json",
+      "plan_sha256": "3fd911372d7cd136d20ab5b4125381a3c3bf161735f90816e83d388c88a03f9c",
+      "config_sha256": "f654a07742340f244b6a4349e4e6ee07754d0949918c93ced195c7b207f55162",
+      "baseline_reused": {
+        "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+        "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+        "result": "/tmp/artroom-f5-signer-node-result/result.json",
+        "ledger": "/tmp/artroom-f5-signer-node-result/coverage-ledger.json",
+        "body_log": "/tmp/artroom-f5-signer-node-result/body.log",
+        "manifest": "/tmp/artroom-f5-signer-node-result/manifest.json",
+        "result_sha256": "7a2d49089fee157f52f28c7f68249a19d5b4edb6dd2224e0feff3fb0d29eb7a4",
+        "ledger_sha256": "ed67d672a8745e9a14a7104f30725b0512eddd1439ba403971be1e1964318263",
+        "body_log_sha256": "b70963aedb659a862e889f4a9ff91474d209104945755ec49303c9e7daf1dff4",
+        "manifest_sha256": "b353ee8c8111616da042092d0ab5fb326f58fd40515589a507316efebe9c190e"
+      },
+      "inert_cwd": "/private/tmp/artroom-f5-signer-page-control",
+      "inert_environment": {
+        "ARTROOM_FOCUSED_PLAN": "/tmp/artroom-f5-signer-controls-preparation/page-plan.json",
+        "ARTROOM_FOCUSED_OUTPUT": "/tmp/artroom-f5-signer-page-control-result"
+      },
+      "inert_argv": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-f5-signer-page-control/packages/page/test/join.test.ts",
+        "--config",
+        "/tmp/artroom-f5-signer-controls-preparation/page-body.config.mjs",
+        "--bail=0",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-f5-signer-page-control/scripts/focused-check.mjs",
+        "--outputFile.json=/tmp/artroom-f5-signer-page-control-result/vitest.json"
+      ],
+      "restore_after_own_run": {
+        "argv": [
+          "git",
+          "switch",
+          "--detach",
+          "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec"
+        ],
+        "expected_head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+        "expected_tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+        "source_sha256": "5bca2a23ceaac371b43bf41996a18944166b944225fed022c41f3fc3c7bd7c82",
+        "witness_sha256": "0c4ae95c1cf45903bed8a153cac6b2f8397a080ae4db0a027a3d59baf84849f6"
+      },
+      "expected_classification": {
+        "intended_failed_title": "incomplete projections stay unreadable and a real returned submit answer survives refresh and view failure with one submission",
+        "failed_cases": 1,
+        "passed_cases": 1,
+        "total_cases": 2,
+        "required": "Assertion at actual derivation-count boundary; all selected cases run once; no skip/todo/retry/error/timeout/unrun; no native authority claim"
+      },
+      "owned_view": {
+        "workspace_count": 12,
+        "alias_count": 24,
+        "links": [
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cloudflare/kv-asset-handler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/kv-asset-handler"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cloudflare/unenv-preset",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/unenv-preset"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cloudflare/vitest-pool-workers",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cloudflare/workerd-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workerd-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cloudflare/workers-types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workers-types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@cspotcode/source-map-support",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@cspotcode/source-map-support"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@esbuild/darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild/darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@img/colour",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/colour"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@img/sharp-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@img/sharp-libvips-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-libvips-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@jridgewell/resolve-uri",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/resolve-uri"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@jridgewell/sourcemap-codec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/sourcemap-codec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@jridgewell/trace-mapping",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/trace-mapping"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@noble/curves",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@noble/hashes",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@oxc-project/types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@oxc-project/types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@poppinss/colors",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/colors"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@poppinss/dumper",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/dumper"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@poppinss/exception",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/exception"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@rolldown/binding-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/binding-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@rolldown/pluginutils",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/pluginutils"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@sindresorhus/is",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@sindresorhus/is"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@speed-highlight/core",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@speed-highlight/core"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@standard-schema/spec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@standard-schema/spec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@types/chai",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/chai"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@types/deep-eql",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/deep-eql"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@types/estree",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/estree"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@types/node",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/node"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@typescript/typescript-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@typescript/typescript-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/expect",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/expect"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/mocker",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/mocker"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/pretty-format",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/pretty-format"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/runner",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/runner"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/snapshot",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/snapshot"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/spy",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/spy"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/@vitest/utils",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/utils"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/assertion-error",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/assertion-error"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/blake3-wasm",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/blake3-wasm"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/chai",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/chai"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/cjs-module-lexer",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/cjs-module-lexer"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/convert-source-map",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/convert-source-map"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/cookie",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/cookie"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/detect-libc",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/detect-libc"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/error-stack-parser-es",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/error-stack-parser-es"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/es-module-lexer",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/es-module-lexer"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/esbuild",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/estree-walker",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/estree-walker"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/expect-type",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/expect-type"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/fdir",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/fdir"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/fsevents",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/fsevents"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/get-tsconfig",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/get-tsconfig"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/jsonata",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/jsonata"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/kleur",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/kleur"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/lightningcss",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/lightningcss-darwin-arm64",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss-darwin-arm64"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/magic-string",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/magic-string"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/miniflare",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/miniflare"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/nanoid",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/obug",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/obug"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/path-to-regexp",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/path-to-regexp"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/pathe",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/pathe"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/picocolors",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/picocolors"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/picomatch",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/picomatch"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/postcss",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/postcss"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/resolve-pkg-maps",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/resolve-pkg-maps"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/rolldown",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/semver",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/semver"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/sharp",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/sharp"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/siginfo",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/siginfo"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/source-map-js",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/source-map-js"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/stackback",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/stackback"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/std-env",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/std-env"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/supports-color",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/supports-color"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/tinybench",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinybench"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/tinyexec",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyexec"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/tinyglobby",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyglobby"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/tinyrainbow",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyrainbow"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/tsx",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/typescript",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/undici",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/undici"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/undici-types",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/undici-types"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/unenv",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/unenv"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/vite",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vite"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/vitest",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/why-is-node-running",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/workerd",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/ws",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/ws"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/youch",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/youch"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/youch-core",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/youch-core"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/zod",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/zod"
+          }
+        ],
+        "bins": [
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/artroom",
+            "target": "/private/tmp/artroom-f5-signer-page-control/packages/cli/bin/artroom.js",
+            "sha256": "600d405b47f9f9f4ecc29c639273e98cb749d225e721e434fa0035279dc7c9a7"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/artroom-replay",
+            "target": "/private/tmp/artroom-f5-signer-page-control/packages/replay/src/bin.ts",
+            "sha256": "05c20a545ef57de1927f518aad723c64e18ad5a9ba7bc33b4ef184ae97627cdb"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/cf-wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/cf-wrangler.js",
+            "sha256": "ac876131b2b0215090d17d36b3e8f9f54edb39418c55b69b24c9c0241d16e33e"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/esbuild",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/bin/esbuild",
+            "sha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/nanoid",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid/bin/nanoid.cjs",
+            "sha256": "e4eb9be1a3e3feb3f8979ef08c3bf3ef8430f4f22df9c4e427353a1577accbe8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/rolldown",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown/bin/cli.mjs",
+            "sha256": "98d6df62aa3c84284db17944a2a8017f911640e9c4d3de907a9f93b467ee47c8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/semver",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/semver/bin/semver.js",
+            "sha256": "bd6c871026985937dc945011fc54b74b47f5998154216d7b8d40d5ed782e4402"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/tsc",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+            "sha256": "2219f428a7e55aaf1f7ad85b9b0f0cf5078aeb76ccc9a7c6036c92d48f492ffd"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/tsx",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx/dist/cli.mjs",
+            "sha256": "8729ecfb90d9d568939e4190e6f1d3317c946583b7d37a776e0c23a21c021cf8"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/vite",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vite/bin/vite.js",
+            "sha256": "de5833362e640673962f16e255bf8738d4380a68601b9af26217eee4e1bac36d"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/vitest",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+            "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/why-is-node-running",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running/cli.js",
+            "sha256": "ca1863b7fa8aa29ad949be5e7a2caa7dbe9edcc1b41c278b3d4a0af1f35a4220"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/workerd",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd/bin/workerd",
+            "sha256": "1136b482136aa93d67b0f77d4987a338a64a725b209ad1b889b8ae975dc7f388"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/wrangler",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+            "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+          },
+          {
+            "path": "/private/tmp/artroom-f5-signer-page-control/node_modules/.bin/wrangler2",
+            "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+            "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+          }
+        ]
+      },
+      "execution": []
+    }
+  ],
+  "status": "INERT; no control execution; actual genuine baseline reused; no compiler/discovery/baseline repeat",
+  "execution": []
+}
