@@ -1,0 +1,18 @@
+{
+  "source": "main9a419849d57c2a18d6aa69741c0a232e1f3bd65d",
+  "deployment": "c084598c-acd7-43ed-8078-30ab361c3634",
+  "command": "Node26 packages/cli/bin/artroom.js issues with existing owner-only rehearsal maintainer config",
+  "original_handle": 18881,
+  "terminal": 0,
+  "result": {
+    "issues": 1,
+    "open": 0,
+    "completed": 1
+  },
+  "initial_attempt": {
+    "terminal": 1,
+    "reason": "Direct TS strip-only entry unsupportedparameterproperty;beforeHTTP;normal documentedCLIlauncher corrected invocation"
+  },
+  "secret_values_printed": false,
+  "qualification": "ActualauthenticatedreadonlyCLI/nativeissues;no newintent/Gitmutation/fulljourney/browserclaim"
+}
