@@ -10,6 +10,7 @@ test("a released Site continuation cannot advance the shared clock past a new na
   const clock = net.clock;
   const old = siteFixtureLifetime();
   old.advance(1);
+  old.advance(0.013); // Exercise a subsecond floor independently of test order.
   const legitimateAdvance = clock.now;
   const gate = new Gate(); gate.hold();
   let stopped = false;
@@ -24,7 +25,9 @@ test("a released Site continuation cannot advance the shared clock past a new na
     expect(await C.stub.deliver(g.rules.relate(C.at, "rules", "published", { approvals: 0, checks: [], ownerMayReview: true }))).toMatchObject({ answer: "recorded" });
     const signed = await C.signed(rita, "offer", { fields: { offeree: una.member, terms: "Integrate." } });
     const sampled = timeMs(clock.now)!;
-    expect(timeMs(signed.signed.intent.notAfter)! - sampled).toBe(300_000);
+    // Client deadlines use whole seconds; legitimate earlier fixture advances
+    // may leave the shared clock between those seconds.
+    expect(timeMs(signed.signed.intent.notAfter)).toBe(Math.floor(sampled / 1000) * 1000 + 300_000);
     gate.release(); await continuing;
     const answer = await C.submit(signed);
     expect(answer.answer).toBe("accepted"); // Old unguarded +1800 yields expired.

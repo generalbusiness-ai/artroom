@@ -110,3 +110,22 @@ only this pinned note and the expected generated module changed. The outer
 run measured 1.47 seconds elapsed and 1.36 seconds CPU; the build child
 measured 0.28 seconds elapsed and 0.19 seconds CPU. No focused checks were
 repeated. The ordinary changed-source gate and independent review remain.
+
+## First ordinary gate outcome
+
+The ordinary gate (26041), at `db44bf291c3e351781769a6ce355c60e97e36f6d`,
+passed whitespace and type checks. Vitest passed 1,027 tests, failed one
+Site clock-lifetime assertion, and retained the two original recorder skips.
+The naming and all 22 manifest cases passed. The chained Node checks did
+not run. The outer gate measured 95.80 seconds elapsed and 152.12 seconds
+CPU. This gate failed; its original outcome remains retained.
+
+The Site assertion assumed the shared scripted clock was on a whole-second
+boundary. The client rounds the signed deadline down to whole seconds;
+the observed 13 ms remainder therefore leaves 299,987 ms of the default
+five-minute lifetime. The repaired witness includes a deliberate subsecond
+advance and checks the exact rounded deadline. Its released-continuation,
+native acceptance and unchanged-clock assertions remain intact. Production
+code, deadlines, the shared clock and all other tests are unchanged.
+The repaired file and previously unrun Node checks remain to be checked;
+the whole suite will not be repeated.
