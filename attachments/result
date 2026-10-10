@@ -1,511 +1,79 @@
 {
-  "kind": "Terminal affected validation, not full gate/Source approval",
-  "authorization": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c2a475c7536d9b143982c25c4ce57bc86b097331",
-  "authority": "Independent builder decision under initial promise11ffa485; not planner restricted-command replay/unrelated-genesis authority",
-  "utc_terminal": "2026-10-10T00:33:38.034525+00:00",
-  "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-  "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-  "canonical_root": "/private/tmp/artroom-initial-native-cleanup-fix",
-  "clean_before_after": true,
-  "source_tool_workspace_guard_static_match_after": true,
-  "four_compilers": {
-    "passed": 4,
-    "failed": 0,
-    "all_logs_empty": true,
-    "roots": [
-      "packages/scope/tsconfig.test.json",
-      "packages/cli/tsconfig.scope.json",
-      "packages/page/tsconfig.scope.json",
-      "packages/lanes/tsconfig.scope.json"
-    ]
+  "head": "0e99a7a13da1c7c37e8ac952acc4aab5e2395adf",
+  "tree": "fbdd3d3da0b2570ea8384bc8ff887bcbb8f358f6",
+  "owner": "99d780fca5c6bf45c8cbb025a75634de2f1bb4e7",
+  "compiler_owner": "bc3f63d1a0ce43e14eb6594acafe86ad396b335f",
+  "source_before": {
+    "head": "0e99a7a13da1c7c37e8ac952acc4aab5e2395adf",
+    "tree": "fbdd3d3da0b2570ea8384bc8ff887bcbb8f358f6",
+    "status": "",
+    "source_hash_count": 1230
   },
-  "supplemental": {
-    "discovery": "terminal0/exact6tuples4completefiles",
-    "body": "terminal0/all6PASS/0fail/0skip",
-    "cases": [
-      {
-        "name": "stale session cleanup and one completed lease cannot expose a new owner's headerless register read",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/test/session-ownership.test.ts",
-        "projectName": "scope",
-        "body_ms": 29,
-        "status": "passed"
-      },
-      {
-        "name": "demo setup exceptions release owned globals and preserve newer fixture wiring",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page/test/demo-cleanup.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 1,
-        "status": "passed"
-      },
-      {
-        "name": "artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs > remote prints the host's form; a member reads the destination with her session before any act there and after the claim window; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/cli/test/clone.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 402,
-        "status": "passed"
-      },
-      {
-        "name": "the browser's native claim survives lost founding and enrollment replies without replacement requests; unsafe configuration or failed storage submits nothing (Git host, scheduler, storage and loss STAND-INs)",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page/test/claim.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 222,
-        "status": "passed"
-      },
-      {
-        "name": "a changed Page context stops queued and prepared native claims before delivery, preserving found, seat and first-key for exact original-context recovery (Git host, scheduler, storage and locks STAND-INs)",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page/test/claim.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 157,
-        "status": "passed"
-      },
-      {
-        "name": "explicit new creates another native directory while exact operation resume, pending conflict, stale new and legacy migration preserve original proofs (Git host, scheduler, storage and locks STAND-INs)",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page/test/claim.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 328,
-        "status": "passed"
-      }
-    ],
-    "raw_bytes": 1868,
-    "raw_sha256": "4bc230e6ef8b9e88d04c2c569230fcfedcc64ef5759d3e418685e18cb8ec25e7",
-    "classified_sha256": "4bc230e6ef8b9e88d04c2c569230fcfedcc64ef5759d3e418685e18cb8ec25e7"
-  },
-  "original_seven": {
-    "discovery": "terminal0/exact7tuples7completefiles",
-    "body": "qualified terminal0/all7PASS/0fail/0skip",
-    "cases": [
-      {
-        "name": "the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs > install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/cli/test/story.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 625,
-        "status": "passed"
-      },
-      {
-        "name": "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/lanes/test/site-native3-publication.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 1141,
-        "status": "passed"
-      },
-      {
-        "name": "exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page/test/source-preview.scope.test.ts",
-        "projectName": "scope",
-        "body_ms": 742,
-        "status": "passed"
-      },
-      {
-        "name": "explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/test/application-establish.test.ts",
-        "projectName": "scope",
-        "body_ms": 971,
-        "status": "passed"
-      },
-      {
-        "name": "a founding on real scopes under the deployed class (authority note, section 3.8; I3 plan, step 9c). The Git host is a STAND-IN > an install founds a register; a founder's claim opens the creation of a repository; the reply to its first attempt is lost, and the own answer of the second selects it and creates the directory; the directory creates and confirms membership, rules and destination; real rules and membership observations decide the first publication with a required passed check",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/test/founding-real.test.ts",
-        "projectName": "scope",
-        "body_ms": 713,
-        "status": "passed"
-      },
-      {
-        "name": "two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/test/site-immutable-publication.test.ts",
-        "projectName": "scope",
-        "body_ms": 890,
-        "status": "passed"
-      },
-      {
-        "name": "a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN > a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code",
-        "file": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope/test/versions.test.ts",
-        "projectName": "scope",
-        "body_ms": 465,
-        "status": "passed"
-      }
-    ],
-    "raw_bytes": 4252,
-    "raw_sha256": "775a223024362d41dc2ab8ab41c6bbc776d6515979290b2c1accfd04879d8571",
-    "classified_sha256": "775a223024362d41dc2ab8ab41c6bbc776d6515979290b2c1accfd04879d8571",
-    "original_timeout_ms": 5000,
-    "retry": 0,
-    "original_lexical_expect_sites": 212,
-    "F1_original49_expect_sites_fourproven_replay_controls": "Whole original case passed through its unchanged final replay assertions; no per-assert printed values claimed"
-  },
-  "diagnostics": {
-    "SQL": "Intentional SQL retention-fault native bridge prints uncaught diagnostic despite expected caught rejection/rollback controls and terminal passed case. Remains unresolved native reporting provenance. No suppression/fix/error-free acceptance claim.",
-    "Site": "Deliberate wrong receipt object produces expected hash-mismatch rejection log; no provider ran.",
-    "cross_DO_RefcountedCanceler": "Not printed in these bounded selections; does not prove original cause resolved."
-  },
-  "parser_disposition": {
-    "file": "/tmp/artroom-native-cfe-affected-validation/reporter-parser-stop.json",
-    "original": "Whole-log failed/skipped token predicate matched failed storage inside a legitimate passing title; read-only AssertionError before seven command",
-    "actual": "All6 exact tuples/order/final summaries matched",
-    "root_direction": "Root allowed external evidence parser correction and as-yet-unrun seven only; no native/config/source retry",
-    "preserved": true
-  },
+  "recipe_packet_sha256": "925db5067c52d8a9372bb65a709f703c3d7369e319293b5f5ecde178dfd4313a",
+  "ready_sha256": "6de42bbe67d7981d108f9d9e45291825d6b4ce5f626d202554ab893759843e28",
+  "canonical_cwd": "/private/tmp/artroom-ux1-compiler-source-fix/packages/page",
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "load_start": [
+    1.82080078125,
+    2.13671875,
+    2.1572265625
+  ],
+  "cache": "existing exact-lock dependencies; no install; local source-owned 12 workspace links",
+  "started_utc": "2026-10-10T00:33:23Z",
   "phases": [
     {
-      "phase": "scope compiler",
-      "argv": [
+      "name": "page-source",
+      "command": [
         "node",
-        "node_modules/typescript/bin/tsc",
+        "/tmp/artroom-ux1-compiler-source-fix/node_modules/typescript/bin/tsc",
         "-p",
-        "packages/scope/tsconfig.test.json"
+        "tsconfig.json"
       ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix",
-      "pid": 26279,
       "exit": 0,
-      "wall_seconds": 0.3986927910009399,
-      "cpu_seconds": 1.7704569999999997,
-      "log": "/tmp/artroom-native-cfe-affected-validation/scope-types.log",
-      "bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_identity": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
+      "wall_seconds": 0.22900125000160187,
+      "cpu_seconds": 0.709935,
+      "log": "/tmp/artroom-ux1-0e99-execution/page-source.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "phase": "cli compiler",
-      "argv": [
+      "name": "page-test",
+      "command": [
         "node",
-        "node_modules/typescript/bin/tsc",
+        "/tmp/artroom-ux1-compiler-source-fix/node_modules/typescript/bin/tsc",
         "-p",
-        "packages/cli/tsconfig.scope.json"
+        "tsconfig.test.json"
       ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix",
-      "pid": 26303,
-      "exit": 0,
-      "wall_seconds": 0.22879754193127155,
-      "cpu_seconds": 0.8162780000000002,
-      "log": "/tmp/artroom-native-cfe-affected-validation/cli-types.log",
-      "bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_identity": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "page compiler",
-      "argv": [
-        "node",
-        "node_modules/typescript/bin/tsc",
-        "-p",
-        "packages/page/tsconfig.scope.json"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix",
-      "pid": 26311,
-      "exit": 0,
-      "wall_seconds": 0.31628983293194324,
-      "cpu_seconds": 1.1924380000000003,
-      "log": "/tmp/artroom-native-cfe-affected-validation/page-types.log",
-      "bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_identity": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "lanes compiler",
-      "argv": [
-        "node",
-        "node_modules/typescript/bin/tsc",
-        "-p",
-        "packages/lanes/tsconfig.scope.json"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix",
-      "pid": 26319,
-      "exit": 0,
-      "wall_seconds": 0.3380836669821292,
-      "cpu_seconds": 1.6544140000000005,
-      "log": "/tmp/artroom-native-cfe-affected-validation/lanes-types.log",
-      "bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_identity": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "supplemental discovery",
-      "argv": [
-        "node",
-        "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vitest/vitest.mjs",
-        "list",
-        "--config",
-        "/tmp/artroom-native-cfe-supplemental-preparation/supplemental.config.mjs",
-        "--json"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope",
-      "pid": 27261,
-      "exit": 0,
-      "wall_seconds": 2.140851665986702,
-      "cpu_seconds": 2.4146630000000004,
-      "before": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      },
-      "utc_terminal": "2026-10-10T00:28:26.805621+00:00",
-      "config_sha256": "594270bbe4ca63d8e5afd7371c51d4d55614e61d3920b079ccc30e6415e19e0d",
-      "stdout": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/supplemental-discovery.json",
-        "bytes": 2230,
-        "sha256": "e5c160956345dc925b6b7f493dcd2ac2e33f92a45c2f4ea26dc3620c644aed5f"
-      },
-      "stderr": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/supplemental-discovery.stderr.log",
-        "bytes": 0,
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-      },
-      "after": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "supplemental body",
-      "argv": [
-        "node",
-        "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vitest/vitest.mjs",
-        "run",
-        "--config",
-        "/tmp/artroom-native-cfe-supplemental-preparation/supplemental.config.mjs",
-        "--reporter",
-        "verbose",
-        "--bail=1"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope",
-      "pid": 28441,
-      "exit": 0,
-      "wall_seconds": 3.0162798749515787,
-      "cpu_seconds": 3.715048,
-      "before": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      },
-      "utc_terminal": "2026-10-10T00:29:04.208894+00:00",
-      "config_sha256": "594270bbe4ca63d8e5afd7371c51d4d55614e61d3920b079ccc30e6415e19e0d",
-      "raw": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/supplemental-body.raw.log",
-        "bytes": 1868,
-        "sha256": "4bc230e6ef8b9e88d04c2c569230fcfedcc64ef5759d3e418685e18cb8ec25e7"
-      },
-      "after": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "seven discovery",
-      "argv": [
-        "node",
-        "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vitest/vitest.mjs",
-        "list",
-        "--config",
-        "/tmp/artroom-initial-native-cleanup-fix-packet/seven-native.config.mjs",
-        "--json"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope",
-      "pid": 37542,
-      "exit": 0,
-      "wall_seconds": 1.9708824580302462,
-      "cpu_seconds": 2.387241,
-      "before": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      },
-      "utc_terminal": "2026-10-10T00:31:13.671144+00:00",
-      "config_sha256": "8219976358d5c3c90a5279216e6e7bcfe5c3605167c556a6d472181d9dbaa4da",
-      "stdout": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/seven-discovery.json",
-        "bytes": 3160,
-        "sha256": "388f0123426a791648aa8a43c31c52fa55d6c3ae80031e5637a0de93f5fc3a83"
-      },
-      "stderr": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/seven-discovery.stderr.log",
-        "bytes": 0,
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-      },
-      "after": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
-    },
-    {
-      "phase": "seven body",
-      "argv": [
-        "node",
-        "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vitest/vitest.mjs",
-        "run",
-        "--config",
-        "/tmp/artroom-initial-native-cleanup-fix-packet/seven-native.config.mjs",
-        "--reporter",
-        "verbose",
-        "--bail=1"
-      ],
-      "cwd": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope",
-      "pid": 39442,
-      "exit": 0,
-      "wall_seconds": 7.832078833016567,
-      "cpu_seconds": 8.819875,
-      "before": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      },
-      "utc_terminal": "2026-10-10T00:31:59.145559+00:00",
-      "config_sha256": "8219976358d5c3c90a5279216e6e7bcfe5c3605167c556a6d472181d9dbaa4da",
-      "raw": {
-        "path": "/tmp/artroom-native-cfe-affected-validation/seven-body.raw.log",
-        "bytes": 4252,
-        "sha256": "775a223024362d41dc2ab8ab41c6bbc776d6515979290b2c1accfd04879d8571"
-      },
-      "after": {
-        "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
-        "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
-        "status": ""
-      }
+      "exit": 1,
+      "wall_seconds": 0.25712624995503575,
+      "cpu_seconds": 1.0662169999999997,
+      "log": "/tmp/artroom-ux1-0e99-execution/page-test.log",
+      "log_bytes": 1670,
+      "log_sha256": "5dbcab4dddb0ab0ec2bb0c63392c0999ad0f71b116c15060bc9838820d9b395b"
     }
   ],
-  "sum_separate_phase_cost": {
-    "wall_seconds": 16.241956664831378,
-    "cpu_seconds": 22.770414000000002,
-    "qualification": "Sum of separately observed command steps, not one observed pipeline or gate; excludes read-only orchestration/parser pause"
+  "terminal_exit": 1,
+  "stopped": "page-test failed",
+  "source_after": {
+    "head": "0e99a7a13da1c7c37e8ac952acc4aab5e2395adf",
+    "tree": "fbdd3d3da0b2570ea8384bc8ff887bcbb8f358f6",
+    "status": "",
+    "source_hash_count": 1230
   },
+  "finished_utc": "2026-10-10T00:33:24Z",
   "unrun": [
-    "full gate",
-    "active-source script",
-    "controls",
-    "profiling/probes",
-    "provider/browser/audio",
-    "formal whole Source review",
-    "gsfiling/landing",
-    "UX/M1 runtime by this agent"
+    "page-scope",
+    "discovery",
+    "body"
   ],
-  "source_edits_during_runtime": false,
-  "native_reruns": 0,
-  "deadline_widening_or_filters": false,
-  "qualifications": [
-    "Affected4compilers+6supplemental+7original native cases on exactcfe only",
-    "Each discovery matched fully before its same-recipe body",
-    "No prior-head pass transfer",
-    "No originaltimeout cause/longpool/physicaldrain claim",
-    "Whole inherited222paths/docs18a integration/final samehead gate/review/landing remainRoot obligations",
-    "Fullproduct/hosted/browser/device/audio/manual scope remains open"
-  ],
-  "files": {
-    "cli-types.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "compiler-proof.json": {
-      "sha256": "1362eabde27cd130902a3435d13b1cc8ab6e6094d2c7084df620f22a513bba4e",
-      "bytes": 3709
-    },
-    "execution-decision.json": {
-      "sha256": "f904e579805145aa3ad5d56e8edbe61685fb46117d293dba998cf305a0e02954",
-      "bytes": 3158
-    },
-    "lanes-types.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "page-types.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "reporter-parser-stop.json": {
-      "sha256": "fd541a7416128915c894a8cedd468c0344755c1f1c2d4c921b16599a38d224ef",
-      "bytes": 5819
-    },
-    "scope-types.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "seven-body-classification.json": {
-      "sha256": "3d1cd23464af24dbc3b736639cc79cb3ff8de9c350cded8ec5341eccf495a8c7",
-      "bytes": 364
-    },
-    "seven-body-proof.json": {
-      "sha256": "24ab87ddd47f2eedddf90d796840de927935f5dea81f3696ebf7ced5774ed699",
-      "bytes": 1094
-    },
-    "seven-body.classified.log": {
-      "sha256": "775a223024362d41dc2ab8ab41c6bbc776d6515979290b2c1accfd04879d8571",
-      "bytes": 4252
-    },
-    "seven-body.raw.log": {
-      "sha256": "775a223024362d41dc2ab8ab41c6bbc776d6515979290b2c1accfd04879d8571",
-      "bytes": 4252
-    },
-    "seven-case-ledger.json": {
-      "sha256": "e7db0a96f5f708b287e98d3edb283f03cb0a1345f9591267fc9a778ca7c354ce",
-      "bytes": 3933
-    },
-    "seven-discovery-proof.json": {
-      "sha256": "3843e4196bf65418517bbbde1c996815c53abb0dbb3378b6f3188ebf6a202f4c",
-      "bytes": 1273
-    },
-    "seven-discovery.json": {
-      "sha256": "388f0123426a791648aa8a43c31c52fa55d6c3ae80031e5637a0de93f5fc3a83",
-      "bytes": 3160
-    },
-    "seven-discovery.stderr.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "seven-selection-match.json": {
-      "sha256": "73651131e008d7f1b958470f1e9f7e2acd2f2860734f203d8cff508705685e26",
-      "bytes": 6671
-    },
-    "supplemental-body-classification.json": {
-      "sha256": "10ba9b97efa5fd5c6358bff37320e794a68c48e3e5bd9996f8cda47de4f8aba5",
-      "bytes": 378
-    },
-    "supplemental-body-proof.json": {
-      "sha256": "85b86d71c64c2c6a3e8e8d901a01eccbf62135e308ef0f61948e1f3527a78138",
-      "bytes": 1111
-    },
-    "supplemental-body.classified.log": {
-      "sha256": "4bc230e6ef8b9e88d04c2c569230fcfedcc64ef5759d3e418685e18cb8ec25e7",
-      "bytes": 1868
-    },
-    "supplemental-body.raw.log": {
-      "sha256": "4bc230e6ef8b9e88d04c2c569230fcfedcc64ef5759d3e418685e18cb8ec25e7",
-      "bytes": 1868
-    },
-    "supplemental-case-ledger.json": {
-      "sha256": "25ba251f3943dc68635e028d551e2dce5329e409b6582af354c0ea3e468db0d1",
-      "bytes": 2759
-    },
-    "supplemental-discovery-proof.json": {
-      "sha256": "e3a37722d76c5eb96a1cbeb383d7f36aef891bbf42838c85d19a4986c46a79ef",
-      "bytes": 1305
-    },
-    "supplemental-discovery.json": {
-      "sha256": "e5c160956345dc925b6b7f493dcd2ac2e33f92a45c2f4ea26dc3620c644aed5f",
-      "bytes": 2230
-    },
-    "supplemental-discovery.stderr.log": {
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
-    },
-    "supplemental-selection-match.json": {
-      "sha256": "7a1d557cfd1e8c73acd7fbb9124a6ca4f93ebd6911d654b64bb22acc933e34a6",
-      "bytes": 4834
-    }
-  }
+  "excluded_checks": [
+    "build",
+    "browser",
+    "native",
+    "gate",
+    "install",
+    "provider",
+    "audio",
+    "control"
+  ]
 }
