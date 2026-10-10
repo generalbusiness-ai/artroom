@@ -1,0 +1,139 @@
+{
+  "release": "9c4fbf747cdbd5489903a05a03e842b6e177b488",
+  "request": "04f7e14e31da28f4a912fb2481b477d87264c106",
+  "promise": "3181024a92cf8bf556f1e3b3b0ea100d2e4bed0e",
+  "head": "2961d8c031c5f3de4a7b0dbc2c036ec04fce6c1a",
+  "tree": "b79f104c650466b98d1d99c178a4998b59f6678b",
+  "cwd": "/private/tmp/artroom-m1-validated-pins",
+  "terminal": 0,
+  "clean_before_after": true,
+  "source_hashes_equal": 524,
+  "tool_hashes_equal": 11,
+  "dependency_view_current_workspaces": 12,
+  "source_aliases": 24,
+  "phases": [
+    {
+      "name": "platform-test",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/opt/homebrew/bin/node",
+        "/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-m1-validated-pins/packages/platform/tsconfig.test.json"
+      ],
+      "cwd": "/private/tmp/artroom-m1-validated-pins",
+      "start_utc": "2026-10-10T00:39:09.970609+00:00",
+      "end_utc": "2026-10-10T00:39:10.174169+00:00",
+      "observed_command_wall_seconds": 0.20334508293308318,
+      "terminal": 0,
+      "raw_time_log": "platform-test.log",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.76,
+      "user_seconds": 0.66,
+      "system_seconds": 0.1
+    },
+    {
+      "name": "cli-test",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/opt/homebrew/bin/node",
+        "/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-m1-validated-pins/packages/cli/tsconfig.test.json"
+      ],
+      "cwd": "/private/tmp/artroom-m1-validated-pins",
+      "start_utc": "2026-10-10T00:39:10.285072+00:00",
+      "end_utc": "2026-10-10T00:39:10.478366+00:00",
+      "observed_command_wall_seconds": 0.1933132919948548,
+      "terminal": 0,
+      "raw_time_log": "cli-test.log",
+      "wall_seconds": 0.19,
+      "cpu_seconds": 0.69,
+      "user_seconds": 0.6,
+      "system_seconds": 0.09
+    },
+    {
+      "name": "scope-test",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/opt/homebrew/bin/node",
+        "/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-m1-validated-pins/packages/scope/tsconfig.test.json"
+      ],
+      "cwd": "/private/tmp/artroom-m1-validated-pins",
+      "start_utc": "2026-10-10T00:39:10.594179+00:00",
+      "end_utc": "2026-10-10T00:39:10.950641+00:00",
+      "observed_command_wall_seconds": 0.35646329110022634,
+      "terminal": 0,
+      "raw_time_log": "scope-test.log",
+      "wall_seconds": 0.35,
+      "cpu_seconds": 1.51,
+      "user_seconds": 1.36,
+      "system_seconds": 0.15
+    },
+    {
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/opt/homebrew/bin/node",
+        "/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-m1-2961-dependency-preparation/five-node-r2.config.mjs",
+        "--json"
+      ],
+      "cwd": "/private/tmp/artroom-m1-validated-pins",
+      "start_utc": "2026-10-10T00:39:40.186878+00:00",
+      "end_utc": "2026-10-10T00:39:41.187719+00:00",
+      "observed_command_wall_seconds": 1.0005535000236705,
+      "terminal": 0,
+      "name": "discovery",
+      "wall_seconds": 0.99,
+      "cpu_seconds": 1.66,
+      "user_seconds": 1.38,
+      "system_seconds": 0.28
+    },
+    {
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/opt/homebrew/bin/node",
+        "/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-m1-2961-dependency-preparation/five-node-r2.config.mjs",
+        "--reporter",
+        "verbose",
+        "--bail=1"
+      ],
+      "cwd": "/private/tmp/artroom-m1-validated-pins",
+      "start_utc": "2026-10-10T00:40:13.204132+00:00",
+      "end_utc": "2026-10-10T00:40:14.011151+00:00",
+      "observed_command_wall_seconds": 0.8068025419488549,
+      "terminal": 0,
+      "name": "body",
+      "wall_seconds": 0.8,
+      "cpu_seconds": 1.46,
+      "user_seconds": 1.22,
+      "system_seconds": 0.24
+    }
+  ],
+  "discovery_identity": "FULL JSON read; exactly 5 preserved full name/file/project tuples,3files,2Nodeprojects, no extras/duplicates",
+  "body_result": {
+    "cases_pass": 5,
+    "files_pass": 3,
+    "fail": 0,
+    "skip": 0,
+    "printed_diagnostic": false,
+    "raw_log_read": "FULL through EOF; classified log is byte-identical, no generated/private payload printed"
+  },
+  "changed_source_during_verification": false,
+  "retry_or_other_checks": false,
+  "execution_lane_terminal": true,
+  "timing_note": "Separate /usr/bin/time -lp commands. Transform/import summed reporter durations are not wall/CPU and not substituted for observed command costs. No before/after speedup or whole-gate claim.",
+  "limits": "Actual definition/catalog/common-admission functions and fake-service memory custody only; real cohort creation/capacity/expiry/concurrency/authority/sessions/grants/native replay/C1/root/product/manual/provider/audio/final gate/review/filing/landing remain owed. Generation remains separately attributed to f145."
+}
