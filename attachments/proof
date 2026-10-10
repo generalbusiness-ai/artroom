@@ -1,0 +1,17 @@
+{
+  "head": "0dd52d2b125d07e40b169fe8b504fbac0595c9f9",
+  "tree": "e9e49b752b34a97abfa4e2c1b3a2c6304e4c1a03",
+  "decision": "8a9da27cc40d06fffef4b84c9473a7ebfd8aa16d",
+  "actual_handle": 95700,
+  "actual_terminal_exit": 0,
+  "result_sha256": "7cba846cbd496ec7b1166d60f7708976b5a9defc7d528c16d8e95318e69be62c",
+  "manifest_sha256": "2b063ade054447742da1b0dbd47d5a8303380cc10cca663a70c9d92de43c7b8e",
+  "outer_log_sha256": "d5a2fb470bc758d702c4f94ff89b0fbf6cc9ed2a567b420cf8ab06e3858129c4",
+  "outer_wall_seconds": 1.74,
+  "outer_cpu_seconds": 3.07,
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "load": "Not captured at start; no load-controlled performance claim",
+  "cache": "existing exact-lock cache and owned12workspace source view; no installs",
+  "verification": "Root FULLread result,complete body/ledger/outer; manifest everyfile hash verified",
+  "limits": "necessary3case editor validation/driver acceptance only; no native/gate/browser/global speedup/full10x claim"
+}

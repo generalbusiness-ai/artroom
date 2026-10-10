@@ -1,0 +1,10 @@
+Focused phase page-source started.
+Focused phase page-source finished; exit 0; signal none.
+Focused phase page-test started.
+Focused phase page-test finished; exit 0; signal none.
+Focused phase body started.
+Focused phase body finished; exit 0; signal none.
+Focused checks passed; exit 0; evidence /tmp/artroom-editor0dd-focused-pipeline-result
+real 1.74
+user 2.51
+sys 0.56

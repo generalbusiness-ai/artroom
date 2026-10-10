@@ -1,0 +1,203 @@
+{
+  "phases": [
+    {
+      "name": "page-source",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-editor-confirm-retirement/packages/page/tsconfig.json"
+      ],
+      "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+      "started": "2026-10-10T01:30:29.964Z",
+      "ended": "2026-10-10T01:30:30.204Z",
+      "measuredCommandMilliseconds": 239.065625,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.23,
+      "userSeconds": 0.54,
+      "systemSeconds": 0.09,
+      "cpuSeconds": 0.63
+    },
+    {
+      "name": "page-test",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-editor-confirm-retirement/packages/page/tsconfig.test.json"
+      ],
+      "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+      "started": "2026-10-10T01:30:30.285Z",
+      "ended": "2026-10-10T01:30:30.545Z",
+      "measuredCommandMilliseconds": 259.383916,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.25,
+      "userSeconds": 0.94,
+      "systemSeconds": 0.12,
+      "cpuSeconds": 1.06
+    },
+    {
+      "name": "body",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+        "--config",
+        "/tmp/artroom-focused-check-pipeline-8aee-packet/editor-body.config.mjs",
+        "--bail=1",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-focused-check-pipeline/scripts/focused-check.mjs",
+        "--outputFile.json=/tmp/artroom-editor0dd-focused-pipeline-result/vitest.json"
+      ],
+      "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+      "started": "2026-10-10T01:30:30.625Z",
+      "ended": "2026-10-10T01:30:31.336Z",
+      "measuredCommandMilliseconds": 710.543417,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.7,
+      "userSeconds": 0.79,
+      "systemSeconds": 0.15,
+      "cpuSeconds": 0.9400000000000001
+    }
+  ],
+  "guards": [
+    {
+      "head": "0dd52d2b125d07e40b169fe8b504fbac0595c9f9",
+      "tree": "e9e49b752b34a97abfa4e2c1b3a2c6304e4c1a03",
+      "clean": true,
+      "sources": 1268,
+      "inputs": 2,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 200.3595
+    },
+    {
+      "head": "0dd52d2b125d07e40b169fe8b504fbac0595c9f9",
+      "tree": "e9e49b752b34a97abfa4e2c1b3a2c6304e4c1a03",
+      "clean": true,
+      "sources": 1268,
+      "inputs": 2,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 81.54179199999999
+    },
+    {
+      "head": "0dd52d2b125d07e40b169fe8b504fbac0595c9f9",
+      "tree": "e9e49b752b34a97abfa4e2c1b3a2c6304e4c1a03",
+      "clean": true,
+      "sources": 1268,
+      "inputs": 2,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 80.447541
+    },
+    {
+      "head": "0dd52d2b125d07e40b169fe8b504fbac0595c9f9",
+      "tree": "e9e49b752b34a97abfa4e2c1b3a2c6304e4c1a03",
+      "clean": true,
+      "sources": 1268,
+      "inputs": 2,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 78.94762500000002
+    }
+  ],
+  "stage": "complete",
+  "verificationExitCode": 0,
+  "commandLedger": [
+    {
+      "name": "page-source",
+      "status": "passed",
+      "phase": {
+        "name": "page-source",
+        "command": [
+          "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+          "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+          "-p",
+          "/private/tmp/artroom-editor-confirm-retirement/packages/page/tsconfig.json"
+        ],
+        "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+        "started": "2026-10-10T01:30:29.964Z",
+        "ended": "2026-10-10T01:30:30.204Z",
+        "measuredCommandMilliseconds": 239.065625,
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null,
+        "wallSeconds": 0.23,
+        "userSeconds": 0.54,
+        "systemSeconds": 0.09,
+        "cpuSeconds": 0.63
+      }
+    },
+    {
+      "name": "page-test",
+      "status": "passed",
+      "phase": {
+        "name": "page-test",
+        "command": [
+          "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+          "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+          "-p",
+          "/private/tmp/artroom-editor-confirm-retirement/packages/page/tsconfig.test.json"
+        ],
+        "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+        "started": "2026-10-10T01:30:30.285Z",
+        "ended": "2026-10-10T01:30:30.545Z",
+        "measuredCommandMilliseconds": 259.383916,
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null,
+        "wallSeconds": 0.25,
+        "userSeconds": 0.94,
+        "systemSeconds": 0.12,
+        "cpuSeconds": 1.06
+      }
+    },
+    {
+      "name": "body",
+      "status": "passed",
+      "phase": {
+        "name": "body",
+        "command": [
+          "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+          "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+          "run",
+          "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+          "--config",
+          "/tmp/artroom-focused-check-pipeline-8aee-packet/editor-body.config.mjs",
+          "--bail=1",
+          "--allowOnly=false",
+          "--passWithNoTests=false",
+          "--reporter=verbose",
+          "--reporter=json",
+          "--reporter=/private/tmp/artroom-focused-check-pipeline/scripts/focused-check.mjs",
+          "--outputFile.json=/tmp/artroom-editor0dd-focused-pipeline-result/vitest.json"
+        ],
+        "cwd": "/private/tmp/artroom-editor-confirm-retirement",
+        "started": "2026-10-10T01:30:30.625Z",
+        "ended": "2026-10-10T01:30:31.336Z",
+        "measuredCommandMilliseconds": 710.543417,
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null,
+        "wallSeconds": 0.7,
+        "userSeconds": 0.79,
+        "systemSeconds": 0.15,
+        "cpuSeconds": 0.9400000000000001
+      }
+    }
+  ],
+  "elapsedToResultPreparationMilliseconds": 1653.789833,
+  "timingNote": "Per-command wall/CPU observations are separate. Time the outer pipeline to measure all guard/artifact/driver CPU; internal elapsed excludes Node bootstrap.",
+  "verificationStatus": "passed"
+}

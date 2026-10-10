@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "invalid retained path keeps its corrected draft through explicit unsent recovery; attempted or partial tasks keep their original custody",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "page",
+          "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+          "name": "invalid retained path keeps its corrected draft through explicit unsent recovery; attempted or partial tasks keep their original custody",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "text limits count UTF-8 bytes losslessly, preserve BOM and allow empty file without delete",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "page",
+          "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+          "name": "text limits count UTF-8 bytes losslessly, preserve BOM and allow empty file without delete",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "title/path-only input preserves untouched BOM CRLF/CR bytes while deliberate text input uses the edited textarea value",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "page",
+          "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+          "name": "title/path-only input preserves untouched BOM CRLF/CR bytes while deliberate text input uses the edited textarea value",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    }
+  ],
+  "observedCases": [
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "invalid retained path keeps its corrected draft through explicit unsent recovery; attempted or partial tasks keep their original custody",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "text limits count UTF-8 bytes losslessly, preserve BOM and allow empty file without delete",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "name": "title/path-only input preserves untouched BOM CRLF/CR bytes while deliberate text input uses the edited textarea value",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    }
+  ],
+  "unexpectedCases": [],
+  "modules": [
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-editor-confirm-retirement/packages/page/test/retained-editor.test.ts",
+      "status": "passed",
+      "errors": 0
+    }
+  ],
+  "issues": [],
+  "passed": true
+}
