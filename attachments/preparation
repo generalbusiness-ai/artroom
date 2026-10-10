@@ -1,0 +1,36 @@
+{
+  "status": "INERT r3; r2 preserved held/unrun",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "root": "/private/tmp/artroom-cloudflare-pool-prototype-once",
+  "plan": "/tmp/artroom-pool53b-corrected-native-preparation-r3/plan.json",
+  "plan_sha256": "3fbd25141fab1152d25346fcaa9121e8ab13c37e652d3cf6018d2718bfc5ca80",
+  "runner": "/tmp/artroom-pool53b-corrected-native-r3-run.py",
+  "runner_sha256": "63c141e53d50bc55d8a8ff3d98635b5e17a9cf26443127daade9621bb91998f4",
+  "config": "/private/tmp/artroom-pool-proxy-native-diagnostic-r3/native.config.mjs",
+  "config_sha256": "6094874fb5f75276676793add5f7b7c9f96d35fe06d6b2790b38e58a45c8b78e",
+  "diagnostic_packet_sha256": "49eb2176e6ea6b536cd921e61df524e3133ada7042453af1c017ec32e06eaf01",
+  "external_inputs": 12,
+  "source_pins": 1272,
+  "cache_files": 3898,
+  "cache_links": 28,
+  "private_package_files": 23,
+  "permanent_bundle": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "corrected_observed_bundle": "1939dfb3075ff4eb4b666f46effd22244ae5a980700d6b2589c059e94d0d5216",
+  "cases": 5,
+  "whole_files": 3,
+  "auth_qualification": "Signed pair uses production signed-read validation and deliberately bypasses session hooks. The unsigned refusal demonstrates real session prepare/allows with sessions enabled, no inspector and an owned required lease. No signed request is claimed to enter those hooks.",
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool53b-corrected-native-r3-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool53b-corrected-native-r3-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool53b-corrected-native-r3-outer.log"
+  },
+  "execution": []
+}

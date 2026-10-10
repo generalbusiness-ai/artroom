@@ -1,0 +1,22 @@
+{
+  "input": {
+    "path": "/tmp/artroom-pool-proxy-native-diagnostic-r3/packet.json",
+    "sha256": "49eb2176e6ea6b536cd921e61df524e3133ada7042453af1c017ec32e06eaf01"
+  },
+  "all_artifact_hashes_verified": true,
+  "unchanged_from_r2": [
+    "apply-observer.mjs",
+    "corrected-observed-factory.txt",
+    "old-observed-factory.txt",
+    "native.config.mjs.recipe"
+  ],
+  "historical_review_corrected": {
+    "path": "/tmp/artroom-pool-observer-r2-independent-review/packet.json",
+    "incorrect_claim": "Signed pair mode-off authorization bypass",
+    "actual": "Signed production branch excludes test readers prepare/allows; real signed validation applies"
+  },
+  "concrete_blockers": [],
+  "review_sha256": "46b57f7fbd29ddfed9ada970b9f66c5aabc11cc173137142ee18c0d6f6fcc72f",
+  "execution": "NONE; source-only",
+  "cause": "UNKNOWN"
+}
