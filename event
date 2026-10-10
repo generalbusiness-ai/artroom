@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a347240e48bb8a56a70cb13b7c9e9f0d77b971fe","text":"Merge retired a covered predecessor; the successor is at packages/checkers/src/job.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a47160ddd77315574d6b31871cf9b2c10b59f5be","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/issues-layout-zoom-200.png."}
