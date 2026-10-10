@@ -1,0 +1,120 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:73d10ceb2f0061aef62c48517f10629fd732f782",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1341e1beafc551f40c760cf5b1f06ba741f42459",
+  "root": "/tmp/artroom-jam-native-v2",
+  "base": "635786ac9a4923e02363ae5b0a35e3686a244775",
+  "head": "a80f2653bc603d4e76fa7172039fc4660354c6b3",
+  "tree": "aab1c905c0c7775592c6118e098c5ca7ee503658",
+  "branch": "request/jam-native-v2",
+  "clean": true,
+  "paths": 15,
+  "sourceBodies": "Complete authored paths retained in bodies; inventory/correspondence not fresh all-repository semantic audit.",
+  "pureClosureExact": true,
+  "files": [
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/authored.diff",
+      "bytes": 132343,
+      "sha256": "0ab378368f7604bd6020690a30d45e54c4c521fffedfe27a2f7cc9d1fd71b5e9"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/definitions/jam-native-v2.json",
+      "bytes": 46232,
+      "sha256": "10b1ae2bd3c2e374a6822db28b3daabe834e7f963c5469937bf2f45da465ecaa"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/notes/2026-10-10-native-v2.md",
+      "bytes": 4387,
+      "sha256": "9586ea35f641e3195338e9e29806c574a04e074d85d2d49efdcde3a6c5fee4a9"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/package.json",
+      "bytes": 339,
+      "sha256": "d91018389f40e87a50fa2a808d5a272e4041df22322aa2dcaf07e74fd2e3809d"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/page/native-app.ts",
+      "bytes": 16836,
+      "sha256": "ae7cdb08c906041364a9ffd98ffb31d2bf9602189db7b0ddf57c5afc40f67c2e"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/page/native.html",
+      "bytes": 3142,
+      "sha256": "1c30619141a7999c546aacef6f37b5e60bf43a9791679c4d89a8eb484533eafa"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/scripts/build.ts",
+      "bytes": 917,
+      "sha256": "39a96696fc7ffef8f0824681ec447d2760cea71dd3d45b3daf7d03c5926c6f4e"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/browser-custody.ts",
+      "bytes": 1826,
+      "sha256": "6324726725e2729b85df57419f5dfdd8fa35406ab69d0b79f74f0d5ed66778ea"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/contributions-v2.ts",
+      "bytes": 8514,
+      "sha256": "b82b265d2315bfb080317a97fe232126d874386a074daf6e414a75e5a02bf141"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/native-audio.ts",
+      "bytes": 3327,
+      "sha256": "a93a1e1f562d55c7ae55fb7f000cd14136b0628406052695d1d045a597136a96"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/native.ts",
+      "bytes": 14799,
+      "sha256": "0702d00d8bcb880ad005c659bcd913929baaaa3dbb4aadb4cac926e04e603124"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/patterns-v2.ts",
+      "bytes": 3304,
+      "sha256": "ed4303a23fbd1485ab3110a0686572f0ea1cc8f57c8a58f8677e304f17317f22"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/recorded-v2.ts",
+      "bytes": 8138,
+      "sha256": "e72e2636b1cc4bcdf46b997bb257f4c149d8f0dab4286f4c85addf7ccf34bb1e"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/src/web-worker.ts",
+      "bytes": 12325,
+      "sha256": "c6a7fcb13be672a98dd672e05f9c7fd747f246ef0f89d44472951dba74099a13"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/test/native-v2.test.ts",
+      "bytes": 2538,
+      "sha256": "8f3262c735ed17667c459eae905194e6f4cadddcf5c53dad99e1797796ecd8d9"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/bodies/wrangler.jsonc",
+      "bytes": 501,
+      "sha256": "496d9e7c67fde6821763dc4c2809434c7225e606e8632755ba1e176e2065eb32"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/ee38-to-a80.diff",
+      "bytes": 2355,
+      "sha256": "1b24403f367dcd7e0b1352ed175b474cae888386119bfd9fd26fc611d04a61d6"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/handoff.md",
+      "bytes": 3786,
+      "sha256": "a99ce2ae2cd8977cc2be7f82c8e6fff15918e653fb9018f43d46c432aacb0f52"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/inventory.json",
+      "bytes": 3051,
+      "sha256": "4e29a4c4812f20307e3ea68d632790a9872ce1d174f5651402a316d04df9b336"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/preservation.json",
+      "bytes": 6329,
+      "sha256": "1a09dd019b071c66216764bd1e64994a68e166d177f59c772f79b339c6546615"
+    },
+    {
+      "path": "/tmp/artroom-jam-native-v2-source-packet-a80/pure-correspondence.json",
+      "bytes": 1268,
+      "sha256": "657fbf731bf7826e47110e92912b328e90f34b81c8dc24d0326dfcc6be60d9e7"
+    }
+  ]
+}
