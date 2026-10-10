@@ -29,9 +29,11 @@ const rows = (): Item[] => [
   member(10, "@orphan", "agent", "@unkeyed"), key(10, 10),
 ].map((item) => item.values["handle"] === "@removed" ? { ...item, state: "removed" } : item);
 const extents = [
-  { name: "source", approvals: 0, approver: "change.review", patterns: [], checks: [], class: "content" },
-  { name: "infrastructure", approvals: 1, approver: "change.merge", patterns: [".github/**"], checks: [], class: "deployment" },
-  { name: "rules", approvals: 1, approver: "rules.publish", patterns: ["**/AGENTS.md"], checks: [], class: "authority" },
+  // Actual lane-held rules projections omit patterns; the destination keeps
+  // path classification. A full rules-scope extent is a different boundary.
+  { name: "source", approvals: 0, approver: "change.review", checks: [], class: "content" },
+  { name: "infrastructure", approvals: 1, approver: "change.merge", checks: [], class: "deployment" },
+  { name: "rules", approvals: 1, approver: "rules.publish", checks: [], class: "authority" },
 ];
 
 test("review choices require a live linked key, live agent controller, the selected extent grant and independence", () => {
@@ -61,6 +63,11 @@ test("a missing author-controller relation is unavailable, and foreign incarnati
   expect(reviewCandidates(rows().filter((item) => item.type !== "roster"), membership, [ref("@author")], false, extents)).toBeNull();
   const unknownAction = [{ ...extents[0]!, approver: "unheld.approval" }];
   expect(reviewCandidates(rows(), membership, [ref("@author")], false, unknownAction)?.byExtent["source"]).toEqual([]);
+  // Neither a different six-field source shape nor ambiguous/malformed held
+  // requirements can supply reviewer choices at this boundary.
+  expect(reviewCandidates(rows(), membership, [ref("@author")], false, [{ ...extents[0]!, patterns: [] }])).toBeNull();
+  expect(reviewCandidates(rows(), membership, [ref("@author")], false, [extents[0]!, extents[0]!])).toBeNull();
+  expect(reviewCandidates(rows(), membership, [ref("@author")], false, [{ ...extents[0]!, approvals: 65, checks: ["same", "same"] }])).toBeNull();
 });
 
 test("standing is recomputed from the current exact key link; retired keys and inactive controllers cannot carry cached permission", () => {

@@ -1,12 +1,32 @@
 /** Presentation over one complete authenticated membership summary. These
  * choices neither issue a grant nor certify the destination's admission. */
 import type { Item, KeyId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, isKeyId, isMemberRef } from "@generalbusiness/artroom-bytes";
-import { CONTROLLER, ROLE_LISTS, RULES_EXTENT, isActions, isExtents, type Role } from "@generalbusiness/artroom-platform";
+import { canonicalize, isKeyId, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
+import { CONTROLLER, EXTENT_CLASSES, EXTENTS_MOST, ROLE_LISTS, RULES_EXTENT, isActions, type Extent, type Role } from "@generalbusiness/artroom-platform";
 import type { Standing } from "@generalbusiness/artroom-cli";
 
 type Choice = { label: string; value: string };
 type Member = { item: Item; actions: readonly string[]; controller: string | null | undefined; live: boolean };
+
+type HeldExtent = Omit<Extent, "patterns">;
+const heldFields = ["name", "approvals", "approver", "checks", "class"];
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const boundedText = (value: unknown, most: number): value is string => typeof value === "string" && utf8(value).length > 0 && utf8(value).length <= most;
+
+/** The change lane holds the rules' five-field projection. Patterns stay in
+ * the rules scope and destination; this presentation cannot invent them. */
+function isHeldExtents(value: unknown): value is HeldExtent[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > EXTENTS_MOST) return false;
+  if (!value.every((extent: unknown) => record(extent)
+    && Object.keys(extent).length === heldFields.length && heldFields.every(field => Object.hasOwn(extent, field))
+    && boundedText(extent["name"], 64) && /^[a-z0-9-]+$/.test(extent["name"])
+    && typeof extent["approvals"] === "number" && Number.isSafeInteger(extent["approvals"]) && extent["approvals"] >= 0 && extent["approvals"] <= 64
+    && boundedText(extent["approver"], 64) && /^[a-z0-9.-]+$/.test(extent["approver"])
+    && Array.isArray(extent["checks"]) && extent["checks"].length <= 32
+    && extent["checks"].every((check: unknown) => boundedText(check, 128)) && new Set(extent["checks"]).size === extent["checks"].length
+    && EXTENT_CLASSES.some(kind => kind === extent["class"]))) return false;
+  return new Set(value.map(extent => extent.name)).size === value.length;
+}
 
 function rosterOf(items: readonly Item[], membership: ScopeRef): Map<string, Member> | null {
   const roster = items.find((item) => item.type === "roster" && item.state === "open");
@@ -51,7 +71,7 @@ export function reviewCandidates(items: readonly Item[], membership: ScopeRef, a
   members: Choice[] | null; byExtent: Record<string, Choice[] | null>;
 } | null {
   const roster = rosterOf(items, membership);
-  if (!roster || typeof ownerMayReview !== "boolean" || !isExtents(extents) || !Array.isArray(authors) || authors.length === 0
+  if (!roster || typeof ownerMayReview !== "boolean" || !isHeldExtents(extents) || !Array.isArray(authors) || authors.length === 0
     || authors.some((author) => !isMemberRef(author) || canonicalize(author.membership) !== canonicalize(membership))) return null;
   const names = new Set<string>(authors.map((author) => author.member));
   const owners = new Set<string>();
