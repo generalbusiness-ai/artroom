@@ -1,0 +1,31 @@
+# Hourly sprint survey — 9 October 2026, 23:07 Eastern
+
+Snapshot refreshed at 2026-10-10 03:07 UTC from workroom and retained public evidence. No project runtime was executed by planner.
+
+The publication and reduced replay repairs now pass their affected checks. The full initial gate remains failed at `059853a2`; the next result must come from the composed corrected source, not another unchanged run. The 10× test-cost target remains unmet.
+
+| Work | Verified change since the boundary | Next action / owner |
+|---|---|---|
+| Replay | `66ce1125`: three compiler contexts and all five native wiring cases passed, handle `43824` exit 0. Exact coverage and nine hashes match. The old-zero-bound control fails the intended W2 assertion; other four cases pass, and its worktree is restored. | Retain the baseline and distinguishing control without repeats, then compose the repair. Checker continues exact reduced-source preparation. The known ancestry-only incomplete result remains explicit. |
+| Publication | `941b113f`: four compiler contexts and seven cases passed. Both controls failed their intended assertions; isolated worktrees restored. | Retain the verified baselines and controls. No repeat for acknowledgment. Include the repaired source in the composed candidate and normal final review. |
+| Native timeout investigation | `fc0f4e04`: the bounded five-case diagnostic passed once with all stage records accounted. | Retain it as short-cohort evidence. The full-suite failure cause and long-pool behavior remain unresolved; the final gate must preserve real outcomes. |
+| Test economy | The reduced replay witness removes extra issues, proposal lanes, multi-holder setup and corruption matrix while retaining one native zero-holder outcome. | Builder gives the Site exact-want/immutable-wire optimization a current-source check slot after replay. Identify passing-test cost from existing evidence or the next required gate. No extra profiling suite. |
+| Public release and Jam | Jam's first own-model source packet exists. Separate release handoff request `7b31f843` now names the package/runtime/validator and implementation/publisher/operator ownership gap. | Builder corrects Jam's native-codec and evidence attribution, and plans one own-module Node witness without requiring SDK publication. Actual native/public/hosted/music acceptance remains separate. |
+| Documentation and UX | The 23:00 report is filed; completed usability review and publication preparation scopes are closed. Main remains `18a1288d`. | Continue full manual alongside Jam and accepted UX. Rendered browser/accessibility/device and complete hosted coding acceptance remain owed. |
+
+```mermaid
+flowchart LR
+    P[Publication checked and controlled] --> C[Compose exact candidate]
+    R[Replay passed] --> K[Control distinguishes original bug]
+    K --> C
+    S[Site fixture cost improvement when ready] --> C
+    V[Exact updated source map] --> C
+    C --> G[One appropriate gate]
+    G --> I[Independent review and normal landing]
+```
+
+Replay body cost is 7.42 elapsed / 8.41 CPU seconds from the raw log. Its outer 8.48 / 11.32 is currently owner-complete-proof qualified because no separate outer raw path has been supplied to planner. This is not a full-suite factor, whole consistent replay or real Git-host proof. Scripted host, changed-set and checker-answer boundaries remain labeled. The old `059` gate and the full 10× outcome remain open.
+
+Builder reports a new prepared composition at `8de54e6e`; its exact checkout, inventory and asset correspondence are requested. The older `/tmp/artroom-initial-final-composition` remains `17b01fde`, with 223 paths, and supplies no inventory or approval for the new head. No current composition gate is reported yet.
+
+The next priorities remain test economy and initial correctness, then declared acts and concrete Jam blockers, with Jam/docs in parallel and accepted UX carried through complete browser/device acceptance. Preserve the full capacity, authority, durable workspace/conversation, exact retry/custody, public starter, manual, Counting voices and actual hosting/audio/listening scope. No current source/check work is waiting on a decision from Hugh.
