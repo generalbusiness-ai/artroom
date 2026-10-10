@@ -55,9 +55,13 @@ cohorts. Existing CLI custody cases include the explicit naming selection.
 One native room-name scenario covers actual founding/session, first-open
 and frozen-revision races, original lost-reply retry, naming-only changes,
 authority/delegation/controller windows, application creation and replay.
-The exact directory7/destination3 manifest publication witness remains an
-explicit adaptation of the existing manifest-tree scenario, not a claim
-from pin equality. Run affected checks and the normal Page asset generation
+The existing manifest-tree story now has an optional explicit shared-name
+cohort and one compatibility invocation. It names the native profile before
+proposing, then retains the existing two-file, configured-checker,
+no-push-before-pass, publication, receipt, cleanup and proven replay checks.
+All old callers and assertions remain. This authored witness is unrun;
+pin equality does not establish manifest publication. Run affected checks
+and the normal Page asset generation
 before one coordinated changed-source gate and independent review.
 
 This backend Source does not implement C4 browser integration, a selector,

@@ -41,6 +41,14 @@ test("a manifest-list reservation records both files before the configured check
   try { await story(ownHost(), wired); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
+test("a named shared-name cohort publishes the two-file manifest through its configured checker without changing repository identity (real scopes, STAND-IN Git host and scheduler)", async () => {
+  net.hold = net.deaf = null;
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  onTestFinished(owner.close);
+  const wired = new Set<ScopeId>();
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, undefined, false, "shared-name"); }
+  finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
+}, 120_000);
 test("a retry fence after publication starts is refused without superseding the live job or forgetting the unknown send (real scopes; host and scheduler STAND-INs)", async () => {
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
@@ -163,7 +171,7 @@ test("a valid custom required rules input is activated natively but stops the fi
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, "custom-required"); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false): Promise<void> {
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false, cohort?: "shared-name"): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
@@ -250,13 +258,38 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const founder = person(), checker = person();
   const run = (who: Context, ...argv: string[]) => command(who, argv);
   const ok = (outcome: Outcome) => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
-  ok(await run(founder, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
+  if (cohort) {
+    // This exact injected route authenticates only its configured-service
+    // acknowledgement. Native histories and replay remain separate checks.
+    founder.trustedFoundingService = { service: SERVICE, fetch };
+    ok(await run(founder, "install", "--plan", SERVICE, "--host", at.host, "--namespace", at.namespace, "--cohort", cohort));
+    const plan = (await founder.store.config())?.plan;
+    if (!plan) throw new Error("The explicit shared-name install must retain its original plan.");
+    expect(plan.definition).toBe("platform:register@7");
+    R = new Platform(plan.register); wire(R.name);
+    ok(await run(founder, "install", "--planned", "--cohort", cohort));
+    const kept = (await founder.store.config())!;
+    expect(kept.register).toEqual(await R.at());
+    expect(kept.plan).toMatchObject({ ...plan, acknowledged: { status: "service-acknowledged", service: SERVICE } });
+  } else ok(await run(founder, "install", SERVICE, "--host", at.host, "--namespace", at.namespace));
   R = new Platform((await founder.store.config())!.register!.scope); wire(R.name); await R.restart(); known.push(R);
   net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
   ok(await run(founder, "claim", "tree", "--handle", "@rita"));
   const repository = (await founder.store.config())!.repository!;
   const G = new Platform(repository.destination); known.push(G); await pause([]);
   expect((await G.summary()).value.definition).toBe("platform:destination@3");
+  const sharedDirectory = cohort ? new Platform(repository.directory.scope) : null;
+  let generatedRepository: string | undefined;
+  if (sharedDirectory) {
+    expect(await Promise.all([R, sharedDirectory, new Platform(repository.membership.scope), new Platform(repository.rules), G].map(async (node) => (await node.summary()).value.definition))).toEqual([
+      "platform:register@7", "platform:directory@7", "platform:membership@6", "platform:rules@3", "platform:destination@3",
+    ]);
+    generatedRepository = canonicalize((await sharedDirectory.item(0)).values["repository"]);
+    expect((await sharedDirectory.summary()).value.items.some((item) => item.type === "room-profile")).toBe(false);
+    ok(await run(founder, "act", "name-room", "--on", "directory", "--set", "name=Shared manifest room"));
+    expect((await sharedDirectory.summary()).value.items.filter((item) => item.type === "room-profile")).toMatchObject([{ state: "open", values: { displayName: "Shared manifest room" } }]);
+    expect(canonicalize((await sharedDirectory.item(0)).values["repository"])).toBe(generatedRepository);
+  }
   const first = host.refs.get("refs/heads/main")!;
   if (receiptRecoveryOnly) {
     ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
@@ -802,6 +835,10 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   const git = readerOf(host); const commit = await git.commit(published);
   expect(commit.tree).toBe(manifest.values["tree"]);
   expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "docs", "one.md"]);
+  if (sharedDirectory) {
+    expect(canonicalize((await sharedDirectory.item(0)).values["repository"])).toBe(generatedRepository);
+    expect((await sharedDirectory.summary()).value.items.filter((item) => item.type === "room-profile")).toMatchObject([{ state: "open", values: { displayName: "Shared manifest room" } }]);
+  }
   // The same command also waits for a publication when no check is owed.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
@@ -956,6 +993,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(host.refs.get("refs/heads/main")).toBe(lastPublished);
   const replayed = await verify(httpSource(SERVICE, { fetch: routed, reader }), { mode: "replay", scope: G.name, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE, head: (await G.summary()).at });
   expect([replayed.report.result, replayed.why ?? null]).toEqual(["consistent", null]);
+  if (sharedDirectory) expect(canonicalize((await sharedDirectory.item(0)).values["repository"])).toBe(generatedRepository);
 }
 
 test("a native version-2 room refuses branch list proposals before local Git capture", async () => {
