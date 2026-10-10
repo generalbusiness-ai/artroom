@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8, digestBytes } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8, digestBytes, takeBytes } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
-import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
+import { idOf, objectId, GitRefusal, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
@@ -69,6 +69,26 @@ async function withTags(pack: Uint8Array, tags: readonly TagObject[]): Promise<U
   return join(body, new Uint8Array(await crypto.subtle.digest("SHA-1", body)));
 }
 
+/** Exact single-want request emitted by the real SmartHttpSource, bounded before parsing. */
+async function wantedObject(request: Request): Promise<string> {
+  const data = request.body ? await takeBytes(request.body, 256, request.signal) : null;
+  if (!(data instanceof Uint8Array)) throw new GitRefusal("unreadable", "fixture upload request");
+  const lines: (string | null)[] = [];
+  for (let at = 0; at < data.length;) {
+    const digits = new TextDecoder("ascii", { fatal: true }).decode(data.subarray(at, at + 4));
+    if (!/^[0-9a-f]{4}$/.test(digits)) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    const size = Number.parseInt(digits, 16);
+    if (size === 0) { lines.push(null); at += 4; continue; }
+    if (size <= 4 || size > 65520 || at + size > data.length) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    const bytes = data.subarray(at + 4, at + size);
+    if (bytes.some(byte => byte > 0x7f)) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    lines.push(new TextDecoder().decode(bytes)); at += size;
+  }
+  const want = /^want ([0-9a-f]{40})(?: ofs-delta)?\n$/.exec(lines[0] ?? "");
+  if (lines.length !== 3 || !want || lines[1] !== null || lines[2] !== "done\n") throw new GitRefusal("unreadable", "fixture upload negotiation");
+  return objectId(want[1], "fixture wanted object");
+}
+
 /** STAND-IN for the hosting's own Git service: the binding and its smart-HTTP upload-pack, over a map of refs and objects. */
 class Scripted {
   name: string | null = null;
@@ -79,6 +99,11 @@ class Scripted {
   packs = 0;
   packBuilds = 0;
   private packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
+  // At most 64 currently indexed promises and 8 MiB encoded completed bytes.
+  // Evicted in-flight callers may finish; the map is not a physical I/O quota.
+  private readonly wanted = new Map<string, { key: string; bytes: Promise<Uint8Array>; size: number }>();
+  private wantedBytes = 0;
+  constructor(private readonly allObjects = false) {}
 
   /** The map's actual ordered content, including replacements/in-place bytes,
    * is the cache identity. Count alone cannot see deletion+addition or changes.
@@ -93,6 +118,46 @@ class Scripted {
     const made = (async () => withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag")))();
     this.packed = { key, bytes: made };
     void made.catch(() => { if (this.packed?.bytes === made) this.packed = null; });
+    return made;
+  }
+
+  /** Only this wanted object's immutable bytes are inspected; unrelated blobs stay untouched. */
+  private wantedPack(id: string): Promise<Uint8Array> {
+    const supplied = this.objects.get(id);
+    if (!supplied) {
+      const prior = this.wanted.get(id);
+      if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+      throw new GitRefusal("unreadable", "fixture wanted object missing");
+    }
+    if (supplied.data.length > MAX_BYTES) {
+      const prior = this.wanted.get(id);
+      if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+      throw new GitRefusal("too-large", "fixture wanted bytes");
+    }
+    const object = { ...supplied, data: supplied.data.slice() };
+    if (object.id !== id) throw new GitRefusal("unreadable", "fixture wanted object identity");
+    const key = canonicalize([id, object.id, object.type, object.data.length, digestBytes(object.data)]);
+    const prior = this.wanted.get(id);
+    if (prior?.key === key) return prior.bytes;
+    if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+    this.packBuilds++;
+    const made = (async () => {
+      if (object.type === "tag") {
+        if (object.data.length > MAX_BYTES) throw new GitRefusal("too-large", "fixture tag bytes");
+        objectId(object.id, "fixture tag object");
+        if (idOf("tag", object.data) !== object.id) throw new GitRefusal("hash-mismatch", "fixture tag object");
+        return withTags(await buildPack([], { maxBytes: MAX_BYTES }), [object]);
+      }
+      return buildPack([object], { maxBytes: MAX_BYTES });
+    })();
+    const entry = { key, bytes: made, size: 0 };
+    this.wanted.set(id, entry);
+    while (this.wanted.size > 64) { const first = this.wanted.entries().next().value!; this.wanted.delete(first[0]); this.wantedBytes -= first[1].size; }
+    void made.then(bytes => {
+      if (this.wanted.get(id) !== entry) return;
+      entry.size = bytes.length; this.wantedBytes += entry.size;
+      while (this.wantedBytes > MAX_BYTES) { const first = this.wanted.entries().next().value!; this.wanted.delete(first[0]); this.wantedBytes -= first[1].size; }
+    }, () => { if (this.wanted.get(id) === entry) { this.wanted.delete(id); this.wantedBytes -= entry.size; } });
     return made;
   }
 
@@ -154,8 +219,9 @@ class Scripted {
     }
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
       this.packs++;
-      // Every object, whatever is wanted: the source keeps what it was sent and checks each object it reads.
-      const pack = await this.pack();
+      // Route reads use the real packetized want. Complete-map mode belongs
+      // only to the independent cache mutation witness below.
+      const pack = this.allObjects ? await this.pack() : await this.wantedPack(await wantedObject(request));
       return new Response(join(utf8(pkt("NAK\n")), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     return new Response("unscripted", { status: 404 });
@@ -615,7 +681,7 @@ test("no ref: /site/<directory> and /site/<directory>/ redirect to HEAD/ (STAND-
 // Invariant: only immutable wire bytes are reused; equal-size map/content changes
 // rebuild and fresh HTTP responses/token accounting remain actual stand-in work.
 test("Scripted pack cache invalidates replacements, byte mutations, deletion and clear without caching responses", async () => {
-  const source = new Scripted(); source.name = "cache-fixture";
+  const source = new Scripted(true); source.name = "cache-fixture";
   const first = utf8("first"); const id = idOf("blob", first);
   source.objects.set(id, { id, type: "blob", data: first });
   const binding = await source.ns.get(source.name);
@@ -642,4 +708,34 @@ test("Scripted pack cache invalidates replacements, byte mutations, deletion and
   await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(8);
   await binding.revokeToken(minted.plaintext);
   expect((await source.fetch(request())).status).toBe(401);
+
+  // The route mode must parse actual wants and deliver no unrelated large blob.
+  const selected = new Scripted(); selected.name = "wanted-fixture";
+  selected.objects.set(id, { id, type: "blob", data: first });
+  const unrelated = [...host.objects.values()].find(object => object.type === "blob" && object.data.length === FILE_BYTES + 1)!;
+  selected.objects.set(unrelated.id, unrelated);
+  const token = await (await selected.ns.get(selected.name)).createToken("read", 120) as { plaintext: string };
+  const wanted = (object: string, body = `${pkt(`want ${object} ofs-delta\n`)}0000${pkt("done\n")}`) => new Request(`${selected.remote(selected.name!)}/git-upload-pack`, { method: "POST", headers: { authorization: `Bearer ${token.plaintext}` }, body });
+  const response = await selected.fetch(wanted(id)), wire = new Uint8Array(await response.arrayBuffer());
+  const nak = utf8(pkt("NAK\n"));
+  expect(wire.subarray(0, nak.length)).toEqual(nak);
+  const { decodePack } = await import("@generalbusiness/artroom-git/http-read");
+  const decoded = await decodePack(wire.subarray(nak.length), { maxBytes: MAX_BYTES });
+  expect(decoded.map(object => [object.id, object.type, object.data])).toEqual([[id, "blob", first]]);
+  expect(wire.length).toBeLessThan(256);
+  await (await selected.fetch(wanted(id))).arrayBuffer(); expect(selected.packBuilds).toBe(1);
+  const next = utf8("next"), nextId = idOf("blob", next);
+  selected.objects.set(nextId, { id: nextId, type: "blob", data: next });
+  await (await selected.fetch(wanted(nextId))).arrayBuffer(); expect(selected.packBuilds).toBe(2);
+  first[0] = 0x62;
+  await expect(selected.fetch(wanted(id))).rejects.toMatchObject({ reason: "hash-mismatch" });
+  await expect(selected.fetch(wanted(id))).rejects.toMatchObject({ reason: "hash-mismatch" });
+  expect(selected.packBuilds).toBe(4);
+  first[0] = 0x66;
+  await (await selected.fetch(wanted(id))).arrayBuffer(); expect(selected.packBuilds).toBe(5);
+  await expect(selected.fetch(wanted(id, "scripted want"))).rejects.toMatchObject({ reason: "unreadable" });
+  await expect(selected.fetch(wanted("0".repeat(40)))).rejects.toMatchObject({ reason: "bad-object-id" });
+  await expect(selected.fetch(wanted(idOf("blob", utf8("absent"))))).rejects.toMatchObject({ reason: "unreadable" });
+  await (await selected.ns.get(selected.name)).revokeToken(token.plaintext);
+  expect((await selected.fetch(wanted(nextId))).status).toBe(401);
 });
