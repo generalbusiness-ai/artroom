@@ -49,7 +49,7 @@ Line numbers in sections A and B refer to the note in the working tree, after di
 |---|---|---|---|
 | B1 | Operation-view reconciliation stated apart from working-copy mutation (6649 group 1; 011 sections 2, 4) | Section 2 line 110; section 4 lines 188-201 | Rewritten; "lock-free concurrency" row replaced |
 | B2 | Git backend "not entirely lock-free"; ordinary I/O failures (011 section 4) | Lines 193-194 | New |
-| B3 | Working-copy interface takes a lock for mutation (011 section 4) | Lines 195-197 | New; source added line 581 |
+| B3 | Working-copy interface takes a lock for mutation (011 section 4) | Lines 195-197 | New; the pinned v0.45.1 working-copy interface is listed in §8, line 617 of the frozen note at `18e2d07731c70c000bbb16c2b26cda9215192de6` (SHA-256 `2b276d1312ba3f0fc605b0f499a4328b65f7fc33ec06c1a30c7fe10c3738b726`) |
 | B4 | No "commands never wait", "writes always succeed" or safe uncoordinated mutation of one working copy (6649 group 1; 011 section 4) | Lines 199-201 | Rewritten; the quote "cannot fail to commit" removed because 011 corrects it |
 | B5 | Contrast with sequenced admission kept; a stale or unauthorised act cannot be merged into authority (011 section 4) | Lines 203-217 | Rewritten |
 | B6 | Parallel editing remains valuable; proposals, prepared commits, evidence and reservations have distinct fences (011 section 4) | Lines 219-223; section 3 line 148 | Rewritten ("never wait to edit, only to land" removed) |
@@ -236,7 +236,9 @@ git diff --check -- notes/2026-10-01-research-jj.md   # no output, exit 0
 Style:
 
 ```sh
-grep -n -e '-' -e '–' -e 'software scale' notes/2026-10-01-research-jj.md   # no output
+grep -n -e '-' -e '–' -e 'software scale' notes/2026-10-01-research-jj.md
+# The earlier "no output" claim is incorrect: the frozen dated note
+# contains literal hyphens, for example on line 3. Not rerun here.
 awk 'length > 72 && substr($0,1,1) != "|" && index($0,"https:")==0 && index($0,"packages/git/measure/results")==0 {print FNR": "length}' notes/2026-10-01-research-jj.md
 # 510: 73, 511: 73 (verbatim quotation)
 ```
