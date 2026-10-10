@@ -1,0 +1,115 @@
+{
+  "kind": "Independent bounded Source composition review; all execution held",
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5ade75228f4ed9d2f4e0b1523bdfd2e46f494692",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2511667df4d7333402f8af8b34d82cb958ecbc43",
+  "worktree": "/tmp/artroom-economy-hub-manifest",
+  "head": "8c9672bb56932d8ccd241090d1c56f89588b3c11",
+  "tree": "fbdae2642a4b1ab93f03dc24b2f79e72640aef28",
+  "initial_reviewed_head": "c17cf974aa49893485404623b75ba763322f654f",
+  "receiving_head": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53",
+  "receiving_tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "source_clean": true,
+  "source_after_head": "8c9672bb56932d8ccd241090d1c56f89588b3c11",
+  "changed_paths": [
+    {
+      "path": "notes/2026-10-09-initial-combined-delivery.md",
+      "bytes": 59362,
+      "sha256": "a76855c4dbc522d6a1f77ae104abc5bb6d74104ba4164cb6b6abe3c7ee0f5a09",
+      "receiving_sha256": "4bcc0a1f52c0ba522525e943874e775423d588ad4a4b310c12aee1cda469e4ee",
+      "blob": "e1ca4f171e5df4fcc608a52e946f16958f76e862"
+    },
+    {
+      "path": "packages/lanes/test/manifest-tree.scope.test.ts",
+      "bytes": 91747,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08",
+      "receiving_sha256": "c2ca688e7351c0d6df2b8e44816584fb8002c1a41d84d2566c3d2609c42ae3ba",
+      "blob": "deed8d68459c81277e80cb7eb9373b2658a4e842"
+    },
+    {
+      "path": "packages/scope/test/hosts-pack-cache.test.ts",
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59",
+      "receiving_sha256": "2319252e9c376493bab6757595928951e19d2c64ac97ac0fef11bfea90d23caa",
+      "blob": "3e4bf65285a3c9abb42d7376e765f2f3f0c4804a"
+    },
+    {
+      "path": "packages/scope/test/hosts.ts",
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5",
+      "receiving_sha256": "0921f03405319e4348a99fe535f718035882ae18daa969a2f573ef1f918b86b9",
+      "blob": "77034bd766c90dd559cc246b66b7e360ce8ac12a"
+    }
+  ],
+  "donor_correspondence": [
+    {
+      "path": "packages/scope/test/hosts.ts",
+      "donor": "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+      "exact_bytes_equal": true,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    {
+      "path": "packages/scope/test/hosts-pack-cache.test.ts",
+      "donor": "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+      "exact_bytes_equal": true,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    {
+      "path": "packages/lanes/test/manifest-tree.scope.test.ts",
+      "donor": "bdf64bdde4afc26485963e76bb409a01a4c9347c",
+      "exact_bytes_equal": true,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+    }
+  ],
+  "static_cases": 27,
+  "required_active_cases": 26,
+  "original_optional_skips": 1,
+  "concrete_composition_defects": [],
+  "execution": "UNRUN",
+  "evidence_files": [
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/c17-to-8c967.diff",
+      "bytes": 2324,
+      "sha256": "24ee25ca994a509f82c214972767f91bf5667fcf96da07eb2d3e28ab12cc60e9"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/read-coverage.json",
+      "bytes": 969,
+      "sha256": "7fb0ad9d3654e5a858d054f1cd9430e67f61f2eef71121a9ee9af48ad623b5d9"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/receiving-relative.diff",
+      "bytes": 23103,
+      "sha256": "e0f246f595ff6c80119e5b19e64ace21b74493ed87e6a97380ca9f50e8304f23"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/review.md",
+      "bytes": 3680,
+      "sha256": "483aae82ef6a8067dabfa08a1b3675d21ff63e966d7b0c5935d7fc72e90aac7c"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/source/notes/2026-10-09-initial-combined-delivery.md",
+      "bytes": 59362,
+      "sha256": "a76855c4dbc522d6a1f77ae104abc5bb6d74104ba4164cb6b6abe3c7ee0f5a09"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/source/packages/lanes/test/manifest-tree.scope.test.ts",
+      "bytes": 91747,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/source/packages/scope/test/hosts-pack-cache.test.ts",
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/source/packages/scope/test/hosts.ts",
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    {
+      "path": "/tmp/artroom-economy-8c967-independent-composition-review/static-title-deadline-map.json",
+      "bytes": 8730,
+      "sha256": "86669cfeac5bc40a39be9bb21e81d85386a45078253d248f717421f30fbfa7c9"
+    }
+  ]
+}

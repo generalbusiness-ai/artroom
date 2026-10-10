@@ -1,0 +1,120 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5ade75228f4ed9d2f4e0b1523bdfd2e46f494692",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2511667df4d7333402f8af8b34d82cb958ecbc43",
+  "root": "/private/tmp/artroom-economy-hub-manifest",
+  "head": "8c9672bb56932d8ccd241090d1c56f89588b3c11",
+  "tree": "fbdae2642a4b1ab93f03dc24b2f79e72640aef28",
+  "clean": true,
+  "pushed": "8c9672bb56932d8ccd241090d1c56f89588b3c11",
+  "receiving_main": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53",
+  "receiving_tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "donors": [
+    "ee7d213113805d8375f2bf7e6e8651f9c0b655b5",
+    "bdf64bdde4afc26485963e76bb409a01a4c9347c"
+  ],
+  "changed_paths": [
+    "notes/2026-10-09-initial-combined-delivery.md",
+    "packages/lanes/test/manifest-tree.scope.test.ts",
+    "packages/scope/test/hosts-pack-cache.test.ts",
+    "packages/scope/test/hosts.ts"
+  ],
+  "whole_cases": 27,
+  "active_required": 26,
+  "original_optional_skip": 1,
+  "compiler_roots": [
+    "packages/scope/tsconfig.test.json",
+    "packages/lanes/tsconfig.scope.json"
+  ],
+  "workspaces": 12,
+  "aliases": 24,
+  "exports": 25,
+  "Sourcehashes": 1272,
+  "private_pool_files": 23,
+  "private_pool_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "cache_unchanged": true,
+  "execution": "NONE: Sourcecomposition+staticownedview+inertrecipesonly",
+  "qualification": "no Sourceapproval/validation/pass/cause/10x/nativeprovider/Productclaim; independentfulldelta+recipe reading and laterRootreleaseowed",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/affected.config.mjs.recipe",
+      "bytes": 3891,
+      "sha256": "68c1d05b007efdc6c265b30a3667af499b042789adc8354bbf6ba09a84aacc8b"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/donor-correspondence.json",
+      "bytes": 1681,
+      "sha256": "1f185fa5137830a7564105ab923c83bac1b2d2c83ec61744d08a4ac5dc60d121"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/execution-inputs.json",
+      "bytes": 721,
+      "sha256": "2d78f97f61b5585548fc169a83108fb9706a6f9a9f049c40e9da1c4564d9ae27"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/external-metadata-correction.diff",
+      "bytes": 10069,
+      "sha256": "370878472535fc453c1d550cf4e921d38a151433bc86e2de015ed92c86cec10d"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/future-controls.json",
+      "bytes": 667,
+      "sha256": "33d30a267f10d6f267d2761a6e44fa9d770a9a8cf230fd418a6c0d56f2e52704"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/plan.json",
+      "bytes": 17412,
+      "sha256": "ded694b2456852f585ac5d38920778eebb87f5e3ee8f67cf43b07867d7303d12"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/preparation.md",
+      "bytes": 7297,
+      "sha256": "c0e6a7a09c1092be3490a192ceb4d57d54f8e45a4ec3df1aae8ce8ab223e6e8e"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/proof.json",
+      "bytes": 260842,
+      "sha256": "b7de60fe18bc833595a54875b22bb345b2019ac20c3dac9a9dfffc63f561e493"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/receiving-main-relative.delta",
+      "bytes": 23103,
+      "sha256": "e0f246f595ff6c80119e5b19e64ace21b74493ed87e6a97380ca9f50e8304f23"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/run-affected.py.recipe",
+      "bytes": 12187,
+      "sha256": "902d3ca14749f719bbaea78151390e8c9a73f633e8ec305133c170b491e726b0"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/shared-cache-snapshot.json",
+      "bytes": 628897,
+      "sha256": "b6d1822dc82db05d261865fea24011cb60b5a8740cdadd27c4e0e79e14e5bd21"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/source-bodies/hosts-pack-cache.test.ts",
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/source-bodies/hosts.ts",
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    {
+      "path": "/tmp/artroom-economy-composition-preparation-r2/source-bodies/manifest-tree.scope.test.ts",
+      "bytes": 91747,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+    }
+  ],
+  "revision": 2,
+  "predecessor": {
+    "packet": "/tmp/artroom-economy-composition-preparation/packet.json",
+    "sha256": "85b7469f5bb7dcbcb20130c58d4aef541c344852dc235543b2042df031086e14"
+  },
+  "external_only_corrections": [
+    "plan expected3files/27cases/26active/1skip",
+    "correct later two-file tree wording, early one-file branch unchanged",
+    "complete donor mergeIDs and materialized external R2input paths"
+  ],
+  "config_runner_proof_source_view_unchanged": true
+}
