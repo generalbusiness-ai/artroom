@@ -8,18 +8,25 @@ import { PUBLICATION_PROOF_BOUNDS, type SitePublicationPeer } from "../src/site/
 // OwnGit/scheduler/clock/memory stores are labelled STAND-INs in the shared fixture.
 // No provider or browser runs. Published authority is never fabricated in this witness.
 test("two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes", async () => {
+  const stageOrigin = performance.now();
+  let lastStarted = "none", lastCompleted = "none";
+  console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const d = await demo(undefined, null, { editorOnly: true, invitation: false });
+  console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
   const snapshot = () => d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
     d.active();
     const tables = state.storage.sql.exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").toArray();
     return tables.map(({ name }) => [name, state.storage.sql.exec(`SELECT * FROM "${name.replaceAll('"', '""')}"`).toArray()]);
   }));
   try {
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "two-publications", lastCompleted);
     expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Original")).code).toBe(0);
     const first = d.at.stand.refs.get("refs/heads/main")!;
     expect((await d.run(d.rita, "edit", "README.md", "--file", "agents.md", "--title", "Later")).code).toBe(0);
     const later = d.at.stand.refs.get("refs/heads/main")!;
     expect(later).not.toBe(first);
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "two-publications");
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "retained-and-head-site", lastCompleted);
     const get = (ref: string, headers?: Record<string, string>) => d.fetch(`https://scopes.test/site/${d.D.name}/${ref}/README.md`, { ...(headers ? { headers } : {}) });
     const before = await snapshot();
     const old = await get(first);
@@ -32,8 +39,10 @@ test("two native publications retain older immutable content and deny pending/co
     expect(await bodyOf(await get("HEAD"))).toContain("Ask before you push");
     expect((await get(first, { "if-none-match": "*" })).status).toBe(304);
     expect(await snapshot()).toEqual(before);
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "retained-and-head-site");
     // Deliberate store-corruption controls exercise the projection boundary;
     // they do not pretend a SQL change is a native lifecycle transition.
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "receipt-refusals", lastCompleted);
     for (const stateName of ["owed", "conflict"]) {
       const prior = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
         d.active();
@@ -45,6 +54,8 @@ test("two native publications retain older immutable content and deny pending/co
       try { expect((await get(first, { "if-none-match": "*" })).status).toBe(404); }
       finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", prior.state, prior.record, prior.id); })); }
     }
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "receipt-refusals");
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "cleanup-and-opening-proof", lastCompleted);
     const peer = d.G.stub as unknown as SitePublicationPeer;
     const directory = d.config.repository!.directory;
     const repo = await d.wait(() => runInDurableObject(d.D.object, (_instance, state) => { d.active(); return JSON.parse(state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type = 'repository'").one().record).values.repository; }));
@@ -80,6 +91,8 @@ test("two native publications retain older immutable content and deny pending/co
     }));
     try { expect((await get(first, { "if-none-match": "*" })).status).toBe(404); }
     finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE entry SET bytes = ? WHERE seq = ?", openingProof.bytes, openingProof.seq); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", historicalPublication.state, historicalPublication.record, historicalPublication.id); })); }
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "cleanup-and-opening-proof");
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "history-byte-bounds", lastCompleted);
     const metadata = await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => {
       d.active();
       const saved = state.storage.sql.exec<{ v: string }>("SELECT v FROM meta WHERE k = 'scope'").one().v;
@@ -112,6 +125,8 @@ test("two native publications retain older immutable content and deny pending/co
     }));
     try { expect(await peer.sitePublishedCommit(directory, repo as never, first)).toEqual({ ok: false, reason: "publication-history-limit" }); }
     finally { await d.wait(() => runInDurableObject(d.G.object, (_instance, state) => { d.active(); state.storage.sql.exec("UPDATE item SET state = ?, record = ? WHERE id = ?", oversized.state, oversized.record, oversized.id); })); }
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "history-byte-bounds");
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "identity-and-receipt-corruption", lastCompleted);
     expect(await peer.sitePublishedCommit({ ...directory, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" as never }, repo as never, first)).toEqual({ ok: false, reason: "not-published" });
     expect(await peer.sitePublishedCommit(directory, { ...repo, id: "foreign" } as never, first)).toEqual({ ok: false, reason: "not-published" });
     const selection = await peer.sitePublishedCommit(directory, repo as never, first);
@@ -123,6 +138,11 @@ test("two native publications retain older immutable content and deny pending/co
     });
     try { expect((await get(first, { "if-none-match": "*" })).status).toBe(502); }
     finally { await d.wait(async () => { d.at.stand.objects.set(selection.proof.receipt.blob, savedObject); }); }
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "identity-and-receipt-corruption");
 
-  } finally { d.done(); }
+  } finally {
+    console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "cleanup", lastCompleted);
+    d.done();
+    console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "cleanup");
+  }
 });

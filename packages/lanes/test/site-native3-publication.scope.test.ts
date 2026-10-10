@@ -17,6 +17,9 @@ import { site } from "../../scope/src/site/route.ts";
 // Only the Git provider, scheduler, clock and local key store are STAND-INs.
 // No SQL state is fabricated, no host/deployment/browser executes.
 test("native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it", async () => {
+  const stageOrigin = performance.now();
+  let lastStarted = "none", lastCompleted = "none";
+  console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const lifetime = siteFixtureLifetime();
   const at = ownHost();
   let register: Platform | undefined;
@@ -41,10 +44,16 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     expect((await lifetime.wait(() => G.summary())).value.definition).toBe("platform:destination@3");
     ok(await lifetime.wait(() => run("act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`)));
     ok(await lifetime.wait(() => run("act", "activate", "--on", "rules", "--set", `digest=${definitionDigest(changeDemo3)}`, "--set", "name=change", "--value", "change3.json")));
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "first-publication", lastCompleted);
     ok(await lifetime.wait(() => run("edit", "README.md", "--file", "one.md"))); await lifetime.wait(() => pause([]));
     const first = at.stand.refs.get("refs/heads/main")!;
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "first-publication");
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "second-publication", lastCompleted);
     ok(await lifetime.wait(() => run("edit", "README.md", "--file", "two.md"))); await lifetime.wait(() => pause([]));
     const second = at.stand.refs.get("refs/heads/main")!; expect(second).not.toBe(first);
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "second-publication");
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "retained-site-proof", lastCompleted);
     const retained = () => runInDurableObject(destination!.object, (_instance, state) => state.storage.sql.exec<{ record: string }>("SELECT record FROM item WHERE type IN ('publication','receipt') ORDER BY id").toArray().map(r => JSON.parse(r.record)));
     const records = await lifetime.wait(() => retained());
     expect(records.filter(r => r.type === "publication" && r.values.integration === first)).toMatchObject([{ state: "cleaned" }]);
@@ -62,7 +71,9 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     expect(body).toContain(`/site/${config.repository!.directory.scope}/${first}/README.md`);
     expect(body).toContain(`Rendered from commit <code>${first}</code>`);
     expect((await lifetime.wait(() => get(first))).status).toBe(304); expect(await lifetime.wait(() => snapshot())).toEqual(before);
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "retained-site-proof");
     // Add a real checker role/configuration but never submit its required check.
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "required-check-reservation", lastCompleted);
     const checker = ok(await lifetime.wait(() => run("act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker")));
     expect(checker.code).toBe(0);
     const configText = new TextDecoder().decode(files["check.json"]);
@@ -77,6 +88,8 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     expect(reserved).toBeDefined();
     const unapproved = reserved.values["integration"] as string;
     expect((await lifetime.wait(() => get(unapproved))).status).toBe(404);
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "required-check-reservation");
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "expiry-alarm-and-refusal", lastCompleted);
     lifetime.advance(1800);
     await lifetime.wait(() => runDurableObjectAlarm(G.object)); await lifetime.wait(() => pause([]));
     const timed = await lifetime.wait(() => G.entries());
@@ -84,7 +97,10 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     expect((await lifetime.wait(() => retained())).find(r => r.type === "publication" && r.id === reserved.id)?.state).toBe("cleaned");
     expect((await lifetime.wait(() => get(unapproved))).status).toBe(404);
     expect((await lifetime.wait(() => get(first))).status).toBe(304);
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "expiry-alarm-and-refusal");
   } finally {
+    console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "cleanup", lastCompleted);
     lifetime.release();
+    console.info("native-stage", "native3", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "cleanup");
   }
 });
