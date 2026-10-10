@@ -13,14 +13,15 @@ unrun at this delivery.
 
 Run only after the exact producer source and tool view are reviewed and its
 execution is released. Use a clean checkout and a fresh absolute staging
-path outside it. Tools come from the reviewed existing lock and a prepared
+path outside it. Its canonical physical parent must already exist; on this
+macOS host `/private/tmp` is canonical, while `/tmp` is a symlink. Tools come from the reviewed existing lock and a prepared
 view; never install a tool in a checkout. The npm CLI argument names the
 actual pinned npm `bin/npm-cli.js`, not a shell wrapper. Supply its exact
 reviewed version. Commands below are execution recipes, not recorded runs.
 
 ```
-node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-commit> --version <reviewed-version> --output /tmp/fresh-sdk-stage --npm-cli /absolute/npm/bin/npm-cli.js --npm-version <exact-npm-version>
-node scripts/check-public-release.mjs --manifest /tmp/fresh-sdk-stage/release-manifest.json
+node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-commit> --version <reviewed-version> --output /private/tmp/fresh-sdk-stage --npm-cli /absolute/npm/bin/npm-cli.js --npm-version <exact-npm-version>
+node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json
 ```
 
 The proposed coordinated version `0.1.0-dev.2` is conditional. It is neither
