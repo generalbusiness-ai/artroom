@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vitest";
+import { expect, test } from "vitest";
 import type { Read, Sealed } from "@generalbusiness/artroom-contract";
 import { entryHash, takeBytes } from "@generalbusiness/artroom-bytes";
 import { listLanes, loadChange, openRoom, placeOf } from "../src/index.ts";
@@ -10,7 +10,6 @@ import { demo } from "./support/demo.ts";
 test("exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback", async () => {
   const stageOrigin = performance.now();
   let lastStarted = "none", lastCompleted = "none";
-  onTestFinished(() => { console.info("native-stage", "preview", "finished", performance.now() - stageOrigin, lastStarted, lastCompleted); });
   let failure: "none" | "missing" | "tampered" | "resealed" = "none";
   let entryReads = 0;
   let siteReads = 0;

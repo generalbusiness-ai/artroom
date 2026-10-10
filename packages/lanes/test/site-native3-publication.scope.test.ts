@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
-import { expect, onTestFinished, test } from "vitest";
+import { expect, test } from "vitest";
 import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
@@ -19,7 +19,6 @@ import { site } from "../../scope/src/site/route.ts";
 test("native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it", async () => {
   const stageOrigin = performance.now();
   let lastStarted = "none", lastCompleted = "none";
-  onTestFinished(() => { console.info("native-stage", "native3", "finished", performance.now() - stageOrigin, lastStarted, lastCompleted); });
   console.info("native-stage", "native3", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const lifetime = siteFixtureLifetime();
   const at = ownHost();

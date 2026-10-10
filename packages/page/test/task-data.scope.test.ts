@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vitest";
+import { expect, test } from "vitest";
 import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
@@ -128,7 +128,6 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
 test("native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices", async () => {
   const stageOrigin = performance.now();
   let lastStarted = "none", lastCompleted = "none";
-  onTestFinished(() => { console.info("native-stage", "task-data", "finished", performance.now() - stageOrigin, lastStarted, lastCompleted); });
   let badSelection = false, unavailableMembers = false, unavailableExtents = false, noCurrent = false;
   let membershipPath = "";
   console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);

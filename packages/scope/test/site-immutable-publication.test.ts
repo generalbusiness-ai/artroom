@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vitest";
+import { expect, test } from "vitest";
 import { runInDurableObject } from "cloudflare:test";
 import { takeBytes } from "@generalbusiness/artroom-bytes";
 import { demo } from "../../page/test/support/demo.ts";
@@ -10,7 +10,6 @@ import { PUBLICATION_PROOF_BOUNDS, type SitePublicationPeer } from "../src/site/
 test("two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes", async () => {
   const stageOrigin = performance.now();
   let lastStarted = "none", lastCompleted = "none";
-  onTestFinished(() => { console.info("native-stage", "immutable", "finished", performance.now() - stageOrigin, lastStarted, lastCompleted); });
   console.info("native-stage", "immutable", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const d = await demo(undefined, null, { editorOnly: true, invitation: false });
   console.info("native-stage", "immutable", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
