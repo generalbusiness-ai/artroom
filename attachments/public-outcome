@@ -1,0 +1,80 @@
+{
+  "request": "c612acc60c1b02577c7814b8026ad6d398f54023",
+  "promise": "96ce76dbe95b0247193bf7ac5d4df47937915350",
+  "head": "4a40c76fad08960155e827049790325a435c9836",
+  "tree": "fc17e053b2bd579978cc01e6e0aa28c70de41c01",
+  "actualHandle": 84483,
+  "terminal": true,
+  "gateExit": 0,
+  "runnerExit": 0,
+  "command": [
+    "npm",
+    "run",
+    "gate"
+  ],
+  "installSkipped": true,
+  "typecheckExit": 0,
+  "vitest": {
+    "passed": 1015,
+    "failed": 0,
+    "skipped": 2,
+    "total": 1017,
+    "files": 178,
+    "filesPassed": 177,
+    "filesSkipped": 1
+  },
+  "node": {
+    "activeSourceAndCompatibilityPassed": 8,
+    "counterBrowserPassed": 37,
+    "failed": 0,
+    "skipped": 0
+  },
+  "times": {
+    "outer": {
+      "real": 94.07,
+      "user": 131.0,
+      "sys": 21.28
+    },
+    "typecheck": {
+      "real": 5.59,
+      "user": 16.3,
+      "sys": 2.23
+    },
+    "test": {
+      "real": 88.22,
+      "user": 114.56,
+      "sys": 18.96
+    }
+  },
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "startLoad": [
+    4.13623046875,
+    3.57568359375,
+    2.783203125
+  ],
+  "openFiles": [
+    8192,
+    9223372036854775807
+  ],
+  "sourceBeforeAfterExactClean": true,
+  "trackedHashes": 1308,
+  "workspaces": 12,
+  "aliases": 24,
+  "sharedCacheRegularFiles": 3898,
+  "sharedCacheLinks": 28,
+  "privatePoolFiles": 23,
+  "privatePoolBundle": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "diagnostics": {
+    "refcountedCancelerAbort": 0,
+    "intentionalSqlRetentionTrigger": 1,
+    "gitContentTypeWarnings": 4
+  },
+  "qualifications": [
+    "Retained worker diagnostics do not constitute error-free/drain/cause evidence.",
+    "Current Page asset includes receiving f722 and M1; UI9e5 composition and regenerated combined Page asset still owed.",
+    "No real deployed Counter/three-device audible demonstration/natural recording claim.",
+    "Source approval and main landing remain owed."
+  ],
+  "manifestSha256": "2f3f408b81ef32e47f19dffd7fb9c1dccc0c10c7c5fa4695e70caa7c04f89efe",
+  "publicWhitelist": true
+}
