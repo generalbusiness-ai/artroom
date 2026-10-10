@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { Answer, Entry, Receipt, Sealed, Settlement } from "@generalbusiness/artroom-contract";
 import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { secretSigner, type Signer } from "@generalbusiness/artroom-client";
-import { NamingBlocked, NamingCustody, confirmNaming, namingContextKey, namingCopy, namingTransition, type NamingContext, type NamingEnvelope, type NamingJournal, type NamingLocks, type NamingNative, type NamingSample, type NamingStore } from "../src/naming-custody.ts";
+import { NamingBlocked, NamingCustody, confirmNaming, isNamingSample, namingContextKey, namingCopy, namingTransition, type NamingContext, type NamingEnvelope, type NamingJournal, type NamingLocks, type NamingNative, type NamingSample, type NamingStore } from "../src/naming-custody.ts";
 
 const TITLE = "naming preserves the frozen original and whole known reply across unavailable settlement, failed persistence and credential drift";
 function deferred() {
@@ -20,7 +20,7 @@ function fixture() {
   const directory = { scope: scopeIdOf({ v: 1, kind: "directory", definition: "platform:directory@1", creator: null, cause, ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(11)), kind: "directory" } as const;
   const membership = { scope: scopeIdOf({ v: 1, kind: "membership", definition: "platform:membership@1", creator: directory, cause, ordinal: 1 }), inc: newIncarnation(new Uint8Array(16).fill(12)), kind: "membership" } as const;
   const context: NamingContext = { origin: "https://naming.test", directory, membership, member: { membership, member: "@owner" }, key: signer.key, credential: "credential-1", generation: 0, epoch: "domain-1" };
-  const sample: NamingSample = { context: namingCopy(context), definition: "platform:directory@1", head: { seq: 1, hash: cause }, time: "2026-10-10T12:00:00Z", state: "profile", profile: { id: 1, revision: 0, opening: { at: directory, seq: 1, hash: cause }, name: "Earlier name" } };
+  const sample: NamingSample = { context: namingCopy(context), definition: "platform:directory@1", head: { seq: 1, hash: cause }, time: "2026-10-10T12:00:00Z", state: "profile", profile: { id: 1, revision: 1, opening: { at: directory, seq: 1, hash: cause }, name: "Earlier name" } };
   let journal: NamingJournal = { v: 1, epoch: context.epoch, revision: 0, context: namingContextKey(context), records: [] };
   let active = true, failKnown = false, signatures = 0;
   const store: NamingStore = {
@@ -60,6 +60,9 @@ function fixture() {
 
 test(TITLE, async () => {
   const first = fixture(), callerContext = namingCopy(first.context);
+  const malformed = namingCopy(first.sample);
+  if (malformed.state === "profile") malformed.profile.revision = 0;
+  expect(isNamingSample(malformed)).toBe(false); // Native items open at revision1; journal CAS starts at0 independently.
   const custody = first.create(callerContext), confirmation = confirmNaming(first.sample, "  Confirmed name  ");
   const frozen = namingCopy(confirmation), originalContext = namingCopy(callerContext);
   first.holdCapture();
@@ -77,7 +80,7 @@ test(TITLE, async () => {
   expect(first.lockNames).toEqual([`artroom:c4:credential:${originalContext.credential}`, `artroom:c4:naming-context:${namingContextKey(originalContext)}`, `artroom:c4:naming-operation:${namingContextKey(originalContext)}`]);
   expect(first.posts).toHaveLength(1); expect(first.signatures()).toBe(1);
   expect(first.posts[0]?.signed.intent.fields).toEqual({ name: frozen.name });
-  expect(first.posts[0]?.signed.intent.expected).toEqual({ on: 0 });
+  expect(first.posts[0]?.signed.intent.expected).toEqual({ on: 1 });
   const retainedOriginal = canonicalize(first.journal().records[0]?.envelope);
   await expect(custody.start(confirmNaming(first.sample, "Replacement"))).rejects.toThrow("unresolved original");
   await custody.reconcile(); // Genuine not-found is still an unresolved original.

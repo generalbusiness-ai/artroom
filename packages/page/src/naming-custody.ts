@@ -93,7 +93,7 @@ export function isNamingSample(value: unknown): value is NamingSample {
   if (!isRecord(value) || !exact(value, ["context", "definition", "head", "time", "state"], ["profile"]) || !isNamingContext(value["context"]) || !isPlatformDefinition(value["definition"]) || !value["definition"].startsWith("platform:directory@") || !isHead(value["head"]) || typeof value["time"] !== "string" || timeMs(value["time"]) === null) return false;
   if (value["state"] === "uninitialized") return !Object.hasOwn(value, "profile");
   const p = value["profile"];
-  return value["state"] === "profile" && isRecord(p) && exact(p, ["id", "revision", "opening", "name"]) && integer(p["id"]) && p["id"] > 0 && p["id"] <= value["head"].seq && integer(p["revision"]) && isFactRef(p["opening"]) && p["opening"].seq === p["id"] && same(p["opening"].at, value["context"].directory) && isConfirmedName(p["name"]);
+  return value["state"] === "profile" && isRecord(p) && exact(p, ["id", "revision", "opening", "name"]) && integer(p["id"]) && p["id"] > 0 && p["id"] <= value["head"].seq && integer(p["revision"]) && p["revision"] > 0 && p["revision"] <= value["head"].seq - p["id"] + 1 && isFactRef(p["opening"]) && p["opening"].seq === p["id"] && same(p["opening"].at, value["context"].directory) && isConfirmedName(p["name"]);
 }
 export function isNamingProjection(value: unknown): value is NamingProjection {
   if (!isRecord(value)) return false;
