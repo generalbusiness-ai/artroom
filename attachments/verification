@@ -1,0 +1,14 @@
+{
+  "new_mutation": "NONE",
+  "verification": "Target absence/preserved branch/object/main ancestry verified; current other-head temporal qualification explicit",
+  "files": {
+    "current-registry.txt": {
+      "bytes": 33826,
+      "sha256": "059d91da89a97495ff4e40d2f7b1e1e65544684b96d6e30ddf8087f47f687801"
+    },
+    "verification.json": {
+      "bytes": 2276,
+      "sha256": "932618c24c636f1ba27c01cd3df0bec6004f7dcc65668a945fa55b4cf8ca8235"
+    }
+  }
+}
