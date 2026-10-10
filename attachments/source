@@ -1,0 +1,49 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2c8cdab8119579ecf0e1b66928668c0fc96fcd92",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3587942b948f7b1ec65c4be272d1d64a59cf6b1c",
+  "base": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "root": "/private/tmp/artroom-cli-fixture-identity",
+  "branch": "request/cli-fixture-identity",
+  "head": "92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44",
+  "tree": "45b892b37473e283894b89eff86375604f304110",
+  "clean": true,
+  "pushed": "92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44",
+  "changed_paths": [
+    "packages/cli/test/git.test.ts"
+  ],
+  "source_hashes": {
+    "packages/cli/test/git.test.ts": "7ac9b8288a1bb9c086b8144a8eeebe61da279603c7a71efaf6a59d700065198e",
+    "packages/cli/src/git.ts": "7fbc4389753693fd54e1dd5253938ffef52ac85dca14b6efdf81669cea030c0e"
+  },
+  "all_case_bodies_assertions_titles_matrices_unchanged": true,
+  "expanded_cases": 15,
+  "fresh_repositories": 14,
+  "static_removed_git_calls": 28,
+  "production_unchanged": true,
+  "project_execution": "UNRUN/HELD",
+  "composition": "NOT authorized into Hub/manifest/SDK subject",
+  "files": {
+    "static-source-ledger.json": {
+      "bytes": 5707,
+      "sha256": "48b26c565e7120c6b340cef91aff272e0c493ce3285b3c80ad603b83096d760c"
+    },
+    "future-whole-file-check.json": {
+      "bytes": 1267,
+      "sha256": "a2de5c13fc098bead7b9dddbe7403960c31845487c531d8e26e2aac889f76057"
+    },
+    "git.test.ts": {
+      "bytes": 10357,
+      "sha256": "7ac9b8288a1bb9c086b8144a8eeebe61da279603c7a71efaf6a59d700065198e"
+    },
+    "delta.patch": {
+      "bytes": 1429,
+      "sha256": "4e31e4c9d16c48146c73cc2d87bd1571a8d31691d52e45fa711ad48c417f3fd3"
+    },
+    "handoff.md": {
+      "bytes": 3011,
+      "sha256": "006841dcd04efa37effe37ca1eba45549e416dca53e4c73599edb66a13812f46"
+    }
+  },
+  "state_filing": false,
+  "formal_approval": false
+}

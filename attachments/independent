@@ -1,0 +1,22 @@
+{
+  "request": "2c8cdab8119579ecf0e1b66928668c0fc96fcd92",
+  "promise": "3587942b948f7b1ec65c4be272d1d64a59cf6b1c",
+  "head": "92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44",
+  "tree": "45b892b37473e283894b89eff86375604f304110",
+  "base": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "source_packet": "/tmp/artroom-cli-fixture-identity-source-packet/packet.json",
+  "source_packet_sha256": "2f0ab2d80207c7d2817245e3086806374264d54db0ff1410f74d51552ff9c55e",
+  "helper_full_read": true,
+  "prefix_suffix_byte_identical": true,
+  "production_capture_byte_identical": true,
+  "expanded_cases_preserved": 15,
+  "fresh_repositories_preserved_static": 14,
+  "removed_setup_calls_static": 28,
+  "blocking_findings": [],
+  "findings": "/tmp/artroom-cli92dc-independent-source-review/findings.txt",
+  "findings_sha256": "c413478f346de27e7580365c5231220e1e9bd8dad9ac095e8187be43c28c5b99",
+  "execution": [],
+  "source_or_state_edits": [],
+  "formal_approval": false,
+  "current_clean": true
+}
