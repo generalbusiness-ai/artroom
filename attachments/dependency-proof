@@ -1,0 +1,476 @@
+{
+  "kind": "Static existing-lock dependency view only",
+  "before": {
+    "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
+    "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
+    "status": ""
+  },
+  "after": {
+    "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
+    "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
+    "status": ""
+  },
+  "root": "/private/tmp/artroom-initial-native-cleanup-fix",
+  "node_modules_real_directory": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules",
+  "node_modules_is_symlink": false,
+  "workspace_directory_owned": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness",
+  "third_party_cache": "/private/tmp/artroom-demo-github-host/node_modules",
+  "third_party_symlinks": [
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/.bin",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/.bin",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/.bin"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@cloudflare",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@cspotcode",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cspotcode",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@cspotcode"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@esbuild",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@img",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@img",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@img"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@jridgewell",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@noble",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@noble"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@oxc-project",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@oxc-project",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@oxc-project"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@poppinss",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@rolldown",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@sindresorhus",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@sindresorhus",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@sindresorhus"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@speed-highlight",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@speed-highlight",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@speed-highlight"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@standard-schema",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@standard-schema",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@standard-schema"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@types",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@types",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@types"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@typescript",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@typescript",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@typescript"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@vitest",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/@vitest"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/assertion-error",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/assertion-error",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/assertion-error"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/blake3-wasm",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/blake3-wasm",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/blake3-wasm"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/chai",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/chai",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/chai"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/cjs-module-lexer",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/cjs-module-lexer",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/cjs-module-lexer"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/convert-source-map",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/convert-source-map",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/convert-source-map"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/cookie",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/cookie",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/cookie"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/detect-libc",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/detect-libc",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/detect-libc"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/error-stack-parser-es",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/error-stack-parser-es",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/error-stack-parser-es"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/es-module-lexer",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/es-module-lexer",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/es-module-lexer"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/esbuild",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/esbuild"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/estree-walker",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/estree-walker",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/estree-walker"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/expect-type",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/expect-type",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/expect-type"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/fdir",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/fdir",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/fdir"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/fsevents",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/fsevents",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/fsevents"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/get-tsconfig",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/get-tsconfig",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/get-tsconfig"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/jsonata",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/jsonata",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/jsonata"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/kleur",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/kleur",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/kleur"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/lightningcss",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/lightningcss-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss-darwin-arm64",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/magic-string",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/magic-string",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/magic-string"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/miniflare",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/miniflare",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/miniflare"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/nanoid",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/nanoid"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/obug",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/obug",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/obug"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/path-to-regexp",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/path-to-regexp",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/path-to-regexp"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/pathe",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/pathe",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/pathe"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/picocolors",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/picocolors",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/picocolors"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/picomatch",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/picomatch",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/picomatch"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/postcss",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/postcss",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/postcss"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/resolve-pkg-maps",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/resolve-pkg-maps",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/resolve-pkg-maps"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/rolldown",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/rolldown"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/semver",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/semver",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/semver"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/sharp",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/sharp",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/sharp"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/siginfo",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/siginfo",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/siginfo"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/source-map-js",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/source-map-js",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/source-map-js"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/stackback",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/stackback",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/stackback"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/std-env",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/std-env",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/std-env"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/supports-color",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/supports-color",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/supports-color"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/tinybench",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinybench",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/tinybench"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/tinyexec",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyexec",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/tinyexec"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/tinyglobby",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyglobby",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/tinyglobby"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/tinyrainbow",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyrainbow",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/tinyrainbow"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/tsx",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/tsx"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/typescript",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/typescript"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/undici",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/undici",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/undici"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/undici-types",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/undici-types",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/undici-types"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/unenv",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/unenv",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/unenv"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vite",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vite",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/vite"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/vitest",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/vitest"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/why-is-node-running",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/workerd",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/workerd"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/wrangler",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/wrangler"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/ws",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/ws",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/ws"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/youch",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/youch",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/youch"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/youch-core",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/youch-core",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/youch-core"
+    },
+    {
+      "path": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/zod",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/zod",
+      "realpath": "/private/tmp/artroom-demo-github-host/node_modules/zod"
+    }
+  ],
+  "excluded_shared_state": [
+    ".artroom-lock-sha256",
+    ".package-lock.json",
+    ".vite",
+    ".vite-temp",
+    "@generalbusiness"
+  ],
+  "owned_empty_cache_dirs": [
+    ".vite",
+    ".vite-temp"
+  ],
+  "workspaces": [
+    {
+      "name": "@generalbusiness/artroom-bytes",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-bytes",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/bytes",
+      "package_json_sha256": "57c1d0aa391091ae56b8d260b06e6f49d66712bc7410db3c79ce1ca4864ed582"
+    },
+    {
+      "name": "@generalbusiness/artroom-checkers",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-checkers",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/checkers",
+      "package_json_sha256": "a0ea3ab7d7cfc0953ce5770df11f9ccc52c6d41e560566dcc9c816a2030fdf4f"
+    },
+    {
+      "name": "@generalbusiness/artroom-cli",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-cli",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/cli",
+      "package_json_sha256": "b1c33a822a70cf59ac7781168d9f5fd6e556f32eb2b288917d4b9f97608e6ae9"
+    },
+    {
+      "name": "@generalbusiness/artroom-client",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-client",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/client",
+      "package_json_sha256": "23268ed3df9014167b037eba926c761f8161a70a124f14b0a9444c907d5cdbca"
+    },
+    {
+      "name": "@generalbusiness/artroom-contract",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-contract",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/contract",
+      "package_json_sha256": "ade3bd1d1104e6318aeaea790b2e51d1b14629f338e4be3c601a62275af09fae"
+    },
+    {
+      "name": "@generalbusiness/artroom-derive",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-derive",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/derive",
+      "package_json_sha256": "6e15cc7ef35481713d37d8210e73bd545242660305e9448be1480b925a77af45"
+    },
+    {
+      "name": "@generalbusiness/artroom-git",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-git",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/git",
+      "package_json_sha256": "c15ff66e0cf6b678c168ebeb7fceadbe210151debf1bb3d8d91f87262f65d256"
+    },
+    {
+      "name": "@generalbusiness/artroom-lanes",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-lanes",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/lanes",
+      "package_json_sha256": "03de3fe871fa9a3d5ec82c582c12cf10ac7920478215f68966d52f19e41088a6"
+    },
+    {
+      "name": "@generalbusiness/artroom-page",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-page",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/page",
+      "package_json_sha256": "bb77544a45638b7e1274faa8834cf5978f8f9a3b9503562961468a50f97cd83c"
+    },
+    {
+      "name": "@generalbusiness/artroom-platform",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-platform",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/platform",
+      "package_json_sha256": "197dcacd1693a0c70af0674df039901b6f9e0e07043856cf91ccefcc34e8ae78"
+    },
+    {
+      "name": "@generalbusiness/artroom-replay",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-replay",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/replay",
+      "package_json_sha256": "cc5f6313d699e44049f706595036deaffb2a33367edb538a0dd1f1f3de884a54"
+    },
+    {
+      "name": "@generalbusiness/artroom-scope",
+      "link": "/private/tmp/artroom-initial-native-cleanup-fix/node_modules/@generalbusiness/artroom-scope",
+      "realpath": "/private/tmp/artroom-initial-native-cleanup-fix/packages/scope",
+      "package_json_sha256": "d30c63c7ea67a06b93221633d35d7cdd3f285fe9343e0b4b7e47c10a5b001386"
+    }
+  ],
+  "workspace_count": 12,
+  "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+  "stamp_sha256": "af6afa160e99193f4667518627dc4838e682177867c4a82bb9d10d9b8adbb2e6",
+  "versions": {
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "esbuild": "0.28.1"
+  },
+  "tools_source_aliases_static_match_manifest": true,
+  "cache_top_level_lstat_before_after_unchanged": true,
+  "cache_mutation": "NONE; no import/tool/install/execution",
+  "project_checks": "ALL UNRUN",
+  "manifest": {
+    "path": "/tmp/artroom-initial-native-cleanup-fix-packet/runtime-manifest.json",
+    "sha256": "e5ee5ca185abba6edf2c484983312a0b2f6dd8049c1555d4ad9c29585bdff0b5"
+  }
+}

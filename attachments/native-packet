@@ -1,0 +1,251 @@
+{
+  "kind": "Initial seven-native source successor, cleanup correction; all project checks HELD",
+  "milestone": "60e59173a14827d5017d89e217a6c8e2cf8d3cde",
+  "promise": "11ffa485a8f1c066471b2a1a5b92d78627db0b54",
+  "source_go": "5045cf538544ebf5e0f5056d9d481dfd61aff5e7",
+  "path": "/tmp/artroom-initial-native-cleanup-fix",
+  "canonical_path": "/private/tmp/artroom-initial-native-cleanup-fix",
+  "branch": "request/initial-native-cleanup-fix",
+  "head": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
+  "tree": "4a726ef46218c30e4f0b4df6ba21b36a2c1d66d6",
+  "base_head": "ab9b499fc221149dcb6825edb7dd2c2e9976d999",
+  "base_tree": "6bb461e515dd6f445d9ab8b82f893a719de69cbf",
+  "clean": true,
+  "pushed_remote_ref": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30",
+  "source_relative_paths": 13,
+  "main_relative_paths": 222,
+  "original_seven_cases": 7,
+  "lexical_original_expect_calls": 212,
+  "new_test_cases": 0,
+  "supplemental_strengthened_existing_case": "packages/scope/test/session-ownership.test.ts original title retained; separate from strict seven selection",
+  "source_provenance": {
+    "parent_own_helper_cli_f1_native3": "259e6a78a26dbc606508ee4dd6e8cc11b4bc69fa",
+    "demo_slice": "c6796efd76590a059d2495c64bdf34ed29158b12 cherry-picked4f3213e6c7d065cd5b0abe5ac3f1bd2f1512c904",
+    "legacy_slice": "b21da16a191a044e0e7f794dd67e241ecfc69ffd cherry-picked5e6f27a6d43edae28002614e5bcd3bf22761a4d2",
+    "composition_completion": "cfe91598cd67320dd9cff9c81dd9a4bb44670a30"
+  },
+  "compiler_roots": [
+    "packages/scope/tsconfig.test.json",
+    "packages/cli/tsconfig.scope.json",
+    "packages/page/tsconfig.scope.json",
+    "packages/lanes/tsconfig.scope.json"
+  ],
+  "dependency_view": "Not prepared in new worktree; future recipe requires exact existing-lock twelve actual workspace bindings/stamp before tool/base import",
+  "runtime_status": "ALL imports/build/generation/compiler/discovery/tests/native/profile/control/gate UNRUN",
+  "cause": "UNKNOWN; source repair does not explain original d048 timeout or prove physical native draining/long-pool safety",
+  "prior_limits": [
+    "d048 failed996/9/2; original7native5s timeouts",
+    "ab9 ten Node PASS at ab9 only (Root reported)",
+    "F1v7 qualified SQL diagnostic; no error-free/pass transfer",
+    "011 affected Site pass retains own head"
+  ],
+  "scope_preserved": [
+    "Whole inherited initial Source publication and final gate/review/landing owed",
+    "All original native titles/assertions/routes/authority/pins/timeouts",
+    "No production/default/lock/config/namespace/pool changes",
+    "No M1/UX/later Site integration"
+  ],
+  "files": {
+    "cleanup-delta-plan.md": {
+      "sha256": "c237125d7f8c76f7c8bfbb4775dc7337957fd13ee4735269419bf17a934de691",
+      "bytes": 7293
+    },
+    "cleanup-only.diff": {
+      "sha256": "c986f83a17bba74440b8ffd64ba3bcad661d436f6756a604e0fca4b481d55e06",
+      "bytes": 11582
+    },
+    "full.diff": {
+      "sha256": "12b1b54d637cb45aebe0337dafc3a5a00f126a7d3b297029954ffafda8155f91",
+      "bytes": 102881
+    },
+    "main-relative-paths.json": {
+      "sha256": "e78d7ead16f5d33aba6ff47654352a4cd2f1ddb7dc5a09ebc68a14d67178de5e",
+      "bytes": 10392
+    },
+    "original287-preservation.json": {
+      "sha256": "4c289e1ff3c6ddb7509179420c57c7e67d558893274a439ea6db0f610ac4c39d",
+      "bytes": 4851
+    },
+    "preservation.json": {
+      "sha256": "9c19b139ecd7b306fb3c4f328e66e1f42b17178d41cef3fb73b1841cc4cb387a",
+      "bytes": 2743
+    },
+    "root-preparation.md": {
+      "sha256": "27e49bdbf878ad282397374c5a1eeba7e451759016fffdd0c26347fd404931b3",
+      "bytes": 11061
+    },
+    "runtime-manifest.json": {
+      "sha256": "e5ee5ca185abba6edf2c484983312a0b2f6dd8049c1555d4ad9c29585bdff0b5",
+      "bytes": 20890
+    },
+    "seven-native.config.mjs": {
+      "sha256": "8219976358d5c3c90a5279216e6e7bcfe5c3605167c556a6d472181d9dbaa4da",
+      "bytes": 1355,
+      "status": "INERT; not imported"
+    },
+    "seven-title-preservation.json": {
+      "sha256": "0486b61b8ce2fff0a38c505b5acd620b196547be4c267ed541a10f265cbac4c0",
+      "bytes": 5873
+    },
+    "source-and-check-plan.md": {
+      "sha256": "5aafcd14b449987b36aca1158b6a1ec7b38046e92d7bc5693ba36b5fdc4e3165",
+      "bytes": 14864
+    },
+    "source-go.json": {
+      "sha256": "6bd7951ce6f9efee9dc5c4c314d0adc65926e86d25382b2e6d75b57ca5db7e58",
+      "bytes": 3724
+    },
+    "source-guard.mjs": {
+      "sha256": "0b361ad32a6a250f11f5ffc9b5901a3928eb4b0d288cc5abb31ab78206d0d35f",
+      "bytes": 4233,
+      "status": "INERT; not imported"
+    },
+    "source-inventory.json": {
+      "sha256": "5586e203290535035613d22e91317fe0e9a085b99d5dea57db551f02420610f3",
+      "bytes": 6754
+    },
+    "sources/before__notes__2026-10-09-initial-combined-delivery.md": {
+      "sha256": "13da01a0b4b0b3022c6234a545dbb834a9a67756f6592b739ecbafde4576e5bc",
+      "bytes": 11911
+    },
+    "sources/before__packages__cli__test__story.scope.test.ts": {
+      "sha256": "36086eea9a12799f43b6b321756c1df35ae56c7a2b4ac8384efd30b05cdf08cb",
+      "bytes": 18913
+    },
+    "sources/before__packages__lanes__test__site-native3-publication.scope.test.ts": {
+      "sha256": "d89bcd8dbd66a00509144eab96a2a0e04da0a7b0c1873de3022fd7b4ce49d7f1",
+      "bytes": 8839
+    },
+    "sources/before__packages__page__test__source-preview.scope.test.ts": {
+      "sha256": "8882aea26171bbbe2b89cb373b782475b12067bfa02c18ff7678e70028c4f33e",
+      "bytes": 3148
+    },
+    "sources/before__packages__page__test__support__demo.ts": {
+      "sha256": "0ff40aed652092caccd7a8fa1ee0ba77e6b3550a88f4d109b22ec0cfe8961a09",
+      "bytes": 11429
+    },
+    "sources/before__packages__scope__test__application-establish.test.ts": {
+      "sha256": "79cac97060c4e54beb76f3bc648316d1875cff93a817ba2e4398a82a182536e3",
+      "bytes": 17392
+    },
+    "sources/before__packages__scope__test__founding-real.test.ts": {
+      "sha256": "d9fe1cc2938ea929aadea4078a93f2e48e570ec1b44cda8d48e86c13023327b0",
+      "bytes": 37588
+    },
+    "sources/before__packages__scope__test__publication.ts": {
+      "sha256": "f5e25c4389e336ec4fdf85d6de869d7ec84e676289ea957d536d626aaf9049a8",
+      "bytes": 3545
+    },
+    "sources/before__packages__scope__test__session-ownership.test.ts": {
+      "sha256": "bb2582403b2856fbc5dfed06978cd5cc22d3ed7c25f26da68eff8cc78507b6fb",
+      "bytes": 2990
+    },
+    "sources/before__packages__scope__test__session-settings.ts": {
+      "sha256": "994a329cf4c5bc2ff9725ba4f81292c5e48c9193991e617312c1ff3996a68654",
+      "bytes": 5757
+    },
+    "sources/before__packages__scope__test__site-immutable-publication.test.ts": {
+      "sha256": "313e43d549486e80f2f58dd0026ae402f371ecc1c6d7a7544314df15caa1d1bb",
+      "bytes": 10294
+    },
+    "sources/before__packages__scope__test__support__native-fixture-lifetime.ts": {
+      "sha256": "f145412da293269c5a1d24578e9f20728a4e22dbf2a5a1207aab92bc973b0f2c",
+      "bytes": 6778
+    },
+    "sources/before__packages__scope__test__versions.test.ts": {
+      "sha256": "b792458ae6ca85b277c2c2e3d2fc2c16808a8da1a6dadac195a7e3a94af43f1e",
+      "bytes": 8757
+    },
+    "sources/notes__2026-10-09-initial-combined-delivery.md": {
+      "sha256": "587a547c49ede9855197e6837af451f31d6ea6a06fbe8e12607a58c65e0739dd",
+      "bytes": 14008
+    },
+    "sources/packages__cli__test__story.scope.test.ts": {
+      "sha256": "30515b02ea413157bdfefd185f1681db7b47f5f6ff758a7bcb4a22cb31eca8b1",
+      "bytes": 19249
+    },
+    "sources/packages__lanes__test__site-native3-publication.scope.test.ts": {
+      "sha256": "0c5ef25d65e61024b35373683aa57cf235a3425cce07d26762c33a8535d081ae",
+      "bytes": 8569
+    },
+    "sources/packages__page__test__source-preview.scope.test.ts": {
+      "sha256": "c35c126841232b96203e31de97676f4754e71b17fd7529715b3f1dd93fc81b13",
+      "bytes": 3210
+    },
+    "sources/packages__page__test__support__demo.ts": {
+      "sha256": "c565d4eb8f9054b7079cee9ce34ac2b6958785eaad37fcef3d74b885e84d9259",
+      "bytes": 9028
+    },
+    "sources/packages__scope__test__application-establish.test.ts": {
+      "sha256": "01bcc83247433558a410283adde00decc7d2e6101e01e6e5e13f093b4b51a31b",
+      "bytes": 17547
+    },
+    "sources/packages__scope__test__founding-real.test.ts": {
+      "sha256": "4188b1426f0a75efd68f57c2ac6f9034b7c14660ca17e04c3ec1eb91cce9afd6",
+      "bytes": 38502
+    },
+    "sources/packages__scope__test__publication.ts": {
+      "sha256": "8c0a9f7dd3604fafcefefcdcdeca2a293488b23092330082d482197dbbac1085",
+      "bytes": 4355
+    },
+    "sources/packages__scope__test__session-ownership.test.ts": {
+      "sha256": "e2354491ea703afaf707798306bfe00011979c44a6220712a3c52679d49d6162",
+      "bytes": 6264
+    },
+    "sources/packages__scope__test__session-settings.ts": {
+      "sha256": "249f441dcb2163331de32f9b09017bad69c68a70a88132932e5c479945f4c93a",
+      "bytes": 6090
+    },
+    "sources/packages__scope__test__site-immutable-publication.test.ts": {
+      "sha256": "bcac8f68cba1b82a1022352a44016b5e01d7ba3af48a50f77c11470c16c623eb",
+      "bytes": 10976
+    },
+    "sources/packages__scope__test__support__native-fixture-lifetime.ts": {
+      "sha256": "7bc4b987fb0b706367952df2bfce7bbafe78caff1cb727720a6c63db0c09bfc2",
+      "bytes": 10656
+    },
+    "sources/packages__scope__test__versions.test.ts": {
+      "sha256": "afda441ec3430cd240138837508b43c3fb1ce5410472b0c612408ff9de9c71c1",
+      "bytes": 9441
+    },
+    "supplemental-preservation.json": {
+      "sha256": "9ba6aa03679ca2e7cea3803be235b6e1536bb794ebeb834927dc35b3fc0db72a",
+      "bytes": 251
+    },
+    "unmodified-callers.json": {
+      "sha256": "eddb9d8a424b09b5221cb5cc6bec6820b29cd4c77adb89241d090ce6e61968a1",
+      "bytes": 3859
+    },
+    "predecessor-before-worktree-location/source-and-check-plan.md": {
+      "sha256": "515f04c6bfde6d274fc148fec6773c5e292a20351d225d7bd35d04ec1025ab64",
+      "bytes": 14868
+    },
+    "predecessor-before-worktree-location/packet.json": {
+      "sha256": "d140782ba94d55638947e48488c048109dafe9d652789ab10fc2e8c856e64e88",
+      "bytes": 10751
+    }
+  },
+  "exact_parent_head": "287777fa606345a685e07b7b26f4f71954b99672",
+  "exact_parent_tree": "05f25f64a8c836008d492c9c5cac8a113373d042",
+  "cleanup_delta_paths": [
+    "notes/2026-10-09-initial-combined-delivery.md",
+    "packages/scope/test/session-ownership.test.ts",
+    "packages/scope/test/support/native-fixture-lifetime.ts"
+  ],
+  "seven_native_bodies_byte_unchanged_from287": true,
+  "original287_packet": {
+    "path": "/tmp/artroom-initial-native-fixture-repairs-packet/packet.json",
+    "sha256": "0c0993baf0bcddc55acb3c42ace22c9f4d4da34f84624e259e8cc3130e719309"
+  },
+  "root_preparation_sha256": "27e49bdbf878ad282397374c5a1eeba7e451759016fffdd0c26347fd404931b3",
+  "cleanup_selection": "Root relayed planner milestone frame21 under5045",
+  "cleanup_semantics": "No actor check for identity-only unWire/unOutside; distinct map-installation records, fresh owned hold wrappers; no retired-owner/newer-value overwrite",
+  "unsupported_gap": "Root-owned Platform RPC under explicit current child not expanded; actual seven signed-child callers use Fetch/node.name",
+  "clerical_predecessor_snapshot": {
+    "path": "/tmp/artroom-initial-native-cleanup-fix-packet/predecessor-before-worktree-location/packet.json",
+    "sha256": "d140782ba94d55638947e48488c048109dafe9d652789ab10fc2e8c856e64e88",
+    "plan_path": "/tmp/artroom-initial-native-cleanup-fix-packet/predecessor-before-worktree-location/source-and-check-plan.md",
+    "plan_sha256": "515f04c6bfde6d274fc148fec6773c5e292a20351d225d7bd35d04ec1025ab64",
+    "change": "One external worktree-location correction only; no source/runtime-recipe changes"
+  }
+}
