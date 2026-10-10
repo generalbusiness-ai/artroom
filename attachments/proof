@@ -1,0 +1,141 @@
+{
+  "own_promise": "93caa99ba2a8eac2bd4973744fa2c903bc41c7bc",
+  "original_handle": 49862,
+  "source": {
+    "root": "/private/tmp/artroom-economy-three-donors",
+    "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+    "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+    "current_clean": true
+  },
+  "original_wrapper": {
+    "exit": 1,
+    "status": "not-distinguished",
+    "resultSha256": "e6692e1e3c497a8205b5a6a898b79f6976ed242b9a8c46a4b05bc801859151e6"
+  },
+  "component_disposition": "intended assertion distinguishes Hub reuse; original wrapper failure retained",
+  "actual_body_exit": 1,
+  "structured_rows": [
+    {
+      "event": "selection",
+      "actual": [
+        "[\"scope\",\"/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts\",\"cloudflare-pool\"]"
+      ],
+      "expected": [
+        "[\"scope\",\"/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts\",\"cloudflare-pool\"]"
+      ],
+      "accepted": true
+    },
+    {
+      "event": "collected",
+      "project": "scope",
+      "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+      "cases": [
+        {
+          "project": "scope",
+          "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+          "name": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+          "status": "pending",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "event": "started",
+      "project": "scope",
+      "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+      "name": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+      "status": "failed",
+      "errors": 1,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "event": "result",
+      "project": "scope",
+      "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+      "name": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+      "status": "failed",
+      "errors": 1,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "event": "end",
+      "reason": "failed",
+      "unhandledErrors": 0,
+      "modules": [
+        {
+          "project": "scope",
+          "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+          "status": "failed",
+          "errors": 0,
+          "cases": [
+            {
+              "project": "scope",
+              "file": "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+              "name": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+              "status": "failed",
+              "errors": 1,
+              "retryCount": 0,
+              "repeatCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "builtin_failure": "AssertionError: expected 2 to be 1 // Object.is equality\n    at /private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts:106:26\n    at private/tmp/artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20",
+  "earliest_false_classifier": "started.errors===0; actual1 after updated task state",
+  "subsequent_terminal_builtin_predicates": "independently match retained intended assertion",
+  "restoration": {
+    "source_inputs": 1272,
+    "cache_files": 3898,
+    "cache_links": 28,
+    "private_pool_files": 23,
+    "current_exact": true
+  },
+  "timing": {
+    "body_wall": 2.35,
+    "body_cpu": 2.78,
+    "outer_wall": 4.52,
+    "outer_cpu": 4.79,
+    "parent_wall": 4.526306833955459
+  },
+  "reporter_sources": [
+    {
+      "path": "/private/tmp/artroom-economy-three-donors/scripts/focused-check.mjs",
+      "bytes": 20718,
+      "sha256": "ebae5c0ff374b87ec042a0a3bd3e78709e6d058938195c6a8a155a137bf9a31f",
+      "scope": "bounded Reporter methods source read"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js",
+      "bytes": 498779,
+      "sha256": "a236001d048380e2c67d05423fc9ea3f26b07ee019ba8d6e622082f29d49102e",
+      "scope": "bounded current task update/Ready/result API spans only, no full vendor review"
+    }
+  ],
+  "findings": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/findings.txt",
+    "bytes": 2801,
+    "sha256": "c21cc2d5edad0034f35329a6bc7eb6ed38895326da288de94dc832af5e07673e",
+    "scope": "bounded independent findings"
+  },
+  "future_criterion": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/future-criterion.txt",
+    "bytes": 990,
+    "sha256": "1883398ef09faf89c8c01b91884039c9f695dfe70eeb58d88bbb3c68c55ac2f6",
+    "scope": "read-only proposal; no amended runner/release"
+  },
+  "execution": [],
+  "public_proof": {
+    "path": "/private/tmp/artroom-hub-reuse-r2-independent-disposition/public-proof.json",
+    "sha256": "523b2e6ad3319c37bf5a4cdb33f7f00018e0b4481ea5db87a7dc6c8653e6aafa",
+    "Root_verified_whitelist_count": 14
+  },
+  "execution_request": "f5a73c21a4a012895a4018e1afbfb9ad6f43bef6",
+  "early": "NEVER DISPATCHED; held by fail-stop condition",
+  "current_restoration": "independent exact Source/cache/pool correspondence plus actual finally guard PASS"
+}
