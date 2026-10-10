@@ -273,3 +273,47 @@ checks remain unrun; the frozen failed attempt and its output stay intact.
 A future attempt needs its own exact reviewed source, fresh owned stage
 and release. One changed-head gate and normal independent review are still
 owed before landing; no public publication follows.
+
+## Six-package validation outcome
+
+The checked source is `f1a5a434f595ef37ada7a0cbde518f87d1f430ba`, tree
+`44da261079aba5428721bd1be04fb12a080d3625`. Original gate handle 90198
+completed with exit 0: whitespace, typecheck and tests passed; 1,005 Vitest
+cases passed with the two original recorder skips, followed by eight passing
+Node cases. Install was skipped under the exact existing lock. Whole time was
+89.66 seconds wall and 144.59 seconds CPU on this machine. These figures are
+not a global speedup, physical-drain or deployed acceptance claim.
+
+Earlier native capture attempts remain separate: the first passed the one
+Node case and Scope test compiler, then failed collection on a temporary alias;
+the second refused mismatched temporary config metadata before any phase;
+the third reached consistent native replay, then failed the retained input's
+mistaken bare definition-name assertion without exporting a capture. The
+corrected capture's handle 93455 passed the affected compiler and whole native
+founding case. Its public canonical capture is 96,949 bytes, SHA-256
+`f01d6a82fb57f72bceb8160b9f0bf6f3a8b32a443bbf87a112b044efbd190833`:
+five complete prefixes, 18 entries, 12 retained inputs and 11 verified foreign
+facts, with no anchors, missing dependencies or redactions. The complete
+report retains every clock, source-head, delivery, observation, outside-host,
+bounds and exact platform-code trust. It is a labeled local native fixture.
+
+The first producer stopped at the missing platform README after four packs;
+the second built all six packs but its checker refused the synthetic runtime
+edge after replay, strict contexts and bundling. Both stages remain intact.
+The corrected handle 12018 passed the affected existing Node case, fresh
+six-package producer and complete checker. Compiled replay matches the native
+report exactly; withholding the directory yields its precise missing fact.
+Strict NodeNext, Bundler and opt-in ambient contexts passed. The browser bundle
+contains 118 actual compiled inputs; SHA-256 is
+`c66c72b8c0351396113e8a092442b639247a522c47871d9119d1d9477b8deb6a`.
+The bounded public proof is
+`/private/tmp/artroom-public-sdk-six-stage3-public-proof.json`, SHA-256
+`f931de5d38544a16034e572a10760c5c2df3eec214accac7c43bf96b6cedf328`.
+
+This outcome update changes only this guide; checked code, tests, settings,
+lock and assets remain identical, so no gate is repeated for it. All six
+`0.1.0-dev.2` artifacts remain local staged outputs. Verified npm publication
+authority, six public versions and integrities, a cold public consumer and
+actual Jam provisioning, browser, model, audio, recovery and Cloudflare
+acceptance remain owed. The Source request closes none of those whole-demo
+obligations.
