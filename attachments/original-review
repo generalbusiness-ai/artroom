@@ -1,0 +1,36 @@
+{
+  "kind": "Independent combined13 frozen3bSource/inertONEordinarygate review",
+  "input_packet": "/private/tmp/artroom-combined13-preparation/packet.json",
+  "input_sha256": "eb8897b4ebdb2d1d75700b449374798e154a822ddcfa945520399d41f76a606b",
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5427e4d24fc85957e07398efd1508cd631b7740b",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8150ab2a264f13672bc6b0632b554af07a9ff54a",
+  "head": "3b4b626c05c5248ab7da855860c2627765c74549",
+  "tree": "bf5171d5bae8249d5529a1dc5882afd1cdabba6b",
+  "receiving": "cf6c9ce6277f6eb840dc4e96d6943c2b87fe53ba",
+  "source_findings": [],
+  "recipe_blockers": [],
+  "later_note_successor": "Actualearly64535 occurred after3bfreeze; future authorizednote-onlyoutcome/proof/headseal rebinding needed, not silently transferred",
+  "runtime": "NONE; no gateexecution/release/approval or Source/cachechanges",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-combined13-3b-independent-review/static-correspondence.json",
+      "bytes": 1424,
+      "sha256": "0c5b091a5729c8d93205f97e7afcb1be73beda657204fc3f1a9f45b92473bfce"
+    },
+    {
+      "path": "/tmp/artroom-combined13-3b-independent-review/source-findings.md",
+      "bytes": 3521,
+      "sha256": "5935b499bd4638c15ceba83fe3f2e0cc727712351648ce832cbad50cefe1d766"
+    },
+    {
+      "path": "/tmp/artroom-combined13-3b-independent-review/recipe-findings.md",
+      "bytes": 3148,
+      "sha256": "359343f41f1c1d96b8289c07467e0adbacff209d11e43c9f7d40fcb0eb6f779d"
+    },
+    {
+      "path": "/tmp/artroom-combined13-3b-independent-review/read-coverage.json",
+      "bytes": 1032,
+      "sha256": "0fe711e053952a8eb6df6a73346e63839a065055eb72477803753987e9f59e84"
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "request": "5427e4d24fc85957e07398efd1508cd631b7740b",
+  "promise": "8150ab2a264f13672bc6b0632b554af07a9ff54a",
+  "source": {
+    "root": "/private/tmp/artroom-combined13-candidate",
+    "branch": "request/combined13-candidate",
+    "head": "62c99630346d57085dfca2292e245140e458ab7d",
+    "tree": "d09cd7a468a3ef230abf93591fb807f05a3bdf12",
+    "clean": true,
+    "pushed": true
+  },
+  "predecessor": {
+    "head": "3b4b626c05c5248ab7da855860c2627765c74549",
+    "packet": "/private/tmp/artroom-combined13-preparation/packet.json",
+    "sha256": "eb8897b4ebdb2d1d75700b449374798e154a822ddcfa945520399d41f76a606b",
+    "preserved": true
+  },
+  "scope": {
+    "receiving_relative_paths": 13,
+    "only_current_delta_path": "notes/2026-10-09-initial-combined-delivery.md",
+    "all12donor_paths_unchanged": true,
+    "other_receiving_entries_unchanged": 1270,
+    "six_main_guides_preserved": true
+  },
+  "note_sha256": "f51c5a8192cf56cd0ff979742fdcfc42a751224badd66689ab9ac336a2f06a4c",
+  "inert_future_dispatch": [
+    "python3",
+    "-I",
+    "/private/tmp/artroom-combined13-final-preparation/normal-gate-run.py"
+  ],
+  "fresh_absent_output": "/private/tmp/artroom-combined13-final-one-normal-gate",
+  "inputproof_sha256": "4f701f645fd36f30baab42d7af2a3f5e0c0c05a4d3e62bcdf27205cf5b40ce7b",
+  "runner_sha256": "62799e0189d7ddd1f8c034d6059d036fad011a48c7d1e2a4e4dbc5f365c5dabb",
+  "seal_sha256": "ac2e52076178ada090247a291e86c9b18828bcf3973ab29889d691cc34323d0f",
+  "execution": [],
+  "state_filings": [],
+  "formal_approval": false,
+  "artifacts": [
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/bounded-disposition.json",
+      "bytes": 1934,
+      "sha256": "19c5e83a4e5c890c7a4a25b42d3c8a6c8afc5d08167c757ff17ff184dd2065a4"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/full13.delta",
+      "bytes": 88955,
+      "sha256": "2f95fa462c2e4296e044c32e4f7f1f56297615c7ec6ba22698eb50a2db1864e3"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/handoff.txt",
+      "bytes": 1939,
+      "sha256": "bf69312173d8dbd3bb312a5e5408462dc14f04c9793f7b184daff10c738d88a7"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/input-proof.json",
+      "bytes": 58252,
+      "sha256": "4f701f645fd36f30baab42d7af2a3f5e0c0c05a4d3e62bcdf27205cf5b40ce7b"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/normal-gate-run.py",
+      "bytes": 8841,
+      "sha256": "62799e0189d7ddd1f8c034d6059d036fad011a48c7d1e2a4e4dbc5f365c5dabb"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/note-only.delta",
+      "bytes": 4888,
+      "sha256": "c31dd4cdbefafb3562200eba8991ee5f103f0dce4bdb9c5e1030847bcbf78efa"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/recipe-binding.delta",
+      "bytes": 1753,
+      "sha256": "64000fcfa9d654dd40df1a5d15fb585df5e8de72d73c9f375c6489920b1fe736"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/recipe-seal.json",
+      "bytes": 1273,
+      "sha256": "ac2e52076178ada090247a291e86c9b18828bcf3973ab29889d691cc34323d0f"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/shared-cache-manifest.json",
+      "bytes": 555835,
+      "sha256": "5f8ed3728526bfe148e1e39e11bed9e2c09294ca0c7a820967104b98c140cb2e"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/docs/public-sdk-release.md",
+      "bytes": 11574,
+      "sha256": "5482a5d9d836ffc2163b901c2b30ac1bef67d4d620b2d35d9b4b61953d43c3d2"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/notes/2026-10-09-initial-combined-delivery.md",
+      "bytes": 66949,
+      "sha256": "f51c5a8192cf56cd0ff979742fdcfc42a751224badd66689ab9ac336a2f06a4c"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/packages/cli/test/git.test.ts",
+      "bytes": 10357,
+      "sha256": "7ac9b8288a1bb9c086b8144a8eeebe61da279603c7a71efaf6a59d700065198e"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/packages/derive/test/fixtures.ts",
+      "bytes": 38705,
+      "sha256": "38277148a00f52c1972498c59735854fd369b8fbfe9e3cf264308690c424a3e6"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/packages/lanes/test/manifest-tree.scope.test.ts",
+      "bytes": 91747,
+      "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/packages/scope/test/hosts-pack-cache.test.ts",
+      "bytes": 8706,
+      "sha256": "b8b6ce04fb06810161100ef1ea313dff16ae90a531c69acc6293bb365e513a59"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/packages/scope/test/hosts.ts",
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/check-public-release.mjs",
+      "bytes": 11930,
+      "sha256": "d3dec7d4a80e5c9faf9627fbb3118220cf8773f657825bdcc5ff0636da12cf11"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/public-release-lib.mjs",
+      "bytes": 11651,
+      "sha256": "ecc290e03d8af858f632f1e78705b85d422cbd0ba8c3a8ee1042b97320c93997"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/public-release-modules.mjs",
+      "bytes": 6121,
+      "sha256": "f547cd2a570e234f7d5e62e793933dce5e27767c780f555fff240f8033e09849"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/public-release-modules.test.mjs",
+      "bytes": 2364,
+      "sha256": "67268adb8632ebf7bdbaa503e485329abd7922b60b70b13353bf05b5045ba020"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/public-release.json",
+      "bytes": 886,
+      "sha256": "86684da056dbc4dbb522d557aa3e22224d7cc5222c0fff5041032a4d1f33849d"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-bodies/scripts/public-release.mjs",
+      "bytes": 9072,
+      "sha256": "f0ac3d01f7d0e144edec1423108b7eb3d1023564cd0a9f9cab8c92ba89c32be0"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/source-correspondence.json",
+      "bytes": 10009,
+      "sha256": "b823d1511c4bc1f188807e8df3477e9c8a85dc2c3f8b6c67142d528db4008774"
+    },
+    {
+      "path": "/private/tmp/artroom-combined13-final-preparation/tracked-source-hashes.json",
+      "bytes": 184275,
+      "sha256": "146beb61d740954877744a2eed971f7f545dc43448fad92c339bf73aa2a0e9a7"
+    }
+  ]
+}
