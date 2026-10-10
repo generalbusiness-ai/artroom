@@ -1,0 +1,43 @@
+{
+  "head": "635786ac9a4923e02363ae5b0a35e3686a244775",
+  "branch": "request/jam-native-v2",
+  "source": "uncommitted source candidate; exact pure closure hashes below",
+  "files": [
+    {
+      "path": "test/native-v2.test.ts",
+      "sha256": "8f3262c735ed17667c459eae905194e6f4cadddcf5c53dad99e1797796ecd8d9",
+      "bytes": 2538
+    },
+    {
+      "path": "src/phrases.ts",
+      "sha256": "b1a8a93e2cb3d263ff1a63b991eb2eb3193112e047f7e0337ca567e631c46d45",
+      "bytes": 1390
+    },
+    {
+      "path": "src/interpret.ts",
+      "sha256": "ef2c1bd77c922a23aaf534437ae889f97c689ec60fb9c8e4d29324d07a2f9f3c",
+      "bytes": 7325
+    },
+    {
+      "path": "src/contributions-v2.ts",
+      "sha256": "b82b265d2315bfb080317a97fe232126d874386a074daf6e414a75e5a02bf141",
+      "bytes": 8514
+    },
+    {
+      "path": "src/recorded-v2.ts",
+      "sha256": "e72e2636b1cc4bcdf46b997bb257f4c149d8f0dab4286f4c85addf7ccf34bb1e",
+      "bytes": 8138
+    },
+    {
+      "path": "src/patterns-v2.ts",
+      "sha256": "ed4303a23fbd1485ab3110a0686572f0ea1cc8f57c8a58f8677e304f17317f22",
+      "bytes": 3304
+    },
+    {
+      "path": "src/music.ts",
+      "sha256": "9a802cad2b5b01146c9723a5ea9f2287ecf02ad9364a42371560b28038766fa8",
+      "bytes": 2576
+    }
+  ],
+  "time": "2026-10-10T12:25:48.559147+00:00"
+}
