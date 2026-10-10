@@ -1,0 +1,133 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-native-direct-stage-markers/packages/scope
+
+ ✓ |scope| ../page/test/task-data.scope.test.ts > selected merge facts are native ISSUE reports in admitted order, independent of later reports and checker jobs 501ms
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data started 0 setup none
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 276 setup setup
+native-stage task-data started 276 rules-and-issue-choices setup
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 320 rules-and-issue-choices rules-and-issue-choices
+native-stage task-data started 320 accepted-entry-and-native-child rules-and-issue-choices
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 345 accepted-entry-and-native-child accepted-entry-and-native-child
+native-stage task-data started 345 issue-description accepted-entry-and-native-child
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 356 issue-description issue-description
+native-stage task-data started 356 publication-and-review-choices issue-description
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 587 publication-and-review-choices publication-and-review-choices
+native-stage task-data started 587 fresh-review-faults publication-and-review-choices
+
+stdout | ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices
+native-stage task-data completed 641 fresh-review-faults fresh-review-faults
+native-stage task-data started 641 cleanup fresh-review-faults
+native-stage task-data completed 641 cleanup cleanup
+
+ ✓ |scope| ../page/test/task-data.scope.test.ts > native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices 641ms
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable started 0 setup none
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 213 setup setup
+native-stage immutable started 213 two-publications setup
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 623 two-publications two-publications
+native-stage immutable started 623 retained-and-head-site two-publications
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 686 retained-and-head-site retained-and-head-site
+native-stage immutable started 686 receipt-refusals retained-and-head-site
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 696 receipt-refusals receipt-refusals
+native-stage immutable started 696 cleanup-and-opening-proof receipt-refusals
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 738 cleanup-and-opening-proof cleanup-and-opening-proof
+native-stage immutable started 738 history-byte-bounds cleanup-and-opening-proof
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 797 history-byte-bounds history-byte-bounds
+native-stage immutable started 797 identity-and-receipt-corruption history-byte-bounds
+
+stderr | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+site objects: GitRefusal: hash-mismatch: pack object; last request: POST https://service.invalid/git/artroom-demo/7cdecl2xqelrdbstpo6n5bha4njndneqbd46ybfh2xk2zrxqelha-1.git/git-upload-pack -> GitRefusal
+
+stdout | test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes
+native-stage immutable completed 806 identity-and-receipt-corruption identity-and-receipt-corruption
+native-stage immutable started 806 cleanup identity-and-receipt-corruption
+native-stage immutable completed 806 cleanup cleanup
+
+ ✓ |scope| test/site-immutable-publication.test.ts > two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes 806ms
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 started 0 setup none
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 242 setup setup
+native-stage native3 started 242 first-publication setup
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 500 first-publication first-publication
+native-stage native3 started 500 second-publication first-publication
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 760 second-publication second-publication
+native-stage native3 started 760 retained-site-proof second-publication
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 786 retained-site-proof retained-site-proof
+native-stage native3 started 786 required-check-reservation retained-site-proof
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 1038 required-check-reservation required-check-reservation
+native-stage native3 started 1038 expiry-alarm-and-refusal required-check-reservation
+
+stdout | ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it
+native-stage native3 completed 1071 expiry-alarm-and-refusal expiry-alarm-and-refusal
+native-stage native3 started 1071 cleanup expiry-alarm-and-refusal
+native-stage native3 completed 1071 cleanup cleanup
+
+ ✓ |scope| ../lanes/test/site-native3-publication.scope.test.ts > native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it 1071ms
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview started 0 setup none
+
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview completed 218 setup setup
+native-stage preview started 218 open-room setup
+
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview completed 223 open-room open-room
+native-stage preview started 223 original-publication-and-source open-room
+
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview completed 478 original-publication-and-source original-publication-and-source
+native-stage preview started 478 later-publication-and-retained-source original-publication-and-source
+
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview completed 730 later-publication-and-retained-source later-publication-and-retained-source
+native-stage preview started 730 fresh-source-faults later-publication-and-retained-source
+
+stdout | ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback
+native-stage preview completed 774 fresh-source-faults fresh-source-faults
+native-stage preview started 774 cleanup fresh-source-faults
+native-stage preview completed 774 cleanup cleanup
+
+ ✓ |scope| ../page/test/source-preview.scope.test.ts > exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback 774ms
+
+ Test Files  4 passed (4)
+      Tests  5 passed (5)
+   Start at  22:30:12
+   Duration  5.17s (transform 488ms, setup 0ms, import 1.09s, tests 3.79s, environment 0ms)
+
+JSON report written to /tmp/artroom-native-fc0-diagnostic-result/vitest.json
+real 5.92
+user 5.86
+sys 0.90
