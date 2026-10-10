@@ -19,7 +19,13 @@ test("Join fences duplicate requests and never applies an accepted reply to chan
     set textContent(value: string) { this.text = value; }
     get textContent(): string { return this.text || this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
     find(predicate: (element: Element) => boolean): Element | undefined { if (predicate(this)) return this; for (const child of this.children) if (child instanceof Element) { const found = child.find(predicate); if (found) return found; } return undefined; }
-    querySelector(selector: string) { return this.find((element) => element.attrs["id"] === selector.slice(1)); }
+    querySelector(selector: string) { return selector.startsWith("#") ? this.find((element) => element.attrs["id"] === selector.slice(1)) : this.querySelectorAll(selector)[0]; }
+    all(): Element[] { return [this, ...this.children.flatMap(child => child instanceof Element ? child.all() : [])]; }
+    querySelectorAll(selector: string) {
+      const part = /^([a-z-]+)?(?:\[([^=\]]+)(?:="([^"]*)")?\])?$/.exec(selector);
+      if (!part) throw new Error(`Unsupported scripted DOM selector: ${selector}`);
+      return this.all().slice(1).filter(element => (!part[1] || element.tag === part[1]) && (!part[2] || Object.hasOwn(element.attrs, part[2]) && (part[3] === undefined || element.attrs[part[2]] === part[3])));
+    }
   }
   const root = new Element("div");
   const original = { place: { directory: "original-room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device" };

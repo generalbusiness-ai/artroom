@@ -9,26 +9,43 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   class Element {
     children: (Element | string)[] = [];
     attrs: Record<string, string> = {};
+    parent: Element | null = null;
     handlers = new Map<string, (event: { preventDefault(): void }) => void>();
     constructor(readonly tag: string) {}
     setAttribute(name: string, value: string) { this.attrs[name] = value; }
-    append(...children: (Element | string)[]) { this.children.push(...children); }
-    prepend(...children: (Element | string)[]) { this.children.unshift(...children); }
-    replaceChildren(...children: (Element | string)[]) { this.children = children; if (this === root) rendered.resolve(); }
+    append(...children: (Element | string)[]) { for (const child of children) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.push(child); } }
+    prepend(...children: (Element | string)[]) { for (const child of [...children].reverse()) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.unshift(child); } }
+    replaceChildren(...children: (Element | string)[]) { for (const child of this.children) if (child instanceof Element) child.parent = null; this.children = []; this.append(...children); if (this === root) rendered.resolve(); }
+    remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
     removeAttribute(name: string) { delete this.attrs[name]; }
     hasAttribute(name: string) { return Object.hasOwn(this.attrs, name); }
-    querySelector(selector: string) { return selector.includes("data-action-slot") ? new Element("div") : this.querySelectorAll(selector)[0] ?? null; }
+    querySelector(selector: string) { return this.querySelectorAll(selector)[0] ?? null; }
     getAttribute(name: string) { return this.attrs[name] ?? null; }
     all(): Element[] { return [this, ...this.children.flatMap(child => typeof child === "string" ? [] : child.all())]; }
+    matches(selector: string): boolean {
+      const part = /^([a-z-]+)?(?:\[([^=\]]+)(?:="([^"]*)")?\])?$/.exec(selector);
+      if (!part) return selector.startsWith(".") && (this.attrs["class"] ?? "").split(/\s+/).includes(selector.slice(1));
+      return (!part[1] || this.tag === part[1]) && (!part[2] || this.hasAttribute(part[2]) && (part[3] === undefined || this.getAttribute(part[2]) === part[3]));
+    }
     querySelectorAll(selector: string) {
-      const attr = /^\[([^\]]+)\]$/.exec(selector)?.[1];
-      return attr ? this.all().filter(node => node.hasAttribute(attr)) : [];
+      return this.all().slice(1).filter(node => selector.split(",").some(choice => {
+        const [ancestor, descendant] = choice.trim().split(/\s+/, 2);
+        if (!descendant) return node.matches(ancestor!);
+        if (!node.matches(descendant)) return false;
+        for (let parent = node.parent; parent; parent = parent.parent) if (parent.matches(ancestor!)) return true;
+        return false;
+      }));
     }
     set textContent(value: string) { this.children = [value]; }
     get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
   }
+  const screen = (...slots: string[]) => {
+    const main = new Element("main");
+    for (const slot of slots) { const host = new Element("div"); host.setAttribute("data-action-slot", slot); main.append(host); }
+    return main;
+  };
   const root = new Element("div");
   type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
@@ -57,8 +74,8 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   }));
   vi.doMock("../src/view.ts", () => ({
     icon: () => new Element("svg"),
-    h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.children = children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]; return el; },
-    roomScreen: () => new Element("main"), issueScreen: () => new Element("main"), changeScreen: () => new Element("main"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
+    h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.append(...children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]); return el; },
+    roomScreen: () => screen("create"), issueScreen: () => screen("comment", "next"), changeScreen: () => screen("comment", "next", "edit"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
     actsPanel: (_offered: unknown, callback: typeof send, last: Element | null, options: (typeof panels)[number]) => { send = callback; panels.push(options); const panel = new Element("section"); if (last) panel.append(last); return panel; },
   }));
   vi.stubGlobal("document", { getElementById: () => root, createElement: (tag: string) => new Element(tag) });
