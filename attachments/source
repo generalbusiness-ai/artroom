@@ -1,0 +1,74 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0c3828a0ca7b50dda540dc1c9023950c03b72668",
+  "rests_on": [
+    "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4291f1e6caa20c865f5c2c983418c408b9d65895"
+  ],
+  "cwd": "/tmp/artroom-sdk-reference-reader-repair",
+  "branch": "request/sdk-reference-reader-repair",
+  "head": "c4bd3f256d6f5cab4038ee9d8c178fbc25a2ee21",
+  "tree": "87876eec6b0f189f445a67638db9fee6b08d983c",
+  "base": "5e1f7c50f7341892f37e1f6f9294396a6d67e62b",
+  "clean": true,
+  "pushed": "c4bd3f256d6f5cab4038ee9d8c178fbc25a2ee21",
+  "changed_paths": [
+    "docs/public-sdk-release.md",
+    "scripts/check-public-release.mjs",
+    "scripts/public-release-lib.mjs",
+    "scripts/public-release-modules.mjs",
+    "scripts/public-release-modules.test.mjs",
+    "scripts/public-release.mjs"
+  ],
+  "new_parser_dependency": false,
+  "SDK_manifests_lock_implementation_unchanged": true,
+  "failed_attempt_and_stage_untouched": true,
+  "one_reader_case": "SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules",
+  "runtime": "ALLnewsyntax/import/cases/compilers/build/pack/check/control/gateUNRUN",
+  "claim": "currentliteralSDKreaderSourceonly; no generalgrammar/Sourceapproval/publicrelease/nativeacceptance transfer",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/authored-source-inventory.json",
+      "bytes": 1308,
+      "sha256": "7d4117f9f983e3780c753a1ce1d221576dd5d02557220d75c1242483252bbf10"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/delta.patch",
+      "bytes": 16062,
+      "sha256": "0c830892f156101c7b41f2b0bce221bf71681b806d6869fd2f15781460712e83"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-and-check-plan.md",
+      "bytes": 7278,
+      "sha256": "c7236420f4c68b1a76370dfac31a35b443716a5438f0c1f2febea3a9b98de424"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/check-public-release.mjs",
+      "bytes": 10683,
+      "sha256": "79816962b32e175551337c5f38a80229697c0c40cacc2f4817d654bc7544e8c6"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/public-release-lib.mjs",
+      "bytes": 11651,
+      "sha256": "ecc290e03d8af858f632f1e78705b85d422cbd0ba8c3a8ee1042b97320c93997"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/public-release-modules.mjs",
+      "bytes": 6121,
+      "sha256": "f547cd2a570e234f7d5e62e793933dce5e27767c780f555fff240f8033e09849"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/public-release-modules.test.mjs",
+      "bytes": 2364,
+      "sha256": "67268adb8632ebf7bdbaa503e485329abd7922b60b70b13353bf05b5045ba020"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/public-release.mjs",
+      "bytes": 9072,
+      "sha256": "f0ac3d01f7d0e144edec1423108b7eb3d1023564cd0a9f9cab8c92ba89c32be0"
+    },
+    {
+      "path": "/tmp/artroom-sdk-reference-reader-repair-source-packet/source-bodies/public-sdk-release.md",
+      "bytes": 8987,
+      "sha256": "54d93ddcec78dada381b978151d053a3ff42afce93325614d531df417570a579"
+    }
+  ]
+}
