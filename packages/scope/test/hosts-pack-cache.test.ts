@@ -126,4 +126,28 @@ test("OwnGit reuses only ordered immutable pack bytes while each request checks 
   expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
   expect(hub.packBuilds).toBe(4);
   expect([hub.minted, hub.mintedPermissions, [...hub.revoked], hub.pushes]).toEqual([[], [], [], []]);
+
+  // Hub's known raw-size failure must reach the actual codec without copying
+  // this already inadmissible payload first. Observe only that exact input.
+  hub.objects.clear(); hub.objects.set(oversized.id, oversized);
+  const originalConstructor = globalThis.Uint8Array;
+  let oversizedCopies = 0;
+  globalThis.Uint8Array = new Proxy(originalConstructor, {
+    construct(target, arguments_, newTarget) {
+      if (arguments_[0] === oversized.data) oversizedCopies++;
+      return Reflect.construct(target, arguments_, newTarget);
+    },
+  });
+  try {
+    await expect(hub.fetch(publicRead())).rejects.toMatchObject({ reason: "too-large" });
+  } finally {
+    globalThis.Uint8Array = originalConstructor;
+  }
+  expect(oversizedCopies).toBe(0);
+  expect(hub.packBuilds).toBe(5);
+  hub.objects.clear(); hub.objects.set(hubSnapshot.id, hubSnapshot);
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(6);
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(6);
 });

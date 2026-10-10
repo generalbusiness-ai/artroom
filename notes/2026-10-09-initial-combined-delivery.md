@@ -229,3 +229,26 @@ Affected compilation, the complete cache and Demo files, a distinguishing
 Hub-only control and a changed-head gate remain unrun and owed. Prior gates
 and native results qualify their exact earlier heads; they do not accept this
 new source. The frozen initial `0e595` filing remains separate.
+
+
+Hub known-refusal allocation — source successor, validation pending
+
+This separate successor of `c8d989305f6a1ed9b8a2570a28232c34c9599145`
+implements request `74b810cd1dd75fbfff0f481c77e290409fc85e32`, resting on
+promise `660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa` and adopted choice
+`0e527840fd86f43dd3d4a2d03a3fd5ca63e0353d`. Only Hub enables the shared
+helper's cheap count/raw-length failure selector. It sends necessarily
+failing ordered object references to the unchanged real codec before any
+fixture payload copy; that codec retains its own first-error ordering.
+OwnGit's inherited path and every accepted owned snapshot remain unchanged.
+Known failing Hub uploads may each call the codec rather than coalescing
+rejected promises. Actual build counting and identity-guarded failed-slot
+retirement remain explicit; no auth, refs, response or receive decision is
+cached. The same cache case observes construction of the exact oversized
+payload and restores the real constructor in `finally`, then checks repair
+and reuse. Constructor interception is unproved until an actual old-path
+control distinguishes it; unsupported interception is not acceptance.
+All new compilation, native bodies, controls and the changed-head gate are
+unrun and remain separately owned. No measured allocation gain, timing
+factor, live GitHub behavior or full tenfold outcome is claimed. Frozen c8
+and the initial `0e595` filing remain unchanged and separate.

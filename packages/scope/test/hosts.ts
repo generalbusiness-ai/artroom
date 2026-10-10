@@ -36,17 +36,33 @@ const pkt = (text: string): Uint8Array => { const bytes = utf8(text); return joi
  * No response, ref, credential or authority answer is cached here. */
 class OwnedPack {
   #packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
-  constructor(private readonly built: () => void) {}
+  constructor(private readonly built: () => void, private readonly earlyRefusal = false) {}
   /** Reuse only immutable pack bytes for the map's actual ordered content.
    * Authentication and Responses are still fresh for every request. */
   get(objects: ReadonlyMap<string, DecodedObject>): Promise<Uint8Array> {
-    const snapshot = [...objects].map(([key, object]) => ({ key, id: object.id, type: object.type, data: new Uint8Array(object.data) }));
-    const key = digestBytes(utf8(canonicalize(snapshot.map(object => [object.key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
-    if (this.#packed?.key === key) return this.#packed.bytes;
-    this.built();
-    // Key and construction use the same owned snapshot, before any await.
-    // The cast does not bypass buildPack's runtime type/hash/size validation.
-    const made = buildPack(snapshot.map(object => ({ id: object.id, type: object.type as "blob" | "tree" | "commit", data: object.data })), { maxBytes: MAX_BYTES });
+    const raw = this.earlyRefusal ? [...objects.values()] : null;
+    let total = 0;
+    const knownFailure = raw !== null && (raw.length > READ_BOUNDS.closureObjects || raw.length > 0xffffffff || raw.some(object => {
+      const limit = object.type === "commit" ? READ_BOUNDS.commitBytes : object.type === "tree" ? READ_BOUNDS.treeBytes : object.type === "blob" ? READ_BOUNDS.blobBytes : Infinity;
+      total += object.data.length;
+      return object.data.length > limit || total > MAX_BYTES;
+    }));
+    let key: string, made: Promise<Uint8Array>;
+    if (knownFailure) {
+      this.built();
+      // Actual codec chooses the first error, including an earlier bad ID,
+      // type, hash or parser input. No fixture payload copy precedes it.
+      made = buildPack(raw as Parameters<typeof buildPack>[0], { maxBytes: MAX_BYTES });
+      key = ""; // Never coalesce known failures; accepted keys are sha256 digests.
+    } else {
+      const snapshot = [...objects].map(([key, object]) => ({ key, id: object.id, type: object.type, data: new Uint8Array(object.data) }));
+      key = digestBytes(utf8(canonicalize(snapshot.map(object => [object.key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
+      if (this.#packed?.key === key) return this.#packed.bytes;
+      this.built();
+      // Key and construction use the same owned snapshot, before any await.
+      // The cast does not bypass buildPack's runtime type/hash/size validation.
+      made = buildPack(snapshot.map(object => ({ id: object.id, type: object.type as "blob" | "tree" | "commit", data: object.data })), { maxBytes: MAX_BYTES });
+    }
     this.#packed = { key, bytes: made };
     void made.catch(() => { if (this.#packed?.bytes === made) this.#packed = null; });
     return made;
@@ -134,7 +150,7 @@ export class Hub {
   readonly pushes: { ref: string; old: string; commit: string }[] = [];
   /** Actual constructions, for the shared fixture's cache witness; not reads. */
   packBuilds = 0;
-  readonly #packed = new OwnedPack(() => { this.packBuilds++; });
+  readonly #packed = new OwnedPack(() => { this.packBuilds++; }, true);
   #repository() {
     return { id: 71, name: this.name, owner: ACCOUNT, private: false, full_name: `${ACCOUNT.login}/${this.name}`, html_url: `https://github.com/${ACCOUNT.login}/${this.name}`, clone_url: `https://github.com/${ACCOUNT.login}/${this.name}.git` };
   }
