@@ -1,5 +1,6 @@
 /** Task-specific retained-text editor. All names/source are inert DOM text. Loaded-Page memory only. */
 import type { ScopeId } from "@generalbusiness/artroom-contract";
+import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { editPath } from "@generalbusiness/artroom-platform";
 import { actAssociation, type ChangeView, type Room } from "./data.ts";
 import { h } from "./view.ts";
@@ -16,6 +17,18 @@ export function retainedEditor(room: Room, change: ChangeView, options: Retained
   let kept = drafts.get(key);
   if (!kept) { kept = { draft: { title: `Edit ${selected.file.path}`.slice(0, 128), path: editPath(selected.file.path) ? selected.file.path : "", content: selected.file.content }, preparing: false, opened: false, message: "" }; drafts.set(key, kept); }
   const record = kept;
+  // Release only a definitely-unsent task in its original mounted context.
+  // A stopped task may already contain accepted work or an uncertain receipt.
+  const canReturnToDraft = (task: EditTask): boolean => record.task === task && !record.preparing && !task.busy
+    && (task.state === "prepared" || task.state === "stopped") && options.current()
+    && task.association === actAssociation(room, change.scope)
+    && task.context.service === room.session.service.replace(/\/+$/, "") && task.context.key === room.key
+    && canonicalize(task.context.membership) === canonicalize(room.membership)
+    && task.context.directory.scope === room.directory && canonicalize(task.context.directory) === canonicalize(task.directory)
+    && task.context.rules === room.rules && task.context.destination === room.destination
+    && task.source.scope.scope === change.scope && task.source.manifest === selected.id && task.source.digest === selected.file!.digest
+    && task.lane === undefined && task.proposal === undefined && task.version === undefined && task.collectedSource === undefined
+    && task.steps.every(step => step.attempted === false && step.answer === undefined && (step.receiptVerified === undefined || step.receiptVerified === false));
   const host = h("section", { class: "panel retained-editor", "aria-label": "Propose a text edit" });
   const draw = () => {
     if (!record.opened) {
@@ -44,14 +57,24 @@ export function retainedEditor(room: Room, change: ChangeView, options: Retained
       const label = task.state === "prepared" ? "Confirm new proposal" : task.state === "unknown" ? "Check original request" : "Continue checking progress";
       const go = h("button", { type: "button", class: "primary" }, task.busy ? "Waiting…" : label) as HTMLButtonElement;
       go.disabled = task.busy || ["recorded","refused","stopped"].includes(task.state);
-      go.addEventListener("click", () => { void (async () => {
-        const opts = { current: options.current, changed: draw };
-        if (task.state === "unknown") await checkEditRequest(room, task, opts); else await continueEdit(room, task, opts);
-        draw();
-      })(); });
+      go.addEventListener("click", () => {
+        if (record.task !== task || record.preparing || task.busy || !options.current()) return;
+        void (async () => {
+          const opts = { current: options.current, changed: draw };
+          if (task.state === "unknown") await checkEditRequest(room, task, opts); else await continueEdit(room, task, opts);
+          draw();
+        })();
+      });
       controls.append(go);
-      if (task.state === "prepared" && !task.busy) {
-        const cancel = h("button", { type: "button" }, "Back to edit"); cancel.addEventListener("click", () => { delete record.task; draw(); }); controls.append(cancel);
+      if (canReturnToDraft(task)) {
+        const cancel = h("button", { type: "button" }, "Back to edit");
+        cancel.addEventListener("click", () => {
+          if (!canReturnToDraft(task)) return;
+          delete record.task;
+          record.message = "Draft preserved. Prepare again to reread the source, authority and current published base, then confirm explicitly. Nothing was sent.";
+          draw();
+        });
+        controls.append(cancel);
       }
       if (task.state === "recorded" && task.lane) {
         const link = h("a", { href: `#/change/${task.lane}`, class: "button" }, "Open new proposal"); link.addEventListener("click", () => options.recorded?.(task.lane!)); controls.append(link);
