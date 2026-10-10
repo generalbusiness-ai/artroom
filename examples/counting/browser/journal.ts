@@ -1,8 +1,8 @@
 /** Private attempt history; service judgments are not signed native receipts. */
 import type { Answer, Digest } from "@generalbusiness/artroom-contract";
 import { canonicalize, isGrant, isHead, isRecord, isSignedIntentShape, REFUSAL_REASONS, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { counting } from "../definition.ts";
-import type { ActorIdentity, PendingReport, PreparedEnvelope } from "./voice-controller.ts";
+import { countingCommitments as counting } from "../commitments.ts";
+import type { ActorIdentity, AudioStart, PendingReport, PreparedEnvelope } from "./voice-controller.ts";
 export const MAX_ATTEMPTS=8, SLOT_BYTES=64*1024;
 export type DispatchPhase="prepared"|"inflight"|"unknown"|"refused"|"recorded";
 export interface RefusalJudgment {
@@ -75,18 +75,28 @@ export function terminalJournal(journal:AttemptJournal|undefined,identity:ActorI
 }
 
 /** Completion custody is local and must stay bound to the same full device identity. */
+export function validAudioStart(value:unknown,identity:ActorIdentity):value is AudioStart {
+  try {
+    if (!closed(value,["turn","voiceId","audioId","startedAt"]) || !isRecord(value)) return false;
+    const t=value["turn"];
+    if (!isRecord(t) || !closed(t,["origin","deployment","scope","definition","membership","member","publicKey","generation","serial","N","expiresAt"])) return false;
+    const {generation,serial,N,expiresAt,...context}=t;
+    return canonicalize(context)===canonicalize(identity) && [generation,serial,N,expiresAt,value["startedAt"]].every(v=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0) && (generation as number)<=1000000 && (serial as number)>=1 && (serial as number)<=1000000 && (N as number)>=1 && (N as number)<=100 && (value["startedAt"] as number)<(expiresAt as number) && typeof value["voiceId"]==="string" && value["voiceId"].length>0 && typeof value["audioId"]==="string" && /^[A-Za-z0-9_-]{22}$/.test(value["audioId"]);
+  } catch { return false; }
+}
 export function validReport(value:unknown,identity:ActorIdentity):value is PendingReport {
   try{
-    if(!isRecord(value)||!closed(value,["completion","envelope","outcome"],["journal"])||!["unknown","refused"].includes(value["outcome"] as string)||!closed(value["completion"],["turn","voiceId","completedAt"]))return false;
+    if(!isRecord(value)||!closed(value,["completion","envelope","outcome"],["journal","audioStart"])||!["unknown","refused"].includes(value["outcome"] as string)||!closed(value["completion"],["turn","voiceId","completedAt"]))return false;
     const c=value["completion"] as Record<string,unknown>,t=c["turn"];
     if(typeof c["voiceId"]!=="string"||!c["voiceId"]||typeof c["completedAt"]!=="number"||!Number.isSafeInteger(c["completedAt"])||c["completedAt"]<0||!isRecord(t)||!closed(t,["origin","deployment","scope","definition","membership","member","publicKey","generation","serial","N","expiresAt"]))return false;
     const {generation,serial,N,expiresAt,...context}=t;
     if(canonicalize(context)!==canonicalize(identity)||![generation,serial,N,expiresAt].every(v=>typeof v==="number"&&Number.isSafeInteger(v))||(generation as number)<0||(serial as number)<1||(N as number)<1||(expiresAt as number)<0||!validEnvelope(value["envelope"],identity)||!fitsPending(identity,value))return false;
+    if (Object.hasOwn(value,"audioStart") && (!validAudioStart(value["audioStart"],identity) || canonicalize(value["audioStart"].turn)!==canonicalize(t) || value["audioStart"].voiceId!==c["voiceId"] || value["audioStart"].startedAt>(c["completedAt"] as number))) return false;
     const intent=value["envelope"].signed.intent;
-    if(intent.kind!=="spoken"||intent.fields["generation"]!==generation||intent.fields["serial"]!==serial||intent.fields["n"]!==N)return false;
+    if(intent.kind!=="fulfill"||intent.fields["generation"]!==generation||intent.fields["serial"]!==serial||intent.fields["n"]!==N)return false;
     if(!Object.hasOwn(value,"journal"))return true;
     const journal=value["journal"] as AttemptJournal;
-    return validJournal(journal,identity,value["envelope"])&&journal.attempts.every(a=>a.envelope.signed.intent.kind==="spoken"&&a.envelope.signed.intent.fields["generation"]===generation&&a.envelope.signed.intent.fields["serial"]===serial&&a.envelope.signed.intent.fields["n"]===N);
+    return validJournal(journal,identity,value["envelope"])&&journal.attempts.every(a=>a.envelope.signed.intent.kind==="fulfill"&&a.envelope.signed.intent.fields["generation"]===generation&&a.envelope.signed.intent.fields["serial"]===serial&&a.envelope.signed.intent.fields["n"]===N);
   }catch{return false;}
 }
 

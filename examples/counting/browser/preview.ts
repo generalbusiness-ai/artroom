@@ -3,7 +3,7 @@ import "./style.css";
 import type { Entry, Item, MemberRef, Receipt, ScopeRef, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch, HeadStreamFetch } from "@generalbusiness/artroom-client";
-import { COUNTING_DEFINITION } from "../pin.ts";
+import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { nativeGateway } from "./client.ts";
 import { mountCountingStage } from "./app.ts";
 import { browserLock, privateCommandStore, privatePendingStore } from "./storage.ts";
@@ -16,12 +16,14 @@ const members:MemberRef[]=["@ada","@beau","@cleo"].map(member=>({membership:M,me
 type FakeItem={-readonly [K in keyof Item]:Item[K]};
 const make=(type:string,id:number,state:string,values:Item["values"],parties:Item["parties"]):FakeItem=>({type,id,state,revision:1,opened:null,values,parties,refs:{},attributed:[]});
 const config=make("configuration",0,"ready",{target:100},{controller:members[0]!});
-const board=make("board",1,"running",{target:100,generation:0,serial:43,lastNumber:42,number:43,basis:members.map((member,i)=>({id:i+2,member})),until:new Date(NOW+15_000).toISOString()},{controller:members[0]!,speaker:members[0]!,lastSpeaker:members[2]!});
-let participants=members.map((member,i)=>make("participant",i+2,"joined",{}, {agent:member})),seq=48,lost=false,posts=0,settles=0,nextID=6,active=true;
+const board=make("board",1,"open",{target:100,generation:0,serial:43,lastNumber:42,until:new Date(NOW+30_000).toISOString()},{controller:members[0]!,lastSpeaker:members[2]!});
+board.refs={pledge:44,lastFulfilledAt:42};
+let pledge:FakeItem|null=make("promise",44,"pledged",{generation:0,serial:43,n:43,basis:members.map((member,i)=>({id:i+2,member})),until:new Date(NOW+30_000).toISOString()},{agent:members[0]!});pledge.refs={participant:2,admittedAt:44};
+let participants=members.map((member,i)=>make("participant",i+2,"active",{}, {agent:member})),seq=48,lost=false,posts=0,settles=0,nextID=6,active=true;
 const entries=new Map<number,Entry>(),receipts=new Map<string,Receipt>(),heads=new Set<ReadableStreamDefaultController<Uint8Array>>();
 const head=()=>({seq,hash:textDigest(`fake head ${seq}`)});
 const notify=()=>{const bytes=new TextEncoder().encode(JSON.stringify({at:head()})+"\n");for(const c of heads)try{c.enqueue(bytes);}catch{heads.delete(c);}};
-const summary=():Summary=>({scope:S,status:"active",definition:COUNTING_DEFINITION,time:new Date(NOW).toISOString(),counts:[],items:[config,board,...participants]});
+const summary=():Summary=>({scope:S,status:"active",definition:COUNTING_DEFINITION,time:new Date(NOW).toISOString(),counts:[],items:[config,board,...participants,...(pledge?[pledge]:[])]});
 const read=(value:unknown)=>Response.json({ok:true,at:head(),complete:true,value});
 const fakeFetch:Fetch=async(url,init)=>{
   const path=new URL(url).pathname;
@@ -32,14 +34,17 @@ const fakeFetch:Fetch=async(url,init)=>{
   posts++;const signed=JSON.parse(init?.body??"{}").signed as SignedIntent;const i=keys.findIndex(k=>keyIdOfSecret(k)===signed.intent.actor),actor=members[i];if(!actor)return Response.json({answer:"refused",reason:"unauthorized",judgedAt:head()});
   const f=signed.intent.fields,kind=signed.intent.kind;
   // Script only expected source-QA paths; this is NOT native guard/admission proof.
-  if(kind==="spoken"){board.values={...board.values,lastNumber:f["n"]!,serial:f["nextSerial"]!,number:f["nextN"]!,basis:f["basis"]!};board.parties={...board.parties,lastSpeaker:actor,speaker:participants.find(p=>p.id===f["next"])!.parties["agent"]!};}
-  else if(kind==="pause"){board.state="paused";board.values={...board.values,serial:f["nextSerial"]!,number:null,basis:null,until:null};board.parties={...board.parties,speaker:null};}
-  else if(kind==="start"){board.state="running";board.values={...board.values,serial:f["nextSerial"]!,number:f["n"]!,basis:f["basis"]!,until:new Date(NOW+15_000).toISOString()};board.parties={...board.parties,speaker:participants.find(p=>p.id===f["next"])!.parties["agent"]!};}
-  else if(kind==="reset"){board.state="paused";board.values={...board.values,generation:f["generation"]!,serial:0,lastNumber:0,number:null,basis:null,until:null};board.parties={...board.parties,speaker:null,lastSpeaker:null};}
-  else if(kind==="leave"){const leaving=participants.find(p=>p.id===signed.intent.on);participants=participants.filter(p=>p.id!==signed.intent.on);if(leaving&&canonicalize(leaving.parties["agent"])===canonicalize(board.parties["speaker"])){board.values={...board.values,serial:f["nextSerial"]!,basis:f["basis"]!,until:f["replace"]?new Date(NOW+15_000).toISOString():null};board.parties={...board.parties,speaker:f["replace"]?participants.find(p=>p.id===f["next"])!.parties["agent"]!:null};if(!f["replace"]){board.state="paused";board.values={...board.values,number:null};}}}
-  else if(kind==="join"){participants.push(make("participant",nextID++,"joined",{}, {agent:actor}));}
+  if(kind==="commit"){const id=seq+1;pledge=make("promise",id,"pledged",{generation:f["generation"]!,serial:f["serial"]!,n:f["n"]!,basis:f["basis"]!,until:new Date(NOW+30_000).toISOString()},{agent:actor});pledge.refs={participant:f["participant"] as number,admittedAt:id};board.refs={...board.refs,pledge:id};board.values={...board.values,serial:f["serial"]!,until:pledge.values["until"]!};}
+  else if(kind==="fulfill"){board.values={...board.values,lastNumber:f["n"]!,until:null};board.parties={...board.parties,lastSpeaker:actor};board.refs={...board.refs,pledge:null,lastFulfilledAt:seq+1};pledge=null;board.state=Number(f["n"])===100?"finished":"open";}
+  else if(kind==="fail"||kind==="cancel"){board.state="paused";board.values={...board.values,until:null};board.refs={...board.refs,pledge:null};pledge=null;}
+  else if(kind==="pause"){board.state="paused";}
+  else if(kind==="start"){board.state="open";}
+  else if(kind==="reset"){board.state="paused";board.values={...board.values,generation:f["generation"]!,serial:0,lastNumber:0,until:null};board.refs={pledge:null,lastFulfilledAt:null};board.parties={...board.parties,lastSpeaker:null};}
+  else if(kind==="participate"){participants.push(make("participant",nextID++,"inactive",{}, {agent:actor}));}
+  else if(kind==="activate"||kind==="deactivate"||kind==="force-deactivate"){const target=participants.find(p=>p.id===signed.intent.on);if(target){target.state=kind==="activate"?"active":"inactive";target.revision++;}}
+  else if(kind==="remove-participant"){participants=participants.filter(p=>p.id!==signed.intent.on);}
   seq++;board.revision++;const entry:Entry={v:1,at:S,seq,prev:textDigest("fake previous entry"),time:new Date(NOW).toISOString(),clamped:false,epoch:0,input:{type:"act",signed,authority:[],presented:{}},uses:[],prepared:[],effects:[],sends:[]};entries.set(seq,entry);const receipt:Receipt={fact:factRefOf(entry),definition:COUNTING_DEFINITION,intent:intentDigest(signed.intent),effects:[],sends:[],epoch:0};receipts.set(canonicalize(signed),receipt);notify();
-  if(lost&&kind==="spoken"){lost=false;throw new Error("FAKE lost accepted reply");}return Response.json({answer:"accepted",receipt});
+  if(lost&&kind==="fulfill"){lost=false;throw new Error("FAKE lost accepted reply");}return Response.json({answer:"accepted",receipt});
 };
 const fakeHeads:HeadStreamFetch=async(url,init)=>{if(init.redirect!=="error")throw new Error("Fake metadata contract requires redirect refusal.");const body=new ReadableStream<Uint8Array>({start(controller){heads.add(controller);controller.enqueue(new TextEncoder().encode(JSON.stringify({at:head()})+"\n"));},cancel(){for(const c of heads)try{c.close();}catch{}heads.clear();}});return{status:200,body,headers:new Headers({"content-type":"application/x-ndjson"}),url,redirected:false};};
 let plays=0,cancels=0,callbacks:{end():void;error():void}|undefined;

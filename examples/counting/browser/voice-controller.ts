@@ -1,7 +1,7 @@
 /** Local media custody only. Observations and media callbacks do not decide a count. */
-import { canonicalize } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Beside, Digest, Grant, KeyId, MemberRef, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
-import { activeAttempt, appendPrepared, envelopeKey, resumableJournal, knownRefusal as validatedRefusal, terminalJournal, validEnvelope, validReport as validatedReport, MAX_ATTEMPTS, type AttemptJournal } from "./journal.ts";
+import { activeAttempt, appendPrepared, envelopeKey, resumableJournal, knownRefusal as validatedRefusal, terminalJournal, validEnvelope, validAudioStart, validReport as validatedReport, MAX_ATTEMPTS, type AttemptJournal } from "./journal.ts";
 
 export interface ActorIdentity {
   readonly origin: string;
@@ -23,6 +23,7 @@ export interface SpeechPort {
   voices(): readonly { readonly id: string; readonly name: string }[];
   play(text: string, voiceId: string, callbacks: { end(): void; error(): void }): () => void;
 }
+export interface AudioStart { readonly turn: TurnToken; readonly voiceId: string; readonly audioId: string; readonly startedAt: number }
 export interface Completion { readonly turn: TurnToken; readonly voiceId: string; readonly completedAt: number }
 export interface PreparedEnvelope { readonly signed: SignedIntent; readonly grants: readonly Grant[]; readonly beside: Beside }
 export interface PendingReport {
@@ -30,11 +31,15 @@ export interface PendingReport {
   readonly envelope: PreparedEnvelope;
   readonly outcome: "unknown" | "refused";
   readonly journal?: AttemptJournal;
+  readonly audioStart?: AudioStart;
 }
 /** Bind this store to the frozen ActorIdentity externally. Use private durable custody.
  * save must finish before any POST. No keys or session tokens belong here. */
 export interface PendingStore {
   load(): Promise<PendingReport | null>;
+  loadStart?(): Promise<AudioStart | null>;
+  saveStart?(marker: AudioStart): Promise<void>;
+  archiveStart?(marker: AudioStart): Promise<void>;
   save(pending: PendingReport): Promise<void>;
   clear(): Promise<void>;
   /** Atomically preserve the complete resolved record under the existing quota, then remove its active pointer. */
@@ -57,6 +62,7 @@ export interface Reporter {
   refresh?(): void | Promise<void>;
   /** Fresh native snapshot says this original completion can no longer be current. */
   obsolete?(completion: Completion): boolean;
+  audioObsolete?(marker: AudioStart): boolean;
 }
 /** Must exclude other controllers using this private pending slot, including other tabs. */
 export interface CustodyLock { run<T>(work: () => Promise<T>): Promise<T> }
@@ -69,6 +75,7 @@ export interface VoiceState {
   readonly voiceId?: string;
   readonly turn?: TurnToken;
   readonly pending?: "unknown" | "refused";
+  readonly audioUncertain?: boolean;
   readonly correctionReady?: boolean;
   readonly resumeReady?: boolean;
 }
@@ -127,6 +134,7 @@ export function createVoiceController(options: {
   let observation: VoiceObservation = { fresh: false, authorized: false };
   let completion: Completion | null = null;
   let pending: PendingReport | null = null;
+  let audioStart: AudioStart | null = null;
   let audioGeneration = 0;
   let cancel: (() => void) | null = null;
   let active: TurnToken | null = null;
@@ -154,6 +162,7 @@ export function createVoiceController(options: {
     if (!current()) return;
     view = retained({ phase, message, armed: armedVoice !== null, ...(armedVoice ? { voiceId: armedVoice } : {}), ...(turn ? { turn } : {}),
       ...(pending && validReport(pending) ? { turn: pending.completion.turn } : {}),
+      ...(audioStart && custodyBlocked ? {audioUncertain:true} : {}),
       ...(pending || custodyBlocked ? { pending: pending?.outcome ?? "unknown", correctionReady: custodyBlocked ? false : correctionReady(), resumeReady: !custodyBlocked && !!pending && validReport(pending) && resumableJournal(pending.journal,identity,pending.envelope) && options.reporter.resumeReady?.(pending)===true } : {}) });
     for (const listener of listeners) { if (current()) listener(view); }
   };
@@ -270,11 +279,14 @@ export function createVoiceController(options: {
       return;
     }
     const journal = appendPrepared(envelope, correcting ? oldPending?.journal : undefined);
-    const report = retained<PendingReport>({ completion: completed, envelope, outcome: "unknown", journal });
+    const marker = correcting ? oldPending?.audioStart : await options.store.loadStart?.();
+    if (!current() || !marker || !validAudioStart(marker,identity) || turnKey(marker.turn)!==turnKey(completed.turn) || marker.voiceId!==completed.voiceId) throw new Error("The original audio-start marker is unavailable.");
+    const report = retained<PendingReport>({ completion: completed, envelope, outcome: "unknown", journal, audioStart: marker });
     if (!validReport(report)) { emit("blocked", "The exact pending report is malformed or exceeds private custody limits."); return; }
     // Nothing may be posted unless these exact signed bytes are privately retained.
     await options.store.save(report);
     pending = report;
+    audioStart = null;
     completion = null;
     if (!usable(completed.turn) || generation !== audioGeneration) { emit("unknown", "The saved attempt awaits reconciliation after a context change."); return; }
     // The dispatcher owns the identity lock for its transport phase. Never nest it.
@@ -299,6 +311,13 @@ export function createVoiceController(options: {
   });
   const ready = options.lock.run(async () => {
     try {
+      const marker = await options.store.loadStart?.();
+      if (!current()) return;
+      if (marker) {
+        if (!validAudioStart(marker,identity)) throw new Error("The audio start is malformed.");
+        audioStart=retained(marker);remember(marker.turn);custodyBlocked=true;loaded=true;
+        emit("blocked", "An interrupted audio attempt is retained. Do not speak it again; resolve its native pledge and Check report.",marker.turn);return;
+      }
       const saved = await options.store.load();
       if (!current()) return;
       if (saved) {
@@ -321,7 +340,7 @@ export function createVoiceController(options: {
 
   const start = (voiceId: string): boolean => {
       const t = observation.turn;
-      if (!loaded || custodyBlocked || busy || pending || completion || active || !t || !usable(t) ||
+      if (!loaded || custodyBlocked || busy || pending || audioStart || completion || active || !t || !usable(t) ||
           attempted.has(turnKey(t)) || !options.speech.voices().some(v => v.id === voiceId)) return false;
       if (replayMemoryFull || attempted.size >= playedTokenLimit) {
         replayMemoryFull = true;
@@ -333,35 +352,43 @@ export function createVoiceController(options: {
       remember(turn);
       const generation = ++audioGeneration;
       active = turn;
-      emit("speaking", "Speaking the assigned number locally.", turn);
+      emit("loading", "Preparing this device’s local voice.", turn);
       const validCallback = (): boolean => current() && generation === audioGeneration && active !== null &&
         turnKey(active) === turnKey(turn) && observation.authorized && sameContext(turn) && now() < turn.expiresAt &&
         (!observation.turn || turnKey(observation.turn) === turnKey(turn));
-      try {
+      busy = true;
+      void options.lock.run(async () => {
+        if (!options.store.saveStart || !options.store.loadStart) throw new Error("Durable audio-start custody is unavailable.");
+        const prior = await options.store.load();
+        const started = await options.store.loadStart();
+        if (!usable(turn) || generation !== audioGeneration) return;
+        if (prior || started) throw new Error("A prior voice attempt remains in private custody.");
+        const marker = retained<AudioStart>({ turn, voiceId, audioId: b64url(crypto.getRandomValues(new Uint8Array(16))), startedAt: now() });
+        await options.store.saveStart(marker);
+        audioStart = marker;
+        const readback = await options.store.loadStart();
+        if (!readback || canonicalize(readback)!==canonicalize(marker)) throw new Error("Audio-start custody did not read back exactly.");
+        if (!usable(turn) || generation !== audioGeneration) { custodyBlocked=true;emit("blocked","The retained audio start became uncertain before playback; do not replay it.");return; }
+        emit("speaking", "Speaking the pledged number locally.", turn);
         const stop = options.speech.play(String(turn.N), voiceId, {
           end() {
             if (!validCallback()) return;
-            audioGeneration += 1;
-            active = null;
-            cancel = null;
+            audioGeneration += 1; active = null; cancel = null;
             completion = retained({ turn, voiceId, completedAt: now() });
-            emit("completed", "Local speech completed; waiting for a fresh matching turn.", turn);
-            if (usable(turn)) void reportCompletion();
+            emit("completed", "Local speech completed; waiting for a fresh matching pledge.", turn);
+            if (!busy && usable(turn)) void reportCompletion();
           },
           error() {
             if (!validCallback()) return;
-            stopAudio();
-            completion = null;
-            emit("blocked", "Local speech failed. No completed turn was reported.");
+            stopAudio();completion=null;custodyBlocked=true;
+            emit("blocked", "Local speech failed or became uncertain. Its start is retained; resolve the pledge without repeating audio.");
           },
         });
-        // Some adapters may complete synchronously during play().
         if (generation === audioGeneration && active) cancel = stop;
-      } catch {
-        stopAudio();
-        completion = null;
-        emit("blocked", "Local speech could not begin. No completed turn was reported.");
-      }
+      }).catch(() => { stopAudio();completion=null;custodyBlocked=true;emit("blocked","Private audio-start custody or playback failed. No fulfillment was sent; do not replay the attempt."); }).finally(() => {
+        busy=false;
+        if (completion && usable(completion.turn) && !pending && !custodyBlocked) void reportCompletion();
+      });
       return true;
   };
   return {
@@ -400,7 +427,21 @@ export function createVoiceController(options: {
     },
     invalidate,
     disarm() { armedVoice = null; invalidate(); },
-    checkPending: () => guarded(async () => {
+    checkPending: async () => {
+      if (audioStart && custodyBlocked) {
+        const marker=audioStart;
+        if (!observation.fresh || !observation.authorized || options.reporter.audioObsolete?.(marker)!==true || !options.store.archiveStart) { emit("blocked","The original audio is uncertain. Resolve its pledge natively before archiving; it will not be repeated.",marker.turn);return; }
+        try { await options.lock.run(async()=>{
+          const kept=await options.store.loadStart?.();
+          if (!current() || !kept || canonicalize(kept)!==canonicalize(marker) || await options.store.load()) throw new Error("Audio custody changed.");
+          if (!observation.fresh || !observation.authorized || options.reporter.audioObsolete?.(marker)!==true) return;
+          await options.store.archiveStart!(marker);
+          if (!current()) return;
+          audioStart=null;custodyBlocked=false;armedVoice=null;emit("idle","The resolved native pledge's uncertain audio history was archived intact. Arm a new pledge explicitly.");
+        }); } catch {emit("blocked","The uncertain original audio remains in private custody.");}
+        return;
+      }
+      return guarded(async () => {
       const stored = await options.store.load();
       if (!current()) return;
       if (stored) {
@@ -418,7 +459,8 @@ export function createVoiceController(options: {
         catch { result = { status: "unknown" }; }
         await finishReport(report, result);
       };
-    }),
+    });
+    },
     resumePending: () => guarded(async () => {
       const saved=await options.store.load();
       if(!current()||!saved||!validReport(saved)||!resumableJournal(saved.journal,identity,saved.envelope)||options.reporter.resumeReady?.(saved)!==true||!options.reporter.resume)return;

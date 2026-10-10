@@ -1,7 +1,7 @@
 /** Private, bounded browser custody. Tokens and signing keys are never stored here. */
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { terminalJournal, type AttemptJournal } from "./journal.ts";
-import type { ActorIdentity, CustodyLock, PendingReport, PendingStore, PreparedEnvelope } from "./voice-controller.ts";
+import { terminalJournal, validAudioStart, validReport, type AttemptJournal } from "./journal.ts";
+import type { ActorIdentity, AudioStart, CustodyLock, PendingReport, PendingStore, PreparedEnvelope } from "./voice-controller.ts";
 const MOST=64*1024, IDENTITIES=32;
 const keyOf=(identity:ActorIdentity)=>digestBytes(utf8(canonicalize(identity)));
 export function browserLock(identity:ActorIdentity):CustodyLock {
@@ -17,9 +17,10 @@ function privateSlot<T>(identity:ActorIdentity,purpose:"voice"|"command") {
   return{
     load:()=>transact<T|null>("readonly",(store,set,reject)=>{const request=store.get(key);request.onsuccess=()=>{const record=request.result as {identity?:ActorIdentity;pending?:T}|undefined;if(!record)return set(null);try{if(canonicalize(record.identity)!==canonicalize(identity)||!record.pending||utf8(canonicalize(record)).length>MOST)return reject(new Error("The private pending identity is unavailable."));set(record.pending);}catch{reject(new Error("The private pending identity is unavailable."));}};}),
     save:async (pending:T)=>{const record={identity,pending};if(utf8(canonicalize(record)).length>MOST)throw new Error("The private pending record exceeds its bound.");await transact<void>("readwrite",(store,set,reject)=>{const count=store.count();count.onsuccess=()=>{const current=store.getKey(key);current.onsuccess=()=>{if(current.result===undefined&&count.result>=IDENTITIES){reject(new Error("Private pending identity capacity is full."));return;}store.put(record,key);set(undefined);};};});},
-    archive:async(pending:T,receiptConfirmed=false)=>{
+    archive:async(pending:T,receiptConfirmed=false,audioOnly=false)=>{
       const candidate=pending as {envelope?:PreparedEnvelope;journal?:AttemptJournal};
-      if(!candidate.envelope||!terminalJournal(candidate.journal,identity,candidate.envelope,receiptConfirmed))throw new Error("Only a fully resolved history can be archived.");
+      if(audioOnly){const record=pending as {audioStart?:unknown};if(Object.keys(record).length!==1||!validAudioStart(record.audioStart,identity))throw new Error("The audio-start history is malformed.");}
+      else if(!candidate.envelope||!terminalJournal(candidate.journal,identity,candidate.envelope,receiptConfirmed))throw new Error("Only a fully resolved history can be archived.");
       // Same object store and transaction: commit an intact record before removing its active pointer.
       await transact<void>("readwrite",(store,set,reject)=>{
         const read=store.get(key);read.onsuccess=()=>{
@@ -41,5 +42,23 @@ function privateSlot<T>(identity:ActorIdentity,purpose:"voice"|"command") {
   };
 }
 
-export function privatePendingStore(identity:ActorIdentity):PendingStore{return privateSlot<PendingReport>(identity,"voice");}
+export function privatePendingStore(identity:ActorIdentity):PendingStore {
+  const slot=privateSlot<PendingReport|{audioStart:AudioStart}>(identity,"voice");
+  const marker=(value:PendingReport|{audioStart:AudioStart}|null):AudioStart|null=>{
+    if(value&&Object.keys(value).length===1&&"audioStart" in value){if(!validAudioStart(value.audioStart,identity))throw new Error("The original audio start is malformed.");return value.audioStart;}
+    if(value&&!validReport(value,identity))throw new Error("The original voice record is malformed.");return null;
+  };
+  return {
+    load:async()=>{const value=await slot.load();return marker(value)?null:value as PendingReport|null;},
+    loadStart:async()=>marker(await slot.load()),
+    saveStart:async audioStart=>{if(!validAudioStart(audioStart,identity)||await slot.load())throw new Error("A voice record already exists or the start is invalid.");await slot.save({audioStart});},
+    save:async pending=>{if(!validReport(pending,identity))throw new Error("The exact completed voice report is invalid.");const value=await slot.load(),held=marker(value);
+      if(held&&(!pending.audioStart||canonicalize(pending.audioStart)!==canonicalize(held)))throw new Error("The original audio start must remain with its completion.");
+      if(value&&!held&&(!validReport(value,identity)||canonicalize(value.completion)!==canonicalize(pending.completion)))throw new Error("The prior voice completion must remain intact.");await slot.save(pending);},
+    clear:slot.clear,
+    archive:(pending,confirmed)=>slot.archive(pending,confirmed),
+    // Native obsolescence is checked by the current gateway/controller; this store owns only atomic custody.
+    archiveStart:async audioStart=>{const value=await slot.load();if(!value||!marker(value)||canonicalize(marker(value))!==canonicalize(audioStart))throw new Error("The original audio start changed.");await slot.archive(value,false,true);},
+  };
+}
 export function privateCommandStore(identity:ActorIdentity){return privateSlot<{kind:string;envelope:PreparedEnvelope;journal?:AttemptJournal}>(identity,"command");}

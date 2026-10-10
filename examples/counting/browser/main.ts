@@ -1,6 +1,6 @@
 import "./style.css";
 import { isKeyId, isMemberRef, isScopeRef, unb64url } from "@generalbusiness/artroom-bytes";
-import { COUNTING_DEFINITION } from "../pin.ts";
+import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { nativeGateway } from "./client.ts";
 import { mountCountingStage } from "./app.ts";
 import { browserSpeech } from "./speech.ts";
@@ -20,9 +20,9 @@ form.addEventListener("submit",event=>{event.preventDefault();void(async()=>{
     const binding=(form.elements.namedItem("binding") as HTMLInputElement).files?.[0],keyFile=(form.elements.namedItem("key") as HTMLInputElement).files?.[0];
     if(!binding||!keyFile||binding.size>16*1024||keyFile.size>256)throw new Error();
     const data=JSON.parse(await binding.text()) as ActorIdentity&{cohort?:{directory?:string;membership?:string;rules?:string;destination?:string}};
-    const url=new URL(data.origin);if(url.origin!==data.origin||url.username||url.password||url.pathname!=="/"||url.search||url.hash||!["https:","http:"].includes(url.protocol))throw new Error();
+    const url=new URL(data.origin);if(url.origin!==location.origin||url.origin!==data.origin||url.username||url.password||url.pathname!=="/"||url.search||url.hash||!["https:","http:"].includes(url.protocol))throw new Error();
     if(data.definition!==COUNTING_DEFINITION||typeof data.deployment!=="string"||!data.deployment||data.deployment.length>128||!isScopeRef(data.scope)||!isScopeRef(data.membership)||!isMemberRef(data.member)||!isKeyId(data.publicKey))throw new Error();
-    if(data.cohort?.directory!=="platform:directory@5"||data.cohort.membership!=="platform:membership@4"||data.cohort.rules!=="platform:rules@3"||data.cohort.destination!=="platform:destination@2")throw new Error();
+    if(data.cohort?.directory!=="platform:directory@6"||data.cohort.membership!=="platform:membership@5"||data.cohort.rules!=="platform:rules@3"||data.cohort.destination!=="platform:destination@2")throw new Error();
     const raw=new Uint8Array(await keyFile.arrayBuffer()),parsed=raw.length===32?raw:unb64url(new TextDecoder().decode(raw).trim());secret=parsed;if(!secret||secret.length!==32)throw new Error();
     const identity:ActorIdentity={origin:data.origin,deployment:data.deployment,scope:data.scope,definition:data.definition,membership:data.membership,member:data.member,publicKey:data.publicKey};
     if(attempt!==active)return;const at=attempt,store=privatePendingStore(identity),lock=browserLock(identity),commandStore=privateCommandStore(identity);

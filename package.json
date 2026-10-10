@@ -7,9 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p examples/counting/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p examples/counting/tsconfig.json && tsc -p examples/counting/browser/tsconfig.json",
     "pretest": "node scripts/cloudflare-pool-compat.mjs",
-    "test": "vitest run && node --test scripts/active-source.test.mjs scripts/cloudflare-pool-compat.test.mjs",
+    "test": "vitest run && node --test scripts/active-source.test.mjs scripts/cloudflare-pool-compat.test.mjs && node --experimental-transform-types --test examples/counting/browser/client.test.ts examples/counting/browser/voice-controller.test.ts examples/counting/browser/app.test.ts",
     "pretest:changed": "node scripts/cloudflare-pool-compat.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gate": "bash scripts/gate.sh"

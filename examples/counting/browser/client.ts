@@ -2,9 +2,9 @@
 import type { Receipt, Summary } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, intentDigest, keyIdOfSecret, isRecord, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHeadStream, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, type Fetch, type HeadStreamFetch, type Observation, type ObservationState, type Session } from "@generalbusiness/artroom-client";
-import { counting } from "../definition.ts";
-import { COUNTING_DEFINITION } from "../pin.ts";
-import { assignedTurn, countingView, ownedParticipant, proposal, same, type Control, type CountingView } from "./model.ts";
+import { countingCommitments as counting } from "../commitments.ts";
+import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
+import { assignedTurn, countingView, ownedParticipant, proposal, same, type Control, type ProposalOptions, type CountingView } from "./model.ts";
 import { appendPrepared, activeAttempt, envelopeKey, fitsPending, resumableJournal, validEnvelope, validReport, validJournal, type AttemptJournal } from "./journal.ts";
 import { attemptDispatcher, type TrustedActFetch } from "./dispatcher.ts";
 import type { ActorIdentity, Completion, PreparedEnvelope, Reporter, ReportOutcome, CustodyLock, PendingStore } from "./voice-controller.ts";
@@ -13,7 +13,7 @@ export interface CommandStore {load():Promise<{kind:string;envelope:PreparedEnve
 export type CommandOutcome=ReportOutcome|{readonly status:"blocked";readonly reason:string};
 export interface StageGateway extends Reporter {
   observe(emit:(state:ObservationState<Summary>,view?:CountingView)=>void):Observation;
-  command(kind:Control):Promise<CommandOutcome>;
+  command(kind:Control,options?:ProposalOptions):Promise<CommandOutcome>;
   checkCommand():Promise<ReportOutcome|null>;
   resumeCommand():Promise<ReportOutcome|null>;
   commandResumeReady():boolean;
@@ -42,26 +42,26 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
   };
   const trusted:TrustedActFetch|undefined=options.actFetch??(options.fetch?undefined:typeof globalThis.fetch==="function"?((url,init)=>fetch(url,{...init,signal:AbortSignal.any([init.signal,lifetime.signal])})):undefined);
   const dispatcher=attemptDispatcher({identity,current:usable,...(trusted?{fetch:trusted}:{}),accepted:verified,settle:async envelope=>{exact(envelope);const answer=await handle().settle(envelope.signed);current();return answer.ok?{ok:true,receipt:answer.value}:{ok:false};},refresh:()=>observer?.refresh()});
-  const candidate=(kind:Control|"spoken",completion?:Completion)=>{if(!view||!fresh)throw new Error("A current counting snapshot is required.");const plan=proposal(view,identity,kind,completion),shaped=shapeDeclaredAct(counting,kind,{on:plan.on,fields:plan.fields});return{plan,shaped};};
+  const candidate=(kind:Control,completion?:Completion,details:ProposalOptions={})=>{if(!view||!fresh)throw new Error("A current counting snapshot is required.");const plan=proposal(view,identity,kind,completion,details),shaped=shapeDeclaredAct(counting,kind,{on:plan.on,fields:plan.fields});return{plan,shaped};};
   const reservation=(report:import("./voice-controller.ts").PendingReport):boolean=>{
     try{
       current();if(!dispatcher.supported()||!report.journal||!validJournal(report.journal,identity,report.envelope)||activeAttempt(report.journal).phase!=="refused"||!["guard-failed","revision-moved"].includes(activeAttempt(report.journal).refusal!.answer.reason))return false;
       const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,report.completion.turn))return false;
-      const {plan,shaped}=candidate("spoken",report.completion);
+      const {plan,shaped}=candidate("fulfill",report.completion);
       // Actual SDK fields have fixed-size22-char operation IDs,86-char signatures and20-char timestamps.
-      const envelope:PreparedEnvelope={signed:{intent:{v:1,to:identity.scope,actor:identity.publicKey,kind:"spoken",on:shaped.on??null,expected:plan.expected,fields:shaped.fields,idempotencyKey:"x".repeat(22),notAfter:"2099-01-01T00:00:00Z"},sig:"x".repeat(86)},grants:[],beside:shaped.beside};
+      const envelope:PreparedEnvelope={signed:{intent:{v:1,to:identity.scope,actor:identity.publicKey,kind:"fulfill",on:shaped.on??null,expected:plan.expected,fields:shaped.fields,idempotencyKey:"x".repeat(22),notAfter:"2099-01-01T00:00:00Z"},sig:"x".repeat(86)},grants:[],beside:shaped.beside};
       const journal=appendPrepared(envelope,report.journal);
       const next={...report,envelope,journal,outcome:"unknown" as const};
       return fitsPending(identity,next);
     }catch{return false;}
   };
-  const prepare=async(kind:Control|"spoken",completion?:Completion):Promise<PreparedEnvelope>=>{
+  const prepare=async(kind:Control,completion?:Completion,details:ProposalOptions={}):Promise<PreparedEnvelope>=>{
     current();if(!dispatcher.supported())throw new Error("Trusted submit transport is unavailable.");
-    const {plan,shaped}=candidate(kind,completion);
+    const {plan,shaped}=candidate(kind,completion,details);
     const signed=await signedIntent(signer,{to:identity.scope,kind,on:shaped.on,fields:shaped.fields,expected:plan.expected});current();return{signed,grants:[],beside:shaped.beside};
   };
   const commandRecord=(held:unknown):held is NonNullable<Awaited<ReturnType<CommandStore["load"]>>>=>{
-    if(!isRecord(held)||Object.keys(held).some(k=>!["kind","envelope","journal"].includes(k))||!Object.hasOwn(held,"kind")||!Object.hasOwn(held,"envelope")||typeof held["kind"]!=="string"||!["initialize","join","leave","start","pause","reset"].includes(held["kind"])||!validEnvelope(held["envelope"],identity)||held["envelope"].signed.intent.kind!==held["kind"]||!fitsPending(identity,held))return false;
+    if(!isRecord(held)||Object.keys(held).some(k=>!["kind","envelope","journal"].includes(k))||!Object.hasOwn(held,"kind")||!Object.hasOwn(held,"envelope")||typeof held["kind"]!=="string"||!["initialize","participate","activate","deactivate","force-deactivate","remove-participant","start","commit","fail","cancel","pause","reset"].includes(held["kind"])||!validEnvelope(held["envelope"],identity)||held["envelope"].signed.intent.kind!==held["kind"]||!fitsPending(identity,held))return false;
     return !Object.hasOwn(held,"journal")||validJournal(held["journal"] as AttemptJournal,identity,held["envelope"]);
   };
   const clearCommand=async(envelope:PreparedEnvelope,result:ReportOutcome):Promise<ReportOutcome>=>{
@@ -84,14 +84,15 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
         emit:state=>{if(!usable())return;fresh=state.status==="current";if(fresh&&state.status==="current"){try{view=countingView(state.snapshot.value,identity.scope);}catch{view=undefined;fresh=false;emit({status:"error",reason:"The counting snapshot is invalid."});return;}}emit(state,view);},
       });return observer;
     },
-    obsolete:completion=>{if(!usable()||!fresh||!view||!view.board)return false;const t=completion.turn,b=view.board,turn=assignedTurn(view,identity);return !ownedParticipant(view,identity)||b.generation!==t.generation||b.serial!==t.serial||b.lastNumber>=t.N||!!turn&&(turn.N!==t.N||turn.expiresAt!==t.expiresAt);},
+    obsolete:completion=>{if(!usable()||!fresh||!view||!view.board)return false;const t=completion.turn,b=view.board,turn=assignedTurn(view,identity);return !ownedParticipant(view,identity)||b.generation!==t.generation||b.serial!==t.serial||b.lastNumber>=t.N||!view.pledge||!!turn&&(turn.N!==t.N||turn.expiresAt!==t.expiresAt);},
+    audioObsolete:marker=>{if(!usable()||!fresh||!view||!view.board)return false;const p=view.pendingPromise,t=marker.turn;return !p||p.generation!==t.generation||p.serial!==t.serial||p.n!==t.N||!same(p.member,identity.member);},
     resumeReady:report=>{const turn=view&&assignedTurn(view,identity);return usable()&&fresh&&!!view&&!!ownedParticipant(view,identity)&&!!turn&&Date.now()<turn.expiresAt&&same(turn,report.completion.turn)&&validReport(report,identity)&&resumableJournal(report.journal,identity,report.envelope);},
     resume:envelope=>options.lock.run(async()=>{current();const held=await options.voiceStore.load();if(!fresh||!held||!validReport(held,identity)||!resumableJournal(held.journal,identity,envelope)||!view||!ownedParticipant(view,identity)||Date.now()>=held.completion.turn.expiresAt||!same(assignedTurn(view,identity),held.completion.turn))return{status:"blocked",reason:"The original report has no current definitely-unsent dispatch proof."};const result=await dispatcher.run(options.voiceStore,envelope);const after=await options.voiceStore.load();current();return after&&validReport(after,identity)&&envelopeKey(after.envelope)===envelopeKey(envelope)?{...result,custody:structuredClone(after)}:result;}),
     correctionReady:reservation,refresh:()=>observer?.refresh(),
-    async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("spoken",completion);},
+    async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("fulfill",completion);},
     submit:envelope=>dispatchReport(envelope,false),
     reconcile:envelope=>dispatchReport(envelope,true),
-    async command(kind){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();await options.commandStore.save(held);}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await dispatcher.run(options.commandStore,envelope);const retained=await options.commandStore.load();current();commandPrepared=!!retained&&commandRecord(retained)&&resumableJournal(retained.journal,identity,retained.envelope);return clearCommand(envelope,result);});},
+    async command(kind,details={}){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind,undefined,details);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();await options.commandStore.save(held);}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await dispatcher.run(options.commandStore,envelope);const retained=await options.commandStore.load();current();commandPrepared=!!retained&&commandRecord(retained)&&resumableJournal(retained.journal,identity,retained.envelope);return clearCommand(envelope,result);});},
     async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;commandPrepared=false;return null;}pending=held.kind;if(!commandRecord(held)){commandPrepared=false;return{status:"blocked",reason:"The malformed original command remains in private custody."};}commandPrepared=resumableJournal(held.journal,identity,held.envelope);const result=await dispatcher.check(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
     async resumeCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;commandPrepared=false;return null;}pending=held.kind;
       const voiceHeld=await options.voiceStore.load();current();if(!fresh||voiceHeld||!commandRecord(held)||!resumableJournal(held.journal,identity,held.envelope)){commandPrepared=false;return{status:"blocked",reason:"The original command has no current definitely-unsent dispatch proof."};}
