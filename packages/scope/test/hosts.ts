@@ -32,6 +32,43 @@ const join = (...parts: Uint8Array[]): Uint8Array => {
 };
 const pkt = (text: string): Uint8Array => { const bytes = utf8(text); return join(utf8((bytes.length + 4).toString(16).padStart(4, "0")), bytes); };
 
+/** The two host stand-ins share only immutable wire-pack construction.
+ * No response, ref, credential or authority answer is cached here. */
+class OwnedPack {
+  #packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
+  constructor(private readonly built: () => void, private readonly earlyRefusal = false) {}
+  /** Reuse only immutable pack bytes for the map's actual ordered content.
+   * Authentication and Responses are still fresh for every request. */
+  get(objects: ReadonlyMap<string, DecodedObject>): Promise<Uint8Array> {
+    const raw = this.earlyRefusal ? [...objects.values()] : null;
+    let total = 0;
+    const knownFailure = raw !== null && (raw.length > READ_BOUNDS.closureObjects || raw.length > 0xffffffff || raw.some(object => {
+      const limit = object.type === "commit" ? READ_BOUNDS.commitBytes : object.type === "tree" ? READ_BOUNDS.treeBytes : object.type === "blob" ? READ_BOUNDS.blobBytes : Infinity;
+      total += object.data.length;
+      return object.data.length > limit || total > MAX_BYTES;
+    }));
+    let key: string, made: Promise<Uint8Array>;
+    if (knownFailure) {
+      this.built();
+      // Actual codec chooses the first error, including an earlier bad ID,
+      // type, hash or parser input. No fixture payload copy precedes it.
+      made = buildPack(raw as Parameters<typeof buildPack>[0], { maxBytes: MAX_BYTES });
+      key = ""; // Never coalesce known failures; accepted keys are sha256 digests.
+    } else {
+      const snapshot = [...objects].map(([key, object]) => ({ key, id: object.id, type: object.type, data: new Uint8Array(object.data) }));
+      key = digestBytes(utf8(canonicalize(snapshot.map(object => [object.key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
+      if (this.#packed?.key === key) return this.#packed.bytes;
+      this.built();
+      // Key and construction use the same owned snapshot, before any await.
+      // The cast does not bypass buildPack's runtime type/hash/size validation.
+      made = buildPack(snapshot.map(object => ({ id: object.id, type: object.type as "blob" | "tree" | "commit", data: object.data })), { maxBytes: MAX_BYTES });
+    }
+    this.#packed = { key, bytes: made };
+    void made.catch(() => { if (this.#packed?.bytes === made) this.#packed = null; });
+    return made;
+  }
+}
+
 /**
  * STAND-IN for the hosting's own Git service: its binding, and smart HTTP over a map of refs and objects. A read serves every
  * object; a push applies its one compare-and-swap command and keeps the objects of its pack, decoded. It is no Git host: the git
@@ -46,7 +83,7 @@ export class OwnGit {
   readonly pushes: { ref: string; old: string; commit: string }[] = [];
   /** Actual constructions, for the fixture's cache witness; not HTTP reads. */
   packBuilds = 0;
-  #packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
+  readonly #packed = new OwnedPack(() => { this.packBuilds++; });
   readonly remote = (name: string) => `https://${HOST}/git/${NAMESPACE}/${name}.git`;
   readonly ns: ArtifactsNamespace = {
     get: async (name) => ({
@@ -74,21 +111,6 @@ export class OwnGit {
     return new Response(join(pkt(`# service=${service}\n`), utf8("0000"), ...lines, utf8("0000")), { headers: { "content-type": `application/x-${service}-advertisement` } });
   }
 
-  /** Reuse only immutable pack bytes for the map's actual ordered content.
-   * Authentication and Responses are still fresh for every request. */
-  #pack(): Promise<Uint8Array> {
-    const snapshot = [...this.objects].map(([key, object]) => ({ key, id: object.id, type: object.type, data: new Uint8Array(object.data) }));
-    const key = digestBytes(utf8(canonicalize(snapshot.map(object => [object.key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
-    if (this.#packed?.key === key) return this.#packed.bytes;
-    this.packBuilds++;
-    // Key and construction use the same owned snapshot, before any await.
-    // The cast does not bypass buildPack's runtime type/hash/size validation.
-    const made = buildPack(snapshot.map(object => ({ id: object.id, type: object.type as "blob" | "tree" | "commit", data: object.data })), { maxBytes: MAX_BYTES });
-    this.#packed = { key, bytes: made };
-    void made.catch(() => { if (this.#packed?.bytes === made) this.#packed = null; });
-    return made;
-  }
-
   readonly fetch = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     expect(url.origin + url.pathname.replace(/\/(info\/refs|git-upload-pack|git-receive-pack)$/, "")).toBe(this.remote(this.name!));
@@ -98,7 +120,7 @@ export class OwnGit {
     const service = url.searchParams.get("service");
     if (request.method === "GET" && (service === "git-upload-pack" || service === "git-receive-pack")) return this.#advertisement(service);
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
-      const pack = await this.#pack();
+      const pack = await this.#packed.get(this.objects);
       return new Response(join(pkt("NAK\n"), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     if (request.method === "POST" && url.pathname.endsWith("/git-receive-pack")) {
@@ -126,6 +148,9 @@ export class Hub {
   readonly mintedPermissions: string[] = [];
   readonly revoked = new Set<string>();
   readonly pushes: { ref: string; old: string; commit: string }[] = [];
+  /** Actual constructions, for the shared fixture's cache witness; not reads. */
+  packBuilds = 0;
+  readonly #packed = new OwnedPack(() => { this.packBuilds++; }, true);
   #repository() {
     return { id: 71, name: this.name, owner: ACCOUNT, private: false, full_name: `${ACCOUNT.login}/${this.name}`, html_url: `https://github.com/${ACCOUNT.login}/${this.name}`, clone_url: `https://github.com/${ACCOUNT.login}/${this.name}.git` };
   }
@@ -166,7 +191,7 @@ export class Hub {
     // Reads are public: no credential is sent. A write carries an installation token that is minted and not revoked.
     if (request.method === "GET" && service === "git-upload-pack") return this.#advertisement(service);
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
-      const pack = await buildPack([...this.objects.values()].map((o) => ({ id: o.id, type: o.type as "blob" | "tree" | "commit", data: o.data })), { maxBytes: MAX_BYTES });
+      const pack = await this.#packed.get(this.objects);
       return new Response(join(pkt("NAK\n"), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     const token = atob(request.headers.get("authorization")?.slice("Basic ".length) ?? "").slice("x-access-token:".length);

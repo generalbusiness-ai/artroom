@@ -1,5 +1,26 @@
 # Initial combined source delivery — 2026-10-09
 
+The initial delivery is landed on main at
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, tree
+`7f9bf06ee29e56b040e5cce07408ad240a2401fe`. The builder verified the
+pushed head against the live remote and retained landing receipt
+`732ca210b84469513b3a53b618b2867ca92a71e0`; request `60e591` is satisfied
+and landed. The earlier failed gates and qualified successful evidence
+below remain attributed to their exact source.
+
+This branch is a separate source-only three-donor test-economy
+composition onto that receiving main: Hub, manifest and CLI Git fixtures.
+Its three compiler contexts and all 42 selected cases, including one
+original optional recorder, are **unrun**. It preserves reviewed donor
+code and original deadlines. The earlier 27-case `5ade`/`8c967`/R2
+preparation remains frozen and unexecuted; it is not an altered acceptance
+or a prior result. New controls, a changed-head gate and independent
+review remain owed. SDK, UI, Counting and other setup branches are outside
+this composition. No new performance, native authority or product
+acceptance is claimed.
+
+## Historical initial delivery and evidence (retained)
+
 This candidate joins the current critical corrections, explicit application establishment, the pinned Counting definition, complete client observation and the enrolled-device counting stage. It lets an authorized controller establish Counting under the supporting cohort, while an independently enrolled device observes the native count and keeps its own exact signed requests in private custody. The native scope remains the authority for counts, membership and every act.
 
 The original application and test preparation was frozen at composition 7ed2670b6c440cba638e6c18624d55b582892eb3, tree d2d53ffc0ff2d0b9965e86ae8cf2650cce400f26, from main 8479057c1ce50f01a5de488c2f6c029b45be65e7. This note is added before the final gate; the gate and normal review evidence will bind the resulting exact head. No final gate, formal Source approval or landing is claimed in this note. Earlier evidence remains attributed to its actual source head. The final sections describe the current editor and focused-check successor.
@@ -212,3 +233,88 @@ The complete log retains the RefcountedCanceler cross-object timeout-abort diagn
 All 1,272 guarded source hashes, twelve workspace links, tool bindings, 3,898 shared-cache files and 28 links remained unchanged, as did the private 23-file pool copy with its permanent corrected cd50d18a helper. The candidate stayed clean. Complete sealed logs are retained at /tmp/artroom-poolb7ee-normal-gate; the complete proof is /tmp/artroom-poolb7ee-gate-complete-result.json, SHA256 8640e81fc2720ddb1d2d656d1698c524ebaf6d600e45979fd2694b7ab4c4bc37.
 
 This outcome amendment changes only this note. Executable source, tests, configuration, dependencies and built assets are unchanged from the successful b7ee subject/tree 8df68d174e474c71e1a237271222059b3ef18cfb. No checks or build were rerun for this documentation-only successor, per docs/testing.md. Formal retirement of the P2 finding, complete Source/evidence approval, request delivery and landing remain owed; manual/product acceptance, a complete causal account and the tenfold objective remain open.
+
+
+Hub fixture pack reuse — source successor, validation pending
+
+Under request `4bb53d024c7b7da058b25c01b71b793454d321af` and promise
+`254f392fdae077dce25642ac494745d40b527967`, this isolated successor of
+`0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` lets the scripted Hub reuse an
+owned ordered-content pack promise through the existing OwnGit mechanism.
+Only immutable wire bytes are reused; responses, refs, public reads and
+write credential/receive decisions remain per request. The same cache
+witness retains its OwnGit assertions and adds Hub public repeats, mutation,
+rejection/recovery and fresh responses/refs using the actual bounded Git codec.
+No live GitHub behavior, timing gain or full 10x outcome is claimed.
+Affected compilation, the complete cache and Demo files, a distinguishing
+Hub-only control and a changed-head gate remain unrun and owed. Prior gates
+and native results qualify their exact earlier heads; they do not accept this
+new source. The frozen initial `0e595` filing remains separate.
+
+
+Hub known-refusal allocation — source successor, validation pending
+
+This separate successor of `c8d989305f6a1ed9b8a2570a28232c34c9599145`
+implements request `74b810cd1dd75fbfff0f481c77e290409fc85e32`, resting on
+promise `660b92b42a131f2ef2bac8c6a4ab34a5294cdbfa` and adopted choice
+`0e527840fd86f43dd3d4a2d03a3fd5ca63e0353d`. Only Hub enables the shared
+helper's cheap count/raw-length failure selector. It sends necessarily
+failing ordered object references to the unchanged real codec before any
+fixture payload copy; that codec retains its own first-error ordering.
+OwnGit's inherited path and every accepted owned snapshot remain unchanged.
+Known failing Hub uploads may each call the codec rather than coalescing
+rejected promises. Actual build counting and identity-guarded failed-slot
+retirement remain explicit; no auth, refs, response or receive decision is
+cached. The same cache case observes construction of the exact oversized
+payload and restores the real constructor in `finally`, then checks repair
+and reuse. Constructor interception is unproved until an actual old-path
+control distinguishes it; unsupported interception is not acceptance.
+All new compilation, native bodies, controls and the changed-head gate are
+unrun and remain separately owned. No measured allocation gain, timing
+factor, live GitHub behavior or full tenfold outcome is claimed. Frozen c8
+and the initial `0e595` filing remain unchanged and separate.
+
+
+Hub and manifest economy composition — source, validation pending
+
+Request `5ade75228f4ed9d2f4e0b1523bdfd2e46f494692`, resting on promise
+`2511667df4d7333402f8af8b34d82cb958ecbc43`, composes only the reviewed Hub
+successor `ee7d213113805d8375f2bf7e6e8651f9c0b655b5` and manifest successor
+`bdf64bdde4afc26485963e76bb409a01a4c9347c` onto actual receiving main
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, whose tree matches the landed
+initial `0e595` source. Both normal merges completed without conflict and
+preserve exact donor code bytes. SDK, UI, Counting and other setup work are
+excluded. The initial delivery is landed; these test changes are a new,
+separate source subject and inherit no validation pass.
+
+The manifest change removes two duplicate object verifications while the
+real checker boundary and corruption refusal remain, and corrects the
+published tree expectation to retain the existing docs folder. The Hub
+change and its allocation/coalescing qualifications stand as recorded
+above. The complete cache, Demo and manifest files retain all 27 cases,
+including the original optional recorder. The smallest direct compiler
+closure, one same-run native body, any separately released controls and a
+changed-head normal gate remain unrun. No timing factor, native authority,
+provider or complete tenfold acceptance is claimed by this composition.
+
+
+Three-donor economy successor — source, all checks unrun
+
+Request `e4c871d0e0ddf04c4e6b400a503cfefe19b563ae`, resting on promise
+`fcb08d0449eebb3dcdfa9c17dc3ed399c378e428`, adds only reviewed CLI donor
+`92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44` to the isolated Hub `ee7d`
+and manifest `bdf64` composition on published receiving main `a1277d`.
+The normal merge has no conflict and retains the complete donor fixture
+bytes. The CLI helper supplies fixed test author/committer identity only
+for its real local commit process instead of two persistent setup commands
+per fixture. All 15 cases, production capture code and original deadlines
+remain. The 28-command reduction is static, not a measured saving.
+
+The new single affected run owns CLI Node/threads group 0 and the original
+Scope Worker group 1: complete CLI Git 15, cache 1, Demo 5 and manifest 21,
+42 cases with 41 active and one original recorder skip. ScopeTEST,
+LanesScope and CLItest each run once only after independent integration
+and recipe review and a separate execution release. No old 27-case run,
+separate CLI baseline, discovery, filter, retry or deadline change is
+introduced. All tests, controls and the coordinated changed-head gate are
+unrun; no SDK source or failed SDK stage belongs to this composition.
