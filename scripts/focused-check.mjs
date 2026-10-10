@@ -2,7 +2,7 @@
 // One reviewed compiler/body plan. Built-ins only until every source/tool fence passes.
 import { spawnSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
@@ -35,7 +35,7 @@ function guard(plan) {
     sources.set(path, file.sha256);
   }
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-  const activeInputs = tracked.filter(path => /^(packages|scripts|examples)\//.test(path) || /^(package(-lock)?\.json|tsconfig.*\.json|vitest\.config\.ts)$/.test(path));
+  const activeInputs = tracked.filter(path => /^(packages|scripts|examples|docs)\//.test(path) || /^(package(-lock)?\.json|tsconfig.*\.json|vitest\.config\.ts)$/.test(path));
   requireFact(activeInputs.every(path => sources.has(realpathSync(resolve(root, path)))), "The active source/configuration/fixture inventory is incomplete");
   const inputs = new Map();
   for (const file of plan.inputs) {
@@ -49,11 +49,16 @@ function guard(plan) {
   const vitestPackage = resolve(dirname(plan.vitest.path), "package.json");
   requireFact(plan.tools.some(t => t.path === vitestPackage) && json(vitestPackage).version === "4.1.11", "The reviewed Vitest reporter API version must be pinned");
   requireFact(sha(resolve(root, "package-lock.json")) === plan.lock_sha256 && readFileSync(resolve(root, "node_modules/.artroom-lock-sha256"), "utf8").trim() === plan.lock_sha256, "Existing-lock dependency view is missing or changed");
+  for (const path of ["node_modules", "node_modules/@generalbusiness", "node_modules/.bin", "node_modules/.vite", "node_modules/.vite-temp"]) {
+    const owned = lstatSync(resolve(root, path));
+    requireFact(owned.isDirectory() && !owned.isSymbolicLink(), "Dependency namespace and Vite state must be owned real directories");
+  }
   const actualPackages = readdirSync(resolve(root, "packages")).filter(name => existsSync(resolve(root, "packages", name, "package.json"))).map(name => {
     const directory = realpathSync(resolve(root, "packages", name));
     return { ...json(resolve(directory, "package.json")), directory };
   });
   requireFact(sameSet(plan.workspaces.map(w => w.name), actualPackages.map(w => w.name)), "The complete current workspace set is required");
+  requireFact(sameSet(readdirSync(resolve(root, "node_modules/@generalbusiness")), plan.workspaces.map(w => w.name.slice("@generalbusiness/".length))), "Dependency namespace contains missing or foreign workspace entries");
   const actualAliases = [];
   for (const workspace of plan.workspaces) {
     const actual = actualPackages.find(w => w.name === workspace.name);

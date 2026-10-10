@@ -349,7 +349,8 @@ tests in a separate discovery run or pause between successful phases.
 ```
 
 The reviewed JSON plan names the canonical checkout, head and tree; every
-tracked package/script/example input and root configuration; extra external
+tracked package/script/example input, read-only documentation fixtures and
+root configuration; extra external
 inputs, including the actual pipeline file and body config; the lock stamp,
 current workspace bindings and source export aliases; pinned Node/compiler/
 Vitest tool files; unique compiler configs and working directories; and the
@@ -357,6 +358,9 @@ body config, working directory and complete file/project/pool/full-title
 selection. It contains paths and hashes, not secrets. A selected file must
 have unique full titles within its project. When that static ledger cannot
 identify every case, keep an explicit collection plan instead of guessing.
+The dependency namespace and its Vite state must be owned real directories;
+a symlink to shared `node_modules` or `@generalbusiness` is refused even when
+an individual workspace resolves to the right source.
 
 The driver checks those facts before any tool or application import, at
 each command boundary and after the terminal command. Any refusal, changed
