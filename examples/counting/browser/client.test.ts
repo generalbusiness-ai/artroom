@@ -1,22 +1,23 @@
 // Actual SDK/W1/signing over FAKE service/session/history/memory custody; no native admission or speech.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Entry, Item, Receipt, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { Entry, Item, MemberRef, Receipt, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch, HeadStreamFetch } from "@generalbusiness/artroom-client";
-import { COUNTING_DEFINITION } from "../pin.ts";
+import { COUNTING_COMMITMENTS_DEFINITION } from "../commitments-pin.ts";
+import { assignedTurn, canCommit, countingView, proposal } from "./model.ts";
 import { nativeGateway, type CommandStore } from "./client.ts";
 import { activeAttempt, markActive, type DispatchPhase } from "./journal.ts";
 import { attemptDispatcher } from "./dispatcher.ts";
 import type { ActorIdentity } from "./voice-controller.ts";
 
 async function fixture(joined=true) {
-  const secret=new Uint8Array(32).fill(51),definition=COUNTING_DEFINITION;
+  const secret=new Uint8Array(32).fill(51),definition=COUNTING_COMMITMENTS_DEFINITION;
   const ref=(kind:ScopeRef["kind"]):ScopeRef=>({scope:scopeIdOf({v:1,kind,definition,creator:null,cause:textDigest(`FAKE gateway ${kind}`),ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(8)),kind});
   const scope=ref("lane"),membership=ref("membership"),member={membership,member:"@ada" as const};
   const identity:ActorIdentity={origin:"https://gateway-fake.test",deployment:"FAKE gateway",scope,definition,membership,member,publicKey:keyIdOfSecret(secret)};
   const item=(type:string,id:number,state:string,values:Item["values"],parties:Item["parties"]):Item=>({type,id,state,revision:1,opened:null,values,parties,refs:{},attributed:[]});
-  const summary:Summary={scope,status:"active",definition,time:new Date().toISOString(),counts:[],items:[item("configuration",0,"ready",{target:3},{controller:member}),item("board",1,"paused",{target:3,generation:0,serial:0,lastNumber:0,number:null,until:null},{controller:member,speaker:null,lastSpeaker:null}),...(joined?[item("participant",2,"joined",{}, {agent:member})]:[])]};
+  const summary:Summary={scope,status:"active",definition,time:new Date().toISOString(),counts:[],items:[item("configuration",0,"ready",{target:3},{controller:member}),item("board",1,"paused",{target:3,generation:0,serial:0,lastNumber:0,until:null},{controller:member,lastSpeaker:null}),...(joined?[item("participant",2,"active",{}, {agent:member})]:[])]};
   const head={seq:1,hash:textDigest("FAKE head")};let held:Awaited<ReturnType<CommandStore["load"]>>=null,posts=0,settles=0,saves=0,clears=0;
   let metadata="trusted",reply:"refused"|"lost"="refused",failPhase:DispatchPhase|undefined,settleAccepted=false,entry:Entry|undefined,receipt:Receipt|undefined,race:"before-post"|"before-reply"|undefined;
   const snapshots:NonNullable<Awaited<ReturnType<CommandStore["load"]>>>[]=[];
@@ -82,7 +83,7 @@ test("FAKE known-refusal journal-save failure fences correction; unavailable loc
     assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.retained(),original);assert.equal(f.counters().posts,1);
   }finally{f.gateway.dispose();}
   const blocked=await fixture(false);try{
-    assert.equal((await blocked.gateway.command("start")).status,"blocked");assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
+    assert.equal((await blocked.gateway.command("activate")).status,"blocked");assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
   }finally{blocked.gateway.dispose();}
 });
 
@@ -135,4 +136,47 @@ test("FAKE read-only dispatcher Check leaves valid prepared custody unsent; orig
     const original=structuredClone(record);assert.equal((await dispatcher.check(store,record.envelope)).status,"unknown");assert.deepEqual(record,original);assert.deepEqual([posts,writes,settles],[0,0,1]);
     assert.equal((await dispatcher.run(store,record.envelope)).status,"refused");assert.equal(posts,1);assert.equal(activeAttempt(record.journal!).phase,"refused");assert.equal((await dispatcher.run(store,record.envelope)).status,"refused");assert.equal(posts,1);
   }finally{f.gateway.dispose();}
+});
+
+// Pure projection/proposal witness over authored summary data; not native authority or media evidence.
+test("C1 claims use the complete active roster without assigning a speaker, and only the exact linked pledge can resolve",()=>{
+  const definition=COUNTING_COMMITMENTS_DEFINITION;
+  const scope:ScopeRef={scope:scopeIdOf({v:1,kind:"lane",definition,creator:null,cause:textDigest("FAKE C1 model"),ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(8)),kind:"lane"};
+  const membership:ScopeRef={...scope,kind:"membership"};
+  const ada={membership,member:"@ada" as const},bea={membership,member:"@bea" as const},cy={membership,member:"@cy" as const};
+  const actor=(member:MemberRef):ActorIdentity=>({origin:"https://model-fake.test",deployment:"FAKE",scope,definition,membership,member,publicKey:keyIdOfSecret(new Uint8Array(32).fill(51))});
+  const item=(type:string,id:number,state:string,values:Item["values"],parties:Item["parties"],refs:Item["refs"]={}):Item=>({type,id,state,revision:id+1,opened:null,values,parties,refs,attributed:[]});
+  const configuration=item("configuration",0,"ready",{target:3},{controller:ada});
+  const board=item("board",1,"open",{target:3,generation:2,serial:4,lastNumber:1,until:null},{controller:ada,lastSpeaker:ada},{pledge:null,lastFulfilledAt:10});
+  // Inactive members fill the native live cap but do not belong to the active claim basis.
+  const roster=[item("participant",2,"active",{},{agent:ada}),item("participant",3,"inactive",{},{agent:bea}),item("participant",5,"active",{},{agent:cy}),...Array.from({length:13},(_,i)=>item("participant",i+20,"inactive",{},{agent:{membership,member:`@guest${i}` as const}}))];
+  const summary:Summary={scope,definition,status:"active",time:"2026-10-10T00:00:00Z",counts:[],items:[configuration,board,...roster]};
+  const view=countingView(summary,scope);
+  assert.equal(view.participants.length,16);
+  const newcomer=actor({membership,member:"@new"});assert.throws(()=>proposal(view,newcomer,"participate"),/roster is full/);
+  const removed=countingView({...summary,counts:[["participant","removed",1]],items:[configuration,board,...roster.filter(p=>p.id!==20)]},scope);
+  assert.deepEqual(proposal(removed,newcomer,"participate"),{kind:"participate",on:null,fields:{},expected:{}});
+  assert.equal(assignedTurn(view,actor(cy)),undefined);assert.equal(canCommit(view,actor(ada)),false);assert.equal(canCommit(view,actor(cy)),true);assert.equal(canCommit(view,actor(bea)),false);
+  assert.deepEqual(proposal(view,actor(cy),"commit"),{kind:"commit",on:null,fields:{participant:5,generation:2,serial:5,n:2,basis:[{id:2,member:ada},{id:5,member:cy}]},expected:{board:2,participant:6}});
+  // Once only Ada is active, the native anti-consecutive exception permits Ada again.
+  const solo=countingView({...summary,items:[configuration,board,...roster.map(p=>p.id===5?{...p,state:"inactive"}:p)]},scope);
+  assert.equal(canCommit(solo,actor(ada)),true);
+  const deadline="2026-10-10T00:00:30Z",pledged=item("promise",11,"pledged",{generation:2,serial:5,n:2,basis:[{id:2,member:ada},{id:5,member:cy}],until:deadline},{agent:cy},{participant:5,admittedAt:11});
+  const linked={...board,revision:7,values:{...board.values,serial:5,until:deadline},refs:{...board.refs,pledge:11}};
+  const held=countingView({...summary,items:[configuration,linked,...roster,pledged]},scope),turn=assignedTurn(held,actor(cy))!;
+  assert.deepEqual([held.board!.number,held.board!.speaker,held.board!.until],[2,cy,Date.parse(deadline)]);
+  assert.equal(assignedTurn(held,actor(ada)),undefined);assert.equal(canCommit(held,actor(cy)),false);
+  const completion={turn,voiceId:"FAKE",completedAt:Date.parse(summary.time)+100};
+  assert.deepEqual(proposal(held,actor(cy),"fulfill",completion),{kind:"fulfill",on:11,fields:{generation:2,serial:5,n:2},expected:{on:12,board:7}});
+  assert.throws(()=>proposal(held,actor(cy),"fulfill",{...completion,turn:{...turn,serial:4}}),/no longer current/);
+  assert.throws(()=>proposal(held,actor(ada),"fulfill",completion),/does not own/);
+  assert.deepEqual(proposal(held,actor(cy),"fail",completion,{reason:"speech-uncertain"}),{kind:"fail",on:11,fields:{generation:2,serial:5,n:2,reason:"speech-uncertain"},expected:{on:12,board:7}});
+  assert.deepEqual(proposal(held,actor(ada),"cancel"),{kind:"cancel",on:11,fields:{generation:2,serial:5,n:2},expected:{on:12,board:7}});
+  assert.throws(()=>proposal(held,actor(ada),"force-deactivate",undefined,{participant:5}),/live promise/);
+  assert.deepEqual(proposal(held,actor(ada),"remove-participant",undefined,{participant:3}),{kind:"remove-participant",on:3,fields:{},expected:{on:4,configuration:1}});
+  assert.throws(()=>countingView({...summary,items:[configuration,{...linked,refs:{pledge:12}},...roster,pledged]},scope),/invalid/);
+  // The first timer entry clears the board before the promise timer settles; it assigns no speech.
+  const expiring=countingView({...summary,items:[configuration,{...linked,state:"paused",values:{...linked.values,until:null},refs:{pledge:null}},...roster,pledged]},scope);
+  assert.equal(expiring.pledge,null);assert.equal(expiring.pendingPromise!.id,11);assert.equal(assignedTurn(expiring,actor(cy)),undefined);
+  assert.throws(()=>proposal(expiring,actor(ada),"start"),/Resolve the live promise/);
 });
