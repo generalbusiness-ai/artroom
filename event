@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:48c751a397949835edfef42ffa9a02b87f7c6ad1","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/change-refused.png."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:490acea8afc75a15faf7425bb988f06a8918e42e","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/site-immutable-publication.test.ts."}
