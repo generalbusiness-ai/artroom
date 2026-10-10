@@ -1,0 +1,177 @@
+{
+  "request": "e0f23786fca461db05c103d2e57cbd08121b6ccb",
+  "promise": "7ec5f3231ba25b6d17a2184ff996a9f29813427b",
+  "base": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "base_tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "head": "bdf64bdde4afc26485963e76bb409a01a4c9347c",
+  "tree": "0016268b717577e1405b048dd4d0d58ba5beca14",
+  "branch": "request/manifest-value-cleanup",
+  "worktree": "/tmp/artroom-manifest-value-cleanup",
+  "status": "",
+  "remote_head": "bdf64bdde4afc26485963e76bb409a01a4c9347c",
+  "changed_paths": [
+    "packages/lanes/test/manifest-tree.scope.test.ts"
+  ],
+  "base_body": {
+    "path": "/tmp/artroom-manifest-value-cleanup-packet/base-body.ts",
+    "bytes": 91917,
+    "sha256": "c2ca688e7351c0d6df2b8e44816584fb8002c1a41d84d2566c3d2609c42ae3ba"
+  },
+  "successor_body": {
+    "path": "/tmp/artroom-manifest-value-cleanup-packet/successor-body.ts",
+    "bytes": 91747,
+    "sha256": "e7425897399fd0590dabe52a2ee61739d4f12817dccb8b5bacf11f73960b4f08"
+  },
+  "source_delta": {
+    "path": "/tmp/artroom-manifest-value-cleanup-packet/source.diff",
+    "bytes": 3777,
+    "sha256": "7d09c089833abe7608f0a7e492915d5b7326adc0daba57822be5ae86e2687c0c"
+  },
+  "source_map": {
+    "path": "/tmp/artroom-manifest-value-cleanup-packet/source-map.md",
+    "bytes": 9440,
+    "sha256": "9e281251ec6173c07947a05543239b02135d04e764fe3d2500f760a4de78eca8"
+  },
+  "static_case_ledger": {
+    "path": "/tmp/artroom-manifest-value-cleanup-packet/static-case-ledger.json",
+    "bytes": 7400,
+    "sha256": "4c4d0afed979e2f924aab14a79d64b3d524d2635587abe07b78bda950d7d8d22"
+  },
+  "preservation": {
+    "exact_only_three_permitted_edits": true,
+    "removed_positive_count": 2,
+    "static21case_ledgers_identical": true,
+    "production_and_config_inputs_unchanged": true
+  },
+  "supporting_inputs": [
+    {
+      "path": "packages/checkers/src/service.ts",
+      "bytes": 18568,
+      "sha256": "68d5ce231f53d2d987a8cfb9a3a4e764ae32f2659de760c4acf29ccb75e388f9",
+      "blob": "a51003ae92e16856f927ffa8627c1445099fe23b",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/checkers/src/reservation-snapshot.ts",
+      "bytes": 2549,
+      "sha256": "93121b370a17fe85b714dde881c91934d5d1921302711ab61b9b17a49c2060bf",
+      "blob": "66d5d9b4d98ef9b49ee26a86b76722a63cbd0765",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/checkers/src/job.ts",
+      "bytes": 12773,
+      "sha256": "4b2e0608b947772278b34beaf3ed5df0d17334b43a25fe174b38555da61ebb63",
+      "blob": "e4e0a8b5a15a1186b6b09bcf825854ae8f7fb0e2",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/checkers/src/store.ts",
+      "bytes": 6323,
+      "sha256": "a69d084e25731d6645e2ce4f4df8936fdaa670cf93446809efb96811a5725885",
+      "blob": "278594cedb112bb8c3cc1fcb8d532e4541c8d913",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/contract/src/reservation-snapshot.ts",
+      "bytes": 560,
+      "sha256": "84b0cb9392bc0aad628e96eea96e526e7c343b38d79c366d02d6634828455fbe",
+      "blob": "1114ddf9087b30655e529ebd8f5daf29569bdfc5",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/scope/src/destination-host.ts",
+      "bytes": 49695,
+      "sha256": "4dc1ee07264b067b9467bb45a2ac4fa4dae00822a41831420b5f76b89f2bbd84",
+      "blob": "2042810e91de356cfe47f34c57002b97f4783cb4",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/scope/src/object.ts",
+      "bytes": 29972,
+      "sha256": "ec0e9936817fce78c4c607fe69197f39af449bcc036e0207296278128fa7ac58",
+      "blob": "5d18f749099e4d88303b3796e91e47cc0eaff243",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/lanes/tsconfig.scope.json",
+      "bytes": 428,
+      "sha256": "2d5767c755a41af4e6c014f82f93a5fa97574e31d238dbac980e4d4265f9dfa1",
+      "blob": "1b89d370082ded146d8c604fb96eb16c217ee5a5",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/lanes/vitest.scope.config.ts",
+      "bytes": 616,
+      "sha256": "ff4ef6408001e0af200eef5f80e2f8cccf08a1b2a481e8238fb40cc44b01339c",
+      "blob": "61a2f0c682057a03af19d7672e86c1597ff0a3a5",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/lanes/wrangler.test.jsonc",
+      "bytes": 781,
+      "sha256": "d055de5a3d1862795e67ef38a39b935e2297a5ba56285ec9a254bc50ae497790",
+      "blob": "17bc7110334e6da81a93716d11f7e4fefb4b3237",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "packages/scope/vitest.worker.config.ts",
+      "bytes": 657,
+      "sha256": "9b375fa731bbd204d402d3f9fcd865936df6a45fa8f12d258013a6611cd402b0",
+      "blob": "26ae6e91c5d5929b6ecd75526dacd5daa671a4ed",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "vitest.config.ts",
+      "bytes": 3329,
+      "sha256": "2803c8ccd5ddb05062d56cd79535b843f94b278e93d90fd62dc87ff5894b2f6b",
+      "blob": "baecc2216d6358150babeead8f45f03caf6cdc95",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 127495,
+      "sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "blob": "58d70d2213d15b33e04344071ea72249dfbd9337",
+      "unchanged_from_base": true
+    }
+  ],
+  "frontiers": [
+    "immutable actual opening/object/source content",
+    "fresh current authorization/generation/snapshot lifetime"
+  ],
+  "lost_coverage": "none identified by static trace; runtime pending",
+  "minimal_future_plan": {
+    "compiler": {
+      "cwd": "/tmp/artroom-manifest-value-cleanup",
+      "argv": [
+        "node_modules/.bin/tsc",
+        "-p",
+        "packages/lanes/tsconfig.scope.json"
+      ]
+    },
+    "whole_body": {
+      "cwd": "/tmp/artroom-manifest-value-cleanup/packages/lanes",
+      "argv": [
+        "../../node_modules/.bin/vitest",
+        "run",
+        "--config",
+        "vitest.scope.config.ts",
+        "test/manifest-tree.scope.test.ts"
+      ],
+      "case_count": 21,
+      "title_filter": null,
+      "profile": "existing Worker config only; exact guarded owner plan still required"
+    },
+    "dependency_view": "unprepared; Root owns future private namespace/aliases/cache binding; no sharedcache/live99684 mutation"
+  },
+  "execution": [],
+  "limits": [
+    "source-only, no performance factor",
+    "native/git-host/provider/demo/cold regimes unchanged",
+    "private inactive fault arms unchanged",
+    "originOf positive association and corrupt negatives retained",
+    "not composed with Hub, initial229 or current99684",
+    "no state filing/approval/landing"
+  ]
+}
