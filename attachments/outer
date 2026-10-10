@@ -1,6 +1,0 @@
-{"name": "page-source", "command": ["/opt/homebrew/Cellar/node/26.11.0_1/bin/node", "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc", "-p", "/private/tmp/artroom-ux1-common-editor-integration/packages/page/tsconfig.json"], "cwd": "/private/tmp/artroom-ux1-common-editor-integration/packages/page", "exit": 0, "wall_seconds": 0.19391862500924617, "cpu_seconds": 0.679672, "log": "/private/tmp/artroom-ux1-03d-compiler-only-result/page-source.log", "log_bytes": 0, "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
-{"name": "page-test", "command": ["/opt/homebrew/Cellar/node/26.11.0_1/bin/node", "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc", "-p", "/private/tmp/artroom-ux1-common-editor-integration/packages/page/tsconfig.test.json"], "cwd": "/private/tmp/artroom-ux1-common-editor-integration/packages/page", "exit": 0, "wall_seconds": 0.25624187500216067, "cpu_seconds": 1.007295, "log": "/private/tmp/artroom-ux1-03d-compiler-only-result/page-test.log", "log_bytes": 0, "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
-RESULT /private/tmp/artroom-ux1-03d-compiler-only-result/compiler-result.json 28f0a657c716f2500fbee7db5b0cce67441d1eb77054a552591d215efb039184 terminal 0
-real 1.18
-user 1.79
-sys 0.49
