@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at docs/manual/record.md","body":{"commit":"18a1288de937db9852912fa7ac3830f387ca61d4","path":"docs/manual/record.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3da17b1e26155980b52531b49d95b3445f4334ec","text":"Merge retired a covered predecessor; the successor is at docs/manual/record.md."}
