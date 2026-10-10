@@ -14,6 +14,9 @@ import { rita } from "./support-founding.ts";
 // Evidence: /tmp/artroom-m1-f145-generation-execution/complete-catalog-validation.json
 // SHA-256: 47545c46bbc0b5fd6c577aa8635d518b76a8416a020fe988d30755eb6a5a950c. Generation is not a test or gate pass.
 const DIGESTS: Readonly<Record<string, string>> = {
+  "platform:register@7": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
+  "platform:directory@7": "sha256:871531c7df82d3945f2697e9cd6188392252bfea491822d99e49d173afd9eed8",
+  "platform:membership@6": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
   "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
   "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155",
   "platform:register@6": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
