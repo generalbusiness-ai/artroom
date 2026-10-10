@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2dea513c54c9a0c80696fee45912be16c81c4a5d"}
+{"kind":"promise","text":"I will refresh the released single planner-sprint14 checkout metadata and owner/dependency clearance, then remove it with ordinary git worktree remove only if still clean, unused and clear. No force, private-content reads, ref/object/evidence removal or other cleanup. Return actual terminal and registry absence, or the exact changed blocker; SDK/economy gate priority remains separate."}
