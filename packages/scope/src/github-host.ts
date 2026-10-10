@@ -193,9 +193,19 @@ export class GitHubProvider implements RegisterProvider, DestinationProvider {
  */
 export async function sendOnce(request: Parameters<DestinationProvider["send"]>[0], transport: SmartHttpOptions, readBack: () => Promise<string | null>): Promise<unknown> {
   const bounds = transport.bounds ?? READ_BOUNDS;
-  const objects: RawGitObject[] = request.objects.map((object) => ({ id: object.id, type: object.kind, data: new Uint8Array(object.body) }));
+  // Capture references and reject the whole allowance before copying any
+  // body. The owned copies still precede the first asynchronous read.
+  const pending: RawGitObject[] = [];
+  const ids = new Set<string>();
+  let bytes = 0;
+  for (const object of request.objects) {
+    const { id, kind: type, body: data } = object;
+    if (ids.has(id) || data.length > transport.maxBytes - bytes) return bad();
+    ids.add(id); bytes += data.length;
+    pending.push({ id, type, data });
+  }
+  const objects = pending.map((object) => ({ ...object, data: new Uint8Array(object.data) }));
   const supplied = new Map(objects.map((object) => [object.id, object]));
-  if (supplied.size !== objects.length || objects.reduce((size, object) => size + object.data.length, 0) > transport.maxBytes) return bad();
   const source: GitSource = {
     object: async (id): Promise<StoredObject | null> => {
       const object = supplied.get(id);
