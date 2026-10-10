@@ -61,3 +61,19 @@ Tracked under gitseq request c612acc60c1b02577c7814b8026ad6d398f54023 and builde
 promise 96ce76dbe95b0247193bf7ac5d4df47937915350, in convergence
 e60a3ca5ce320ba4af84478ff5f88ff4d6be63fe. Economy work is superseded by the
 adopted two-sprint deployment schedule, not completed as a measured global speedup.
+
+The ordinary gate at 452e5cc8dd0c2870707edfa1935d8081719a6f7a completed with
+exit 1: typecheck passed, 1,014 Vitest cases passed, two original optional recorder
+cases skipped and the sole failure was Page asset freshness. M1's new catalog
+bytes change Page's imported build closure. The committed Page module was
+572,351 bytes (SHA-256 2da67c07dea4d042835dc437206051daafd48cd66170f2a0275e22d62647e59c);
+the current-source build required 573,350 bytes (SHA-256
+d390fbbb76a5bcbbb1dd34ad6d7bbb2b293e8e6eb9b9573604e0ac86a0a94a6e).
+The existing normal Page builder then completed once and refreshed that module.
+No Page design, protocol or source was changed for this repair. The failed gate
+and its exact clean before/after source, shared cache and private pool proof remain
+retained at /private/tmp/artroom-counter-one-normal-gate. The Node chain was
+unrun after Vitest failed. The gate took 89.05 seconds wall and 146.09 seconds CPU;
+these are machine/load-specific observations. RefcountedCanceler abort, SQL
+retention-trigger and four Git Content-Type diagnostics remain recorded, with no
+cause, drain or error-free claim. A changed-head ordinary gate remains pending.
