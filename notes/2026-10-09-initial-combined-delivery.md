@@ -8,13 +8,16 @@ pushed head against the live remote and retained landing receipt
 and landed. The earlier failed gates and qualified successful evidence
 below remain attributed to their exact source.
 
-This branch is a separate source-only Hub and manifest test-economy
-composition onto that receiving main. Its two compiler contexts and all
-27 selected native cases, including one original optional recorder, are
-**unrun**. It preserves the reviewed donor code and original deadlines;
-new controls, a changed-head gate and independent review remain owed.
-SDK, UI, Counting and other setup branches are outside this composition.
-No new performance, native authority or product acceptance is claimed.
+This branch is a separate source-only three-donor test-economy
+composition onto that receiving main: Hub, manifest and CLI Git fixtures.
+Its three compiler contexts and all 42 selected cases, including one
+original optional recorder, are **unrun**. It preserves reviewed donor
+code and original deadlines. The earlier 27-case `5ade`/`8c967`/R2
+preparation remains frozen and unexecuted; it is not an altered acceptance
+or a prior result. New controls, a changed-head gate and independent
+review remain owed. SDK, UI, Counting and other setup branches are outside
+this composition. No new performance, native authority or product
+acceptance is claimed.
 
 ## Historical initial delivery and evidence (retained)
 
@@ -293,3 +296,25 @@ including the original optional recorder. The smallest direct compiler
 closure, one same-run native body, any separately released controls and a
 changed-head normal gate remain unrun. No timing factor, native authority,
 provider or complete tenfold acceptance is claimed by this composition.
+
+
+Three-donor economy successor — source, all checks unrun
+
+Request `e4c871d0e0ddf04c4e6b400a503cfefe19b563ae`, resting on promise
+`fcb08d0449eebb3dcdfa9c17dc3ed399c378e428`, adds only reviewed CLI donor
+`92dc7b2f85ef25ced9a53a8b800c8c75f17f7f44` to the isolated Hub `ee7d`
+and manifest `bdf64` composition on published receiving main `a1277d`.
+The normal merge has no conflict and retains the complete donor fixture
+bytes. The CLI helper supplies fixed test author/committer identity only
+for its real local commit process instead of two persistent setup commands
+per fixture. All 15 cases, production capture code and original deadlines
+remain. The 28-command reduction is static, not a measured saving.
+
+The new single affected run owns CLI Node/threads group 0 and the original
+Scope Worker group 1: complete CLI Git 15, cache 1, Demo 5 and manifest 21,
+42 cases with 41 active and one original recorder skip. ScopeTEST,
+LanesScope and CLItest each run once only after independent integration
+and recipe review and a separate execution release. No old 27-case run,
+separate CLI baseline, discovery, filter, retry or deadline change is
+introduced. All tests, controls and the coordinated changed-head gate are
+unrun; no SDK source or failed SDK stage belongs to this composition.
