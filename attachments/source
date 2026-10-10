@@ -1,0 +1,38 @@
+{
+  "head": "32c9f27793737e01c16333cc5d54ac0bd5bc2077",
+  "tree": "f019a7b799e2df1054ff1a992025d521aee75c89",
+  "parent": "c292f670623e57fe15fb2805004ebb9ed6f4872a",
+  "worktree": "/tmp/artroom-ux1-actions-text-fix",
+  "branch": "request/ux1-actions-text-fix",
+  "request": "94b932355c4ad6c4270ddaf4231c1d4ac329b2c2",
+  "promise": "919649f327066d2ac06411e24ae4c48171018a13",
+  "repair_paths": [
+    "packages/page/test/actions.test.ts"
+  ],
+  "files": {
+    "actions-body.txt": {
+      "path": "/tmp/artroom-ux1-actions-text-fix-packet/actions-body.txt",
+      "bytes": 21900,
+      "sha256": "600d13dcec918dd474fbeed5e6a0e35d43cd1f61e329898abab87060a6148063"
+    },
+    "actions-repair.patch": {
+      "path": "/tmp/artroom-ux1-actions-text-fix-packet/actions-repair.patch",
+      "bytes": 743,
+      "sha256": "dcae19384b38cf8a1553901774a6ba45cb4cfedfae7ee1344b9b4aa1fe3d7ef4"
+    },
+    "preservation.json": {
+      "path": "/tmp/artroom-ux1-actions-text-fix-packet/preservation.json",
+      "bytes": 158578,
+      "sha256": "0adee124cefc454f39df80943605dea602af381fa5d3bd91249a3ba83b887677"
+    },
+    "disposition.md": {
+      "path": "/tmp/artroom-ux1-actions-text-fix-packet/disposition.md",
+      "bytes": 1804,
+      "sha256": "798e8b091aa2f7381dafd025129507e09dccade6e15d915396d570f0096e96e7"
+    }
+  },
+  "recipe": "/tmp/artroom-ux1-actions-text-node-preparation/recipe-packet.json",
+  "recipe_sha256": "76c13170915ede8c00008c185db65e5d8415e13d5b1b21409396ca3eefa967e2",
+  "clean": true,
+  "execution": []
+}
