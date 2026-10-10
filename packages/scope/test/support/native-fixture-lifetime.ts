@@ -10,46 +10,51 @@ import { platformOutside } from "../worker.ts";
 
 type PortFactory = NonNullable<ReturnType<typeof wired.get>>;
 type OutsideFactory = NonNullable<ReturnType<typeof platformOutside.get>>;
-const retired = new WeakSet<object>();
-const predecessors = new WeakMap<object, object | null>();
+const retired = new WeakSet<Function>();
+const predecessors = new WeakMap<Function, Function | null>();
 /** A nested owner can finish after its parent: skip retired tokens to the
  * first still-owned predecessor, rather than restoring a retired parent. */
-const previousLive = <V extends object>(value: V | undefined | null): V | null => {
-  let previous: object | null = value ?? null;
+const previousLive = <V extends Function>(value: V | undefined | null): V | null => {
+  let previous: Function | null = value ?? null;
   while (previous && retired.has(previous)) previous = predecessors.get(previous) ?? null;
   return previous as V | null;
 };
+interface Installation { value: object | undefined; previous: Installation | null; retired: boolean }
+// The existing ledger tracks installations separately from their public values.
+// In particular two owners may retain the exact same semantic peer object.
+const resourceLedgers = new WeakMap<object, Map<unknown, Installation>>();
 function resources<K, V extends object>(map: Map<K, V>) {
-  const installed = new Map<K, { previous: V | undefined; value: V }>();
+  let ledger = resourceLedgers.get(map);
+  if (!ledger) resourceLedgers.set(map, (ledger = new Map()));
+  const installed = new Map<K, Installation>();
+  const remove = (key: K): void => {
+    const record = installed.get(key);
+    if (!record) return;
+    record.retired = true;
+    installed.delete(key);
+    if (ledger!.get(key) !== record) return;
+    // An external different value also supersedes this installation.
+    if (map.get(key) !== record.value) { ledger!.delete(key); return; }
+    let previous = record.previous;
+    while (previous?.retired) previous = previous.previous;
+    if (previous?.value !== undefined) {
+      ledger!.set(key, previous); map.set(key, previous.value as V);
+    } else { ledger!.delete(key); map.delete(key); }
+  };
   return {
     set(key: K, value: V): void {
       const prior = installed.get(key);
-      if (prior) retired.add(prior.value);
-      const previous = prior ? prior.previous : map.get(key);
-      predecessors.set(value, previous ?? null);
-      installed.set(key, { previous, value });
+      const current = ledger!.get(key), actual = map.get(key);
+      const previous = prior && current === prior && actual === prior.value ? prior.previous
+        : current && !current.retired && current.value === actual ? current : { value: actual, previous: null, retired: false };
+      if (prior) prior.retired = true;
+      // A fresh token always points backwards, even if value === actual.
+      const record: Installation = { previous, value, retired: false };
+      installed.set(key, record); ledger!.set(key, record);
       map.set(key, value);
     },
-    remove(key: K): void {
-      const record = installed.get(key);
-      if (!record) return;
-      retired.add(record.value);
-      if (map.get(key) === record.value) {
-        const previous = previousLive(record.previous);
-        if (previous) map.set(key, previous);
-        else map.delete(key);
-      }
-      installed.delete(key);
-    },
-    release(): void {
-      for (const [key, record] of installed) {
-        retired.add(record.value);
-        if (map.get(key) !== record.value) continue;
-        const previous = previousLive(record.previous);
-        if (previous) map.set(key, previous);
-        else map.delete(key);
-      }
-    },
+    remove,
+    release(): void { for (const key of [...installed.keys()]) remove(key); },
   };
 }
 
@@ -123,13 +128,19 @@ export function nativeFixtureLifetime(owner: SessionOwner, options: { required?:
   }
   return {
     owner, active, activeFor, wait, waitFor, release,
-    /** Cleanup can retire resources without starting an RPC under a successor. */
+    /** Current ownership is required for new work, never identity-only cleanup. */
     current(): boolean { return !released && owner.isCurrent() && net.clock === clock && net.hold === hold && net.deaf === deaf; },
-    unWire: (name: string): void => { active(); ports.remove(name); },
-    unOutside: (name: string): void => { active(); outsides.remove(name); },
+    unWire: (name: string): void => ports.remove(name),
+    unOutside: (name: string): void => outsides.remove(name),
     platform: (name: ScopeId): Platform => { active(); return new OwnedPlatform(name); },
     cleanup(run: () => void): void { if (released) run(); else cleanups.add(run); },
-    setHold(next: NonNullable<typeof net.hold>): void { active(); if (next === hold) return; retired.add(hold); predecessors.set(next, before.hold); hold = next; net.hold = hold; },
+    setHold(next: NonNullable<typeof net.hold>): void {
+      active(); if (next === hold) return;
+      retired.add(hold);
+      // A borrowed predecessor predicate is data, not this owner's token.
+      hold = envelope => next(envelope);
+      predecessors.set(hold, before.hold); net.hold = hold;
+    },
     wire(name: string, factory: PortFactory): void { active(); ports.set(name, () => { active(); return factory(); }); },
     outside(name: string, factory: OutsideFactory): void { active(); outsides.set(name, (given, sql) => { active(); return factory(given, sql); }); },
     /** Scripted anchors stay available until the owning scenario has finished. */
