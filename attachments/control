@@ -1,0 +1,43 @@
+{
+  "status": "INERT, actual package-tool control only; source/head/tree unchanged",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "root": "/private/tmp/artroom-pool53b-oldfactory-control",
+  "branch": "control/cloudflare-pool-prototype-original",
+  "plan": "/tmp/artroom-pool53b-oldfactory-preparation/plan.json",
+  "plan_sha256": "f4238674dbd9dc81206e7aee4eb27f3d7f2841182ced201ee5243b4492e571bc",
+  "runner": "/tmp/artroom-pool53b-oldfactory-run.py",
+  "runner_sha256": "8966be49ba6fe2664f00bf520b7b49a5fb01aed6ceac066268c87c6de5a6007d",
+  "cases": [
+    "the actual pinned pool factory keeps one lazy prototype across early and late constructions, preserving receiver and later prototype methods",
+    "compatibility privately copies cache-linked bytes, is idempotent, and refuses unknown versions or bundles before changing that view"
+  ],
+  "package_files": 23,
+  "initial_bundle": "8d3d115037c749cce1e8cb26bc70ba08e215aaaa357e4eae9f0c1577277c5855",
+  "restored_bundle": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "source_pins": 1272,
+  "cache_files": 3898,
+  "cache_links": 28,
+  "baseline_reused": {
+    "path": "/tmp/artroom-pool53b-permanent-complete-proof.json",
+    "sha256": "e94165ec16296705d36c1d74c5cca9b859e6f45bd12a0cb8d31046670eaf4d93"
+  },
+  "command": [
+    "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+    "--test",
+    "scripts/cloudflare-pool-compat.test.mjs"
+  ],
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool53b-oldfactory-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool53b-oldfactory-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool53b-oldfactory-outer.log"
+  },
+  "execution": []
+}
