@@ -85,11 +85,16 @@ export class Unreadable extends Error {
 }
 
 const nowOf = (session: Session): number => session.now?.() ?? Date.now();
-const transportOf = (session: Session): Transport =>
-  signedReads(httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {}), secretSigner(session.secret), session.now ? { now: session.now } : {});
+const transportOf = (session: Session, reader: string | null = null): Transport => {
+  const transport = httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {});
+  return typeof reader === "string" ? transport : signedReads(transport, secretSigner(session.secret), session.now ? { now: session.now } : {});
+};
 
 /** A handle on one scope that presents the caller's session, or signs each read where there is none. */
-const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => new ScopeHandle(transportOf(room.session), scope, room.reader?.reader() ?? null);
+const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => {
+  const reader = room.reader?.reader() ?? null;
+  return new ScopeHandle(transportOf(room.session, reader), scope, reader);
+};
 
 /** Renews the caller's session when it has ended, or will within ten seconds. A room that membership gave no session stays on signed reads. */
 async function fresh(room: Room): Promise<void> {
@@ -672,7 +677,8 @@ async function valuesOf(room: Room, act: ActShape, fields: Record<string, FieldV
     if (domain === null || typeof digest !== "string") continue;
     if (domain !== DEFINITION_DOMAIN) throw new Unreadable(`The field ${name} takes a value in ${domain}, which this page cannot supply.`);
     // A value in the domain of a definition is kept as a definition, and read by that kind (as `artroom edit` reads it).
-    const kept = await transportOf(room.session).retained(room.rules, room.reader?.reader() ?? null, "definition", digest as Digest);
+    const reader = room.reader?.reader() ?? null;
+    const kept = await transportOf(room.session, reader).retained(room.rules, reader, "definition", digest as Digest);
     if (!kept.ok) throw new Unreadable(`Cannot read the definition ${digest} from the rules scope: ${kept.reason}. Nothing was signed.`);
     values.push(kept.value.bytes);
   }

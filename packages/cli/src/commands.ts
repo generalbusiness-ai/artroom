@@ -135,6 +135,13 @@ const signing = (ctx: Context): Signing => (ctx.now ? { now: ctx.now() } : {});
 const readSigning = (ctx: Context): ReadSigning => (ctx.now ? { now: ctx.now } : {});
 const transportOf = (ctx: Context, service: string): Transport => httpTransport(service, ctx.fetch ? { fetch: ctx.fetch } : {});
 
+/** A known session needs no read signer; still require the configured key. */
+async function readTransportOf(ctx: Context, config: Config, reader?: string | null): Promise<Transport> {
+  const transport = transportOf(ctx, config.service);
+  const secret = await signerOf(ctx, config);
+  return typeof reader === "string" ? transport : signedReads(transport, secretSigner(secret), readSigning(ctx));
+}
+
 /**
  * What this caller presents to the read routes: a read session from the
  * repository's membership scope, signed for by the caller's key, or none.
@@ -159,7 +166,7 @@ async function readerOf(ctx: Context, config: Config): Promise<string | null> {
  * root of the scope's cause chain, within the window of an intent.
  */
 async function handleOf(ctx: Context, config: Config, scope: ScopeId, reader?: string | null): Promise<ScopeHandle> {
-  const transport = signedReads(transportOf(ctx, config.service), secretSigner(await signerOf(ctx, config)), readSigning(ctx));
+  const transport = await readTransportOf(ctx, config, reader);
   return new ScopeHandle(transport, scope, reader === undefined ? await readerOf(ctx, config) : reader);
 }
 
@@ -1209,7 +1216,7 @@ async function activeDefinition(ctx: Context, config: Config, reader: string | n
   const active = (await summaryOf(R)).items.filter((item) => item.type === "definition" && item.state === "active" && item.values["name"] === name).sort((a, b) => b.id - a.id)[0];
   const digest = active?.values["digest"] as Digest | undefined;
   if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no ${name} definition active. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=${name} --value <definition file>.`));
-  const transport = signedReads(transportOf(ctx, config.service), secretSigner(await signerOf(ctx, config)), readSigning(ctx));
+  const transport = await readTransportOf(ctx, config, reader);
   // A value in the domain of a definition is kept as a definition (`core.ts`), and read by that kind.
   const kept = await transport.retained(repository.rules, reader, "definition", digest);
   if (!kept.ok) return stop(failed(`Cannot read the ${name} definition ${digest} from the rules scope: ${kept.reason}.`));
