@@ -1,0 +1,46 @@
+{
+  "actual_handle": 85407,
+  "terminal_exit": 1,
+  "release": "1fd50d5195fd3a0663a96f710913caa503adce2c",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "result_manifest": {
+    "path": "/tmp/artroom-pool53b-old-native-r3-result/manifest.json",
+    "sha256": "afc148c79602a0d9f1981bb16cd47b42dcd4fb876f27e0ecf4f8ffcceab8dc49"
+  },
+  "raw_outer": [
+    {
+      "path": "/tmp/artroom-pool53b-old-native-r3-outer.log",
+      "sha256": "5a757577e0d2e6441ebd25434973e5cc2ae313aeee1e91c15e0d41dd9a77624e"
+    },
+    {
+      "path": "/tmp/artroom-pool53b-old-native-r3-outer.time",
+      "sha256": "8c82b80d293b881964fb25093a105b0ec3611a00d69566b09e22871d19964954"
+    }
+  ],
+  "classification": "distinguishes",
+  "coverage": {
+    "cases": 5,
+    "passed": 4,
+    "intended_failed": 1,
+    "skipped": 0,
+    "retries": 0,
+    "unhandled": 0
+  },
+  "failure": "AssertionError line70:72 expected[[1,1]] got[[33,33]]; real native work/auth completed before layer assertion",
+  "observations": {
+    "worker_early": 18,
+    "worker_late": 33,
+    "worker_layers_late": 33,
+    "max_fetch_depth": 33,
+    "platform_early": 1,
+    "platform_late": 16,
+    "platform_layers_late": 16,
+    "max_summary_depth": 16,
+    "real_auth_choices": 3,
+    "inspector": 0
+  },
+  "restore_verified": true,
+  "baseline_reused": "69874a733e7ada8b08b37a3f501791981072fb92",
+  "qualification": "Actual native accumulation mechanism; DO layer growth observed but later DO assertion unexecuted after intended Worker failure; fullpoolcause/global10x/physicaldrain unproven."
+}
