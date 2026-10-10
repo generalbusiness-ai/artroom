@@ -150,8 +150,10 @@ literal lookup repair passed CLI source, CLI test and Scope test compilers,
 both existing CLI custody cases, and the existing native application
 factory case. The normal Page build then refreshed its generated module;
 all other tracked files and the guarded dependency view stayed unchanged.
-The ordinary changed-source gate remains pending. These checks establish
-bootstrap behavior, with the witness limitations stated above.
+The ordinary changed-source gate passed: 1,025 Vitest cases, two original
+optional skips, and the chained Node checks (8 repository cases and 37
+Counting browser cases). These checks establish bootstrap behavior, with
+the witness limitations stated above.
 
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
