@@ -8,16 +8,23 @@ pushed head against the live remote and retained landing receipt
 and landed. The earlier failed gates and qualified successful evidence
 below remain attributed to their exact source.
 
-This branch is a separate source-only three-donor test-economy
-composition onto that receiving main: Hub, manifest and CLI Git fixtures.
-Its three compiler contexts and all 42 selected cases, including one
-original optional recorder, are **unrun**. It preserves reviewed donor
-code and original deadlines. The earlier 27-case `5ade`/`8c967`/R2
-preparation remains frozen and unexecuted; it is not an altered acceptance
-or a prior result. New controls, a changed-head gate and independent
-review remain owed. SDK, UI, Counting and other setup branches are outside
-this composition. No new performance, native authority or product
-acceptance is claimed.
+This candidate normally merges the frozen five-path test-economy donor
+`f027d949b9c7d0b064c1cb3c23dc88284de67fe3` and eight-path SDK donor
+`d2a39598f56708a4523bdfde2ad98a82dd843cb7` onto receiving main
+`cf6c9ce6277f6eb840dc4e96d6943c2b87fe53ba`, tree
+`d855f91866f66a9d396b1c3098f8f307d4791d22`. Main retains the landed
+initial delivery and its later six-document guide increment. The two
+merges have no conflict. All thirteen paths are disjoint; donor code and
+all other receiving-main modes and blobs remain exact. Only this existing
+note's provenance and outcome accounting differ from the economy donor.
+Names, C4, the separate P3 checklist corrections, UI and new optimizations
+are outside this composition.
+
+The affected economy and local SDK outcomes below remain evidence for
+their actual frozen heads. They do not establish a passing gate or public
+SDK acceptance for this new candidate. One ordinary changed-head gate and
+normal independent review remain owed. No project runtime ran during this
+source composition or its inert gate preparation.
 
 ## Historical initial delivery and evidence (retained)
 
@@ -288,8 +295,10 @@ excluded. The initial delivery is landed; these test changes are a new,
 separate source subject and inherit no validation pass.
 
 The manifest change removes two duplicate object verifications while the
-real checker boundary and corruption refusal remain, and corrects the
-published tree expectation to retain the existing docs folder. The Hub
+real checker boundary and corruption refusal remain. Its advisory cleanup
+removes an unreachable alternate tree expectation after the one-file
+branch returns; both reachable one-file and two-file expectations remain
+unchanged. The Hub
 change and its allocation/coalescing qualifications stand as recorded
 above. The complete cache, Demo and manifest files retain all 27 cases,
 including the original optional recorder. The smallest direct compiler
@@ -318,3 +327,67 @@ and recipe review and a separate execution release. No old 27-case run,
 separate CLI baseline, discovery, filter, retry or deadline change is
 introduced. All tests, controls and the coordinated changed-head gate are
 unrun; no SDK source or failed SDK stage belongs to this composition.
+
+
+## Combined SDK and economy candidate — gate pending
+
+Preparation request `5427e4d24fc85957e07398efd1508cd631b7740b` rests on
+promise `8150ab2a264f13672bc6b0632b554af07a9ff54a`. This composition
+preserves the exact frozen donor code and current main's six guide blobs;
+it adds no outcome file, test matrix, dependency or configuration change.
+The earlier source-writing “unrun” sections are historical preparation
+records. The current observed outcomes are qualified as follows.
+
+At exact economy `f027`/tree `6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c`,
+handle 68074 passed all three compiler contexts and its whole four-file
+body: 41 cases passed and the original optional recorder was skipped.
+The wrapper exited 1 because its added project-order assertion rejected
+the actual callback order. The baseline component was accepted under
+`4aa`; this does not relabel the failed wrapper. Complete retained proof:
+`/tmp/artroom-economy-f027-one-run-complete-proof.json`, SHA-256
+`4ce0355912e938938601371eb7da613a10b7ddc255102fe0bfc2350e43b6862b`.
+
+The reuse control at that same source, handle 49862, ran the unchanged
+whole cache case once under the Hub-only control. It failed the intended
+pack-count assertion at line 106:26: two builds instead of one, after both
+responses had been awaited and decoded. There was no other case, module
+error, reported unhandled error or retry. Source, cache and permanent pool
+were restored. Its component was accepted under `5bb`; the original
+wrapper still exited 1 as “not-distinguished” because its Ready callback
+incorrectly required zero errors even though Vitest had already updated
+the task's final result. The separate early-refusal control remains
+unrun. No unchanged baseline or control is repeated by this composition.
+
+At exact SDK `d2a3`/tree `1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f`,
+handle 22393 exited 0: the whole reader case, all four packages' actual
+resolution and emission, offline packs, complete compiled-output journey
+and all three strict consumer contexts passed. The native Node clone call
+and private type erasure were checked, nested clone changes were validated,
+and the original fixture's canonical bytes were preserved. All 264 child
+commands completed: 22 producer and 242 checker children. The complete
+local proof is `/private/tmp/artroom-sdk-d2a3-complete-success-proof.json`,
+SHA-256 `31bf3a57bdc33c96dbb2f4e22e4a567b02b90a749abc84ff2f789bf636f99c40`;
+its explicit public evidence metadata is
+`/tmp/artroom-sdk-d2a3-independent-actual-result/public-proof-r2.json`,
+SHA-256 `2525bde54e2a5b4999f51b79a8b52de7b9c14d2b5d94810a228762f825e63704`.
+Acceptance `364ede`/ratification `a35fc7` concern that local result.
+The four archives and extracted member records remain opaque hash evidence.
+The observed outer time was 4.21 seconds wall and 5.14 seconds CPU; this is
+one local invocation, not a speedup or whole-gate result.
+
+These outputs are owned local stages, not published registry packages,
+installed outside consumers or a deployed service. The failed `5e1f`,
+`c4bd` and `7695` stages remain immutable and supply no borrowed artifacts.
+The SDK guide's preparation statements remain attributed to their original
+source stage; this paragraph records the later successful local outcome.
+No prior source approval transfers to this combined head.
+
+The inert gate recipe retains the ordinary `npm run gate`, unchanged root
+configuration, original 1,007 Vitest cases and two optional recorder skips,
+and the existing active-source and compatibility Node checks. It adds no
+filter, reporter, discovery, compiler/body repeat, `--ci` or SDK stage run.
+Fresh output and exact current source/tool/cache/workspace guards are
+required before a separately released single gate. Complete source and
+evidence review, early-refusal distinction, ordinary landing, public SDK
+publication and outsider/browser/hosted/Jam acceptance, and the full
+measured tenfold objective remain open.
