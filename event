@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a332e7077a982fc5824b7c253d440506c24f515e"}
+{"kind":"artifact","text":"packages/scope/test/hosts.ts at exact 62c99630346d57085dfca2292e245140e458ab7d on request/combined13-candidate, under promise git:sha1…a9ff54a on request git:sha1…1b7740b","body":{"commit":"62c99630346d57085dfca2292e245140e458ab7d","path":"packages/scope/test/hosts.ts"}}
