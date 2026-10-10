@@ -1,0 +1,97 @@
+{
+  "head": "1f925622fcc2e96d0a86bf9822092dde97e83dc7",
+  "tree": "e9cce8fa148d3aa19616e25398c246c6d32f454f",
+  "release": "86a8f44d87560dc68c1fba92d34f38ecbeec20fa",
+  "actual_handle": 1852,
+  "actual_exit": 1,
+  "status": "FAILED",
+  "whitespace": "PASS",
+  "typecheck": "PASS",
+  "install": "SKIPPED exactlock",
+  "tests": {
+    "total": 1007,
+    "passed": 1000,
+    "failed": 5,
+    "skipped": 2,
+    "files": 172,
+    "file_failed": 5,
+    "file_passed": 166,
+    "file_skipped": 1
+  },
+  "active_source": "UNRUN because original Vitest && node --test chain stopped",
+  "failed_cases": [
+    "site-native3-publication",
+    "source-preview",
+    "application-establish",
+    "site-immutable-publication",
+    "versions"
+  ],
+  "task_data": "Both original cases passed in total; neither listed as failed",
+  "observed_incomplete_stages": {
+    "immutable": "two-publications after setup2115ms; no completion",
+    "native3": "second-publication after setup2353ms/firstpublication4509ms; cleanup5015ms not physicaldrain",
+    "preview": "original-publication-and-source after setup3237ms/openroom3302ms; cleanup5014ms not physicaldrain",
+    "application_establish": "no markers, stageunknown",
+    "versions": "no markers, stageunknown"
+  },
+  "cause": "UNKNOWN. Comparison to exactfc0 shortgreen localizes observed slower setup/publication groups only, not causal repair or native work attribution.",
+  "diagnostics": [
+    "RefcountedCanceler crossDO I/O at runner timeoutabort",
+    "SQL fixture retention fault",
+    "two Content-Type smartGit text warnings"
+  ],
+  "outer_wall_seconds": 326.61,
+  "outer_cpu_seconds": 390.5,
+  "test_wall_seconds": 320.86,
+  "test_cpu_seconds": 372.15,
+  "cost_capture_limit": "Original default output prints failing file/case durations and selected fixednative stages; passing-file/case bulk timings absent. No extra reporter/profile/suite repeat run.",
+  "source_clean_unchanged": true,
+  "manifest_verified": {
+    "files": {
+      "outer.time": {
+        "bytes": 34,
+        "sha256": "f09b8f86d821743b0ba0c65a4723822eb3397df3c5c9dd2ce8cd5f98b8c59d91"
+      },
+      "whitespace.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "start-proof.json": {
+        "bytes": 729,
+        "sha256": "2d0e7e3c22e91481fd970b74d3328fb63807e817a9325be4c43fbf08fd588119"
+      },
+      "whitespace.time": {
+        "bytes": 29,
+        "sha256": "3c69b88f5dc6931c1d6ce4a1228d308bdb3b56481e783c9eb3d2f953cf9c0446"
+      },
+      "test.log": {
+        "bytes": 10773,
+        "sha256": "afe92415647238ccb3f09d484a3e51a46ce827b591a47276d8f3962bb09f65d8"
+      },
+      "typecheck.log": {
+        "bytes": 1552,
+        "sha256": "5bbce9b984257ab2ead7b08222be0dd739a8be2bf1a66c6f9db57c78cddc6ce9"
+      },
+      "test.time": {
+        "bytes": 34,
+        "sha256": "89fc73bb8be55d0da6c809171f9ab841129cce588a745fffece1385b7b05e6cb"
+      },
+      "outer.log": {
+        "bytes": 3053,
+        "sha256": "bea543c196205ee6e1340efe0593c337d32e89c6390640bd7562d4744a929ced"
+      },
+      "terminal-proof.json": {
+        "bytes": 1344,
+        "sha256": "282b63f2377742d8fc8aaa2da5f68bd8c61a345cd5967e50a6e77240a8b02909"
+      },
+      "typecheck.time": {
+        "bytes": 30,
+        "sha256": "60473e5daf8d7dcb77e25c5a4dbe5d2e6159635d3758df49036113690165afd4"
+      }
+    },
+    "actual_gate_exit": 1,
+    "runner_exit": 1,
+    "qualification": "Original default gate output retained whole; per-file/case timing only where emitted. No new reporter, instrumentation, discovery, retry or baseline."
+  },
+  "limits": "No artifact/review/landing approval; no unchangedgate or nativebaseline repeat. Failed059 preserved separately. Fullproduct/manual/10x remainopen."
+}
