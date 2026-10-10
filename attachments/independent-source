@@ -1,0 +1,24 @@
+{
+  "head": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "tree": "11412d5e08fbbd61e13a5479d5bb66f20a8faf68",
+  "source_packet": "/tmp/artroom-hub-pack-reuse-source-packet-r2/packet.json",
+  "source_packet_sha256": "0dadb1133cc0a5474c25d69b0d92e181ef576afc091016ec3804b41acea61ee7",
+  "changed_bodies_full_read": 2,
+  "three_path_delta_full_read": true,
+  "own_git_original_statements_byte_identical": true,
+  "own_git_body_sha256": "19cf2277c763ea98ec8408464f962da687e8cc6819b17752fe4dbc113e1944a5",
+  "own_git_fetch_preserved_except_helper_call": true,
+  "hub_fetch_preserved_except_pack_call": true,
+  "receive_and_following_exports_byte_identical": true,
+  "known_subset_limit": "Fresh Demo read is its declared title/timeout/recorder region and caller spans, not entire unchanged body. No broad project audit.",
+  "blocking_findings": [],
+  "preparation_only": true,
+  "execution": [],
+  "git_clean_and_head_unchanged": true,
+  "files": {
+    "findings.txt": {
+      "path": "/tmp/artroom-hub-c8-independent-source-review/findings.txt",
+      "sha256": "957ee172eb6873422024014d9fe1b677eb3e545ef3cdd3a72a59806a2f072650"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "request": "4bb53d024c7b7da058b25c01b71b793454d321af",
+  "promise": "254f392fdae077dce25642ac494745d40b527967",
+  "cwd": "/tmp/artroom-hub-pack-reuse",
+  "branch": "request/hub-pack-reuse",
+  "head": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "tree": "11412d5e08fbbd61e13a5479d5bb66f20a8faf68",
+  "base_head": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "clean": true,
+  "pushed_head": "c8d989305f6a1ed9b8a2570a28232c34c9599145",
+  "changed_paths": [
+    "notes/2026-10-09-initial-combined-delivery.md",
+    "packages/scope/test/hosts-pack-cache.test.ts",
+    "packages/scope/test/hosts.ts"
+  ],
+  "old_own_git_case_body_byte_identical": true,
+  "old_own_git_case_body_sha256": "19cf2277c763ea98ec8408464f962da687e8cc6819b17752fe4dbc113e1944a5",
+  "execution": "UNRUN project/runtime/validation/control/gate",
+  "native_whole_title_count": 6,
+  "original_optional_recorders": 1,
+  "claim": "Source-only Hub fixture successor; no measured gain/tenfold/native authority/Source acceptance transfer",
+  "artifacts": [
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/delta.patch",
+      "bytes": 12351,
+      "sha256": "fb54a8ac7045afb35345754a2490a1e169ca167f192a65b61170dde50ed595eb"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/dependency-source-inventory.json",
+      "bytes": 4286,
+      "sha256": "ab42296b5a462efaf04acc0725b041c2ce8141a69321f8c87faa3e6faec3af6a"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/refinement.patch",
+      "bytes": 1160,
+      "sha256": "e7cfd57a08fbd81df4c0d49c24c3fa81a9d0d42094d55b0002bb21e777d75a50"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/source-and-check-plan.md",
+      "bytes": 7232,
+      "sha256": "17f1b66c25e1f35974e68d402ebe4fe27fa0ecf096eed45f06b4de3a17e90498"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/source-bodies/hosts-pack-cache.test.ts",
+      "bytes": 7631,
+      "sha256": "063108300af0ac29acfb4b5ec5f574c49cf9a17aae8732df4c70b242aa1ccfb4"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/source-bodies/hosts.ts",
+      "bytes": 16294,
+      "sha256": "6a8b17bed8bbb716d225b44797bd23845f86e4bccaf39332ffa10ce4ac27d91e"
+    },
+    {
+      "path": "/tmp/artroom-hub-pack-reuse-source-packet-r2/whole-file-title-ledger.json",
+      "bytes": 2801,
+      "sha256": "1c0df070bbc6af7039f3d7703c03484abaffc47b4cb8288db1b994384d1c844f"
+    }
+  ],
+  "revision": 2,
+  "predecessor": {
+    "head": "4b8a932f8c13dc63178bb0ea11ca2e213a2e5169",
+    "packet": "/tmp/artroom-hub-pack-reuse-source-packet/packet.json",
+    "sha256": "a6d068e2cf6f1b3fe6b8d160acea6b7bb861334ac45bf08ecb563592cf1f908e"
+  },
+  "intended_control_assertion_line": 106,
+  "refinement": "Await and decode both Hub Responses before asserting reuse count; no pending native wire work on intended failure"
+}
