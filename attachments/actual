@@ -1,0 +1,113 @@
+{
+  "execution_request": "0cbf05f238adcad4cb690c952553a121ab686c8b",
+  "execution_promise": "60ac2f573262646824db6e2a35ffd578e58b980f",
+  "preparation_request": "e4c871d0e0ddf04c4e6b400a503cfefe19b563ae",
+  "source": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "process_handle": 68074,
+  "process_terminal": 1,
+  "wrapper_status": "failed",
+  "compilers": {
+    "scope-test": 0,
+    "lanes-scope": 0,
+    "cli-test": 0
+  },
+  "body_exit": 0,
+  "actual_report": {
+    "total": 42,
+    "passed": 41,
+    "original_skipped": 1,
+    "unhandledErrors": 0
+  },
+  "coverage_qualification": "Guarded pipeline failed its strict lifecycle order assertion: first Scope start index2 precedes CLI results60..88. Result/ledger retained, no overallPASS; static build group order did not enforce serial lifecycle. Independent exact diagnosis pending.",
+  "source_cache_guards": "before/after/terminal PASS",
+  "outer_cost": {
+    "wall_seconds": 46.03,
+    "user_seconds": 44.26,
+    "system_seconds": 6.72,
+    "cpu_seconds": 50.98
+  },
+  "artifacts": [
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/result.json",
+      "bytes": 4663,
+      "sha256": "77b8b612ae10eff3c73e1031060f17d5b27f1e77d52e5463d96249be0267c707"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/manifest.json",
+      "bytes": 1969,
+      "sha256": "1fea183392106eab391a1ba72a6112c32e5c6927b879f8fc7eef6a649d9446d0"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/coverage-ledger.json",
+      "bytes": 36286,
+      "sha256": "4fe451be97496e5b047e92e763961b2643c9526a42f9f77445659bc80e62fa88"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/coverage.jsonl",
+      "bytes": 55123,
+      "sha256": "cfabd74b7da4cad5aed3b480191d655bd92d00d758fb5513781734059e4a8543"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/vitest.json",
+      "bytes": 17042,
+      "sha256": "2e8629c0a8d9b6aa44b328088a9a58a8873e4a88b5c14ee58c50f42d9450ac35"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/public-classified.json",
+      "bytes": 8786,
+      "sha256": "def93edf570114071334a1e3b20f90c168984434216013a320ce8bb99c5a8275"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/scope-test.time",
+      "bytes": 753,
+      "sha256": "7ec7ed6064ee999cfbff253436143a820dc332886447fc5f0d09ac1f785922bc"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/lanes-scope.time",
+      "bytes": 753,
+      "sha256": "7637104f743a584eee723ac029a300081d4c311c6f3d01db89775e58df617c77"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/cli-test.time",
+      "bytes": 753,
+      "sha256": "dbf0a777d1416a9649be55eafb6ee8327740ca72a703b3768310dd1bee7b83ca"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-output-one/body.time",
+      "bytes": 755,
+      "sha256": "7ddcc4edd33c69ae077283ba897d93bb6e9ebda63826ea13d3d9cb2722e8cad1"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/stdout",
+      "bytes": 168,
+      "sha256": "a82daf4966cd7aa48b79b9b55356b0d9e47d64d61dd79f9b01f728c256f8a8ff"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/outer.time",
+      "bytes": 755,
+      "sha256": "d3f8aff27904bc98a5b3b6b60c7b093e55c9a87eb7368310730c6cc89f113113"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/exit-status",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/completion.json",
+      "bytes": 374,
+      "sha256": "8e7a73e22fe9ecec4fbdd1ed15cf5fcfb141981962f4968fe4bbc9b1d36693d8"
+    },
+    {
+      "path": "/private/tmp/artroom-economy-f027-run-outer-one/dispatch-environment.json",
+      "bytes": 376,
+      "sha256": "9ab6452cfb4d28809103487bc41aa74ffb16548ad3ca39fbcdc1feac94b85171"
+    }
+  ],
+  "public_authority": "Only explicit selected evidence; raw body log private/hash-only, no automatic traversal",
+  "runtime_scope": "ONE actual pipeline, no controls/gate/retry; internal result still names preparation binding, external report names executionrequest/promise"
+}
