@@ -1,0 +1,169 @@
+{
+  "execution_request": "a1f29ee08b10774208f8dc87a1510c19f69bdbf7",
+  "execution_promise": "585316e135e3f041a537383382d14eecf85306f6",
+  "original_handle": 64535,
+  "actual_terminal": 0,
+  "result": {
+    "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+    "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+    "label": "early",
+    "status": "distinguished",
+    "body": {
+      "argv": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+        "--config",
+        "/private/tmp/artroom-hub-early-e307-preparation/control.config.mjs",
+        "--bail=0",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-economy-three-donors/scripts/focused-check.mjs",
+        "--outputFile.json=/private/tmp/artroom-hub-early-e307-output-one/vitest.json"
+      ],
+      "cwd": "/private/tmp/artroom-economy-three-donors",
+      "actual_exit": 1,
+      "elapsed_seconds": 2.753236542106606
+    },
+    "baseline": {
+      "path": "/tmp/artroom-economy-f027-one-run-complete-proof.json",
+      "sha256": "4ce0355912e938938601371eb7da613a10b7ddc255102fe0bfc2350e43b6862b",
+      "qualification": "actual wrapper1 retained; three compilers0, body0, exact41PASS1originalSKIP, cache1PASS; independent nonoverlap/order reconciliation73b97+268014 retained; no new baseline"
+    },
+    "new_baseline": false,
+    "before": {
+      "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+      "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+      "clean": true,
+      "control": null,
+      "source_count": 1272,
+      "cache_unchanged": true,
+      "private_pool_cd50": true
+    },
+    "baseline_artifacts_exact": true,
+    "mutant": {
+      "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+      "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+      "clean": false,
+      "control": "early",
+      "source_count": 1272,
+      "cache_unchanged": true,
+      "private_pool_cd50": true
+    },
+    "after_mutant": {
+      "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+      "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+      "clean": false,
+      "control": "early",
+      "source_count": 1272,
+      "cache_unchanged": true,
+      "private_pool_cd50": true
+    },
+    "coverage": {
+      "distinguished": true,
+      "case": [
+        "scope",
+        "/private/tmp/artroom-economy-three-donors/packages/scope/test/hosts-pack-cache.test.ts",
+        "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response"
+      ],
+      "intended_line": 146,
+      "actual": 1,
+      "expected": 0,
+      "failure_sha256": "6e013b71b0d60e4f6d72497f1f9b064482c84a7463ced79424cef81d9f437be8",
+      "body_exit": 1,
+      "whole_cases": 1,
+      "failed": 1,
+      "skipped": 0,
+      "unhandled_errors": 0,
+      "retries": 0,
+      "repeats": 0
+    },
+    "restoration": {
+      "head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+      "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+      "clean": true,
+      "control": null,
+      "source_count": 1272,
+      "cache_unchanged": true,
+      "private_pool_cd50": true
+    },
+    "actual_wrapper_exit": 0
+  },
+  "outer_cost": {
+    "wall": 4.9,
+    "user": 4.28,
+    "system": 0.96,
+    "CPU": 5.24
+  },
+  "public_whitelist": [
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/result.json",
+      "bytes": 3043,
+      "sha256": "2e441e39748277e53f4b5ccbebc79a3e9c6540eba3d848d8b6955aab2bce1a2e"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/manifest.json",
+      "bytes": 988,
+      "sha256": "be475c2791e461f7bca0a57c6067602a00a95bf605c90896567d46ebc815c0c7"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/coverage-ledger.json",
+      "bytes": 692,
+      "sha256": "163ccf4109c67970b0805c8c84ff194e5b08e5f24dc94b31273f372298f8333f"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/coverage.jsonl",
+      "bytes": 1895,
+      "sha256": "47db5dc31cfadcd34e97b3dd0259f7014a737bb5e4721fa2197cb339112feaab"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/vitest.json",
+      "bytes": 1287,
+      "sha256": "61bbc13c33d562337e0bf97ba36b40b76abbe269624805bbe3c13e7e41f435d6"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/public-classified.json",
+      "bytes": 6156,
+      "sha256": "5f3c89f827d6688a054262272229115dfa078a19e65ddc76814a0450d069ef62"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-output-one/body.time",
+      "bytes": 753,
+      "sha256": "88d014cc3b9d7cd724b588a80a40b20c17e696ceb244ff00c3bdfbd237d4e264"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/stdout",
+      "bytes": 70,
+      "sha256": "fbf977f01c4b7de9624d338d4639a7221fec0b8c1314583db26d7d34e47bd689"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/outer.time",
+      "bytes": 753,
+      "sha256": "ddccf1cb6678440f975f0bcbebaf927f614b968620f37c97ac4f926aeb96a456"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/exit-status",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/completion.json",
+      "bytes": 375,
+      "sha256": "941f0a6ac9be160514920b63c9233ae4761001dca9ca7b89f51f92bc760e0b39"
+    },
+    {
+      "path": "/private/tmp/artroom-hub-early-e307-outer-one/dispatch-machine.json",
+      "bytes": 413,
+      "sha256": "62d815a87806010cd5ce57429d3e434b23e4eb9e5a52418c4ba7017b1ef0b0c3"
+    }
+  ],
+  "qualification": "Only originalonecase early-refusal intendedassertion sensitivity; oldbaseline/reuse not rerun; rawbodylogprivate/hashclassified. No gate/Sourceapproval/realprovider/globalfactor."
+}

@@ -1,0 +1,21 @@
+{
+  "scope": "Retained mechanical outcome audit by recipe author, not formal approval",
+  "execution_request": "a1f29ee08b10774208f8dc87a1510c19f69bdbf7",
+  "execution_promise": "585316e135e3f041a537383382d14eecf85306f6",
+  "new_runtime": "NONE",
+  "actual_outcome": "original64535 wrapper0/body1; intended146 AssertionError1vs0; module/unhandled0; exact restoration",
+  "files": {
+    "findings.md": {
+      "bytes": 2974,
+      "sha256": "c9c265d302004e62343b7d7e7f1845d572a6f05118c50169088592e8ff876719"
+    },
+    "public-proof.json": {
+      "bytes": 4921,
+      "sha256": "07e90faef99ad0e9709b5eddd5b92ffa897e5a8074fa9bf109c12c4f27b12a09"
+    },
+    "source-correspondence.json": {
+      "bytes": 1355,
+      "sha256": "50ac85cc9581956532705636d7d201fdb960dba287bf29a131e21a58212ade30"
+    }
+  }
+}
