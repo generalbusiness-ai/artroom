@@ -1,0 +1,249 @@
+{
+  "head": "9e5d497316946b5ae78165187239a23fdcd3d23d",
+  "tree": "84f2ff7533ba188ea0b9de352ef28d71476be9a9",
+  "UI_donor": "cc7986b722e289b0e02b09f77c563a4f97d49453",
+  "receiving": "f722bc22d484c16fc73eae31e4c4a8eae94a546a",
+  "common_base": "9a419849d57c2a18d6aa69741c0a232e1f3bd65d",
+  "clean_observed": true,
+  "receiving_UI_delta": [
+    {
+      "path": "packages/page/src/actions.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "66d5cbd51d2e65731680ab1ec3d940efb34818f1"
+    },
+    {
+      "path": "packages/page/src/data.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "df8d09020d0cd1cd43940bd4b8235babaa0687e6"
+    },
+    {
+      "path": "packages/page/src/focus.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "fbfc986df7d8fb498b48b65bfb15a2d0b10c2417"
+    },
+    {
+      "path": "packages/page/src/index.html",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "c8bc71662894bf66824c5a53a0c0bc4f8139a5ba"
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "494c68a83a84e04f546332b9b7619d5ca58f36cd"
+    },
+    {
+      "path": "packages/page/src/membership-projection.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "df37a51a882d31e5184e6da37f63353e8b26b96c"
+    },
+    {
+      "path": "packages/page/src/shell.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "96cd3bd4c6329c8b898658d3f1ebbfa634644998"
+    },
+    {
+      "path": "packages/page/src/tasks.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "9e40bddb1cb61b0e01837493b5e7743ef39a520c"
+    },
+    {
+      "path": "packages/page/src/view.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "5cde9caf8149f8a25a3c9ff712c4456852b059f3"
+    },
+    {
+      "path": "packages/page/test/actions.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "a75485e59c4dfe2da179c0bf5bbb55f66cd8165a"
+    },
+    {
+      "path": "packages/page/test/claim-ui.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "7d8de8487f914f5ae1596ca064602475998edab0"
+    },
+    {
+      "path": "packages/page/test/correction-main.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "bc62cc150e49c2f6b7656bd015798f78ef6094f8"
+    },
+    {
+      "path": "packages/page/test/focus.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "639859ef3d22ebe7adea42fc7fe00d46ccb38c58"
+    },
+    {
+      "path": "packages/page/test/join-ui.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "3e4f9e0004f9482f673edb61ed92ae15caa32a00"
+    },
+    {
+      "path": "packages/page/test/membership-projection.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "538761ab5b8ebde019b49bbddf3996f26ae17516"
+    },
+    {
+      "path": "packages/page/test/sending.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "b039b73122c719bf2a418cb4ac1d1a283c3f2d01"
+    },
+    {
+      "path": "packages/page/test/settings.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "bb668cc9674cba37d721103d923299b70c5173e3"
+    },
+    {
+      "path": "packages/page/test/task-data.scope.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "a526630b16490960b7097f0c59648b7254b57bf2"
+    },
+    {
+      "path": "packages/scope/src/page-assets.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "9966bb0d0e914362e456f3757a7fa6220b992c1c"
+    }
+  ],
+  "incoming_main17": [
+    {
+      "path": "docs/public-sdk-release.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "64278d889908544d9584c7606039aad7a6c93830"
+    },
+    {
+      "path": "notes/2026-10-04-notes-reconciliation/collections.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "253af6c612ce2af21c22fdd4facb485eb955ffe2"
+    },
+    {
+      "path": "notes/2026-10-04-notes-reconciliation/jj.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "9f6f524e894ec4fea28a7aa8376952a48d218078"
+    },
+    {
+      "path": "notes/2026-10-04-notes-reconciliation/mcp.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "db770391573317339953c99c673bc2eae1990c63"
+    },
+    {
+      "path": "notes/2026-10-04-notes-reconciliation/wake.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "068c8cde08ec45b60eb67a8ccb9ef1d1d528c516"
+    },
+    {
+      "path": "notes/2026-10-09-initial-combined-delivery.md",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "03396b61be065947c49b3cdd303febfd99738004"
+    },
+    {
+      "path": "packages/cli/test/git.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "c38f2d41f5962e8ecbd40b6d9b3837e713f2eb5b"
+    },
+    {
+      "path": "packages/derive/test/fixtures.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "5d494ab920543b60a398dd36222262c6301f9f2a"
+    },
+    {
+      "path": "packages/lanes/test/manifest-tree.scope.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "deed8d68459c81277e80cb7eb9373b2658a4e842"
+    },
+    {
+      "path": "packages/scope/test/hosts-pack-cache.test.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "3e4bf65285a3c9abb42d7376e765f2f3f0c4804a"
+    },
+    {
+      "path": "packages/scope/test/hosts.ts",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "77034bd766c90dd559cc246b66b7e360ce8ac12a"
+    },
+    {
+      "path": "scripts/check-public-release.mjs",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "df8a88be693b9e2a2778ad62c591c09a592aeca5"
+    },
+    {
+      "path": "scripts/public-release-lib.mjs",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "c66457465ab840e9f48416b2228a6749067e3eae"
+    },
+    {
+      "path": "scripts/public-release-modules.mjs",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "d38158efbcfde4e77c78e432da4d57568d750e25"
+    },
+    {
+      "path": "scripts/public-release-modules.test.mjs",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "8cf57645ca524312b1e8df205dc0ed2c71ba5ef4"
+    },
+    {
+      "path": "scripts/public-release.json",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "c536fb5b58b5b3cdadbf92d7433448025a767596"
+    },
+    {
+      "path": "scripts/public-release.mjs",
+      "mode": "100644",
+      "kind": "blob",
+      "blob": "d1c646d466a5f8c40b74828bcb5930b2337094c0"
+    }
+  ],
+  "UI19_exact_donor_mode_type_blob": true,
+  "incoming17_exact_receiving_mode_type_blob": true,
+  "disjoint_pathsets": true,
+  "other_base_entries_unchanged": 1253,
+  "final_receiving_delta_exactly19": true,
+  "prior_bounded_reviews": [
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-3b7-projection-review/packet.json",
+      "sha256": "7c3ae1a5a2fc2691de1149e4af8c700a67d85eea45ae6182ab744e7112fae883"
+    },
+    {
+      "path": "/private/tmp/artroom-ui-settings-cc798-source-review/packet.json",
+      "sha256": "5ac42942857d403a34f5bd9d0fd3a5ac1dcb05d67b92ecc99c8d9c823b87b85d"
+    }
+  ],
+  "semantic_scope": "Composition identities only; prior bounded projection/settings review retained, not a full19-body UI approval",
+  "generatedasset": "native Git mode/type/blob equality + accepted opaque checksum; no bundle decoding",
+  "gate_owner": "u1 actual32093 LIVE, no result read yet; later explicitpublic whitelist/terminal needed",
+  "runtime": [],
+  "source_edits": [],
+  "state_filings": []
+}
