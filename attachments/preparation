@@ -1,0 +1,27 @@
+{
+  "status": "STATIC only; execution requires Root exact-head release",
+  "head": "33a8e30905bea75f7bc26d1924215367518b43e9",
+  "tree": "44fb42c1160d1dc1a5235ba7c00038f73b3cc600",
+  "files": {
+    "plan.json": {
+      "path": "/tmp/artroom-i1-33a-static-preparation/plan.json",
+      "sha256": "3a2bac8a37918def6f1ff52cbaf3e80bcdb9bcd8897c84943ec54d732a4f7575"
+    },
+    "proof.json": {
+      "path": "/tmp/artroom-i1-33a-static-preparation/proof.json",
+      "sha256": "e559f12ff6077d935a3dc1e15438e7470e28b901f426fbe922cbb91d04525265"
+    },
+    "client-one-body.config.mjs": {
+      "path": "/tmp/artroom-i1-33a-static-preparation/client-one-body.config.mjs",
+      "sha256": "ecaa4343ea4fdf5329d44930f3c995f66a58b3d5731d0af79913f8f6e919dfdc"
+    },
+    "run.py": {
+      "path": "/tmp/artroom-i1-33a-static-preparation/run.py",
+      "sha256": "fafbc324597f52a3ccd92de14f85faaf588a62077a6923112871db07f05da355"
+    }
+  },
+  "driver": "Absent on actual I1 source; external Python built-ins only guard/launch/JSON coverage recipe, no repository framework addition",
+  "selection": "Exactly ClientSOURCE, ClientTEST, then whole packages/client/test/invitation.test.ts one case; Node environment/threads pool and original default deadline retained",
+  "execution": [],
+  "limits": "Pure configuration/codec witness and actual configured public API type closure only. No native admission, Page Join journal, deployment bootstrap, session, provider, browser or audio proof. Same-run Vitest JSON coverage; no custom collection ledger or discovery run."
+}

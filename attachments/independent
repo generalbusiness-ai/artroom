@@ -1,0 +1,59 @@
+{
+  "status": "Independent bounded static review; no execution or scope closure",
+  "subject": {
+    "head": "33a8e30905bea75f7bc26d1924215367518b43e9",
+    "tree": "44fb42c1160d1dc1a5235ba7c00038f73b3cc600",
+    "worktree": "/tmp/artroom-i1-codec-witness-source",
+    "clean": true
+  },
+  "request": "96dd910e8a7a6c904c8d9ffdb439e63f8ae2594b",
+  "promise": "abf3d6b893888caa5a407a56ada7181c333ca089",
+  "author_packet_sha256": "b3dc4614ccd5deba73011278c44a1d3bbc6357cf567615e5654a65d828f28aa3",
+  "findings": [],
+  "conclusion": "No concrete issue found in the one coherent pure codec witness. Exact native upper ceiling and legacy pending identity compatibility are represented truthfully.",
+  "coverage": [
+    {
+      "path": "packages/client/test/invitation.test.ts",
+      "sha256": "04f34ebf9d9a6f8076884759c5bec4d194b46bfeb5e57be798148648233ed43b",
+      "read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/invitation.ts",
+      "sha256": "a02e732f90e61d1c7ff6a9c8110f296f800896934724b96884008849249d6275",
+      "read": "FULL through EOF"
+    },
+    {
+      "path": "packages/client/src/index.ts",
+      "sha256": "b98c8422e559689732f7c25f5633b4b9a2b4733a6d122ba2cdac386f9fc34add",
+      "read": "FULL through EOF"
+    },
+    {
+      "path": "packages/platform/src/membership.ts",
+      "sha256": "2aa96958b8bbe000f785148275587bea7027a6d4ce98b3505ca12857d5622c62",
+      "read": "391-426 Join/enrol actual numeric max1e9;656-683 invitation lookup"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "sha256": "4f25a2fa26371c5c9e7bb6ca94aafb0c2bbb6f85624d3eb47082d680c85d3caa",
+      "read": "680-763 real issuer/legacy parser/positive-ID Join/default/pending fingerprint custody"
+    }
+  ],
+  "witness_disposition": [
+    "At1e9 independently encoded canonical v2 address both formats/parses;1e9+1 both formatting and manual parsing refuse. Actual Join/enrol max1000000000 is unchanged; syntactic parsing/binding does not claim a native invitation exists or is admitted.",
+    "v1 beyond native maximum remains parseable as the old safe-positive-ID pending identity. Its original extension-bearing decoded value/address and canonical fingerprint are preserved. Untagged membership@1 fallback is separate and not inserted into value/fingerprint. Actual CLI join computes textDigest(canonicalize(link)) before native field shaping, agreeing with this distinction.",
+    "Canonical encoding/JSON, closed full refs/app lane kind, independent configured origin/deployment/catalog comparisons, malformed bytes/extra fields/address forms and UTF8 address bounds remain in one existing proposed case. Fixture refs/catalogs/secrets are explicitly synthetic stand-ins, not native app/membership provenance.",
+    "Typed non-null binding containers remain preconditions; future I2 bootstrap validates untrusted boundary objects. This witness is not an outer-JS robustness/native authority claim."
+  ],
+  "preservation": "Only new84-line test path differs6284; codec/index exact predecessor bytes and recipe assertions from imports through EOF are identical. Packet/body/recipe hashes match.",
+  "read_external": "Full current packet,source delta and check plan; cumulative project/whole scope not reviewed.",
+  "unrun": [
+    "test/discovery",
+    "compiler/config/project import",
+    "build/generation",
+    "install",
+    "push",
+    "native/provider/browser/audio",
+    "gate/filing"
+  ],
+  "limits": "Pure codec/configuration boundary only. Full I1 issuer/CLI/Page/native stories and I2 trust bootstrap/transport/session/durable Join/crash/reload/device custody remain open. No Source approval or runtime result transfer."
+}

@@ -1,0 +1,128 @@
+{
+  "request": "96dd910e8a7a6c904c8d9ffdb439e63f8ae2594b",
+  "promise": "abf3d6b893888caa5a407a56ada7181c333ca089",
+  "source_go": "9879e320de020a7520e6586bc9579291f713ed13",
+  "base": "6284fe15b225af562ee601dd74ede5efcc54d8b8",
+  "base_tree": "e4900e555745b0cfe61194dffe54d19c30f5a36f",
+  "head": "33a8e30905bea75f7bc26d1924215367518b43e9",
+  "tree": "44fb42c1160d1dc1a5235ba7c00038f73b3cc600",
+  "branch": "request/i1-codec-witness-source",
+  "worktree": "/tmp/artroom-i1-codec-witness-source",
+  "changed_paths": [
+    "packages/client/test/invitation.test.ts"
+  ],
+  "cumulative_changed_paths": [
+    "packages/client/src/index.ts",
+    "packages/client/src/invitation.ts",
+    "packages/client/test/invitation.test.ts"
+  ],
+  "status": "",
+  "bodies": [
+    {
+      "source_path": "packages/client/src/invitation.ts",
+      "blob": "e5389ff83279b0cb796fdc36d529b628a6ce1f02",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/bodies/packages/client/src/invitation.ts",
+      "bytes": 10186,
+      "sha256": "a02e732f90e61d1c7ff6a9c8110f296f800896934724b96884008849249d6275"
+    },
+    {
+      "source_path": "packages/client/src/index.ts",
+      "blob": "f151029fe3607129eb9250f98e0238b39e33cd69",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/bodies/packages/client/src/index.ts",
+      "bytes": 370,
+      "sha256": "b98c8422e559689732f7c25f5633b4b9a2b4733a6d122ba2cdac386f9fc34add"
+    },
+    {
+      "source_path": "packages/client/test/invitation.test.ts",
+      "blob": "73a13316b60fd1ddc05c59f6ab0fe4325803bbf7",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/bodies/packages/client/test/invitation.test.ts",
+      "bytes": 6810,
+      "sha256": "04f34ebf9d9a6f8076884759c5bec4d194b46bfeb5e57be798148648233ed43b"
+    }
+  ],
+  "source_delta": {
+    "path": "/tmp/artroom-i1-codec-witness-source-packet/source.diff",
+    "bytes": 7176,
+    "sha256": "58ea6e3564eb46daa38f8c83cc17f8390215742d1dade661a32be25fc09a5700"
+  },
+  "cumulative_delta": {
+    "path": "/tmp/artroom-i1-codec-witness-source-packet/cumulative-source.diff",
+    "bytes": 18229,
+    "sha256": "c4df32142410f3486bc721c693dc36c8255da4d8becc6fc3a749439d053ffaf4"
+  },
+  "configs": [
+    {
+      "source_path": "tsconfig.base.json",
+      "blob": "39e8690bf4ce9a541b499f65d1621c62f770d1b1",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/tsconfig.base.json",
+      "bytes": 602,
+      "sha256": "25f0a24435a9bbf2c945890c930ffffb57b14e02b4f27b425886e7b4ef9401da"
+    },
+    {
+      "source_path": "vitest.config.ts",
+      "blob": "baecc2216d6358150babeead8f45f03caf6cdc95",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/vitest.config.ts",
+      "bytes": 3329,
+      "sha256": "2803c8ccd5ddb05062d56cd79535b843f94b278e93d90fd62dc87ff5894b2f6b"
+    },
+    {
+      "source_path": "packages/client/tsconfig.json",
+      "blob": "d4be5e90c73f90bd26ad2903cbf6d4dc44ce140f",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/packages/client/tsconfig.json",
+      "bytes": 288,
+      "sha256": "06ebadd052485fa7a31642e79e14908c1668da3fae2c35c20d23c756163bbda6"
+    },
+    {
+      "source_path": "packages/client/tsconfig.test.json",
+      "blob": "c163ea614aac221177b4d3cddec4b45f2f35e4a8",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/packages/client/tsconfig.test.json",
+      "bytes": 192,
+      "sha256": "2039b6fb6376351bcab85522bbde756c4d91bf17700c1f366e59818e331890b3"
+    },
+    {
+      "source_path": "packages/client/vitest.config.ts",
+      "blob": "542817256c494cadb36ef5eea2e9c1e8865623f8",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/packages/client/vitest.config.ts",
+      "bytes": 243,
+      "sha256": "d0e900d29909fa1dea22ee6635299bbb2162161a26362248598500c91478d582"
+    },
+    {
+      "source_path": "package-lock.json",
+      "blob": "58d70d2213d15b33e04344071ea72249dfbd9337",
+      "path": "/tmp/artroom-i1-codec-witness-source-packet/configs/package-lock.json",
+      "bytes": 127495,
+      "sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097"
+    }
+  ],
+  "preservation": {
+    "recipe_body_unchanged_beyond_status_header": true,
+    "frozen_recipe": {
+      "path": "/tmp/artroom-i1-v2-native-ceiling-packet/invitation.test.ts.recipe",
+      "bytes": 6882,
+      "sha256": "1d2b657aa9cd3543afcc385295fc0cb4d769991aa79b4b7f1021f475efec8780"
+    },
+    "codec_and_index_unchanged": true,
+    "frozen_6284_status": ""
+  },
+  "case": {
+    "title": "invitation codec binds canonical hints to independent trust and retains legacy pending identity",
+    "file": "packages/client/test/invitation.test.ts",
+    "count": 1,
+    "execution": "unrun; authoring only"
+  },
+  "dependency_state": "new worktree unprepared: old6284 proof does not transfer. Prepare owned12 aliases/bins/Vite for this head from exactd4e567 cached lock before Root released checks; no install.",
+  "push": "not performed; clean local source commit",
+  "runtime": "none: no compiler/test/discovery/import/generation/build/gate/provider/native/browser/audio/install/filing",
+  "limits": [
+    "configuration-only comparison",
+    "full I1 issuer/CLI/Page/native admission/app remain open",
+    "I2 bootstrap/no-redirect transport/session/durable Join custody/reload/device remain open",
+    "same actual MembershipInvitationDefinition alias and lane app kind",
+    "typed non-null binding containers remain caller precondition"
+  ],
+  "check_plan": {
+    "path": "/tmp/artroom-i1-codec-witness-source-packet/check-plan.md",
+    "bytes": 5160,
+    "sha256": "8a45e4ebd13236203d797d2b305f4b0bed3d13e277bcad0a33f64a85c5fc4c19"
+  }
+}
