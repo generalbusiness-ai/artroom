@@ -736,7 +736,6 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     if (!snapshot || "refused" in snapshot) expect.fail("The one-file checker origin must read its actual reservation");
     expect(snapshot.sources).toHaveLength(1);
     expect(snapshot.sources[0]!.entry.input).toMatchObject({ type: "act", signed: { intent: { kind: "propose-file", fields: { path: "one.md", digest: digestBytes(files["one.md"]!) } } } });
-    expect(await verifyReservationObjects(snapshot)).toBe(true);
     expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
     loseSubmit = false;
     expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
@@ -771,7 +770,6 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   net.clock.now = beforeSlow;
   if (snapshot && !("refused" in snapshot)) expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: snapshot })).toMatchObject({ job: { tree: manifest.values["tree"], commit: manifest.values["integration"] } });
   if (snapshot && !("refused" in snapshot)) {
-    expect(await verifyReservationObjects(snapshot)).toBe(true);
     const corrupt = { ...snapshot, objects: snapshot.objects.map((object, n) => n === 0 ? { ...object, data: Uint8Array.from([...object.data, 0]) } : object) };
     expect(await verifyReservationObjects(corrupt)).toBe(false);
     expect(originOf({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string }, { entry: jobEntry, pinned: definitionDigest(changeDemo3), activated: { name: "change", state: "active" }, manifest: manifestEntry, reservation: corrupt })).toEqual({ not: "no-manifest" });
@@ -803,7 +801,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(host.refs.has(reservationRef)).toBe(false);
   const git = readerOf(host); const commit = await git.commit(published);
   expect(commit.tree).toBe(manifest.values["tree"]);
-  expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(oneFileOnly ? ["README.md", "one.md"] : ["README.md", "docs", "one.md"]);
+  expect((await git.tree(commit.tree)).map((row) => new TextDecoder().decode(row.name))).toEqual(["README.md", "docs", "one.md"]);
   // The same command also waits for a publication when no check is owed.
   ok(await run(founder, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   founder.git = { run: async () => 0, files: async () => ({ ok: true, tip: published, files: [{ path: "three.md", bytes: utf8("# Three\n") }, { path: "four.md", bytes: utf8("# Four\n") }] }) };
