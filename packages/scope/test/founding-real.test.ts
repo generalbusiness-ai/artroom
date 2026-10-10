@@ -350,7 +350,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
       if (sessionSecret !== null) knownSecrets.push(sessionSecret);
       knownSecrets.push(issued.session.reader());
       if (knownSecrets.some((secret) => secret.length > 0 && text.includes(secret))) throw new Error("A known secret prevents public native capture.");
-      for (let offset = 0, part = 0; offset < text.length; offset += 65536, part++) console.log(`PUBLIC-SDK-NATIVE-CAPTURE ${part} ${text.slice(offset, offset + 65536)}`);
+      // Match the existing recorder's ASCII transport; no UTF-16 character
+      // can be split and separately re-encoded by console forwarding.
+      const encoded = b64url(utf8(text));
+      for (let offset = 0, part = 0; offset < encoded.length; offset += 65536, part++) console.log(`PUBLIC-SDK-NATIVE-CAPTURE ${part} ${encoded.slice(offset, offset + 65536)}`);
       console.log("PUBLIC-SDK-NATIVE-CAPTURE end");
     }
     // From then on the incarnation is a function of the folded state: the rules scope records the reference with it, and accepts the
