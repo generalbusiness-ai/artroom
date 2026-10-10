@@ -340,8 +340,9 @@ const INSTALL_COHORTS: Readonly<Record<InstallCohort, PlatformDefinition>> = {
 };
 function selectedRegister(cohort: unknown): PlatformDefinition | undefined {
   if (cohort === undefined) return undefined;
-  if (cohort !== "application" && cohort !== "counting-commitments") stop(usage("--cohort takes exactly application or counting-commitments; nothing was signed or sent."));
-  return INSTALL_COHORTS[cohort];
+  if (cohort === "application") return INSTALL_COHORTS.application;
+  if (cohort === "counting-commitments") return INSTALL_COHORTS["counting-commitments"];
+  return stop(usage("--cohort takes exactly application or counting-commitments; nothing was signed or sent."));
 }
 const selectedPlan = (definition: PlatformDefinition): boolean =>
   definition === APPLICATION_COHORT.register || definition === COUNTING_COHORT.register;
