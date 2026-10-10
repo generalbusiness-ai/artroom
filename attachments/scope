@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted binding: a creation revokes its write token at once or reports it owed; a refusal is the answer; delete names the exact repository",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "scope",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+          "name": "scripted binding: a creation revokes its write token at once or reports it owed; a refusal is the answer; delete names the exact repository",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted smart HTTP: ref, format and objects read with a read token minted for the read and revoked after, at the service's own remote",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "scope",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+          "name": "scripted smart HTTP: ref, format and objects read with a read token minted for the read and revoked after, at the service's own remote",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted mint and send: one write token with the service's expiry, one push with it, refused and not-sent distinct, revoke at the recorded repository",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "scope",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+          "name": "scripted mint and send: one write token with the service's expiry, one push with it, refused and not-sent distinct, revoke at the recorded repository",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    }
+  ],
+  "observedCases": [
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted binding: a creation revokes its write token at once or reports it owed; a refusal is the answer; delete names the exact repository",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted smart HTTP: ref, format and objects read with a read token minted for the read and revoked after, at the service's own remote",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "name": "scripted mint and send: one write token with the service's expiry, one push with it, refused and not-sent distinct, revoke at the recorded repository",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    }
+  ],
+  "unexpectedCases": [],
+  "modules": [
+    {
+      "project": "scope",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/scope/test/artifacts-host.test.ts",
+      "status": "passed",
+      "errors": 0
+    }
+  ],
+  "issues": [],
+  "passed": true
+}

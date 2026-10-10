@@ -1,0 +1,125 @@
+{
+  "cases": [
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "Git sha1 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "platform",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+          "name": "Git sha1 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "Git sha256 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "platform",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+          "name": "Git sha256 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "editPath gives the segments of a path that a published tree may hold, and refuses an empty, a dot, a parent and a .git segment, a control character and a path over 1024 bytes",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "platform",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+          "name": "editPath gives the segments of a path that a published tree may hold, and refuses an empty, a dot, a parent and a .git segment, a control character and a path over 1024 bytes",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "the judgment of a one-file manifest: a bad path is path-invalid before what the evidence lacks; bytes unlike their digest or size, a changed set beyond the path, or another first parent are integration-invalid; otherwise reserved with the commit the destination writes",
+      "status": "passed",
+      "started": true,
+      "observed": [
+        {
+          "project": "platform",
+          "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+          "name": "the judgment of a one-file manifest: a bad path is path-invalid before what the evidence lacks; bytes unlike their digest or size, a changed set beyond the path, or another first parent are integration-invalid; otherwise reserved with the commit the destination writes",
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    }
+  ],
+  "observedCases": [
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "Git sha1 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "Git sha256 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "editPath gives the segments of a path that a published tree may hold, and refuses an empty, a dot, a parent and a .git segment, a control character and a path over 1024 bytes",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    },
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "name": "the judgment of a one-file manifest: a bad path is path-invalid before what the evidence lacks; bytes unlike their digest or size, a changed set beyond the path, or another first parent are integration-invalid; otherwise reserved with the commit the destination writes",
+      "status": "passed",
+      "errors": 0,
+      "retryCount": 0,
+      "repeatCount": 0
+    }
+  ],
+  "unexpectedCases": [],
+  "modules": [
+    {
+      "project": "platform",
+      "file": "/private/tmp/artroom-publication-final-trees/packages/platform/test/edit.test.ts",
+      "status": "passed",
+      "errors": 0
+    }
+  ],
+  "issues": [],
+  "passed": true
+}
