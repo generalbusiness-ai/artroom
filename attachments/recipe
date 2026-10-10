@@ -1,0 +1,103 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0da42a1126c471750cec1ccaf3adf17f4c94ee7c",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694fa7a6b5005d72c3085c1ca037a4a21cc49ec",
+  "adoption": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5bdb4183391917025edeb8c9b23786e625034360",
+  "source": "/private/tmp/artroom-sdk-clone-witness-range-repair",
+  "head": "d2a39598f56708a4523bdfde2ad98a82dd843cb7",
+  "tree": "1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f",
+  "clean": true,
+  "source_packet": {
+    "path": "/private/tmp/artroom-sdk-clone-witness-range-source-packet/packet.json",
+    "sha256": "b9f0ca6bedfdb8849450861a19677ccc5ed5d08154c6d7187f73da59ccfd8443"
+  },
+  "independent_source_review": {
+    "path": "/private/tmp/artroom-sdk-d2a3-independent-source-review/packet.json",
+    "sha256": "f525e2940d4f7146eda578d04f09ed91fa5a012bffe98bd85cdfba18ddd9ecca"
+  },
+  "bindings_sha256": "64b3e9a113c3dfbbce8316ed009f223188b4c704fc73d2b964b2b8f5c37f29e2",
+  "seal_sha256": "cd8506332d5c0b8304c10436c4efa742a6b3ba1385292b65b600f4a5c787dfb5",
+  "whole_reader_cases": 1,
+  "producer_packages": 4,
+  "complete_checker_contexts": [
+    "NodeNext",
+    "Bundler",
+    "ambient-only-no-DOM-no-Node"
+  ],
+  "driver_measurement_byte_identical_to7695": true,
+  "tracked_inputs": 124,
+  "unchanged_from7695": 122,
+  "changed_from7695": [
+    "docs/public-sdk-release.md",
+    "scripts/check-public-release.mjs"
+  ],
+  "owned_packages": 7,
+  "package_files_each_side": 809,
+  "npm_file_link_records": 1953,
+  "fresh_absent_roots": {
+    "output": "/private/tmp/artroom-sdk-d2a3-localdev2-stage-next-one",
+    "evidence": "/private/tmp/artroom-sdk-d2a3-localdev2-evidence-next-one",
+    "outer": "/private/tmp/artroom-sdk-d2a3-localdev2-outer-next-one"
+  },
+  "future_inert_dispatch": [
+    "/bin/sh",
+    "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-once.sh"
+  ],
+  "execution": [],
+  "execution_release": "NONE; separate Root review/release required",
+  "artifacts": [
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/bindings.json",
+      "bytes": 623820,
+      "mode": 420,
+      "sha256": "64b3e9a113c3dfbbce8316ed009f223188b4c704fc73d2b964b2b8f5c37f29e2"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/handoff.txt",
+      "bytes": 2405,
+      "mode": 420,
+      "sha256": "55b670694c86470f92bacd439f265b319d770d6b26548ae20e575a67f8d067f7"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/measure-child.mjs",
+      "bytes": 3714,
+      "mode": 420,
+      "sha256": "7350cb16527829dec9adc3abde98727a7b720631e629b6873d2df9d545b4bdb5"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/recipe-seal.json",
+      "bytes": 919,
+      "mode": 420,
+      "sha256": "cd8506332d5c0b8304c10436c4efa742a6b3ba1385292b65b600f4a5c787dfb5"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-once.sh",
+      "bytes": 576,
+      "mode": 420,
+      "sha256": "a8ba1b9bef63057c8c13ea85a3d48607a717efc78bdd6b128f248934d4514ca2"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-sdk.mjs",
+      "bytes": 14489,
+      "mode": 420,
+      "sha256": "5138bc8cf7dc3d74b6dee74ec8079f7d1705e0d3037acd3456e362840bf78fbd"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-bodies/docs/public-sdk-release.md",
+      "bytes": 11574,
+      "mode": 420,
+      "sha256": "5482a5d9d836ffc2163b901c2b30ac1bef67d4d620b2d35d9b4b61953d43c3d2"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-bodies/scripts/check-public-release.mjs",
+      "bytes": 11930,
+      "mode": 420,
+      "sha256": "d3dec7d4a80e5c9faf9627fbb3118220cf8773f657825bdcc5ff0636da12cf11"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-correspondence.json",
+      "bytes": 32930,
+      "mode": 420,
+      "sha256": "3c66bb3f3efb27a49da89b2d1a7f8302e316b6a1b9d5340e76d17f0e042c357e"
+    }
+  ]
+}
