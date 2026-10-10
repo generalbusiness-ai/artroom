@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import { entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
@@ -126,8 +126,12 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
 // Actual membership, sessions, rules activation and directory creation.
 // The Git host, scheduler and clock are the Page demo's stand-ins.
 test("native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices", async () => {
+  const stageOrigin = performance.now();
+  let lastStarted = "none", lastCompleted = "none";
+  onTestFinished(() => { console.info("native-stage", "task-data", "finished", performance.now() - stageOrigin, lastStarted, lastCompleted); });
   let badSelection = false, unavailableMembers = false, unavailableExtents = false, noCurrent = false;
   let membershipPath = "";
+  console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const d = await demo((fetch, owner) => async (url, init) => {
     const response = await fetch(url, init);
     if (unavailableMembers && new URL(url).pathname === membershipPath && init?.method !== "POST") {
@@ -145,7 +149,9 @@ test("native task data supplies active issue choices, detached Description, exac
     }
     return Response.json(read);
   }, null, { invitation: false });
+  console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
   try {
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "rules-and-issue-choices", lastCompleted);
     const room = await openRoom(d.as(await d.secretOf(d.rita)), placeOf(JSON.stringify(d.config))!);
     membershipPath = `/v1/scopes/${d.M.name}`;
     const extents = firstExtents({ approvals: 0, checks: [] });
@@ -157,11 +163,17 @@ test("native task data supplies active issue choices, detached Description, exac
     const created = await act(room, room.directory, "open-issue", { fields: { definition: choices[0]!.value, title: "Clear task", body: "A literal Description.", conditions: ["Clear task"] } });
     expect(created.answer.answer).toBe("accepted");
     if (created.answer.answer !== "accepted") throw new Error("Issue opening was not accepted");
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "rules-and-issue-choices");
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "accepted-entry-and-native-child", lastCompleted);
     const child = await completeIssue(d, room, created.answer.receipt.fact);
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "accepted-entry-and-native-child");
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "issue-description", lastCompleted);
     const issue = (await listLanes(room)).issues.find((row) => row.title === "Clear task")!;
     expect(issue, "Confirmed native issue must appear in the Page projection").toBeDefined();
     expect(issue.scope).toBe(child);
     expect((await loadIssue(room, issue.scope)).body).toBe("A literal Description.");
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "issue-description");
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "publication-and-review-choices", lastCompleted);
     expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Task data")).code).toBe(0);
     const changeRow = (await listLanes(room)).changes.find((row) => row.title === "Task data")!;
     const change = await loadChange(room, changeRow.scope);
@@ -170,6 +182,8 @@ test("native task data supplies active issue choices, detached Description, exac
     expect(change.reviewExtents?.map((e) => e.value)).toEqual(change.rules?.extents.map((e) => e.name));
     expect(change.reviewMembers?.map((member) => member.value)).toContain("@paul");
     expect(change.reviewMembers?.map((member) => member.value)).not.toContain("@rita");
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "publication-and-review-choices");
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "fresh-review-faults", lastCompleted);
     badSelection = true;
     const malformed = await loadChange(room, changeRow.scope);
     expect(malformed.manifests.find((m) => m.id === malformed.currentManifest)?.selectedReports).toBeNull();
@@ -179,5 +193,10 @@ test("native task data supplies active issue choices, detached Description, exac
     expect((await loadChange(room, changeRow.scope)).reviewExtents).toBeNull();
     unavailableExtents = false; noCurrent = true;
     expect((await loadChange(room, changeRow.scope)).currentManifest).toBeNull();
-  } finally { d.done(); }
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "fresh-review-faults");
+  } finally {
+    console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "cleanup", lastCompleted);
+    d.done();
+    console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "cleanup");
+  }
 });
