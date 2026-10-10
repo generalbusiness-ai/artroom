@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a0f0440b4ed6c66419c59be437ab1bd7fddb5a65","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/validate/timed.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a106243cb5d1384da60cac50b278be2bb539c7d1","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/site-clock-lifetime.scope.test.ts."}
