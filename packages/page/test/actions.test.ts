@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { changeTaskContext, createIssue, taskForm } from "../src/tasks.ts";
-import type { Offered } from "../src/data.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, taskForm } from "../src/tasks.ts";
+import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
 // Real signing, typed definitions and refusal are covered by story.scope.test.ts.
@@ -9,13 +9,23 @@ class Element {
   children: (Element | string)[] = [];
   attrs = new Map<string, string>();
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
+  closed = false;
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
+  getAttribute(name: string) { return this.attrs.get(name) ?? null; }
   removeAttribute(name: string) { this.attrs.delete(name); }
-  showModal() {} close() {} remove() {} focus() {}
+  showModal() { this.closed = false; } close() { this.closed = true; } remove() {} focus() {}
+  querySelectorAll(selector: string): Element[] {
+    return this.all().filter(node => selector.split(",").some(part => {
+      const simple = part.trim(), attribute = /^\[([^=\]]+)\]$/.exec(simple)?.[1];
+      if (attribute) return node.hasAttribute(attribute);
+      if (simple === 'button[type=submit]') return node.tag === "button" && node.attrs.get("type") === "submit";
+      return node.tag === simple;
+    }));
+  }
   querySelector<T>(selector: string): T | null {
     const name = /^\[name="([^"]+)"\]$/.exec(selector)?.[1];
-    return (name ? this.all().find((node) => node.name === name) : this.all().find((node) => ["input", "textarea", "button"].includes(node.tag))) as T ?? null;
+    return (name ? this.all().find((node) => node.name === name) : this.querySelectorAll(selector)[0]) as T ?? null;
   }
   hasAttribute(name: string) { return this.attrs.has(name); }
   append(...children: (Element | string)[]) { this.children.push(...children); }
@@ -30,6 +40,7 @@ class Element {
   }
   set value(value: string) { this.attrs.set("value", value); }
   get textContent(): string { return this.children.map((child) => typeof child === "string" ? child : child.textContent).join(""); }
+  set textContent(value: string) { this.children = [value]; }
   all(): Element[] { return [this, ...this.children.flatMap((child) => typeof child === "string" ? [] : child.all())]; }
   event(name: string) { for (const listener of this.listeners.get(name) ?? []) listener({ preventDefault() {} }); }
 }
@@ -37,7 +48,7 @@ const asElement = (node: HTMLElement) => node as unknown as Element;
 let oldDocument: PropertyDescriptor | undefined;
 beforeEach(() => {
   oldDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: (tag: string) => new Element(tag) } });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElementNS: (_namespace: string, tag: string) => new Element(tag), createElement: (tag: string) => new Element(tag) } });
 });
 afterEach(() => {
   if (oldDocument) Object.defineProperty(globalThis, "document", oldDocument);
@@ -54,7 +65,7 @@ test("review submits the exact observed version and typed controls once; unsuppo
     choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "changes" }] } },
   }));
   const nodes = panel.all();
-  expect(nodes.filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Review change", "Inspect", "custom-act"]);
+  expect(nodes.filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Review change", "Advanced", "custom-act"]);
   expect(nodes.find((node) => node.name === "field:manifest")?.attrs.get("type")).toBe("hidden");
   nodes.find((node) => node.name === "field:verdict")!.value = "changes";
   nodes.find((node) => node.name === "field:body")!.value = "<script>kept as text</script>";
@@ -108,7 +119,7 @@ test("ordinary declared inherited names remain own fields with their exact text,
   const sent: unknown[] = [];
   const context = { defaults: {}, choices: {}, draftKey: "ordinary-inherited-names" };
   const panel = asElement(actsPanel(offered, (...args) => sent.push(args), null, context));
-  expect(panel.all().filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Inspect", ...names]);
+  expect(panel.all().filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Advanced", ...names]);
   const form = panel.all().find((node) => node.attrs.get("data-act") === "__proto__")!;
   for (const name of names) {
     const input = form.all().find((node) => node.name === `field:${name}`)!;
@@ -188,7 +199,7 @@ test("task defaults retain selected issue-report order and never fall back to an
 
 test("Create issue asks for title and description and intentionally uses the title as its native condition", () => {
   const body = new Element("body");
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: (tag: string) => new Element(tag), body } });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElementNS: (_namespace: string, tag: string) => new Element(tag), createElement: (tag: string) => new Element(tag), body } });
   const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "authenticated-definition" }] }, { name: "title", type: "text", required: true }, { name: "body", type: "text", required: false }, { name: "conditions", type: "list", required: true }] };
   const sent: unknown[] = [];
   const create = asElement(createIssue(open, (...args) => sent.push(args), {})); create.event("click");
@@ -202,11 +213,61 @@ test("Create issue asks for title and description and intentionally uses the tit
 
 
 test("Create issue keeps authenticated multiple-definition selection and submits the chosen digest with native conditions",()=>{
-  const body=new Element("body");Object.defineProperty(globalThis,"document",{configurable:true,value:{createElement:(tag:string)=>new Element(tag),body}});
+  const body=new Element("body");Object.defineProperty(globalThis,"document",{configurable:true,value:{createElementNS:(_namespace:string,tag:string)=>new Element(tag),createElement:(tag:string)=>new Element(tag),body}});
   const open:Offered={kind:"open-issue",step:"open",on:"lane",line:"Open",fields:[{name:"definition",type:"digest",required:true,choices:[{label:"Issue v1",value:"first-authenticated"},{label:"Issue v2",value:"second-authenticated"}]},{name:"title",type:"text",required:true},{name:"body",type:"text",required:false},{name:"conditions",type:"list",required:true}]};
   const sent:unknown[]=[];const create=asElement(createIssue(open,(...args)=>sent.push(args),{}));expect(create.hasAttribute("data-task-act")).toBe(true);create.event("click");
   const form=body.all().find(e=>e.tag==="form")!;const select=form.all().find(e=>e.name==="field:definition")!;expect(select.tag).toBe("select");select.value="second-authenticated";
   form.all().find(e=>e.name==="field:title")!.value="Chosen issue";form.event("submit");
   expect((sent[0]as unknown[]).slice(0,3)).toEqual(["open-issue","",{definition:"second-authenticated",title:"Chosen issue",conditions:'["Chosen issue"]'}]);
   const unavailable=asElement(createIssue({...open,fields:[...open.fields,{name:"custom",type:"text",required:true}]},()=>{},{}));expect(unavailable.hasAttribute("data-task-act")).toBe(false);
+});
+
+test("the next task follows the selected file's recorded requirements and current candidate authority", () => {
+  const change = { state: "open", author: "@author", currentManifest: 12,
+    manifests: [{ id: 12, state: "current", authors: ["@author"], file: { path: "AGENTS.md" } }],
+    reviews: [], rules: { approvals: 0, extents: [
+      { name: "rules", patterns: ["AGENTS.md"], approvals: 1 }, { name: "source", patterns: [], approvals: 0 },
+    ] }, reviewMembersByExtent: { rules: [{ label: "@controller", value: "@controller" }], source: [{ label: "@reader", value: "@reader" }] },
+  } as unknown as ChangeView;
+  const offered = ["merge", "request-review-own", "review-verdict"].map(kind => ({ kind, fields: [] })) as unknown as Offered[];
+  const room = { me: { handle: "@author" } } as unknown as Room;
+  const allowed = offered.map(act => act.kind);
+  expect(nextChangeAction(room, change, offered, allowed)?.kind).toBe("request-review-own");
+  const content = { ...change, manifests: [{ ...change.manifests[0]!, file: { ...change.manifests[0]!.file!, path: "README.md" } }] };
+  expect(nextChangeAction(room, content, offered, allowed)?.kind).toBe("merge");
+  const stranger = { me: { handle: "@unqualified" } } as unknown as Room;
+  expect(nextChangeAction(stranger, change, offered.filter(act => act.kind === "review-verdict"), allowed)).toBeNull();
+  expect(nextChangeAction(room, { ...change, state: "closed" }, offered, allowed)).toBeNull();
+});
+
+test("one authenticated reviewer is named directly without a false picker", () => {
+  const request: Offered = { kind: "request-review-own", step: "open", on: "review-request", line: "Request review", fields: [{ name: "requested", type: "member", required: true }] };
+  const sent: unknown[] = [];
+  const form = asElement(taskForm(request, (...args) => sent.push(args), { choices: { "request-review-own": { requested: [{ label: "@controller", value: "@controller" }] } } }, ["requested"], "Request review"));
+  expect(form.all().filter(node => node.tag === "select")).toEqual([]);
+  expect(form.all().find(node => node.tag === "button")?.textContent).toBe("Request review from @controller");
+  form.event("submit");
+  expect(sent[0]).toEqual(["request-review-own", "", { requested: "@controller" }]);
+});
+
+test("a refused creation keeps its draft editable; unknown creation offers a read-only status check without another send", () => {
+  const body = new Element("body");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElementNS: (_namespace: string, tag: string) => new Element(tag), createElement: (tag: string) => new Element(tag), body, querySelectorAll: (selector: string) => body.querySelectorAll(selector) } });
+  const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "native-pin" }] }, { name: "title", type: "text", required: true }, { name: "conditions", type: "list", required: true }] };
+  const sent: unknown[] = [];
+  let reads = 0;
+  const creator = asElement(createIssue(open, (...args) => sent.push(args), { draftKey: "creation-original-context", current: () => true, refresh: () => reads++ }));
+  creator.event("click");
+  const dialog = body.all().find(node => node.tag === "dialog")!;
+  const form = dialog.all().find(node => node.tag === "form")!;
+  form.all().find(node => node.name === "field:title")!.value = "Keep these words";
+  form.event("input"); form.event("submit");
+  issueDialogOutcome("creation-original-context", "editable", "The native request was refused.");
+  expect(form.all().find(node => node.name === "field:title")?.value).toBe("Keep these words");
+  expect(form.all().find(node => node.tag === "button")?.hasAttribute("disabled")).toBe(false);
+  issueDialogOutcome("creation-original-context", "unknown", "The original request remains unknown.");
+  form.event("submit");
+  expect(sent).toHaveLength(1);
+  dialog.all().find(node => node.hasAttribute("data-check-original"))!.event("click");
+  expect([reads, sent.length, dialog.closed]).toEqual([1, 1, true]);
 });

@@ -21,15 +21,16 @@
 import type { Answer, FieldValue, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, enrollmentAssociation, fieldValue, joinAssociation, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
-import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
-import type { ActionContext } from "./actions.ts";
+import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { changeTaskContext, createIssue, nextChangeAction, taskForm } from "./tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, reviewSelectionProblem, taskForm, taskReviewExtents } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
+import { controlKey, keepFocus, restoreFocus } from "./focus.ts";
 import { allowedClaim, claimRoom, claimStatus, type ClaimRegister } from "./claim.ts";
 
 const KEPT = "artroom-page";
@@ -91,8 +92,12 @@ const root = (): HTMLElement => document.getElementById("page")!;
 let drawing = 0;
 const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
   if (n !== drawing) return;
+  const previousFocus = keepFocus(root());
   root().replaceChildren(...children);
+  reconcileActionDrafts(root());
+  syncCurrentFences();
   if (focus) document.getElementById("page-main")?.focus?.();
+  else restoreFocus(root(), previousFocus);
 };
 
 
@@ -107,10 +112,201 @@ const joinRepliesByContext = new Map<string, { result: Awaited<ReturnType<typeof
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
+let roomDialogBinding: { settings: string; route: string } | null = null;
+interface WorkbenchDialog {
+  dialog: HTMLDialogElement; body: HTMLElement; context: string; route: string; kind: "record" | "review" | "source";
+  opener: string; manifest?: number; action?: string; message: HTMLElement; binding: string;
+  reviewDisabled?: Set<HTMLElement>;
+  review?: { room: Room; change: Awaited<ReturnType<typeof loadChange>>; blocked: boolean; offered: boolean };
+}
+let workbenchDialog: WorkbenchDialog | null = null;
 const settingsContext = (kept: Settings): string => JSON.stringify([location.origin, kept.place, kept.secret, kept.register ?? null]);
 let claimOffer: { kept: Settings; configured: ClaimRegister } | undefined;
 function unknownRequest(kind: string): HTMLElement {
   return h("p", { class: "muted" }, `The ${kind} request may have been recorded. Checking status only reads the scope; a changed head does not settle this request. This page does not retain the exact signed request for automatic recovery. Keep this session open and inspect the original request before recovery; do not send a replacement.`);
+}
+
+function currentScopeHosts(context: string): HTMLElement[] {
+  return [root(), ...(workbenchDialog?.context === context && workbenchDialog.route === location.hash ? [workbenchDialog.body] : [])];
+}
+function fenceCurrentScope(context: string): void {
+  for (const host of currentScopeHosts(context)) for (const control of host.querySelectorAll<HTMLElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+}
+/** A render prepared before submission still publishes the current scope fence. */
+function syncCurrentFences(): void {
+  const hosts = [root(), ...(workbenchDialog?.kind === "record" && workbenchDialog.route === location.hash ? [workbenchDialog.body] : [])];
+  for (const host of hosts) for (const marker of host.querySelectorAll<HTMLElement>("[data-request-context]")) {
+    const context = marker.getAttribute("data-request-context")!;
+    const last = lastActs.get(context);
+    if (sending.get(context) || last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null)) fenceCurrentScope(context);
+  }
+}
+
+function returnToControl(key: string): void {
+  if (!restoreFocus(root(), { key })) document.getElementById("page-main")?.focus();
+}
+function closeWorkbench(restore = true): void {
+  const current = workbenchDialog;
+  if (!current) return;
+  workbenchDialog = null;
+  current.dialog.close(); current.dialog.remove();
+  if (restore && location.hash === current.route && current.binding === settingsContext(settings() ?? { place: null, secret: "" })) returnToControl(current.opener);
+}
+function openWorkbench(title: string, body: HTMLElement, context: string, opener: string, kind: WorkbenchDialog["kind"], subject?: { manifest: number; action: string }): void {
+  closeWorkbench(false);
+  const close = h("button", { type: "button", class: "icon-button dialog-close", "aria-label": "Close dialog", "data-focus-key": controlKey(context, "dialog-close") }, icon("close"));
+  const message = h("p", { role: "status", "aria-live": "polite", hidden: "" });
+  const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "workbench-dialog-title" }, close, h("h1", { id: "workbench-dialog-title" }, title), body, message) as HTMLDialogElement;
+  workbenchDialog = { dialog, body, message, context, route: location.hash, kind, opener, binding: settingsContext(settings() ?? { place: null, secret: "" }), ...subject };
+  close.addEventListener("click", () => closeWorkbench());
+  dialog.addEventListener("cancel", event => { event.preventDefault(); closeWorkbench(); });
+  document.body.append(dialog); dialog.showModal();
+  (body.querySelector<HTMLElement>("input:not([type=hidden]), textarea, select, button, summary") ?? close).focus();
+}
+
+/** All deep records share one entry; status recovery remains a visible task. */
+function inspectedScreen(screen: HTMLElement, panel: HTMLElement, context: string, label: string): HTMLElement {
+  const record = screen.querySelector<HTMLElement>("details.inspection");
+  record?.remove();
+  const recovery = panel.querySelector<HTMLElement>("[data-status-recovery]");
+  if (recovery) {
+    recovery.remove();
+    const next = screen.querySelector('[data-action-slot="next"]') ?? screen.querySelector('[data-action-slot="create"]');
+    next?.replaceChildren(recovery);
+  }
+  const notice = panel.querySelector<HTMLElement>("[data-task-status]");
+  if (notice) { notice.remove(); screen.append(notice); }
+  const rulesForm = panel.querySelector<HTMLElement>(".rules-editor");
+  if (rulesForm) { rulesForm.remove(); screen.append(rulesForm); }
+  const body = h("div", { hidden: "", "data-record-body": "" }, record, panel);
+  const key = controlKey(context, "inspect");
+  const inspect = h("button", { type: "button", class: "icon-button", "aria-label": `Inspect ${label.toLowerCase()}`, "data-focus-key": key }, icon("more"));
+  inspect.addEventListener("click", () => { body.removeAttribute("hidden"); openWorkbench(label, body, context, key, "record"); });
+  (screen.querySelector(".detail-top") ?? screen.querySelector('[data-action-slot="create"]') ?? screen).append(inspect);
+  screen.append(body);
+  if (workbenchDialog?.kind === "record" && workbenchDialog.context === context && workbenchDialog.route === location.hash) {
+    const saved = keepFocus(workbenchDialog.body);
+    body.removeAttribute("hidden"); workbenchDialog.body.replaceWith(body); workbenchDialog.body = body;
+    reconcileActionDrafts(body);
+    restoreFocus(body, saved);
+  }
+  return screen;
+}
+
+function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send: Send, context: ActionContext, fields: readonly string[], label: string, association: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>): HTMLElement {
+  const form = taskForm(act, send, context, fields, label);
+  if (!form.hasAttribute("data-act") || act.kind !== "review-verdict") return form;
+  const manifest = context.defaults?.[act.kind]?.fields?.["manifest"];
+  if (manifest === undefined) return form;
+  const key = controlKey(association, `review:${manifest}`);
+  const button = h("button", { type: "button", class: "primary", "data-task-act": act.kind, "data-focus-key": key }, "Review change");
+  if (context.pending || context.uncertain) button.setAttribute("disabled", "");
+  button.addEventListener("click", () => {
+    let owned: WorkbenchDialog | null = null;
+    const scopeOfReview = change.scope;
+    const content = taskForm(act, (kind, on, typed, accepted) => send(kind, on, typed, () => { accepted?.(); if (workbenchDialog === owned) closeWorkbench(); }, async () => {
+      if (!owned || workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
+      const latest = await loadChange(room, scopeOfReview);
+      if (workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
+      const problem = reviewSelectionProblem(room, latest, Number(manifest), typed["extent"] ?? "");
+      if (problem) { owned.message.textContent = problem; owned.message.removeAttribute("hidden"); throw new Error(problem); }
+    }), context, fields, label);
+    openWorkbench(`Review version ${manifest}`, content, association, key, "review", { manifest: Number(manifest), action: act.kind });
+    owned = workbenchDialog;
+    if (owned) { owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true }; owned.reviewDisabled = new Set(content.querySelectorAll<HTMLElement>("[disabled]")); }
+    content.addEventListener("input", () => { if (workbenchDialog === owned && owned?.review) reconcileReview(association, owned.review.room, owned.review.change, owned.review.blocked, owned.review.offered); });
+  });
+  return button;
+}
+
+function reconcileReview(context: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>, blocked: boolean, offered = true): void {
+  const selected = workbenchDialog;
+  if (selected?.kind !== "review" || selected.context !== context || selected.route !== location.hash) return;
+  selected.review = { room, change, blocked, offered };
+  const last = lastActs.get(context);
+  const requestBlocked = blocked || !!sending.get(context) || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
+  const extent = selected.body.querySelector<HTMLInputElement | HTMLSelectElement>('[name="field:extent"]')?.value ?? "";
+  const problem = reviewSelectionProblem(room, change, selected.manifest!, extent);
+  // A failed preparation has no submitted original to fence. Keep the exact
+  // draft editable for deliberate correction; initially unavailable controls stay unavailable.
+  if (!requestBlocked) for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select")) {
+    if (!selected.reviewDisabled?.has(control)) control.removeAttribute("disabled");
+  }
+  if (requestBlocked || !offered || problem) {
+    selected.message.textContent = requestBlocked ? "Check the original request before another action. This review still names its original version." : !offered ? "Review is no longer available to this member. This draft still names its original version." : problem!;
+    selected.message.removeAttribute("hidden");
+    for (const button of selected.body.querySelectorAll("button[type=submit]")) button.setAttribute("disabled", "");
+  } else {
+    if (last && last.kind === selected.action && last.answer.answer === "refused") {
+      selected.message.textContent = nonacceptedAnswerText(last.answer);
+      selected.message.removeAttribute("hidden");
+      for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select, button[type=submit]")) if (!selected.reviewDisabled?.has(control)) control.removeAttribute("disabled");
+    } else if (!sending.get(context)) {
+      selected.message.setAttribute("hidden", "");
+      for (const button of selected.body.querySelectorAll("button[type=submit]")) button.removeAttribute("disabled");
+    }
+  }
+}
+
+/** Enter the existing editor from one explicitly selected native change.
+ * This supplies no empty/new-page source, in-place correction or invented base. */
+function proposeFromRecordedSource(room: Room, rows: Awaited<ReturnType<typeof listLanes>>["changes"], context: ActionContext): HTMLElement {
+  const association = actAssociation(room, room.directory);
+  const key = controlKey(association, "propose-change");
+  const button = h("button", { type: "button", class: "button primary", "aria-label": "Propose change", "data-focus-key": key },
+    h("span", { class: "full-label" }, "Propose change"), h("span", { class: "short-label" }, icon("plus"), "Create"));
+  const host = h("div", {}, button);
+  const permitted = !!room.me?.actions.includes("change.propose");
+  if (context.pending || context.uncertain || rows.length === 0 || !permitted) button.setAttribute("disabled", "");
+  if (!permitted) host.append(h("p", { class: "muted small" }, "Your current member cannot propose a text change."));
+  else if (rows.length === 0) host.append(h("p", { class: "muted small" }, "No recorded change is available here as a text source."));
+  button.addEventListener("click", () => {
+    if (button.hasAttribute("disabled")) return;
+    const binding = settingsContext(settings() ?? { place: null, secret: "" });
+    const route = location.hash;
+    const content = h("div");
+    openWorkbench("Propose change", content, association, key, "source");
+    const owned = workbenchDialog!;
+    const current = () => workbenchDialog === owned && location.hash === route && settingsContext(settings() ?? { place: null, secret: "" }) === binding;
+    const message = h("p", { role: "status", "aria-live": "polite" });
+    const load = async (scope: ScopeId) => {
+      if (!current()) return;
+      content.replaceChildren(message); message.textContent = "Reading source";
+      try {
+        const change = await loadChange(room, scope);
+        if (!current()) return;
+        const selected = change.manifests.find(manifest => manifest.state === "current") ?? change.manifests.at(-1);
+        if (!selected?.file || typeof selected.file.content !== "string") {
+          message.textContent = "Verified retained text is unavailable for this change.";
+          if (rows.length > 1) {
+            const back = h("button", { type: "button" }, "Choose another source");
+            back.addEventListener("click", () => { content.replaceChildren(h("label", {}, "Source change", selection), choose); selection.focus(); });
+            content.append(back);
+          }
+          return;
+        }
+        const sourceContext = actAssociation(room, change.scope);
+        const settled = () => {
+          const unsettled = [lastActs.get(sourceContext), lastActs.get(association)].some(last => last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null));
+          return !sending.get(association) && !sending.get(sourceContext) && !unsettled;
+        };
+        content.replaceChildren(retainedEditor(room, change, { current: () => current() && settled(), recorded: lane => { if (current()) location.hash = `#/change/${lane}`; } }));
+      } catch (error) { if (current()) message.textContent = error instanceof Error ? error.message : "The recorded source could not be read."; }
+    };
+    if (rows.length === 1) { void load(rows[0]!.scope); return; }
+    const selection = h("select", { "aria-label": "Recorded source change", "data-focus-key": controlKey(association, "source-choice") },
+      h("option", { value: "" }, "Choose a recorded source"), rows.map(row => h("option", { value: row.scope }, `#${row.number ?? "?"} · ${row.title ?? "Untitled"}`))) as HTMLSelectElement;
+    const choose = h("button", { type: "button", class: "primary" }, "Use source");
+    choose.setAttribute("disabled", "");
+    selection.addEventListener("change", () => { if (selection.value) choose.removeAttribute("disabled"); else choose.setAttribute("disabled", ""); });
+    choose.addEventListener("click", () => {
+      const row = rows.find(row => row.scope === selection.value);
+      if (row) void load(row.scope);
+    });
+    content.replaceChildren(h("label", {}, "Source change", selection), choose);
+    selection.focus();
+  });
+  return host;
 }
 
 async function roomOf(kept: Settings, place: Place): Promise<Room> {
@@ -124,18 +320,19 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const directory = room?.directory ?? kept?.place?.directory;
   const recordedName = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
   const local = room && kept ? labelFor(kept.label, { directory: room.directory, membership: room.membership }, kept.register)?.text : undefined;
-  const name = local || recordedName;
+  const name = recordedName;
   const account = room?.me?.handle || "Your key";
-  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}` }, h("span", { class: "room-name" }, h("span", local ? { title: "Local room label" } : {}, name), local ? h("span", { class: "room-recorded-name", title: "Recorded repository name" }, recordedName) : null), h("span", { "aria-hidden": "true" }, "⌄"));
-  const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}` }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
+  const shellContext = JSON.stringify([location.origin, directory ?? null, room?.membership ?? null, room?.key ?? null]);
+  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}`, "data-focus-key": controlKey(shellContext, "room-settings") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄"));
+  const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}`, "data-focus-key": controlKey(shellContext, "account-settings") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
     ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) =>
-      h("a", { class: "nav-item", href, ...(destination === kind ? { "aria-current": "page" } : {}) }, label)),
+      h("a", { class: "nav-item", href, "data-focus-key": controlKey(shellContext, `nav:${kind}`), ...(destination === kind ? { "aria-current": "page" } : {}) }, label)),
     room ? h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages") : null);
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
   skip.addEventListener("click", (event) => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
   const create = () => {
-    const button = h("button", { class: "nav-item", type: "button" }, "Create room");
+    const button = h("button", { class: "nav-item", type: "button", "data-focus-key": controlKey(shellContext, "create-room") }, "Create room");
     button.addEventListener("click", () => { if (room && offer) claimDialog(room, offer.kept, offer.configured, button); });
     return button;
   };
@@ -160,10 +357,12 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
   const message = h("p", { role: "status", hidden: "" });
   const submit = h("button", { type: "submit", class: "primary" }, mode === "resume" ? "Resume creation" : "Create room");
   const cancel = h("button", { type: "button" }, "Cancel");
-  const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Room name", name), message, h("div", { class: "form-footer" }, cancel, submit));
+  const form = h("form", {}, h("h1", { id: "create-room-title" }, "Create room"), h("label", {}, "Personal label", name), message, h("div", { class: "form-footer" }, cancel, submit));
   const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-room-title" }, form) as HTMLDialogElement;
   roomDialog = dialog;
-  const close = (preserveDraft = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); dialog.close(); dialog.remove(); if (roomDialog === dialog) roomDialog = null; opener.focus(); };
+  roomDialogBinding = { settings: binding, route: location.hash };
+  const openerKey = opener.getAttribute("data-focus-key");
+  const close = (preserveDraft = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); dialog.close(); dialog.remove(); if (roomDialog === dialog) { roomDialog = null; roomDialogBinding = null; } if (openerKey) returnToControl(openerKey); };
   cancel.addEventListener("click", () => { close(); });
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   name.addEventListener("input", () => { claimDrafts.set(binding, name.value); });
@@ -188,7 +387,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
             submit.textContent = "Resume creation";
             return;
           }
-          opened.clear(); close(false); location.hash = "#/"; await draw();
+          opened.clear(); close(false); location.hash = "#/"; await draw(true);
         } else {
           message.textContent = result.outcome.lines.join(" "); submit.textContent = result.pending ? "Resume creation" : "Create room";
           if (result.pending) name.setAttribute("disabled", ""); else name.removeAttribute("disabled");
@@ -204,7 +403,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
       finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
     })();
   });
-  root().append(dialog); dialog.showModal(); name.focus();
+  document.body.append(dialog); dialog.showModal(); name.focus();
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
@@ -217,44 +416,53 @@ interface PanelOptions {
 async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {}, options: PanelOptions = {}): Promise<HTMLElement> {
   const association = actAssociation(room, scope);
   const capturedRoute = location.hash;
-  const capturedDrawing = drawing;
-  let answerHost: HTMLElement | null = null;
-  const activeView = () => capturedDrawing === drawing && location.hash === capturedRoute && currentContext();
-  const showLocally = (message: HTMLElement, blocked = true) => {
+  const activeView = () => location.hash === capturedRoute && currentContext();
+  const showLocally = (message: HTMLElement, blocked = true, notice = "") => {
     if (!activeView()) return;
-    answerHost?.replaceChildren(message);
-    if (blocked) for (const control of root().querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+    for (const host of currentScopeHosts(association)) {
+      const answerHost = [...host.querySelectorAll<HTMLElement>("[data-request-context]")].find(node => node.getAttribute("data-request-context") === association);
+      answerHost?.replaceChildren(message);
+      const noticeHost = [...host.querySelectorAll<HTMLElement>("[data-task-context]")].find(node => node.getAttribute("data-task-context") === association);
+      if (noticeHost && notice) { noticeHost.textContent = notice; noticeHost.removeAttribute("hidden"); }
+    }
+    if (blocked) fenceCurrentScope(association);
   };
   const currentContext = () => {
     const current = settings();
-    return current?.place && roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
+    if (!current?.place) return false;
+    return roomContext(location.origin, current.place, current.secret) === roomContext(room.session.service, { directory: room.directory, membership: room.membership }, b64url(room.session.secret));
   };
-  const send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => {
+  const send: Send = (kind, on, typed, accepted, beforeSign) => {
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
-    showLocally(h("p", { role: "status" }, "Sending request"));
+    showLocally(h("p", { role: "status" }, "Sending request"), true, "Sending request");
     void (async () => {
       try {
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         const offered = (await actsOn(room, scope)).acts.find((a) => a.kind === kind);
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
+        await beforeSign?.();
+        if (!currentContext()) throw new Error("The room or key changed before signing. Nothing was sent.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
         const target = /^\d+$/.test(on) ? Number(on) : null;
         const result = await act(room, scope, kind, { on: target, fields }, (known) => {
           lastActs.set(association, known); sending.answered(association);
-          showLocally(answerLine(known));
+          showLocally(answerLine(known), true, known.answer.answer === "accepted" ? "Request accepted" : known.answer.answer === "refused" ? `Request refused: ${known.answer.reason}` : "Request outcome unknown");
           if (known.answer.answer === "accepted") accepted?.();
         }, () => {
           if (!currentContext()) throw new Error("The room or key changed before submission. Nothing was sent.");
           sending.submitting(association);
         });
         lastActs.set(association, result);
+        if (result.answer.answer === "refused" && result.observation === null) issueDialogOutcome(association, "editable", nonacceptedAnswerText(result.answer));
+        else if (result.answer.answer !== "accepted" || result.observation !== null) issueDialogOutcome(association, "unknown", "The original request remains unresolved. Check status without sending a replacement.");
       } catch (error) {
         sending.failed(association);
-        if (sending.get(association)?.state === "unknown") showLocally(unknownRequest(kind));
-        else if (activeView()) showLocally(h("p", { role: "status" }, error instanceof Error ? error.message : String(error)), false);
+        issueDialogOutcome(association, sending.get(association)?.state === "unknown" ? "unknown" : "editable", sending.get(association)?.state === "unknown" ? "Request outcome unknown. Check status without sending a replacement." : error instanceof Error ? error.message : "The request could not be prepared.");
+        if (sending.get(association)?.state === "unknown") showLocally(unknownRequest(kind), true, "Request outcome unknown");
+        else if (activeView()) showLocally(h("p", { role: "status" }, error instanceof Error ? error.message : String(error)), false, error instanceof Error ? error.message : "The request could not be prepared.");
       }
       if (activeView()) await draw();
     })();
@@ -264,12 +472,17 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const fence = sending.get(association);
   const pending = !!fence && fence.state !== "unknown";
   const uncertain = fence?.state === "unknown" || context.uncertain || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
-  const taskContext = { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); } };
+  const taskContext = { ...context, pending, uncertain, draftKey: association, refresh: () => { void draw(); }, current: () => location.hash === capturedRoute && currentContext() };
   const represented = options.tasks?.(offered, send, taskContext) ?? [];
   const remaining = { ...offered, acts: offered.acts.filter((act) => !options.represented?.includes(act.kind) && !represented.includes(act.kind)) };
-  const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...taskContext, primary: [] });
-  answerHost = h("div", { class: "request-answer", "aria-live": "polite" });
+  const advancedContext = { ...taskContext };
+  delete advancedContext.choices;
+  const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...advancedContext, primary: [] });
+  const answerHost = h("div", { class: "request-answer", "aria-live": "polite", "data-request-context": association });
   panel.prepend(answerHost);
+  const noticeHost = h("p", { "data-task-status": "", "data-task-context": association, role: "status", "aria-live": "polite", hidden: "" });
+  if (pending || uncertain) { noticeHost.textContent = pending ? "Sending request" : "Request outcome unknown"; noticeHost.removeAttribute("hidden"); }
+  panel.append(noticeHost);
   if (options.customForm) panel.append(options.customForm(send, pending || !!uncertain, association));
   if (fence?.state === "unknown") panel.append(unknownRequest(fence.kind));
   return panel;
@@ -397,7 +610,11 @@ function settingsScreen(): HTMLElement {
 async function draw(focus = false): Promise<void> {
   const currentDraw = ++drawing;
   claimOffer = undefined;
-  roomDialog?.close(); roomDialog?.remove(); roomDialog = null;
+  reconcileIssueDialogs();
+  if (roomDialog && (roomDialogBinding?.settings !== settingsContext(settings() ?? { place: null, secret: "" }) || roomDialogBinding?.route !== location.hash)) {
+    roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
+  }
+  if (workbenchDialog && (workbenchDialog.route !== location.hash || workbenchDialog.binding !== settingsContext(settings() ?? { place: null, secret: "" }))) closeWorkbench(false);
   const route = routeOf(location.hash);
   const kept = settings();
   const publish = showFor(currentDraw, focus);
@@ -430,14 +647,24 @@ async function draw(focus = false): Promise<void> {
       const offered = await actsOn(room, scope as ScopeId);
       const screen = issueScreen(room, issue);
       const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) };
-      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, actionContext, { offered, tasks: (acts, send, context) => {
+      const association = actAssociation(room, scope as ScopeId);
+      const panel = await panelFor(room, scope as ScopeId, actionContext, { offered, tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
-        if (comment) { screen.querySelector('[data-action-slot="comment"]')?.append(taskForm(comment, send, context, ["body"], "Comment")); represented.push("comment"); }
+        if (comment) {
+          const control = taskForm(comment, send, context, ["body"], "Comment");
+          screen.querySelector('[data-action-slot="comment"]')?.append(control);
+          if (control.hasAttribute("data-act")) represented.push("comment");
+        }
         const next = acts.acts.find((act) => actionContext.primary.includes(act.kind) && act.kind !== "comment");
-        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["reason"], "Issue action")); represented.push(next.kind); }
+        if (next && !context.pending && !context.uncertain) {
+          const control = taskForm(next, send, context, ["reason"], "Issue action");
+          screen.querySelector('[data-action-slot="next"]')?.append(control);
+          if (control.hasAttribute("data-act")) represented.push(next.kind);
+        }
         return represented;
-      } })));
+      } });
+      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Issue record")));
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
@@ -447,6 +674,15 @@ async function draw(focus = false): Promise<void> {
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
       const taskContext = changeTaskContext(change);
+      const applicable = taskReviewExtents(change);
+      if (change.reviewMembersByExtent !== undefined && taskContext.choices["review-verdict"]) {
+        taskContext.choices["review-verdict"] = { ...taskContext.choices["review-verdict"], extent: (change.reviewExtents ?? []).filter(extent => applicable.some(row => row.name === extent.value) && change.reviewMembersByExtent?.[extent.value]?.some(member => member.value === loaded.me?.handle)) };
+        const required = applicable.filter(extent => extent.approvals > 0);
+        const relevant = required.length ? required : applicable;
+        const recipients = new Map<string, { label: string; value: string }>();
+        for (const extent of relevant) for (const candidate of change.reviewMembersByExtent?.[extent.name] ?? []) recipients.set(candidate.value, candidate);
+        for (const kind of ["request-review-own", "request-review-any"]) taskContext.choices[kind] = { requested: [...recipients.values()] };
+      }
       const uncertain = change.merges.some((merge) => ["intended", "committed", "unknown"].includes(merge.state));
       const { primary, blockedKinds } = changeActions(change.state, !!current?.file && editPath(current.file.path) === null);
       const lastAct = lastActs.get(actAssociation(room, scope as ScopeId));
@@ -462,26 +698,46 @@ async function draw(focus = false): Promise<void> {
           recorded: (lane) => { location.hash = `#/change/${lane}`; },
         }));
       }
-      return show(...shell(destination, room, screen, await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
+      const association = actAssociation(room, scope as ScopeId);
+      const panel = await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
-        if (comment) { screen.querySelector('[data-action-slot="comment"]')?.append(taskForm(comment, send, context, ["body"], "Comment")); represented.push("comment"); }
+        if (comment) {
+          const control = taskForm(comment, send, context, ["body"], "Comment");
+          screen.querySelector('[data-action-slot="comment"]')?.append(control);
+          if (control.hasAttribute("data-act")) represented.push("comment");
+        }
         const next = nextChangeAction(loaded, change, acts.acts, primary);
-        if (next) { screen.querySelector('[data-action-slot="next"]')?.append(taskForm(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change")); represented.push(next.kind); }
+        reconcileReview(association, loaded, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"));
+        if (next && !context.pending && !context.uncertain) {
+          const label = next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change";
+          const control = nextTask(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], label, association, loaded, change);
+          screen.querySelector('[data-action-slot="next"]')?.append(control);
+          if (control.hasAttribute("data-act") || control.hasAttribute("data-task-act")) represented.push(next.kind);
+        }
         return represented;
-      } })));
+      } });
+      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Change record")));
     }
     if (destination === "rules") {
       const rules = await loadRules(room);
       const offered = await actsOn(room, room.rules);
       const editable = rules.item !== undefined && offered.acts.some((act) => act.kind === "publish");
       const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
-      return show(...shell(destination, room, rulesScreen(room, rules, editable), await panelFor(room, room.rules, {}, options)));
+      const screen = rulesScreen(room, rules, editable);
+      const panel = await panelFor(room, room.rules, {}, options);
+      return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record")));
     }
     const kind = destination === "changes" ? "change" : "issue";
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
-    const screen = roomScreen(room, await listLanes(room), kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); } });
-    return show(...shell(destination, room, screen, await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
+    const lanes = await listLanes(room);
+    const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
+    const panel = await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
+      if (destination === "changes") {
+        const open = acts.acts.find(act => act.kind === "open-pr");
+        if (open) screen.querySelector('[data-action-slot="create"]')?.append(proposeFromRecordedSource(loaded, lanes.changes, context));
+        return []; // Generic custom declarations remain available in Advanced.
+      }
       const open = destination === "issues" ? acts.acts.find((act) => act.kind === "open-issue") : undefined;
       if (!open) return [];
       const control = createIssue(open, send, context);
@@ -489,7 +745,8 @@ async function draw(focus = false): Promise<void> {
       // An unavailable task paragraph must not remove the usable native
       // declaration from Inspect (for example a custom required field).
       return control.hasAttribute("data-task-act") ? [open.kind] : [];
-    } })));
+    } });
+    return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record")));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];

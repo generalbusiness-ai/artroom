@@ -65,6 +65,10 @@
 
   .toolbar { display: flex; gap: 24px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
   .toolbar > .button { margin-left: auto; }
+  .toolbar > [data-action-slot="create"] { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  [data-action-slot="next"] { display: flex; align-items: center; gap: 8px; }
+  [data-action-slot="next"] form { margin: 0; }
+  [data-task-status] { margin: 16px 0; color: var(--muted-ink); font-size: 14px; }
   .search { display: flex; align-items: center; gap: 9px; flex: 0 1 314px; min-height: 44px; border: 1px solid var(--input-line); border-radius: 6px; padding: 0 11px; background: var(--rail); color: var(--muted-ink); max-width: 314px; min-width: 140px; }
   .search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
   .search input { border: 0; background: transparent; width: 100%; max-width: none; min-width: 0; padding: 8px 0; font-size: 16px; }
@@ -125,6 +129,8 @@
   .comment p { margin: 8px 0 0; }
   .comment-author { font-size: 14px; font-weight: 500; }
   .composer { margin-top: 22px; }
+  .composer > label { margin-bottom: 10px; }
+  .composer > button { display: flex; margin-left: auto; }
   .composer .actions { justify-content: flex-end; margin-top: 10px; }
   .answer { border-left: 2px solid var(--input-line); padding: 8px 0 8px 14px; margin: 16px 0; font-size: 14px; }
   .answer p:last-child { margin-bottom: 0; }
@@ -185,6 +191,7 @@
   .room-dialog::backdrop { background: #1c23372e; }
   .room-dialog h1 { margin-bottom: 24px; font-size: 22px; }
   .room-dialog form { min-width: 0; }
+  .dialog-close { float: right; margin: -10px -10px 0 10px; }
   .room-dialog .form-footer { flex-wrap: wrap; }
   .room-dialog .answer { margin-bottom: 0; }
   @media (prefers-color-scheme: dark) {
@@ -209,6 +216,7 @@
     .content, .artroom > .screen { padding: 20px 16px 28px; }
     .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-bottom: 8px; }
     .toolbar > .button { margin-left: 0; justify-self: end; }
+    .toolbar > [data-action-slot="create"] { margin-left: 0; justify-self: end; }
     .search { grid-column: 1 / -1; max-width: none; margin-bottom: 4px; }
     .filters { gap: 10px; }
     .filter { padding: 10px 0; }
