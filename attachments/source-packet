@@ -1,0 +1,143 @@
+{
+  "head": "0e99a7a13da1c7c37e8ac952acc4aab5e2395adf",
+  "tree": "fbdd3d3da0b2570ea8384bc8ff887bcbb8f358f6",
+  "parent": "4b1f4b9c64d015b4b4faee1f7729a85be0d30ac6",
+  "worktree": "/tmp/artroom-ux1-compiler-source-fix",
+  "branch": "request/ux1-compiler-source-fix",
+  "request": "94b932355c4ad6c4270ddaf4231c1d4ac329b2c2",
+  "promise": "919649f327066d2ac06411e24ae4c48171018a13",
+  "paths": [
+    {
+      "path": "packages/page/src/actions.ts",
+      "sha256": "e9d173bb3e32eb94099c8005367cab544fa9ebe87e396980488ce4565e3eb4d4",
+      "bytes": 11588,
+      "lines": 184,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/data.ts",
+      "sha256": "c1e1d136ec1ffde8c3b965d629ebd1372f27b19e00fc5f50075e189452c24bf7",
+      "bytes": 55634,
+      "lines": 786,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/focus.ts",
+      "sha256": "5c3d87eef2f114eed5c2ee116487100e9eaab6a12d8ba8bc68c68efb5d690690",
+      "bytes": 2275,
+      "lines": 42,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/index.html",
+      "sha256": "28e4c1a631e31e5af2bacb551c33f00ea31aa062d8a45d0f014c13c07898d376",
+      "bytes": 18706,
+      "lines": 265,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/main.ts",
+      "sha256": "4a1fe1e583d2bb3976870c612351f93632cad8da41ac7cb830e2596cd432b521",
+      "bytes": 58441,
+      "lines": 765,
+      "changed_from_4b1": true
+    },
+    {
+      "path": "packages/page/src/membership-projection.ts",
+      "sha256": "b9c189fc04f6621aaad0b22caec8f4dfb6bff36dc4ce38a4a34c99cb3fb032f7",
+      "bytes": 5423,
+      "lines": 76,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/shell.ts",
+      "sha256": "4f9a113d6d7efec9dd3a7de91240a0142b0710542f29e5a49c84eb3f575b08bd",
+      "bytes": 3703,
+      "lines": 65,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/tasks.ts",
+      "sha256": "0e0631f5174742dfcfdd05dbcd06857ad5214763bbffeb797e727c3dbc300462",
+      "bytes": 12245,
+      "lines": 132,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/src/view.ts",
+      "sha256": "0aa41ffe0b6c751650069f786798b4bf7dee7bffbfc0b52ffe0a918e52b7f6d3",
+      "bytes": 23187,
+      "lines": 225,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/actions.test.ts",
+      "sha256": "d1ed23cc728098ddf282a9d94b2c0d3664fafc24ffd18b858f11a1967256c958",
+      "bytes": 21838,
+      "lines": 271,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/claim-ui.test.ts",
+      "sha256": "6e2bdf63d8609a20589d1770fe06812dc5dd1d7cf3291ff69050578c810303ed",
+      "bytes": 12859,
+      "lines": 134,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/correction-main.test.ts",
+      "sha256": "e1f467db04c7a22a83f32f41a03b98362200d4accbec16ae414085542cb1ec76",
+      "bytes": 5246,
+      "lines": 45,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/focus.test.ts",
+      "sha256": "2f1d4b21d14c5d5411db00149d41f8a1c521966210b66b40b8d1b4143bb5f514",
+      "bytes": 3384,
+      "lines": 54,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/join-ui.test.ts",
+      "sha256": "45689d981bdd9898d0c1bc2a64d717375b2b274fbc78fc03a20dbf1ee06fe672",
+      "bytes": 9215,
+      "lines": 91,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/membership-projection.test.ts",
+      "sha256": "fca6e8ab822991eea6b3abec29122194c8e1048b17cbe8eb00055c5fac9689f2",
+      "bytes": 6091,
+      "lines": 75,
+      "changed_from_4b1": false
+    },
+    {
+      "path": "packages/page/test/sending.test.ts",
+      "sha256": "7c135f9df3df23ed4f0c13dc86e0251564bc6382537acb06966571465f376955",
+      "bytes": 29265,
+      "lines": 343,
+      "changed_from_4b1": false
+    }
+  ],
+  "repair_paths": [
+    "packages/page/src/main.ts"
+  ],
+  "body": "/tmp/artroom-ux1-compiler-source-fix-packet/main-body.txt",
+  "body_sha256": "4a1fe1e583d2bb3976870c612351f93632cad8da41ac7cb830e2596cd432b521",
+  "delta": "/tmp/artroom-ux1-compiler-source-fix-packet/main-repair.patch",
+  "delta_sha256": "b970105a4366114549dad43ff3add54569468837cece61a2e2e5dd02159bd19f",
+  "disposition": "/tmp/artroom-ux1-compiler-source-fix-packet/disposition.md",
+  "disposition_sha256": "8b50ee532db16201ade903f726c7715b0ed709db21c5d293b1a28ae9d0144886",
+  "failed_parent_evidence": {
+    "proof": "/tmp/artroom-ux1-4b1-compiler-preparation/compiler-result.json",
+    "sha256": "3d9a1e8fa57d95fb6e3ac8532d7711c958a2b8cc862ddc81a1470d8a28a4171f",
+    "log": "/tmp/artroom-ux1-4b1-compiler-preparation/page-source.log",
+    "log_sha256": "a630a15d059858d3913d4697d5f03b49c2fb0104f9f5ae283333c64885737132"
+  },
+  "held_node_selection": "/tmp/artroom-ux1-4b1-compiler-preparation/page-nine-selection.json",
+  "held_node_selection_sha256": "aadb5a66cb8d3fb2988e67eac58cd27c210ab043c7fcbd1d3d6e8fc5eca33251",
+  "clean": true,
+  "successor_execution": [],
+  "dependency_view": "unprepared"
+}
