@@ -1,0 +1,179 @@
+{
+  "head": "fc0f4e04220f03fb9f86734c09a8a52e5f6509f3",
+  "tree": "9d222d5fa6d22511dc03dd4b796329673588bb3a",
+  "root": "/private/tmp/artroom-native-direct-stage-markers",
+  "branch": "request/native-direct-stage-markers",
+  "parent": "d54c94d676ae4a0cab741205db61e3e6eb83aa8a",
+  "comparison_base": "958fbb7198a9411f0fca86e2ea2bd35c4f6a24ac",
+  "tracking": "effective e158 / promise1922 under initial60e and workflow67a; Root direct-only source selection",
+  "status": "clean pushed source; static owned dependency view ready; all runtime held",
+  "predecessor_packet": "/tmp/artroom-native-d54-stage-packet/packet.json",
+  "predecessor_sha256": "93b4dd3a37e83aeea99d81bdac1980e9056da6a16bbf101bd51b09f854a50b82",
+  "files": [
+    {
+      "name": "affected-native.config.mjs.recipe",
+      "bytes": 3319,
+      "sha256": "087447faccda217c7450e016b38c10f324b66794be32684e515dcbb9c9b16dd2"
+    },
+    {
+      "name": "authored.diff",
+      "bytes": 23456,
+      "sha256": "c029611845e169ddc3478291f5d5408268df307a0130e5a0cbae3374458e8a07"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-10594-10639.txt",
+      "bytes": 1634,
+      "sha256": "eda611025579a42af519e894ab8a91fd06a43b2764a16b714fb7296b41850953"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-10746-10751.txt",
+      "bytes": 252,
+      "sha256": "f9c03f1e87c5492354c8ccbb0e03894a1529b3765c8481da38788a9f58d4819f"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-11688-11755.txt",
+      "bytes": 2483,
+      "sha256": "0b70e24338b9725f7c541353209c381a7dcb83f402cfd8df62801ba9f55161bc"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-12614-12644.txt",
+      "bytes": 1446,
+      "sha256": "306d5a65fa8af50b0244b7eb4aaa3c0b9b0b711bdf4daf2b142dc07cca50b4a1"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-12725-12743.txt",
+      "bytes": 1072,
+      "sha256": "dbc1f9748ac9c8c144fdd9533af0bfbbc71d4ef6cfc64966dc54aed342257bc9"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-13635-13669.txt",
+      "bytes": 1462,
+      "sha256": "50a7d6cc34a6bb506f328aabc27078655ff52af92cf7cec83875c2ffc76f89cc"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-14049-14056.txt",
+      "bytes": 234,
+      "sha256": "ab04262baa7851cf3822e48c329897d546c45887d4a8113b87536543d9fc6045"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-2788-2811.txt",
+      "bytes": 1018,
+      "sha256": "d2eceb2720df1b5c9a7c1a1d6c663388d3bb33349866bfc1b8d075664be3173e"
+    },
+    {
+      "name": "cli-api.CnMVyzaz.js-3669-3676.txt",
+      "bytes": 297,
+      "sha256": "2a01b1e3a9f91533daa6383acc4fba80b31a1fb3fc2b2038f1bbb42459be5a1c"
+    },
+    {
+      "name": "compiler-include-map.json",
+      "bytes": 1967,
+      "sha256": "fda5496a58bd522d08271637d22dac66b18324a3cec21db9e55bd80885a149aa"
+    },
+    {
+      "name": "delta-since-d54.diff",
+      "bytes": 5333,
+      "sha256": "ba87325c1196ce2d33c5e228aa2e0ddd59e4c707b01bd9388acb88e0a5798168"
+    },
+    {
+      "name": "e158-request.json",
+      "bytes": 4263,
+      "sha256": "5271091d6e5a0d50642c73e2927d3990183b7e67a00df40fc89520c771190db7"
+    },
+    {
+      "name": "five-case-ledger.json",
+      "bytes": 3056,
+      "sha256": "e722bb1508c7fe2355270a0c82dc3052adf5934a6858f7d5ef9d70c488b2f6a0"
+    },
+    {
+      "name": "focused-plan.json",
+      "bytes": 106764,
+      "sha256": "7e5dfc4c9ae3d03cd2df89509429003e1c9923ac0e77fc360764367698a5d32b"
+    },
+    {
+      "name": "index.mjs-60389-60417.txt",
+      "bytes": 1048,
+      "sha256": "936255ac775aa50b81315ad426fb026a832369ef0a5b5ac8c625215869172641"
+    },
+    {
+      "name": "index.mjs-60422-60458.txt",
+      "bytes": 2193,
+      "sha256": "7f015ee91e03979530968ba59d401432d56014ff3750a61f7f4788a06768d981"
+    },
+    {
+      "name": "index.mjs-60482-60487.txt",
+      "bytes": 204,
+      "sha256": "6fd059aea4a962f0cdb5a1f1fccbf9f32cef8b36cf96533fd438c0eea467efc6"
+    },
+    {
+      "name": "index.mjs-60517-60528.txt",
+      "bytes": 490,
+      "sha256": "a36f971804b89dd2d6aeed9721312c32139863d50d0e9dc856948ca68786e5a4"
+    },
+    {
+      "name": "native-reporter-api-proof.json",
+      "bytes": 8036,
+      "sha256": "42b96a870b5d0e3e928b48772add15a6fe50948b30751595c6977e060bb27bd1"
+    },
+    {
+      "name": "new-site-immutable-publication.test.ts",
+      "bytes": 13353,
+      "sha256": "a8994103580be7a9091f9eb68189d5e70ff044b42318f7d253f9bd8b80cdd5dc"
+    },
+    {
+      "name": "new-site-native3-publication.scope.test.ts",
+      "bytes": 10614,
+      "sha256": "2e43475889f435734a6c8ff2ed54029fb7ef45cb96d07fb5ea56ed727892ac06"
+    },
+    {
+      "name": "new-source-preview.scope.test.ts",
+      "bytes": 4997,
+      "sha256": "56b65c2466b2f30cc0f0df8acc26adf3489e387f8904351b4b311dba1fd41a0c"
+    },
+    {
+      "name": "new-task-data.scope.test.ts",
+      "bytes": 18441,
+      "sha256": "6cd393d03aca2d1d194b238617a89f45455f24279c7ed404f07b65eb312a98ef"
+    },
+    {
+      "name": "old-site-immutable-publication.test.ts",
+      "bytes": 10976,
+      "sha256": "bcac8f68cba1b82a1022352a44016b5e01d7ba3af48a50f77c11470c16c623eb"
+    },
+    {
+      "name": "old-site-native3-publication.scope.test.ts",
+      "bytes": 8569,
+      "sha256": "0c5ef25d65e61024b35373683aa57cf235a3425cce07d26762c33a8535d081ae"
+    },
+    {
+      "name": "old-source-preview.scope.test.ts",
+      "bytes": 3210,
+      "sha256": "c35c126841232b96203e31de97676f4754e71b17fd7529715b3f1dd93fc81b13"
+    },
+    {
+      "name": "old-task-data.scope.test.ts",
+      "bytes": 16332,
+      "sha256": "a1035f9f24efaecfb7b77624e6b610b0b7dc9edc30810f0c1e2299de174060d6"
+    },
+    {
+      "name": "plan.md",
+      "bytes": 4859,
+      "sha256": "a0380341f41d8a6aa66c182547de7458b6e59e8f26f77278cde1c28b5d6c3163"
+    },
+    {
+      "name": "preservation.json",
+      "bytes": 3761,
+      "sha256": "58b62faa682b558826adae799936c1fbf3a637143263b67cf0f984ddb574c0a6"
+    },
+    {
+      "name": "static-dependencies-proof.json",
+      "bytes": 34799,
+      "sha256": "fca99f5b798eba41a7b28326f151a8955c9ed4c4e257fb3d382da107b8e7bd19"
+    },
+    {
+      "name": "tracked-source-hashes.json",
+      "bytes": 141755,
+      "sha256": "51675f68f558de93a27d187e61a4055dbcaa156e726d430fc12ab08048d48765"
+    }
+  ]
+}
