@@ -1,0 +1,165 @@
+{
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b9c885d3a85a87f350d446da4c225986cb19f599",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fe19f5fb567010918e598376382f8d18aca722f1",
+  "ownerHandle": 24461,
+  "gateExit": 0,
+  "runnerExit": 0,
+  "head": "fb6f923ee75123fc045fd4368af4a1a41cda32e2",
+  "tree": "bef12a58ff0cf285b8d1b4ab46c15309d40d07a5",
+  "sourceAfter": {
+    "head": "fb6f923ee75123fc045fd4368af4a1a41cda32e2",
+    "tree": "bef12a58ff0cf285b8d1b4ab46c15309d40d07a5",
+    "clean": true,
+    "source_hashes": 1312,
+    "workspaces": 12,
+    "tools_view_source_match": true,
+    "shared_cache_regular_files": 3898,
+    "shared_cache_links": 28,
+    "shared_cache_unchanged": true,
+    "private_pool_files": 23,
+    "private_pool_cd50": true,
+    "pool_tool_realpath": "/private/tmp/artroom-demo-counter-ui-final/node_modules/@cloudflare/vitest-pool-workers/dist/pool/index.mjs",
+    "npm_executable": "/opt/homebrew/Cellar/node/26.11.0_1/bin/npm",
+    "npm_cli_realpath": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js"
+  },
+  "installSkipped": true,
+  "phaseExits": {
+    "whitespace": 0,
+    "typecheck": 0,
+    "test": 0
+  },
+  "vitest": {
+    "filesPassed": 179,
+    "filesSkipped": 1,
+    "filesTotal": 180,
+    "casesPassed": 1025,
+    "casesSkipped": 2,
+    "casesTotal": 1027,
+    "caseSkipMeaning": "Two original opt-in recording cases preserved; no extra skip inferred"
+  },
+  "nodeGroups": [
+    {
+      "tests": 8,
+      "suites": 0,
+      "passed": 8,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1090.593167
+    },
+    {
+      "tests": 37,
+      "suites": 0,
+      "passed": 37,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1680.570583
+    }
+  ],
+  "timing": {
+    "outer": {
+      "wallSeconds": 92.34,
+      "userSeconds": 129.25,
+      "systemSeconds": 21.27,
+      "cpuSeconds": 150.52
+    },
+    "typecheck": {
+      "wallSeconds": 5.57,
+      "userSeconds": 16.4,
+      "systemSeconds": 2.33,
+      "cpuSeconds": 18.729999999999997
+    },
+    "test": {
+      "wallSeconds": 86.54,
+      "userSeconds": 112.71,
+      "systemSeconds": 18.86,
+      "cpuSeconds": 131.57
+    },
+    "whitespace": {
+      "wallSeconds": 0.02,
+      "userSeconds": 0.01,
+      "systemSeconds": 0.0,
+      "cpuSeconds": 0.01
+    }
+  },
+  "diagnosticClasses": {
+    "gitContentTypeWarnings": 4,
+    "sqlTriggerDiagnosticLines": 1,
+    "refcountedCancelerPhraseObserved": false,
+    "qualification": "Counts are exact fixed-string line classifications of this retained run, not a diagnosis/drain guarantee. Historical warnings are not transferred into this run."
+  },
+  "publicWhitelist": [
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/manifest.json",
+      "bytes": 1561,
+      "sha256": "43e46c38bf9c669139fadf893bfefbcb884dd7f3332009cee24bc98478adca9e",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/start-proof.json",
+      "bytes": 719,
+      "sha256": "ab4938fa9cbb6ba869fab6b93c0bce3b833759add1a12b7e88269080123a00e5",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/terminal-proof.json",
+      "bytes": 2196,
+      "sha256": "9f354a0c5f11605e3859ccc07c3fb755b56120d89604035a269b8472baf26cb2",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/outer.log",
+      "bytes": 519,
+      "sha256": "646da9d50be527aa8f29eca411888118d22574deaf47c67eb0d84be376daab97",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/outer.time",
+      "bytes": 33,
+      "sha256": "2622ab8248b92268498bfb64c9b54ab1f3963189c5d2e66fbbfa594f3a6af464",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/whitespace.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/whitespace.time",
+      "bytes": 29,
+      "sha256": "277cd953e26eafa013746d69c70f31747b7899cc5aac10e4e17ca2ac64447f24",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/typecheck.log",
+      "bytes": 1602,
+      "sha256": "d051eae71dd0d9a65040c2e0d0e9ddbd32e694d1565d7f4a32463c88f34503e4",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/typecheck.time",
+      "bytes": 30,
+      "sha256": "a131f2bdda5be887471db4dbde7ac8f503740001c327b310dbc2cdb32e82e80b",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/test.time",
+      "bytes": 33,
+      "sha256": "3a648298450f29d3d6b031c3380a91d903464ab28cfa52a6da2c435c73b44ce4",
+      "classification": "PUBLIC exactSource/phase/terminal or bounded non-body log/time"
+    }
+  ],
+  "privateHashOnly": [
+    {
+      "path": "/private/tmp/artroom-counter-ui-fb6-one-normal-gate/test.log",
+      "bytes": 8706,
+      "sha256": "9a5786e55b2efadb99e0e8b1f422888ec0a26ce2499f860c0a2d4a6009ddded1",
+      "classification": "PRIVATE raw test diagnostic/body log; only fixed public count/diagnostic-class/time projection extracted, no body copied"
+    }
+  ],
+  "qualification": "One actual ordinary corrected fb6 gate; original40a9 whitespace-only67482 failure remains separate/types-testsUNRUN there. Focused66677 and normalbuild81844 were not repeated. Counter/browser Node stand-ins, native fixture claims and real deployment/audio/manual/publicSDK/provider duties remain distinct. No global factor or physical drain claim."
+}
