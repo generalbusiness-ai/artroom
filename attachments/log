@@ -1,0 +1,186 @@
+
+ RUN  v4.1.11 /private/tmp/artroom-ux1-fixture-type-fix/packages/page
+
+ ✓ |page| test/focus.test.ts > same keyed refresh preserves the unsent value, selection and focus on the replacement control 1ms
+ ✓ |page| test/focus.test.ts > a new room or selected version cannot inherit another subject's focus or draft 0ms
+ ✓ |page| test/focus.test.ts > current text and select choices stay authoritative while the old control regains focus 0ms
+ ✓ |page| test/shell.test.ts > closed issues offer one reopen and invalid changes offer no merge or review decision 1ms
+ ✓ |page| test/shell.test.ts > navigation keeps lane identity and separates the room's Issues and Changes lists 0ms
+ ✓ |page| test/shell.test.ts > a scope fence permits pre-submit correction but never a fresh signature after an attempted request loses its reply 0ms
+ ✓ |page| test/shell.test.ts > a late read from the previous room cannot replace the active room or reuse another membership incarnation 1ms
+ ✓ |page| test/correction-main.test.ts > Main mounts a new corrected-proposal control for verified invalid-path text and keeps publication/review unavailable 271ms
+ ✓ |page| test/membership-projection.test.ts > review choices require a live linked key, live agent controller, the selected extent grant and independence 19ms
+ ✓ |page| test/membership-projection.test.ts > a missing author-controller relation is unavailable, and foreign incarnation or missing role authority offers no invented choices 9ms
+ ✓ |page| test/membership-projection.test.ts > standing is recomputed from the current exact key link; retired keys and inactive controllers cannot carry cached permission 3ms
+ ✓ |page| test/claim-ui.test.ts > only an eligible configured founder sees creation; an in-flight or stale claim cannot replace another room 348ms
+ ✓ |page| test/join-ui.test.ts > Join fences duplicate requests and never applies an accepted reply to changed settings 352ms
+ × |page| test/sending.test.ts > the shell fences the whole scope during a submit and keeps a lost reply read-only after redraw 351ms
+   → expected [] to deeply equal [ 'room/member/directory' ]
+ · |page| test/sending.test.ts > retained dialogs use the live scope; accepted draft retirement and refreshed review qualification survive redraw
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |page| test/sending.test.ts > the shell fences the whole scope during a submit and keeps a lost reply read-only after redraw
+AssertionError: expected [] to deeply equal [ 'room/member/directory' ]
+
+- Expected
++ Received
+
+- [
+-   "room/member/directory",
+- ]
++ []
+
+ ❯ test/sending.test.ts:75:114
+     73|     expect(panels.length).toBeGreaterThan(0);
+     74|     // Main owns these public association hosts; the view stand-in mus…
+     75|     expect(root.querySelectorAll('[data-request-context]').map(node=>n…
+       |                                                                                                                  ^
+     76|     expect(root.querySelectorAll('[data-task-context]').map(node=>node…
+     77|     const beforePending = panels.length;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 7 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:765:6
+ ❯ VitestModuleEvaluator._runInlinedModule ../../../artroom-demo-github-host/node_modules/vitest/dist/module-evaluator.js:206:4
+ ❯ VitestModuleRunner.directRequest ../../../artroom-demo-github-host/node_modules/vite/dist/node/module-runner.js:1286:59
+ ❯ VitestModuleRunner.cachedRequest ../../../artroom-demo-github-host/node_modules/vite/dist/node/module-runner.js:1193:73
+ ❯ test/join-ui.test.ts:45:5
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:50:45
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:58:45
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:75:141
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:77:24
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:84:54
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: container.querySelectorAll is not a function or its return value is not iterable
+ ❯ reconcileActionDrafts src/actions.ts:58:32
+     56|  * This is a render projection, not a second draft store or request jo…
+     57| export function reconcileActionDrafts(container: HTMLElement): void {
+     58|   for (const form of container.querySelectorAll<HTMLElement>("form[dat…
+       |                                ^
+     59| }
+     60|
+ ❯ src/main.ts:97:3
+ ❯ show src/main.ts:626:5
+ ❯ draw src/main.ts:628:95
+ ❯ src/main.ts:764:52
+ ❯ test/join-ui.test.ts:88:73
+ ❯ ../../../artroom-demo-github-host/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+This error originated in "test/join-ui.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 6 passed (9)
+      Tests  1 failed | 13 passed (40)
+     Errors  7 errors
+   Start at  20:48:17
+   Duration  440ms (transform 1.86s, setup 0ms, import 1.33s, tests 1.36s, environment 0ms)
+
+JSON report written to /tmp/artroom-ux1-3ea-execution/body.json
