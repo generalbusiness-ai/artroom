@@ -18,7 +18,8 @@ import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "./support
 const SERVICE = "https://scopes.test";
 
 // Real native factory, R6/D6/M5, enrollment, membership authority, C1 evaluator,
-// SQLite, HTTP sessions and replay. Git-host answers and the monotonic clock are
+// SQLite, HTTP sessions and replay, with one admin person and two independently enrolled agents.
+// Git-host answers and the monotonic clock are
 // labelled stand-ins. No inspector, fabricated grant, child founding or speech:
 // a refused competitor has no native pledge; physical silence is a browser duty.
 test("native Counting admits one competing pledge, fulfills its exact holder, applies current activity and fairness, then expires board before promise and resets without losing proven history", async () => {
@@ -60,8 +61,11 @@ test("native Counting admits one competing pledge, fulfills its exact holder, ap
     const membership=await M.at();
     for(const [who,handle] of [[keys.una,"@una"],[keys.vic,"@vic"]] as const){
       const secret=`native-counter-${handle}-invitation-secret-of-at-least-32-bytes`;
-      const invitation=await M.did(rita,"invite-member",{fields:{handle,role:"member",inviteHash:textDigest(secret),inviteEnds:soon(60)}});
-      await M.did(who,"join",{fields:{invitation,secret}});
+      const member=await M.did(rita,"add-member",{fields:{handle,kind:"agent",controller:{membership,member:"@rita"}}});
+      const invitation=await M.did(rita,"invite-key",{fields:{member,kind:"agent",inviteHash:textDigest(secret),inviteEnds:soon(60)},expected:await M.expected({member})});
+      await M.did(who,"enrol",{on:0,fields:{invitation,secret},expected:await M.expected({on:0,member})});
+      expect(await M.item(member)).toMatchObject({state:"active",values:{kind:"agent",role:"agent"},parties:{controller:{membership,member:"@rita"}}});
+      expect((await M.summary()).value.items.find(i=>i.type==="key"&&i.values["id"]===who.key)).toMatchObject({state:"active",values:{kind:"agent"},refs:{member}});
     }
     const bytes=canonicalize(countingCommitments);
     expect(await Q.stub.submit(await Q.intent(rita,"activate",{fields:{digest:COUNTING_COMMITMENTS_DEFINITION,name:countingCommitments.name}}),[],{values:[bytes]})).toMatchObject({answer:"accepted"});
@@ -73,7 +77,7 @@ test("native Counting admits one competing pledge, fulfills its exact holder, ap
     // The factory's admission of genesis grants no domain control by implication.
     expect(await C.act(rita,"initialize",{expected:await C.expected({configuration:0})})).toMatchObject({answer:"refused",reason:"unauthorized"});
     const domain=["counting.participate","counting.activity","counting.commit","counting.fulfill","counting.fail"];
-    for(const role of ["admin","member"] as const)await M.did(rita,"set-actions",{on:0,expected:await M.expected({on:0}),fields:{role,actions:[...FIRST_ACTIONS_OF[COUNTING_COHORT.membership]![role],...domain,...(role==="admin"?["counting.control"]:[])]}});
+    for(const role of ["admin","agent"] as const)await M.did(rita,"set-actions",{on:0,expected:await M.expected({on:0}),fields:{role,actions:[...FIRST_ACTIONS_OF[COUNTING_COHORT.membership]![role],...domain,...(role==="admin"?["counting.control"]:[])]}});
     lifetime.advance(301000); // End the previous native authority reuse window, without a revocation claim.
     const readers=new Map<Actor,string>();
     for(const who of [rita,keys.una,keys.vic]){
@@ -125,8 +129,26 @@ test("native Counting admits one competing pledge, fulfills its exact holder, ap
     await wrote(act(rita,"reset",b,{generation:1}));await C.restart();
     expect([(await board()).state,(await board()).values["generation"],(await board()).values["serial"],(await board()).values["lastNumber"]]).toEqual(["paused",1,0,0]);
     await wrote(act(rita,"start",b));
+    await wrote(act(holder,"commit",null,await claimFields(participants.get(holder)!),{board:b,participant:participants.get(holder)!}));
+    const failed=await current();
+    await wrote(act(holder,"fail",failed.id,{...resolution(failed),reason:"process-error"},{board:b}));
+    expect([(await board()).state,(await board()).values["lastNumber"],(await board()).refs["pledge"]]).toEqual(["paused",0,null]);
+    const failures=await lifetime.wait(()=>(C.stub as unknown as {items(reader:unknown,type:string):Promise<Read<readonly Item[]>>}).items(C.reader,"promise"));
+    expect(failures.ok&&failures.value.find(p=>p.id===failed.id)).toMatchObject({state:"failed",values:{reason:"process-error",n:1}});
+    const removed=participants.get(holder)!;
+    await wrote(act(holder,"deactivate",removed));
+    await wrote(act(rita,"force-deactivate",participants.get(loser)!,{}, {configuration:0}));
+    await wrote(act(rita,"remove-participant",removed,{}, {configuration:0}));
+    const history=await lifetime.wait(()=>(C.stub as unknown as {items(reader:unknown,type:string):Promise<Read<readonly Item[]>>}).items(C.reader,"participant"));
+    expect(history.ok&&history.value.find(p=>p.id===removed)?.state).toBe("removed");
+    const replacement=await wrote(act(holder,"participate"));expect(replacement).not.toBe(removed);participants.set(holder,replacement);
+    await wrote(act(holder,"activate",replacement));await wrote(act(loser,"activate",participants.get(loser)!));
+    expect((await C.summary()).value.items.filter(i=>i.type==="participant"&&i.state==="active").map(i=>i.id)).toEqual([...participants.values()].sort((a,b)=>a-b));
+    await wrote(act(rita,"start",b));await wrote(act(rita,"pause",b));expect((await board()).state).toBe("paused");await wrote(act(rita,"start",b));
     for(const who of [holder,loser]){await wrote(act(who,"commit",null,await claimFields(participants.get(who)!),{board:b,participant:participants.get(who)!}));const p=await current();await wrote(act(who,"fulfill",p.id,resolution(p),{board:b}));}
     expect([(await board()).state,(await board()).values["lastNumber"]]).toEqual(["finished",2]);
+    const kinds=(await C.entries()).flatMap(e=>e.input.type==="act"?[e.input.signed.intent.kind]:[]);
+    expect([...new Set(kinds)].sort()).toEqual(["initialize","participate","activate","deactivate","force-deactivate","remove-participant","start","commit","fulfill","fail","cancel","pause","reset"].sort());
     expect((await C.entries()).filter(e=>e.input.type==="act"&&e.input.signed.intent.kind==="commit").every(e=>e.input.type==="act"&&e.input.authority.some(g=>g.actions.includes("counting.commit")))).toBe(true);
     expect((await fetch(`${SERVICE}/v1/scopes/${C.name}`)).status).toBe(403);
     for(const who of [rita,keys.una,keys.vic])expect((await fetch(`${SERVICE}/v1/scopes/${C.name}`,{headers:{authorization:readers.get(who)!}})).status).toBe(200);
