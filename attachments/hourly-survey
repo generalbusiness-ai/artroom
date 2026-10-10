@@ -1,0 +1,35 @@
+# Hourly sprint survey — 10 October 2026, 02:07 Eastern
+
+Survey for the 06:07 UTC boundary. Refreshed workroom and retained outcomes; planner ran no project runtime.
+
+The repaired initial candidate is ready for ordinary Source review once its artifact filing is complete. Its gate passed with 1,005 Vitest passes, two original recorder skips and all eight Node companion passes. Checker retired the staging defect as a blocker for this candidate; main has not received the fix. The complete 10× test/workflow target remains open.
+
+| Work | Evidence | Next action / owner |
+|---|---|---|
+| Initial candidate | Final `0e5954ec` differs from passing `b7ee8549` only in its outcome note. All 229 paths, blobs, sizes and hashes verified: 201 authored text, 28 opaque. | Builder preserves support-first/primary-last filing under `60e59173` / `11ffa485`, then gets current full review and normal landing/receipt. No note-only rerun. |
+| Gate and staging repair | New repaired gate passed in 96.61 elapsed / 155.00 CPU seconds. Actual collision witness and old-cleanup control distinguish preservation. Checker retirement `911890e4` is effective only for the repaired candidate. | Targeted repair report binding remains separate under `0ad66c94` / `4f92f42f`; main is still `18a1288d`. Whole Source approval is not supplied by preparation. |
+| Filing | Old `bc2` archival process `87954` finished with exit 0; all supports and primary artifact `db906034` are recorded. Targeted repair report `0eca6496` is separately bound to f241. Current repaired-candidate filing is live as handle `99684`. | Preserve new handle `99684` and distinguish the exact old archive from final filing. Targeted repair report is effective but marked stale through its retired-finding ancestry; validate current review binding without rewriting facts or adding tests. Cost followthrough `600aa23f` can now use the old terminal outcome. |
+| Test economy | Both retained 172-file duration caches identify manifest-tree and demo as leading costs, about 35% of aggregate duration. Values overlap; they are not whole wall time. | Builder and checker map useful invariants and redundant work. Removal/merge is allowed when surviving coverage is explicit; no blanket preservation of every old title/assertion. |
+| Next optimization | Hub fixture rebuilds a full real Git pack on every upload. Isolated Source request `4bb53d02`, now promised by builder `254f392f`, selects owned immutable wire-byte reuse and a compact extension of the existing cache witness. | Preserve codec/bounds, fresh responses/refs, public reads, tokens and receive CAS. No authority/state cache or default deadline changes. Manifest phase-local read consolidation follows separately. |
+| Public release | Builder delivered r2 preparation report `a8a89805` under `7b31f843` / `7ec2630e`: four compiled ESM/type packages, controlled build/declaration closure and public-consumer/validator/smoke recipes. Dated public checks at 05:48 returned 404; scratch npm identity returned ENEEDAUTH. | Planner read the handoff and its bounded review; plan/owner adoption remains open. Publisher rights and deployed operator remain unverified. Assembly needs separate authorization; actual publication and provisioned smoke require the right operator. No private absence, namespace ownership, release, login or deployment claim. |
+| Jam and manual | One existing own-module symbolic check is commissioned under `715c3fdc`, independent of SDK publication. Full manual remains alongside Jam. | Use the next free serialized runtime slot without Artroom imports/install/native/audio claims; progress a useful manual workflow page. Ordinary Jam review/hosting and musical acceptance remain owed. |
+| Complete product | Counting/capacity/invitations, authorized shared names, browser accessibility and real A-to-B hosted coding remain incomplete. | Preserve original full acceptance and current owners. Worktree registry has 221 entries; 30 clean main-ancestor candidates need retention review. A bounded symlink scan identifies three of those roots still serving other checkouts; preserve them and all current evidence. |
+
+```mermaid
+flowchart LR
+    P[Repaired Source and passing gate] --> A[Finish ordinary artifact filing]
+    A --> R[Complete current Source review]
+    R --> L[Normal landing and receipt]
+    C[Retained passing-file costs] --> H[Isolated Hub wire-byte reuse]
+    H --> V[Only justified affected checks]
+    J[Jam own-module work] --> I[Public and native integration]
+    D[Full manual in parallel] --> B[Complete browser and device acceptance]
+```
+
+The pool backport removed observed cumulative wrapper layers and the previous five native timeouts were absent in both passing gates. Observed elapsed improvement was about 3.3–3.6× across different heads and loads. These observations do not establish a controlled factor, universal timeout cause, physical drain or complete tenfold outcome. Raw SQL, cross-DO abort and Content-Type diagnostics remain retained.
+
+Hugh is the project authority for later publisher/operator delegation, but no npm organization write right is assumed. The unauthenticated 404 checks establish dated public availability only, not private package or namespace absence. Source packaging work can continue without credentials; any actual publication decision must concern a concrete reviewed release.
+
+Keep declared acts and concrete Jam blockers after test economy, Jam/docs in parallel and accepted UX through actual browser/device acceptance. No current Source/check work needs a decision from Hugh. This survey is not Source approval or Git publication.
+
+Checker completed the cost Source inquiry (`132de109`), identifying direct positive-verifier duplication with a surviving service check, unreachable private fault branches and conditional story-prefix sharing. No blanket case deletion is adopted: commit association and both declaration/provider regimes need their explicit surviving witnesses. Hub reuse remains the first commissioned change, with no new runtime yet.
