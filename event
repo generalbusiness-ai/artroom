@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cee223552698b3682c25a3b7b1144cf22466cafe","text":"Merge retired a covered predecessor; the successor is at scripts/active-source.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cf2bb62c61dcc238d266c0441f3ed8ea08f325d4","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/support/native-fixture-lifetime.ts."}
