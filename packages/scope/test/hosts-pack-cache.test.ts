@@ -2,10 +2,11 @@ import { expect, test } from "vitest";
 import { utf8 } from "@generalbusiness/artroom-bytes";
 import { idOf } from "@generalbusiness/artroom-git";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
-import { MAX_BYTES, OwnGit } from "./hosts.ts";
+import { Hub, MAX_BYTES, OwnGit } from "./hosts.ts";
 
 // Fixture mechanism only: the real pack builder/decoder over OwnGit's mutable
-// object map. No native publication or membership authority is supplied here.
+// object map, then Hub's public-read path using the same pack helper.
+// No native publication, real GitHub or membership authority is supplied here.
 test("OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response", async () => {
   const host = new OwnGit();
   await host.ns.create("pack-cache");
@@ -85,4 +86,68 @@ test("OwnGit reuses only ordered immutable pack bytes while each request checks 
   await binding.revokeToken(minted.plaintext);
   expect((await host.fetch(request())).status).toBe(401);
   expect((await host.fetch(request("unknown-token"))).status).toBe(401); reused();
+
+  // Hub reads are public. The same owned helper supplies its bytes, while
+  // responses and ref advertisements are fresh without minting a write token.
+  const hub = new Hub();
+  hub.name = "pack-cache";
+  const remote = `https://github.com/generalbusiness-ai/${hub.name}.git`;
+  const publicRead = () => new Request(`${remote}/git-upload-pack`, { method: "POST", body: "scripted want" });
+  const hubFirst = blob("public first");
+  const hubSnapshot = { ...hubFirst, data: new Uint8Array(hubFirst.data) };
+  hub.objects.set(hubFirst.id, hubFirst);
+  const publicOne = hub.fetch(publicRead()); const publicTwo = hub.fetch(publicRead());
+  // An in-place mutation before completion cannot change either owned pack.
+  hubFirst.data[0] = 0x61;
+  const [publicA, publicB] = await Promise.all([publicOne, publicTwo]);
+  expect(publicA).not.toBe(publicB);
+  expect(await decoded(publicA)).toEqual([hubSnapshot]);
+  expect(await decoded(publicB)).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(1);
+  await expect(hub.fetch(publicRead())).rejects.toMatchObject({ reason: "hash-mismatch" });
+  expect(hub.packBuilds).toBe(2);
+  // A rejection is evicted, and an old rejection cannot erase a newer build.
+  const publicRejected = expect(hub.fetch(publicRead())).rejects.toMatchObject({ reason: "hash-mismatch" });
+  hub.objects.set(hubFirst.id, hubSnapshot);
+  const publicRepaired = hub.fetch(publicRead());
+  await publicRejected;
+  expect(await decoded(await publicRepaired)).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(4);
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(4);
+  const publicRefs = () => new Request(`${remote}/info/refs?service=git-upload-pack`);
+  hub.refs.set("refs/heads/main", hubSnapshot.id);
+  const beforeRefs = await hub.fetch(publicRefs());
+  hub.refs.delete("refs/heads/main"); hub.refs.set("refs/heads/later", hubSnapshot.id);
+  const afterRefs = await hub.fetch(publicRefs());
+  expect(beforeRefs).not.toBe(afterRefs);
+  expect(await beforeRefs.text()).toContain(" refs/heads/main\0");
+  expect(await afterRefs.text()).toContain(" refs/heads/later\0");
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(4);
+  expect([hub.minted, hub.mintedPermissions, [...hub.revoked], hub.pushes]).toEqual([[], [], [], []]);
+
+  // Hub's known raw-size failure must reach the actual codec without copying
+  // this already inadmissible payload first. Observe only that exact input.
+  hub.objects.clear(); hub.objects.set(oversized.id, oversized);
+  const originalConstructor = globalThis.Uint8Array;
+  let oversizedCopies = 0;
+  globalThis.Uint8Array = new Proxy(originalConstructor, {
+    construct(target, arguments_, newTarget) {
+      if (arguments_[0] === oversized.data) oversizedCopies++;
+      return Reflect.construct(target, arguments_, newTarget);
+    },
+  });
+  try {
+    await expect(hub.fetch(publicRead())).rejects.toMatchObject({ reason: "too-large" });
+  } finally {
+    globalThis.Uint8Array = originalConstructor;
+  }
+  expect(oversizedCopies).toBe(0);
+  expect(hub.packBuilds).toBe(5);
+  hub.objects.clear(); hub.objects.set(hubSnapshot.id, hubSnapshot);
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(6);
+  expect(await decoded(await hub.fetch(publicRead()))).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(6);
 });
