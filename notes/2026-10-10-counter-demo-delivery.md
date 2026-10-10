@@ -91,8 +91,9 @@ This successor normally composes immutable UI
 9e5d497316946b5ae78165187239a23fdcd3d23d with Counter 4a40. Its only merge conflict
 was the generated Page asset. The normal existing Page builder completed once
 from both current production source closures; neither donor asset was selected
-as the resolution. All eighteen UI authored paths and all Counter paths except
-that shared generated module retain their exact donor bytes. The original UI
+as the resolution. All eighteen UI authored paths and all Counter code, data, tests and configuration
+except that shared generated module retain their exact donor bytes. This note adds
+the combined candidate's current evidence and pending work. The original UI
 review remains pending; composition claims neither approval nor landing. A new
 ordinary gate on this combined code head remains pending. Main f722 and both
 original donor worktrees, histories and proofs remain unchanged.
