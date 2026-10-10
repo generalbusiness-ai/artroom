@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8aaecb5a554842db0664bd95368cd750d861612b","text":"Merge retired a covered predecessor; the successor is at packages/replay/src/verify.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8c1c6a3b190920674977032d3a2da8b36b3088d4","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/change-refused-record.png."}
