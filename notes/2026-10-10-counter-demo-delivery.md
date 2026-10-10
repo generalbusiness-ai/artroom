@@ -97,3 +97,29 @@ the combined candidate's current evidence and pending work. The original UI
 review remains pending; composition claims neither approval nor landing. A new
 ordinary gate on this combined code head remains pending. Main f722 and both
 original donor worktrees, histories and proofs remain unchanged.
+
+The combined ordinary gate at 45f71de70fe9af49fddbf935a3d03aa2b5bd123c,
+tree 4041a6a7a59bace295c8dde7dbd5783da8bcd02d, completed with exit 0.
+It passed 1,025 Vitest cases across 179 passing files, with the two original
+optional recorder cases and one recorder file skipped, then passed all eight
+active-source/compatibility and 37 Counter browser Node cases. No Node case
+failed, skipped, cancelled or remained todo. The gate kept ordinary settings,
+original deadlines and the unchanged lock; install was skipped. Source, all
+twelve workspace bindings, shared cache and the private patched pool matched
+before and after. Whole command time was 92.49 seconds wall and 150.65 seconds
+CPU on this machine; typecheck took 5.5 seconds wall and 18.5 seconds CPU, and
+tests took 86.7 seconds wall and 131.9 seconds CPU. The retained Worker abort,
+intentional SQL retention-trigger and four Git Content-Type diagnostics remain
+qualified; this is not an error-free, physical-drain, timeout-cause or global
+speedup claim. The public proof is
+/private/tmp/artroom-counter-ui-final-gate-complete-proof.json, SHA-256
+a0cb271837b73d912b6ab61b9e5d31268c3cade7af1f72a946213c9cec94d947.
+
+This outcome is a note-only successor: executable source, tests, configuration
+and all generated assets remain byte-identical to the checked combined head.
+The separate UI's formal review and the combined candidate's source approval
+and normal main landing remain owed. Actual Cloudflare deployment of these
+sources, real bootstrap/invitation/enrollment and three independent audible
+devices with peer updates, recovery and a final natural recording remain owed.
+No donor gate, local fake, native fixture or successful static build substitutes
+for those deployed outcomes.
