@@ -1,0 +1,43 @@
+{
+  "request": "14baa25b833799e3ac9ffc3332e9f7a2c8f7d332",
+  "promise": "fcb663f3c3a9fc1ab9409f6b8b2135a12a3cc27b",
+  "candidate": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "primary": "23eaef7b1806a3def74a490e88cec8681df9ed5f",
+  "review_request": "c94b58a1467e21609709764ef2e014f3f788ffa3",
+  "documentation": [
+    {
+      "path": "/Users/hughpyle/play/gitseq/docs/reference/gs/review.md",
+      "sha256": "3648db4212e8e5e39df9cd76ef26df0e576baeff9fd16f1a9d67ec63039d046c",
+      "read": "FULL"
+    },
+    {
+      "path": "/Users/hughpyle/play/gitseq/docs/reference/gs/review-request.md",
+      "sha256": "cb4a77774483f9f3316c24bc99ccf9ba106baef4b81a18cb2e18946d238aca38",
+      "read": "FULL"
+    },
+    {
+      "path": "/Users/hughpyle/play/gitseq/docs/concepts/decision-authority.md",
+      "sha256": "2019cdfccb8b571ba575617402a93a1f3309221fb2b8433ae52373fa09e78cf0",
+      "read": "FULL"
+    }
+  ],
+  "finding": "Stale effective unretired artifacts and review promises may be reviewed; guarded review records stale qualification. Projection stale is not itself a refusal. Existing assigned binding is selected by exact reporting artifact and own promise; do not relabel as self initiated or evidence-only.",
+  "limitation": "Installed gs binary/current Source correspondence not established; reviewer actual read-only --prepare result required. No reviewer identity impersonation or approval attempt by builder.",
+  "actual_guard_result": {
+    "verdict_event": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2a41bb06e7e115aea92c8a2de4a409f98aeda328",
+    "decision": "effective",
+    "verdict": "approved",
+    "binding": "assigned",
+    "head": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+    "implementations": [
+      "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:11ffa485a8f1c066471b2a1a5b92d78627db0b54"
+    ],
+    "staleness": "artifact, promise, request stale; retired bases: git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f81b19a5f2779381afdb1fe04edc2c997b99cc90",
+    "qualification": "Actual guarded review approved assigned existing229 under11ffa, recording inherited staleness; no refile/duplicate filing needed. Normal landing still pending."
+  },
+  "mutation": "none; existing229 artifacts and invitation preserved",
+  "actual_guard_evidence": {
+    "path": "/tmp/artroom-0e595-approved-review.json",
+    "sha256": "684e8b25f1e9357b9659906272decd566e0e22ab72d4799a148461df233dcfb8"
+  }
+}
