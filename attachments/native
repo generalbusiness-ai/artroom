@@ -1,0 +1,100 @@
+{
+  "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+  "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+  "head_unchanged": true,
+  "clean": true,
+  "native_plan": "/tmp/artroom-f5-signer-static-preparation/native-plan.json",
+  "native_plan_sha256": "a8d0ea6e27463cf478c73bbb3f3ac5e3d41d9835fd8a8fbc3e2f92187f5e3e3e",
+  "native_config": "/tmp/artroom-f5-signer-static-preparation/native-body.config.mjs",
+  "native_config_sha256": "0faed2770602f287bb5c51859085a457ca77eda92991da0ead8ace31bac32d81",
+  "selection": [
+    {
+      "path": "packages/lanes/test/site-native3-publication.scope.test.ts",
+      "sha256": "2e43475889f435734a6c8ff2ed54029fb7ef45cb96d07fb5ea56ed727892ac06",
+      "cases": [
+        "native @3 cleaned publication retains immutable Site eligibility while timed reserved expiry never grants it"
+      ],
+      "whole_file_case_count": 1,
+      "fc0_byte_identical": true,
+      "explicit_timeout_source_spans": []
+    },
+    {
+      "path": "packages/page/test/source-preview.scope.test.ts",
+      "sha256": "56b65c2466b2f30cc0f0df8acc26adf3489e387f8904351b4b311dba1fd41a0c",
+      "cases": [
+        "exact retained proposal source survives later publication; missing and tampered entry replies offer no source or HEAD fallback"
+      ],
+      "whole_file_case_count": 1,
+      "fc0_byte_identical": true,
+      "explicit_timeout_source_spans": [
+        {
+          "line": 28,
+          "source": "    const bytes = response.body ? await owner.required(() => takeBytes(response.body!, 256 * 1024, AbortSignal.timeout(30_000))) : null;"
+        }
+      ]
+    },
+    {
+      "path": "packages/page/test/task-data.scope.test.ts",
+      "sha256": "6cd393d03aca2d1d194b238617a89f45455f24279c7ed404f07b65eb312a98ef",
+      "cases": [
+        "selected merge facts are native ISSUE reports in admitted order, independent of later reports and checker jobs",
+        "native task data supplies active issue choices, detached Description, exact current manifest and eligible review choices"
+      ],
+      "whole_file_case_count": 2,
+      "fc0_byte_identical": true,
+      "explicit_timeout_source_spans": [
+        {
+          "line": 141,
+          "source": "    const bytes = response.body ? await owner.required(() => takeBytes(response.body!, REPLY_BYTES, AbortSignal.timeout(REPLY_SECONDS * 1000))) : null;"
+        }
+      ]
+    },
+    {
+      "path": "packages/scope/test/site-immutable-publication.test.ts",
+      "sha256": "a8994103580be7a9091f9eb68189d5e70ff044b42318f7d253f9bd8b80cdd5dc",
+      "cases": [
+        "two native publications retain older immutable content and deny pending/conflicting receipt before 304 without SQLite writes"
+      ],
+      "whole_file_case_count": 1,
+      "fc0_byte_identical": true,
+      "explicit_timeout_source_spans": [
+        {
+          "line": 34,
+          "source": "    const bodyOf = async (reply: Awaited<ReturnType<typeof get>>) => new TextDecoder().decode(await d.wait(() => takeBytes(reply.body!, 1024 * 1024, AbortSignal.timeout(30_000))) as Uint8Array);"
+        }
+      ]
+    },
+    {
+      "path": "packages/scope/test/application-establish.test.ts",
+      "sha256": "01bcc83247433558a410283adde00decc7d2e6101e01e6e5e13f093b4b51a31b",
+      "cases": [
+        "explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant"
+      ],
+      "whole_file_case_count": 1,
+      "fc0_byte_identical": false,
+      "explicit_timeout_source_spans": []
+    },
+    {
+      "path": "packages/scope/test/versions.test.ts",
+      "sha256": "afda441ec3430cd240138837508b43c3fb1ce5410472b0c612408ff9de9c71c1",
+      "cases": [
+        "a room founded on version 1 of every definition, on the code that ships version 2. The Git host is a STAND-IN > a register founded on platform:register@1 founds its whole room on version 1; its first head is the empty tree; read-token is refused by name and writes nothing; a grant read from membership states version 1; every history replays consistent, and replays with mismatch when version 1 is judged by version 2's code"
+      ],
+      "whole_file_case_count": 1,
+      "fc0_byte_identical": false,
+      "explicit_timeout_source_spans": []
+    }
+  ],
+  "case_total": 7,
+  "file_total": 6,
+  "native_pool": "actual original Scope Worker plugin/wrangler/globalSetup; isolatefalse/maxWorkers1; provide pageRecord/demoRecord false; default5000/retry0; all source case overrides unchanged",
+  "compilers_once": [
+    "CLI_SCOPE",
+    "Page_SCOPE",
+    "Lanes_SCOPE",
+    "Scope_TEST"
+  ],
+  "no_node_compiler_repeat": true,
+  "config_source": "fc0 reviewed Scope recipe; only source head/root/tree/selection and explanatory labels replaced",
+  "execution": []
+}

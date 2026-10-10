@@ -1,0 +1,50 @@
+{
+  "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+  "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+  "release": "d887615852a44499bb3e417034922200e6cd3637",
+  "actual_handle": 80239,
+  "actual_exit": 0,
+  "compilers": "CLI SOURCE/TEST,Page SOURCE/TEST eachoncePASS",
+  "body": "Whole CLIclone1/Pagejoin2 casesPASS, strictsame-runselection; no errors/skips/retries/repeats",
+  "manifest_verified": {
+    "files": {
+      "CLI-source.log": {
+        "sha256": "b27f1fdf0332fdb75aeb8fe0c550ca21b68046d8089796bf5ba26c0149094fed"
+      },
+      "CLI-test.log": {
+        "sha256": "8412eb76f97fc4b2afa9b0ba9af468bafdff9318a4e1b6981809bfc538f7550e"
+      },
+      "Page-source.log": {
+        "sha256": "fd57d7ae47fa540ef3e03aa2ae92c547797eff7a7b481c5b62858a9593ef6c2e"
+      },
+      "Page-test.log": {
+        "sha256": "260a30dec9fdfceb30a09218f80d4aa5391a61a2fbf7c195a9eccb9a5d8193db"
+      },
+      "body.log": {
+        "sha256": "b70963aedb659a862e889f4a9ff91474d209104945755ec49303c9e7daf1dff4"
+      },
+      "coverage-ledger.json": {
+        "sha256": "ed67d672a8745e9a14a7104f30725b0512eddd1439ba403971be1e1964318263"
+      },
+      "coverage.jsonl": {
+        "sha256": "e7afdd907565126829bf89da11323627c90be174c6b8b271608568d4ba0f3e6b"
+      },
+      "plan.json": {
+        "sha256": "9ea167e18ce0923dfaa688358274339509d3e928195ef45218210f746e875e35"
+      },
+      "result.json": {
+        "sha256": "7a2d49089fee157f52f28c7f68249a19d5b4edb6dd2224e0feff3fb0d29eb7a4"
+      },
+      "vitest.json": {
+        "sha256": "3469ffdf767d4ebeeb581e0da102ec0ccafafa466e8d3c92f7432cd0a0fb2118"
+      }
+    },
+    "verificationExitCode": 0,
+    "completionRule": "Actual pipeline exit is authoritative; a sealing failure is not a complete run."
+  },
+  "outer_wall_seconds": 2.13,
+  "outer_cpu_seconds": 4.63,
+  "body_wall_seconds": 0.79,
+  "body_cpu_seconds": 1.34,
+  "limits": "Actual cryptographic derivation/signature andHTTP transport, scripted session/summary/submit replies/minimalDOM. Spy baseline supports claimed counts; oldbranchcontrols pending. Native/current fullgate/timeoutcause/dominant10x not established."
+}
