@@ -47,7 +47,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`artroom install <base-url> [--host <git-host>] [--namespace <name>]`**
+**`artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
 founds the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -59,34 +59,90 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]`**
+**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
 signs the same `install` intent and founds nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will found,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be founded. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
-register's genesis records both. A later plan replaces it.
+register's genesis records both. Only a definitely unsent legacy plan may
+be replaced. An explicitly selected plan remains exact.
 
 ```
 Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`artroom install --planned`** founds the planned register, with the kept
+**`artroom install --planned [--cohort application|counting-commitments]`** founds the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
-version is not the one this command founds under, is refused as
+version is not supported by the installed catalog, is refused as
 `plan-mismatch`; a plan whose time is over is refused as `plan-expired`.
-Either refusal sends nothing and writes nothing; plan again, and set the
-new ID. After the founding, the receipt's register must be the planned
-one.
+A definitely unsent expired legacy plan may be replaced. Keep a selected
+or attempted plan for recovery: do not create a second install after an
+uncertain answer. An attempted replay sends the original signed request;
+the service may recover its previously accepted genesis even after expiry.
+After founding, the receipt must name the planned register, definition and
+intent. Its acceptance is a service acknowledgement; independent history
+verification remains separate.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.
 ```
 
 [deploy.md](deploy.md) says why and when to plan first.
+
+### An explicitly selected application room
+
+Omitting `--cohort` keeps the legacy default. `--cohort application` selects
+`APPLICATION_COHORT`: register@5, directory@5, membership@4, rules@3,
+destination@2 and inbox@1, each with the `platform:` prefix.
+`--cohort counting-commitments` retains its separate register@6,
+directory@6 and membership@5 lineage. Both choices use the existing exact
+planned-install custody. Unknown or multiple choices, another retained
+cohort, service, host or namespace refuse before signing or sending.
+`install --planned` may omit the selection: it uses the saved definition
+and signature. It never upgrades a plan to a newer catalog version.
+
+For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
+and a deployed service that supports all six exact application pins:
+
+```sh
+artroom install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
+# Configure that host's registerScope with the printed planned ID.
+artroom install --planned --cohort application
+artroom claim <label> --handle @operator
+```
+
+Keep the operator key and pending envelopes in that private directory;
+share public full scope references and actual genesis pins, never keys or
+session headers. An uncertain install retries `--planned`; an unfinished
+claim repeats the same claim without `--again`. Verify the actual directory,
+membership, rules and destination creation and confirmation before using
+the room. The selected bootstrap does not validate, activate or create Jam.
+
+The provisioning owner must next validate the exact application declaration
+with public `validateDefinition` under the deployed bounds, retain its
+canonical bytes and `definitionDigest`, and activate that digest and all
+required declaration dependencies in the actual rules scope. The authorized
+`establish-application` act on directory@5 names that digest, bounded
+canonical genesis `values` and `execution=recorded-do`. Supply declaration
+bytes beside it; the factory supplies the trusted opener and membership.
+Keep the exact signed creation request before submission and reconcile its
+accepted fact and confirmed child seed after an unknown answer. Do not
+create a second application to replace an uncertain first one.
+
+Membership must explicitly grant the declaration's domain actions to the
+intended role or agent. Enrollment and a read session alone grant no domain
+act. Respect the deployed grant reuse window after permission changes.
+Provision each verifier reader for the target and every foreign history it
+needs; a room session may not read another root or membership. Retain the
+actual deployed bounds, exact platform catalog, capability versions and
+parameters with the public configuration. Missing history or unsupported
+pins remain verification failures. Jam must consume genuine published SDK
+packages; this CLI bootstrap proves no registry, deployment, microphone,
+model, playback or distributed-user acceptance.
 
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,

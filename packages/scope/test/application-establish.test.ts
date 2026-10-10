@@ -1,8 +1,9 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
 import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, intentDigest, isSeed, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest, isSeed, scopeIdOf, seedDigest, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
+import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 import { keys } from "@generalbusiness/artroom-derive/testing";
 import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/artroom-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
@@ -19,7 +20,9 @@ import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
 const SERVICE = "https://scopes.test";
 
 // One real native graph and real production membership/creation/replay. Git host,
-// clock and read inspector are labelled stand-ins. The SQL trigger is an explicit
+// clock, local memoryStore and read inspector are labelled stand-ins. The CLI
+// selects the explicit application cohort over the real routed transport.
+// The SQL trigger is an explicit
 // retention-fault control; it writes no invented native entry or authority.
 test("explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant", async () => {
   const lifetime = siteFixtureLifetime();
@@ -46,17 +49,36 @@ test("explicit supporting cohort establishes Counting with native authority and 
       return new OwnedPlatform(scopeIdOf(send.to));
     }
   }
-  const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null, expected: {},
-    fields: { host: "git.example", namespace: "application", policy: "keys", founders: [rita.key] },
-    idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
-  const R = new OwnedPlatform(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register, creator: null, cause: intentDigest(install), ordinal: 0 }));
+  const store = memoryStore();
+  await lifetime.wait(() => store.keep("operator", rita.secret));
+  const fetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
+  const context: Context = { store, fetch, trustedFoundingService: { service: SERVICE, fetch },
+    now: () => { lifetime.active(); return timeMs(soon(0))!; } };
+  const run = (...argv: string[]) => lifetime.wait(() => command(context, argv));
+  const planned = await run("install", "--plan", SERVICE, "--cohort", "application", "--host", "git.example", "--namespace", "application");
+  expect(planned.code, planned.lines.join("\n")).toBe(0);
+  const pending = await lifetime.wait(() => store.config());
+  const plan = pending?.plan;
+  if (!plan) throw new Error("The CLI must retain the original application install plan.");
+  expect([pending?.register, plan.definition, plan.founding.intent.actor]).toEqual([undefined, "platform:register@5", rita.key]);
+  expect(plan.register).toBe(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register, creator: null, cause: intentDigest(plan.founding.intent), ordinal: 0 }));
+  const R = new OwnedPlatform(plan.register);
   let D: Platform | undefined, C: Platform | undefined;
   try {
     const host = outsideOf(R.name);
     const ports = () => { lifetime.active(); return { outside: host }; };
     wired.set(R.name, ports);
     releaseRegister = () => { if (wired.get(R.name) === ports) wired.delete(R.name); };
-    expect(await R.stub.found(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
+    expect((await R.stub.summary(reader)).ok).toBe(false);
+    const installed = await run("install", "--planned", "--cohort", "application");
+    expect(installed.code, installed.lines.join("\n")).toBe(0);
+    const kept = await lifetime.wait(() => store.config());
+    expect(kept?.register).toEqual(await R.at());
+    expect(kept?.plan).toMatchObject({ ...plan, acknowledged: { status: "service-acknowledged", service: SERVICE } });
+    expect((await R.summary()).value).toMatchObject({ definition: "platform:register@5", status: "active" });
+    const founding = (await R.entries())[0]!.input;
+    if (founding.type !== "genesis") throw new Error("The CLI install must produce a native genesis.");
+    expect(founding.founding).toEqual(plan.founding);
     const claim = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
     const directorySeed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
     D = new OwnedPlatform(scopeIdOf(directorySeed));

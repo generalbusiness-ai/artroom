@@ -2,11 +2,15 @@ import { expect, test } from "vitest";
 import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { COUNTING_COHORT } from "@generalbusiness/artroom-platform";
+import { APPLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/artroom-platform";
 import { command, install, installPlanned, memoryStore, planInstall, type Config, type Context, type Store } from "../src/index.ts";
 
 const SERVICE = "https://cohort.test";
 const COHORT = "counting-commitments" as const;
+const COHORTS = [
+  { name: COHORT, definition: COUNTING_COHORT.register, other: "application" },
+  { name: "application", definition: APPLICATION_COHORT.register, other: COHORT },
+] as const;
 // Fake service answers and memory storage: no native authority or host proof.
 function scenario(fault: "none" | "reply" | "save" = "none") {
   const store = memoryStore();
@@ -32,7 +36,7 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
       const body = String(init?.body);
       const request = JSON.parse(body) as { founding: SignedIntent; definition: PlatformDefinition };
       const kept = (await store.config())!;
-      if (request.definition === COUNTING_COHORT.register) {
+      if (request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register) {
         expect(kept.plan?.attempted).toMatch(/^sha256:/);
         expect(canonicalize(kept.plan?.founding)).toBe(canonicalize(request.founding));
         expect(kept.plan?.definition).toBe(request.definition);
@@ -52,7 +56,7 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
 
 test("closed cohort selection preserves legacy defaults and refuses retained binding conflicts without replacing custody", async () => {
   const bad = scenario();
-  for (const args of [["install", SERVICE, "--cohort"], ["install", SERVICE, "--cohort", "latest"], ["install", SERVICE, "--cohort", ""], ["install", SERVICE, "--cohort", COHORT, "--cohort", COHORT]]) {
+  for (const args of [["install", SERVICE, "--cohort"], ["install", SERVICE, "--cohort", "latest"], ["install", SERVICE, "--cohort", ""], ["install", SERVICE, "--cohort", COHORT, "--cohort", COHORT], ["install", SERVICE, "--cohort", "application", "--cohort", COHORT]]) {
     expect((await command(bad.ctx, args)).code).toBe(2);
   }
   expect((await install(bad.ctx, SERVICE, { cohort: "latest" as never })).code).toBe(2);
@@ -61,56 +65,69 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
   expect((await command(legacy.ctx, ["install", "--plan", SERVICE])).code).toBe(0);
   const legacyPlan = (await legacy.store.config())!.plan!;
   expect(legacyPlan.definition).toBe("platform:register@3");
+  for (const { name } of COHORTS) {
+    const metrics = legacy.metrics();
+    expect((await command(legacy.ctx, ["install", SERVICE, "--cohort", name])).code).toBe(1);
+    expect((await command(legacy.ctx, ["install", "--planned", "--cohort", name])).code).toBe(1);
+    expect([(await legacy.store.config())!.plan, legacy.metrics(), legacy.bodies]).toEqual([legacyPlan, metrics, []]);
+  }
   expect((await command(legacy.ctx, ["install", SERVICE])).code).toBe(0);
   expect((await legacy.store.config())!.register!.scope).not.toBe(legacyPlan.register);
 
-  const s = scenario();
-  expect((await command(s.ctx, ["install", "--plan", SERVICE, "--cohort", COHORT, "--host", "artifacts", "--namespace", "room"])).code).toBe(0);
-  const original = (await s.store.config())!;
-  expect([original.plan!.definition, s.bodies]).toEqual([COUNTING_COHORT.register, []]);
-  expect((await command(s.ctx, ["install", "--plan", SERVICE, "--cohort", COHORT])).code).toBe(0);
-  expect(await s.store.config()).toEqual(original);
-  const metrics = s.metrics();
-  for (const args of [
-    ["install", SERVICE, "--cohort", COHORT, "--host", "github.com"],
-    ["install", "--plan", SERVICE, "--cohort", COHORT, "--namespace", "other"],
-    ["install", "https://other.test", "--cohort", COHORT],
-    ["install", SERVICE], ["install", "--plan", SERVICE],
-  ]) {
-    expect((await command(s.ctx, args)).code).toBe(1);
+  for (const { name, definition, other } of COHORTS) {
+    const s = scenario();
+    expect((await command(s.ctx, ["install", "--plan", SERVICE, "--cohort", name, "--host", "artifacts", "--namespace", "room"])).code).toBe(0);
+    const original = (await s.store.config())!;
+    expect([original.plan!.definition, s.bodies]).toEqual([definition, []]);
+    expect((await command(s.ctx, ["install", "--plan", SERVICE, "--cohort", name])).code).toBe(0);
     expect(await s.store.config()).toEqual(original);
+    const metrics = s.metrics();
+    for (const args of [
+      ["install", SERVICE, "--cohort", name, "--host", "github.com"],
+      ["install", "--plan", SERVICE, "--cohort", name, "--namespace", "other"],
+      ["install", "https://other.test", "--cohort", name],
+      ["install", SERVICE, "--cohort", other], ["install", "--plan", SERVICE, "--cohort", other],
+      ["install", "--planned", "--cohort", other],
+      ["install", SERVICE], ["install", "--plan", SERVICE],
+    ]) {
+      expect((await command(s.ctx, args)).code).toBe(1);
+      expect(await s.store.config()).toEqual(original);
+    }
+    expect([s.metrics(), s.bodies]).toEqual([metrics, []]);
+    expect((await command(s.ctx, ["install", "--planned", "--host", "artifacts", "--cohort", name])).code).toBe(2);
+    expect((await command(s.ctx, ["install", "--planned"])).code).toBe(0);
+    expect(canonicalize((await s.store.config())!.plan!.founding)).toBe(canonicalize(original.plan!.founding));
+    expect((await s.store.config())!.register!.scope).toBe(original.plan!.register);
   }
-  expect([s.metrics(), s.bodies]).toEqual([metrics, []]);
-  expect((await command(s.ctx, ["install", "--planned", "--host", "artifacts", "--cohort", COHORT])).code).toBe(2);
-  expect((await command(s.ctx, ["install", "--planned", "--cohort", COHORT])).code).toBe(0);
-  expect((await s.store.config())!.register!.scope).toBe(original.plan!.register);
 });
 
 test("selected delivery requires exact plan and attempt readback and recovers the original envelope after reply or final-save loss", async () => {
-  for (const mode of ["reply", "save"] as const) {
-    const s = scenario(mode);
-    const first = await install(s.ctx, SERVICE, { cohort: COHORT }).catch(() => ({ code: 1 }));
-    expect(first.code).toBe(1);
-    const pending = (await s.store.config())!;
-    expect([pending.register, pending.plan?.attempted]).toEqual([undefined, expect.stringMatching(/^sha256:/)]);
-    const original = canonicalize(pending.plan!.founding);
-    expect((await install(s.ctx, SERVICE, { cohort: COHORT })).code).toBe(0);
-    const kept = (await s.store.config())!;
-    expect([kept.register!.scope, canonicalize(kept.plan!.founding), new Set(s.bodies).size]).toEqual([pending.plan!.register, original, 1]);
+  for (const { name } of COHORTS) {
+    for (const mode of ["reply", "save"] as const) {
+      const s = scenario(mode);
+      const first = await install(s.ctx, SERVICE, { cohort: name }).catch(() => ({ code: 1 }));
+      expect(first.code).toBe(1);
+      const pending = (await s.store.config())!;
+      expect([pending.register, pending.plan?.attempted]).toEqual([undefined, expect.stringMatching(/^sha256:/)]);
+      const original = canonicalize(pending.plan!.founding);
+      expect((await install(s.ctx, SERVICE, { cohort: name })).code).toBe(0);
+      const kept = (await s.store.config())!;
+      expect([kept.register!.scope, canonicalize(kept.plan!.founding), new Set(s.bodies).size]).toEqual([pending.plan!.register, original, 1]);
+    }
+    // A store that silently drops the attempted marker provides no custody.
+    const s = scenario();
+    expect((await planInstall(s.ctx, SERVICE, { cohort: name })).code).toBe(0);
+    const original: Config = (await s.store.config())!;
+    s.ctx.store = { ...s.ctx.store, save: async next => { if (!next.plan?.attempted) await s.store.save(next); } };
+    expect((await installPlanned(s.ctx, { cohort: name })).code).toBe(1);
+    expect([s.bodies, await s.store.config()]).toEqual([[], original]);
+    // A save callback mutating its argument cannot replace the signed plan.
+    const changed = scenario();
+    changed.ctx.store = { ...changed.ctx.store, save: async next => {
+      if (next.plan) next.plan.service = "https://substituted.test";
+      await changed.store.save(next);
+    } };
+    expect((await install(changed.ctx, SERVICE, { cohort: name })).code).toBe(1);
+    expect(changed.bodies).toEqual([]);
   }
-  // A store that silently drops the attempted marker provides no custody.
-  const s = scenario();
-  expect((await planInstall(s.ctx, SERVICE, { cohort: COHORT })).code).toBe(0);
-  const original: Config = (await s.store.config())!;
-  s.ctx.store = { ...s.ctx.store, save: async next => { if (!next.plan?.attempted) await s.store.save(next); } };
-  expect((await installPlanned(s.ctx, { cohort: COHORT })).code).toBe(1);
-  expect([s.bodies, await s.store.config()]).toEqual([[], original]);
-  // A save callback mutating its argument cannot replace the signed plan.
-  const changed = scenario();
-  changed.ctx.store = { ...changed.ctx.store, save: async next => {
-    if (next.plan) next.plan.service = "https://substituted.test";
-    await changed.store.save(next);
-  } };
-  expect((await install(changed.ctx, SERVICE, { cohort: COHORT })).code).toBe(1);
-  expect(changed.bodies).toEqual([]);
 });
