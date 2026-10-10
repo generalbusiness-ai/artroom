@@ -1,0 +1,43 @@
+{
+  "status": "INERT one own-module Jam case; explicit715 authorizes this pure scope only",
+  "request": "715c3fdce1f5570b8877e1be8124b0b77c9fdf61",
+  "promise": "a4475180ba4c806d5b6f2068c569904876e8f013",
+  "head": "a89bcf4686abe0306ffd4344a8553d53bc1d0b11",
+  "tree": "4c53ae2ddbf5693106f449cbd7ded1d25804e67a",
+  "root": "/private/tmp/artroom-jam-contributions-v1",
+  "plan": "/tmp/artroom-jam-a89-pure-preparation/plan.json",
+  "plan_sha256": "32b5d6532726038d39440256cf372690aea435bc89bfcd719664f341af668ea8",
+  "runner": "/tmp/artroom-jam-a89-pure-run.py",
+  "runner_sha256": "d6c73ede85cf5c01678fd4319f7fa34dbe03952c0481224dd2e5f334f7b4fef4",
+  "guarded_tracked_files": 82,
+  "own_modules_with_test": 6,
+  "closed_import_clauses": 11,
+  "builtin_imports": [
+    "node:test",
+    "node:assert/strict"
+  ],
+  "command": [
+    "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+    "--test",
+    "test/contributions.test.ts"
+  ],
+  "whole_file_cases": 1,
+  "full_title": "recorded-v1 preserves the original contributions and assigns historical cues without rounding or pending-configuration rewrites",
+  "output": "/tmp/artroom-jam-a89-pure-result",
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-jam-a89-pure-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-jam-a89-pure-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-jam-a89-pure-outer.log"
+  },
+  "execution": [],
+  "sdk_or_dependencies_or_view": false,
+  "source_edits": [],
+  "imports_or_install": false
+}
