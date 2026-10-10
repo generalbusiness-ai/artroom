@@ -34,7 +34,7 @@ import {
   type Fetch, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { APPLICATION_COHORT, COUNTING_COHORT, ROOM_NAME_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
 const NEW_REGISTER = NEWEST["platform:register"]!;
 
@@ -332,20 +332,22 @@ async function createdBy(handle: ScopeHandle, seq: number): Promise<{ n: number;
 // ---------------------------------------------------------------- the commands
 
 /** Explicit selection only; omission retains the installed default cohort. */
-export type InstallCohort = "application" | "counting-commitments";
+export type InstallCohort = "application" | "counting-commitments" | "shared-name";
 export interface InstallOptions { host?: string; namespace?: string; cohort?: InstallCohort }
 const INSTALL_COHORTS: Readonly<Record<InstallCohort, PlatformDefinition>> = {
   application: APPLICATION_COHORT.register,
+  "shared-name": ROOM_NAME_COHORT.register,
   "counting-commitments": COUNTING_COHORT.register,
 };
 function selectedRegister(cohort: unknown): PlatformDefinition | undefined {
   if (cohort === undefined) return undefined;
   if (cohort === "application") return INSTALL_COHORTS.application;
+  if (cohort === "shared-name") return INSTALL_COHORTS["shared-name"];
   if (cohort === "counting-commitments") return INSTALL_COHORTS["counting-commitments"];
-  return stop(usage("--cohort takes exactly application or counting-commitments; nothing was signed or sent."));
+  return stop(usage("--cohort takes exactly application, counting-commitments or shared-name; nothing was signed or sent."));
 }
 const selectedPlan = (definition: PlatformDefinition): boolean =>
-  definition === APPLICATION_COHORT.register || definition === COUNTING_COHORT.register;
+  definition === APPLICATION_COHORT.register || definition === COUNTING_COHORT.register || definition === ROOM_NAME_COHORT.register;
 
 /** Ordinary installs keep their legacy path; selected installs use exact planned custody. */
 export function install(ctx: Context, service: string, options: InstallOptions = {}): Promise<Outcome> {

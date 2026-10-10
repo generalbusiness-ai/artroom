@@ -14,6 +14,8 @@ import { APPLICATION_COHORT, directory5, directoryRules5 } from "./application.t
 export { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, directory5, directoryRules5 } from "./application.ts";
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
+import { ROOM_NAME_COHORT, directory7, directoryRules7 } from "./room-name.ts";
+export { ROOM_NAME_COHORT, ROOM_NAME_BYTES, isRoomName, directory7, directoryRules7 } from "./room-name.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
@@ -122,6 +124,9 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   [COUNTING_COHORT.register]: { data: register, rules: registerRules },
   [COUNTING_COHORT.directory]: { data: directory6, rules: directoryRules6, membership: directoryMembership, rulesScope: directoryRulesScope },
   [COUNTING_COHORT.membership]: { data: membership5, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, COUNTING_COHORT.membership) },
+  [ROOM_NAME_COHORT.register]: { data: register, rules: registerRules },
+  [ROOM_NAME_COHORT.directory]: { data: directory7, rules: directoryRules7, membership: directoryMembership, rulesScope: directoryRulesScope },
+  [ROOM_NAME_COHORT.membership]: { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, ROOM_NAME_COHORT.membership) },
   "platform:register@1": { data: register, rules: registerRules },
   "platform:register@2": { data: register, rules: registerRules },
   "platform:register@3": { data: register, rules: registerRules },

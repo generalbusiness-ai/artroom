@@ -3,7 +3,7 @@ import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusin
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import type { PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
 import { d } from "@generalbusiness/artroom-derive/testing";
-import { APPLICATION_COHORT, COUNTING_COHORT, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
+import { APPLICATION_COHORT, COUNTING_COHORT, ROOM_NAME_COHORT, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
 import { rita } from "./support-founding.ts";
 
 // The planner's decision of 2026-10-07: a changed definition carries a new version; a scope pins its version at its genesis and is
@@ -42,7 +42,7 @@ test("every shipped version resolves to its own data, pinned by digest, and vers
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
   expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
   // The explicit application pins do not replace the existing default cohort.
-  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership]);
+  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, ROOM_NAME_COHORT.register, ROOM_NAME_COHORT.directory, ROOM_NAME_COHORT.membership]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.

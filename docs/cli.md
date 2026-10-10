@@ -47,7 +47,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments|shared-name]`**
 founds the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -59,7 +59,7 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments|shared-name]`**
 signs the same `install` intent and founds nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will found,
@@ -74,7 +74,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`artroom install --planned [--cohort application|counting-commitments]`** founds the planned register, with the kept
+**`artroom install --planned [--cohort application|counting-commitments|shared-name]`** founds the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -104,6 +104,13 @@ planned-install custody. Unknown or multiple choices, another retained
 cohort, service, host or namespace refuse before signing or sending.
 `install --planned` may omit the selection: it uses the saved definition
 and signature. It never upgrades a plan to a newer catalog version.
+
+`--cohort shared-name` selects the separate naming closure: register@7,
+directory@7, membership@6, rules@3, destination@3 and inbox@1. It preserves
+the application factory while selecting the manifest-supporting destination.
+Existing rooms keep their original pins and pending plans; this selection
+provides no migration or automatic naming. Use the same plan, host
+configuration and `--planned` custody as the other explicit cohorts.
 
 For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
 and a deployed service that supports all six exact application pins:

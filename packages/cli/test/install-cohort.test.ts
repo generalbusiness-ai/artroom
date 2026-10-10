@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { APPLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/artroom-platform";
+import { APPLICATION_COHORT, COUNTING_COHORT, ROOM_NAME_COHORT } from "@generalbusiness/artroom-platform";
 import { command, install, installPlanned, memoryStore, planInstall, type Config, type Context, type Store } from "../src/index.ts";
 
 const SERVICE = "https://cohort.test";
@@ -10,6 +10,7 @@ const COHORT = "counting-commitments" as const;
 const COHORTS = [
   { name: COHORT, definition: COUNTING_COHORT.register, other: "application" },
   { name: "application", definition: APPLICATION_COHORT.register, other: COHORT },
+  { name: "shared-name", definition: ROOM_NAME_COHORT.register, other: "application" },
 ] as const;
 // Fake service answers and memory storage: no native authority or host proof.
 function scenario(fault: "none" | "reply" | "save" = "none") {
@@ -36,7 +37,7 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
       const body = String(init?.body);
       const request = JSON.parse(body) as { founding: SignedIntent; definition: PlatformDefinition };
       const kept = (await store.config())!;
-      if (request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register) {
+      if (request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register || request.definition === ROOM_NAME_COHORT.register) {
         expect(kept.plan?.attempted).toMatch(/^sha256:/);
         expect(canonicalize(kept.plan?.founding)).toBe(canonicalize(request.founding));
         expect(kept.plan?.definition).toBe(request.definition);
