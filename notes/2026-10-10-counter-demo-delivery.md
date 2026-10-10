@@ -124,37 +124,26 @@ devices with peer updates, recovery and a final natural recording remain owed.
 No donor gate, local fake, native fixture or successful static build substitutes
 for those deployed outcomes.
 
-The original UI source at 9e5 and combined source at 6c97 received the concrete
-workflow finding 6007484daf003b6ced81f8c42bfea8930423332b and formal changes-requested
-report 1edd6ce82e58e7224c56cf1216179856ff631792. Those earlier gates remain retained
-history, not source approval. The corrected source delivery is tracked separately
-under b9c885d3a85a87f350d446da4c225986cb19f599 and builder promise
-fe19f5fb567010918e598376382f8d18aca722f1; the separate Counter source phase remains
-unchanged.
+The original UI/combined source received finding
+6007484daf003b6ced81f8c42bfea8930423332b and formal changes-requested report
+1edd6ce82e58e7224c56cf1216179856ff631792. Those earlier passing gates are retained
+history, not source approval. Corrected source delivery is tracked by
+b9c885d3a85a87f350d446da4c225986cb19f599 and promise
+fe19f5fb567010918e598376382f8d18aca722f1; the Counter source phase stays separate.
 
-Correction edde968313b70c478df56d5307692d8b3c0bfb3e binds full native rules policy
-to the recorded held source and current selected file. The five-field held
-extents remain patternless. README's zero-approval source requirement no longer
-selects unrelated mandatory rules review; a touched AGENTS path keeps its required
-rules review. Missing or later policy remains explicitly unknown. The destination
-still judges actual changed trees, links, actors and evidence; the primary task
-is not a certificate that a merge will be admitted. Pure helpers share the
-existing DOM-free task-values module; Worker compilation adds no DOM library.
+Focused invocation 66677 passed the three Page compiler contexts, all 15 actions
+and two mounted sending cases, and both complete task-data native cases at
+edde968313b70c478df56d5307692d8b3c0bfb3e. The existing native journey now verifies
+README versus AGENTS applicability and rejects a later pattern-only policy
+substitution while preserving the five-field projection. Native Git/scheduler/
+clock and mounted DOM/transport remain labeled fixtures.
 
-Focused invocation 66677 passed all three Page compiler contexts, 15 actions
-cases, two mounted sending cases and both complete task-data native cases. The
-native journey kept its original publication/assertions and created real children
-for README and AGENTS, respecting the actual one-version guard. It also proved
-that a real later publish changing only patterns makes an old policy unavailable,
-even when all five projected fields remain equal. These native proofs retain the
-fixture's labeled Git host, scheduler and clock; mounted DOM/transport remain
-stand-ins. No full source approval, Cloudflare deployment or audible-device
-acceptance is claimed from them. The normal Page build 81844 then completed once with exit 0 from this corrected
-combined Counter/UI source. Its only tracked output change was page-assets.ts,
-596,511 bytes, SHA-256
+Normal Page build 81844 completed once with exit 0; only the generated module
+changed: 596,511 bytes, SHA-256
 ad0ef682d57235b2569141615ec81f3394a70371f600b651d3b642a4cd0b51ed.
-The complete build result is retained at
-/private/tmp/artroom-counter-ui-edde-page-build-one/result.json. The seven
-focused-checked authored paths remain byte-identical; this successor adds only
-the generated asset and this existing note update. One changed-code normal gate
-remains owed before exact-head review and normal landing.
+Its result is /private/tmp/artroom-counter-ui-edde-page-build-one/result.json.
+The seven checked authored paths remain byte-identical. This successor adds only
+that asset and this existing-note update. A new combined ordinary gate, exact-head
+source review and normal landing remain owed; deployment, live enrollment and
+three independent audible devices remain owed. No earlier gate or fixture result
+substitutes for these outcomes.
