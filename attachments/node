@@ -1,0 +1,631 @@
+{
+  "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+  "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+  "clean_before_after": true,
+  "head_unchanged": true,
+  "owned_workspaces": [
+    {
+      "name": "@generalbusiness/artroom-bytes",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/bytes",
+      "package_json_sha256": "57c1d0aa391091ae56b8d260b06e6f49d66712bc7410db3c79ce1ca4864ed582"
+    },
+    {
+      "name": "@generalbusiness/artroom-checkers",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/checkers",
+      "package_json_sha256": "a0ea3ab7d7cfc0953ce5770df11f9ccc52c6d41e560566dcc9c816a2030fdf4f"
+    },
+    {
+      "name": "@generalbusiness/artroom-cli",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/cli",
+      "package_json_sha256": "b1c33a822a70cf59ac7781168d9f5fd6e556f32eb2b288917d4b9f97608e6ae9"
+    },
+    {
+      "name": "@generalbusiness/artroom-client",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/client",
+      "package_json_sha256": "23268ed3df9014167b037eba926c761f8161a70a124f14b0a9444c907d5cdbca"
+    },
+    {
+      "name": "@generalbusiness/artroom-contract",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/contract",
+      "package_json_sha256": "ade3bd1d1104e6318aeaea790b2e51d1b14629f338e4be3c601a62275af09fae"
+    },
+    {
+      "name": "@generalbusiness/artroom-derive",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/derive",
+      "package_json_sha256": "6e15cc7ef35481713d37d8210e73bd545242660305e9448be1480b925a77af45"
+    },
+    {
+      "name": "@generalbusiness/artroom-git",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/git",
+      "package_json_sha256": "c15ff66e0cf6b678c168ebeb7fceadbe210151debf1bb3d8d91f87262f65d256"
+    },
+    {
+      "name": "@generalbusiness/artroom-lanes",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/lanes",
+      "package_json_sha256": "03de3fe871fa9a3d5ec82c582c12cf10ac7920478215f68966d52f19e41088a6"
+    },
+    {
+      "name": "@generalbusiness/artroom-page",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/page",
+      "package_json_sha256": "bb77544a45638b7e1274faa8834cf5978f8f9a3b9503562961468a50f97cd83c"
+    },
+    {
+      "name": "@generalbusiness/artroom-platform",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/platform",
+      "package_json_sha256": "197dcacd1693a0c70af0674df039901b6f9e0e07043856cf91ccefcc34e8ae78"
+    },
+    {
+      "name": "@generalbusiness/artroom-replay",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/replay",
+      "package_json_sha256": "cc5f6313d699e44049f706595036deaffb2a33367edb538a0dd1f1f3de884a54"
+    },
+    {
+      "name": "@generalbusiness/artroom-scope",
+      "directory": "/private/tmp/artroom-session-read-signer-preparation/packages/scope",
+      "package_json_sha256": "d30c63c7ea67a06b93221633d35d7cdd3f285fe9343e0b4b7e47c10a5b001386"
+    }
+  ],
+  "actual_aliases": [
+    {
+      "find": "@generalbusiness/artroom-bytes",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/bytes/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-checkers",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/checkers/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-cli",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/cli/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-client",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/client/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-contract",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/contract/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-derive",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/derive/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-derive/rule",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/derive/src/rule/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-derive/testing",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/derive/test/fixtures.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-git",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/git/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-git/node",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/git/src/node.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-git/http",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/git/src/http.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-git/github",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/git/src/github.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-git/http-read",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/git/src/http-read.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-lanes",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/lanes/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-lanes/definitions/issue.json",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/lanes/definitions/issue.json"
+    },
+    {
+      "find": "@generalbusiness/artroom-lanes/definitions/change.json",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/lanes/definitions/change.json"
+    },
+    {
+      "find": "@generalbusiness/artroom-page",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/page/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-platform",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/platform/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-platform/testing",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/platform/test/support.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-replay",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/replay/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-scope",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/scope/src/index.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-scope/worker",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/scope/src/worker.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-scope/testing",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/scope/src/testing.ts"
+    },
+    {
+      "find": "@generalbusiness/artroom-scope/testing/worker",
+      "replacement": "/private/tmp/artroom-session-read-signer-preparation/packages/scope/test/worker.ts"
+    }
+  ],
+  "owned_directories": [
+    "/private/tmp/artroom-session-read-signer-preparation/node_modules",
+    "/private/tmp/artroom-session-read-signer-preparation/node_modules/@generalbusiness",
+    "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin",
+    "/private/tmp/artroom-session-read-signer-preparation/node_modules/.vite",
+    "/private/tmp/artroom-session-read-signer-preparation/node_modules/.vite-temp"
+  ],
+  "third_party_links": [
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cloudflare/kv-asset-handler",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/kv-asset-handler"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cloudflare/unenv-preset",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/unenv-preset"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cloudflare/vitest-pool-workers",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cloudflare/workerd-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workerd-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cloudflare/workers-types",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/workers-types"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@cspotcode/source-map-support",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@cspotcode/source-map-support"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@esbuild/darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild/darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@img/colour",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/colour"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@img/sharp-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@img/sharp-libvips-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@img/sharp-libvips-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@jridgewell/resolve-uri",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/resolve-uri"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@jridgewell/sourcemap-codec",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/sourcemap-codec"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@jridgewell/trace-mapping",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@jridgewell/trace-mapping"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@noble/curves",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/curves"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@noble/hashes",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@noble/hashes"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@oxc-project/types",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@oxc-project/types"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@poppinss/colors",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/colors"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@poppinss/dumper",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/dumper"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@poppinss/exception",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@poppinss/exception"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@rolldown/binding-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/binding-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@rolldown/pluginutils",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@rolldown/pluginutils"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@sindresorhus/is",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@sindresorhus/is"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@speed-highlight/core",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@speed-highlight/core"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@standard-schema/spec",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@standard-schema/spec"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@types/chai",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/chai"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@types/deep-eql",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/deep-eql"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@types/estree",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/estree"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@types/node",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@types/node"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@typescript/typescript-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@typescript/typescript-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/expect",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/expect"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/mocker",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/mocker"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/pretty-format",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/pretty-format"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/runner",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/runner"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/snapshot",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/snapshot"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/spy",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/spy"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/@vitest/utils",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/@vitest/utils"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/assertion-error",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/assertion-error"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/blake3-wasm",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/blake3-wasm"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/chai",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/chai"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/cjs-module-lexer",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/cjs-module-lexer"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/convert-source-map",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/convert-source-map"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/cookie",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/cookie"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/detect-libc",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/detect-libc"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/error-stack-parser-es",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/error-stack-parser-es"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/es-module-lexer",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/es-module-lexer"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/esbuild",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/estree-walker",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/estree-walker"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/expect-type",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/expect-type"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/fdir",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/fdir"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/fsevents",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/fsevents"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/get-tsconfig",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/get-tsconfig"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/jsonata",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/jsonata"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/kleur",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/kleur"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/lightningcss",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/lightningcss-darwin-arm64",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/lightningcss-darwin-arm64"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/magic-string",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/magic-string"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/miniflare",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/miniflare"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/nanoid",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/obug",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/obug"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/path-to-regexp",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/path-to-regexp"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/pathe",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/pathe"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/picocolors",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/picocolors"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/picomatch",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/picomatch"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/postcss",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/postcss"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/resolve-pkg-maps",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/resolve-pkg-maps"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/rolldown",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/semver",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/semver"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/sharp",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/sharp"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/siginfo",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/siginfo"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/source-map-js",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/source-map-js"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/stackback",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/stackback"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/std-env",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/std-env"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/supports-color",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/supports-color"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/tinybench",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinybench"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/tinyexec",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyexec"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/tinyglobby",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyglobby"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/tinyrainbow",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tinyrainbow"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/tsx",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/typescript",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/undici",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/undici"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/undici-types",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/undici-types"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/unenv",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/unenv"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/vite",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vite"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/vitest",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/why-is-node-running",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/workerd",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/wrangler",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/ws",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/ws"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/youch",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/youch"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/youch-core",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/youch-core"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/zod",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/zod"
+    }
+  ],
+  "bins": [
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/artroom",
+      "target": "/private/tmp/artroom-session-read-signer-preparation/packages/cli/bin/artroom.js",
+      "sha256": "600d405b47f9f9f4ecc29c639273e98cb749d225e721e434fa0035279dc7c9a7"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/artroom-replay",
+      "target": "/private/tmp/artroom-session-read-signer-preparation/packages/replay/src/bin.ts",
+      "sha256": "05c20a545ef57de1927f518aad723c64e18ad5a9ba7bc33b4ef184ae97627cdb"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/cf-wrangler",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/cf-wrangler.js",
+      "sha256": "ac876131b2b0215090d17d36b3e8f9f54edb39418c55b69b24c9c0241d16e33e"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/esbuild",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/bin/esbuild",
+      "sha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/nanoid",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/nanoid/bin/nanoid.cjs",
+      "sha256": "e4eb9be1a3e3feb3f8979ef08c3bf3ef8430f4f22df9c4e427353a1577accbe8"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/rolldown",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/rolldown/bin/cli.mjs",
+      "sha256": "98d6df62aa3c84284db17944a2a8017f911640e9c4d3de907a9f93b467ee47c8"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/semver",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/semver/bin/semver.js",
+      "sha256": "bd6c871026985937dc945011fc54b74b47f5998154216d7b8d40d5ed782e4402"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/tsc",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+      "sha256": "2219f428a7e55aaf1f7ad85b9b0f0cf5078aeb76ccc9a7c6036c92d48f492ffd"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/tsx",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/tsx/dist/cli.mjs",
+      "sha256": "8729ecfb90d9d568939e4190e6f1d3317c946583b7d37a776e0c23a21c021cf8"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/vite",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vite/bin/vite.js",
+      "sha256": "de5833362e640673962f16e255bf8738d4380a68601b9af26217eee4e1bac36d"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/vitest",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+      "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/why-is-node-running",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/why-is-node-running/cli.js",
+      "sha256": "ca1863b7fa8aa29ad949be5e7a2caa7dbe9edcc1b41c278b3d4a0af1f35a4220"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/workerd",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/workerd/bin/workerd",
+      "sha256": "1136b482136aa93d67b0f77d4987a338a64a725b209ad1b889b8ae975dc7f388"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/wrangler",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+      "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+    },
+    {
+      "path": "/private/tmp/artroom-session-read-signer-preparation/node_modules/.bin/wrangler2",
+      "target": "/private/tmp/artroom-demo-github-host/node_modules/wrangler/bin/wrangler.js",
+      "sha256": "780661a508810f3b65786895b1ca9aacbc4f55d329ae6b8c1e49ec8433569f77"
+    }
+  ],
+  "active_source_pins": 634,
+  "full_source_pins": 1269,
+  "full_pins_file": "/tmp/artroom-f5-signer-static-preparation/full-tracked-pins.json",
+  "full_pins_sha256": "f6aa8268c7b394753dea5bc337fd07f53a01ee369283a8b8a521aca07a97f753",
+  "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+  "cache": "/private/tmp/artroom-demo-github-host/node_modules",
+  "cache_mutation": false,
+  "node_plan": "/tmp/artroom-f5-signer-static-preparation/node-plan.json",
+  "node_plan_sha256": "9ea167e18ce0923dfaa688358274339509d3e928195ef45218210f746e875e35",
+  "node_config": "/tmp/artroom-f5-signer-static-preparation/node-body.config.mjs",
+  "node_config_sha256": "7658384985988cdf8debc0cc1b966eaae1439bee52a73ac39b508f79f75bd64f",
+  "driver_sha256": "ebae5c0ff374b87ec042a0a3bd3e78709e6d058938195c6a8a155a137bf9a31f",
+  "selected_node_files": 2,
+  "selected_node_cases": 3,
+  "execution": []
+}

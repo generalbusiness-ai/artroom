@@ -1,0 +1,232 @@
+{
+  "request": "e158025252248ab4e5f9c96adb59cbac29a3bddc",
+  "promise": "1922a72f2cc0fb7e44eb99cdb013103eb4c34ece",
+  "worktree": "/tmp/artroom-session-read-signer-preparation",
+  "canonical_worktree": "/private/tmp/artroom-session-read-signer-preparation",
+  "branch": "request/session-read-signer-preparation",
+  "head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+  "tree": "596f15e975cd5beee89c91b62c62c4e7dc893795",
+  "base_head": "787c6c758906eb1ce32790cad0e3d4e092c5f35e",
+  "clean": true,
+  "remote_tracking_head": "f5a656b9d2eedbae5d2bc79ea3bbb05a3d4d6eec",
+  "changed": [
+    {
+      "path": "packages/cli/src/commands.ts",
+      "before_sha256": "4f25a2fa26371c5c9e7bb6ca94aafb0c2bbb6f85624d3eb47082d680c85d3caa",
+      "after_sha256": "50be23900b1afb89a6ec03a425d2d442d1abd454b582dc14d96bd9a9a40b5994",
+      "before_bytes": 128454,
+      "after_bytes": 128729
+    },
+    {
+      "path": "packages/cli/test/clone.test.ts",
+      "before_sha256": "5924f5ba1b86bba110d33b020ad1d6721ccc65760fcf515736836e1120446e20",
+      "after_sha256": "963b70be497ff0db344629458caac720968a7640f624ebe39f67a79df7bd3a73",
+      "before_bytes": 4204,
+      "after_bytes": 6596
+    },
+    {
+      "path": "packages/page/src/data.ts",
+      "before_sha256": "bea8db7175582a51f59b932d076f9ea2f5fdb51ac4b33bd683815a46e115a8c2",
+      "after_sha256": "5bca2a23ceaac371b43bf41996a18944166b944225fed022c41f3fc3c7bd7c82",
+      "before_bytes": 54828,
+      "after_bytes": 55024
+    },
+    {
+      "path": "packages/page/test/join.test.ts",
+      "before_sha256": "b9297fea21a8d36441995ab6a8964ec81bcb681d0aac6838b5cf1aa0a982783a",
+      "after_sha256": "0c4ae95c1cf45903bed8a153cac6b2f8397a080ae4db0a027a3d59baf84849f6",
+      "before_bytes": 11366,
+      "after_bytes": 13205
+    }
+  ],
+  "unchanged_contexts": [
+    {
+      "path": "packages/client/src/signed-read.ts",
+      "sha256": "1aa6fe35dafe5c53c1ca4f3ba31f1c9540a3b04dcd0640b7857842c3f5dd2a9a",
+      "bytes": 6460,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/client/src/intent.ts",
+      "sha256": "e681e250e5ee1cbaa04b9649fda6eea3a3b5fccff9bfd91bdacb291b8c5e7b29",
+      "bytes": 5282,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/client/src/handle.ts",
+      "sha256": "d1ae3172cf63c8252347e2519d10d2de693222647b5231314372cd2e5c1412e9",
+      "bytes": 7921,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/client/src/session.ts",
+      "sha256": "7c614aac9297c7edfecc4867d03d9d17c065c4f585dabdad8efa07e027ad7cb3",
+      "bytes": 7003,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/client/src/http.ts",
+      "sha256": "8e8973321f361223c7d4c534034ac77c703ca5a30575a18d3e5f9f1351c5810b",
+      "bytes": 7134,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/bytes/src/sign.ts",
+      "sha256": "4d47ee542f81bf6f28e88542092f8923a51fd8468b2cb89f001f60c294c626fe",
+      "bytes": 1750,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/cli/src/store.ts",
+      "sha256": "11c26b104d1cda75cdb3a4dbd5c58f318951dfcd5da8d5030b0fe7079b4fbdbb",
+      "bytes": 5070,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/cli/src/files.ts",
+      "sha256": "338318375ff3390a4179b40713c8e380bcfde94de056e06a9846d344165cdd1e",
+      "bytes": 4062,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/cli/tsconfig.test.json",
+      "sha256": "ba4a0563118ca2ebc1eaaab34a0ff3574b06e4ebf508ed6d848c309ca73aab72",
+      "bytes": 127,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/page/tsconfig.test.json",
+      "sha256": "25e7c8ebac89f553ab629214510d7b6c4f0ae80f971eb089217d3b5eea2ff4ba",
+      "bytes": 187,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/cli/tsconfig.scope.json",
+      "sha256": "6038ad1228eda947afce2779896a13335e32e93c8b78ef2d073d263e26ff71ad",
+      "bytes": 515,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/page/tsconfig.scope.json",
+      "sha256": "a24d96696241a0ae8efc266ab767b0aa6ed5d45cb0b6ec3f5ac9ea80ebc046f9",
+      "bytes": 498,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/scope/tsconfig.test.json",
+      "sha256": "5277eb7f0e6e39ababe48d6921e004e63fabb632e446e86ffc823c46e29719ee",
+      "bytes": 287,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/lanes/tsconfig.scope.json",
+      "sha256": "2d5767c755a41af4e6c014f82f93a5fa97574e31d238dbac980e4d4265f9dfa1",
+      "bytes": 428,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/cli/vitest.config.ts",
+      "sha256": "5291165a9e5d07978c8ce065a5df83890a9480b7e3615f88cc82550eeaecd8d7",
+      "bytes": 395,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/page/vitest.config.ts",
+      "sha256": "adca97464c9336d532bed3a5d3bbc2c8d710fcd10f161b0f727fd7aabcbf63d5",
+      "bytes": 404,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "vitest.config.ts",
+      "sha256": "2803c8ccd5ddb05062d56cd79535b843f94b278e93d90fd62dc87ff5894b2f6b",
+      "bytes": 3329,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+      "bytes": 127495,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "scripts/focused-check.mjs",
+      "sha256": "ebae5c0ff374b87ec042a0a3bd3e78709e6d058938195c6a8a155a137bf9a31f",
+      "bytes": 20718,
+      "unchanged_from_predecessor": true
+    },
+    {
+      "path": "packages/page/package.json",
+      "sha256": "bb77544a45638b7e1274faa8834cf5978f8f9a3b9503562961468a50f97cd83c",
+      "bytes": 1282,
+      "unchanged_from_predecessor": true
+    }
+  ],
+  "node_ledger": [
+    {
+      "path": "packages/cli/test/clone.test.ts",
+      "project": "cli",
+      "pool": "threads",
+      "titles": [
+        "remote reads the recorded repository; missing Git and the pinned @1 without read-token both sign nothing"
+      ],
+      "original_expect_calls": 12,
+      "current_expect_calls": 19,
+      "all_original_cases_retained": true
+    },
+    {
+      "path": "packages/page/test/join.test.ts",
+      "project": "page",
+      "pool": "threads",
+      "titles": [
+        "page join refuses mismatched encoding before submission and accepts scripted native/@2 replies on the configured service",
+        "incomplete projections stay unreadable and a real returned submit answer survives refresh and view failure with one submission"
+      ],
+      "original_expect_calls": 32,
+      "current_expect_calls": 38,
+      "all_original_cases_retained": true
+    }
+  ],
+  "project_execution": "UNRUN; all runtime held for Root review/release",
+  "artifacts": {
+    "after/packages/cli/src/commands.ts": {
+      "sha256": "50be23900b1afb89a6ec03a425d2d442d1abd454b582dc14d96bd9a9a40b5994",
+      "bytes": 128729
+    },
+    "after/packages/cli/test/clone.test.ts": {
+      "sha256": "963b70be497ff0db344629458caac720968a7640f624ebe39f67a79df7bd3a73",
+      "bytes": 6596
+    },
+    "after/packages/page/src/data.ts": {
+      "sha256": "5bca2a23ceaac371b43bf41996a18944166b944225fed022c41f3fc3c7bd7c82",
+      "bytes": 55024
+    },
+    "after/packages/page/test/join.test.ts": {
+      "sha256": "0c4ae95c1cf45903bed8a153cac6b2f8397a080ae4db0a027a3d59baf84849f6",
+      "bytes": 13205
+    },
+    "before/packages/cli/src/commands.ts": {
+      "sha256": "4f25a2fa26371c5c9e7bb6ca94aafb0c2bbb6f85624d3eb47082d680c85d3caa",
+      "bytes": 128454
+    },
+    "before/packages/cli/test/clone.test.ts": {
+      "sha256": "5924f5ba1b86bba110d33b020ad1d6721ccc65760fcf515736836e1120446e20",
+      "bytes": 4204
+    },
+    "before/packages/page/src/data.ts": {
+      "sha256": "bea8db7175582a51f59b932d076f9ea2f5fdb51ac4b33bd683815a46e115a8c2",
+      "bytes": 54828
+    },
+    "before/packages/page/test/join.test.ts": {
+      "sha256": "b9297fea21a8d36441995ab6a8964ec81bcb681d0aac6838b5cf1aa0a982783a",
+      "bytes": 11366
+    },
+    "delta.patch": {
+      "sha256": "e593759d2064d56550f9404d7d88284694c9878d94bda702b7a740bb6801b75b",
+      "bytes": 14321
+    },
+    "source-and-check-plan.md": {
+      "sha256": "c205567f48c18ed5c1d70f1fd8b0962467400d158897f4c56ee328fbbf79f9ec",
+      "bytes": 6697
+    }
+  }
+}
