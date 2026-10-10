@@ -1,0 +1,39 @@
+{
+  "time_utc": "2026-10-10T05:48:17.859675+00:00",
+  "source_head": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "public_registry": [
+    {
+      "name": "@generalbusiness/artroom-contract",
+      "url": "https://registry.npmjs.org/@generalbusiness%2Fartroom-contract",
+      "status": 404,
+      "qualification": "Public unauthenticated registry response; not private registry or publisher authority."
+    },
+    {
+      "name": "@generalbusiness/artroom-bytes",
+      "url": "https://registry.npmjs.org/@generalbusiness%2Fartroom-bytes",
+      "status": 404,
+      "qualification": "Public unauthenticated registry response; not private registry or publisher authority."
+    },
+    {
+      "name": "@generalbusiness/artroom-client",
+      "url": "https://registry.npmjs.org/@generalbusiness%2Fartroom-client",
+      "status": 404,
+      "qualification": "Public unauthenticated registry response; not private registry or publisher authority."
+    },
+    {
+      "name": "@generalbusiness/artroom-derive",
+      "url": "https://registry.npmjs.org/@generalbusiness%2Fartroom-derive",
+      "status": 404,
+      "qualification": "Public unauthenticated registry response; not private registry or publisher authority."
+    }
+  ],
+  "npm_identity": {
+    "operation": "npm whoami read-only",
+    "registry": "https://registry.npmjs.org",
+    "exit": 1,
+    "qualification": "Identity availability only; neither organization publish rights nor publisher authorization established.",
+    "code": "ENEEDAUTH"
+  },
+  "browser_tool": "registry URLs inaccessible through web tool; primary unauthenticated HTTPS responses retained here",
+  "candidate_version": "No version adopted; choose after review with current absence/availability and publisher ownership."
+}

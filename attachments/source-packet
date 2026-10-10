@@ -1,0 +1,64 @@
+{
+  "request": "7b31f843fac3bcc5f64b0b5caaad72f1f8191082",
+  "promise": "7ec2630ef2337cc4eabed16ce25b742727761d05",
+  "cwd": "/tmp/artroom-pool-staging-ownership",
+  "head": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "candidate_version": {
+    "value": "0.1.0-dev.2",
+    "status": "conditional proposal, not adopted"
+  },
+  "full_act_reads": [
+    "f3299ab4b2bf553f2a221a353a7cb75f04cbd5c6",
+    "d0682f8e90cd0847cf387ebb73083d0990169175",
+    "2a0294fc2101797c53e944ad794fe968800b4a84",
+    "7b31f843fac3bcc5f64b0b5caaad72f1f8191082"
+  ],
+  "availability_packet": {
+    "path": "/tmp/artroom-public-release-availability/packet.json",
+    "sha256": "2479a123ac08302d1edf5cee768df169b6337b223fda5b7257e2fc0368ea5c02",
+    "scope": "Root retained evidence, not independently rerun"
+  },
+  "files": [
+    {
+      "path": "/tmp/artroom-public-release-source-preparation-r2/handoff.md",
+      "bytes": 18020,
+      "sha256": "51a39ee7a824a39c408e761300b3f865d5ad54ad0cf5e3fec5ebf27a69422f3b"
+    },
+    {
+      "path": "/tmp/artroom-public-release-source-preparation-r2/package-input-hash-inventory.json",
+      "bytes": 22850,
+      "sha256": "79a3d65ee666ac5c72913d62fe4bb88598209a91bd19fa21e08cecd027f1b74c"
+    },
+    {
+      "path": "/tmp/artroom-public-release-source-preparation-r2/read-inventory.json",
+      "bytes": 9583,
+      "sha256": "14739768fe721915dc95f522e63e8c88a2cbaee36177234531d0fae56e1c5e91"
+    }
+  ],
+  "unrun": [
+    "imports",
+    "compiler",
+    "build",
+    "pack",
+    "tests",
+    "install",
+    "registry queries",
+    "credential inspection",
+    "publication",
+    "deployment",
+    "external smoke"
+  ],
+  "source_changes": false,
+  "claim": "bounded source handoff; no source approval, release/adoption/runtime/registry-authority/starter scope closure",
+  "revision": 2,
+  "predecessor": {
+    "packet": "/tmp/artroom-public-release-source-preparation/packet.json",
+    "sha256": "17b2309de555e7f84e0047cf3287bbd5957b13d945e57db68a2b2ae5973014be",
+    "handoff_sha256": "33edfa33d61de467b6344a9aacd2033783f1f4f63585a3cfa80473c6519c3273"
+  },
+  "corrections": [
+    "bytes/web is opt-in ambient-only: separate no-DOM resolution fixture, no exported-type import or default globals injection; client web declarations compilation-only",
+    "Build actual hash-verified owned source-input copy with compiled-only ancestor Artroom dependencies; no external-config/outDir-only resolution claim"
+  ]
+}

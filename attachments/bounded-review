@@ -1,0 +1,34 @@
+{
+  "request": "7b31f843fac3bcc5f64b0b5caaad72f1f8191082",
+  "promise": "7ec2630ef2337cc4eabed16ce25b742727761d05",
+  "no_git_artifact": true,
+  "head": "0e5954ecfca23f531cfa2ec42be1524bef3bc9a8",
+  "tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+  "input": {
+    "path": "/tmp/artroom-public-release-source-preparation-r2/packet.json",
+    "sha256": "c5fda3d27180b95babd2a48a5f2cacfa466cbdc46fa6b14b4473a21928a9cd7a",
+    "handoff_sha256": "51a39ee7a824a39c408e761300b3f865d5ad54ad0cf5e3fec5ebf27a69422f3b"
+  },
+  "predecessor_review": {
+    "path": "/tmp/artroom-public-release-prep-independent-review/packet.json",
+    "sha256": "9c84a04dfc9c1ad7a71e69fef356d1a3926a1ab7fa030f88ca4ad49072a3279b",
+    "policy": "Preserved; bounded source facts reused without extra walk"
+  },
+  "findings_addressed": [
+    "Actual owned copied build-input ancestry and compiled-only resolution contract",
+    "Ambient bytes/web opt-in no-DOM/no-Node witness, normal module type checks separated"
+  ],
+  "remaining_concrete_source_recipe_blockers": [],
+  "remaining_owner_decisions": [
+    "adoption/coordinated version/testing export",
+    "npm namespace publisher rights/exact artifact publication authorization",
+    "deployed cohort/bounds/URL/custody/auth/same-origin or bridge",
+    "supported Jam revision and bounded smoke",
+    "separate verifier/starter/adapters where originally required"
+  ],
+  "review_sha256": "daa2134fa43e9cfa4c26788ab3ccb4ef1e635dee34a085f0bae5cb3bdaddb198",
+  "new_source_walk": false,
+  "new_runtime": "NONE",
+  "release_approval": false,
+  "qualification": "Preparation only; future recipes/output/public consumer/smoke all unrun"
+}
