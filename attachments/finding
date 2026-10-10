@@ -1,0 +1,29 @@
+{
+  "kind": "Independent FULL inertHubcontrolsR1 review; strict-classification correction owed",
+  "input_packet": "/tmp/artroom-economy-f027-hub-controls-preparation/packet.json",
+  "input_sha256": "bdf6f93fe519e647f205287fe5e4db49575c2988e473b5aed04062227fb2dd22",
+  "source": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "clean": true,
+  "complete_reads": [
+    "control.config.mjs.recipe",
+    "run-control.py.recipe",
+    "plan.json",
+    "control.json",
+    "execution-inputs.json",
+    "reuse.diff",
+    "early.diff",
+    "guard-fragment.txt",
+    "preparation.md"
+  ],
+  "exact_one_Hub_replacement_each": true,
+  "original_test_source_unchanged": true,
+  "baseline_reuse": "ActualcachecasePASS from prior42 body; wrapper1 remainsfailed, no newbaseline",
+  "blocking_finding": "Add module.errors0 plus started.errors0/result.errors1 before intendedAssertionError distinction",
+  "runtime": "NONE",
+  "review": {
+    "path": "/tmp/artroom-economy-f027-hub-controls-independent-review/review.md",
+    "bytes": 3673,
+    "sha256": "ce734b9a94c1d19ee58bbce42b1fd5ad231ebad115b9814e58b6ac0b71857cd2"
+  }
+}

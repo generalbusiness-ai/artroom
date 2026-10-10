@@ -1,103 +1,114 @@
 {
-  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0da42a1126c471750cec1ccaf3adf17f4c94ee7c",
-  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694fa7a6b5005d72c3085c1ca037a4a21cc49ec",
-  "adoption": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5bdb4183391917025edeb8c9b23786e625034360",
-  "source": "/private/tmp/artroom-sdk-clone-witness-range-repair",
-  "head": "d2a39598f56708a4523bdfde2ad98a82dd843cb7",
-  "tree": "1d37e5a5ca2f9960fda4c2404ad7b36a8a99de3f",
-  "clean": true,
-  "source_packet": {
-    "path": "/private/tmp/artroom-sdk-clone-witness-range-source-packet/packet.json",
-    "sha256": "b9f0ca6bedfdb8849450861a19677ccc5ed5d08154c6d7187f73da59ccfd8443"
+  "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e4c871d0e0ddf04c4e6b400a503cfefe19b563ae",
+  "promise": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fcb08d0449eebb3dcdfa9c17dc3ed399c378e428",
+  "subject_head": "f027d949b9c7d0b064c1cb3c23dc88284de67fe3",
+  "subject_tree": "6ceaaea29f72ebc9e363da5c3aa9cad9b5131c0c",
+  "source_clean_unchanged": true,
+  "runtime": "NONE; both controls UNRUN",
+  "baseline": {
+    "path": "/tmp/artroom-economy-f027-one-run-complete-proof.json",
+    "sha256": "4ce0355912e938938601371eb7da613a10b7ddc255102fe0bfc2350e43b6862b",
+    "qualification": "actual wrapper1 retained; three compilers0, body0, exact41PASS1originalSKIP, cache1PASS; independent nonoverlap/order reconciliation73b97+268014 retained; no new baseline"
   },
-  "independent_source_review": {
-    "path": "/private/tmp/artroom-sdk-d2a3-independent-source-review/packet.json",
-    "sha256": "f525e2940d4f7146eda578d04f09ed91fa5a012bffe98bd85cdfba18ddd9ecca"
-  },
-  "bindings_sha256": "64b3e9a113c3dfbbce8316ed009f223188b4c704fc73d2b964b2b8f5c37f29e2",
-  "seal_sha256": "cd8506332d5c0b8304c10436c4efa742a6b3ba1385292b65b600f4a5c787dfb5",
-  "whole_reader_cases": 1,
-  "producer_packages": 4,
-  "complete_checker_contexts": [
-    "NodeNext",
-    "Bundler",
-    "ambient-only-no-DOM-no-Node"
-  ],
-  "driver_measurement_byte_identical_to7695": true,
-  "tracked_inputs": 124,
-  "unchanged_from7695": 122,
-  "changed_from7695": [
-    "docs/public-sdk-release.md",
-    "scripts/check-public-release.mjs"
-  ],
-  "owned_packages": 7,
-  "package_files_each_side": 809,
-  "npm_file_link_records": 1953,
-  "fresh_absent_roots": {
-    "output": "/private/tmp/artroom-sdk-d2a3-localdev2-stage-next-one",
-    "evidence": "/private/tmp/artroom-sdk-d2a3-localdev2-evidence-next-one",
-    "outer": "/private/tmp/artroom-sdk-d2a3-localdev2-outer-next-one"
-  },
-  "future_inert_dispatch": [
-    "/bin/sh",
-    "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-once.sh"
-  ],
-  "execution": [],
-  "execution_release": "NONE; separate Root review/release required",
-  "artifacts": [
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/bindings.json",
-      "bytes": 623820,
-      "mode": 420,
-      "sha256": "64b3e9a113c3dfbbce8316ed009f223188b4c704fc73d2b964b2b8f5c37f29e2"
+  "mutants": {
+    "reuse": {
+      "path": "/tmp/artroom-economy-f027-hub-controls-preparation-r2/hosts.reuse.ts.mutant",
+      "sha256": "a274ab1f5cb85fbfd6f68b4fa80cb65138c97f20dd1db6a0505f0e4d81b15b14",
+      "intended_line": 106,
+      "actual": 2,
+      "expected": 1
     },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/handoff.txt",
-      "bytes": 2405,
-      "mode": 420,
-      "sha256": "55b670694c86470f92bacd439f265b319d770d6b26548ae20e575a67f8d067f7"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/measure-child.mjs",
-      "bytes": 3714,
-      "mode": 420,
-      "sha256": "7350cb16527829dec9adc3abde98727a7b720631e629b6873d2df9d545b4bdb5"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/recipe-seal.json",
-      "bytes": 919,
-      "mode": 420,
-      "sha256": "cd8506332d5c0b8304c10436c4efa742a6b3ba1385292b65b600f4a5c787dfb5"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-once.sh",
-      "bytes": 576,
-      "mode": 420,
-      "sha256": "a8ba1b9bef63057c8c13ea85a3d48607a717efc78bdd6b128f248934d4514ca2"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/run-sdk.mjs",
-      "bytes": 14489,
-      "mode": 420,
-      "sha256": "5138bc8cf7dc3d74b6dee74ec8079f7d1705e0d3037acd3456e362840bf78fbd"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-bodies/docs/public-sdk-release.md",
-      "bytes": 11574,
-      "mode": 420,
-      "sha256": "5482a5d9d836ffc2163b901c2b30ac1bef67d4d620b2d35d9b4b61953d43c3d2"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-bodies/scripts/check-public-release.mjs",
-      "bytes": 11930,
-      "mode": 420,
-      "sha256": "d3dec7d4a80e5c9faf9627fbb3118220cf8773f657825bdcc5ff0636da12cf11"
-    },
-    {
-      "path": "/private/tmp/artroom-sdk-d2a3-validation-preparation/source-correspondence.json",
-      "bytes": 32930,
-      "mode": 420,
-      "sha256": "3c66bb3f3efb27a49da89b2d1a7f8302e316b6a1b9d5340e76d17f0e042c357e"
+    "early": {
+      "path": "/tmp/artroom-economy-f027-hub-controls-preparation-r2/hosts.early.ts.mutant",
+      "sha256": "f44cc5c41987d2be29e2e37e9eeb91cfcf81ab3acfb8ae8862c2ba529887276c",
+      "intended_line": 146,
+      "actual": 1,
+      "expected": 0
     }
+  },
+  "body": {
+    "whole_files": 1,
+    "whole_cases": 1,
+    "original_title": "OwnGit reuses only ordered immutable pack bytes while each request checks its token and gets a fresh response",
+    "original_deadline_ms": 5000,
+    "retry": 0,
+    "bail": 0
+  },
+  "future_order": [
+    "reuse",
+    "early"
+  ],
+  "execution_release": "OWED",
+  "files": {
+    "control.config.mjs.recipe": {
+      "bytes": 4271,
+      "sha256": "ad1bc5103cd8a40623b155f15531371feaf248370925808e7b8e066157390472"
+    },
+    "control.json": {
+      "bytes": 1173,
+      "sha256": "c12876d36e96410261ce1bc316a9e344f985d8791966503837ef5e07f5c051d4"
+    },
+    "early.diff": {
+      "bytes": 689,
+      "sha256": "a3682886a14611d4ab5dad4a7d2d94e87e434a29ff2fbfa346ea6874d066500f"
+    },
+    "execution-inputs.json": {
+      "bytes": 2019,
+      "sha256": "71cfb84f746fe139367ac126c00eb011d5b71b622093528942dabb368dfefcaf"
+    },
+    "guard-fragment.txt": {
+      "bytes": 2685,
+      "sha256": "bf0edffd006fa0b3cca4cc5cc7b41980f212027a9b906ad55ee9f11f7ee45804"
+    },
+    "hosts.early.ts.mutant": {
+      "bytes": 17281,
+      "sha256": "f44cc5c41987d2be29e2e37e9eeb91cfcf81ab3acfb8ae8862c2ba529887276c"
+    },
+    "hosts.original.ts": {
+      "bytes": 17280,
+      "sha256": "1c0832c6fa786d31967a48f79a2a6692dab655835ba966ee72ffdb3df376ffa5"
+    },
+    "hosts.reuse.ts.mutant": {
+      "bytes": 17317,
+      "sha256": "a274ab1f5cb85fbfd6f68b4fa80cb65138c97f20dd1db6a0505f0e4d81b15b14"
+    },
+    "plan.json": {
+      "bytes": 1720,
+      "sha256": "195597c8a839dda7c1ce60809ce60f9ea4fd44e31d542b52906d53f980681763"
+    },
+    "preparation.md": {
+      "bytes": 6516,
+      "sha256": "f41a21e28d93cd0a7524cf2d45009b2b2975b3107afb3c978d2e0adeed741ddf"
+    },
+    "proof.json": {
+      "bytes": 260592,
+      "sha256": "0ae1a948bb69328bac43f59896eddf2f1b91da7fac8495b5d0347c1a32889038"
+    },
+    "r2-runner.diff": {
+      "bytes": 1491,
+      "sha256": "3d73e25bbdb571bb34de286e6c3bbbf46362c1a58836eae8dca1ec5d116a64bb"
+    },
+    "reuse.diff": {
+      "bytes": 816,
+      "sha256": "f17ffeedec8bf4f2679a247b3e4f189ce24859373a1a35c886d344c317e2afd3"
+    },
+    "run-control.py.recipe": {
+      "bytes": 10978,
+      "sha256": "87bc45b832e51c857635956f293cc1517afa84cd427130e8f99acaf11d866478"
+    }
+  },
+  "predecessor": {
+    "packet": "/tmp/artroom-economy-f027-hub-controls-preparation/packet.json",
+    "sha256": "bdf6f93fe519e647f205287fe5e4db49575c2988e473b5aed04062227fb2dd22",
+    "preserved": true
+  },
+  "revision": "R2 external-only failure-classification correction; all controls UNRUN",
+  "unchanged_artifacts": [
+    "proof.json",
+    "plan.json",
+    "hosts.original.ts",
+    "hosts.reuse.ts.mutant",
+    "hosts.early.ts.mutant",
+    "control.config.mjs.recipe"
   ]
 }

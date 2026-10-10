@@ -1,0 +1,20 @@
+{
+  "kind": "Independent bounded inertHubcontrolsR2 correspondence",
+  "input_packet": "/tmp/artroom-economy-f027-hub-controls-preparation-r2/packet.json",
+  "input_sha256": "2a71b9f262b7c1980b1d65afa8dd1faf26d0bb1986bdadda538e89e4530befa3",
+  "predecessor_independent_packet": "/tmp/artroom-economy-f027-hub-controls-independent-review/packet.json SHA14d9e42fff0fe7c9eafb49123efd56b74ce41c23427011f3209d76c5a0c567d4",
+  "sole_blocker_corrected": true,
+  "runner_only_two_predicate_changes": true,
+  "module_errors_required": 0,
+  "started_errors_required": 0,
+  "result_terminal_case_errors_required": 1,
+  "all_other_witness_restoration_guard_bytes_unchanged": true,
+  "source_clean_unchanged": true,
+  "new_blockers": [],
+  "runtime": "NONE",
+  "review": {
+    "path": "/tmp/artroom-economy-f027-hub-controls-independent-review-r2/review.md",
+    "bytes": 1686,
+    "sha256": "692de319ed0f79bca91992ec8c29b6c735155141d91e17046ea90577ed96071a"
+  }
+}
