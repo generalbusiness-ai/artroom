@@ -144,6 +144,15 @@ pins remain verification failures. Jam must consume genuine published SDK
 packages; this CLI bootstrap proves no registry, deployment, microphone,
 model, playback or distributed-user acceptance.
 
+Application bootstrap checks on 2026-10-10: the first focused attempt
+stopped in the CLI source compiler before any case ran. The explicit
+literal lookup repair passed CLI source, CLI test and Scope test compilers,
+both existing CLI custody cases, and the existing native application
+factory case. The normal Page build then refreshed its generated module;
+all other tracked files and the guarded dependency view stayed unchanged.
+The ordinary changed-source gate remains pending. These checks establish
+bootstrap behavior, with the witness limitations stated above.
+
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
 membership, the rules scope and the destination are created and
