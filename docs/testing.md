@@ -337,6 +337,48 @@ The selection follows imports. A test that reads a file without importing
 it, such as a fixture or a document, is not selected when only that file
 changes. The gate runs everything.
 
+### A reviewed focused plan
+
+For a frozen candidate with an exact compiler closure and complete static
+case ledger, use `scripts/focused-check.mjs`. Its one invocation runs each
+declared compiler once, then one Vitest body. It does not collect the same
+tests in a separate discovery run or pause between successful phases.
+
+```
+/usr/bin/time -p node scripts/focused-check.mjs /tmp/reviewed-plan.json /tmp/new-evidence-directory
+```
+
+The reviewed JSON plan names the canonical checkout, head and tree; every
+tracked package/script/example input and root configuration; extra external
+inputs, including the actual pipeline file and body config; the lock stamp,
+current workspace bindings and source export aliases; pinned Node/compiler/
+Vitest tool files; unique compiler configs and working directories; and the
+body config, working directory and complete file/project/pool/full-title
+selection. It contains paths and hashes, not secrets. A selected file must
+have unique full titles within its project. When that static ledger cannot
+identify every case, keep an explicit collection plan instead of guessing.
+
+The driver checks those facts before any tool or application import, at
+each command boundary and after the terminal command. Any refusal, changed
+source, nonzero exit or signal stops the pipeline. Its same-run reporter
+checks complete file/project/pool identity before global setup, then records
+actual case states, errors, skips and unfinished or unrun obligations. It
+uses structured status fields; a title containing “failed” is only a title.
+The built-in JSON reporter provides a second count/file/status check in the
+same body invocation. Verbose output and complete raw reports stay in the
+new external evidence directory; its manifest seals their hashes. Existing
+evidence is never overwritten, and the driver never installs dependencies,
+retries a command or changes an original test deadline.
+`result.json` records verification outcomes; actual process exit remains
+authoritative. A sealing failure exits nonzero and retains partial artifacts
+and, when possible, a fresh sibling failure record without rewriting them.
+
+Time the outer command to include guards, parsing, artifact work and child
+CPU. The driver also retains each command's own wall, user and system time.
+Their sum is a sum of separate commands, not a measured pipeline duration.
+A focused pass protects only its selected boundaries. It does not replace
+the final gate, meaningful controls, manual acceptance or complete review.
+
 ## Before a review
 
 Run the gate once, at the head you will send.
