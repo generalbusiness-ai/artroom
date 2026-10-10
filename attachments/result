@@ -1,0 +1,50 @@
+{
+  "release": "b48ecb99acc686fb65f81282bc8b89abafb2ca46",
+  "subject_head": "f1455d9401d8d806e129524ed5655381bc4cb8e5",
+  "subject_tree": "9d52d768a8e9faa23a3a1dbb19607019b0adf586",
+  "cwd": "/private/tmp/artroom-m1-counting-cohort",
+  "clean_before_after": true,
+  "source_files_unchanged": 148,
+  "bundling_invocations": 1,
+  "semantic_invocations": 1,
+  "bundle_phase": {
+    "terminal": 0,
+    "wall_seconds": 0.17,
+    "user_seconds": 0.1,
+    "system_seconds": 0.04,
+    "cpu_seconds": 0.14
+  },
+  "semantic_phase": {
+    "terminal": 0,
+    "wall_seconds": 0.15,
+    "user_seconds": 0.13,
+    "system_seconds": 0.03,
+    "cpu_seconds": 0.16
+  },
+  "timing_note": "Rounded /usr/bin/time -lp observations; separate commands, not an observed pipeline duration",
+  "catalog_count": 21,
+  "old_literal_bindings_equal": 19,
+  "new_bindings": {
+    "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
+    "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155"
+  },
+  "new_canonical_bytes": {
+    "platform:directory@6": 13235,
+    "platform:membership@5": 13134
+  },
+  "definition_budget": 262144,
+  "validation_contract": "Actual complete VERSIONS, validateDefinition platform:true + outcomeValueDomains, PROFILES + RULE_PROFILES, runnable actual rules, canonical definitionDigest == validator digest, canonical bytes <= PROPOSED_BOUNDS; old/default symbolic pins and M5 member16/key32 checked inside actual invocation",
+  "metafile_input_origins": {
+    "SOURCE": 95,
+    "ENTRY": 1,
+    "CACHE": 17
+  },
+  "metafile_import_edges": 510,
+  "all_metafile_input_paths_reviewed_before_semantic": true,
+  "qualifications": [
+    "Two initial read-only inspection predicates failed: generated esbuild <runtime> marker; unused testing export alias missing from original 148 source hash list. Logs preserved. Static context/source ownership resolved without rebuilding or semantic retry.",
+    "Original full catalog JSON output attempt was truncated; all 21 digest/byte/mark-count/deadline/pending summaries and complete new D6/M5 results were read separately. Full raw catalog retained; no claim of visually rereading every old mark/duty row."
+  ],
+  "source_binding_performed": false,
+  "other_checks_run": false
+}

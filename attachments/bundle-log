@@ -1,0 +1,21 @@
+External bundle prepared. Semantic invocation remains separate pending full metafile inspection.
+real 0.17
+user 0.10
+sys 0.04
+            76120064  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                9958  page reclaims
+                 130  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   4  messages sent
+                  17  messages received
+                   0  signals received
+                   0  voluntary context switches
+                 221  involuntary context switches
+          1550222506  instructions retired
+           422416309  cycles elapsed
+            43878920  peak memory footprint
