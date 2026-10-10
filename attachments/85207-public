@@ -1,0 +1,69 @@
+{
+  "originalOwnerHandle": 85207,
+  "purpose": "extent-build-result",
+  "sourceOriginalRecord": {
+    "path": "/private/tmp/artroom-demo-core-ui-extent-build-result/result.json",
+    "bytes": 1909,
+    "sha256": "f14ddd8e242a874a2dc97c8899285c5ef38d3f080ad073c89a72f479bf1e4360",
+    "policy": "PRIVATE original hash only"
+  },
+  "retainedManifest": {
+    "path": "/private/tmp/artroom-demo-core-ui-extent-build-result/manifest.json",
+    "bytes": 552,
+    "sha256": "6c5c5066a01430c09ccfeb0bbc945eef643f2e5ee7c8a7d57329f39869ac4a71",
+    "policy": "PUBLIC integrity metadata"
+  },
+  "noNewExecution": true,
+  "source_head": "3b7fd4c4cc421ae30ce329259541c2bdcb484ebf",
+  "source_tree": "76a3e5f6941429e17c6ba39c1dca3141a92360c2",
+  "command": [
+    "npm",
+    "run",
+    "build",
+    "--workspace",
+    "@generalbusiness/artroom-page"
+  ],
+  "status": "passed",
+  "actual_exit": 0,
+  "runner_exit": 0,
+  "elapsed_seconds": 0.25666629197075963,
+  "before": {
+    "head": "3b7fd4c4cc421ae30ce329259541c2bdcb484ebf",
+    "tree": "76a3e5f6941429e17c6ba39c1dca3141a92360c2",
+    "status": [],
+    "sources": 1282,
+    "cache_unchanged": true,
+    "private_pool_cd50": true
+  },
+  "after": {
+    "head": "3b7fd4c4cc421ae30ce329259541c2bdcb484ebf",
+    "tree": "76a3e5f6941429e17c6ba39c1dca3141a92360c2",
+    "status": [
+      " M packages/scope/src/page-assets.ts"
+    ],
+    "sources": 1282,
+    "cache_unchanged": true,
+    "private_pool_cd50": true
+  },
+  "outputs": [
+    {
+      "path": "packages/scope/src/page-assets.ts",
+      "bytes": 592857,
+      "sha256": "ea2c7492d8e9909e932bc41b722ad1bdc86aeb9b5405dd3d6c4f63b7ddd4d559",
+      "scope": "generated asset hash only"
+    },
+    {
+      "path": "packages/page/dist/index.html",
+      "bytes": 18706,
+      "sha256": "28e4c1a631e31e5af2bacb551c33f00ea31aa062d8a45d0f014c13c07898d376",
+      "scope": "generated asset hash only"
+    },
+    {
+      "path": "packages/page/dist/page.js",
+      "bytes": 552847,
+      "sha256": "b89aa42820d18c885b74dd6ee5d66697cdcbfb36ac5bdf311a65e76aa311f905",
+      "scope": "generated asset hash only"
+    }
+  ],
+  "qualification": "Actual normal Page generator, not a test. Outputs are generated OPAQUE hashes only; no rendered fidelity or browser execution claim."
+}

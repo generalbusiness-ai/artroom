@@ -1,0 +1,386 @@
+{
+  "originalOwnerHandle": 33383,
+  "purpose": "extent-focused-result",
+  "sourceOriginalRecord": {
+    "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/result.json",
+    "bytes": 8647,
+    "sha256": "b232b4b98b0689af431aaea3fe96c3b7b04336fa8d7598e8d8d4b0361756f85e",
+    "policy": "PRIVATE original hash only"
+  },
+  "retainedManifest": {
+    "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/manifest.json",
+    "bytes": 1167,
+    "sha256": "34476b8ef81fed793dc1dc2478b9b82887243636b879aad95b27c26395571f1c",
+    "policy": "PUBLIC integrity metadata"
+  },
+  "noNewExecution": true,
+  "source": {
+    "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+    "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff"
+  },
+  "sourceAndInputGuards": [
+    {
+      "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+      "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff",
+      "clean": true,
+      "sources": 1282,
+      "inputs": 1,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 103.195
+    },
+    {
+      "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+      "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff",
+      "clean": true,
+      "sources": 1282,
+      "inputs": 1,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 94.47641699999997
+    },
+    {
+      "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+      "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff",
+      "clean": true,
+      "sources": 1282,
+      "inputs": 1,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 92.85012499999993
+    },
+    {
+      "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+      "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff",
+      "clean": true,
+      "sources": 1282,
+      "inputs": 1,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 90.27645800000005
+    },
+    {
+      "head": "5f963bad813d5f0457ecf664fc35e3b52ba1baeb",
+      "tree": "d682a86da19a1bdb5216bbaa264a072fd16f20ff",
+      "clean": true,
+      "sources": 1282,
+      "inputs": 1,
+      "workspaces": 12,
+      "aliases": 24,
+      "milliseconds": 95.619459
+    }
+  ],
+  "phaseRecords": [
+    {
+      "name": "page-source",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-demo-core-ui-composed/packages/page/tsconfig.json"
+      ],
+      "cwd": "/private/tmp/artroom-demo-core-ui-composed",
+      "started": "2026-10-10T11:56:51.321Z",
+      "ended": "2026-10-10T11:56:51.522Z",
+      "measuredCommandMilliseconds": 201.45912500000003,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.19,
+      "userSeconds": 0.62,
+      "systemSeconds": 0.07,
+      "cpuSeconds": 0.69
+    },
+    {
+      "name": "page-test",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-demo-core-ui-composed/packages/page/tsconfig.test.json"
+      ],
+      "cwd": "/private/tmp/artroom-demo-core-ui-composed",
+      "started": "2026-10-10T11:56:51.617Z",
+      "ended": "2026-10-10T11:56:51.893Z",
+      "measuredCommandMilliseconds": 275.87375000000003,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.27,
+      "userSeconds": 0.89,
+      "systemSeconds": 0.11,
+      "cpuSeconds": 1
+    },
+    {
+      "name": "page-scope",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "-p",
+        "/private/tmp/artroom-demo-core-ui-composed/packages/page/tsconfig.scope.json"
+      ],
+      "cwd": "/private/tmp/artroom-demo-core-ui-composed",
+      "started": "2026-10-10T11:56:51.986Z",
+      "ended": "2026-10-10T11:56:52.302Z",
+      "measuredCommandMilliseconds": 316.11966700000005,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.31,
+      "userSeconds": 1.12,
+      "systemSeconds": 0.1,
+      "cpuSeconds": 1.2200000000000002
+    },
+    {
+      "name": "body",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-demo-core-ui-composed/packages/page/test/membership-projection.test.ts",
+        "--config",
+        "/private/tmp/artroom-demo-core-ui-extent-focused-preparation/page.config.mjs",
+        "--bail=1",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-demo-core-ui-composed/scripts/focused-check.mjs",
+        "--outputFile.json=/private/tmp/artroom-demo-core-ui-extent-focused-result/vitest.json"
+      ],
+      "cwd": "/private/tmp/artroom-demo-core-ui-composed/packages/page",
+      "started": "2026-10-10T11:56:52.393Z",
+      "ended": "2026-10-10T11:56:52.940Z",
+      "measuredCommandMilliseconds": 547.1537079999998,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "wallSeconds": 0.54,
+      "userSeconds": 0.65,
+      "systemSeconds": 0.1,
+      "cpuSeconds": 0.75
+    }
+  ],
+  "verificationStage": "complete",
+  "verificationExit": 0,
+  "verificationStatus": "passed",
+  "wholeSelection": [
+    {
+      "path": "packages/page/test/membership-projection.test.ts",
+      "project": "page",
+      "pool": "threads",
+      "cases": [
+        "review choices require a live linked key, live agent controller, the selected extent grant and independence",
+        "a missing author-controller relation is unavailable, and foreign incarnation or missing role authority offers no invented choices",
+        "standing is recomputed from the current exact key link; retired keys and inactive controllers cannot carry cached permission"
+      ]
+    }
+  ],
+  "wholeCaseCensus": [
+    {
+      "project": "page",
+      "file": "page/test/membership-projection.test.ts",
+      "title": "review choices require a live linked key, live agent controller, the selected extent grant and independence",
+      "retainedReporterStatus": "passed",
+      "reporterStarted": true,
+      "completionClassification": "passed",
+      "observedTerminalTuples": [
+        {
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "page",
+      "file": "page/test/membership-projection.test.ts",
+      "title": "a missing author-controller relation is unavailable, and foreign incarnation or missing role authority offers no invented choices",
+      "retainedReporterStatus": "passed",
+      "reporterStarted": true,
+      "completionClassification": "passed",
+      "observedTerminalTuples": [
+        {
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    },
+    {
+      "project": "page",
+      "file": "page/test/membership-projection.test.ts",
+      "title": "standing is recomputed from the current exact key link; retired keys and inactive controllers cannot carry cached permission",
+      "retainedReporterStatus": "passed",
+      "reporterStarted": true,
+      "completionClassification": "passed",
+      "observedTerminalTuples": [
+        {
+          "status": "passed",
+          "errors": 0,
+          "retryCount": 0,
+          "repeatCount": 0
+        }
+      ]
+    }
+  ],
+  "censusCounts": {
+    "passed": 3
+  },
+  "unexpectedCaseCount": 0,
+  "moduleCensus": [
+    {
+      "project": "page",
+      "file": "/private/tmp/artroom-demo-core-ui-composed/packages/page/test/membership-projection.test.ts",
+      "status": "passed",
+      "errors": 0
+    }
+  ],
+  "ledgerPassed": true,
+  "builtinCounts": {
+    "numTotalTestSuites": 1,
+    "numPassedTestSuites": 1,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 3,
+    "numPassedTests": 3,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "success": true
+  },
+  "toolBoundary": {
+    "node": {
+      "name": "node",
+      "path": "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+      "sha256": "f75a79e4c96954709a130427e452d6720b35c90318ca8293727a4c6376198453"
+    },
+    "tsc": {
+      "name": "pinned-tsc",
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+      "sha256": "2219f428a7e55aaf1f7ad85b9b0f0cf5078aeb76ccc9a7c6036c92d48f492ffd"
+    },
+    "vitest": {
+      "name": "pinned-vitest.mjs",
+      "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+      "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6"
+    },
+    "lockSha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+    "toolsMetadata": [
+      {
+        "name": "node",
+        "path": "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "sha256": "f75a79e4c96954709a130427e452d6720b35c90318ca8293727a4c6376198453"
+      },
+      {
+        "name": "npm-cli",
+        "path": "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js",
+        "sha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7"
+      },
+      {
+        "name": "typescript-package",
+        "version": "7.0.2",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/typescript/package.json",
+        "sha256": "3722b30210616a13a3213ded11575ba6b2dbab10c32a5ef67afca8513e27017e"
+      },
+      {
+        "name": "vitest-package",
+        "version": "4.1.11",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/package.json",
+        "sha256": "a28126d97bcaf567da5bed69443b7f3bcd9a7a8c38c8b66e554686b6bb2c10e0"
+      },
+      {
+        "name": "esbuild-package",
+        "version": "0.28.1",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/package.json",
+        "sha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+      },
+      {
+        "name": "esbuild/lib/main.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/lib/main.js",
+        "sha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73"
+      },
+      {
+        "name": "esbuild/bin/esbuild",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/esbuild/bin/esbuild",
+        "sha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a"
+      },
+      {
+        "name": "@esbuild/darwin-arm64/bin/esbuild",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/@esbuild/darwin-arm64/bin/esbuild",
+        "sha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a"
+      },
+      {
+        "name": "pinned-tsc",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/typescript/bin/tsc",
+        "sha256": "2219f428a7e55aaf1f7ad85b9b0f0cf5078aeb76ccc9a7c6036c92d48f492ffd"
+      },
+      {
+        "name": "pinned-vitest.mjs",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "sha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6"
+      },
+      {
+        "name": "pinned-node.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/node.js",
+        "sha256": "34be25dbabf478136f6ea1b1f7b9a075ab833a14df3da9fc69d39b671dc19551"
+      },
+      {
+        "name": "pinned-config.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/config.js",
+        "sha256": "0ab30953d20f3f2c9662d4ea4d174dc0506483e0afaf02fd84713bbc391972cd"
+      },
+      {
+        "name": "pinned-index.UpGiHP7g.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/chunks/index.UpGiHP7g.js",
+        "sha256": "cdafaf8e508042dddba72f8c7bbae84e2836ddb6b06c7026520c35d91af4e798"
+      },
+      {
+        "name": "pinned-cli-api.CnMVyzaz.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js",
+        "sha256": "a236001d048380e2c67d05423fc9ea3f26b07ee019ba8d6e622082f29d49102e"
+      },
+      {
+        "name": "pinned-cac.uFydS1Z4.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/chunks/cac.uFydS1Z4.js",
+        "sha256": "27cc9365d180bee3da005fe6c4d485868caf9d8f54280759eea28842836af549"
+      },
+      {
+        "name": "pinned-reporters.d.DtoKVV2s.d.ts",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vitest/dist/chunks/reporters.d.DtoKVV2s.d.ts",
+        "sha256": "7fa6fdc6eeeb3850e6b3166836f8c9199594c4f4bed3cee02cac0ca33d71894d"
+      },
+      {
+        "name": "pinned-index.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vite/dist/node/index.js",
+        "sha256": "f109fff88512ed5cf39503b7a4b2a1de1c95bff333cb1d3635454558e3bfefc7"
+      },
+      {
+        "name": "pinned-node.js",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/vite/dist/node/chunks/node.js",
+        "sha256": "21d5c6b4fb1013b98b1436e9e2a3bb416c8932343ad42ec293bbf760f51a0131"
+      },
+      {
+        "name": "pinned-package.json",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers/package.json",
+        "sha256": "17f59cd527395976f966fd22a7d6de071596f13a2b8d22c9624369185ec413a1"
+      },
+      {
+        "name": "pinned-index.mjs",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers/dist/pool/index.mjs",
+        "sha256": "b38f2441bd7e5d632b523b44d9a95ce8da8db6afa2e3035e90c69a25a8b593c0"
+      },
+      {
+        "name": "pinned-test.mjs",
+        "path": "/private/tmp/artroom-demo-github-host/node_modules/@cloudflare/vitest-pool-workers/dist/worker/lib/cloudflare/test.mjs",
+        "sha256": "dddc30e9b572697af7bd92f2355401e99b1be393fb5ec59f309eee0b13d4b03c"
+      }
+    ],
+    "ownWorkspaceCount": 12,
+    "aliasCount": 24,
+    "originalPlanHash": "ac6e0059eb3996b2c0026d7152c7e40ad4bbdce95641641cf6da8838d888c516"
+  },
+  "originalQualification": "Changed production held-extent validator/meaningful native-shaped purefixture:threePagecompilers then ONEwhole membership-projection3case body; original46PASS andfailed85377 retained separately. No unchanged broadNode rerun."
+}

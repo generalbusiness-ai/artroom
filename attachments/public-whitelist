@@ -1,0 +1,241 @@
+{
+  "visibility": "PUBLIC",
+  "request": "3578584fda7345aec71614d2fd45839ad4127db9",
+  "coordinationRequest": "6cd695a8b115b109018a703b083833024471f1c3",
+  "review": "b8b7cc3510d546313ba8df419880cffa3a4dc71f",
+  "owningReviewPromise": "bbf2dff0d77b128e74a8d22cfdc87ec19e51e081",
+  "mailbox": {
+    "explicitRepo": "/Users/hughpyle/play/artroom",
+    "agent": "builder",
+    "genesis": "589bca982736a2361d15d53f7572375ef2f7aaf3",
+    "frontierHead": "26e1b71a41eab970af6a553a9b8fdd860fcebec4",
+    "depth": 31110,
+    "calls": 1,
+    "priorityAvailable": true,
+    "priorityFrames": [],
+    "acknowledged": 0,
+    "otherLeasesTouched": false
+  },
+  "runs": [
+    {
+      "handle": 85207,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/85207-public-projection.json",
+      "sha256": "5b079c3070310a5a67c6a349293f90bdaeeeb8c76784526a99a74d4bee7d7e70"
+    },
+    {
+      "handle": 33383,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/33383-public-projection.json",
+      "sha256": "16dd10e6df36292555ad28e5b5e4f3b332fe176b8f436486db0f47ab7a4b5090"
+    },
+    {
+      "handle": 81927,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/81927-public-projection.json",
+      "sha256": "ef19727d7a59dd89073d8839685bed3bd9499d863a997d882e3b5eef2732597f"
+    },
+    {
+      "handle": 71754,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/71754-public-projection.json",
+      "sha256": "93e4dff396290b0361950d8150d7bbc1960d09240d94951cc2b5b8668b12ac34"
+    },
+    {
+      "handle": 85377,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/85377-public-projection.json",
+      "sha256": "25bafb37bf79f67047ba925b2b48fcce62f4cf8b17fd309c50ef16f91dda9d99"
+    },
+    {
+      "handle": 93596,
+      "path": "/private/tmp/artroom-ui357-public-retained-components/93596-public-projection.json",
+      "sha256": "13ea5eff53f8fe723ae21386d8610bcd5b88cff2d4110c5fdcf3cf90811068fb"
+    }
+  ],
+  "explicitWhitelist": [
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-build-result/build.log",
+      "bytes": 193,
+      "sha256": "b1ec43a603a4db351513946b3860046ad9165f639f5bd5648467e54b3a230aeb",
+      "policy": "PRIVATE raw build hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-build-result/build.time",
+      "bytes": 29,
+      "sha256": "076f64cf1bd144fd709ca83c37bf90e168c895b4d3037a5f0aaa36b8f8ee5ad5",
+      "policy": "PUBLIC timing"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/85207-public-projection.json",
+      "bytes": 2256,
+      "sha256": "5b079c3070310a5a67c6a349293f90bdaeeeb8c76784526a99a74d4bee7d7e70",
+      "policy": "PUBLIC complete allowlisted projection"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/body.log",
+      "bytes": 884,
+      "sha256": "7723d7f53df75792823710e53a208ecedec1c05198cf25f81f1bea2a00033847",
+      "policy": "PRIVATE raw body hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/vitest.json",
+      "bytes": 1817,
+      "sha256": "2e1774a3b241385f4264c9742e908f9f7407e7b96979a8498475738ec5bbec95",
+      "policy": "PRIVATE original builtin JSON hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/coverage.jsonl",
+      "bytes": 4507,
+      "sha256": "97eb8b5186e17ac1032b4b314b31fb6fc6b0be6f18a1f68cc2ff50be3194ffce",
+      "policy": "PRIVATE original structured event hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-focused-result/coverage-ledger.json",
+      "bytes": 3761,
+      "sha256": "2728555dd2f3ee709aa780422467fc25faee2e9a3dffa0721409072d52e953ef",
+      "policy": "PRIVATE original ledger hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/33383-public-projection.json",
+      "bytes": 14478,
+      "sha256": "16dd10e6df36292555ad28e5b5e4f3b332fe176b8f436486db0f47ab7a4b5090",
+      "policy": "PUBLIC complete allowlisted projection"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-native-result/body.log",
+      "bytes": 5503,
+      "sha256": "14970b31b3908d30e2805426838397bc6d1482d5bac76f3e683cc611ecfd9653",
+      "policy": "PRIVATE raw body hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-native-result/vitest.json",
+      "bytes": 2974,
+      "sha256": "5e9e5219f1611d1abddd6b35e47a1f8a33eda67ed046030cba77b739b566a875",
+      "policy": "PRIVATE original builtin JSON hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-native-result/coverage.jsonl",
+      "bytes": 8324,
+      "sha256": "77b7ac9029b7d67e1d6f653dd500d4a2c0057e292ef7816d831f2f5eb6ae2134",
+      "policy": "PRIVATE original structured event hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-extent-native-result/coverage-ledger.json",
+      "bytes": 6533,
+      "sha256": "6787b28b95a83be8c95d065c58c5daaabc329b0f2699eeedaf5dadb1f88a8053",
+      "policy": "PRIVATE original ledger hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/81927-public-projection.json",
+      "bytes": 14154,
+      "sha256": "ef19727d7a59dd89073d8839685bed3bd9499d863a997d882e3b5eef2732597f",
+      "policy": "PUBLIC complete allowlisted projection"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-settings-focused-result/body.log",
+      "bytes": 3241,
+      "sha256": "5f8ef3e1298450aa4b5171518870bba475aa2d27b15194ce6cb9aef8d0a7f670",
+      "policy": "PRIVATE raw body hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-settings-focused-result/vitest.json",
+      "bytes": 8196,
+      "sha256": "53a8de6defe2ac974ba4e48e104d4a3a539cb77e66d8ce3a237ac727f39332be",
+      "policy": "PRIVATE original builtin JSON hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-settings-focused-result/coverage.jsonl",
+      "bytes": 25770,
+      "sha256": "05296dec1aedab7588cb27da300f5a1b32105c21534d2f7c9f41ab6bc1045b2c",
+      "policy": "PRIVATE original structured event hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-settings-focused-result/coverage-ledger.json",
+      "bytes": 22610,
+      "sha256": "ceda873e9b0a88597aff08a62adf9af5ed7c8a30afb81bae3bcc7eefdc3ef612",
+      "policy": "PRIVATE original ledger hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/71754-public-projection.json",
+      "bytes": 24309,
+      "sha256": "93e4dff396290b0361950d8150d7bbc1960d09240d94951cc2b5b8668b12ac34",
+      "policy": "PUBLIC complete allowlisted projection"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-native-result/body.log",
+      "bytes": 4357,
+      "sha256": "216430b4f74ead4076404b0ef06bc15d88521ae46b6379f4116c079a168a4498",
+      "policy": "PRIVATE raw body hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-native-result/vitest.json",
+      "bytes": 3666,
+      "sha256": "f5bb5f2362c253a0578f41e5d62c4516d4e2b276675e5f53b18747eb515eb59e",
+      "policy": "PRIVATE original builtin JSON hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-native-result/coverage.jsonl",
+      "bytes": 8338,
+      "sha256": "64a31b18e0c60f026184c9249cf372a2634b02790d01bd24a7ece576e02f660d",
+      "policy": "PRIVATE original structured event hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-native-result/coverage-ledger.json",
+      "bytes": 6775,
+      "sha256": "2d60d05bce32e7ecc3f1c53b650bc37ccd2f37ebd612a669f679f4db4116e0e9",
+      "policy": "PRIVATE original ledger hash only; sanitized census supplied"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/85377-public-projection.json",
+      "bytes": 14589,
+      "sha256": "25bafb37bf79f67047ba925b2b48fcce62f4cf8b17fd309c50ef16f91dda9d99",
+      "policy": "PUBLIC complete allowlisted projection"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/test.log",
+      "bytes": 7302,
+      "sha256": "20f4a5af8d9a0a295e0df085bb57e4ca3608eea0f712df20368f48a0e85c06cc",
+      "policy": "PRIVATE raw hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/outer.log",
+      "bytes": 2627,
+      "sha256": "a11b38a04ff50eb6acf580f5ea2b7b4b773d61ecd101010c1a33f565a9056e1b",
+      "policy": "PRIVATE raw hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/typecheck.log",
+      "bytes": 1552,
+      "sha256": "5bbce9b984257ab2ead7b08222be0dd739a8be2bf1a66c6f9db57c78cddc6ce9",
+      "policy": "PRIVATE raw hash only"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/outer.time",
+      "bytes": 33,
+      "sha256": "29bfac1ce8c17be90087314b38d98a03490086acd5e8d0c7ba73700df6b43958",
+      "policy": "PUBLIC timing"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/test.time",
+      "bytes": 33,
+      "sha256": "75c4ae8a7fbaa58ed1b26efbf2f483affdb1d6180002724d69a8997f7b20a338",
+      "policy": "PUBLIC timing"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/typecheck.time",
+      "bytes": 30,
+      "sha256": "7febc82eddeb52ebf081e7391caf611c1314136bd91413978e05d8812d5b4263",
+      "policy": "PUBLIC timing"
+    },
+    {
+      "path": "/private/tmp/artroom-demo-core-ui-one-normal-gate/whitespace.time",
+      "bytes": 29,
+      "sha256": "e321fd66e43908c3ec255c752ac518d47c383da51140731add2e65b0adc7930d",
+      "policy": "PUBLIC timing"
+    },
+    {
+      "path": "/private/tmp/artroom-ui357-public-retained-components/93596-public-projection.json",
+      "bytes": 2657,
+      "sha256": "13ea5eff53f8fe723ae21386d8610bcd5b88cff2d4110c5fdcf3cf90811068fb",
+      "policy": "PUBLIC complete allowlisted projection"
+    }
+  ],
+  "privacy": "Only allowlisted metadata, source identities, process commands/exits/times and full test titles/status/error counts are PUBLIC. Raw logs/structured error bodies/generated assets/configs/tool bundles are PRIVATE or OPAQUE hash-only. No source/tool/generated third-party bodies included.",
+  "limits": "Retained evidence only; original handle identities are owner-observed handles, not PIDs. Native85377 reporter may mark unfinished cases started but none has a completed result. Built-in failed-run suite counts are not substituted for strict census. Final32093 proof remains separate; no gate aggregate used to infer these component cases. No rerun, runtime, probe, checkout edit or state filing."
+}
