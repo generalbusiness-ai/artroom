@@ -190,7 +190,7 @@ test("shared names serialize first openings and frozen revisions, retain exact r
     expect(established.answer).toBe("accepted");
     if (established.answer !== "accepted") throw new Error("The named directory must preserve native application establishment.");
     const C = await child(D, established.receipt.fact.seq);
-    lifetime.wire(C.name, () => NO_OUTSIDE);
+    lifetime.wire(C.name, () => ({ outside: NO_OUTSIDE }));
     await settle(D, C);
     expect(await D.item(established.receipt.fact.seq)).toMatchObject({ state: "created", refs: { scope: await C.at() } });
     expect((await C.summary()).value).toMatchObject({ definition: COUNTING_DEFINITION, status: "active", items: [{ type: "configuration", values: { target: 7 }, parties: { controller: { membership, member: "@rita" } } }] });
