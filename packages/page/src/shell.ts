@@ -11,7 +11,7 @@ export function issueActions(state: string, offered: readonly string[]): { prima
 
 export function changeActions(state: string, invalidPath: boolean): { primary: string[]; blockedKinds: string[] } {
   const decisions = ["merge", "review-verdict", "ready-own", "ready-any", "request-review-own", "request-review-any"];
-  const blockedKinds = state === "merged" || invalidPath ? decisions : [];
+  const blockedKinds = ["merged", "closed", "cancelled"].includes(state) || invalidPath ? decisions : [];
   return { primary: ["comment", "review-verdict", "merge", "request-review-own", "ready-own"].filter((kind) => !blockedKinds.includes(kind)), blockedKinds };
 }
 

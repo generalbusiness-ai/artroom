@@ -38,9 +38,10 @@ import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isS
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
+import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
 import { knownLIST1 } from "./source-support.ts";
+import { currentStanding, reviewCandidates } from "./membership-projection.ts";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -109,6 +110,16 @@ async function summaryOf(handle: ScopeHandle): Promise<{ summary: Summary; at: H
   if (!read.ok) throw new Unreadable(`Cannot read ${handle.scope}: ${read.reason}.`);
   if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read ${handle.scope}: incomplete summary.`);
   return { summary: read.value, at: read.at };
+}
+
+/** Refresh only the existing complete authenticated roster. Session renewal is
+ * not a fresh permission observation; a failed roster read cannot retain old standing. */
+async function refreshStanding(room: Room): Promise<Standing | null> {
+  room.me = null;
+  const { summary } = await summaryOf(handleOf(room, room.membership.scope));
+  if (canonicalize(summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The roster names another membership incarnation.");
+  room.me = currentStanding(summary.items, room.membership, room.key);
+  return room.me;
 }
 
 /** Collect only a complete enumeration. Existing caller budgets stay unchanged. */
@@ -245,7 +256,7 @@ export async function openRoom(session: Session, place: Place): Promise<Room> {
   room.destination = destination;
   const recordedRepository = repository.values["repository"];
   if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository["name"] === "string") room.name = recordedRepository["name"];
-  room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
+  await refreshStanding(room);
   return room;
 }
 
@@ -367,6 +378,8 @@ export interface ChangeView {
   /** Choices from held rules and authenticated membership; null means unavailable. */
   reviewExtents?: { label: string; value: string }[] | null;
   reviewMembers?: { label: string; value: string }[] | null;
+  /** Per held extent, current presentation candidates; null means its authority is unavailable, not destination readiness. */
+  reviewMembersByExtent?: Record<string, { label: string; value: string }[] | null> | null;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
@@ -488,20 +501,22 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const reviewExtents = Array.isArray(extents) && extents.every((extent) => extent && typeof extent === "object" && !Array.isArray(extent) && typeof extent["name"] === "string")
     ? extents.map((extent) => ({ label: String((extent as Record<string, FieldValue>)["name"]), value: String((extent as Record<string, FieldValue>)["name"]) })) : null;
   let reviewMembers: { label: string; value: string }[] | null = null;
+  let reviewMembersByExtent: ChangeView["reviewMembersByExtent"] = null;
   if (current) {
     try {
+      room.me = null;
       const membership = await summaryOf(handleOf(room, room.membership.scope));
       if (canonicalize(membership.summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The reviewer roster names another membership incarnation.");
-      const authorsParty = current.parties["authors"];
-      if (!Array.isArray(authorsParty) || authorsParty.some((author) => canonicalize(author.membership) !== canonicalize(room.membership))) throw new Unreadable("The manifest authors name another membership incarnation.");
-      const authors = membersOf(authorsParty);
-      reviewMembers = holdersOf(membership.summary.items, "change.review").filter((member) => !authors.includes(member)).map((member) => ({ label: member, value: member }));
+      room.me = currentStanding(membership.summary.items, room.membership, room.key);
+      const candidates = reviewCandidates(membership.summary.items, room.membership, current.parties["authors"], rulesItem?.values["ownerMayReview"], extents);
+      reviewMembers = candidates?.members ?? null;
+      reviewMembersByExtent = candidates?.byExtent ?? null;
     } catch { /* Missing authority offers no invented reviewer choices. */ }
   }
   const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
   const listFile = selected && selected.values["files"] !== undefined ? await manifestListFile(handle, summary.scope, selected, definition, summary.definition, await all("source")) : null;
   return {
-    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers,
+    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers, reviewMembersByExtent,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: manifests.map((m) => ({
       selectedReports: reportsOf(m, definition),
@@ -701,9 +716,10 @@ async function shapeOf(room: Room, handle: ScopeHandle, summary: Summary): Promi
  */
 export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offered[]; hidden: number }> {
   await fresh(room);
+  const me = await refreshStanding(room);
   const handle = handleOf(room, scope);
   const { shape } = await shapeOf(room, handle, (await summaryOf(handle)).summary);
-  const { acts, hidden } = heldActs(shape, room.me);
+  const { acts, hidden } = heldActs(shape, me);
   const definitions = acts.some(([, a]) => Object.values(a.fields).some((f) => domainOf(f) === DEFINITION_DOMAIN)) ? await activeDefinitions(room) : [];
   return {
     acts: acts.map(([kind, a]) => ({

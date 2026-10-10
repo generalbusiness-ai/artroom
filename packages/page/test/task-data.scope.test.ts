@@ -179,8 +179,10 @@ test("native task data supplies active issue choices, detached Description, exac
     expect(change.currentManifest).toBe(change.manifests.find((m) => m.state === "current")?.id);
     expect(change.manifests.find((m) => m.id === change.currentManifest)?.selectedReports).toEqual([]);
     expect(change.reviewExtents?.map((e) => e.value)).toEqual(change.rules?.extents.map((e) => e.name));
+    expect(change.rules?.extents.every((extent) => !Object.hasOwn(extent, "patterns"))).toBe(true);
     expect(change.reviewMembers?.map((member) => member.value)).toContain("@paul");
     expect(change.reviewMembers?.map((member) => member.value)).not.toContain("@rita");
+    expect(change.reviewMembersByExtent?.["source"]?.map((member) => member.value)).toContain("@paul");
     console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "publication-and-review-choices");
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "fresh-review-faults", lastCompleted);
     badSelection = true;

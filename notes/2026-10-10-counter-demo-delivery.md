@@ -77,3 +77,22 @@ unrun after Vitest failed. The gate took 89.05 seconds wall and 146.09 seconds C
 these are machine/load-specific observations. RefcountedCanceler abort, SQL
 retention-trigger and four Git Content-Type diagnostics remain recorded, with no
 cause, drain or error-free claim. A changed-head ordinary gate remains pending.
+
+The repaired Counter gate at 4a40c76fad08960155e827049790325a435c9836 passed:
+1,015 Vitest cases passed with two original optional recorder skips, followed by
+eight active-source/compatibility and all 37 Counter browser Node cases. Exact
+source, shared cache and private pool guards remained unchanged. It took 94.07
+seconds wall and 152.28 seconds CPU on this machine. Worker abort/retention and
+Git Content-Type diagnostics remain qualified. The public result is retained at
+/private/tmp/artroom-counter-second-gate-complete-proof.json. That subject still
+contained the older functional UI; it did not include the separate UI delivery.
+
+This successor normally composes immutable UI
+9e5d497316946b5ae78165187239a23fdcd3d23d with Counter 4a40. Its only merge conflict
+was the generated Page asset. The normal existing Page builder completed once
+from both current production source closures; neither donor asset was selected
+as the resolution. All eighteen UI authored paths and all Counter paths except
+that shared generated module retain their exact donor bytes. The original UI
+review remains pending; composition claims neither approval nor landing. A new
+ordinary gate on this combined code head remains pending. Main f722 and both
+original donor worktrees, histories and proofs remain unchanged.
