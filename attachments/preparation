@@ -1,0 +1,46 @@
+{
+  "status": "INERT; failed4c72 proof retained; not Source PASS",
+  "head": "4578df645df520d9cff8291ab3ead71abc2d41e1",
+  "tree": "8f928c4ddc255acf0c60f8e718076fb260d6b8e8",
+  "root": "/private/tmp/artroom-site-want-decoder-options",
+  "clean_before_after": true,
+  "head_unchanged": true,
+  "fresh_owned_view": true,
+  "workspace_count": 12,
+  "alias_count": 24,
+  "active_source_pins": 634,
+  "full_source_pins": 1269,
+  "selected_source_sha256": "11982457968697b58d76535641826dc4e83b6e64d6c88c84ec2c8baaf5b89786",
+  "source_change": "Only explicit ignoreBOM:false on ASCII fatal decoder; prior default semantics retained; assets unchanged; no build",
+  "preserved_failed_subject": "4c72c3f267343dc33154bf123f78211915a3f196",
+  "preserved_failed_result": "/tmp/artroom-site4c72-focused-result",
+  "selection": "Same one whole Site file/fifteen original source titles, actual public Reporter same-run proof, no discovery/control/baseline repeat",
+  "compiler_once": "Scope_TEST only",
+  "native_base": "Original shared Scope Worker/wrangler/globalSetup/isolatefalse/maxWorkers1/default5000/retry0, source case overrides untouched",
+  "files": {
+    "plan.json": {
+      "path": "/tmp/artroom-site4578-static-preparation/plan.json",
+      "sha256": "fd445e5d771b8d52980953a4c545a8cc4d3912fed995a9d01681b29562287257"
+    },
+    "site-body.config.mjs": {
+      "path": "/tmp/artroom-site4578-static-preparation/site-body.config.mjs",
+      "sha256": "cdf3efb1f4abb4e97f3f9371e739a0f58bedfe4514c7e09aab7a35fa487dd910"
+    },
+    "full-tracked-pins.json": {
+      "path": "/tmp/artroom-site4578-static-preparation/full-tracked-pins.json",
+      "sha256": "ff412b0a3606799926174695782049a2dcdbd46d6d9ac7e206cee796a75536b8"
+    },
+    "owned-bindings.json": {
+      "path": "/tmp/artroom-site4578-static-preparation/owned-bindings.json",
+      "sha256": "8c0eec7fd107bdb93bf96c206fec53630b7d175f163666a32a6b93decaeb32dd"
+    }
+  },
+  "inert_command": [
+    "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+    "/private/tmp/artroom-site-want-decoder-options/scripts/focused-check.mjs",
+    "/tmp/artroom-site4578-static-preparation/plan.json",
+    "/tmp/artroom-site4578-focused-result"
+  ],
+  "execution": [],
+  "install_or_cache_mutation": false
+}
