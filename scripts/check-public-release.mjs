@@ -66,9 +66,9 @@ const secret = new Uint8Array(32).fill(9), message = canonicalBytes({ b:2, a:1 }
 assert.equal(verify(keyIdOfSecret(secret), sign(secret,message),message),true);
 assert.equal(validateDefinition(small,PROPOSED_BOUNDS,RULE_PROFILES).ok,true);
 const originalSmall = canonicalBytes(small);
-const cloned = variant(small, definition => { definition.name = 'compiled-clone'; definition.items.note.values.text.of.max = 39; });
+const cloned = variant(small, definition => { definition.name = 'compiled-clone'; definition.items.note.values.text.of.max = 201; });
 assert.equal(cloned.declared.name,'compiled-clone');
-assert.equal(cloned.declared.items.note.values.text.of.max,39);
+assert.equal(cloned.declared.items.note.values.text.of.max,201);
 assert.deepEqual(canonicalBytes(small),originalSmall);
 const refused = structuredClone(small); refused.rules = { bad:'$now()' };
 assert.equal(validateDefinition(refused,PROPOSED_BOUNDS,RULE_PROFILES).ok,false);

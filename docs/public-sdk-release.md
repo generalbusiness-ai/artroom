@@ -171,6 +171,20 @@ calls the real compiled helper, changes a nested cloned value and checks
 that the original small fixture retains exactly its canonical bytes.
 
 All repaired-head imports, cases, compilers, packing and complete output
-checks remain unrun. A future attempt needs its own exact reviewed source,
-fresh owned stage and release. One changed-head gate and normal independent
-review are still owed before landing; no public publication follows.
+checks were unrun at that Source delivery. A later exact `7695` attempt
+passed the reader case and all four packages' resolution, emission and
+offline packing, and sealed its producer manifest. The checker passed its
+archive and emitted fixture ABI guards, then the compiled journey failed:
+the clone witness narrowed the text slot to 39 while write/edit fields
+still admitted 200. The actual validator refused both assignments. The
+journey failed before any of the three strict consumer contexts were
+dispatched.
+
+The successor changes only the witness's nested slot maximum and expected
+value to 201. This preserves assignment from the original 200-byte fields
+and stays inside the declared text bound. The real clone/name mutation and
+original canonical-byte preservation assertions remain. All successor
+checks remain unrun; the frozen failed attempt and its output stay intact.
+A future attempt needs its own exact reviewed source, fresh owned stage
+and release. One changed-head gate and normal independent review are still
+owed before landing; no public publication follows.
