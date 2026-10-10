@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:252845972e73b09a00a3e510610d38bae2e72469","text":"Merge retired a covered predecessor; the successor is at scripts/cloudflare-pool-compat.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:25396017148d50dc6ccfa3e262a5f9b8275d2aa3","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/commands.ts."}
