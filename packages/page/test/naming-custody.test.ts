@@ -82,7 +82,10 @@ test(TITLE, async () => {
   expect(first.posts[0]?.signed.intent.fields).toEqual({ name: frozen.name });
   expect(first.posts[0]?.signed.intent.expected).toEqual({ on: 1 });
   const retainedOriginal = canonicalize(first.journal().records[0]?.envelope);
-  await expect(custody.start(confirmNaming(first.sample, "Replacement"))).rejects.toThrow("unresolved original");
+  await expect(custody.start(confirmNaming(first.sample, "Replacement"))).rejects.toThrow(NamingBlocked);
+  expect(first.signatures()).toBe(1); // The durable backstop cannot undo another signature.
+  expect(first.posts).toHaveLength(1);
+  expect(canonicalize(first.journal().records[0]?.envelope)).toBe(retainedOriginal);
   await custody.reconcile(); // Genuine not-found is still an unresolved original.
   expect(custody.publicStatus().phase).toBe("unknown");
   first.found(); await custody.reconcile();
