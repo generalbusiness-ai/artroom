@@ -76,3 +76,37 @@ before one coordinated changed-source gate and independent review.
 This backend Source does not implement C4 browser integration, a selector,
 legacy attachment/migration, version labels, publication observations,
 retention budgets or public disclosure. Their adopted duties stay open.
+
+## Focused result, before Page generation and the gate
+
+The first focused attempt (69694) passed platform Source/Test, CLI Test and
+Scope Source compilers, then stopped in Scope Test at a fixture Ports-shape
+error. Lanes Scope and every test body were unrun. The one-line fixture
+repair changed no production input or validated catalog identity.
+
+The reduced attempt (88859) passed the remaining Scope Test and Lanes Scope
+compilers, then all five whole files and 28 cases: the pure naming case,
+two golden/catalog cases, two CLI custody cases, the native naming case,
+and all 22 manifest cases including the new shared-name invocation.
+The earlier four compiler passes remain bound to their unchanged inputs;
+they were not repeated. Both attempts and their original outcomes remain.
+
+Durable Objects, SQLite, membership authority, HTTP/session reads, native
+creation and replay are real in the native witnesses. Git hosts, clocks,
+schedulers, local stores and selected service/runner boundaries remain the
+stand-ins labelled by each witness. This is no deployed host, C4 browser,
+public registry, device or full product acceptance.
+
+The reduced pipeline measured 28.18 seconds elapsed and 33.43 seconds CPU;
+its test body measured 25.38 seconds elapsed and 28.13 seconds CPU. These
+are separate measurements, not a sum. The normal Page build, one ordinary
+changed-source gate and independent Source review still remain.
+
+The normal Page build (52663) passed. It emitted 558,411 bytes of Page
+JavaScript and the 598,623-byte generated Worker module, SHA-256
+`b7fe3177bf10431ac739f41fed3baf383534a79e4987625962c4230d3b615bb7`.
+Its pre/post guards preserved product Source, tests, tools and dependencies;
+only this pinned note and the expected generated module changed. The outer
+run measured 1.47 seconds elapsed and 1.36 seconds CPU; the build child
+measured 0.28 seconds elapsed and 0.19 seconds CPU. No focused checks were
+repeated. The ordinary changed-source gate and independent review remain.
