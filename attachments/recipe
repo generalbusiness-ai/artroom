@@ -1,0 +1,28 @@
+{
+  "head": "263254752b602bd5f88c97817f2391aa5606db61",
+  "tree": "c8671f98cf141c34b57b33998796028b0836f406",
+  "predecessor": "/tmp/artroom-ux1-actions-text-node-preparation/recipe-packet.json",
+  "files": {
+    "preflight.json": {
+      "bytes": 144469,
+      "sha256": "a81e1a327ea6a981090f4c4481e52604a8c10c59f13ccbede589c120260618a7"
+    },
+    "selection.json": {
+      "bytes": 6898,
+      "sha256": "a172d7e94899958bfd8c4c823680ff6fef50c3297d623b5a9da2a02105500479"
+    },
+    "guard.mjs.recipe": {
+      "bytes": 3809,
+      "sha256": "448b82031d92bd9dbfdf1e6b09abb215980e620350e688714c30ad8176837d42"
+    },
+    "page-nine.config.mjs.recipe": {
+      "bytes": 2911,
+      "sha256": "00bab0ef0f0fbd113354b31e0f1f5b1986e8f95c6e2f1f0d98b095b9b5693add"
+    },
+    "plan.md": {
+      "bytes": 2036,
+      "sha256": "e85d0860fa68f80e92cc0a172d186e58131a1ab568173a7045faa6772f0e91cb"
+    }
+  },
+  "execution": []
+}

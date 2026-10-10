@@ -1,0 +1,43 @@
+{
+  "head": "263254752b602bd5f88c97817f2391aa5606db61",
+  "tree": "c8671f98cf141c34b57b33998796028b0836f406",
+  "parent": "32c9f27793737e01c16333cc5d54ac0bd5bc2077",
+  "worktree": "/tmp/artroom-ux1-actions-attribute-fix",
+  "branch": "request/ux1-actions-attribute-fix",
+  "request": "94b932355c4ad6c4270ddaf4231c1d4ac329b2c2",
+  "promise": "919649f327066d2ac06411e24ae4c48171018a13",
+  "repair_paths": [
+    "packages/page/test/actions.test.ts"
+  ],
+  "files": {
+    "actions-body.txt": {
+      "path": "/tmp/artroom-ux1-actions-attribute-fix-packet/actions-body.txt",
+      "bytes": 21970,
+      "sha256": "022c6e6c71dd0a41c135f53be9b3e90c2970e14d5f2131d10f253b6090f150e3"
+    },
+    "actions-repair.patch": {
+      "path": "/tmp/artroom-ux1-actions-attribute-fix-packet/actions-repair.patch",
+      "bytes": 651,
+      "sha256": "8473876baa1de057719f073e6a83efd4d4abc2aa37ff0ffde64b8482caa1da5d"
+    },
+    "preservation.json": {
+      "path": "/tmp/artroom-ux1-actions-attribute-fix-packet/preservation.json",
+      "bytes": 158584,
+      "sha256": "1ffde28ee5acf8f99c3b2148713ffd23d6683316d1cfa8dd0b132303682d8efb"
+    },
+    "dom-path-audit.md": {
+      "path": "/tmp/artroom-ux1-actions-attribute-fix-packet/dom-path-audit.md",
+      "bytes": 3760,
+      "sha256": "9e1c6298caa99c4a7c13d9120e0ea0b602b2965912b8d7e304c20b98d044725a"
+    },
+    "disposition.md": {
+      "path": "/tmp/artroom-ux1-actions-attribute-fix-packet/disposition.md",
+      "bytes": 1822,
+      "sha256": "8278beba823dc376b0574d1d0c2557474a506ce4fa9dbcce62c111ddae32aa09"
+    }
+  },
+  "recipe": "/tmp/artroom-ux1-actions-attribute-node-preparation/recipe-packet.json",
+  "recipe_sha256": "ab7959c4f243c36f72e1ae2190dc8a3712381e8c7787710a696c81281372a703",
+  "clean": true,
+  "execution": []
+}
