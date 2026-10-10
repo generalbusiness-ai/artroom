@@ -1,5 +1,23 @@
 # Initial combined source delivery — 2026-10-09
 
+The initial delivery is landed on main at
+`a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`, tree
+`7f9bf06ee29e56b040e5cce07408ad240a2401fe`. The builder verified the
+pushed head against the live remote and retained landing receipt
+`732ca210b84469513b3a53b618b2867ca92a71e0`; request `60e591` is satisfied
+and landed. The earlier failed gates and qualified successful evidence
+below remain attributed to their exact source.
+
+This branch is a separate source-only Hub and manifest test-economy
+composition onto that receiving main. Its two compiler contexts and all
+27 selected native cases, including one original optional recorder, are
+**unrun**. It preserves the reviewed donor code and original deadlines;
+new controls, a changed-head gate and independent review remain owed.
+SDK, UI, Counting and other setup branches are outside this composition.
+No new performance, native authority or product acceptance is claimed.
+
+## Historical initial delivery and evidence (retained)
+
 This candidate joins the current critical corrections, explicit application establishment, the pinned Counting definition, complete client observation and the enrolled-device counting stage. It lets an authorized controller establish Counting under the supporting cohort, while an independently enrolled device observes the native count and keeps its own exact signed requests in private custody. The native scope remains the authority for counts, membership and every act.
 
 The original application and test preparation was frozen at composition 7ed2670b6c440cba638e6c18624d55b582892eb3, tree d2d53ffc0ff2d0b9965e86ae8cf2650cce400f26, from main 8479057c1ce50f01a5de488c2f6c029b45be65e7. This note is added before the final gate; the gate and normal review evidence will bind the resulting exact head. No final gate, formal Source approval or landing is claimed in this note. Earlier evidence remains attributed to its actual source head. The final sections describe the current editor and focused-check successor.
