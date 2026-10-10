@@ -88,7 +88,9 @@ export async function replayCapture(capture) {
   require(full.report.mode === 'replay' && full.report.result === 'consistent' && full.why === null, 'native captured replay not consistent');
   require(canonicalize(full.report.target) === canonicalize({at:target.scope,...capture.target.head}), 'native target changed');
   require(full.report.coverage.some(row => canonicalize(row.scope) === canonicalize(target.scope) && row.from === 0 && row.through === capture.target.head.seq), 'native target coverage');
-  require(full.report.dependencies.verified > 0 && full.report.dependencies.anchored === 0 && full.report.anchors.length === 0 && !full.report.trusts.includes(TRUSTS.authority), 'native foreign authority not proven');
+  require(full.report.dependencies.verified > 0 && full.report.dependencies.anchored === 0 && full.report.dependencies.missing.length === 0 && full.report.anchors.length === 0, 'native foreign dependencies not proven');
+  require(!full.report.trusts.includes(TRUSTS.authority) && !full.report.trusts.includes(TRUSTS.anchors) && !full.report.trusts.includes(TRUSTS.head), 'native authority, anchors or target head taken on trust');
+  require(capture.observed?.why === null && canonicalize(full.report) === canonicalize(capture.observed.report), 'compiled replay differs from the retained native report or its trust qualifications');
   require(capture.missing?.scope !== capture.target.scope && capture.scopes.some(scope=>scope.scope.scope===capture.missing?.scope), 'missing source control');
   const absent = await verify(new MemorySource(capture.scopes.filter(scope=>scope.scope.scope!==capture.missing.scope)),options);
   require(absent.report.result === 'missing-dependency' && absent.report.dependencies.missing.some(fact=>canonicalize(fact)===canonicalize(capture.missing.fact)), 'missing foreign fact was not reported');

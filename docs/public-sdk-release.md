@@ -107,7 +107,10 @@ It records a separate check result; producer output alone is not a pass.
 The same compiled-output journey now replays a separately reviewed public
 native-history capture with proven grants, a known target head and a foreign
 fact. It compares target identity, full target coverage, verified foreign
-dependencies and trust labels. Removing the directory source must give the
+dependencies and trust labels, including exact agreement with the capture's
+retained native report. Missing dependencies and authority, anchor or target-head
+trust must be absent explicitly; consistency alone is not used to infer that.
+Removing the directory source must give the
 exact missing-dependency fact; no anchor or test-authority grant is substituted.
 The capture's original and owned copy are bound to the supplied SHA-256 and
 remain unchanged through the checker. Actual replay reports are kept in its
