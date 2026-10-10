@@ -1,6 +1,6 @@
 /** The destination's reading of the pinned change lane's retained entries (authority revision 28, sections 3.3 and 6.5). */
 import type { Entry, FactRef, KeyId, MemberId, RulesObservation } from "@generalbusiness/artroom-contract";
-import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isFactRef, isMemberRef } from "@generalbusiness/artroom-bytes";
 import type { RuleGiven } from "@generalbusiness/artroom-derive";
 import type { LaneRead } from "./destination.ts";
 import type { EditFile, Statement } from "./reservation.ts";
@@ -84,4 +84,34 @@ export function decidingKeys(given: Pick<RuleGiven, "uses">, statement: Statemen
     ...statement.verdicts.filter((verdict) => verdict.verdict === "approve").map((verdict) => actor(of(given, verdict.review))),
     ...checks.flatMap((check) => { const jobs = statement.jobs.filter((job) => job.name === check.name); const job = jobs.length === 1 ? jobs[0] : null; return job?.state === "passed" && job.decidedBy ? [actor(of(given, job.decidedBy))] : []; }),
   ].filter((key): key is KeyId => key !== null);
+}
+
+/** The frozen paths and their signed source facts, read from a list manifest. */
+export interface ManifestSource { path: string; entry: FactRef; digest: string }
+export function sourcesOf(entry: Entry | null | undefined): readonly ManifestSource[] | null {
+  const proposed = fields(entry ?? null, "propose-manifest");
+  const sources = proposed?.["files"];
+  if (!Array.isArray(sources) || sources.length === 0 || sources.length > 64) return null;
+  const read: ManifestSource[] = [];
+  for (const value of sources) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    if (typeof row["path"] !== "string" || typeof row["digest"] !== "string" || !isFactRef(row["entry"])) return null;
+    read.push({ path: row["path"], digest: row["digest"], entry: row["entry"] });
+  }
+  return new Set(read.map((row) => row.path)).size === read.length ? read : null;
+}
+/** Every source belongs to the manifest's lane and agrees with its frozen row. */
+export function manifestFiles(manifest: Entry, uses: readonly { fact: FactRef; entry: Entry }[]): readonly EditFile[] | null {
+  const sources = sourcesOf(manifest);
+  const base = fields(manifest, "propose-manifest")?.["base"];
+  if (!sources) return null;
+  return sources.reduce<EditFile[] | null>((files, row) => {
+    if (!files || !same(row.entry.at, manifest.at)) return null;
+    const source = uses.find((use) => same(use.fact, row.entry))?.entry;
+    const file = fileOf(source);
+    const sourceBase = fields(source ?? null, PROPOSE_FILE)?.["base"];
+    if (!file || file.path !== row.path || file.digest !== row.digest || sourceBase !== base) return null;
+    files.push(file); return files;
+  }, []);
 }

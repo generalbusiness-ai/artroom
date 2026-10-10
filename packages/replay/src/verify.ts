@@ -863,8 +863,9 @@ class Verifier {
   async #standing(run: Run, entry: Entry, o: ObservationUse["observation"], where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     // The holders of an action: the answer lists the first of them, as many as the row's `most` or all. The judge checks the list's
-    // length against the row, so the value is asked here for as many as the record lists.
-    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : o.subject === "holders" ? { of: o.of, holders: o.action, most: o.holders.length } : { of: o.of, asked: o.content.asked };
+    // length against the row. Reconstruct that prefix with a positive bound even when no holder is listed:
+    // membership refuses most=0; most=1 still returns [] only when the exact native count is zero.
+    const asked: ObservationRequest = !("subject" in o) ? { of: o.of, key: o.key } : o.subject === "member" ? { of: o.of, member: o.member } : o.subject === "holders" ? { of: o.of, holders: o.action, most: Math.max(1, o.holders.length) } : { of: o.of, asked: o.content.asked };
     const unanswered = (): Stop => new Stop("unsupported-definition", `the observed scope ${o.of.scope} pins a definition for which this replay has no answer to an observation`, where);
     let derived: unknown;
     if (o.of.scope === run.id) {
@@ -1273,7 +1274,7 @@ class Verifier {
         judged = judgeDiagnosis(state, definition, { of: input.of, attempts: input.attempts }, { ...reading, prepared: [], origin: sealed(input.of.seq) });
         break;
       case "timed":
-        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities });
+        judged = judgeTimed(state, definition, { item: input.item, rule: input.rule, due: input.due }, { clock, bounds, capabilities: this.#capabilities, platform: run.platform ?? undefined });
         break;
       case "preparation": {
         // Section 9.3, the row "Preparation", and point E13: the entry is derived with the rules of its step, which the capability's

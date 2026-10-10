@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "types": ["node"],
+    "paths": {
+      "@generalbusiness/artroom-contract": ["../../packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-bytes": ["../../packages/bytes/src/index.ts"],
+      "@generalbusiness/artroom-derive": ["../../packages/derive/src/index.ts"],
+      "@generalbusiness/artroom-derive/rule": ["../../packages/derive/src/rule/index.ts"],
+      "@generalbusiness/artroom-derive/testing": ["../../packages/derive/test/fixtures.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}

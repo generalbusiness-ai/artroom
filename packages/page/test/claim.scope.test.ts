@@ -1,11 +1,12 @@
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { nativeFixtureLifetime, driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
+import type { Platform } from "../../scope/test/repository.ts";
 import { expect, test } from "vitest";
 import type { ScopeId, SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url, scopeIdOf, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import { b64url, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { net } from "@generalbusiness/artroom-scope/testing";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
-import { claimRoom, claimStatus, type ClaimOptions, type ClaimStorage } from "../src/claim.ts";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { routed } from "../../scope/test/repository.ts";
+import { claimRoom as nativeClaimRoom, claimStatus, type ClaimOptions, type ClaimStorage } from "../src/claim.ts";
 import { command, memoryStore, type Context } from "@generalbusiness/artroom-cli";
 import { reader } from "../../scope/test/support.ts";
 import { OwnGit, ownHost } from "../../scope/test/hosts.ts";
@@ -14,43 +15,39 @@ import type { ArtifactsNamespace } from "../../scope/src/artifacts-host.ts";
 import type { ClaimLocks } from "../src/claim.ts";
 
 async function registerFixture() {
-  net.hold = net.deaf = null;
-  platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  platformNet.sessions = true;
-  platformNet.inspector = reader;
-  const host = ownHost();
-  // STAND-IN namespace: each repository uses the existing OwnGit fixture;
-  // a register can create more than one repository in this namespace.
-  const repositories = new Map<string, OwnGit>();
-  const namespace: ArtifactsNamespace = {
-    create: async (name) => { if (repositories.has(name)) throw new Error("ALREADY_EXISTS"); const repo = new OwnGit(); repositories.set(name, repo); return repo.ns.create(name); },
-    get: async (name) => { const repo = repositories.get(name); if (!repo) throw new Error("repository not created"); return repo.ns.get(name); },
-    delete: async () => false,
-  };
-  const hostFetch = async (request: Request) => {
-    const name = new URL(request.url).pathname.split("/")[3]?.replace(/\.git$/, "");
-    const repo = name ? repositories.get(name) : undefined;
-    return repo ? repo.fetch(request) : new Response("no repository", { status: 404 });
-  };
-  const wired = new Set<ScopeId>();
-  let R: Platform;
-  const wire = (name: ScopeId) => { wired.add(name); platformOutside.set(name, (given, sql) => artifactsOutside(given, sql, { ...host.bindings(R.name), ARTIFACTS: namespace }, hostFetch)); };
-  const pause = async (waiting: readonly ScopeId[] = []) => {
-    const nodes = [R, ...waiting.filter((name) => name !== R.name).map((name) => new Platform(name))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of nodes) { while (await (node.stub as unknown as { effect(): Promise<number> }).effect() > 0) made++; made += await node.stub.dispatch(); }
-      if (!made) break;
-    }
-    await settle(...nodes);
-  };
-  const ctx: Context = { store: memoryStore(), fetch: routed as unknown as Fetch, now: () => timeMs(net.clock.now)!, pause };
-  expect((await command(ctx, ["install", "https://scopes.test", "--host", host.host, "--namespace", host.namespace])).code).toBe(0);
-  const config = (await ctx.store.config())!;
-  R = new Platform(config.register!.scope); wire(R.name); await R.restart();
-  net.hold = (envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; };
-  const secret = (await ctx.store.secret(config.key))!;
-  return { config, pause, fetch: routed as unknown as Fetch, secret, session: { service: "https://scopes.test", secret, now: ctx.now! }, done: () => { for (const name of wired) platformOutside.delete(name); platformNet.secret = null; platformNet.sessions = false; platformNet.inspector = null; net.hold = null; } };
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  const lifetime = nativeFixtureLifetime(owner);
+  try {
+    const host = ownHost();
+    // STAND-IN namespace: each repository uses the existing OwnGit fixture;
+    // a register can create more than one repository in this namespace.
+    const repositories = new Map<string, OwnGit>();
+    const namespace: ArtifactsNamespace = {
+      create: async (name) => { lifetime.active(); if (repositories.has(name)) throw new Error("ALREADY_EXISTS"); const repo = new OwnGit(); repositories.set(name, repo); return repo.ns.create(name); },
+      get: async (name) => { lifetime.active(); const repo = repositories.get(name); if (!repo) throw new Error("repository not created"); return repo.ns.get(name); },
+      delete: async () => false,
+    };
+    const hostFetch = async (request: Request) => {
+      lifetime.active();
+      const name = new URL(request.url).pathname.split("/")[3]?.replace(/\.git$/, "");
+      const repo = name ? repositories.get(name) : undefined;
+      return repo ? lifetime.wait(() => repo.fetch(request)) : new Response("no repository", { status: 404 });
+    };
+    let R: Platform;
+    const wire = (name: ScopeId) => { lifetime.active(); lifetime.outside(name, (given, sql) => artifactsOutside(given, sql, { ...host.bindings(R.name), ARTIFACTS: namespace }, hostFetch)); };
+    const pause = async (waiting: readonly ScopeId[] = []) => {
+      const nodes = [R, ...waiting.filter(name => name !== R.name).map(name => lifetime.platform(name))];
+      await driveFixture(nodes, lifetime.wait);
+    };
+    const fetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
+    const ctx: Context = { store: memoryStore(), fetch, now: lifetime.now, pause };
+    expect((await lifetime.wait(() => command(ctx, ["install", "https://scopes.test", "--host", host.host, "--namespace", host.namespace]))).code).toBe(0);
+    const config = (await lifetime.wait(() => ctx.store.config()))!;
+    R = lifetime.platform(config.register!.scope); wire(R.name); await lifetime.wait(() => R.restart());
+    lifetime.setHold(envelope => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; });
+    const secret = (await lifetime.wait(() => ctx.store.secret(config.key)))!;
+    return { config, pause, fetch, secret, session: { service: "https://scopes.test", secret, now: ctx.now! }, lifetime, done: lifetime.release };
+  } catch (error) { lifetime.release(); throw error; }
 }
 // Test stand-in for Web Locks: queues every caller sharing the same lock name.
 function testLocks(): ClaimLocks {
@@ -75,34 +72,37 @@ function activeKept(bytes: string): any {
 // Real Worker routes, register/directory/membership/rules/destination and signed
 // reads. STAND-INs: demo's Git host and scheduler, local storage and HTTP loss.
 test("the browser's native claim survives lost founding and enrollment replies without replacement requests; unsafe configuration or failed storage submits nothing (Git host, scheduler, storage and loss STAND-INs)", async () => {
-  const clock = net.clock.now;
   const d = await registerFixture();
+  const claimRoom: typeof nativeClaimRoom = (...args) => d.lifetime.wait(() => nativeClaimRoom(...args));
   try {
     const secret = d.secret;
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     let failWrites = false;
     let dropWrites = false;
-    const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { if (failWrites) throw new Error("private storage full"); if (!dropWrites) values.set(key, value); } };
+    const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { d.lifetime.active(); if (failWrites) throw new Error("private storage full"); if (!dropWrites) values.set(key, value); } };
     const sent: SignedIntent[] = [];
     let entered!: () => void;
     let release!: () => void;
     const blocked = new Promise<void>((resolve) => { entered = resolve; });
     const released = new Promise<void>((resolve) => { release = resolve; });
+    d.lifetime.cleanup(() => release());
     let unavailableSettlement = false;
     let lose: "before-found" | "after-seat" | null = null;
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
+      d.lifetime.active();
       const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? (JSON.parse(init.body) as { signed?: SignedIntent }).signed : undefined;
       if (signed) sent.push(structuredClone(signed));
       if (new URL(url).pathname.endsWith("/settle") && unavailableSettlement) return Response.json({ ok: false, reason: "unavailable" });
-      if (signed?.intent.kind === "found" && lose === "before-found") { lose = null; entered(); await released; throw new Error("loss before delivery"); }
-      const response = await (d.fetch as unknown as typeof globalThis.fetch)(url, init);
-      if (signed?.intent.kind === "seat" && lose === "after-seat") { lose = null; await response.body?.cancel(); throw new Error("loss after accepted seat"); }
+      if (signed?.intent.kind === "found" && lose === "before-found") { lose = null; entered(); await released; d.lifetime.active(); throw new Error("loss before delivery"); }
+      const response = await d.fetch(url, init);
+      if (signed?.intent.kind === "seat" && lose === "after-seat") { lose = null; await d.lifetime.wait(async () => { await response.body?.getReader().cancel(); }); throw new Error("loss after accepted seat"); }
       return response;
-    }) as unknown as Fetch;
+    };
     const session = { ...d.session, fetch };
     const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks() };
     const kinds = () => sent.map((signed) => signed.intent.kind);
+    await expect(claimRoom(session, { ...configured, definition: "platform:register@2" }, storage, "My local label", options)).rejects.toThrow("pinned version");
     await expect(claimRoom(session, { ...configured, definition: "platform:register@1" }, storage, "My local label", options)).rejects.toThrow("pinned version");
     await expect(claimRoom({ ...session, secret: crypto.getRandomValues(new Uint8Array(32)) }, configured, storage, "My local label", options)).rejects.toThrow("cannot be read");
     expect(sent).toEqual([]);
@@ -116,15 +116,17 @@ test("the browser's native claim survives lost founding and enrollment replies w
     dropWrites = false;
     lose = "before-found";
     const first = claimRoom(session, configured, storage, "My local label", options);
+    void first.catch(() => {});
     await blocked;
     const second = claimRoom(session, configured, storage, "An edited label must not replace the request", { ...options, mode: "resume" });
+    void second.catch(() => {});
     // A second caller waits outside the durable record while the first found
     // is in flight; it cannot replace the recovery key or envelope.
     await Promise.resolve();
     const inFlight = [...values.values()][0]!;
     expect(sent).toHaveLength(1);
-    net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000);
-    await new Platform(configured.register.scope).restart();
+    d.lifetime.advance(30_000);
+    await d.lifetime.platform(configured.register.scope).restart();
     lose = "after-seat";
     release();
     const unknown = await first;
@@ -141,7 +143,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
     const seatRecord = activeKept([...values.values()][0]!);
     expect(seatRecord.label).toBe("My local label");
     expect(sent.filter((signed) => signed.intent.kind === "found")).toEqual([original, original]);
-    const M = new Platform(seatRecord.config.claim.repository.membership.scope);
+    const M = d.lifetime.platform(seatRecord.config.claim.repository.membership.scope);
     await M.restart();
     const complete = await claimRoom(session, configured, storage, "Retry", options);
     expect(complete.outcome.code, complete.outcome.lines.join("\n")).toBe(0);
@@ -173,7 +175,7 @@ test("the browser's native claim survives lost founding and enrollment replies w
     expect(substituted.outcome.lines.join("\n")).toContain("repository references do not match");
     expect(sent).toHaveLength(count);
     values.set(storageKey, completeBytes);
-  } finally { d.done(); net.clock.now = clock; }
+  } finally { d.done(); }
 });
 
 // Invariant: a claim queued or prepared under a room/key/register that is no
@@ -181,16 +183,17 @@ test("the browser's native claim survives lost founding and enrollment replies w
 // and can resume only when that original context is selected again.
 // The scopes/routes are real; Git host, scheduler, storage and lock are STAND-INs.
 test("a changed Page context stops queued and prepared native claims before delivery, preserving found, seat and first-key for exact original-context recovery (Git host, scheduler, storage and locks STAND-INs)", async () => {
-  const clock = net.clock.now;
   const d = await registerFixture();
+  const claimRoom: typeof nativeClaimRoom = (...args) => d.lifetime.wait(() => nativeClaimRoom(...args));
   try {
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
     let selected = true;
     let invalidate: "found" | "seat" | "firstKey" | null = null;
     const storage: ClaimStorage = {
       getItem: (key) => values.get(key) ?? null,
       setItem: (key, value) => {
+        d.lifetime.active();
         values.set(key, value);
         const step = invalidate === null ? null : activeKept(value).config.claim?.[invalidate];
         if (step?.signed && !step.accepted) { selected = false; invalidate = null; }
@@ -198,19 +201,22 @@ test("a changed Page context stops queued and prepared native claims before deli
     };
     let reads = 0;
     const sent: SignedIntent[] = [];
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
+      d.lifetime.active();
       reads++;
       if (new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string") sent.push(structuredClone(JSON.parse(init.body).signed));
-      return routed(url, init);
-    }) as unknown as Fetch;
+      return d.fetch(url, init);
+    };
     const session = { ...d.session, fetch };
     const options: ClaimOptions = { mode: "new", pause: d.pause, tries: 16, locks: testLocks(), current: () => selected };
     let release!: () => void;
     const queuedGate = new Promise<void>((resolve) => { release = resolve; });
+    d.lifetime.cleanup(() => release());
     let entered!: () => void;
     const waiting = new Promise<void>((resolve) => { entered = resolve; });
-    const queuedLocks: ClaimLocks = { request: async (_name, run) => { entered(); await queuedGate; return run(); } };
+    const queuedLocks: ClaimLocks = { request: async (_name, run) => { entered(); await queuedGate; d.lifetime.active(); return run(); } };
     const queued = claimRoom(session, configured, storage, "Original label", { ...options, locks: queuedLocks });
+    void queued.catch(() => {});
     await waiting;
     selected = false;
     release();
@@ -238,12 +244,12 @@ test("a changed Page context stops queued and prepared native claims before deli
       expect([reads, [...values.values()][0]!]).toEqual([before, saved]);
       selected = true;
     }
-    net.clock.now = timeOf(timeMs(net.clock.now)! + 30_000);
+    d.lifetime.advance(30_000);
     const complete = await claimRoom(session, configured, storage, "Replacement label", options);
     expect([complete.outcome.code, complete.pending, complete.label]).toEqual([0, false, "Original label"]);
     expect(sent).toEqual([originals.found, originals.seat, originals.firstKey]);
     expect(complete.repository).not.toBeNull();
-  } finally { d.done(); net.clock.now = clock; }
+  } finally { d.done(); }
 });
 
 // Invariant: explicit New creates a distinct durable operation and native room
@@ -251,20 +257,21 @@ test("a changed Page context stops queued and prepared native claims before deli
 // one original operation, and neither pending work nor an archived proof is
 // replaced by a label edit, a queued duplicate New action, or another context.
 test("explicit new creates another native directory while exact operation resume, pending conflict, stale new and legacy migration preserve original proofs (Git host, scheduler, storage and locks STAND-INs)", async () => {
-  const clock = net.clock.now;
   const d = await registerFixture();
+  const claimRoom: typeof nativeClaimRoom = (...args) => d.lifetime.wait(() => nativeClaimRoom(...args));
   try {
-    const configured = { register: d.config.register!, definition: "platform:register@2" as const };
+    const configured = { register: d.config.register!, definition: "platform:register@3" as const };
     const values = new Map<string, string>();
-    const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); } };
+    const storage: ClaimStorage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { d.lifetime.active(); values.set(key, value); } };
     let loseFound = true;
     const sent: SignedIntent[] = [];
-    const fetch = (async (url: string, init?: RequestInit) => {
+    const fetch: Fetch = async (url, init) => {
+      d.lifetime.active();
       const signed = new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" ? JSON.parse(init.body).signed as SignedIntent : undefined;
       if (signed) sent.push(structuredClone(signed));
       if (signed?.intent.kind === "found" && loseFound) { loseFound = false; throw new Error("scripted loss before found"); }
-      return routed(url, init);
-    }) as unknown as Fetch;
+      return d.fetch(url, init);
+    };
     const session = { ...d.session, fetch };
     const options = { pause: d.pause, tries: 16, locks: testLocks() };
     expect(claimStatus(session, configured, storage)).toBeNull();
@@ -303,7 +310,7 @@ test("explicit new creates another native directory while exact operation resume
     // neither invents a found nor loses the original recovery/proof bytes.
     const legacyRaw = JSON.stringify(JSON.parse(firstBytes), null, 2);
     const legacyValues = new Map<string, string>([[[...values.keys()][0]!, legacyRaw]]);
-    const legacyStorage: ClaimStorage = { getItem: (key) => legacyValues.get(key) ?? null, setItem: (key, value) => { legacyValues.set(key, value); } };
+    const legacyStorage: ClaimStorage = { getItem: (key) => legacyValues.get(key) ?? null, setItem: (key, value) => { d.lifetime.active(); legacyValues.set(key, value); } };
     expect(claimStatus(session, configured, legacyStorage)).toEqual({ operation: "legacy", label: first.label, state: "complete" });
     const legacy = await claimRoom(session, configured, legacyStorage, "No replacement", { ...options, mode: "resume", operation: "legacy" });
     expect([legacy.repository, sent.length]).toEqual([first.repository, beforeResume]);
@@ -319,5 +326,5 @@ test("explicit new creates another native directory while exact operation resume
     await expect(claimRoom(session, configured, storage, "Another", { ...options, mode: "new", operation: full.active })).rejects.toThrow("journal is full");
     expect(sent).toHaveLength(beforeResume);
     expect([...values.values()][0]! === saturated).toBe(true);
-  } finally { d.done(); net.clock.now = clock; }
+  } finally { d.done(); }
 });

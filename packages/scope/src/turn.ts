@@ -266,14 +266,14 @@ export class Turns {
     }
   }
 
-  #timed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" {
+  #timed(definition: ValidDefinition, turn: Counts, selected: Due, snapshot: Head): "written" | "dropped" | "clock-behind" | "unfit" {
     return this.#store.transaction(() => {
       const clock = clockOf(this.#store, this.#ports.clock.read());    // 6.1
       turn.last = clock;
       const head = this.#store.scope()?.head;
       if (head?.seq !== snapshot.seq || head.hash !== snapshot.hash) return "dropped";   // 6.2
-      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds, capabilities: this.#ports.capabilities ?? undefined });   // 6.3 and 6.4
-      if (judged.result === "unavailable") return "clock-behind";
+      const judged = judgeTimed(this.#store, definition, selected, { clock, bounds: this.#bounds, capabilities: this.#ports.capabilities ?? undefined, platform: this.#platform() });   // 6.3 and 6.4
+      if (judged.result === "unavailable") return judged.reason === "clock-behind" ? "clock-behind" : "unfit";
       if (judged.result === "dropped") return "dropped";
       this.#seal(definition, judged.draft, clock, []);                 // 6.5
       turn.wrote = true;

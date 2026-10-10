@@ -46,10 +46,11 @@ import { Dispatcher, Wakes } from "./outbox.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
-import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
+import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading, type SignedReadObserver } from "./signed-reads.ts";
 import { LATE, within } from "./turn.ts";
 import { SqliteStore } from "./sqlite.ts";
 import type { Duty, OperationStatus, Sealed, Store } from "./store.ts";
+import { siteDestination, sitePublication, sitePublishedCommit } from "./site/publication.ts";
 
 /**
  * What a deployment gives a scope in place of a default. `authority`: the
@@ -89,6 +90,8 @@ export interface Wiring {
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
   limits?: LimitConfig;
+  /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
+  signedReadObserver?: SignedReadObserver;
 }
 
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
@@ -178,7 +181,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       const read = await within(() => ports.resolver.read(use.fact, bounds.fetchSeconds), bounds.fetchSeconds);
       return read !== LATE && read !== null && "entry" in read && isEntryOf(read.entry, use.fact) ? read.entry : null;
     });
-    this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains };
+    this.#signed = { clock: ports.clock, window: bounds.intentLifetimeSeconds, chains: this.#chains, ...(wiring.signedReadObserver ? { observe: wiring.signedReadObserver } : {}) };
     this.#readers = ports.readers;
     this.#reads = new Reads(store, () => this.#scope.pinned(), ports.readers, wiring.reads ?? READ_BOUNDS, record, this.#signed, () => this.#scope.owners());
     this.#deliveries = new Deliveries(this.#name, this.#scope, store, ports, bounds);
@@ -282,6 +285,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
   source(seq: number): Sourced | null { this.#first(); return sourced(this.#store, this.#scope.pinned(), seq); }
+  /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
+  siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
+  siteRoom() {
+    if ((this.#store.storedBytes(0) ?? 0) > 1024 * 1024 || (this.#store.scopeBytes() ?? 0) > 1024 * 1024) throw new Error("publication-history-limit");
+    return sourced(this.#store, this.#scope.pinned(), 0);
+  }
+  sitePublication(directory: unknown, repository: unknown) { return sitePublication(this.#store, this.#scope.pinned()?.named, directory, repository); }
+  sitePublishedCommit(directory: unknown, repository: unknown, commit: unknown) { return sitePublishedCommit(this.#store, this.#scope.pinned()?.named, directory, repository, commit); }
   /** The bytes of one declaration this scope retains, for a child that is about to write its genesis (sections 7.2 and 9.2). */
   declared(digest: Digest): string | null { this.#first(); return declaredBy(this.#store, digest); }
   /** A detached text that a send of this scope's entry at `seq` names, for the scope that received that send (section 6.2). */
@@ -331,8 +342,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    */
   async #rooted(reader: unknown, read: ReadName, arg: string): Promise<void> {
     if (presentsSignedRead(reader)) {
-      if (!("key" in checkSignedReadRequest(this.#signed, this.#store, reader as string, read, arg))) return;
-      const local = checkLocalSignedRead(this.#signed, this.#store, reader as string, read, arg);
+      if (!("key" in checkSignedReadRequest(this.#signed.observe ? { ...this.#signed, phase: "rooted-request" } : this.#signed, this.#store, reader as string, read, arg))) return;
+      const local = checkLocalSignedRead(this.#signed.observe ? { ...this.#signed, phase: "rooted-local" } : this.#signed, this.#store, reader as string, read, arg);
       // The register's recent local signers read its whole history (ca8ad1cf).
       if ("key" in local && this.#store.scope()?.at.kind === "register") return;
       if (read === "summary" || read === "entry") {
@@ -367,6 +378,21 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async retained(reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { this.#first(); await this.#prepared(reader, "retained"); await this.#rooted(reader, "retained", retainedReadArgument(kind, digest, domain)); return this.#reads.retained(reader, kind, digest, domain); }
   async incidents(reader: unknown, cursor?: Cursor): Promise<Read<readonly Incident[]>> { this.#first(); await this.#prepared(reader, "incidents"); return this.#reads.incidents(reader, cursor); }
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
+
+  /** Internal namespace read of one exact job's current state. */
+  async jobState(fact: import("@generalbusiness/artroom-contract").FactRef): Promise<{ state: string; decidedBy: import("@generalbusiness/artroom-contract").FactRef | null } | null> {
+    this.#first(); const scope = this.#store.scope(); const sealed = this.#store.stored(fact.seq);
+    if (!scope || !sealed || fact.at.scope !== scope.at.scope || fact.at.inc !== scope.at.inc || sealed.hash !== fact.hash) return null;
+    const item = this.#store.item(fact.seq);
+    const deciding = item?.refs["decidedBy"];
+    const entry = typeof deciding === "number" ? this.#store.stored(deciding) : null;
+    return item?.type === "job" ? { state: item.state, decidedBy: entry ? { at: scope.at, seq: deciding as number, hash: entry.hash } : null } : null;
+  }
+  /** Authenticated by the signed job-read request and current configured checker. */
+  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> {
+    this.#first();
+    try { return await this.#outside.snapshot?.(asked) ?? null; } catch { return null; }
+  }
 
   /**
    * The one-time read of a member's read token at a destination, by its handle (the planner's decision for I5). Only a session

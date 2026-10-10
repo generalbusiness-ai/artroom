@@ -1,8 +1,10 @@
 import { answerText, nonacceptedAnswerText } from "../src/view.ts";
-import { expect, test } from "vitest";
-import type { SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import type { Fetch } from "@generalbusiness/artroom-client";
+import { expect, test, vi } from "vitest";
+import type { SignedIntent, SignedRead } from "@generalbusiness/artroom-contract";
+import * as bytes from "@generalbusiness/artroom-bytes";
+import { b64url, definitionDigest, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { changeDemo } from "@generalbusiness/artroom-lanes";
+import { Session as ReadSession, type Fetch } from "@generalbusiness/artroom-client";
 import { joinAssociation, joinRoom, placeOf, type Session } from "../src/index.ts";
 
 // One client boundary, with a SCRIPTED service acknowledgment. No scope,
@@ -79,15 +81,23 @@ test("incomplete projections stay unreadable and a real returned submit answer s
   const ref = (letter: string, kind: string) => ({ scope: `sc_${letter.repeat(51)}a` as const, inc: newIncarnation(new Uint8Array(16).fill(3)), kind });
   const M = ref("b", "membership"), R = ref("c", "rules"), G = ref("d", "destination"), C = ref("e", "lane");
   const head = { seq: 0, hash: textDigest("scripted head") };
+  const changeDigest = definitionDigest(changeDemo);
   const item = (type: string, id = 0, refs = {}) => ({ id, type, state: "open", revision: 1, opened: null, attributed: [], parties: {}, values: {}, refs });
   let mode: "complete" | "item-refused" | "item-budget" | "destination-incomplete" | "history-incomplete" | "act-refresh" = "complete";
   let itemReads = 0, submits = 0;
   let receipt: unknown;
   const kept = new Map<string, Acted>();
   let room: Room;
+  let refusedRenewal = false;
+  const readers: string[] = [];
   const read = (value: unknown, complete = true, next?: string) => new Response(JSON.stringify({ ok: true, at: head, value, complete, ...(next === undefined ? {} : { next }) }));
   const fetch: Fetch = async (address, init) => {
     const url = new URL(address), path = url.pathname;
+    if (path.endsWith("/sessions")) {
+      expect(refusedRenewal).toBe(true);
+      return Response.json({ ok: false, reason: "sessions-unavailable" });
+    }
+    if (!path.endsWith("/acts")) readers.push(init?.headers?.["authorization"] ?? "");
     if (path.endsWith("/acts")) {
       submits++;
       const { signed } = JSON.parse(init!.body!) as { signed: SignedIntent };
@@ -108,11 +118,29 @@ test("incomplete projections stay unreadable and a real returned submit answer s
       return new Response(JSON.stringify({ ok: false, reason: "forbidden" }));
     }
     const scope = path.endsWith(M.scope) ? M : path.endsWith(R.scope) ? R : path.endsWith(G.scope) ? G : C;
-    const definition = scope === C ? textDigest("scripted change") : `platform:${scope.kind}@1`;
+    const definition = scope === C ? changeDigest : `platform:${scope.kind}@1`;
     const items = scope === M ? [item("roster")] : scope === R ? [item("rules")] : scope === C ? [item("proposal")] : [item("publication", 3, { operation: { at: C, seq: 5, hash: textDigest("scripted merge") } })];
     return read({ scope, status: "active", definition, time: "2026-10-08T12:00:00Z", counts: [], items }, !(scope === G && mode === "destination-incomplete"));
   };
-  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", definitions: new Map([[textDigest("scripted change"), { name: "change" } as Room["definitions"] extends Map<string, infer T> ? T : never]]) };
+  room = { session: { service: "https://page.test", secret: new Uint8Array(32).fill(7), fetch, now: () => Date.parse("2026-10-08T12:00:00Z") }, directory: ref("a", "directory").scope, membership: M as Room["membership"], rules: R.scope, destination: G.scope, key: "" as Room["key"], me: null, reader: null, unsessioned: "scripted", definitions: new Map([[changeDigest, changeDemo]]) };
+  // Real signer and HTTP transport, SCRIPTED reads/session refusal. A fixed
+  // session handle derives no read key; after renewal is refused a new null
+  // handle keeps the real authenticated signed-read fallback.
+  const claims = { v: 1 as const, deployment: "scripted", membership: room.membership, member: "@operator" as const, key: keyIdOfSecret(room.session.secret), reads: ["summary"], ends: "2026-10-08T12:01:00Z" };
+  const derivations = vi.spyOn(bytes, "keyIdOfSecret");
+  try {
+    room.reader = new ReadSession("scripted-reader", claims);
+    expect((await loadRules(room)).definitions).toEqual([]);
+    expect([derivations.mock.calls.length, readers.length > 0, readers.every(reader => reader === "Session scripted-reader")]).toEqual([0, true, true]);
+    room.reader = new ReadSession("scripted-reader", { ...claims, ends: "2026-10-08T12:00:05Z" });
+    refusedRenewal = true; readers.length = 0;
+    expect((await loadRules(room)).definitions).toEqual([]);
+    expect([room.reader, room.unsessioned, derivations.mock.calls.length]).toEqual([null, "sessions-unavailable", 3]);
+    const signed = bytes.parseStrictBytes(bytes.unb64url(readers.find(reader => reader.startsWith("Signed "))!.slice("Signed ".length))!) as SignedRead;
+    expect([bytes.verifySignedRead(signed), signed.request.read]).toEqual([true, "summary"]);
+  } finally {
+    derivations.mockRestore(); refusedRenewal = false; room.reader = null;
+  }
   expect((await loadRules(room)).definitions).toEqual([]); // Distinguishing complete empty enumeration.
   mode = "item-refused";
   await expect(loadRules(room)).rejects.toThrow("forbidden");

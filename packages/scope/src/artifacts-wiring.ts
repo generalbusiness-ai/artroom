@@ -12,7 +12,7 @@ import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-b
 import { destinationBranch, isOf } from "@generalbusiness/artroom-platform";
 import { ArtifactsProvider, type ArtifactsNamespace, type CreationCustody } from "./artifacts-host.ts";
 import { CredentialStore } from "./credential-store.ts";
-import { DestinationHost, type DestinationRepository } from "./destination-host.ts";
+import { DestinationHost, type SnapshotReader, type DestinationRepository } from "./destination-host.ts";
 import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
 import type { OutsideGiven } from "./object.ts";
 import { NO_OUTSIDE, type EffectRequest, type Outside } from "./operations.ts";
@@ -74,7 +74,7 @@ function creationCustody(sql: Pick<SqlStorage, "exec">, current: () => string | 
 }
 
 /** Factory for one object life. Its scope/state reads stay live across genesis and later entries. */
-export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: ArtifactsBindings, fetch?: (request: Request) => Promise<Response>): Outside {
+export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: ArtifactsBindings, fetch?: (request: Request) => Promise<Response>, snapshotReader?: SnapshotReader): Outside {
   try {
     const config = configuration(env.ARTIFACTS_CONFIG);
     const namespaceBinding = binding(env.ARTIFACTS);
@@ -90,7 +90,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
     });
     const register = new RegisterHost(given, { host, namespace, provider });
     const custody = new CredentialStore(sql, () => given.scope()?.at ?? null);
-    const destination = new DestinationHost(given, { host, namespace, provider, custody });
+    const destination = new DestinationHost(given, { host, namespace, provider, custody, ...(snapshotReader ? { snapshotReader } : {}) });
     const bound = hostBound(given, config.registerScope, host, namespace);
     const accepts = (owner: string, kind: string): boolean => bound(owner) && (isOf(owner, "platform:register") ? register.accepts(owner, kind) : destination.accepts(owner, kind));
     const send = (request: EffectRequest) => !accepts(request.owner, request.kind) ? Promise.resolve(null) : isOf(request.owner, "platform:register") ? register.send(request) : destination.send(request);
@@ -98,6 +98,8 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
     // repeated read is not free of mutation.
     return {
       accepts, send,
+      recovery: { accepts: (owner, kind) => kind === "check-judge" && accepts(owner, kind), read: (request) => request.kind === "check-judge" && accepts(request.owner, request.kind) ? destination.send(request) : Promise.resolve(null) },
+      snapshot: (asked) => bound(given.genesis()?.seed.definition ?? "") ? destination.snapshot(asked) : Promise.resolve(null),
       judged: (at, sealed) => destination.judged(at, sealed),
       replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },
       credential: (handle, key) => bound(given.genesis()?.seed.definition ?? "") ? destination.credential(handle, key) : null,

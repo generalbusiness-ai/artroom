@@ -1,11 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { Entry, OperationId, Receipt, Seed } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, seedDigest, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { EffectRequest } from "../../scope/src/operations.ts";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { DIRECTORY_OF, repositoryName } from "@generalbusiness/artroom-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
 import { command, memoryStore, type Context } from "../src/index.ts";
@@ -27,29 +27,23 @@ const reader = "a test reader";
 describe("install --plan and --planned. The Git host and the scheduler are STAND-INs", () => {
   test("the planned register ID is the founded one; with the host pinned to it before the install, a claim creates its repository in one run with no restart, sent once; a mismatched or expired plan is refused by name and sends nothing; a plain install founds another register; the config holds no secret", async () => {
     net.hold = net.deaf = null;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     try {
       await planned();
     } finally {
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
     }
   });
 
   test("the attempted marker precedes submission; accepted reply or config-save loss recovers the same founding after expiry, while an unsent expired plan sends nothing and an attempted unaccepted expired founding is refused", async () => {
     const clock = net.clock.now;
-    platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    platformNet.sessions = true;
-    platformNet.inspector = reader;
+    const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+    onTestFinished(owner.close);
     try { await recovering(); }
     finally {
       net.clock.now = clock;
-      platformNet.secret = null;
-      platformNet.sessions = false;
-      platformNet.inspector = null;
+      owner.close();
     }
   });
 });

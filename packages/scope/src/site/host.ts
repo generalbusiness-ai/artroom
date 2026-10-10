@@ -5,8 +5,8 @@
  * The room is read from the directory's genesis entry: the repository
  * record `{ host, namespace, name, id }` and the published branch, which
  * the register's `create` gave it. The entry is read through the object's
- * `source` method, the one that scopes use to check each other's sends: it
- * checks no reader. Only a directory that the register pinned in the host's
+ * `siteRoom` method, which checks no reader and starts no outside work.
+ * Only a directory that the register pinned in the host's
  * setting created is a room here, as only that register and its
  * destinations may use the host (`host-wiring.ts`, `hostBound`).
  *
@@ -16,9 +16,9 @@
  * with none when the setting says reads are public.
  */
 import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
-import { isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
 import { isOf } from "@generalbusiness/artroom-platform";
-import type { GitSource } from "@generalbusiness/artroom-git";
+import { READ_BOUNDS, type GitSource } from "@generalbusiness/artroom-git";
 import { githubRepository, type GitHubAccount } from "@generalbusiness/artroom-git/github";
 import { requireGitHubRepositoryIdentity } from "../github-host.ts";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
@@ -27,6 +27,7 @@ import { ARTIFACTS_HOST, type ArtifactsBindings } from "../artifacts-wiring.ts";
 import type { DestinationRepository } from "../destination-host.ts";
 import type { GitHubBindings } from "../github-wiring.ts";
 import type { Binding, Sourced } from "../namespace.ts";
+import type { Publication, PublishedCommitSelection, SitePublicationPeer } from "./publication.ts";
 
 export const GITHUB_HOST = "github.com";
 
@@ -37,6 +38,35 @@ export interface Room {
   repository: DestinationRepository;
   /** The published branch's name, without `refs/heads/`. */
   branch: string;
+}
+
+/** Read the room's confirmed destination and its publication, never provider refs. */
+export async function publicationOf(scopes: Binding, directory: string, room: Room): Promise<Publication | null> {
+  const directoryObject = scopes.get(scopes.idFromName(directory)) as SitePublicationPeer & { siteRoom(): Promise<Sourced | null> };
+  const source = await directoryObject.siteRoom();
+  if (!source || source.at.scope !== directory || source.at.kind !== "directory") return null;
+  const destination = await directoryObject.siteDestination();
+  if (!destination || destination.kind !== "destination") return null;
+  const object = scopes.get(scopes.idFromName(destination.scope)) as SitePublicationPeer;
+  const publication = await object.sitePublication(source.at, room.repository);
+  if (!publication || canonicalize(publication.at) !== canonicalize(destination)) return null;
+  return publication;
+}
+
+/** Validate the complete native identity at the internal immutable selector boundary. */
+export async function publishedCommitOf(scopes: Binding, directory: string, room: Room, commit: string): Promise<PublishedCommitSelection> {
+  const absent = { ok: false, reason: "not-published" } as const;
+  const directoryObject = scopes.get(scopes.idFromName(directory)) as SitePublicationPeer & { siteRoom(): Promise<Sourced | null> };
+  const source = await directoryObject.siteRoom();
+  if (!source || source.at.scope !== directory || source.at.kind !== "directory") return absent;
+  const destination = await directoryObject.siteDestination();
+  if (!destination || destination.kind !== "destination") return absent;
+  const object = scopes.get(scopes.idFromName(destination.scope)) as SitePublicationPeer;
+  const selected = await object.sitePublishedCommit(source.at, room.repository, commit);
+  if (!selected.ok) return selected;
+  const proof = selected.proof;
+  return canonicalize(proof.at) === canonicalize(destination) && canonicalize(proof.directory) === canonicalize(source.at)
+    && canonicalize(proof.repository) === canonicalize(room.repository) && proof.commit === commit ? selected : absent;
 }
 
 /** A source for one repository, and how to end it: a minted read token is revoked. */
@@ -93,8 +123,8 @@ const record = (value: unknown): Record<string, unknown> | null => (typeof value
  */
 export async function roomOf(scopes: Binding, directory: string): Promise<Room | null> {
   if (!isScopeId(directory)) return null;
-  const object = scopes.get(scopes.idFromName(directory)) as { source(seq: number): Promise<Sourced | null> };
-  const sourced = await object.source(0);
+  const object = scopes.get(scopes.idFromName(directory)) as { siteRoom(): Promise<Sourced | null> };
+  const sourced = await object.siteRoom();
   if (!sourced || sourced.at.kind !== "directory" || sourced.at.scope !== directory || sourced.bytes === null) return null;
   const entry = parseStrict(sourced.bytes) as unknown as Entry;
   const input = entry.input;
@@ -145,7 +175,7 @@ export function readerOf(env: SiteEnv, room: Room, fetch?: (request: Request) =>
         throw e;
       }
     };
-    return { source: new SmartHttpSource({ remote, maxBytes, ...(authorization === undefined ? {} : { authorization }), fetch: traced }), last: () => last };
+    return { source: new SmartHttpSource({ remote, maxBytes: Math.min(maxBytes, 16 * 1024 * 1024), bounds: { ...READ_BOUNDS, commitBytes: 1024 * 1024, treeBytes: 8 * 1024 * 1024, blobBytes: 1024 * 1024 + 1, closureObjects: 4096, refs: 4096 }, ...(authorization === undefined ? {} : { authorization }), fetch: traced }), last: () => last };
   };
   if (repository.host === ARTIFACTS_HOST) {
     const config = setting(env.ARTIFACTS_CONFIG);

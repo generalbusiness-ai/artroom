@@ -1,7 +1,7 @@
+import { beginSessionChild } from "../../scope/test/session-settings.ts";
 import { expect, test } from "vitest";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet } from "@generalbusiness/artroom-scope/testing/worker";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { act, actsOn, changeStates, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, siteAddress, Unreadable } from "../src/index.ts";
 import { SERVICE, demo } from "./support/demo.ts";
@@ -45,17 +45,16 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     // With no session secret, membership gives no session, and the page reads by signed reads: rita's key signed acts of the rules
     // scope and her claim caused the directory, within the window, so she reads; una's key signed none of the directory, so her read
     // of it is refused.
-    const secret = platformNet.secret;
-    platformNet.secret = null;
+    const unavailableSecret = beginSessionChild(d.sessionOwner, { secret: null });
     try {
-      const signed = await openRoom(d.as(ritas), place);
+      const signed = await openRoom(d.as(ritas, unavailableSecret), place);
       expect([signed.reader, signed.unsessioned, signed.me?.handle]).toEqual([null, "sessions-unavailable", "@rita"]);
       // Limited signed reads do not authorize retained-item enumeration. The
       // page must show that refusal rather than a partial definition list.
       await expect(loadRules(signed)).rejects.toThrow(new Unreadable(`Cannot read definition items of ${d.rules.name}: forbidden.`));
-      await expect(openRoom(d.as(unas), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
+      await expect(openRoom(d.as(unas, unavailableSecret), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
     } finally {
-      platformNet.secret = secret;
+      unavailableSecret.close();
     }
 
     const forRita = await openRoom(d.as(ritas), place);
@@ -95,7 +94,7 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     let change = await loadChange(forUna, readme.scope);
     expect(change.proposal).toEqual(expect.any(Number));
     expect(change.manifests.map((m) => m.file)).toEqual([{ path: "README.md", digest: expect.stringMatching(/^sha256:/), size: 37, page: `${SERVICE}/site/${d.D.name}/HEAD/README.md`, content: "# The handbook\n\nWritten by the room.\n" }]);
-    expect([change.merges.map((m) => [m.state, m.commit, m.publication?.state])]).toEqual([[["published", head1, "published"]]]);
+    expect([change.merges.map((m) => [m.state, m.commit, m.publication?.state])]).toEqual([[["published", head1, "cleaned"]]]);
     expect(changeStates(change).map((s) => s.state)).toEqual(["publication confirmed", ...change.merges[0]!.publication!.operations.map(() => "effect confirmed")]);
     // The published file, read back through the site route at the address the page links to.
     const shown = await loadSite(forUna, "README.md");

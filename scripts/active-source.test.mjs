@@ -76,7 +76,8 @@ test("the git package depends only on contract and bytes, and only scope, checke
 
 // The checkers package is the checker service: a separate service with its own key, and not a scope (I3 plan, section 3.1). It
 // depends only on contract, bytes and git. No package names it. The lanes' scenario of a check reads its origin read and its signer
-// by path, in a test, and no source file of any package does.
+// by path, in a test. The manifest scenario also runs the actual checker service
+// against a real lane and a job-bound snapshot. No production source reaches it.
 test("the checkers package depends only on contract, bytes and git, and no package names it", () => {
   assert.ok(files.includes("packages/checkers/package.json"), "the checkers package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
@@ -85,5 +86,5 @@ test("the checkers package depends only on contract, bytes and git, and no packa
   const named = files.filter((f) => source(f) && !f.startsWith("packages/checkers/"));
   assert.deepEqual(named.filter((f) => /artroom-checkers/.test(text(f))), []);
   const reaches = files.filter((f) => source(f) && !f.startsWith("packages/checkers/") && /[.\/]\/checkers\//.test(text(f)));
-  assert.deepEqual(reaches, ["packages/lanes/test/checks.scope.test.ts"]);
+  assert.deepEqual(reaches, ["packages/lanes/test/checks.scope.test.ts", "packages/lanes/test/manifest-tree.scope.test.ts"]);
 });

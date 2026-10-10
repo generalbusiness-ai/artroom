@@ -25,7 +25,7 @@
  * | 7 | `outcomes`, by the kind of each operation that the definition owns | `OutcomeMark` |
  */
 
-import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule, Subject, Where } from "./definition.ts";
+import type { ActType, AlsoRule, DeclaredDefinition, EffectForm, FieldType, Guard, ItemType, ReceiveType, ResultClauses, SendForm, SlotRule, Subject, TimedRule, Where } from "./definition.ts";
 import type { FieldValue } from "./intent.ts";
 import type { ClauseObserves, Observe, Origin } from "./observes.ts";
 
@@ -200,7 +200,12 @@ export type PlatformItem = Omit<ItemType, "refs" | "values"> & {
  * (section 4.3), with the one send that such an entry may make. A timed
  * rule holds no mark: its effects are total.
  */
-export interface PlatformData extends Omit<DeclaredDefinition, "items" | "acts" | "receives"> {
+/** Constant, held operations opened by a platform timed transition. This is
+ * not a callback or a new user act. Only destination@3 implements the opener. */
+export type PlatformTimedRule = TimedRule & { opens?: readonly { kind: "reservation-delete" | "mint"; attempts: number }[] };
+
+export interface PlatformData extends Omit<DeclaredDefinition, "items" | "acts" | "receives" | "timed"> {
+  timed: Record<string, PlatformTimedRule>;
   items: Record<string, PlatformItem>;
   acts: Record<string, PlatformAct>;
   receives: Record<string, PlatformReceive>;

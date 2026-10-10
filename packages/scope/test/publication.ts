@@ -22,18 +22,25 @@ import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
 import type { Platform } from "./repository.ts";
+import type { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 
 /**
  * Drive the founding publication of the destination `G` to its end: the branch is `ready` at the first head, and the receipt is
  * written. The first head is the founding commit of the destination's own version, from its own records (`foundingOf`). The
  * STAND-IN host is wired for the destination while this runs, and unwired after.
  */
-export async function foundingPublication(G: Platform): Promise<void> {
+export async function foundingPublication(G: Platform, lifetime?: ReturnType<typeof nativeFixtureLifetime>): Promise<void> {
+  const wait = <T>(run: () => Promise<T>): Promise<T> => lifetime ? lifetime.wait(run) : run();
   const host = outsideOf(G.name);
   let driving = "";
-  wired.set(G.name, () => ({ outside: { accepts: (_owner, kind) => kind === driving, send: (request) => host.send(request) } }));
+  const ports = () => ({ outside: {
+    accepts: (_owner: string, kind: string) => { lifetime?.active(); return kind === driving; },
+    send: (request: import("../src/index.ts").EffectRequest) => wait(() => host.send(request)),
+  } });
+  if (lifetime) lifetime.wire(G.name, ports); else wired.set(G.name, ports);
   const drive = async (kind: string) => {
-    const answers = await runInDurableObject(G.object, (_instance, state) => {
+    const answers = await wait(() => runInDurableObject(G.object, (_instance, state) => {
+      lifetime?.active();
       const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: (closure) => state.storage.transactionSync(closure) });
       const own = (seq: number) => { const row = store.stored(seq); return row ? { entry: JSON.parse(row.bytes) as Entry, hash: row.hash } : null; };
       return store.all().operations.filter((operation) => operation.kind === kind).flatMap((operation) => operation.attempts.filter((attempt) => attempt.outcomes.length === 0).map((attempt) => {
@@ -43,16 +50,26 @@ export async function foundingPublication(G: Platform): Promise<void> {
           : { send: "accepted", seen: foundingOf(store, own, "sha1").commit };
         return { operation: operation.id as OperationId, attempt: attempt.attempt, body };
       }));
-    });
+    }));
+    lifetime?.active();
     for (const answer of answers) host.answer(answer.operation, answer.attempt, { result: "confirmed", evidence: { basis: "own-answer", body: answer.body } });
     driving = kind;
-    await G.restart();
-    await (G.stub as unknown as { effect(): Promise<number> }).effect();
+    await wait(() => G.restart());
+    await wait(() => (G.stub as unknown as { effect(): Promise<number> }).effect());
   };
   try {
     for (const kind of ["mint", "first-head", "mint", "receipt", "revoke"]) await drive(kind);
   } finally {
-    wired.delete(G.name);
-    await G.restart();
+    if (lifetime) {
+      // A finished fixture already owns synchronous resource retirement.
+      // Its continuation cannot evict an object under a successor's settings.
+      if (lifetime.current()) {
+        lifetime.unWire(G.name);
+        await wait(() => G.restart());
+      }
+    } else {
+      wired.delete(G.name);
+      await G.restart();
+    }
   }
 }

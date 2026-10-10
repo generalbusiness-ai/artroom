@@ -20,34 +20,40 @@ A page's address is:
   not a human name.
   `artroom claim` prints it ("Claimed demo: directory sc_..."), and the
   command line keeps it under the name `directory`.
-- `<ref>` is `HEAD`, a branch or a tag. `HEAD` is the room's published
-  branch, the one the room's destination writes. For a branch or a tag,
-  the Worker looks for a branch of that name first, then a tag. A name
-  that holds a `/` is written with `%2F` in its place, such as
-  `release%2F1.0`.
+- `<ref>` is `HEAD` or a published branch name. `HEAD` names the room's
+  branch at the exact head its destination records. The Worker does not
+  substitute the Git host's current branch head. A name that holds a `/`
+  uses `%2F`, such as `release%2F1.0`. A full 40-character lowercase Git
+  object ID selects an immutable native publication with a written receipt.
+  This syntax takes precedence over a branch whose name looks like that ID.
+  Short or uppercase hashes, arbitrary ancestors and provider-only branches
+  or tags confer no publication authority. The proof must match the exact
+  receipt ref, commit, tree and canonical file fetched from the same repository.
+  The current room model records one branch and no tags or named versions;
+  provider tags do not become published versions.
 - `<path>` is a file or a folder in the repository at that commit.
 
 For example, `<base-url>/site/sc_hs5f27fz.../HEAD/` opens the room's
-front page, and `<base-url>/site/sc_hs5f27fz.../v1.0/docs/setup.md` opens
-one page at the tag `v1.0`.
+front page. Use the recorded branch name for latest navigation. To preserve
+a published result, use its complete commit ID; relative links and images
+keep that same immutable prefix. Imported ancestry is not a native publication.
 
 Two more addresses:
 
 - `<base-url>/site/<directory>/`, with no ref, redirects (status 302) to
   `<base-url>/site/<directory>/HEAD/`.
-- `<base-url>/site/<directory>/versions/` is the versions page: every
-  branch and tag of the room's repository, each with the commit it names
-  and a link to its root. An annotated tag shows the commit it names, not
-  the tag object. The published branch is marked "HEAD, the published
-  branch". The list is read from the Git host, as the host advertises it.
-  Because of this address, the root of a branch or tag named `versions`
-  cannot be opened; its other paths can.
+- `<base-url>/site/<directory>/versions/` lists only the room's recorded
+  published refs and exact commits, with links to their roots. Today it
+  lists the destination's single published branch, marked "HEAD, the
+  published branch"; before its first head it lists no versions. Provider
+  branches and tags are never used to build the list. The name `versions`
+  is reserved for this listing at the root.
 
 ## What every page shows
 
 - **A header.** "Repository:" and the repository's name as the directory
-  records it, linking to the root of the same branch or tag; the branch
-  or tag shown, such as "branch main (HEAD)", "branch draft" or "tag v1.0";
+  records it, linking to the root of the same published branch; the branch
+  shown, such as "branch main (HEAD)" or "branch main";
   and a link to the versions page. This is the name the register gave the
   repository at the Git host. It is not a human claim name. Carrying a
   signed claim display name into the directory and header remains a named
@@ -89,6 +95,31 @@ extensions to it.
   started` has the id `getting-started`, and a second heading of the same
   text has `getting-started-1`.
 
+The checked-in document
+[`packages/scope/test/site/completeness/fixture.md`](../packages/scope/test/site/completeness/fixture.md)
+puts these constructs together. The `GFM completeness fixture` test in
+`packages/scope/test/site-route.test.ts` renders those exact bytes through
+Site and follows its companion-page and repository-image addresses. Its
+Git host is a labelled stand-in; this test does not show a deployment.
+The companion page and SVG beside the fixture can be published with it
+for the separate deployment observation.
+
+| Construct in the fixture | Site's answer |
+|---|---|
+| Headings, including repeated headings; same-page anchors | Renders. The anchors are `getting-started` and `getting-started-1`. |
+| Emphasis, strong emphasis, strikethrough and inline code | Renders. |
+| Bullet, nested and ordered lists | Renders. |
+| Task lists | Renders as disabled checkboxes, including checked and unchecked tasks. |
+| Tables | Renders with the declared column alignment. |
+| Fenced code with a language | Renders as code with `language-ts`; syntax colouring is not built. |
+| Block quotes and extended URL and email autolinks | Renders. |
+| Relative page links, repository-root and parent-folder links | Renders as links under the same room and ref. The companion page serves its heading and anchor. |
+| A repository SVG image | Renders at the same room and ref; the image route serves its exact bytes with a sandbox policy. |
+| Inline and block HTML | Differs from GitHub: shown as escaped source; a block is in a source box. |
+| An unsafe `javascript:` address | Filtered: the link text remains, with an empty address. |
+| Footnotes | Unsupported: the reference and definition stay ordinary text. Footnotes are outside the GFM specification; this fixture records the limitation rather than adding another parser extension. |
+| Wiki links | Unsupported: `[[Companion]]` stays ordinary text. |
+
 Links and images:
 
 - A relative address, such as `setup.md`, `../README.md` or
@@ -127,20 +158,30 @@ as the specification's runner sets it.
 - **File size.** A file of more than 1 MiB (1,048,576 bytes) is refused
   with `too-large` (status 413).
 - **Transfer size.** To read a file, the Worker fetches the commit with
-  its whole history from the Git host, limited by the host setting's
-  `maxBytes` (docs/hosts.md). A repository whose history is larger than
+  its history from the Git host. Wire, inflated and retained bytes are capped
+  at the lesser of the host setting's `maxBytes` and 16 MiB; commit/tree/blob
+  allocations and the 4,096-object and 4,096-ref allowances are checked before
+  download or inflation exceeds them. A repository whose history is larger than
   that cannot be read, and every page answers `unreadable`.
+- **Native proof budget.** Scope/item/entry sizes are checked in SQLite before
+  their JSON is allocated. Selection allows 16 pages of 16 receipt items,
+  256 item reads, 16 entry reads, a 1 MiB aggregate native payload and
+  at most 4,096 history entries and 16 MiB of stored history before SQL JSON
+  inspection. Exhaustion is `unreadable` with
+  `publication-history-limit`, never absent or not published. Paths allow
+  at most 64 segments and 8 KiB of UTF-8 path bytes.
 - **Caching.** An answer may be kept for 60 seconds. Each answer has an
   `ETag` made from the commit, the path, and what the header shows: the
   recorded repository name, the ref as written in the address, and the
-  branch or tag it names. So the same file under `HEAD`, under the branch's name and under a
-  tag has three tags. A browser that asks again with that tag, while the
-  ref still names the same commit, gets `304 Not Modified`, and the Worker
-  reads no file. When the ref moves to a new commit, every page gets a new
-  tag. The versions page's tag is made from every branch and tag and the
-  object each names, so it changes when any of them moves or is added.
+  published ref it names. The same file under `HEAD` and its branch name
+  has different tags because the headers differ. The room's publication
+  selection, repository identity, commit, path, object type and size are
+  checked before `304 Not Modified`; a matching tag never bypasses a refusal.
+  The versions page's tag covers only the recorded published refs and commits,
+  whose commit objects are validated before 304.
 - Each page read on the hosting's own Git service mints a read token for
-  two minutes and revokes it after the read.
+  two minutes and attempts to revoke it after the read. A failed revocation
+  remains unconfirmed; Site does not turn that into confirmed cleanup.
 
 ## Refusals
 
@@ -154,7 +195,7 @@ authorization value and URL query replaced by `[redacted]`.
 | Reason | Status | When |
 |---|---|---|
 | `not-found` | 404 | No room has that directory, or no file or folder is at that path. |
-| `ref-not-found` | 404 | No branch or tag has that name. |
+| `not-published` | 404 | The room has no confirmed publication, or has not published the requested ref or commit name. |
 | `too-large` | 413 | The file is more than 1 MiB. |
 | `bad-request` | 400 | The address is not a site address, or a path segment is empty, `.` or `..`, or holds a `/`. |
 | `method-not-allowed` | 405 | The request is not a `GET`. |
@@ -177,12 +218,25 @@ bytes, or one that is not UTF-8, cannot be edited this way.
 
 ## Who can read a site
 
-**Every site is public for now.** Anyone who has the room's directory
-scope ID can read every page of every branch and tag of the room's
-repository, with no session. The Worker reads the repository with its
-own access: a read token it mints on the hosting's own Git service, or
-the deployment's read token on GitHub. So a private repository's files
-are readable through the site by anyone with the address.
+**Published files are public.** Anyone with the room's directory scope
+ID can read every file at its current recorded published branch head, or
+at an eligible immutable native publication addressed by its complete
+40-character lowercase commit ID with a written receipt. No session is
+needed, including for files published from a private backing repository.
+`HEAD` and the published branch name provide current recorded navigation;
+an eligible immutable URL continues to name that published result. Arbitrary
+or unproved commits and provider-only branches or tags are refused before
+acquiring provider access. The Worker reads only the selected commit with its
+existing host credentials: a temporary read token on the hosting's own Git service, or
+the deployment's existing GitHub read token. GitHub's stable repository ID
+must match the room's record before any Git source is acquired. Knowing a
+room address does not publish its private repository's other branches.
+
+The selection is a read of the confirmed directory and destination's current
+SQLite records. It records no entry, starts no pending operation and changes
+no credential custody. Provider branch changes alone do not change the site;
+the destination must record the new published head. Missing or unavailable
+room records never fall back to provider refs.
 
 A site for members only, which would ask for a read session of the room's
 membership, is not built.

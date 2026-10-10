@@ -1,9 +1,11 @@
 import { expect, inject, test } from "vitest";
 import { b64url } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { act, actsOn, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, type Room } from "../src/index.ts";
+import { prepareEdit } from "../src/retained-editor-data.ts";
 import { SERVICE, demo } from "./support/demo.ts";
 
 declare module "vitest" {
@@ -45,6 +47,7 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     expect((await joinRoom(d.as(unas), d.link)).answer.answer).toBe("accepted");
     const forUna = await openRoom(d.as(unas), place);
     const pauls = await d.secretOf(d.paul);
+    const ritas = await d.secretOf(d.rita);
     const forPaul = await openRoom(d.as(pauls), place);
     expect((await act(forUna, d.D.name, "open-issue", { fields: { definition: DEMO_DIGESTS.issue, title: "The handbook is empty", conditions: ["README.md says what the room is for"] } })).answer.answer).toBe("accepted");
     await d.pause([d.D.name]);
@@ -60,17 +63,29 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     recording = new Map();
     const screens = async (room: Room) => {
       await listLanes(room);
+      await actsOn(room, d.D.name);
       await loadIssue(room, issue);
       await actsOn(room, issue);
       for (const change of [readme, agents]) {
-        await loadChange(room, change);
-        await actsOn(room, change);
+        // Each browser can land directly on this route with an empty
+        // definition cache. Record that actor's actual cold lane read.
+        const direct = await openRoom(room.session, place);
+        await loadChange(direct, change);
+        await actsOn(direct, change);
       }
       await loadRules(room);
       await actsOn(room, d.rules.name);
     };
-    for (const secret of [unas, pauls]) await screens(await openRoom(d.as(secret), place));
+    for (const secret of [unas, pauls, ritas]) await screens(await openRoom(d.as(secret), place));
     const seen = await openRoom(d.as(pauls), place);
+    // This fixture uses the current CLI founding cohort (@3 destination)
+    // with the legacy demo change declaration and its one-file manifest.
+    // Preparation requires the separately implemented exact compatibility;
+    // it does not exercise manifest-list or branch-proposal orchestration.
+    // Read-only editor preparation records its original-source/authority/base
+    // reads. No browser proposal POST or native admission is fabricated.
+    const selected = await loadChange(seen, readme);
+    await prepareEdit(seen, selected, selected.manifests[0]!.id, { title: "Capture draft", path: "docs/capture.md", content: "# Capture draft\n" }, { current: () => true });
     expect((await act(seen, agents, "review-verdict", { fields: { manifest, verdict: "approve", extent: "rules" } })).answer).toMatchObject({ answer: "refused", name: "author-cannot-review" });
     await loadChange(seen, agents);
     await actsOn(seen, agents);
@@ -81,8 +96,11 @@ test.skipIf(!inject("pageRecord"))("record the Worker's answers to the page's re
     // The page itself, as the deployed Worker's one entry serves it.
     for (const path of ["/page/", "/page/page.js"]) await keep(`GET ${path}`, await worker.fetch(new Request(`${SERVICE}${path}`), {} as Env));
 
+    const destination = await new ScopeHandle(signedReads(httpTransport(SERVICE, { fetch: seen.session.fetch! }), secretSigner(seen.session.secret), { now: seen.session.now! }), seen.destination, seen.reader?.reader() ?? null).summary();
+    expect(destination.ok).toBe(true);
+    if (!destination.ok) throw new Error("The capture actor could not read its destination.");
     const record = {
-      service: SERVICE, place, issue, readme, agents, manifest, people: { una: b64url(unas), paul: b64url(pauls) }, answers: Object.fromEntries(recording),
+      service: SERVICE, place, issue, readme, agents, manifest, fixture: { destinationDefinition: destination.value.definition, changeDefinition: selected.definition, workflow: "legacy one-file manifest on current CLI cohort; no manifest-list proposal" }, people: { una: b64url(unas), paul: b64url(pauls), rita: b64url(ritas) }, answers: Object.fromEntries(recording),
     };
     recording = null;
     // In lines of at most 64 KiB, which the test runner prints whole.

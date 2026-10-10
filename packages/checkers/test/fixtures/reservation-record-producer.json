@@ -1,0 +1,25 @@
+{
+  "recordSha256": "e0c0f1023925207bde7f52859d91601e76cd85c6093427244ae164df963fe4c9",
+  "recordBytes": 29734,
+  "producerHead": "bc85a7a279f28ec4892b7c7b49e9d26f99f880ee",
+  "producerState": "Dirty capture; this is not a clean exact-HEAD proof.",
+  "changedDuringCapture": [
+    "packages/platform/src/destination.ts",
+    "packages/lanes/test/manifest-tree.scope.test.ts"
+  ],
+  "sourceQualification": "Destination changes bound stagedOwn to the publication operation and integration/tree. The lane fixture included unknown-stage/deletion scenarios and recorded the signed read and scope heads. Those changes were subsequently committed as 4dd2d731cdad861ba1710e8e70a85e1a6243c76d. A temporary recorder-only replacement of inject('demoRecord') with true was restored in finally; there was no configuration patch or package installation.",
+  "start": {
+    "printed": "21:18:39",
+    "date": "2026-10-08",
+    "timezone": "America/New_York",
+    "timezoneBasis": "Producer-reported host timezone; the log has no timezone.",
+    "utc": "2026-10-09T01:18:39Z",
+    "utcBasis": "Inferred from producer-reported date and timezone."
+  },
+  "command": "./node_modules/.bin/vitest run --project scope packages/lanes/test/manifest-tree.scope.test.ts --reporter=verbose --silent=false",
+  "logSha256": "4baefe76887462dddee90489e7de5154412a2308d5bdc4dfc9b92198a9d99d1e",
+  "logBytes": 31224,
+  "producerExit": 0,
+  "producerTests": 5,
+  "limits": "Two runtimes connected by these exact recorded public bytes. The local Git repository and check executable are stand-ins; image 777 is a configuration fixture. No deployed provider, image, container, fresh authorization, full history replay, or final gate is proved."
+}

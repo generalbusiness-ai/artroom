@@ -34,12 +34,13 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, entryHash, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
+import { knownLIST1 } from "./source-support.ts";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -84,11 +85,16 @@ export class Unreadable extends Error {
 }
 
 const nowOf = (session: Session): number => session.now?.() ?? Date.now();
-const transportOf = (session: Session): Transport =>
-  signedReads(httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {}), secretSigner(session.secret), session.now ? { now: session.now } : {});
+const transportOf = (session: Session, reader: string | null = null): Transport => {
+  const transport = httpTransport(session.service, session.fetch ? { fetch: session.fetch } : {});
+  return typeof reader === "string" ? transport : signedReads(transport, secretSigner(session.secret), session.now ? { now: session.now } : {});
+};
 
 /** A handle on one scope that presents the caller's session, or signs each read where there is none. */
-const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => new ScopeHandle(transportOf(room.session), scope, room.reader?.reader() ?? null);
+const handleOf = (room: Pick<Room, "session" | "reader">, scope: ScopeId): ScopeHandle => {
+  const reader = room.reader?.reader() ?? null;
+  return new ScopeHandle(transportOf(room.session, reader), scope, reader);
+};
 
 /** Renews the caller's session when it has ended, or will within ten seconds. A room that membership gave no session stays on signed reads. */
 async function fresh(room: Room): Promise<void> {
@@ -285,10 +291,14 @@ export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; change
 /** A lane's definition, as the scope retains it under the digest its summary names. */
 async function laneDefinition(room: Room, handle: ScopeHandle, summary: Summary): Promise<DeclaredDefinition> {
   const kept = room.definitions.get(summary.definition);
-  if (kept) return kept;
+  if (kept) {
+    if (definitionDigest(kept) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
+    return kept;
+  }
   const read = await handle.definition();
   if (!read.ok) throw new Unreadable(`Cannot read the definition of ${handle.scope}: ${read.reason}.`);
   if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read the definition of ${handle.scope}: incomplete.`);
+  if (definitionDigest(read.value) !== summary.definition) throw new Unreadable(`The retained definition of ${handle.scope} does not match its pin.`);
   room.definitions.set(summary.definition, read.value);
   return read.value;
 }
@@ -330,6 +340,8 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
  * the Version screen does not offer it as a rendered-page link.
  */
 export interface Manifest {
+  /** Native ISSUE report facts in selection order; null means unavailable or malformed. */
+  selectedReports?: FactRef[] | null;
   id: number; state: string; integrator: string | null; authors: string[]; base: string | null; integration: string | null; tree: string | null; complete: boolean | null;
   file: { path: string; digest: string | null; size: number | null; page: string;
     /** Exact retained proposal text, verified for the selected version; null when unavailable. Never read from HEAD. */
@@ -350,12 +362,50 @@ export interface Merge { id: number; state: string; manifest: number | null; rea
 export interface ChangeView {
   /** The actual proposal item used by transitions. */
   proposal?: number;
+  /** Actual current item; never a retained-version fallback for a mutation. */
+  currentManifest?: number | null;
+  /** Choices from held rules and authenticated membership; null means unavailable. */
+  reviewExtents?: { label: string; value: string }[] | null;
+  reviewMembers?: { label: string; value: string }[] | null;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
 }
 
 const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
+
+/** The declared selection is the authority for its ISSUE report role. An
+ * absent optional typed slot is the native empty list, not a failed read. */
+function reportsOf(manifest: Item, definition: DeclaredDefinition): FactRef[] | null {
+  const slot = definition.items["manifest"]?.values["selected"];
+  const type = slot?.of;
+  if (!type || type.type !== "list" || type.of.type !== "record") return null;
+  const report = type.of.of["report"], accepted = type.of.of["accepted"];
+  if (report?.type !== "fact" || report.under !== "issue" || (report.kind.length !== 1 || report.kind[0] !== "report") || accepted?.type !== "fact" || accepted.under !== "issue" || (accepted.kind.length !== 1 || accepted.kind[0] !== "accept-report")) return null;
+  const selected = manifest.values["selected"];
+  if (selected === undefined || selected === null) return slot.required ? null : [];
+  if (!Array.isArray(selected) || selected.length > type.max) return null;
+  const reports: FactRef[] = [];
+  for (const row of selected) {
+    if (!row || typeof row !== "object" || Array.isArray(row) || !isFactRef(row["report"]) || !isFactRef(row["accepted"])) return null;
+    reports.push(row["report"]);
+  }
+  return reports;
+}
+
+
+/** Required merge facts without destination/history presentation reads.
+ * Reads use the caller's existing authenticated session or signed-read path. */
+export async function loadChangeSelection(room: Room, scope: ScopeId): Promise<{ scope: ScopeRef; head: Head; currentManifest: number | null; manifests: { id: number; state: string; selectedReports: FactRef[] | null }[] }> {
+  await fresh(room);
+  const handle = handleOf(room, scope);
+  const { summary, at } = await summaryOf(handle);
+  const definition = await laneDefinition(room, handle, summary);
+  if (definition.name !== "change") throw new Unreadable(`${scope} is not a change lane.`);
+  const manifests = await itemsOf(handle, summary, "manifest", at);
+  return { scope: summary.scope, head: at, currentManifest: manifests.find((item) => item.state === "current")?.id ?? null,
+    manifests: manifests.map((item) => ({ id: item.id, state: item.state, selectedReports: reportsOf(item, definition) })) };
+}
 
 /** Item IDs are their opening entry positions (contract 4.1). Read just that
  * authenticated entry and bind its signed bytes to the selected manifest.
@@ -378,6 +428,42 @@ async function manifestContent(handle: ScopeHandle, scope: Summary["scope"], man
   } catch { return null; }
 }
 
+async function manifestListFile(handle: ScopeHandle, scope: ScopeRef, manifest: Item, definition: DeclaredDefinition, pin: string, sources: readonly Item[]): Promise<NonNullable<Manifest["file"]> | null> {
+  try {
+    if (!knownLIST1(definition, pin)) return null;
+    const files = manifest.values["files"];
+    if (!Array.isArray(files) || files.length !== 1) return null;
+    const row = files[0];
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row["path"] !== "string" || typeof row["digest"] !== "string" || typeof row["entry"] !== "number" || !Number.isSafeInteger(row["entry"]) || row["entry"] >= manifest.id) return null;
+    const opening = await handle.entry(manifest.id);
+    if (!opening.ok || !opening.complete || opening.next !== undefined) return null;
+    const frozenInput = opening.value.entry.input;
+    const frozenFiles = frozenInput.type === "act" ? frozenInput.signed.intent.fields["files"] : null;
+    if (!Array.isArray(frozenFiles) || frozenFiles.length !== 1) return null;
+    const frozen = frozenFiles[0];
+    if (!frozen || typeof frozen !== "object" || Array.isArray(frozen) || !isFactRef(frozen["entry"]) || frozen["path"] !== row["path"] || frozen["digest"] !== row["digest"]) return null;
+    const fact = frozen["entry"];
+    if (canonicalize(fact.at) !== canonicalize(scope) || fact.seq !== row["entry"]) return null;
+    const source = await handle.entry(fact.seq);
+    if (!opening.ok || !opening.complete || opening.next !== undefined || !source.ok || !source.complete || source.next !== undefined) return null;
+    const m = opening.value, s = source.value;
+    if (m.entry.seq !== manifest.id || canonicalize(m.entry.at) !== canonicalize(scope) || entryHash(m.entry) !== m.hash || m.hash !== manifest.opened || s.entry.seq !== fact.seq || canonicalize(s.entry.at) !== canonicalize(fact.at) || entryHash(s.entry) !== s.hash || s.hash !== fact.hash) return null;
+    const mi = m.entry.input, si = s.entry.input;
+    if (mi.type !== "act" || si.type !== "act" || mi.signed.intent.kind !== "propose-manifest" || si.signed.intent.kind !== "propose-file" || !verifySignedIntent(mi.signed) || !verifySignedIntent(si.signed) || canonicalize(mi.signed.intent.to) !== canonicalize(scope) || canonicalize(si.signed.intent.to) !== canonicalize(scope)) return null;
+    if (!m.entry.effects.some((effect) => effect.effect === "open" && effect.type === "manifest" && effect.item === manifest.id) || !s.entry.effects.some((effect) => effect.effect === "open" && effect.type === "source" && effect.item === fact.seq)) return null;
+    const storedSource = sources.find((item) => item.id === fact.seq && item.type === "source");
+    if (!storedSource || storedSource.opened !== fact.hash) return null;
+    if (mi.signed.intent.fields["base"] !== manifest.values["base"]) return null;
+    const author = mi.authority.length === 1 ? mi.authority[0] : null, sourceAuthor = si.authority.length === 1 ? si.authority[0] : null;
+    if (!author || !sourceAuthor || author.key !== mi.signed.intent.actor || sourceAuthor.key !== si.signed.intent.actor || si.signed.intent.actor !== mi.signed.intent.actor || canonicalize(sourceAuthor.subject) !== canonicalize(author.subject) || canonicalize(author.subject) !== canonicalize(manifest.parties["integrator"]) || !Array.isArray(manifest.parties["authors"]) || !manifest.parties["authors"].some((member) => canonicalize(member) === canonicalize(author.subject))) return null;
+    const { base, path, digest, size, content } = si.signed.intent.fields;
+    shapeDeclaredAct(definition, "propose-file", { on: null, fields: si.signed.intent.fields });
+    shapeDeclaredAct(definition, "propose-manifest", { on: null, fields: mi.signed.intent.fields });
+    if (base !== manifest.values["base"] || path !== row["path"] || digest !== row["digest"] || typeof path !== "string" || typeof digest !== "string" || typeof size !== "number" || typeof content !== "string" || !fileSound({ path, digest, size, content })) return null;
+    if (base !== storedSource.values["base"] || path !== storedSource.values["path"] || digest !== storedSource.values["digest"] || size !== storedSource.values["size"] || canonicalize(storedSource.parties["integrator"]) !== canonicalize(sourceAuthor.subject)) return null;
+    return { path, digest, size, content, page: "" };
+  } catch { return null; }
+}
 /**
  * A change lane, and for each of its merges the destination's publication
  * and that publication's outside operations, read from the destination's
@@ -396,17 +482,34 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const rulesItem = summary.items.find((item) => item.type === "rules");
   const publications = await publicationsOf(room, scope);
   const manifests = await all("manifest");
-  const selected = manifests.find((m) => m.state === "current") ?? manifests.at(-1);
+  const current = manifests.find((m) => m.state === "current") ?? null;
+  const selected = current ?? manifests.at(-1); // Read-only preview may show retained history.
+  const extents = rulesItem?.values["extents"];
+  const reviewExtents = Array.isArray(extents) && extents.every((extent) => extent && typeof extent === "object" && !Array.isArray(extent) && typeof extent["name"] === "string")
+    ? extents.map((extent) => ({ label: String((extent as Record<string, FieldValue>)["name"]), value: String((extent as Record<string, FieldValue>)["name"]) })) : null;
+  let reviewMembers: { label: string; value: string }[] | null = null;
+  if (current) {
+    try {
+      const membership = await summaryOf(handleOf(room, room.membership.scope));
+      if (canonicalize(membership.summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The reviewer roster names another membership incarnation.");
+      const authorsParty = current.parties["authors"];
+      if (!Array.isArray(authorsParty) || authorsParty.some((author) => canonicalize(author.membership) !== canonicalize(room.membership))) throw new Unreadable("The manifest authors name another membership incarnation.");
+      const authors = membersOf(authorsParty);
+      reviewMembers = holdersOf(membership.summary.items, "change.review").filter((member) => !authors.includes(member)).map((member) => ({ label: member, value: member }));
+    } catch { /* Missing authority offers no invented reviewer choices. */ }
+  }
   const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
+  const listFile = selected && selected.values["files"] !== undefined ? await manifestListFile(handle, summary.scope, selected, definition, summary.definition, await all("source")) : null;
   return {
-    scope, definition: summary.definition, head: at, proposal: proposal.id,
+    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: manifests.map((m) => ({
+      selectedReports: reportsOf(m, definition),
       id: m.id, state: m.state, integrator: memberOf(m.parties["integrator"]), authors: membersOf(m.parties["authors"]),
       base: text(m.values["base"]), integration: text(m.values["integration"]), tree: text(m.values["tree"]), complete: typeof m.values["complete"] === "boolean" ? m.values["complete"] : null,
       file: typeof m.values["path"] === "string" ? {
         path: m.values["path"], digest: text(m.values["digest"]), size: typeof m.values["size"] === "number" ? m.values["size"] : null, page: siteAddress(room, m.values["path"]), ...(m === selected ? { content } : {}),
-      } : null,
+      } : m === selected && listFile ? { ...listFile, page: siteAddress(room, listFile.path) } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
     requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]) })),
@@ -574,7 +677,8 @@ async function valuesOf(room: Room, act: ActShape, fields: Record<string, FieldV
     if (domain === null || typeof digest !== "string") continue;
     if (domain !== DEFINITION_DOMAIN) throw new Unreadable(`The field ${name} takes a value in ${domain}, which this page cannot supply.`);
     // A value in the domain of a definition is kept as a definition, and read by that kind (as `artroom edit` reads it).
-    const kept = await transportOf(room.session).retained(room.rules, room.reader?.reader() ?? null, "definition", digest as Digest);
+    const reader = room.reader?.reader() ?? null;
+    const kept = await transportOf(room.session, reader).retained(room.rules, reader, "definition", digest as Digest);
     if (!kept.ok) throw new Unreadable(`Cannot read the definition ${digest} from the rules scope: ${kept.reason}. Nothing was signed.`);
     values.push(kept.value.bytes);
   }
@@ -652,9 +756,17 @@ export async function act(room: Room, scope: ScopeId, kind: string, asked: { on?
     submitting?.();
     answer = await typed.handle.submit(signed, [], values.length > 0 ? { ...beside, values } : beside);
   } else {
-    const signed = await signedIntent(signer, { to: summary.scope, kind, on, fields, expected }, signing);
+    // The shaping helper reads only the actual act declaration. Platform
+    // fields use the same typed inputs and detached-text transport as lanes.
+    const ordinary = Object.fromEntries(Object.entries(declaration.fields).filter(([, field]) => field.type !== undefined && field.type !== "code"));
+    if (Object.keys(fields).some((name) => !Object.hasOwn(declaration.fields, name)) || Object.entries(declaration.fields).some(([name, field]) => field.required && !Object.hasOwn(fields, name))) throw new Unreadable("The fields do not match this native action's declaration.");
+    const typedFields = Object.fromEntries(Object.entries(fields).filter(([name]) => Object.hasOwn(ordinary, name)));
+    const shaped = shapeDeclaredAct({ ...shape, acts: { ...shape.acts, [kind]: { ...declaration, fields: ordinary } } } as unknown as DeclaredDefinition, kind as never, { on, fields: typedFields } as never);
+    const marked = Object.fromEntries(Object.entries(fields).filter(([name]) => !Object.hasOwn(ordinary, name)));
+    const signedFields = { ...shaped.fields, ...marked };
+    const signed = await signedIntent(signer, { to: summary.scope, kind, on: shaped.on, fields: signedFields, expected: expectedOf(declaration, summary.items, shaped.on, signedFields) }, signing);
     submitting?.();
-    answer = await handle.submit(signed, [], values.length > 0 ? { values } : {});
+    answer = await handle.submit(signed, [], values.length > 0 ? { ...shaped.beside, values } : shaped.beside);
   }
   const result: Acted = { service: room.session.service, directory: room.directory, membership: { ...room.membership }, key: signer.key, scope, kind, on, answer, before, after: null, observation: "Observation refresh pending." };
   received?.(result); // Preserve the real answer before any awaited refresh.

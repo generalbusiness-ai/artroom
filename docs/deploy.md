@@ -121,6 +121,24 @@ an installation token cannot do; use the user's own fine-grained token.
 When `publicReads` is true and the repositories are public, the Worker
 reads them with no token, and `GITHUB_READ_TOKEN` is not needed.
 
+## Published repository sites
+
+The `/site/<directory>/<ref>/<path>` route serves recorded publications.
+`HEAD` and the published branch name read the destination's current recorded
+commit; the Git host's newer head is not substituted. A complete 40-character
+lowercase commit ID can also read an eligible immutable native publication
+with a written receipt. Arbitrary or unproved commits and provider-only
+branches or tags answer `not-published` before acquiring provider access.
+The versions page lists only room-recorded publications. The current room
+model records one branch and no tag or named-version registry.
+
+Published files are public without a session, including files published from
+private repositories. Other private branches are not exposed by Site. The
+existing provider access stays unchanged, and GitHub's stable repository ID
+is checked against the room before Git reads. Conditional responses still
+validate publication, identity, commit, path, object type and size before 304.
+No additional setting or token is required. See [pages.md](pages.md).
+
 ## The page
 
 The scope Worker serves the room's page at `/page/` from

@@ -96,13 +96,18 @@ The account control identifies the member. Record inspection retains the
 role, key and read-session evidence. The room switcher uses the recorded
 repository name; it does not invent a retained claim display name.
 
-**Actions.** Under the room, each issue, each change and the rules, the page
-lists the acts of that scope's definition that the signed-in member may
-sign now: each act whose grant action the member's role holds, and each act
-that a rule decides. It computes this the way `artroom acts` does, with the
-command line's own function. Each act is a form: one input for each field,
-typed as the field's declared type reads it, and for a transition the item
-it is on. The button signs the act and sends it. The page then shows the
+**Actions.** Create issue opens a dialog with Title and Description. The title
+also states the completion condition, matching the CLI's issue command.
+Comments appear with the conversation. A change has one prominent next action
+from its offered native actions; other actions remain under Inspect. Review
+uses the selected version and held extent choices. Merge uses that version's
+selected issue-report facts in their native order, not checker jobs. Missing
+technical facts make the task unavailable instead of asking for guessed IDs.
+
+The page computes offered actions with the same function as `artroom acts`;
+native guards remain decisive. Signing fences the visible controls locally
+and preserves the subject. The actual answer appears before the optional
+observation refresh. The page shows the
 actual answer category: accepted with its recorded fact, refused with its
 reason and any guard name, unavailable, or mismatch. Before/after heads are
 separate observations; a refusal category alone does not show that the head
@@ -115,6 +120,19 @@ while a request is pending, including after navigation. A lost submit reply
 keeps that scope read-only. Check status reads; it does not resubmit or treat
 a changed head as settlement. Generic submission does not retain its exact
 signed envelope across reload, so that recovery limit remains.
+
+List query and filter state survives detail/back navigation and refresh in
+this browser session. It is separated by origin, directory, membership, key
+and list kind; it supplies no authority for a mutation.
+
+For verified retained one-file text, **Propose an edit** prepares a new change
+with Title, Target file path and Text. An invalid old path offers **Create
+corrected proposal**. The task derives exact UTF-8 digest and size, names the
+recorded published base and warns that current-file comparison is unavailable.
+Changing the path leaves the old file. Confirmation creates only a proposal;
+it does not review or merge it. Each signed step is kept before POST and a
+lost reply stops further steps. Drafts, requests and answers survive only
+while this Page remains loaded. Reload recovery remains separately owed.
 
 Join also blocks duplicate requests and checks captured settings before
 submission and before selecting an accepted reply. A late accepted answer
@@ -169,11 +187,13 @@ that the room's records show, with the record it comes from:
 
 ## What it does not do yet
 
-- **Proposing a version from the page.** `propose-file` is listed as a
-  generic form, which needs the base commit, the content, its digest and
-  its size typed by hand; use `artroom edit`. `propose-manifest` needs a
-  hold and a step of the hold capability prepared first, which the page
-  does not prepare.
+- **General source authoring.** The retained editor supports one bounded
+  UTF-8 text file under a compatible manifest-producing declaration. It does
+  not supply packs, multiple files, deletes, renames or binary edits. The known
+  LIST1 source-producing declaration records one source, then freezes exactly
+  that source in a separate manifest step. Another collected source stops the
+  one-file task. A source receipt alone is not a proposed version. Unsupported
+  declaration pins remain unavailable.
 - **Activating a definition.** The rules scope's `activate` needs the
   definition's bytes, which no scope holds before the activation; use
   `artroom act activate --value`.

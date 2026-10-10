@@ -113,6 +113,7 @@ export type LateAnswers = (operation: OperationId, attempt: number, answer: Effe
  * releases or drops it here, on what the sealed entry says.
  */
 export interface Outside {
+  snapshot?(asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
   send(request: EffectRequest): Promise<EffectAnswer | null>;
   late?(deliver: LateAnswers): void;

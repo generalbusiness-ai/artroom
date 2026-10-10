@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { utf8 } from "@generalbusiness/artroom-bytes";
 import { idOf, snapshotCommit } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
+import { editTree, type DestinationObject } from "@generalbusiness/artroom-platform";
 import { ArtifactsProvider, READ_TTL, WRITE_TTL, type ArtifactsNamespace, type CreationCustody } from "../src/artifacts-host.ts";
 import type { DestinationBinding } from "../src/destination-host.ts";
 
@@ -209,13 +210,14 @@ test("scripted mint and send: one write token with the service's expiry, one pus
   const objects = built.objects.map((object) => ({ id: object.id, kind: object.type, body: object.data }));
   let head: string | null = null;
   let report = "ok refs/heads/main\n";
+  let sentCommit = built.commit;
   const requests: { method: string; url: string; authorization: string | null }[] = [];
   let recorded: typeof repository | null = repository;
   const p = provider(s, async (request) => {
     requests.push({ method: request.method, url: request.url, authorization: request.headers.get("authorization") });
     if (request.url.endsWith("/info/refs?service=git-receive-pack")) return receiveAdvertisement(head === null ? {} : { "refs/heads/main": head });
     if (request.url.endsWith("/git-receive-pack")) {
-      if (report.startsWith("ok ")) head = built.commit;
+      if (report.startsWith("ok ")) head = sentCommit;
       return response(`${pkt("unpack ok\n")}${pkt(report)}0000`, "application/x-git-receive-pack-result");
     }
     if (request.url.endsWith("/info/refs?service=git-upload-pack")) return uploadAdvertisement(head === null ? {} : { "refs/heads/main": head });
@@ -243,6 +245,45 @@ test("scripted mint and send: one write token with the service's expiry, one pus
   // Not sent: the ref has moved since; compare-and-swap is never forced.
   expect(await push()).toEqual({ send: "not-sent" });
   expect(requests.filter((request) => request.method === "POST")).toHaveLength(2);
+
+  // Refuse the aggregate before copying or contacting the host. This
+  // scripted Uint8Array proxy observes copy iteration, not measured memory.
+  let copied = 0;
+  // Each body fits individually; their aggregate exceeds the allowance.
+  const excess = [new Uint8Array(600 * 1024), new Uint8Array(600 * 1024).fill(1)];
+  const watched = excess.map(bytes => new Proxy(bytes, { get(target, key) {
+    if (key === Symbol.iterator) copied++;
+    const value = Reflect.get(target, key, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  } }));
+  const beforeExcess = requests.length;
+  await expect(p.send({ repository, ref: "refs/heads/main", old: null, commit: built.commit,
+    objects: excess.map((bytes, n) => ({ id: idOf("blob", bytes), kind: "blob", body: watched[n]! })), requireParentless: true,
+    token: minted.plaintext, binding, allowed: () => true })).rejects.toMatchObject({ reason: "unreadable" });
+  expect(copied).toBe(0); expect(requests).toHaveLength(beforeExcess);
+
+  // All 64 replacements fit the unchanged allowance as a final+base
+  // closure, although 64 obsolete intermediate roots would not fit.
+  const previousBytes = utf8("before\n"), previousBlob = { id: idOf("blob", previousBytes), kind: "blob" as const, body: previousBytes };
+  const paths = Array.from({ length: 200 }, (_, n) => `file-${String(n).padStart(3, "0")}-${"x".repeat(75)}`);
+  const previous = snapshotCommit(paths.map(path => ({ path, mode: "100644" as const, id: previousBlob.id })), "budget base\n");
+  const baseObjects: DestinationObject[] = [previousBlob, ...previous.objects.map(object => ({ id: object.id, kind: object.type, body: object.data }))];
+  const stored = new Map(baseObjects.map(object => [object.id, object]));
+  const edits = paths.slice(0, 64).map(path => ({ path, bytes: utf8("after\n") }));
+  const next = editTree("sha1", id => stored.get(id) ?? null, previous.commit, edits)!;
+  const commitBytes = utf8(`tree ${next.tree}\nparent ${previous.commit}\nauthor Fixture <fixture@artroom.invalid> 0 +0000\ncommitter Fixture <fixture@artroom.invalid> 0 +0000\n\nfixture\n`);
+  const commit = { id: idOf("commit", commitBytes), kind: "commit" as const, body: commitBytes };
+  const finalObjects = [...new Map([...baseObjects, ...next.objects, commit].map(object => [object.id, object])).values()];
+  expect(previous.objects.find(object => object.type === "tree")!.data.length * 65).toBeGreaterThan(1024 * 1024);
+  expect(finalObjects.reduce((size, object) => size + object.body.length, 0)).toBeLessThan(1024 * 1024);
+  head = previous.commit; sentCommit = commit.id;
+  const sending = p.send({ repository, ref: "refs/heads/main", old: previous.commit, commit: commit.id,
+    objects: finalObjects, expectedTree: next.tree, requireParentless: false, token: minted.plaintext, binding, allowed: () => true });
+  // Caller mutation after the synchronous capture cannot change checked
+  // bytes while closure validation and compression await their results.
+  next.objects.find(object => object.kind === "blob")!.body.fill(0);
+  await expect(sending).resolves.toEqual({ send: "accepted" });
+  expect(head).toBe(commit.id);
 
   s.calls.length = 0;
   expect(await p.revoke("adapter:local-handle", minted.plaintext)).toEqual({ revoked: true, id: "adapter:local-handle" });

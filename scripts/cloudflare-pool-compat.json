@@ -1,0 +1,11 @@
+{
+  "package": "@cloudflare/vitest-pool-workers",
+  "version": "0.22.0",
+  "relative_bundle": "dist/worker/lib/cloudflare/test-internal.mjs",
+  "before_sha256": "8d3d115037c749cce1e8cb26bc70ba08e215aaaa357e4eae9f0c1577277c5855",
+  "after_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "before_factory": "function createProxyPrototypeClass(superClass, getUnknownPrototypeKey) {\n\tfunction Class(...args) {\n\t\tClass.prototype = new Proxy(Class.prototype, { get(target, key, receiver) {\n\t\t\tconst value = Reflect.get(target, key, receiver);\n\t\t\tif (value !== void 0) return value;\n\t\t\tif (typeof key === \"symbol\" || IGNORED_KEYS.includes(key)) return;\n\t\t\treturn getUnknownPrototypeKey.call(receiver, key);\n\t\t} });\n\t\treturn Reflect.construct(superClass, args, Class);\n\t}\n\tReflect.setPrototypeOf(Class.prototype, superClass.prototype);\n\tReflect.setPrototypeOf(Class, superClass);\n\treturn Class;\n}",
+  "after_factory": "function createProxyPrototypeClass(superClass, getUnknownPrototypeKey) {\n\tlet proxyInstalled = false;\n\tfunction Class(...args) {\n\t\tif (!proxyInstalled) {\n\t\t\tClass.prototype = new Proxy(Class.prototype, { get(target, key, receiver) {\n\t\t\t\tconst value = Reflect.get(target, key, receiver);\n\t\t\t\tif (value !== void 0) return value;\n\t\t\t\tif (typeof key === \"symbol\" || IGNORED_KEYS.includes(key)) return;\n\t\t\t\treturn getUnknownPrototypeKey.call(receiver, key);\n\t\t\t} });\n\t\t\tproxyInstalled = true;\n\t\t}\n\t\treturn Reflect.construct(superClass, args, Class);\n\t}\n\tReflect.setPrototypeOf(Class.prototype, superClass.prototype);\n\tReflect.setPrototypeOf(Class, superClass);\n\treturn Class;\n}",
+  "upstream": "https://github.com/cloudflare/workers-sdk/pull/15106",
+  "upstream_merge": "d5f3e56bce1622754388ad5d7543a71e5e028850"
+}

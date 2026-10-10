@@ -276,7 +276,28 @@ objects in maps and decodes each pushed pack; the site route reads the
 published file back over the same stand-in. It lives with the lanes,
 because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
-git package. `packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+git package.
+
+`packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
+successor on real platform and lane scopes, through the production wiring
+of the hosting's own Git service over its labelled host stand-in. It
+records two signed file entries and a frozen manifest, reserves the shared
+tree before a required check, refuses a wrong source digest and wrong job
+tree, and publishes only after a configured checker member signs a pass.
+The destination replays from its retained inputs. The actual CheckerService
+reads a signed, job-bound reservation read over the Worker route, validates the recorded reservation and its object closure,
+and signs the result that the lane admits. Its durable storage and runner
+are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
+both object-overlay verification and exact reservation-ref fetching with
+actual private Git checkout and a
+configured step that reads both files. No container platform or deployed
+checker service is established by these witnesses. A held outside answer
+shows that a retry fence invalidates the old result even when the old
+current-job read finished first. Other cases preserve an unresolved push
+when its retry is refused, cancel a pre-push reservation, drain its recorded
+deadline, and refuse a final membership read that exceeded its window.
+
+`packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
 `packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
@@ -312,6 +333,15 @@ answers, and nothing about a real host, a real tree or a runner.
 
 ## While you work
 
+Root `npm test` and `npm run test:changed` first apply the narrow Cloudflare
+pool compatibility backport in `scripts/cloudflare-pool-compat.mjs`. It accepts
+only the pinned 0.22.0 package and complete known bundle hashes. Cache-linked
+views receive a private physical copy; the shared cache is never patched.
+The backport installs the upstream prototype Proxy once per wrapper class,
+keeping native introspection and RPC behavior. It changes no pool settings.
+Before a direct package or Vitest invocation, run this same script from the
+repository root. Unknown package versions or bytes stop preparation.
+
 Run the tests of what you changed, not the repository.
 
 ```
@@ -337,6 +367,52 @@ The selection follows imports. A test that reads a file without importing
 it, such as a fixture or a document, is not selected when only that file
 changes. The gate runs everything.
 
+### A reviewed focused plan
+
+For a frozen candidate with an exact compiler closure and complete static
+case ledger, use `scripts/focused-check.mjs`. Its one invocation runs each
+declared compiler once, then one Vitest body. It does not collect the same
+tests in a separate discovery run or pause between successful phases.
+
+```
+/usr/bin/time -p node scripts/focused-check.mjs /tmp/reviewed-plan.json /tmp/new-evidence-directory
+```
+
+The reviewed JSON plan names the canonical checkout, head and tree; every
+tracked package/script/example input, read-only documentation fixtures and
+root configuration; extra external
+inputs, including the actual pipeline file and body config; the lock stamp,
+current workspace bindings and source export aliases; pinned Node/compiler/
+Vitest tool files; unique compiler configs and working directories; and the
+body config, working directory and complete file/project/pool/full-title
+selection. It contains paths and hashes, not secrets. A selected file must
+have unique full titles within its project. When that static ledger cannot
+identify every case, keep an explicit collection plan instead of guessing.
+The dependency namespace and its Vite state must be owned real directories;
+a symlink to shared `node_modules` or `@generalbusiness` is refused even when
+an individual workspace resolves to the right source.
+
+The driver checks those facts before any tool or application import, at
+each command boundary and after the terminal command. Any refusal, changed
+source, nonzero exit or signal stops the pipeline. Its same-run reporter
+checks complete file/project/pool identity before global setup, then records
+actual case states, errors, skips and unfinished or unrun obligations. It
+uses structured status fields; a title containing “failed” is only a title.
+The built-in JSON reporter provides a second count/file/status check in the
+same body invocation. Verbose output and complete raw reports stay in the
+new external evidence directory; its manifest seals their hashes. Existing
+evidence is never overwritten, and the driver never installs dependencies,
+retries a command or changes an original test deadline.
+`result.json` records verification outcomes; actual process exit remains
+authoritative. A sealing failure exits nonzero and retains partial artifacts
+and, when possible, a fresh sibling failure record without rewriting them.
+
+Time the outer command to include guards, parsing, artifact work and child
+CPU. The driver also retains each command's own wall, user and system time.
+Their sum is a sum of separate commands, not a measured pipeline duration.
+A focused pass protects only its selected boundaries. It does not replace
+the final gate, meaningful controls, manual acceptance or complete review.
+
 ## Before a review
 
 Run the gate once, at the head you will send.
@@ -349,7 +425,10 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `scope-denial`, `lanes`, `cli` and `page`), then one script (`scripts/active-source.test.mjs`). The script checks that no
+`scope`, `scope-denial`, `lanes`, `cli` and `page`), then the built-in Node
+checks in `scripts/active-source.test.mjs` and `scripts/cloudflare-pool-compat.test.mjs`.
+The compatibility witness uses the guarded actual pool factory and private-copy
+workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
 active file imports from `parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
@@ -408,7 +487,10 @@ gate.
 The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
-names the lanes package. The lanes package keeps
+names the lanes package. The Site publication and clock lifetime scenarios
+also live in the lanes package: they need its definition or graph. They use
+the Scope package's existing host, repository and lifetime helpers, with no
+copy of a fixture or change to the native Worker classes. The lanes package keeps
 `vitest.scope.config.ts` and `wrangler.test.jsonc`, which run the same
 files alone, in a Worker of its own with the same classes: for `npm test`
 in the package, for `scripts/control.mjs` and for
@@ -419,8 +501,10 @@ scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has
 made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
-The `lanes` project is the four tests of
-`packages/lanes/test/definitions.test.ts`. They read the four byte files
+The Node `lanes` project checks the definitions and the scripted CLI proposal
+outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
+witness has no native admission or authority; its native counterparts stay in
+`manifest-tree.scope.test.ts`. The four definition tests read the four byte files
 under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those
 files alone is not selected by `npm run test:changed`; the gate runs it.

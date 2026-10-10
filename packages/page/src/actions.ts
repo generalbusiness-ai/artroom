@@ -19,7 +19,7 @@ export interface ActionContext {
   draftKey?: string;
 }
 
-type Send = (kind: string, on: string, typed: Record<string, string>) => void;
+export type Send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => void;
 type Child = HTMLElement | string | null;
 const element = (tag: string, attrs: Record<string, string> = {}, ...children: (Child | Child[])[]): HTMLElement => {
   const node = document.createElement(tag);
@@ -41,6 +41,7 @@ const fieldLabels: Record<string, string> = {
   labels: "Labels", extents: "Review requirements", conditions: "Conditions", definition: "Definition", draft: "Draft",
 };
 const drafts = new Map<string, Record<string, string>>();
+const draftVersions = new Map<string, number>();
 const own = <T>(record: Record<string, T> | undefined, name: string): T | undefined => record && Object.hasOwn(record, name) ? record[name] : undefined;
 const technical = new Set(["base", "digest", "size", "definition", "draft", "conditions", "reports", "manifest", "earlier", "request", "replyTo", "mentions", "thread", "number", "opener"]);
 const labelOf = (name: string) => own(fieldLabels, name) ?? name.replace(/-/g, " ");
@@ -75,7 +76,7 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
   return panel;
 }
 
-function actionForm(act: Offered, send: Send, context: ActionContext, primary: boolean): HTMLElement {
+export function actionForm(act: Offered, send: Send, context: ActionContext, primary: boolean): HTMLElement {
   const defaults = own(context.defaults, act.kind);
   const choicesFor = own(context.choices, act.kind);
   const blocked = context.uncertain || context.pending || context.blockedKinds?.includes(act.kind);
@@ -115,7 +116,9 @@ function actionForm(act: Offered, send: Send, context: ActionContext, primary: b
       input = element("input", { ...attrs, type: "text", value }) as HTMLInputElement;
     }
     controls.push(input);
-    const label = element("label", {}, labelOf(field.name), input);
+    const fieldLabel = field.name === "body" && act.kind === "comment" ? "Comment"
+      : field.name === "body" && act.kind === "review-verdict" ? "Review comment" : labelOf(field.name);
+    const label = element("label", {}, fieldLabel, input);
     if (primary && technical.has(field.name) && !field.required) advanced.push(label);
     else form.append(label);
   }
@@ -134,15 +137,22 @@ function actionForm(act: Offered, send: Send, context: ActionContext, primary: b
     return { on, typed };
   };
   form.addEventListener("input", () => {
-    if (draftKey) { const { on, typed } = read(); drafts.set(draftKey, { ...typed, on }); }
+    if (draftKey) { const { on, typed } = read(); drafts.set(draftKey, { ...typed, on }); draftVersions.set(draftKey, (draftVersions.get(draftKey) ?? 0) + 1); }
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (blocked || button.hasAttribute("disabled")) return;
     const { on, typed } = read();
+    const submittedDraft = { ...typed, on };
+    if (draftKey) drafts.set(draftKey, submittedDraft);
+    const submittedVersion = draftKey ? draftVersions.get(draftKey) ?? 0 : null;
     // Block repeated clicks while the shell's signed operation is awaiting its answer.
     button.setAttribute("disabled", "");
-    send(act.kind, on, typed);
+    const accepted = act.kind === "comment" && draftKey ? () => {
+      const current = drafts.get(draftKey);
+      if (current && (draftVersions.get(draftKey) ?? 0) === submittedVersion && JSON.stringify(current) === JSON.stringify(submittedDraft)) drafts.delete(draftKey);
+    } : undefined;
+    if (accepted) send(act.kind, on, typed, accepted); else send(act.kind, on, typed);
   });
   return form;
 }

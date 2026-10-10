@@ -130,6 +130,23 @@ function openSignedRead(reader: string): SignedRead | null {
 /** The signed entry at the root of a cause chain: its signer, its time, and where it is. */
 export interface Root { actor: KeyId; time: Timestamp; scope: ScopeId; seq: number }
 
+/** Passive diagnostics of the checks already performed. No credential or identity is a record field. */
+export type SignedReadPhase = "rooted-request" | "rooted-local" | "final-summary" | "final-read" | "unmarked";
+export type SignedReadStage = "encoding-invalid" | "signature-invalid" | "scope-absent" | "target-mismatch" | "read-mismatch" | "argument-mismatch"
+  | "clock-invalid-or-behind" | "request-ended" | "request-beyond-window" | "request-eligible" | "local-signer-eligible" | "causal-root-needed"
+  | "request-refused" | "local-summary-eligible" | "genesis-root-summary-eligible" | "genesis-root-summary-ineligible" | "other-read-eligible";
+export interface SignedReadCheck {
+  phase: SignedReadPhase; stage: SignedReadStage;
+  clockValuesValid?: boolean; readingBeforePrevious?: boolean; readingAtOrPastEnd?: boolean; remainingExceedsWindow?: boolean;
+}
+/** The reader is passed only for private correlation, never as a record field. Default wiring supplies no observer. */
+export type SignedReadObserver = (reader: string, check: Readonly<SignedReadCheck>) => void;
+function observed(config: SignedReading, reader: string, stage: SignedReadStage, clock?: Omit<SignedReadCheck, "phase" | "stage">): void {
+  if (!config.observe) return;
+  try { config.observe(reader, { phase: config.phase ?? "unmarked", stage, ...clock }); }
+  catch { /* Diagnostics cannot change a read's authority or verdict. */ }
+}
+
 /** What a scope's check of a signed read is given. Each is read at every check. */
 export interface SignedReading {
   /** The scope's own clock. */
@@ -138,6 +155,8 @@ export interface SignedReading {
   window: number;
   /** The roots of this scope's cause chains, as the scope found them before the read. Absent: none is known. */
   chains?: Pick<Chains, "at" | "claimOf" | "has">;
+  observe?: SignedReadObserver;
+  phase?: SignedReadPhase;
 }
 
 /** The most causes that a cause chain is followed through (decision 70a0680e). */
@@ -273,15 +292,23 @@ export class Chains {
  */
 export function checkSignedReadRequest(config: SignedReading, store: Pick<Store, "scope">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number } | { refused: false | "clock-behind" } {
   const signed = openSignedRead(reader);
-  if (!signed || !verifySignedRead(signed)) return { refused: false };
+  if (!signed) { observed(config, reader, "encoding-invalid"); return { refused: false }; }
+  if (!verifySignedRead(signed)) { observed(config, reader, "signature-invalid"); return { refused: false }; }
   const scope: ScopeState | null = store.scope();
   const { to, actor, notAfter } = signed.request;
-  if (!scope || to !== scope.at.scope) return { refused: false };
-  if (signed.request.read !== read || signed.request.arg !== arg) return { refused: false };
+  if (!scope) { observed(config, reader, "scope-absent"); return { refused: false }; }
+  if (to !== scope.at.scope) { observed(config, reader, "target-mismatch"); return { refused: false }; }
+  if (signed.request.read !== read) { observed(config, reader, "read-mismatch"); return { refused: false }; }
+  if (signed.request.arg !== arg) { observed(config, reader, "argument-mismatch"); return { refused: false }; }
   const [reading, previous, ends] = [timeMs(config.clock.read()), timeMs(scope.time), timeMs(notAfter)!];
-  if (reading === null || previous === null || reading < previous) return { refused: "clock-behind" };
+  if (reading === null || previous === null || reading < previous) {
+    observed(config, reader, "clock-invalid-or-behind", { clockValuesValid: reading !== null && previous !== null, readingBeforePrevious: reading !== null && previous !== null && reading < previous });
+    return { refused: "clock-behind" };
+  }
   const window = config.window * 1000;
-  if (reading >= ends || ends - reading > window) return { refused: false };
+  if (reading >= ends) { observed(config, reader, "request-ended", { clockValuesValid: true, readingBeforePrevious: false, readingAtOrPastEnd: true }); return { refused: false }; }
+  if (ends - reading > window) { observed(config, reader, "request-beyond-window", { clockValuesValid: true, readingBeforePrevious: false, readingAtOrPastEnd: false, remainingExceedsWindow: true }); return { refused: false }; }
+  observed(config, reader, "request-eligible", { clockValuesValid: true, readingBeforePrevious: false, readingAtOrPastEnd: false, remainingExceedsWindow: false });
   return { key: actor, since: reading - window };
 }
 
@@ -297,21 +324,24 @@ export function checkLocalSignedRead(config: SignedReading, store: Pick<Store, "
     if (!row) break;
     const entry = JSON.parse(row.bytes) as Entry;
     if ((timeMs(entry.time) ?? -Infinity) < since) break;
-    if (signerOf(entry) === actor) return { key: actor, since };
+    if (signerOf(entry) === actor) { observed(config, reader, "local-signer-eligible"); return { key: actor, since }; }
   }
+  observed(config, reader, "causal-root-needed");
   return { root: { actor, since } };
 }
 
 /** The full check, using a resolved root only when local eligibility needs it. */
 export function checkSignedRead(config: SignedReading, store: Pick<Store, "scope" | "stored">, reader: string, read: ReadName, arg: string): { key: KeyId; since: number; scoped: boolean; whole: boolean } | { refused: false | "clock-behind" } {
   const checked = checkLocalSignedRead(config, store, reader, read, arg);
-  if ("refused" in checked) return checked;
+  if ("refused" in checked) { observed(config, reader, "request-refused"); return checked; }
   const { actor, since } = "key" in checked ? { actor: checked.key, since: checked.since } : checked.root;
   // Summary and legacy own/genesis permissions still need scoped eligibility.
   // Other entries may qualify by their own causal root, checked by Reads.
   const root = config.chains?.at(0) ?? null;
   const scoped = "key" in checked || leads(root, actor, since);
   const whole = store.scope()?.at.kind === "register" && "key" in checked;
+  if (read === "summary") observed(config, reader, "key" in checked ? "local-summary-eligible" : scoped ? "genesis-root-summary-eligible" : "genesis-root-summary-ineligible");
+  else observed(config, reader, "other-read-eligible");
   return read === "summary" && !scoped ? { refused: false } : { key: actor, since, scoped, whole };
 }
 

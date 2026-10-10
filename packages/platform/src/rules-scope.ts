@@ -55,8 +55,9 @@
 import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
+import { definitionClosure, definitionDependencies } from "./definition-input.ts";
 import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
-import type { Item, RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
 import type { Extent } from "./extents.ts";
 
@@ -637,26 +638,45 @@ export const rulesScopeRules: Rules = {
    */
   "definition-bytes": {
     place: "guard", refusals: ["unsupported-definition"],
+    run: (given) => definitionBytes(given),
+  },
+};
+
+function definitionBytes(given: RuleGiven, profiles?: Parameters<typeof validateDefinition>[2]): ReturnType<GuardRule> {
+  const { digest, name } = given.resolved.fields;
+  const { bounds } = given.resolved;
+  if (!isDigest(digest) || typeof name !== "string") throw new Error("this rule stands in `activate`, which names a digest and a name");
+  const unsupported = { holds: false, name: "unsupported-definition", code: "unsupported-definition" } as const;
+  const seen = new Set<Digest>();
+  const queue: Digest[] = [digest];
+  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+    if (seen.has(next)) continue;
+    // The definition itself is not counted among those that it names, as for the closure that a scope retains at its genesis.
+    if (seen.size > bounds.namedDefinitions) return unsupported;
+    seen.add(next);
+    const value = given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes);
+    if (value === undefined) return { holds: null, reason: "dependency-unavailable" };
+    const checked = validateDefinition(value, bounds, profiles);
+    if (!checked.ok || checked.definition.digest !== next) return unsupported;
+    if (next === digest && checked.definition.declared.name !== name) return unsupported;
+    queue.push(...creates(checked.definition.declared));
+  }
+  return { holds: true };
+}
+
+/** Supporting application cohort: old activation rules keep their parser semantics. */
+export const rulesScopeRules3: Rules = {
+  ...rulesScopeRules,
+  "definition-bytes": {
+    place: "guard", refusals: ["unsupported-definition"],
     run: (given) => {
-      const { digest, name } = given.resolved.fields;
-      const { bounds } = given.resolved;
-      if (!isDigest(digest) || typeof name !== "string") throw new Error("this rule stands in `activate`, which names a digest and a name");
-      const unsupported = { holds: false, name: "unsupported-definition", code: "unsupported-definition" } as const;
-      const seen = new Set<Digest>();
-      const queue: Digest[] = [digest];
-      for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-        if (seen.has(next)) continue;
-        // The definition itself is not counted among those that it names, as for the closure that a scope retains at its genesis.
-        if (seen.size > bounds.namedDefinitions) return unsupported;
-        seen.add(next);
-        const value = given.value(DEFINITION_DOMAIN, next, bounds.definitionBytes);
-        if (value === undefined) return { holds: null, reason: "dependency-unavailable" };
-        const checked = validateDefinition(value, bounds);
-        if (!checked.ok || checked.definition.digest !== next) return unsupported;
-        if (next === digest && checked.definition.declared.name !== name) return unsupported;
-        queue.push(...creates(checked.definition.declared));
-      }
-      return { holds: true };
+      const checked = definitionClosure(given, "digest");
+      if (checked.result === "unavailable") return { holds: null, reason: "dependency-unavailable" };
+      return checked.result === "ready" && checked.root.name === given.resolved.fields["name"]
+        ? { holds: true } : { holds: false, name: "unsupported-definition", code: "unsupported-definition" };
     },
   },
 };
+
+/** Version 3 adds explicit closure places; versions 1 and 2 retain their exact data. */
+export const rulesScope3: PlatformData = { ...rulesScope2, acts: { ...rulesScope2.acts, activate: { ...rulesScope2.acts["activate"]!, fields: { ...rulesScope2.acts["activate"]!.fields, ...definitionDependencies } } } };

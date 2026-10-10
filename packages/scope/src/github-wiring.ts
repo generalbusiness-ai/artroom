@@ -9,7 +9,7 @@ import { isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
 import { isOf } from "@generalbusiness/artroom-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
-import { DestinationHost } from "./destination-host.ts";
+import { DestinationHost, type SnapshotReader } from "./destination-host.ts";
 import { GitHubProvider } from "./github-host.ts";
 import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
 import type { OutsideGiven } from "./object.ts";
@@ -57,7 +57,7 @@ function cleanupTokens(raw: string | undefined): ReadonlyMap<string, Cleanup> | 
 }
 
 /** Factory for one object life. Its scope/state reads stay live across genesis and later entries. */
-export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings, fetch?: (request: Request) => Promise<Response>): Outside {
+export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, env: GitHubBindings, fetch?: (request: Request) => Promise<Response>, snapshotReader?: SnapshotReader): Outside {
   try {
     const config = configuration(env.GITHUB_APP_CONFIG);
     const cleanups = cleanupTokens(env.GITHUB_CLEANUP_TOKENS);
@@ -77,7 +77,7 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
     });
     const register = new RegisterHost(given, { host, namespace, provider });
     const custody = new CredentialStore(sql, () => given.scope()?.at ?? null);
-    const destination = new DestinationHost(given, { host, namespace, provider, custody });
+    const destination = new DestinationHost(given, { host, namespace, provider, custody, ...(snapshotReader ? { snapshotReader } : {}) });
     const bound = hostBound(given, config.registerScope, host, namespace);
     // accepts names a kind, not one operation. A nonempty cleanup map enables
     // that kind; a missing exact ID/name within it still yields no answer.
@@ -98,6 +98,7 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
     };
     return {
       accepts, send,
+      snapshot: (asked) => bound(given.genesis()?.seed.definition ?? "") ? destination.snapshot(asked) : Promise.resolve(null),
       judged: (at, sealed) => destination.judged(at, sealed),
       recovery: { accepts: (owner, kind) => accepts(owner, kind) && destination.recovery.accepts(owner, kind), read: (request) => accepts(request.owner, request.kind) ? destination.recovery.read(request) : Promise.resolve(null) },
       replies: (limit) => bound(given.genesis()?.seed.definition ?? "") ? destination.replies(limit) : { answers: [], more: false },

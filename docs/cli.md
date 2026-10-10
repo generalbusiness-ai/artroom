@@ -295,6 +295,66 @@ The token is for the clone. A later `git fetch` in the clone needs a new
 token; run `artroom clone` again for one. A token that is never read ends
 at its end.
 
+**`artroom propose <branch> [--title <text>]`** submits the committed files
+that differ between the room's published head and a local branch tip. It
+reads committed objects, so uncommitted files and the index remain untouched.
+The room's head must be an ancestor of that tip. The room creates and
+publishes its own commit; the person does not push the branch. After a
+publication, `git pull` reads that room commit.
+
+This command requires a manifest-list change definition and a destination
+at version 3. Existing rooms retain their genesis pins. An older room is
+refused with `version-mismatch`; activation alone cannot upgrade its
+native destination. A founder supplies the authored `change3.json` or
+`change-demo3.json` bytes to the rules scope, by their exact digest.
+
+The change records one signed `propose-file` source entry per path, then
+one `propose-manifest` that freezes all paths, entry references and byte
+digests on the published base. The destination builds their shared tree
+at reservation and records it before any required check. A check request
+reads that reservation tree; publication waits for every required check's
+authentic pass. The destination stages the recorded integration on the
+canonical host
+under `refs/artroom/reservations/<reservation id>` before it reports the
+reservation to the lane. The checker reads that reservation and fetches
+its exact ref, then checks its integration ID, tree and first parent. A
+missing or mismatched stage gives `reservation-stage-missing` or
+`reservation-stage-mismatch` and starts no run. While a check is owed, the
+command prints the change and
+reserved tree. A published result prints the room's commit. A policy
+refusal prints its name and the merge command to run after approval.
+
+Reservation snapshots currently use the Git reader’s supported SHA-1
+format. The private checkout refuses SHA-256 as
+`unsupported-object-format`; this is a supported-format limit, not a
+claim that SHA-256 checks ran.
+
+This delivery carries UTF-8 text, including its exact byte order mark and
+NUL bytes. It names refusals for deleted or renamed files, non-UTF-8
+content, an unsupported mode change, more than 64 changed paths, a path
+that cannot be written, and a file over 65,536 bytes. Each source entry
+uses the existing per-entry transport bound. It carries no Git pack.
+A `request-check` first records a queued job. The destination fences that
+check's exact job generation, invalidating any earlier pass, before its
+acknowledgement makes the new job requested and supersedes the old job.
+A retry may be requested while checks are pending. If publication has
+started, the fence is refused as `publication-started`; the old job and
+any unresolved send remain recorded. Delayed results count only for the
+destination's acknowledged generation. Cancellation before a push and the
+recorded check deadline release logical publication availability. A staged
+ref remains a separate cleanup duty. Publication moves the branch by its
+recorded compare-and-swap; deletion of the reservation ref and revocation
+of its tokens must settle before the destination’s publication is final.
+Unknown staging or deletion remains recorded and is never inferred from
+a read alone. A staging mismatch that may leave a ref keeps a live
+`cleanup-aborted` duty; its branch slot can be reclaimed independently
+of that cleanup. A delete uses the recorded old integration ID and cannot
+remove another writer’s replacement ref. Expiry currently retains `cleanup-aborted`; its explicit
+`resend` cleanup trigger is awaiting the owner’s disposition (`f1b87a0b`).
+
+Binary content, deletion and rename support remain in the later R5 work.
+The demonstration uses two text files.
+
 **`artroom edit <path> --file <local file> [--title <text>]`** writes one
 file of the repository through the room. The person never writes the
 repository: the room judges the change and its destination writes it. The

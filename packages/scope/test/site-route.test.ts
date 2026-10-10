@@ -1,19 +1,23 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8, digestBytes, takeBytes } from "@generalbusiness/artroom-bytes";
 import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER } from "@generalbusiness/artroom-platform";
-import { idOf, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
+import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
+import { idOf, objectId, GitRefusal, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
+import type { Binding } from "../src/namespace.ts";
 import type { SiteEnv } from "../src/site/host.ts";
 import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
 import { platformOutside } from "./worker.ts";
+import completeness from "./site/completeness/fixture.md?raw";
+import companion from "./site/completeness/companion.md?raw";
+import diagram from "./site/completeness/diagram.svg?raw";
 
 // The site route on a real register and directory, under the deployed class in the namespace `PLATFORM`, with the platform
 // package's rules. The register's claim creates the repository through the production wiring of the hosting's own Git service,
@@ -65,6 +69,26 @@ async function withTags(pack: Uint8Array, tags: readonly TagObject[]): Promise<U
   return join(body, new Uint8Array(await crypto.subtle.digest("SHA-1", body)));
 }
 
+/** Exact single-want request emitted by the real SmartHttpSource, bounded before parsing. */
+async function wantedObject(request: Request): Promise<string> {
+  const data = request.body ? await takeBytes(request.body, 256, request.signal) : null;
+  if (!(data instanceof Uint8Array)) throw new GitRefusal("unreadable", "fixture upload request");
+  const lines: (string | null)[] = [];
+  for (let at = 0; at < data.length;) {
+    const digits = new TextDecoder("ascii", { fatal: true, ignoreBOM: false }).decode(data.subarray(at, at + 4));
+    if (!/^[0-9a-f]{4}$/.test(digits)) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    const size = Number.parseInt(digits, 16);
+    if (size === 0) { lines.push(null); at += 4; continue; }
+    if (size <= 4 || size > 65520 || at + size > data.length) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    const bytes = data.subarray(at + 4, at + size);
+    if (bytes.some(byte => byte > 0x7f)) throw new GitRefusal("unreadable", "fixture upload pkt-line");
+    lines.push(new TextDecoder().decode(bytes)); at += size;
+  }
+  const want = /^want ([0-9a-f]{40})(?: ofs-delta)?\n$/.exec(lines[0] ?? "");
+  if (lines.length !== 3 || !want || lines[1] !== null || lines[2] !== "done\n") throw new GitRefusal("unreadable", "fixture upload negotiation");
+  return objectId(want[1], "fixture wanted object");
+}
+
 /** STAND-IN for the hosting's own Git service: the binding and its smart-HTTP upload-pack, over a map of refs and objects. */
 class Scripted {
   name: string | null = null;
@@ -73,6 +97,70 @@ class Scripted {
   readonly minted: string[] = [];
   readonly revoked = new Set<string>();
   packs = 0;
+  packBuilds = 0;
+  private packed: { key: string; bytes: Promise<Uint8Array> } | null = null;
+  // At most 64 currently indexed promises and 8 MiB encoded completed bytes.
+  // Evicted in-flight callers may finish; the map is not a physical I/O quota.
+  private readonly wanted = new Map<string, { key: string; bytes: Promise<Uint8Array>; size: number }>();
+  private wantedBytes = 0;
+  constructor(private readonly allObjects = false) {}
+
+  /** The map's actual ordered content, including replacements/in-place bytes,
+   * is the cache identity. Count alone cannot see deletion+addition or changes.
+   * Hashing stays linear; only repeated compression/pack construction is saved. */
+  private pack(): Promise<Uint8Array> {
+    const key = digestBytes(utf8(canonicalize([...this.objects].map(([key, object]) => [key, object.id, object.type, object.data.length, digestBytes(object.data)]))));
+    if (this.packed?.key === key) return this.packed.bytes;
+    const all: (RawGitObject | TagObject)[] = [...this.objects.values()].map(object => ({ ...object, data: object.data.slice() }));
+    this.packBuilds++;
+    // A changed map starts a new immutable pack snapshot. Failed construction
+    // is released so an identical later request may retry; no Response is cached.
+    const made = (async () => withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag")))();
+    this.packed = { key, bytes: made };
+    void made.catch(() => { if (this.packed?.bytes === made) this.packed = null; });
+    return made;
+  }
+
+  /** Only this wanted object's immutable bytes are inspected; unrelated blobs stay untouched. */
+  private wantedPack(id: string): Promise<Uint8Array> {
+    const supplied = this.objects.get(id);
+    if (!supplied) {
+      const prior = this.wanted.get(id);
+      if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+      throw new GitRefusal("unreadable", "fixture wanted object missing");
+    }
+    if (supplied.data.length > MAX_BYTES) {
+      const prior = this.wanted.get(id);
+      if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+      throw new GitRefusal("too-large", "fixture wanted bytes");
+    }
+    const object = { ...supplied, data: supplied.data.slice() };
+    if (object.id !== id) throw new GitRefusal("unreadable", "fixture wanted object identity");
+    const key = canonicalize([id, object.id, object.type, object.data.length, digestBytes(object.data)]);
+    const prior = this.wanted.get(id);
+    if (prior?.key === key) return prior.bytes;
+    if (prior) { this.wanted.delete(id); this.wantedBytes -= prior.size; }
+    this.packBuilds++;
+    const made = (async () => {
+      if (object.type === "tag") {
+        if (object.data.length > MAX_BYTES) throw new GitRefusal("too-large", "fixture tag bytes");
+        objectId(object.id, "fixture tag object");
+        if (idOf("tag", object.data) !== object.id) throw new GitRefusal("hash-mismatch", "fixture tag object");
+        return withTags(await buildPack([], { maxBytes: MAX_BYTES }), [object]);
+      }
+      return buildPack([object], { maxBytes: MAX_BYTES });
+    })();
+    const entry = { key, bytes: made, size: 0 };
+    this.wanted.set(id, entry);
+    while (this.wanted.size > 64) { const first = this.wanted.entries().next().value!; this.wanted.delete(first[0]); this.wantedBytes -= first[1].size; }
+    void made.then(bytes => {
+      if (this.wanted.get(id) !== entry) return;
+      entry.size = bytes.length; this.wantedBytes += entry.size;
+      while (this.wantedBytes > MAX_BYTES) { const first = this.wanted.entries().next().value!; this.wanted.delete(first[0]); this.wantedBytes -= first[1].size; }
+    }, () => { if (this.wanted.get(id) === entry) { this.wanted.delete(id); this.wantedBytes -= entry.size; } });
+    return made;
+  }
+
   /** What the service is scripted to answer: the field that holds a minted token, the remote that `info` reports, and a failure. */
   tokenField: "plaintext" | "token" = "plaintext";
   reported: ((name: string) => string) | null = null;
@@ -131,9 +219,9 @@ class Scripted {
     }
     if (request.method === "POST" && url.pathname.endsWith("/git-upload-pack")) {
       this.packs++;
-      // Every object, whatever is wanted: the source keeps what it was sent and checks each object it reads.
-      const all = [...this.objects.values()];
-      const pack = await withTags(await buildPack(all.filter((o): o is RawGitObject => o.type !== "tag"), { maxBytes: MAX_BYTES }), all.filter((o): o is TagObject => o.type === "tag"));
+      // Route reads use the real packetized want. Complete-map mode belongs
+      // only to the independent cache mutation witness below.
+      const pack = this.allObjects ? await this.pack() : await this.wantedPack(await wantedObject(request));
       return new Response(join(utf8(pkt("NAK\n")), pack), { headers: { "content-type": "application/x-git-upload-pack-result" } });
     }
     return new Response("unscripted", { status: 404 });
@@ -141,6 +229,35 @@ class Scripted {
 }
 
 const host = new Scripted();
+// SCRIPTED publication boundary for these renderer/HTTP witnesses. The
+// selected-publication test separately exercises actual destination records.
+const publishedScopes: Binding = {
+  idFromName: (name) => env.PLATFORM.idFromName(name),
+  get: (id) => {
+    const object = env.PLATFORM.get(id) as unknown as import("../src/site/publication.ts").SitePublicationPeer & { siteRoom(): Promise<import("../src/namespace.ts").Sourced | null> };
+    return {
+      siteRoom: () => object.siteRoom(),
+      siteDestination: () => object.siteDestination(),
+      // SCRIPTED proof and matching Git receipt objects; not native publication evidence.
+      sitePublishedCommit: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository, commit: string) => {
+        const actual = await object.sitePublication(directory, repository);
+        if (!actual) return { ok: false, reason: "not-published" };
+        const fact = { at: actual.at, seq: 1, hash: `sha256:${"a".repeat(64)}` } as const;
+        const file = canonicalize({ v: 1, scripted: true, commit });
+        const receipt = receiptObjects("sha1", actual.at.scope, "2099-01-01T00:00:00Z", fact, JSON.parse(file));
+        const ref = `refs/artroom/receipts/${commit}`;
+        host.refs.set(ref, receipt.commit);
+        for (const o of receipt.objects) host.objects.set(o.id, { id: o.id, type: o.kind, data: o.body });
+        return { ok: true, proof: { at: actual.at, head: actual.head, directory, repository, commit, publication: fact, written: fact,
+          receipt: { ref, commit: receipt.commit, tree: receipt.objects.find(o => o.kind === "tree")!.id, blob: receipt.objects.find(o => o.kind === "blob")!.id, file } } };
+      },
+      sitePublication: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
+        const actual = await object.sitePublication(directory, repository);
+        return actual && { ...actual, refs: [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
+      },
+    };
+  },
+};
 let D: Platform;
 let R: Platform;
 let siteEnv: SiteEnv;
@@ -153,7 +270,7 @@ beforeAll(async () => {
   const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
   const registerSeed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 };
   R = new Platform(scopeIdOf(registerSeed));
-  siteEnv = { SCOPES: env.PLATFORM, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
+  siteEnv = { SCOPES: publishedScopes, ARTIFACTS: host.ns, ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) };
   platformOutside.set(R.name, (given, sql) => artifactsOutside(given, sql, siteEnv, host.fetch));
   expect(await R.stub.found(signIntent(install, paul.secret), REGISTER)).toMatchObject({ answer: "accepted" });
   const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
@@ -168,6 +285,9 @@ beforeAll(async () => {
     "docs/index.md": "# Docs\n\nThe [guide](guide.md).\n",
     "docs/guide.md": "# Guide\n\n## Setup\n\n## Setup\n\nBack [home](../README.md), [the top](/README.md), [elsewhere](https://example.com/x), [setup](#setup).\n\n![A diagram](diagram.png)\n\n| a | b |\n| - | :-: |\n| 1 | ~~2~~ |\n\n- [x] done\n- [ ] not yet\n",
     "docs/diagram.png": PNG,
+    "docs/completeness/fixture.md": completeness,
+    "docs/completeness/companion.md": companion,
+    "docs/completeness/diagram.svg": diagram,
     "notes/a.txt": "plain\n",
     "notes/b.md": "b\n",
     "big.md": "a".repeat(FILE_BYTES + 1),
@@ -239,6 +359,52 @@ test("a page: a markdown file at HEAD, at its branch and at a tag renders as HTM
   expect(host.minted.filter((token) => !host.revoked.has(token))).toEqual([]);
 });
 
+// Invariant: one checked-in document renders the supported GFM constructs through Site; its repository links and image
+// remain at the requested ref and serve the companion bytes, while the documented safety differences and unsupported syntax
+// remain visible. The register/directory are real scopes; the Git host is the labelled stand-in above.
+test("GFM completeness fixture: constructs render through Site, relative page and image addresses serve their repository bytes, and documented differences stay visible (STAND-IN host)", async () => {
+  const prefix = `/site/${D.name}/HEAD/`;
+  const response = await get(`${prefix}docs/completeness/fixture.md`);
+  expect([response.status, response.headers.get("content-type")]).toEqual([200, "text/html; charset=utf-8"]);
+  const body = await response.text();
+  for (const construct of [
+    '<h1 id="site-completeness">Site completeness</h1>',
+    '<h2 id="getting-started">Getting <em>started</em></h2>',
+    '<h2 id="getting-started-1">Getting <em>started</em></h2>',
+    '<a href="#getting-started">the first section</a>',
+    '<a href="#getting-started-1">the repeated section</a>',
+    '<em>Emphasis</em>', '<strong>strong emphasis</strong>', '<del>strikethrough</del>', '<code>inline code</code>',
+    '<ul>\n<li>First bullet</li>', '<li>Nested bullet</li>', '<ol>\n<li>First ordered item</li>',
+    '<li><input checked="" disabled="" type="checkbox"> Finished task</li>',
+    '<li><input disabled="" type="checkbox"> Open task</li>',
+    '<th align="left">Feature</th>', '<th align="right">State</th>', '<td align="right">working</td>',
+    '<pre><code class="language-ts">const answer = 42;\n</code></pre>',
+    '<blockquote>\n<p>A quoted paragraph.</p>\n<p>With another paragraph.</p>\n</blockquote>',
+    '<a href="https://example.com/guide">https://example.com/guide</a>',
+    '<a href="http://www.example.com">www.example.com</a>',
+    '<a href="mailto:reader@example.com">reader@example.com</a>',
+    `<a href="${prefix}docs/completeness/companion.md#linked-section">the companion page</a>`,
+    `<a href="${prefix}README.md">the repository root</a>`, `<a href="${prefix}docs/index.md">the parent page</a>`,
+    `<img src="${prefix}docs/completeness/diagram.svg" alt="Repository diagram" title="A repository image" />`,
+    'Inline HTML &lt;em&gt;stays text&lt;/em&gt;.',
+    '<pre class="raw-html">&lt;div&gt;Block HTML stays text.&lt;/div&gt;</pre>',
+    '<a href="">An unsafe link</a>',
+    'a note[^note].', '[^note]: This is ordinary text, not a footnote.', '[[Companion]]',
+  ]) expect(body, construct).toContain(construct);
+  expect(body).not.toMatch(/<sup|<div>|<em>stays text|href="javascript:/);
+
+  // Follow the addresses written by Site, rather than rebuilding the next requests from the fixture paths.
+  const linked = /<a href="([^"]+)">the companion page<\/a>/.exec(body)![1]!;
+  const linkedResponse = await get(linked);
+  expect(linkedResponse.status).toBe(200);
+  expect(await linkedResponse.text()).toContain('<h2 id="linked-section">Linked section</h2>');
+  const src = /<img src="([^"]+)" alt="Repository diagram"/.exec(body)![1]!;
+  const image = await get(src);
+  expect([image.status, image.headers.get("content-type")]).toEqual([200, "image/svg+xml"]);
+  expect(image.headers.get("content-security-policy")).toContain("sandbox");
+  expect(new Uint8Array(await image.arrayBuffer())).toEqual(utf8(diagram));
+});
+
 // Invariant: a directory answers its index page if it has one, else a listing of its entries.
 test("an index: the root answers its README, a directory its index.md, and a directory with neither a listing of its files (STAND-IN host)", async () => {
   const root = await page(await get(`/site/${D.name}/HEAD/`));
@@ -274,14 +440,14 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
   const cases: [string, number, string, SiteEnv?][] = [
     [`/site/${D.name}/HEAD/docs/missing.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs/guide.md/`, 404, "not-found"],
-    [`/site/${D.name}/no-such-branch/README.md`, 404, "ref-not-found"],
-    [`/site/${D.name}/bad..ref/README.md`, 404, "ref-not-found"],
+    [`/site/${D.name}/no-such-branch/README.md`, 404, "not-published"],
+    [`/site/${D.name}/bad..ref/README.md`, 404, "not-published"],
     [`/site/${D.name}/HEAD/big.md`, 413, "too-large"],
     [`/site/${R.name}/HEAD/README.md`, 404, "not-found"],
     [`/site/not-a-scope/HEAD/README.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs%2Fguide.md`, 400, "bad-request"],
     [`/site/${D.name}/HEAD/%E0%A4%A`, 400, "bad-request"],
-    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: env.PLATFORM }],
+    [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { SCOPES: publishedScopes }],
     // The host's setting pins another register: this room was not created by it, and its repository is not read.
     [`/site/${D.name}/HEAD/README.md`, 503, "host-not-configured", { ...siteEnv, ARTIFACTS_CONFIG: canonicalize({ registerScope: D.name, namespace: NAMESPACE, host: SERVICE, maxBytes: MAX_BYTES, credentialIdentity: "adapter-attempt" }) }],
   ];
@@ -307,7 +473,9 @@ test("cache: same commit, same ETag, and If-None-Match answers 304 only for a se
   const etag = first.headers.get("etag")!;
   expect(first.headers.get("cache-control")).toBe("public, max-age=60");
   expect(etag).toMatch(new RegExp(`^"${host.refs.get("refs/heads/moving")}\\.[0-9a-f]{24}"$`));
+  const builds = host.packBuilds;
   expect((await get(at)).headers.get("etag")).toBe(etag);
+  expect(host.packBuilds).toBe(builds); // Same actual object bytes reuse compression, not a Response/ref/token.
   expect((await get(`/site/${D.name}/moving/docs/index.md`)).headers.get("etag")).not.toBe(etag);
   const unchanged = await get(at, { headers: { "if-none-match": etag } });
   expect([unchanged.status, await unchanged.text(), unchanged.headers.get("etag")]).toEqual([304, "", etag]);
@@ -405,7 +573,7 @@ test("navigation: the header labels the repository and the branch or tag, the br
   expect(head.body).toContain(`<span class="version">branch main (HEAD)</span>`);
   expect(head.body).toContain(`Rendered from commit <code>${host.refs.get("refs/heads/main")}</code>.`);
   expect((await page(await get(`${at("main")}docs/guide.md`))).body).toContain(`<span class="version">branch main</span>`);
-  // An annotated tag is followed to its commit.
+  // SCRIPTED publication names the annotated tag's already-recorded commit.
   expect((await page(await get(`${at("release")}README.md`))).body).toContain(`Rendered from commit <code>${nav}</code>.`);
 });
 
@@ -439,15 +607,16 @@ test("a folder: its listing gives sub-folders, markdown files by their first hea
   expect((await page(await get(`${prefix}guide/deep`))).body).toContain('<h1 id="deep">Deep</h1>');
 });
 
-// Invariant: the versions page lists every branch and tag of the repository with the commit it names, an annotated tag
-// followed, and marks the published branch; its ETag changes when a ref changes, and invalid rows fail before 304.
-test("versions: /site/<directory>/versions/ lists each branch and tag with its commit, an annotated tag followed, the published branch marked; a new tag gives a new ETag (STAND-IN host)", async () => {
+// Invariant: the versions page renders the SCRIPTED publication record, marks
+// its published branch, and validates recorded commit targets before 304.
+// This fixture scripts additional named versions that today's real room has no registry for.
+test("versions: recorded version rows and their commits render, changed publication gives a new ETag, invalid targets fail before 304 (SCRIPTED publication, STAND-IN host)", async () => {
   const at = `/site/${D.name}/versions/`;
   const response = await get(at);
   const versions = await page(response);
   expect([versions.status, versions.type]).toEqual([200, "text/html; charset=utf-8"]);
   const rows = [...versions.body.matchAll(/<tr><td>(branch|tag)<\/td><td><a href="([^"]+)">([^<]+)<\/a>([^<]*)<\/td><td><code>([0-9a-f]{40})<\/code><\/td><\/tr>/g)].map((m) => m.slice(1));
-  const expected = [...host.refs].sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
+  const expected = [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).sort(([a], [b]) => (a < b ? -1 : 1)).map(([ref, id]) => {
     const tag = ref.startsWith("refs/tags/");
     const name = ref.replace(/^refs\/(heads|tags)\//, "");
     return [tag ? "tag" : "branch", `/site/${D.name}/${name}/`, name, name === "main" && !tag ? " (HEAD, the published branch)" : "", name === "release" ? nav : id];
@@ -461,14 +630,14 @@ test("versions: /site/<directory>/versions/ lists each branch and tag with its c
   const etag = response.headers.get("etag")!;
   expect((await get(at, { headers: { "if-none-match": etag } })).status).toBe(304);
   expect((await get(at, { headers: { "if-none-match": "*" } })).status).toBe(304);
-  // A supported annotated-tag pack entry whose target is a blob, not a commit.
+  // An invalid publication target: a blob rather than a recorded commit.
   const wrong = utf8("not a commit\n");
   const wrongId = idOf("blob", wrong);
   host.objects.set(wrongId, { id: wrongId, type: "blob", data: wrong });
   const tag = utf8(`object ${wrongId}\ntype blob\ntag wrong-target\ntagger Rita <rita@example.invalid> 0 +0000\n\nwrong target\n`);
   const tagId = idOf("tag", tag);
   host.objects.set(tagId, { id: tagId, type: "tag", data: tag });
-  host.refs.set("refs/tags/wrong-target", tagId);
+  host.refs.set("refs/tags/wrong-target", wrongId);
   try {
     const ordinary = await get(at);
     const conditional = await get(at, { headers: { "if-none-match": "*" } });
@@ -507,4 +676,66 @@ test("no ref: /site/<directory> and /site/<directory>/ redirect to HEAD/ (STAND-
   }
   expect(host.packs).toBe(packs);
   expect((await get(`/site//`)).status).toBe(400);
+});
+
+// Invariant: only immutable wire bytes are reused; equal-size map/content changes
+// rebuild and fresh HTTP responses/token accounting remain actual stand-in work.
+test("Scripted pack cache invalidates replacements, byte mutations, deletion and clear without caching responses", async () => {
+  const source = new Scripted(true); source.name = "cache-fixture";
+  const first = utf8("first"); const id = idOf("blob", first);
+  source.objects.set(id, { id, type: "blob", data: first });
+  const binding = await source.ns.get(source.name);
+  const minted = await binding.createToken("read", 120) as { plaintext: string };
+  const request = () => new Request(`${source.remote(source.name!)}/git-upload-pack`, { method: "POST", headers: { authorization: `Bearer ${minted.plaintext}` }, body: "scripted want" });
+  const one = await source.fetch(request()); const two = await source.fetch(request());
+  expect(one).not.toBe(two);
+  expect(new Uint8Array(await one.arrayBuffer())).toEqual(new Uint8Array(await two.arrayBuffer()));
+  expect([source.packs, source.packBuilds]).toEqual([2, 1]);
+  const replacement = utf8("other");
+  const replaced = { id: idOf("blob", replacement), type: "blob" as const, data: replacement };
+  source.objects.set(id, replaced); // Same map count/key; actual ID/content changes.
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(2);
+  replacement[0] = 0x61; // In-place same-length content invalidates and must fail the real pack hash check.
+  await expect(source.fetch(request())).rejects.toMatchObject({ reason: "hash-mismatch" }); expect(source.packBuilds).toBe(3);
+  await expect(source.fetch(request())).rejects.toMatchObject({ reason: "hash-mismatch" }); expect(source.packBuilds).toBe(4); // Failed promise cannot poison retry.
+  source.objects.set(id, { id, type: "blob", data: first });
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(5);
+  source.objects.delete(id);
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(6);
+  source.objects.set(id, { id, type: "blob", data: first });
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(7);
+  source.objects.clear();
+  await (await source.fetch(request())).arrayBuffer(); expect(source.packBuilds).toBe(8);
+  await binding.revokeToken(minted.plaintext);
+  expect((await source.fetch(request())).status).toBe(401);
+
+  // The route mode must parse actual wants and deliver no unrelated large blob.
+  const selected = new Scripted(); selected.name = "wanted-fixture";
+  selected.objects.set(id, { id, type: "blob", data: first });
+  const unrelated = [...host.objects.values()].find(object => object.type === "blob" && object.data.length === FILE_BYTES + 1)!;
+  selected.objects.set(unrelated.id, unrelated);
+  const token = await (await selected.ns.get(selected.name)).createToken("read", 120) as { plaintext: string };
+  const wanted = (object: string, body = `${pkt(`want ${object} ofs-delta\n`)}0000${pkt("done\n")}`) => new Request(`${selected.remote(selected.name!)}/git-upload-pack`, { method: "POST", headers: { authorization: `Bearer ${token.plaintext}` }, body });
+  const response = await selected.fetch(wanted(id)), wire = new Uint8Array(await response.arrayBuffer());
+  const nak = utf8(pkt("NAK\n"));
+  expect(wire.subarray(0, nak.length)).toEqual(nak);
+  const { decodePack } = await import("@generalbusiness/artroom-git/http-read");
+  const decoded = await decodePack(wire.subarray(nak.length), { maxBytes: MAX_BYTES });
+  expect(decoded.map(object => [object.id, object.type, object.data])).toEqual([[id, "blob", first]]);
+  expect(wire.length).toBeLessThan(256);
+  await (await selected.fetch(wanted(id))).arrayBuffer(); expect(selected.packBuilds).toBe(1);
+  const next = utf8("next"), nextId = idOf("blob", next);
+  selected.objects.set(nextId, { id: nextId, type: "blob", data: next });
+  await (await selected.fetch(wanted(nextId))).arrayBuffer(); expect(selected.packBuilds).toBe(2);
+  first[0] = 0x62;
+  await expect(selected.fetch(wanted(id))).rejects.toMatchObject({ reason: "hash-mismatch" });
+  await expect(selected.fetch(wanted(id))).rejects.toMatchObject({ reason: "hash-mismatch" });
+  expect(selected.packBuilds).toBe(4);
+  first[0] = 0x66;
+  await (await selected.fetch(wanted(id))).arrayBuffer(); expect(selected.packBuilds).toBe(5);
+  await expect(selected.fetch(wanted(id, "scripted want"))).rejects.toMatchObject({ reason: "unreadable" });
+  await expect(selected.fetch(wanted("0".repeat(40)))).rejects.toMatchObject({ reason: "bad-object-id" });
+  await expect(selected.fetch(wanted(idOf("blob", utf8("absent"))))).rejects.toMatchObject({ reason: "unreadable" });
+  await (await selected.ns.get(selected.name)).revokeToken(token.plaintext);
+  expect((await selected.fetch(wanted(nextId))).status).toBe(401);
 });

@@ -19,11 +19,11 @@
  * 3. *The configuration.* Fetched from the rules scope by the job's digest,
  *    and read only when the bytes hash to it (`configuration.ts`).
  *    Otherwise no run: `check-error`, `configuration-unavailable`.
- * 4. *The read token.* The service asks the lane for the step `job-read`,
- *    with a request that it signed in step 2 and keeps. The lane mints the
- *    token. Its plaintext goes from the mint's answer to the runner's
- *    gateway, and is never given to this code or to the runner. With no
- *    token no runner starts.
+ * 4. *The read origin.* Manifest-list jobs use their signed, job-bound
+ *    reservation snapshot and its verified overlay. They need no minted
+ *    read token. Legacy jobs ask the lane for `job-read`, using the retained
+ *    signed request. The minted token's plaintext goes only to the runner's
+ *    gateway. With no token, a legacy runner cannot start.
  * 5. *The run.* One runner, for this job alone. Its input is `RunAsk`: the
  *    run's name, the job as read, and the configuration. No key, no token
  *    and no member of a notice is in it.
@@ -63,9 +63,10 @@
  * `not-the-checker`. Nothing is recorded for any of them.
  */
 
-import type { Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, isRecord } from "@generalbusiness/artroom-bytes";
 import { readConfiguration, type Configuration } from "./configuration.ts";
+import { verifyReservationObjects } from "./reservation-snapshot.ts";
 import { manifestOf, originOf, type Job, type NotAJob, type Notice } from "./job.ts";
 import { judge, provenanceOf, readReport, type Details, type Outcome } from "./outcome.ts";
 import { JOB_READ, signJobRead, signResult, type ResultSigner } from "./signing.ts";
@@ -81,6 +82,7 @@ import type { JobRecord, Outcomes } from "./store.ts";
  * one member"; I3 deltas, entry EW15). No notice and no lane names it.
  */
 export interface Scopes {
+  reservationSnapshot?(lane: ScopeRef, signed: SignedIntent): Promise<ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   /** The lane's entry at that position, with the hash that the lane serves for it. Null: the lane has none. */
   entry(lane: ScopeRef, seq: number): Promise<Sealed | null>;
   /** The definition that the lane pins. */
@@ -172,7 +174,20 @@ export class CheckerService {
       const entry = await scopes.entry(notice.lane, notice.job.seq);
       const at = manifestOf(entry, notice.job);
       const pinned = await scopes.pinned(notice.lane);
-      const origin = originOf(notice, { entry, pinned, activated: typeof pinned === "string" && pinned.startsWith("sha256:") ? await scopes.activated(pinned as Digest) : null, manifest: at === null ? null : await scopes.entry(notice.lane, at) });
+      const activated = typeof pinned === "string" && pinned.startsWith("sha256:") ? await scopes.activated(pinned as Digest) : null;
+      const manifest = at === null ? null : await scopes.entry(notice.lane, at);
+      const listManifest = manifest?.entry.input.type === "act" && Array.isArray(manifest.entry.input.signed.intent.fields["files"]);
+      const previous = listManifest ? await this.#o.outcomes.get(notice.job) : null;
+      if (previous?.state === "admitted" || previous?.state === "superseded") return { did: "nothing", why: "closed" };
+      let reservation: ReservationSnapshot | null = previous?.reservation ?? null;
+      if (listManifest && !reservation && scopes.reservationSnapshot) {
+        const asked = await signJobRead(this.#o.signer, { lane: notice.lane, fact: notice.job }, this.#signing());
+        const answer = await scopes.reservationSnapshot(notice.lane, asked);
+        if (answer && "refused" in answer) return { did: "nothing", why: answer.refused };
+        reservation = answer;
+      }
+      if (listManifest && (!reservation || !await verifyReservationObjects(reservation))) return { did: "nothing", why: "no-manifest" };
+      const origin = originOf(notice, { ...(reservation ? { reservation } : {}), entry, pinned, activated, manifest });
       if ("not" in origin) return { did: "nothing", why: origin.not };
       job = origin.job;
     } catch {
@@ -186,7 +201,7 @@ export class CheckerService {
     if (record === null) {
       const run = b64url(this.#o.random(16));
       const asked = await signJobRead(this.#o.signer, job, this.#signing());
-      if (await outcomes.start(job.fact, run, asked)) {
+      if (await outcomes.start(job.fact, run, asked, job.snapshot)) {
         // Nothing waits between the write that made the record and this mark.
         const key = flightOf(job);
         this.#flying.add(key);
@@ -235,16 +250,17 @@ export class CheckerService {
     let report: unknown = null;
     let ran = false;
     if (configuration !== null) {
-      // 4. The read token. Without it no runner starts: the run has no end to find, which is `run-lost`.
+      // 4. Legacy runs require the read token; snapshot runs use their verified overlay.
+      // Without the required legacy token no runner starts, leaving `run-lost`.
       let token: Answer | null = null;
       try {
-        token = await this.#o.scopes.prepare(job.lane, asked, JOB_READ.capability, JOB_READ.step);
+        token = job.snapshot ? null : await this.#o.scopes.prepare(job.lane, asked, JOB_READ.capability, JOB_READ.step);
       } catch {
         this.#log("job-read", "no-answer");
       }
       // The lane's answer is read as data: a value that is no answer is no token, and the log holds one of four fixed words.
       const answered = isRecord(token) ? token["answer"] : null;
-      if (answered === "accepted") {
+      if (job.snapshot || answered === "accepted") {
         ran = true;
         try {
           // 5. The one run of this job.

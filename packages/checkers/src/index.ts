@@ -28,6 +28,6 @@ export { JOB_READ, signJobRead, signResult } from "./signing.ts";
 export type { ResultSigner, Signing } from "./signing.ts";
 export { CheckerService, RUNNING } from "./service.ts";
 export type { Delivered, RunAsk, Runner, Scopes, ServiceOptions } from "./service.ts";
-export { checkout, runSteps } from "./runner.ts";
+export { checkout, checkoutObjects, runSteps } from "./runner.ts";
 export type { Checkout, CheckoutAsk, CheckoutReason, StepExec } from "./runner.ts";
 export { CHECK_READ, readGrant, runnerGateway } from "./sandbox.ts";

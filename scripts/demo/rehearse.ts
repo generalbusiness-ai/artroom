@@ -13,7 +13,7 @@
 
 import { canonicalize, intentDigest, isPlatformDefinition, isReceipt, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, platformName, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { command, type Context, type Outcome } from "@generalbusiness/artroom-cli";
-import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
+import { DEMO_DIGESTS, MANIFEST_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/artroom-lanes";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
 
 /** The three people of the script, each with a fresh config directory. Hardware identity is not verified. */
@@ -24,6 +24,7 @@ export const HANDLES: Readonly<Record<Person, string>> = { founder: "@hugh", mem
 export const FILES: Readonly<Record<string, Uint8Array>> = {
   "issue-demo.json": utf8(canonicalize(issueDemo)),
   "change-demo.json": utf8(canonicalize(changeDemo)),
+  "change-demo3.json": utf8(canonicalize(changeDemo3)),
   "start.md": utf8("# Getting started\n\nClone the room, then edit a page.\n"),
   "agents.md": utf8("# Agents\n\nAsk before you push.\n"),
 };
@@ -47,11 +48,20 @@ export interface Stage {
   get(url: string): Promise<Fetched>;
   /** `git -C <directory> log --oneline`, in the member's working directory. */
   log(directory: string): Promise<Outcome>;
+  /** Opt in to the two-text-file manifest sequence after shot 16. */
+  manifest?: boolean;
+  /** Prepare and commit a local branch in the member's clone; returned lines record the Git operations, not Artroom acts. */
+  prepareBranch?(branch: string, files: readonly { path: string; bytes: Uint8Array }[]): Promise<Outcome>;
   /** The wall clock, in milliseconds. The default is `Date.now`. */
   now?(): number;
+  /** Before a runnable shot starts, its secrets cut. Awaited before any command or read and before its timer. */
+  beforeShot?(shot: NextShot): Promise<void>;
   /** Told each shot as it ends, its secrets cut: for a person who watches the run. */
   told?(shot: Taken): void;
 }
+
+/** What is about to run. Invitation links remain cut on the recording screen. */
+export interface NextShot { n: number; title: string; scene: string; who: string; typed: string }
 
 /** What one shot did. */
 export interface Taken {
@@ -126,7 +136,7 @@ function shots(stage: Stage): Shot[] {
   const site = (path: string) => `${service}/site/{directory}/HEAD/${path}`;
   const took = (scope: string) => `Took effect: entry {${scope}}:<seq>, hash <hash>.`;
   const page = (title: string, shows: string | null) => [`HTTP 200, text/html; charset=utf-8`, `Title: ${title}`, ...(shows ? [`Shows: "${shows}"`] : [])];
-  return [
+  const list: Shot[] = [
     {
       title: "Plan the install", scene: "3", who: "founder",
       typed: () => ["artroom", "install", "--plan", stage.service, "--host", stage.host, "--namespace", stage.namespace],
@@ -254,9 +264,9 @@ function shots(stage: Stage): Shot[] {
     {
       title: "The verifier, every scope", scene: "12", who: "member",
       typed: () => ["artroom", "verify", "--all"],
-      expect: { code: 0, lines: () => [
+      expect: { code: 0, lines: (v) => [
         ...[["register", "register"], ["directory", "directory"], ["membership", "membership"], ["rules", "rules"], ["destination", "destination"], ["lane", "issue"], ["lane", "published"], ["lane", "controlled"], ["lane", "refused"], ["inbox", "founderInbox"], ["inbox", "memberInbox"], ["inbox", "maintainerInbox"]]
-          .map(([kind, name]) => `${kind} {${name}}, entry <seq>: consistent.`),
+          .flatMap(([kind, name]) => [`${kind} {${name}}, entry <seq>: consistent.`, ...(kind === "destination" && v["registerDefinition"] === "platform:register@3" ? ["Cleanup status: destination {destination}, entry <seq>: no reservation is recorded as cleanup-owed."] : [])]),
         "All consistent: 12 scopes.",
       ] },
     },
@@ -281,7 +291,48 @@ function shots(stage: Stage): Shot[] {
       expect: { code: 0, lines: () => page("Artroom", null) },
     },
   ];
+  if (stage.manifest) {
+    const activate: Shot = ({
+      title: "Activate the manifest-list change definition",
+      scene: "after 16, manifest extension", who: "founder",
+      typed: () => ["artroom", "act", "activate", "--on", "rules", "--set", `digest=${MANIFEST_DIGESTS.demo}`, "--set", "name=change", "--value", "change-demo3.json"],
+      expect: { code: 0, lines: () => [took("rules")] },
+    });
+    const prepare = (branch: string): Shot => ({
+      title: `Prepare the committed two-text-file branch ${branch}`, scene: "after 16, local Git preparation", who: "member",
+      typed: () => ["prepare-branch", branch],
+      expect: { code: 0, lines: () => [`Prepared local Git branch ${branch} with 2 text files.`, "<...>"] },
+    });
+    list.splice(16, 0, activate, prepare("two-pages"), {
+      title: "Propose a two-text-file branch: published", scene: "after 16, artroom propose", who: "maintainer",
+      typed: () => ["artroom", "propose", "two-pages"],
+      expect: { code: 0, lines: () => ["Proposed 2 files as change <manifestPublished>, version <manifestVersion>.", "Published: commit <manifestCommit>, by the merge {manifestPublished}:<seq>."] },
+    }, prepare("two-controlled"), {
+      title: "Propose a controlled two-text-file branch: refused by name", scene: "after 16, artroom propose control", who: "maintainer",
+      typed: () => ["artroom", "propose", "two-controlled"],
+      expect: { code: 1, lines: () => ["Proposed 2 files as change <manifestRefused>, version <manifestRefusedVersion>.", "Not published: the merge {manifestRefused}:<seq> is refused, rules-not-met:rules. The change {manifestRefused} stays open at version {manifestRefusedVersion}. When it may be merged, run: artroom merge {manifestRefused}"] },
+    });
+    const merged = list.find((shot) => shot.title === "Merge: it publishes")!;
+    merged.expect.lines = () => ["Published: commit <controlledCommit>, by the merge {controlled}:<seq>."];
+    const verify = list.find((shot) => shot.title === "The verifier, every scope")!;
+    const before = verify.expect.lines;
+    verify.expect.lines = (v) => {
+      const lines = before(v);
+      const afterPublished = lines.findIndex((line) => line.startsWith("lane {published},")) + 1;
+      return [...lines.slice(0, afterPublished), "lane {manifestPublished}, entry <seq>: consistent.", "lane {manifestRefused}, entry <seq>: consistent.", ...lines.slice(afterPublished, -1), "All consistent: 14 scopes."];
+    };
+  }
+  return list;
 }
+
+/** The preparation's exact text sources. Git commits these; Artroom proposes their committed bytes. */
+export const branchFiles = (branch: string): readonly { path: string; bytes: Uint8Array }[] => branch === "two-pages" ? [
+  { path: "guide/branch-one.md", bytes: utf8("# Branch one\n\nThe first text file proposed from a committed branch.\n") },
+  { path: "guide/branch-two.md", bytes: utf8("# Branch two\n\nThe second text file belongs to the same change.\n") },
+] : [
+  { path: "AGENTS.md", bytes: utf8("# Agents\n\nA controlled branch needs the rules controller.\n") },
+  { path: "guide/controlled.md", bytes: utf8("# Controlled branch\n\nThis second text file must not publish alone.\n") },
+];
 
 function need(v: Found, name: string): string {
   const value = v[name];
@@ -384,23 +435,26 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const list = shots(stage);
   let identityStop: string | null = null;
   for (const [i, shot] of list.entries()) {
-    const started = now();
     const expected = { code: shot.expect.code, lines: shot.expect.lines(v) };
-    const base = { n: i + 1, title: shot.title, scene: shot.scene, who: `${shot.who} (${HANDLES[shot.who]})`, at: new Date(started).toISOString(), expected };
+    const base = { n: i + 1, title: shot.title, scene: shot.scene, who: `${shot.who} (${HANDLES[shot.who]})`, expected };
     let words: string[];
     try {
       if (identityStop !== null) throw new Missing(identityStop);
       words = filled(shot.typed(v), v);
     } catch (error) {
       if (!(error instanceof Missing)) throw error;
-      const skipped: Taken = { ...base, typed: "(not run)", code: -1, lines: [], seconds: 0, match: false, why: `not run: ${error.message}`, note: null };
+      const skipped: Taken = { ...base, at: new Date(now()).toISOString(), typed: "(not run)", code: -1, lines: [], seconds: 0, match: false, why: `not run: ${error.message}`, note: null };
       taken.push(skipped);
       stage.told?.(skipped);
       continue;
     }
+    const typed = withheld(words.map(quoted).join(" "));
+    await stage.beforeShot?.({ n: base.n, title: base.title, scene: base.scene, who: base.who, typed });
+    const started = now();
     let outcome: Outcome;
     const shows = expected.lines.find((line) => line.startsWith("Shows: \""))?.slice(8, -1) ?? null;
     if (words[0] === "GET") outcome = seen(await stage.get(words[1]!), shows);
+    else if (words[0] === "prepare-branch") outcome = stage.prepareBranch ? await stage.prepareBranch(words[1]!, branchFiles(words[1]!)) : { code: 1, lines: ["No local Git branch preparation is configured."] };
     else if (words[0] === "git") outcome = await stage.log(words[2]!);
     else outcome = await command(await personOf(shot.who), words.slice(1));
     let why = judged(expected, outcome, v);
@@ -414,7 +468,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     // Ordinary output mismatches remain diagnostic and may continue. A newly
     // captured scope identity cannot drive another person's command or hook
     // when the producer did not return the complete expected result.
-    const names = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused"]
+    const names = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused", "manifestPublished", "manifestRefused"]
       .filter((name) => expected.lines.some((line) => line.includes(`<${name}>`)));
     if (names.length > 0) {
       const config = await (await personOf(shot.who)).store.config();
@@ -429,7 +483,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     }
     const note = shot.after && why === null ? await shot.after(v, stage) : null;
     const done: Taken = {
-      ...base, typed: withheld(words.map(quoted).join(" ")), code: outcome.code, lines: outcome.lines.map(withheld),
+      ...base, at: new Date(started).toISOString(), typed, code: outcome.code, lines: outcome.lines.map(withheld),
       seconds: Math.round((now() - started) / 100) / 10, match: why === null, why, note,
     };
     taken.push(done);

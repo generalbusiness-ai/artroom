@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, onTestFinished } from "vitest";
 import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -7,7 +7,8 @@ import { firstExtents, foundingObjects, platform } from "@generalbusiness/artroo
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { platformNet, platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { site } from "../../scope/src/site/route.ts";
 import type { SiteEnv } from "../../scope/src/site/host.ts";
 import { gitHub, ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
@@ -36,16 +37,13 @@ describe("artroom edit on real scopes, through the production wiring of each Git
   for (const [label, made] of [["the hosting's own Git service", async () => ownHost()], ["GitHub", gitHub]] as const) {
     test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async () => {
       net.hold = net.deaf = null;
-      platformNet.secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      platformNet.sessions = true;
-      platformNet.inspector = reader;
+      const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+      onTestFinished(owner.close);
       const wired = new Set<ScopeId>();
       try {
         await story(await made(), wired);
       } finally {
-        platformNet.secret = null;
-        platformNet.sessions = false;
-        platformNet.inspector = null;
+        owner.close();
         net.hold = null;
         for (const name of wired) platformOutside.delete(name);
       }
@@ -216,7 +214,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect([outside.code, outside.lines[1]]).toEqual([1, expect.stringMatching(/^Not published: the merge sc_\S+:\d+ is refused, path-invalid\. /)]);
   expect([host.refs.get("refs/heads/main"), host.pushes.length]).toEqual([head3, pushes]);
 
-  // The destination's history, with its three publications of a one-file manifest and two refusals, replays consistent, with the
+  // The new destination's history, with its three publications of a one-file manifest and two refusals, replays consistent, with the
   // histories whose entries it names: a verifier reads each over HTTP and derives every entry again, with the platform package's
   // rules and the capability code that the production ports hold, as `wiring.scope.test.ts` does. `artroom verify` carries no
   // capability code, and answers that it cannot derive a lane (the delivery note's section 5).
@@ -228,7 +226,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // The publications are the room's: every push to the branch is the destination's, after the founding one.
   expect(host.pushes.filter((p) => p.ref === "refs/heads/main").map((p) => p.commit)).toEqual([first, head1, head2, head3]);
   const items = await (G.stub as unknown as { items(reader: unknown, type: string): Promise<Read<readonly Item[]>> }).items(reader, "publication");
-  expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["published", null], ["published", null], ["not-reserved", "rules-not-met:rules"], ["published", null], ["not-reserved", "path-invalid"]]);
+  expect(items.ok && items.value.map((item) => [item.state, item.values["reason"] ?? null])).toEqual([["cleaned", null], ["cleaned", null], ["not-reserved", "rules-not-met:rules"], ["cleaned", null], ["not-reserved", "path-invalid"]]);
   if (at.host === "artifacts") {
     // Scripted HTTP read boundary only: after one real accepted merge, three
     // unrelated entries precede its terminal entry. That terminal is just

@@ -1,5 +1,8 @@
-import { expect, test } from "vitest";
-import { newIncarnation } from "@generalbusiness/artroom-bytes";
+import { expect, test, vi } from "vitest";
+import { newIncarnation, parseStrictBytes, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
+import * as bytes from "@generalbusiness/artroom-bytes";
+import type { SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import type { Fetch } from "@generalbusiness/artroom-client";
 const DESTINATION = "platform:destination@1" as const;
 import { command } from "../src/line.ts";
 import type { Config } from "../src/store.ts";
@@ -18,10 +21,19 @@ test("remote reads the recorded repository; missing Git and the pinned @1 withou
   const calls: string[] = [];
   let definition: string = DESTINATION;
   let category: "unavailable" | "mismatch" = "unavailable";
-  const fetch = async (url: string) => {
+  let sessionMode: "absent" | "issued" | "read-refused" = "absent";
+  const readers: string[] = [];
+  const fetch: Fetch = async (url, init) => {
     calls.push(url);
     if (url.endsWith("/acts")) return Response.json({ answer: category, reason: category === "unavailable" ? "busy" : "idempotency-mismatch" });
-    if (url.endsWith("/sessions")) return new Response(JSON.stringify({ ok: false, reason: "sessions-unavailable" }));
+    if (url.endsWith("/sessions")) {
+      if (sessionMode === "absent") return new Response(JSON.stringify({ ok: false, reason: "sessions-unavailable" }));
+      const asked = JSON.parse(init!.body!) as SignedSessionRequest;
+      return Response.json({ ok: true, token: "scripted-reader", session: { v: 1, deployment: "scripted", membership, member: "@operator", key: asked.request.actor, reads: ["summary"], ends: asked.request.notAfter } });
+    }
+    const reader = init?.headers?.["authorization"] ?? "";
+    readers.push(reader);
+    if (sessionMode === "read-refused" && reader === "Session scripted-reader") return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
     return new Response(JSON.stringify({ ok: true, at: { seq: 0, hash: `sha256:${"a".repeat(64)}` }, complete: true, value: { scope: at, status: "active", definition, time: "2026-10-07T12:00:00Z", counts: [], items: [{ id: 0, type: "branch", state: "ready", revision: 0, opened: null, parties: {}, refs: {}, attributed: [], values: { repository: { host: "artifacts", namespace: "demo", name: "r", id: "r" } } }] } }));
   };
   const context = { store, fetch, now: () => Date.parse("2026-10-07T12:00:00Z") };
@@ -35,6 +47,27 @@ test("remote reads the recorded repository; missing Git and the pinned @1 withou
   expect(gitCalls).toEqual([["--version"]]);
   expect(calls.every((url) => url.endsWith("/sessions") || url.endsWith(`/${at.scope}`))).toBe(true);
   expect(await store.config()).toEqual(config);
+  // Real key derivation/signature code, SCRIPTED session and summary replies:
+  // an issued session needs only its request's derivation, while a refused
+  // session makes a NEW signed-read handle. Neither path loses key custody.
+  const derivations = vi.spyOn(bytes, "keyIdOfSecret");
+  try {
+    sessionMode = "issued"; readers.length = 0;
+    expect((await command(context, ["remote"])).code).toBe(0);
+    expect([derivations.mock.calls.length, readers]).toEqual([1, ["Session scripted-reader"]]);
+    derivations.mockClear(); sessionMode = "read-refused"; readers.length = 0;
+    expect((await command(context, ["remote"])).code).toBe(0);
+    expect([derivations.mock.calls.length, readers[0], readers.length]).toEqual([2, "Session scripted-reader", 2]);
+    const signed = parseStrictBytes(unb64url(readers[1]!.slice("Signed ".length))!) as SignedRead;
+    expect([readers[1]!.startsWith("Signed "), verifySignedRead(signed), signed.request.read]).toEqual([true, true, "summary"]);
+    readers.length = 0; sessionMode = "issued";
+    let keyLoads = 0;
+    const missingKey = await command({ ...context, store: { ...store, secret: async name => ++keyLoads === 1 ? store.secret(name) : null } }, ["remote"]);
+    expect([missingKey.code, readers]).toEqual([1, []]);
+    expect(missingKey.lines.join(" ")).toContain("is missing from the config directory; nothing was signed");
+  } finally {
+    derivations.mockRestore(); sessionMode = "absent";
+  }
   // SCRIPTED answer categories, not a timed-turn or real admission proof.
   // Both the generic act formatter and accepted-only clone helper preserve
   // unavailable versus mismatch without a no-write or fresh-command retry.

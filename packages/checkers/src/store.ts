@@ -26,8 +26,8 @@
  * is ever written here.
  */
 
-import type { FactRef, SignedIntent } from "@generalbusiness/artroom-contract";
-import { canonicalize } from "@generalbusiness/artroom-bytes";
+import type { ReservationSnapshot, FactRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import { b64url, unb64url, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Details, Outcome } from "./outcome.ts";
 
 /** The storage's side. Each call is atomic for its key, and resolves only when its effect is durable. */
@@ -60,9 +60,12 @@ export interface JobRecord {
   details: Details | null;
   /** The last signed result that was submitted. The same bytes are sent first on a later submit: a lane that admitted them answers with their receipt. */
   signed: SignedIntent | null;
+  reservation?: ReservationSnapshot;
 }
 
 const keyOf = (job: FactRef): string => `job/${job.at.scope}/${job.at.inc}/${job.seq}/${job.hash}`;
+
+const recordBytes = (record: JobRecord): string => canonicalize(record.reservation ? { ...record, reservation: { ...record.reservation, objects: record.reservation.objects.map((object) => ({ ...object, data: b64url(object.data) })) } } : record);
 
 export class Outcomes {
   readonly #durable: Durable;
@@ -73,19 +76,22 @@ export class Outcomes {
    * made it, and it alone may start a runner. False: a record exists, or
    * the write did not create one, and this delivery starts no runner.
    */
-  start(job: FactRef, run: string, asked: SignedIntent | null): Promise<boolean> {
-    const record: JobRecord = { job, state: "started", run, asked, outcome: null, details: null, signed: null };
-    return this.#durable.create(keyOf(job), canonicalize(record));
+  start(job: FactRef, run: string, asked: SignedIntent | null, reservation?: ReservationSnapshot): Promise<boolean> {
+    const record: JobRecord = { job, state: "started", run, asked, outcome: null, details: null, signed: null, ...(reservation ? { reservation } : {}) };
+    return this.#durable.create(keyOf(job), canonicalize(reservation ? { ...record, reservation: { ...reservation, objects: reservation.objects.map((object) => ({ ...object, data: b64url(object.data) })) } } : record));
   }
 
   async get(job: FactRef): Promise<JobRecord | null> {
     const kept = await this.#durable.read(keyOf(job));
-    return kept === null ? null : (JSON.parse(kept) as JobRecord);
+    if (kept === null) return null;
+    const record = JSON.parse(kept) as JobRecord;
+    if (record.reservation) record.reservation = { ...record.reservation, objects: record.reservation.objects.map((object) => ({ ...object, data: typeof object.data === "string" ? unb64url(object.data)! : object.data })) };
+    return record;
   }
 
   /** One change of a record, from exactly the record that was read. False: another delivery changed it first, and this one changes nothing. */
   #move(from: JobRecord, to: JobRecord): Promise<boolean> {
-    return this.#durable.replace(keyOf(from.job), canonicalize(from), canonicalize(to));
+    return this.#durable.replace(keyOf(from.job), recordBytes(from), recordBytes(to));
   }
 
   /**

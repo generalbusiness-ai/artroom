@@ -3,10 +3,10 @@
  * a page of a room's repository, rendered.
  *
  * - `:directory` is the room's directory scope ID (`host.ts`, `roomOf`).
- * - `:ref` is a branch or a tag, one path segment, percent-encoded where it
+ * - `:ref` is a recorded published ref, one path segment, percent-encoded where it
  *   holds a `/`. `HEAD` is the published branch that the directory records.
- *   A branch is looked for first, then a tag; an annotated tag is followed
- *   to its commit.
+ *   Only refs recorded by the room are served, at their recorded commits.
+ *   The current destination records one branch and no tags.
  * - `*path` is a file or a directory at that commit. A markdown file
  *   (`.md`, `.markdown`) answers as a page of HTML. A directory answers its
  *   `index.md`, else its `README.md` (either name in any case, or with
@@ -28,9 +28,9 @@
  * other files; a name that starts with `.` is not listed.
  *
  * `/site/:directory` and `/site/:directory/` redirect to `HEAD/`.
- * `/site/:directory/versions/` lists the repository's branches and tags,
- * each with its commit, as the Git host advertises them. So the root of a
- * branch or tag named `versions` is not reachable; its other paths are.
+ * `/site/:directory/versions/` lists only the room's recorded published refs
+ * and their recorded commits, never provider-advertised branches or tags.
+ * The name `versions` is reserved for this listing at the root.
  *
  * Every answer of a file carries an `ETag` of the commit, the path and what
  * the header shows, and `Cache-Control`. A request whose `If-None-Match`
@@ -43,9 +43,10 @@
  * nothing of the repository. No session is read: every site is public to
  * whoever has the room's directory scope ID.
  */
-import { GitRefusal, READ_BOUNDS, Reader, refName, type ObjectId, type TreeEntry } from "@generalbusiness/artroom-git";
+import { GitRefusal, READ_BOUNDS, Reader, type ObjectId, type TreeEntry } from "@generalbusiness/artroom-git";
+import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { credentialInUrl } from "../sessions.ts";
-import { StepError, readerOf, roomOf, type Opened, type SiteEnv, type SiteStep } from "./host.ts";
+import { StepError, publicationOf, publishedCommitOf, readerOf, roomOf, type Opened, type SiteEnv, type SiteStep } from "./host.ts";
 import { renderMarkdown, titleOf } from "./markdown.ts";
 import { escapeHtml } from "./node.ts";
 
@@ -55,15 +56,13 @@ export const FILE_BYTES = 1024 * 1024;
 export const MAX_AGE = 60;
 /** Changes when the HTML of the same file at the same commit would change: it is part of every `ETag`. */
 const RENDERER = "site-3";
-/** How many annotated tags one ref may be followed through to its commit. */
-const TAG_DEPTH = 4;
 /** How many markdown files of one folder's listing are read for their titles. The rest are listed by name. */
 export const LISTED_TITLES = 100;
 /** The room's own page, which every page's footer links to (`page.ts`). */
 const ROOM_PAGE = "/page/";
 
-export type SiteRefusal = "bad-request" | "method-not-allowed" | "not-found" | "ref-not-found" | "too-large" | "host-not-configured" | "unreadable";
-const STATUS: Record<SiteRefusal, number> = { "bad-request": 400, "method-not-allowed": 405, "not-found": 404, "ref-not-found": 404, "too-large": 413, "host-not-configured": 503, unreadable: 502 };
+export type SiteRefusal = "bad-request" | "method-not-allowed" | "not-found" | "not-published" | "too-large" | "host-not-configured" | "unreadable";
+const STATUS: Record<SiteRefusal, number> = { "bad-request": 400, "method-not-allowed": 405, "not-found": 404, "not-published": 404, "too-large": 413, "host-not-configured": 503, unreadable: 502 };
 
 /** A refusal. `step`: the step of the read that failed, as the header `x-site-step`; the body does not say it. */
 export function refused(reason: SiteRefusal, sentence: string, step?: SiteStep): Response {
@@ -180,38 +179,6 @@ function parse(url: URL): Parsed | null {
 /** What a ref names: the commit, and the branch or tag by its full name. */
 interface Named { commit: ObjectId; name: string }
 
-/** The commit that a branch or tag names now, an annotated tag followed. Null when the repository has neither of that name. */
-async function commitOf(reader: Reader, ref: string, branch: string, at: (step: SiteStep) => void): Promise<Named | null> {
-  const names = ref === "HEAD" ? [`refs/heads/${branch}`] : [`refs/heads/${ref}`, `refs/tags/${ref}`];
-  for (const name of names) {
-    refName(name, "site ref");
-    const id = await reader.ref(name);
-    if (id === null) continue;
-    // A branch names a commit, which the page reads and checks before a conditional response. A tag may name a tag.
-    if (name.startsWith("refs/heads/")) return { commit: id, name };
-    at("objects");
-    return { commit: await peeled(reader, id), name };
-  }
-  return null;
-}
-
-/** The commit that an object names: a commit itself, or an annotated tag followed to it. */
-async function peeled(reader: Reader, object: ObjectId): Promise<ObjectId> {
-  let id = object;
-  for (let depth = 0; ; depth++) {
-    try {
-      await reader.commit(id);
-      return id;
-    } catch (e) {
-      if (!(e instanceof GitRefusal) || e.reason !== "wrong-type" || depth >= TAG_DEPTH) throw e;
-    }
-    const tag = text.decode(await reader.object(id, "tag"));
-    const target = /^object ([0-9a-f]{40})\n/.exec(tag);
-    if (!target) throw new GitRefusal("malformed-commit", "tag");
-    id = target[1]!;
-  }
-}
-
 /** What a page's header and footer show. */
 interface Frame {
   /** The recorded repository name, which links to `root`; not a human claim name. */
@@ -227,7 +194,7 @@ interface Frame {
 
 /** The words for the branch or tag that `ref` named. */
 const versionOf = (ref: string, name: string): string =>
-  name.startsWith("refs/tags/") ? `tag ${name.slice("refs/tags/".length)}` : `branch ${name.slice("refs/heads/".length)}${ref === "HEAD" ? " (HEAD)" : ""}`;
+  name === "commit" ? `commit ${ref}` : name.startsWith("refs/tags/") ? `tag ${name.slice("refs/tags/".length)}` : `branch ${name.slice("refs/heads/".length)}${ref === "HEAD" ? " (HEAD)" : ""}`;
 
 function page(title: string, frame: Frame, body: string): string {
   return `<!doctype html>
@@ -269,24 +236,36 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   // No ref: the published branch.
   if (parsed.ref === null) return new Response(null, { status: 302, headers: { location: `/site/${segment(parsed.directory)}/HEAD/`, "cache-control": "no-store" } });
   const { directory, ref, path, trailing } = parsed;
+  if (path.length > 64 || utf8.encode(path.join("/")).length > 8192) return refused("unreadable", "publication-history-limit", "objects");
   const versions = ref === "versions" && path.length === 0;
-  if (ref !== "HEAD" && !versions) {
-    try {
-      refName(`refs/heads/${ref}`, "site ref");
-    } catch (e) {
-      logged("refs", e);
-      return refused("ref-not-found", "no branch or tag has that name", "refs");
-    }
-  }
 
   let room;
   try {
     room = await roomOf(env.SCOPES, directory);
   } catch (e) {
     logged("room", e);
-    return refused("unreadable", "the room could not be read", "room");
+    return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room");
   }
   if (!room) return refused("not-found", "no room has that directory");
+  let publication;
+  try { publication = await publicationOf(env.SCOPES, directory, room); }
+  catch (e) { logged("room", e); return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room"); }
+  if (!publication) return refused("not-published", "the room has no confirmed publication");
+  // Full canonical object IDs take precedence over branch-like hash names.
+  const immutable = /^[0-9a-f]{40}$/.test(ref);
+  const names = ref === "HEAD" ? [`refs/heads/${room.branch}`] : [`refs/heads/${ref}`, `refs/tags/${ref}`];
+  const selected = publication.refs.find((r) => names.includes(r.ref));
+  if (!versions && !immutable && !selected) return refused("not-published", "the room has not published that ref");
+  let proof: import("./publication.ts").PublishedCommitProof | undefined;
+  if (!versions) {
+    try {
+      const selection = await publishedCommitOf(env.SCOPES, directory, room, immutable ? ref : selected!.target);
+      if (!selection.ok) return selection.reason === "publication-history-limit"
+        ? refused("unreadable", "publication-history-limit", "room")
+        : refused("not-published", "the room has no written publication receipt for that commit");
+      proof = selection.proof;
+    } catch (e) { logged("room", e); return refused("unreadable", "the publication proof could not be read", "room"); }
+  }
   const open = readerOf(env, room, fetch);
   if (!open) return refused("host-not-configured", "this deployment does not read that room's repository");
 
@@ -305,12 +284,36 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   // Conditional caching applies only after the representation has passed its ordinary read and servability checks.
   const notModified = (cached: Record<string, string>) => matches(request.headers.get("if-none-match"), cached["etag"]!)
     ? new Response(null, { status: 304, headers: cached }) : null;
+  const eligible = async (answer: Response): Promise<Response> => {
+    const now = await roomOf(env.SCOPES, directory);
+    if (!now || canonicalize(now) !== canonicalize(room)) return refused("not-published", "the room identity changed during this read");
+    if (!versions && proof) {
+      const currentProof = await publishedCommitOf(env.SCOPES, directory, now, proof.commit);
+      if (!currentProof.ok) return currentProof.reason === "publication-history-limit" ? refused("unreadable", "publication-history-limit", "room") : refused("not-published", "the publication is no longer eligible");
+      if (!immutable) {
+        const latest = await publicationOf(env.SCOPES, directory, now);
+        if (latest?.refs.find(r => r.ref === selected!.ref)?.target !== proof.commit) return refused("unreadable", "the latest publication changed during this read", "room");
+      }
+      if (canonicalize(currentProof.proof) !== canonicalize(proof)) return refused("unreadable", "the publication record changed during this read", "room");
+    } else {
+      const currentPublication = await publicationOf(env.SCOPES, directory, now);
+      if (canonicalize(currentPublication) !== canonicalize(publication)) return refused("unreadable", "the publication record changed during this read", "room");
+    }
+    return answer;
+  };
   const html = (title: string, frame: Frame, body: string, cached: Record<string, string>) => notModified(cached) ?? new Response(page(title, frame, body), { status: 200, headers: { ...cached, "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
   try {
     const reader = new Reader(opened.source, { ...READ_BOUNDS, blobBytes: FILE_BYTES });
-    if (versions) return await versionsPage(reader, room.repository.name, room.branch, base, at, html);
-    const named = await commitOf(reader, ref, room.branch, at);
-    if (named === null) return refused("ref-not-found", "no branch or tag has that name");
+    if (versions) {
+      for (const row of publication.refs) {
+        const selection = await publishedCommitOf(env.SCOPES, directory, room, row.target);
+        if (!selection.ok) return selection.reason === "publication-history-limit" ? refused("unreadable", "publication-history-limit", "room") : refused("not-published", "the room has no written publication receipt for that commit");
+        await verifiedReceipt(reader, selection.proof, at);
+      }
+      return await eligible(await versionsPage(reader, room.repository.name, room.branch, publication.refs, base, at, html));
+    }
+    await verifiedReceipt(reader, proof!, at);
+    const named: Named = { commit: proof!.commit, name: immutable ? "commit" : selected!.ref };
     const { commit } = named;
     const etag = await etagOf(commit, path.join("/") + (trailing ? "/" : ""), [room.repository.name, ref, named.name]);
     const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
@@ -335,7 +338,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
       const source = text.decode(await reader.blob(file.id, "page"));
       at("render");
       const { html: body, title } = renderMarkdown(source, { resolve: (destination) => resolveAddress(prefix, where.join("/"), destination) });
-      return html(title ?? where.join("/"), frame, body, cached);
+      return await eligible(html(title ?? where.join("/"), frame, body, cached));
     };
 
     // A directory: its index page, else a listing.
@@ -345,8 +348,8 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
       const title = path.length === 0 ? ref : path.join("/");
       const shown = tree.filter((e) => !nameOf(e).startsWith("."));
       // An empty folder, or an empty repository at its root, is a page that says so.
-      if (shown.length === 0) return html(title, frame, `<h1>${escapeHtml(title)}</h1>\n<p>${path.length === 0 ? "The repository has no files at this commit." : "This folder has no files at this commit."}</p>\n`, cached);
-      return html(title, frame, `<h1>${escapeHtml(title)}</h1>\n${await listing(reader, shown, (name, dir) => href([...path, name], dir))}`, cached);
+      if (shown.length === 0) return await eligible(html(title, frame, `<h1>${escapeHtml(title)}</h1>\n<p>${path.length === 0 ? "The repository has no files at this commit." : "This folder has no files at this commit."}</p>\n`, cached));
+      return await eligible(html(title, frame, `<h1>${escapeHtml(title)}</h1>\n${await listing(reader, shown, (name, dir) => href([...path, name], dir))}`, cached));
     }
 
     // A file.
@@ -354,18 +357,29 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     if (isMarkdown(name)) return await rendered(entry, path);
     const bytes = await reader.blob(entry.id, "page");
     const type = IMAGES[extension(name)];
-    return notModified(cached) ?? new Response(bytes, {
+    return await eligible(notModified(cached) ?? new Response(bytes, {
       status: 200,
       headers: { ...cached, "content-type": type ?? "application/octet-stream", ...(type ? {} : { "content-disposition": "attachment" }), "content-security-policy": FILE_POLICY, "x-content-type-options": "nosniff" },
-    });
+    }));
   } catch (e) {
     logged(step, e, opened);
     if (e instanceof GitRefusal && e.reason === "too-large" && e.what === "page") return refused("too-large", `a file of more than ${FILE_BYTES} bytes is not served`, step);
-    if (e instanceof GitRefusal && e.reason === "bad-ref-name") return refused("ref-not-found", "no branch or tag has that name", step);
-    return refused("unreadable", "the repository could not be read", step);
+    return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the repository could not be read", step);
   } finally {
     await opened.close();
   }
+}
+
+/** Exact hash-checked Git correspondence, before any content or conditional response. */
+async function verifiedReceipt(reader: Reader, proof: import("./publication.ts").PublishedCommitProof, at: (step: SiteStep) => void): Promise<void> {
+  at("refs");
+  if (await reader.ref(proof.receipt.ref, "publication receipt") !== proof.receipt.commit) throw new GitRefusal("unreadable", "publication receipt ref");
+  at("objects");
+  const receiptCommit = await reader.commit(proof.receipt.commit, "publication receipt");
+  if (receiptCommit.tree !== proof.receipt.tree) throw new GitRefusal("unreadable", "publication receipt tree");
+  const receiptTree = await reader.tree(receiptCommit.tree, "publication receipt");
+  if (receiptTree.length !== 1 || receiptTree[0]!.mode !== "100644" || nameOf(receiptTree[0]!) !== "receipt.json" || receiptTree[0]!.id !== proof.receipt.blob
+    || text.decode(await reader.blob(proof.receipt.blob, "publication receipt")) !== proof.receipt.file) throw new GitRefusal("unreadable", "publication receipt file");
 }
 
 /**
@@ -399,31 +413,29 @@ async function listing(reader: Reader, entries: readonly TreeEntry[], href: (nam
 }
 
 /**
- * The versions page: every branch and tag of the repository, as the Git
- * host advertises them, each with the commit it names, an annotated tag
- * followed. Its `ETag` is of every ref and its target, so a moved branch
- * or a new tag gives a new one.
+ * The versions page: only refs and exact commits from the room record.
+ * Every recorded target is checked as a commit before a conditional response.
  */
 async function versionsPage(
-  reader: Reader, room: string, branch: string, base: string, at: (step: SiteStep) => void,
+  reader: Reader, room: string, branch: string, refs: readonly { ref: string; target: ObjectId }[], base: string, at: (step: SiteStep) => void,
   html: (title: string, frame: Frame, body: string, cached: Record<string, string>) => Response,
 ): Promise<Response> {
-  const refs = [...(await reader.snapshot("refs/heads/", "site refs")), ...(await reader.snapshot("refs/tags/", "site refs"))];
   const etag = `"versions.${await digestOf([RENDERER, room, branch, ...refs.flatMap((r) => [r.ref, r.target])])}"`;
   const cached = { etag, "cache-control": `public, max-age=${MAX_AGE}` };
   at("objects");
   const row = async (r: { ref: string; target: ObjectId }) => {
     const tag = r.ref.startsWith("refs/tags/");
     const name = r.ref.slice(tag ? "refs/tags/".length : "refs/heads/".length);
-    const commit = tag ? await peeled(reader, r.target) : r.target;
+    const commit = r.target;
+    await reader.commit(commit);
     const published = !tag && name === branch ? " (HEAD, the published branch)" : "";
     return `<tr><td>${tag ? "tag" : "branch"}</td><td><a href="${escapeHtml(`${base}${segment(name)}/`)}">${escapeHtml(name)}</a>${published}</td><td><code>${commit}</code></td></tr>`;
   };
   const rows: string[] = [];
-  for (const r of refs) rows.push(await row(r));
-  const frame: Frame = { room, root: `${base}HEAD/`, version: "every branch and tag", versions: `${base}versions/`, crumbs: `<a href="${escapeHtml(`${base}HEAD/`)}">HEAD</a> / versions`, commit: null };
+  for (const r of [...refs].sort((a, b) => a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0)) rows.push(await row(r));
+  const frame: Frame = { room, root: `${base}HEAD/`, version: "published versions", versions: `${base}versions/`, crumbs: `<a href="${escapeHtml(`${base}HEAD/`)}">HEAD</a> / versions`, commit: null };
   const body = rows.length === 0
-    ? "<h1>Versions</h1>\n<p>The repository has no branches or tags.</p>\n"
+    ? "<h1>Versions</h1>\n<p>The room has no published versions.</p>\n"
     : `<h1>Versions</h1>\n<table>\n<thead><tr><th>Kind</th><th>Name</th><th>Commit</th></tr></thead>\n<tbody>\n${rows.join("\n")}\n</tbody>\n</table>\n`;
   return html("Versions", frame, body, cached);
 }

@@ -376,6 +376,23 @@ artroom issues
 artroom verify --all
 ```
 
+For rooms pinned to `platform:destination@3`, this command also reports
+recorded reservation cleanup at the same destination head that replay reached.
+It names each reservation marked `cleanup-owed`, with separate ref and token
+duties and their actual recorded attempt counts;
+unknown custody stays unknown. This separate observation does not turn a
+consistent history into a claim that cleanup finished. An incomplete or moving
+cleanup read is reported as unread, and owed or unread cleanup exits nonzero.
+Earlier destination versions define no staged-reservation cleanup status; their
+unchanged output makes no cleanup claim.
+
+Reads do not start cleanup. Before the destination's next act or alarm, a
+reservation whose deadline the service clock has reached is reported as
+`Cleanup pending`, with its recorded state and read head. If that clock is
+unavailable or behind the last sealed time, the command reports the recorded
+state and makes no expiry claim. Pending cleanup and an unavailable expiry
+clock exit nonzero without changing the historical replay result.
+
 The observed issue listing printed:
 
 ```
