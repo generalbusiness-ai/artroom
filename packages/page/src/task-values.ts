@@ -88,4 +88,3 @@ export function nextChangeAction(room: Room, change: ChangeView, offered: readon
   const order = author ? needsReview ? [...requests, "merge"] : ["merge", ...requests] : canReview ? ["review-verdict", "merge"] : ["merge"];
   return order.map((kind) => offered.find((act) => act.kind === kind && allowed.includes(kind))).find((act) => act !== undefined) ?? null;
 }
-
