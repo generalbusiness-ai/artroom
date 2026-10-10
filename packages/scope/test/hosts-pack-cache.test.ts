@@ -97,13 +97,13 @@ test("OwnGit reuses only ordered immutable pack bytes while each request checks 
   const hubSnapshot = { ...hubFirst, data: new Uint8Array(hubFirst.data) };
   hub.objects.set(hubFirst.id, hubFirst);
   const publicOne = hub.fetch(publicRead()); const publicTwo = hub.fetch(publicRead());
-  expect(hub.packBuilds).toBe(1);
   // An in-place mutation before completion cannot change either owned pack.
   hubFirst.data[0] = 0x61;
   const [publicA, publicB] = await Promise.all([publicOne, publicTwo]);
   expect(publicA).not.toBe(publicB);
   expect(await decoded(publicA)).toEqual([hubSnapshot]);
   expect(await decoded(publicB)).toEqual([hubSnapshot]);
+  expect(hub.packBuilds).toBe(1);
   await expect(hub.fetch(publicRead())).rejects.toMatchObject({ reason: "hash-mismatch" });
   expect(hub.packBuilds).toBe(2);
   // A rejection is evicted, and an old rejection cannot erase a newer build.
