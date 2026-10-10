@@ -413,7 +413,9 @@ async function reviewPolicyOf(room: Room, change: ScopeRef, proposal: Item, held
     const sends = entry.sends.filter(send => canonicalize(send.to) === canonicalize(change) && send.message.class === "request"
       && send.message.type === "relate" && record(send.message.body) && send.message.body["name"] === "rules");
     if (sends.length !== 1) return null;
-    const body = sends[0]!.message.body;
+    const message = sends[0]!.message;
+    if (message.class !== "request" || message.type !== "relate") return null;
+    const body = message.body;
     if (!record(body) || body["state"] !== "current" || !isFactRef(body["item"])
       || canonicalize(body["item"].at) !== canonicalize(source.at) || body["item"].seq !== rules.id || body["item"].hash !== rules.opened
       || !record(body["detail"])) return null;
