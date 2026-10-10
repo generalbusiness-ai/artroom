@@ -17,6 +17,9 @@ import { entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scop
 import { MemoryState, actionOf, applyEntry, clockOf, entryOf, judgeAct, judgeDelivery, judgeGenesis, judgeTimed, messageFacts, nextDue, timeMs, timeOf, validateDefinition } from "../src/index.ts";
 import type { ActJudgment, Creation, Delivered, DeliveryContext, Draft, Fetched, JudgeContext, Judgment, Presented, Source, TimedJudgment, ValidDefinition, Validation } from "../src/index.ts";
 
+// This fixture uses the runtime's native clone. Keep its type local to this module.
+declare function structuredClone(value: DeclaredDefinition): DeclaredDefinition;
+
 export const d = (c: string): Digest => `sha256:${c.repeat(64)}`;
 export const T0 = "2026-10-04T12:00:00Z";
 /** `seconds` after T0. */

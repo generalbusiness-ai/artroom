@@ -38,11 +38,17 @@ function repository(format: "sha1" | "sha256" = "sha1") {
   const dir = mkdtempSync(join(tmpdir(), "artroom-propose-git-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir }).toString("utf8").trim();
   git("init", "--quiet", `--object-format=${format}`, "--initial-branch=main");
-  git("config", "user.name", "Git capture test");
-  git("config", "user.email", "capture@artroom.invalid");
   git("config", "core.fileMode", "true");
   const write = (path: string, bytes: string | Uint8Array) => writeFileSync(join(dir, path), bytes);
-  const commit = () => { git("add", "--all"); git("commit", "--quiet", "-m", "capture fixture"); return git("rev-parse", "HEAD"); };
+  const commit = () => {
+    git("add", "--all");
+    execFileSync("git", ["commit", "--quiet", "-m", "capture fixture"], { cwd: dir, env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "Git capture test", GIT_AUTHOR_EMAIL: "capture@artroom.invalid",
+      GIT_COMMITTER_NAME: "Git capture test", GIT_COMMITTER_EMAIL: "capture@artroom.invalid",
+    } });
+    return git("rev-parse", "HEAD");
+  };
   write("changed.txt", "base\n");
   write("executable", "base command\n");
   chmodSync(join(dir, "executable"), 0o755);

@@ -254,7 +254,7 @@ all 14 were applied. Line numbers are in the edited file.
 | 5 | "`main` does not return a principal revision today" was an unpinned fact | Replaced with 007's caution: the design must not imply it (lines 627-629) |
 | 6 | Proposed qualifications under Adopted labels | Three places marked **Proposed**: work unit (lines 68-72), slot check (line 188), target resolution (line 189) |
 | 7 | Owner row dropped "preserve their separately reviewed lifecycle and authority" | Restored in the D1 and N2 row (line 958) |
-| 8 | Owner row for the schedule-class choice is in no source | Row removed. A paragraph now says only that neither plan says how the class is expressed or names an owner (lines 962-962). The reviewer's suggested Judgement was not added, per the coordinator's ruling |
+| 8 | Owner row for the schedule-class choice is in no source | Historical first-pass disposition before direction `fceb27d0`: the row was removed and the paragraph then at line 962 said neither plan named an owner. That disposition was superseded by the named schedule-class owner in §10, line 954, under the direction; see drift item 8. The reviewer's suggested Judgement was not added |
 | 9 | "Each receiver needs a named catch-up path" wider than the sources | Replaced: the durable hosted receiver must name its catch-up path and budget (lines 77-81) |
 | 10 | Order of work omitted test reduction | Added "Test-overhead reduction stays first (`plans/007`)" (lines 888-889) |
 | 11 | Two 007 statements shortened | Added "do not claim that the current read contract is broken" (lines 600-603) and the scan-page and selection-generation sentence (lines 604-612) |
@@ -292,8 +292,10 @@ git diff --check -- notes/2026-10-01-wake-and-schedule.md
 #   no output, exit 0
 
 # banned text
-grep -n "-\|software scale" notes/2026-10-01-wake-and-schedule.md
-#   no output
+grep -n -e '-' -e 'software scale' -- notes/2026-10-01-wake-and-schedule.md
+# Corrected syntax only; not rerun for this maintenance. The earlier
+# "no output" claim is not valid evidence: the dated note contains
+# literal hyphens (for example, its date).
 
 # paths and links named in the note
 f=notes/2026-10-01-wake-and-schedule.md
