@@ -1,0 +1,131 @@
+{
+  "head": "263254752b602bd5f88c97817f2391aa5606db61",
+  "tree": "c8671f98cf141c34b57b33998796028b0836f406",
+  "owner": "85657331cc5287885e54f5c46939b446f93cdd16",
+  "builder_decision": "8b94c9faf68fe97a3674fc4f94a9ae89407c038f",
+  "source_before": {
+    "head": "263254752b602bd5f88c97817f2391aa5606db61",
+    "tree": "c8671f98cf141c34b57b33998796028b0836f406",
+    "status": "",
+    "source_hash_count": 1230
+  },
+  "recipe_packet_sha256": "ab7959c4f243c36f72e1ae2190dc8a3712381e8c7787710a696c81281372a703",
+  "canonical_cwd": "/private/tmp/artroom-ux1-actions-attribute-fix/packages/page",
+  "machine": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "load_start": [
+    2.32666015625,
+    2.14306640625,
+    2.04736328125
+  ],
+  "cache": "existing exact-lock dependencies; no install; local source-owned 12 workspace links",
+  "started_utc": "2026-10-10T01:21:33Z",
+  "phases": [
+    {
+      "name": "page-test",
+      "command": [
+        "node",
+        "/tmp/artroom-ux1-actions-attribute-fix/node_modules/typescript/bin/tsc",
+        "-p",
+        "tsconfig.test.json"
+      ],
+      "exit": 0,
+      "wall_seconds": 0.3048849171027541,
+      "cpu_seconds": 1.08631,
+      "log": "/tmp/artroom-ux1-263254-execution/page-test.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "discovery",
+      "command": [
+        "node",
+        "/tmp/artroom-ux1-actions-attribute-fix/node_modules/vitest/vitest.mjs",
+        "list",
+        "--config",
+        "/tmp/artroom-ux1-actions-attribute-node-preparation/page-nine.config.mjs",
+        "--json",
+        "/tmp/artroom-ux1-263254-execution/discovery.json"
+      ],
+      "exit": 0,
+      "wall_seconds": 0.7528198340442032,
+      "cpu_seconds": 1.53283,
+      "log": "/tmp/artroom-ux1-263254-execution/discovery.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "body",
+      "command": [
+        "node",
+        "/tmp/artroom-ux1-actions-attribute-fix/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/tmp/artroom-ux1-actions-attribute-node-preparation/page-nine.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile.json=/tmp/artroom-ux1-263254-execution/body.json",
+        "--bail",
+        "1"
+      ],
+      "exit": 0,
+      "wall_seconds": 0.733622207888402,
+      "cpu_seconds": 2.0849919999999997,
+      "log": "/tmp/artroom-ux1-263254-execution/body.log",
+      "log_bytes": 5849,
+      "log_sha256": "3fa6ba476141c8c458b545f80350321676375996cd0b04e0ab0e7dee4896f13a"
+    }
+  ],
+  "terminal_exit": 0,
+  "prior_evidence": "SOURCE compiler NOT rerun, actual0e99 PASS retained; SCOPE compiler NOT rerun, actual3ea PASS retained, both qualified by unchanged production/config/support closures",
+  "preservation": "/tmp/artroom-ux1-actions-attribute-fix-packet/preservation.json",
+  "preservation_sha256": "1ffde28ee5acf8f99c3b2148713ffd23d6683316d1cfa8dd0b132303682d8efb",
+  "discovery": {
+    "path": "/tmp/artroom-ux1-263254-execution/discovery.json",
+    "sha256": "d856a8d49daa2ef8cfc91644e3f7085ca9a19096edc23827ed435243b49d87f7",
+    "bytes": 9847,
+    "titles": 40,
+    "files": 9,
+    "projects": [
+      "page"
+    ],
+    "exact_tuple_match": true
+  },
+  "body_report": {
+    "path": "/tmp/artroom-ux1-263254-execution/body.json",
+    "sha256": "7f4fef7e6db5dcb229b40373da20f5afe2ce74387297169a759dc3c551d72f48",
+    "bytes": 15571,
+    "numTotalTests": 40,
+    "numPassedTests": 40,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "coverage": "/tmp/artroom-ux1-263254-execution/actual-body-coverage.json",
+    "coverage_sha256": "bdf463058e35d68a92c238d8bf9b943d953ef43054af8139611a385b7fae4694",
+    "actual_status_counts": {
+      "passed": 40
+    },
+    "unhandled_errors": "None printed in complete fully read verbose body output.",
+    "all40_result_tuple_match": true,
+    "complete_pass": true
+  },
+  "source_after": {
+    "head": "263254752b602bd5f88c97817f2391aa5606db61",
+    "tree": "c8671f98cf141c34b57b33998796028b0836f406",
+    "status": "",
+    "source_hash_count": 1230
+  },
+  "finished_utc": "2026-10-10T01:21:35Z",
+  "unrun": [],
+  "excluded_checks": [
+    "Source/Scope compiler rerun",
+    "build",
+    "browser",
+    "native",
+    "gate",
+    "install",
+    "provider",
+    "audio",
+    "control"
+  ],
+  "original_terminal_proof": "/tmp/artroom-ux1-263254-execution/complete-result-before-coverage.json",
+  "original_terminal_proof_sha256": "13ce98ecfd44324c4e7ca7e5618541d858dcb7cd6f1d4d263b17901aaecf7176"
+}
