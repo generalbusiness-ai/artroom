@@ -1,0 +1,53 @@
+{
+  "status": "INERT one old native observer control; corrected actual5PASS reused",
+  "head": "53b672197c869a6aaf731e4ca51f074c0f5d4af4",
+  "tree": "36f358049aa3a3a2719a7b181bb87e4616ddabd8",
+  "root": "/private/tmp/artroom-cloudflare-pool-prototype-once",
+  "plan": "/tmp/artroom-pool53b-old-native-preparation-r3/plan.json",
+  "plan_sha256": "6727833e34621d22f40c64fd0b2fe8aa042af8e877b0b29129b5fdc13e72ef95",
+  "runner": "/tmp/artroom-pool53b-old-native-r3-run.py",
+  "runner_sha256": "999e25b3ed1b8dbe26ca4d78dc4797578a08684139de238440227d3ec8316afc",
+  "config": "/private/tmp/artroom-pool-proxy-native-diagnostic-r3/native.config.mjs",
+  "config_sha256": "6094874fb5f75276676793add5f7b7c9f96d35fe06d6b2790b38e58a45c8b78e",
+  "source_case_and_config_unchanged": true,
+  "mode": "old",
+  "observed_bundle_sha256": "3cae6450d58cb507240305b7b4aa3f64fff588957b164c55aca33bff33e5ccd9",
+  "restored_bundle_sha256": "cd50d18adce92adb54a3f00410d646b2fe09b3f12c5b833c492bcf5857621b39",
+  "expected": "All5 cases exactly once;4PASS plus one intended diagnostic AssertionError at line70; no unhandled/collection errors or timeouts. Root reads full failure for final classification.",
+  "intended_assertion": {
+    "file": "/private/tmp/artroom-pool-proxy-native-diagnostic-r3/pool-construction-diagnostic.test.mjs",
+    "line": 70,
+    "source": "expect(workers.map(row => [row.installations, row.maxFetchDepth])).toEqual(workers.map(() => [1, 1]));",
+    "full_title": "actual pool wrappers keep one installed layer across early and late native HTTP and signed DO reads"
+  },
+  "baseline_reused": {
+    "path": "/tmp/artroom-pool53b-corrected-native-r3-result",
+    "files": {
+      "preparation.log": "54c1917ba9e1b5e3d5362de67e96f30044742b3f6e06dde5e8b3b19e433d7894",
+      "preparation.time": "36ed4b0c320f1c4b2f0e8057de2bb49214aba89c82c0a3b34fc99bf8b1f0073a",
+      "result.json": "68d613d44b76c787af9108df621e3d62c6dbc832c3efe8a44e5dcd306860bc5e",
+      "vitest.json": "7b2142ec7624c83bfae626a849ad9e1e7a9c7b39d55dc13de0dbe91e834c4c8f",
+      "coverage.jsonl": "675c03e9980fe5862eac97f67df8cfc2e17601f8663e7f3a2c4e836edbfa632a",
+      "body.log": "b7df9e48b842d8ae794625bf631595395310baa4a460fa1ec350b0c2dc2799e4",
+      "body.time": "22a2c860727d179e1bf237fef40eabf29fe89030a4326017f45d99ddc2063e6e",
+      "manifest.json": "1d395d88ebed6373d34e5bb8846512da12a03b227f471d507c5b0689ac980315",
+      "coverage-ledger.json": "04787dbf8c74df87a2c7b05ee9cbdcb5bd834b9c977ba6b02c5f2cd6ec930d5d"
+    },
+    "actual_corrected_handle": 61085
+  },
+  "scope": "Actual installed Cloudflare pool wrappers across existing routes/client native cases and one coherent native HTTP/signed-DO observation in one Worker life; real session-hook unsigned denial with owned required leases, no inspector. Labelled clock/fixture settings. No broad timeout-cause, throughput or tenfold claim.",
+  "output": "/tmp/artroom-pool53b-old-native-r3-result",
+  "raw_outer_recipe": {
+    "argv": [
+      "/usr/bin/time",
+      "-p",
+      "-o",
+      "/tmp/artroom-pool53b-old-native-r3-outer.time",
+      "python3",
+      "-I",
+      "/tmp/artroom-pool53b-old-native-r3-run.py"
+    ],
+    "stdout_stderr": "/tmp/artroom-pool53b-old-native-r3-outer.log"
+  },
+  "execution": []
+}
