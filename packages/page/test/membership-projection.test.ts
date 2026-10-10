@@ -56,7 +56,7 @@ test("a missing author-controller relation is unavailable, and foreign incarnati
   expect(exceptSource.byExtent["rules"]).toBeNull();
   const foreign = { membership: { ...membership, inc: newIncarnation(new Uint8Array(16).fill(3)) }, member: "@author" };
   expect(reviewCandidates(rows(), membership, [foreign], false, extents)).toBeNull();
-  const foreignController = rows().map((item) => item.values["handle"] === "@agent" ? { ...item, parties: { ...item.parties, controller: { ...foreign, member: "@controller" } } } : item);
+  const foreignController = rows().map<Item>((item) => item.values["handle"] === "@agent" ? { ...item, parties: { ...item.parties, controller: { ...foreign, member: "@controller" } } } : item);
   expect(reviewCandidates(foreignController, membership, [ref("@author")], false, extents)?.members?.map((choice) => choice.value)).not.toContain("@agent");
   expect(reviewCandidates(rows().filter((item) => item.type !== "roster"), membership, [ref("@author")], false, extents)).toBeNull();
   const unknownAction = [{ ...extents[0]!, approver: "unheld.approval" }];
