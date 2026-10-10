@@ -1,0 +1,275 @@
+{
+  "status": "INERT; Root reviews/releases; no control execution or classification",
+  "request": "564d5fc95c9b263ced580b9533f875cfaf25e1b2",
+  "promise": "ac23ad39c10ec0949d74c1be45cbfcfdfa69bae5",
+  "baseline": {
+    "head": "941b113f4134c34019f80a176f28587cef49425e",
+    "tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+    "unchanged": true,
+    "genuine_retained_results_reused": true,
+    "rerun": false
+  },
+  "controls": [
+    {
+      "label": "trees",
+      "head": "4d2c3a5f9e509572cf11906cd008d8f4e0597dc2",
+      "tree": "833c0f7e69bdf2a5c040287853ffec232ebe355f",
+      "branch": "request/publication-sequential-tree-control",
+      "worktree": "/private/tmp/artroom-publication-sequential-tree-control",
+      "clean": true,
+      "source": "packages/platform/src/destination-objects.ts",
+      "source_sha256": "5bdcb34657dfb7b9c99f6d5c69f0a4355e8765d5a5115bedefac84f1f4531bb8",
+      "witness": "packages/platform/test/edit.test.ts",
+      "witness_sha256": "6eff7fd51d00f10d6b876d90f57e6fa4bc79688d9185dd87ff6346c65a5c948e",
+      "delta_sha256": "37fbe36f6cf4f34ea2e8b7e91c9040c0b77442c4dcfdf84c096b3b372b4e56c5",
+      "plan": "/tmp/artroom-publication941b-controls-packet/trees-plan.json",
+      "plan_sha256": "dbbec51d46bec04d36cadcd6599ffef4fa47377a9b743f3760ad668401da5348",
+      "config": "/tmp/artroom-publication941b-controls-packet/trees-body.config.mjs",
+      "config_sha256": "230f080a7e426de41e9f26d2ec2670978b87000ab2e60faf9bfa695b12970ab6",
+      "original_config": "/tmp/artroom-publication941b-static-preparation/node-body.config.mjs",
+      "original_config_sha256": "d349ed4f9ce66e07875059746012c5d4cdc21034f3e7f2ff7f5487a917502f74",
+      "config_changes_only": "canonical root/head/tree and absolute same selected-file source bindings; original base/settings/Reporter/project/pool/deadline/retry preserved",
+      "selection": [
+        {
+          "path": "packages/platform/test/edit.test.ts",
+          "project": "platform",
+          "pool": "threads",
+          "cases": [
+            "Git sha1 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+            "Git sha256 reads an edit's objects as the published tree with one file written: a new file, a replaced one and one in a new folder; every other entry, a link's among them, is unchanged; a path that a folder, a link or a file on the way holds gives no objects",
+            "editPath gives the segments of a path that a published tree may hold, and refuses an empty, a dot, a parent and a .git segment, a control character and a path over 1024 bytes",
+            "the judgment of a one-file manifest: a bad path is path-invalid before what the evidence lacks; bytes unlike their digest or size, a changed set beyond the path, or another first parent are integration-invalid; otherwise reserved with the commit the destination writes"
+          ]
+        }
+      ],
+      "expected": {
+        "failed": 2,
+        "passed": 2,
+        "assertion": "expect(combined.objects.every(object => reached.has(object.id))).toBe(true);",
+        "why": "Original sequential algorithm returns obsolete docs/root versions, absent from Git final reachable names; both format cases fail this assertion.",
+        "location": "packages/platform/test/edit.test.ts:75 (both SHA1/SHA256 original cases)"
+      },
+      "baseline_reused": {
+        "head": "941b113f4134c34019f80a176f28587cef49425e",
+        "tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+        "result": "/tmp/artroom-publication941b-node-result/result.json",
+        "result_sha256": "d68bca9289150fd5fcda08882ae0b760806cf286a4684026b8384738bdcc6719",
+        "ledger": "/tmp/artroom-publication941b-node-result/coverage-ledger.json",
+        "ledger_sha256": "363212ff42e96a278e7cd9d7d88ae6b4cb99f75dfbe76b047836e682fe9ab276",
+        "body_log": "/tmp/artroom-publication941b-node-result/body.log",
+        "body_log_sha256": "c9d24e8016d200c3f15e5b657c7a7675bd989bffe39949e1331de4add3e12e2c",
+        "manifest": "/tmp/artroom-publication941b-node-result/manifest.json",
+        "manifest_sha256": "5432151516c9f06644386e1c5e57cb643ef9da7964e0e04222bf6e8411bd74cb"
+      },
+      "inert_argv": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-publication-sequential-tree-control/packages/platform/test/edit.test.ts",
+        "--config",
+        "/tmp/artroom-publication941b-controls-packet/trees-body.config.mjs",
+        "--bail=0",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-publication-sequential-tree-control/scripts/focused-check.mjs",
+        "--outputFile.json=/tmp/artroom-publication941b-trees-control-result/vitest.json"
+      ],
+      "inert_cwd": "/private/tmp/artroom-publication-sequential-tree-control/packages/platform",
+      "inert_environment": {
+        "ARTROOM_FOCUSED_PLAN": "/tmp/artroom-publication941b-controls-packet/trees-plan.json",
+        "ARTROOM_FOCUSED_OUTPUT": "/tmp/artroom-publication941b-trees-control-result"
+      },
+      "dependency_static": {
+        "third_party_symlinks": 70,
+        "owned_real_directories": [
+          "/private/tmp/artroom-publication-sequential-tree-control/node_modules",
+          "/private/tmp/artroom-publication-sequential-tree-control/node_modules/@generalbusiness",
+          "/private/tmp/artroom-publication-sequential-tree-control/node_modules/.bin",
+          "/private/tmp/artroom-publication-sequential-tree-control/node_modules/.vite",
+          "/private/tmp/artroom-publication-sequential-tree-control/node_modules/.vite-temp"
+        ],
+        "workspaces": 12,
+        "aliases": 24,
+        "source_hashes": 634,
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "install": false,
+        "shared_cache_mutation": false
+      },
+      "restore_after_own_run": {
+        "argv": [
+          "git",
+          "checkout",
+          "--detach",
+          "941b113f4134c34019f80a176f28587cef49425e"
+        ],
+        "cwd": "/private/tmp/artroom-publication-sequential-tree-control",
+        "expected_head": "941b113f4134c34019f80a176f28587cef49425e",
+        "expected_tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+        "expected_clean": true,
+        "source_sha256": "3882f9990dfbdec724bfb5d9e09f7893dff58f6afaac0c3bd3f92f84fe08bd39",
+        "witness_sha256": "6eff7fd51d00f10d6b876d90f57e6fa4bc79688d9185dd87ff6346c65a5c948e",
+        "preserve_local_mutant_branch": true
+      },
+      "execution": []
+    },
+    {
+      "label": "copy",
+      "head": "02bcb610cf78f03b55c993b06846d9fd4e865ebf",
+      "tree": "f38d3806f8b123e9f83262ed6188d53e3486ba98",
+      "branch": "request/publication-precopy-control",
+      "worktree": "/private/tmp/artroom-publication-precopy-control",
+      "clean": true,
+      "source": "packages/scope/src/github-host.ts",
+      "source_sha256": "ca787a57f0d34f27128eda32f8c53d4ec972224940f128a0419362c4d3999848",
+      "witness": "packages/scope/test/artifacts-host.test.ts",
+      "witness_sha256": "23f287029c5c94d03870f30fcd5a2c6bb037dfd782b6a19469a5d594100d944b",
+      "delta_sha256": "cff4fd66b4b616f6956f6b2278590d858605219c352ec79543772b9b6953c9ef",
+      "plan": "/tmp/artroom-publication941b-controls-packet/copy-plan.json",
+      "plan_sha256": "266cb4b5ec86516ae0d988845071c7f6122532050a72c5e5b3c87d7ec958fb96",
+      "config": "/tmp/artroom-publication941b-controls-packet/copy-body.config.mjs",
+      "config_sha256": "d040f0caea728c320c119345088edfc0ebbf90d188cc86a75a94f12c41a05565",
+      "original_config": "/tmp/artroom-publication941b-static-preparation/native-body.config.mjs",
+      "original_config_sha256": "e1528c2bf2afe6f998b3d3883427e0132ad6f20853a340ca03a4260c2ef3c058",
+      "config_changes_only": "canonical root/head/tree and absolute same selected-file source bindings; original base/settings/Reporter/project/pool/deadline/retry preserved",
+      "selection": [
+        {
+          "path": "packages/scope/test/artifacts-host.test.ts",
+          "project": "scope",
+          "pool": "cloudflare-pool",
+          "cases": [
+            "scripted binding: a creation revokes its write token at once or reports it owed; a refusal is the answer; delete names the exact repository",
+            "scripted smart HTTP: ref, format and objects read with a read token minted for the read and revoked after, at the service's own remote",
+            "scripted mint and send: one write token with the service's expiry, one push with it, refused and not-sent distinct, revoke at the recorded repository"
+          ]
+        }
+      ],
+      "expected": {
+        "failed": 1,
+        "passed": 2,
+        "assertion": "expect(copied).toBe(0);",
+        "why": "Both individually permitted600KiB bodies copy before aggregate rejection, so scripted copy iterator counter is nonzero while HTTP remains unsent.",
+        "location": "packages/scope/test/artifacts-host.test.ts:263 (third original case)"
+      },
+      "baseline_reused": {
+        "head": "941b113f4134c34019f80a176f28587cef49425e",
+        "tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+        "result": "/tmp/artroom-publication941b-native-result/result.json",
+        "result_sha256": "12f2dda2ff188e9059a9c0df66a274e9bfcb70c737046a26426293b33eb9738b",
+        "ledger": "/tmp/artroom-publication941b-native-result/coverage-ledger.json",
+        "ledger_sha256": "17a167b8d451da161130734108a112e1ace8148578d193704a3e8d73377d56a6",
+        "body_log": "/tmp/artroom-publication941b-native-result/body.log",
+        "body_log_sha256": "8df63bb8f59a2902263cf7092b19ae2128fc36c152aad73f3011a5a2e8c54130",
+        "manifest": "/tmp/artroom-publication941b-native-result/manifest.json",
+        "manifest_sha256": "05d69bcf63a669b9396b1be62cb063885e91a638d5eb9382d4372c73cd3ae198"
+      },
+      "inert_argv": [
+        "/opt/homebrew/Cellar/node/26.11.0_1/bin/node",
+        "/private/tmp/artroom-demo-github-host/node_modules/vitest/vitest.mjs",
+        "run",
+        "/private/tmp/artroom-publication-precopy-control/packages/scope/test/artifacts-host.test.ts",
+        "--config",
+        "/tmp/artroom-publication941b-controls-packet/copy-body.config.mjs",
+        "--bail=0",
+        "--allowOnly=false",
+        "--passWithNoTests=false",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--reporter=/private/tmp/artroom-publication-precopy-control/scripts/focused-check.mjs",
+        "--outputFile.json=/tmp/artroom-publication941b-copy-control-result/vitest.json"
+      ],
+      "inert_cwd": "/private/tmp/artroom-publication-precopy-control/packages/scope",
+      "inert_environment": {
+        "ARTROOM_FOCUSED_PLAN": "/tmp/artroom-publication941b-controls-packet/copy-plan.json",
+        "ARTROOM_FOCUSED_OUTPUT": "/tmp/artroom-publication941b-copy-control-result"
+      },
+      "dependency_static": {
+        "third_party_symlinks": 70,
+        "owned_real_directories": [
+          "/private/tmp/artroom-publication-precopy-control/node_modules",
+          "/private/tmp/artroom-publication-precopy-control/node_modules/@generalbusiness",
+          "/private/tmp/artroom-publication-precopy-control/node_modules/.bin",
+          "/private/tmp/artroom-publication-precopy-control/node_modules/.vite",
+          "/private/tmp/artroom-publication-precopy-control/node_modules/.vite-temp"
+        ],
+        "workspaces": 12,
+        "aliases": 24,
+        "source_hashes": 634,
+        "lock_sha256": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+        "install": false,
+        "shared_cache_mutation": false
+      },
+      "restore_after_own_run": {
+        "argv": [
+          "git",
+          "checkout",
+          "--detach",
+          "941b113f4134c34019f80a176f28587cef49425e"
+        ],
+        "cwd": "/private/tmp/artroom-publication-precopy-control",
+        "expected_head": "941b113f4134c34019f80a176f28587cef49425e",
+        "expected_tree": "6a0c76b510ca1d1cfc1a8e16e1e8f3b8711ec2a4",
+        "expected_clean": true,
+        "source_sha256": "f17b321200e94ef3ab4a9420bafd7885b7bb4da2e8e89d0f1ae442fdb15683fd",
+        "witness_sha256": "23f287029c5c94d03870f30fcd5a2c6bb037dfd782b6a19469a5d594100d944b",
+        "preserve_local_mutant_branch": true
+      },
+      "execution": []
+    }
+  ],
+  "rules": [
+    "One controlled source path each; original whole witness files4/3 unchanged.",
+    "Use direct same-config/public Reporter command with control-only bail0 so all cases are accounted. Driver main hardcodes bail1 and must not be used for these controls.",
+    "Root static exact source/tool/config/owned dependency/current aliases guard BEFORE config import and terminal guard after; no retry/discovery/compiler/baseline repeat.",
+    "A nonzero alone is not distinguishing. Require exact intended assertion failures at current unchanged lines, all declared cases, no skip/timeout/unhandled/retry/repeat/collection/infrastructure-only failure.",
+    "Restore each isolated worktree to original941b after its own run, verifying head/tree/clean/source/witness hashes; local mutant branch remains.",
+    "All runtime held until explicit Root release. No native admission/provider/benchmark/global Source approval inferred from scripted port body."
+  ],
+  "files": {
+    "copy-body.config.mjs": {
+      "bytes": 2506,
+      "sha256": "d040f0caea728c320c119345088edfc0ebbf90d188cc86a75a94f12c41a05565"
+    },
+    "copy-mutation.patch": {
+      "bytes": 1541,
+      "sha256": "cff4fd66b4b616f6956f6b2278590d858605219c352ec79543772b9b6953c9ef"
+    },
+    "copy-plan.json": {
+      "bytes": 105683,
+      "sha256": "266cb4b5ec86516ae0d988845071c7f6122532050a72c5e5b3c87d7ec958fb96"
+    },
+    "copy-source-body.txt": {
+      "bytes": 23153,
+      "sha256": "ca787a57f0d34f27128eda32f8c53d4ec972224940f128a0419362c4d3999848"
+    },
+    "trees-body.config.mjs": {
+      "bytes": 2968,
+      "sha256": "230f080a7e426de41e9f26d2ec2670978b87000ab2e60faf9bfa695b12970ab6"
+    },
+    "trees-mutation.patch": {
+      "bytes": 5291,
+      "sha256": "37fbe36f6cf4f34ea2e8b7e91c9040c0b77442c4dcfdf84c096b3b372b4e56c5"
+    },
+    "trees-plan.json": {
+      "bytes": 106520,
+      "sha256": "dbbec51d46bec04d36cadcd6599ffef4fa47377a9b743f3760ad668401da5348"
+    },
+    "trees-source-body.txt": {
+      "bytes": 12538,
+      "sha256": "5bdcb34657dfb7b9c99f6d5c69f0a4355e8765d5a5115bedefac84f1f4531bb8"
+    },
+    "static-proof.json": {
+      "bytes": 1269,
+      "sha256": "ea5b5b1dceb474e46ab82f7084b8329f920b38ad25ef213551fc7edc116e1ddc"
+    }
+  },
+  "predecessor_packet": {
+    "path": "/tmp/artroom-publication941b-controls-packet/packet.json",
+    "sha256": "45a3d5095d9403d8a83ff9a11919df236eb5ed4b33735c7c9441026a14806d24"
+  },
+  "static_proof": {
+    "path": "/tmp/artroom-publication941b-controls-packet/static-proof.json",
+    "sha256": "ea5b5b1dceb474e46ab82f7084b8329f920b38ad25ef213551fc7edc116e1ddc"
+  }
+}
