@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a47160ddd77315574d6b31871cf9b2c10b59f5be","text":"Merge retired a covered predecessor; the successor is at packages/page/test/screenshots/issues-layout-zoom-200.png."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a4953ee3b97e0fcff52806584d7bf4d2ff3c64d3","text":"Merge retired a covered predecessor; the successor is at packages/cli/test/claim.scope.test.ts."}
