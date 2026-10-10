@@ -1,0 +1,30 @@
+{
+  "head": "66ce1125c00a15242f5b277de8d5b580e5ed81ba",
+  "tree": "0cebf0f372e752c50028d18b8b7f6b2fffad8ea9",
+  "actual_baseline": "three compilers and complete5 native cases PASS, no missing/skips/errors/retries; structured result/ledger parsed statically, Root full-read rawbody",
+  "files": {
+    "result.json": {
+      "path": "/tmp/artroom-replay66-baseline-result/result.json",
+      "sha256": "6b046a45745f7ac0ad4d092efa02ee78cb4bea827f3abbaa0ab8fe5e1009a699"
+    },
+    "coverage-ledger.json": {
+      "path": "/tmp/artroom-replay66-baseline-result/coverage-ledger.json",
+      "sha256": "8234946f18005eb8921cf24534877031d3d0ec1a50a60d0578deb60e9fa4918f"
+    },
+    "body.log": {
+      "path": "/tmp/artroom-replay66-baseline-result/body.log",
+      "sha256": "0a645e2b8ad511ab3983104c362bbbc9df3b1777fa466b9a43bce597e6e693c7"
+    }
+  },
+  "control_proof": {
+    "path": "/tmp/artroom-replay66-oldmost-control-preparation/proof.json",
+    "sha256": "b32c172742a6504c8b109eea0a962f9fb7e288d4f32c3ce9becc489805743129"
+  },
+  "control_plan": {
+    "path": "/tmp/artroom-replay66-oldmost-control-preparation/control-plan.json",
+    "sha256": "888b4e4885ccf7d4a1ab6c7fd7f1057985f1aab89a0f319a7477b07afde00ef9"
+  },
+  "execution_by_preparer": [],
+  "baseline_reruns": 0,
+  "status": "Existing genuine baseline linked for later ONEcontrol, no release inferred"
+}
