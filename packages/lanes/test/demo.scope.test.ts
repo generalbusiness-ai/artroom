@@ -286,6 +286,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const events: string[] = [];
   let waiting = false;
   let clock = Date.UTC(2026, 9, 8);
+  let monotonicReads = 0;
   // The pacing wait must finish before a command/read runs or its timer starts.
   // A clock and a microtask gate avoid wall-clock sleeps. The real scope story
   // still proves each shot runs; the added boundary guards against running it
@@ -293,6 +294,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const rehearsal: Rehearsal = await rehearse({
     ...stage,
     now: () => clock,
+    monotonic: () => 100 + 250 * monotonicReads++,
     beforeShot: async (shot) => {
       waiting = true;
       next.push(shot);
@@ -318,6 +320,12 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect(failed, failed.join("\n\n")).toEqual([]);
   expect([rehearsal.ok, told, rows.length, rows.every((row) => row.endsWith(" | yes |"))]).toEqual([true, rehearsal.shots.map((shot) => shot.n), 27, true]);
   expect(text).toContain("Result: all 27 shots printed what the script expects.");
+  const measured = rehearsal.shots.filter(shot => shot.staleRefusal !== undefined);
+  expect(monotonicReads, "only the stale merge command uses the refusal timer").toBe(2);
+  expect(measured).toHaveLength(1);
+  expect(measured[0]!.staleRefusal).toEqual({ milliseconds: 250, at: measured[0]!.at, service: SERVICE, host: at.host, method: "injected monotonic clock" });
+  expect(text).toContain("Runner-local stale merge refusal: 250 ms");
+  expect(text).toContain("excludes the fresh proposal and publication");
   expect(rehearsal.shots[0]!.typed).toContain(`--host ${at.host} --namespace ${at.namespace}`);
   expect(rehearsal.shots[0]!.note).toContain(`${at.host === "github.com" ? "GITHUB_APP_CONFIG" : "ARTIFACTS_CONFIG"}.registerScope`);
   if (at.stand instanceof Hub) {

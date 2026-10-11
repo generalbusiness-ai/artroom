@@ -56,6 +56,8 @@ export interface Stage {
   prepareBranch?(branch: string, files: readonly { path: string; bytes: Uint8Array }[]): Promise<Outcome>;
   /** The wall clock, in milliseconds. The default is `Date.now`. */
   now?(): number;
+  /** A monotonic millisecond clock for test injection; production uses `performance.now()`. */
+  monotonic?(): number;
   /** Before a runnable shot starts, its secrets cut. Awaited before any command or read and before its timer. */
   beforeShot?(shot: NextShot): Promise<void>;
   /** Told each shot as it ends, its secrets cut: for a person who watches the run. */
@@ -64,6 +66,15 @@ export interface Stage {
 
 /** What is about to run. Invitation links remain cut on the recording screen. */
 export interface NextShot { n: number; title: string; scene: string; who: string; typed: string }
+
+/** Runner-local elapsed time, not a native fact or server-only latency. */
+export interface StaleRefusalTiming {
+  milliseconds: number;
+  at: string;
+  service: string;
+  host: string;
+  method: "performance.now()" | "injected monotonic clock";
+}
 
 /** What one shot did. */
 export interface Taken {
@@ -80,6 +91,8 @@ export interface Taken {
   /** The lines printed, its secrets cut. */
   lines: string[];
   seconds: number;
+  /** Only the stale merge command, excluding the fresh proposal and publication. */
+  staleRefusal?: StaleRefusalTiming;
   expected: { code: number; lines: string[] };
   match: boolean;
   /** Why the shot does not match, or null. */
@@ -517,7 +530,7 @@ async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controll
 }
 
 /** Merge the already-admitted loser, then open a distinct fresh-head change. */
-async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found): Promise<Outcome> {
+async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found, monotonic: () => number, now: () => number, measured: (milliseconds: number, at: string) => void): Promise<Outcome> {
   const lines = [`Old base: ${oldBase}; new base: ${newBase}.`];
   const failure = (): Outcome => ({ code: 1, lines: [...lines, "Composite stopped: required result did not match. No mutation was retried."] });
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
@@ -526,7 +539,15 @@ async function staleReproposal(ctx: Context, oldBase: string, newBase: string, e
     lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
     return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
   };
-  if (!await run(["merge", v["stale"]], 1, 2, 3)) return failure();
+  // Start immediately before the CLI invocation and stop immediately when it
+  // returns. Formatting, judging and the subsequent fresh edit are outside it.
+  const at = new Date(now()).toISOString();
+  const started = monotonic();
+  const refused = await command(ctx, ["merge", v["stale"]]);
+  const milliseconds = monotonic() - started;
+  lines.push(`$ artroom merge ${v["stale"]}`, ...refused.lines, `Exit ${refused.code}.`);
+  if (judged({ code: 1, lines: expected.lines.slice(2, 3) }, refused, v) !== null) return failure();
+  measured(milliseconds, at);
   if (!await run(["edit", "guide/concurrent.md", "--file", "concurrent.md"], 0, 5, expected.lines.length - 1)) return failure();
   if (!isScopeId(v["reproposed"]) || v["reproposed"] === v["stale"]) return failure();
   return { code: 0, lines };
@@ -559,10 +580,13 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     await stage.beforeShot?.({ n: base.n, title: base.title, scene: base.scene, who: base.who, typed });
     const started = now();
     let outcome: Outcome;
+    let staleRefusal: StaleRefusalTiming | undefined;
     const shows = expected.lines.find((line) => line.startsWith("Shows: \""))?.slice(8, -1) ?? null;
     if (words[0] === "GET") outcome = seen(await stage.get(words[1]!), shows);
     else if (words[0] === "prepare-concurrent-and-merge") outcome = await prepareConcurrentAndMerge(await personOf(shot.who), words[1]!, words[2]!, expected, v, stage.manifest ?? false);
-    else if (words[0] === "stale-reproposal") outcome = await staleReproposal(await personOf(shot.who), words[1]!, words[2]!, expected, v);
+    else if (words[0] === "stale-reproposal") outcome = await staleReproposal(await personOf(shot.who), words[1]!, words[2]!, expected, v, () => stage.monotonic ? stage.monotonic() : performance.now(), now, (milliseconds, at) => {
+      staleRefusal = { milliseconds, at, service: stage.service, host: stage.host, method: stage.monotonic ? "injected monotonic clock" : "performance.now()" };
+    });
     else if (words[0] === "prepare-branch") outcome = stage.prepareBranch ? await stage.prepareBranch(words[1]!, branchFiles(words[1]!)) : { code: 1, lines: ["No local Git branch preparation is configured."] };
     else if (words[0] === "git") outcome = await stage.log(words[2]!);
     else outcome = await command(await personOf(shot.who), words.slice(1));
@@ -594,6 +618,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     const done: Taken = {
       ...base, at: new Date(started).toISOString(), typed, code: outcome.code, lines: outcome.lines.map(withheld),
       seconds: Math.round((now() - started) / 100) / 10, match: why === null, why, note,
+      ...(staleRefusal ? { staleRefusal } : {}),
     };
     taken.push(done);
     stage.told?.(done);
@@ -636,6 +661,7 @@ export function transcript(rehearsal: Rehearsal, heading: { service: string; hos
       "",
       shot.code >= 0 ? `Exit ${shot.code}. ${shot.match ? "Matches the expected lines." : `Does not match: ${shot.why}.`}` : `Not run: ${shot.why}.`,
       "",
+      ...(shot.staleRefusal ? [`Runner-local stale merge refusal: ${shot.staleRefusal.milliseconds} ms, measured with ${shot.staleRefusal.method} from command invocation to its expected out-of-date return. Date ${shot.staleRefusal.at}; service ${shot.staleRefusal.service}; Git host ${shot.staleRefusal.host}. Includes CLI and round-trip waiting; excludes the fresh proposal and publication. This is not server-only latency or a native history fact.`, ""] : []),
       ...(shot.note ? [shot.note, ""] : []),
     );
   }

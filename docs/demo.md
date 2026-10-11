@@ -35,7 +35,13 @@ observed run of the 23:00 sprint report, except the new stale-base row.
 Its development expectations follow the production CLI format and still
 require an observed rehearsal-host run. The controlled change and the
 stale change name the same earlier published base. Both proposals are
-admitted before the controlled publication; the second merge follows it. The freeze route uses a
+admitted before the controlled publication; the second merge follows it. The result's
+`staleRefusal` field and transcript report runner-local elapsed milliseconds
+from invoking that merge command to its expected `out-of-date` return,
+using `performance.now()`. They label the date, service and Git host. This
+includes CLI work and round-trip waiting, excludes the fresh proposal and
+publication, and is not server-only latency or a native history fact.
+Injected test clocks are labelled separately. The freeze route uses a
 new change lane; same-lane manifest replacement remains separate work
 under plan 029.
 
