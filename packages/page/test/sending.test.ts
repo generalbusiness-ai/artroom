@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 
 // The real shell handlers over a minimal DOM and a scripted data boundary.
 // No browser, native scope or transport runs; the submit-phase callback is
@@ -247,11 +248,13 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   }
   const root=new Node('div'),body=new Node('body');body.append(root);
   const doc={createElement:(tag:string)=>new Node(tag),createElementNS:(_ns:string,tag:string)=>new Node(tag),getElementById:(id:string)=>id==='page'?root:body.all().find(node=>node.attrs['id']===id)??null,querySelectorAll:(selector:string)=>body.querySelectorAll(selector),body,get activeElement(){return focused;}};
-  const place={directory:'directory',membership:{scope:`sc_${'b'.repeat(52)}`,kind:'membership',inc:`in_${'a'.repeat(26)}`}};
+  const fixtureDigest=digestBytes(new Uint8Array([1]));
+  const place={directory:'directory',membership:{scope:scopeIdOf({v:1,kind:'membership',definition:fixtureDigest,creator:null,cause:fixtureDigest,ordinal:0}),kind:'membership',inc:newIncarnation(new Uint8Array(16))}};
   const settings={place,secret:'device'};
   const room={session:{service:'https://page.test',secret:new Uint8Array(32)},...place,rules:'rules',destination:'destination',key:'key',me:{handle:'@reader',role:'maintainer',actions:['change.review','change.merge','issue.open'],ref:{membership:place.membership,member:'@reader'}},reader:{}};
   const issue={scope:'issue',definition:'definition',head:{seq:1,hash:'head'},intent:0,title:'Native issue',number:1,body:null,state:'open',requester:'@author',assignees:[],conditions:[],comments:[],closeReason:null};
-  const change={scope:`sc_${'c'.repeat(52)}`,ref:{scope:`sc_${'c'.repeat(52)}`,kind:'lane',inc:`in_${'b'.repeat(26)}`},definition:'definition',head:{seq:2,hash:'head'},proposal:0,title:'Selected change',number:2,body:null,state:'open',author:'@author',currentManifest:12,
+  const changeScope=scopeIdOf({v:1,kind:'lane',definition:fixtureDigest,creator:null,cause:fixtureDigest,ordinal:0});
+  const change={scope:changeScope,ref:{scope:changeScope,kind:'lane',inc:newIncarnation(new Uint8Array(16).fill(1))},definition:'definition',head:{seq:2,hash:'head'},proposal:0,title:'Selected change',number:2,body:null,state:'open',author:'@author',currentManifest:12,
     manifests:[{id:12,state:'current',authors:['@author'],integrator:'@author',base:'a'.repeat(40),integration:null,tree:null,complete:true,selectedReports:[],file:{path:'AGENTS.md',digest:'digest',size:4,page:'latest',content:'Text'}}],
     reviews:[],requests:[{id:6,state:'open',requested:'@reader',requester:'@author',requestedRef:room.me.ref,requesterRef:{membership:place.membership,member:'@author'}}],jobs:[],links:[],merges:[],comments:[],rules:{approvals:0,ownerMayReview:false,revision:1,checks:[],extents:[{name:'rules',approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
     // Synthetic presentation fixture; the native task-data case proves the real policy binding.
@@ -318,7 +321,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
     expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Keep this selected review');
     change.requests[0]!.state='open';await refresh();
-    const sameNameElsewhere={...room.me.ref,membership:{...place.membership,inc:`in_${'c'.repeat(26)}`}};
+    const sameNameElsewhere={...room.me.ref,membership:{...place.membership,inc:newIncarnation(new Uint8Array(16).fill(2))}};
     change.requests[0]!.requestedRef=sameNameElsewhere;rendered=gate();form.emit('submit');await rendered.promise;
     expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
     change.requests[0]!.requestedRef=room.me.ref;await refresh();

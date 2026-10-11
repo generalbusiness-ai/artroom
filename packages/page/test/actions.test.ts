@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
 import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskForm } from "../src/tasks.ts";
+import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
@@ -198,13 +199,14 @@ test("task defaults retain selected issue-report order and never fall back to an
   expect(changeTaskContext(unreadable).defaults?.["merge"]).toBeUndefined();
   // Synthetic complete identity, not a native grant. Same handle in another
   // membership incarnation cannot attach another person's request.
-  const membership: ScopeRef = { scope: `sc_${"b".repeat(52)}`, inc: `in_${"a".repeat(26)}`, kind: "membership" };
-  const lane: ScopeRef = { scope: `sc_${"c".repeat(52)}`, inc: `in_${"b".repeat(26)}`, kind: "lane" };
+  const fixtureDigest = digestBytes(new Uint8Array([1]));
+  const membership: ScopeRef = { scope: scopeIdOf({ v: 1, kind: "membership", definition: fixtureDigest, creator: null, cause: fixtureDigest, ordinal: 0 }), inc: newIncarnation(new Uint8Array(16)), kind: "membership" };
+  const lane: ScopeRef = { scope: scopeIdOf({ v: 1, kind: "lane", definition: fixtureDigest, creator: null, cause: fixtureDigest, ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(1)), kind: "lane" };
   const member: MemberRef = { membership, member: "@reviewer" };
   const requester: MemberRef = { membership, member: "@author" };
   const room = { membership, me: { handle: "@reviewer", ref: member } } as unknown as Room;
   const request = (id: number, requestedRef: MemberRef = member, state = "open") => ({ id, state, requested: "@reviewer", requester: "@author", requestedRef, requesterRef: requester });
-  const requested = { ...change, scope: lane.scope, ref: lane, state: "open", reviewMembersByExtent: { docs: [{ label: "@reviewer", value: "@reviewer" }] }, reviewPolicy: { manifest: 12, source: {} as never, extents: [{ name: "docs", patterns: ["README.md"], approvals: 1, approver: "change.review", checks: [], class: "content" }] }, manifests: [{ ...change.manifests[1]!, authors: [], file: { path: "README.md" } }], requests: [request(7, { ...member, membership: { ...membership, inc: `in_${"c".repeat(26)}` } }), request(8, member, "met"), request(6)] } as unknown as ChangeView;
+  const requested = { ...change, scope: lane.scope, ref: lane, state: "open", reviewMembersByExtent: { docs: [{ label: "@reviewer", value: "@reviewer" }] }, reviewPolicy: { manifest: 12, source: {} as never, extents: [{ name: "docs", patterns: ["README.md"], approvals: 1, approver: "change.review", checks: [], class: "content" }] }, manifests: [{ ...change.manifests[1]!, authors: [], file: { path: "README.md" } }], requests: [request(7, { ...member, membership: { ...membership, inc: newIncarnation(new Uint8Array(16).fill(2)) } }), request(8, member, "met"), request(6)] } as unknown as ChangeView;
   const context = changeTaskContext(requested, room);
   expect(context.defaults["review-verdict"]!.fields).toEqual({ manifest: "12", request: "6" });
   const actualReview: Offered = { ...review, fields: [...review.fields, { name: "extent", type: "text", required: false }, { name: "request", type: "item", required: false }] };
@@ -216,7 +218,7 @@ test("task defaults retain selected issue-report order and never fall back to an
   const captured = { scope: lane, member, request: 6 };
   expect(reviewSelectionProblem(room, { ...requested, requests: [...requested.requests, request(9)] }, 12, "docs", captured)).toBeNull();
   expect(reviewSelectionProblem(room, { ...requested, requests: [request(6, member, "met")] }, 12, "docs", captured)).toContain("no longer open");
-  expect(reviewSelectionProblem(room, { ...requested, requests: [request(6, { ...member, membership: { ...membership, inc: `in_${"d".repeat(26)}` } })] }, 12, "docs", captured)).toContain("no longer open");
+  expect(reviewSelectionProblem(room, { ...requested, requests: [request(6, { ...member, membership: { ...membership, inc: newIncarnation(new Uint8Array(16).fill(3)) } })] }, 12, "docs", captured)).toContain("no longer open");
   const multiple = changeTaskContext({ ...requested, requests: [request(6), request(9)] }, room);
   expect(multiple.defaults["review-verdict"]!.fields?.["request"]).toBeUndefined();
   expect(multiple.choices["review-verdict"]!["request"]!.map(choice => choice.value)).toEqual(["6", "9"]);
