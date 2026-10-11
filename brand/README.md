@@ -1,0 +1,3 @@
+# dap brand kit
+
+This kit was imported from `~/play/dap-logo-concepts/kit`; `gen6.py` comes from that directory’s parent. The approved garnet amendment changes only `tokens.css` and the Colour section of `GUIDELINES.md`; the remaining supplied files are unchanged. The source [guidelines](GUIDELINES.md) describe the logo, colours, typography, and supplied variants. To regenerate the 13 master SVGs, copy `gen6.py` to a scratch directory and run `python3 gen6.py` there. The generator writes a `kit/` directory beside itself. It does not regenerate `dist/`, `fonts/`, `fonts.css`, `tokens.css`, or `GUIDELINES.md`; the distribution files retain their supplied bytes, while the tokens and guidelines include the approved amendment.
