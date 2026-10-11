@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f7223dfe98711b155ae6988cf8a90d8ccbad3ee8","text":"Merge retired a covered predecessor; the successor is at packages/page/src/focus.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f74b53a3f5b61392035e2b87ba3340791a97b580","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/model.ts."}
