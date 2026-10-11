@@ -7,7 +7,7 @@ import { changeStates, operationsOf, type Merge, type ReviewRequest } from "../s
 // queued and effect confirmed. The cases here are those the story's stand-in host does not produce. Each view is MADE BY HAND.
 
 const merge = (over: Partial<Merge>): Merge => ({ id: 30, state: "intended", manifest: 20, reason: null, commit: null, publication: null, ...over });
-const request: ReviewRequest = { id: 12, state: "open", requested: "@paul", requester: "@una" };
+const request: ReviewRequest = { id: 12, state: "open", requested: "@paul", requester: "@una", requestedRef: null, requesterRef: null };
 const refusedBy = (reason: string, name?: string): Answer => ({ answer: "refused", reason, ...(name ? { name } : {}), judgedAt: { seq: 9, hash: "sha256:00" } }) as unknown as Answer;
 
 test("an open request waits for its reviewer until a merge is published; a merge's lost and refused operations are effect unknown and effect refused", () => {

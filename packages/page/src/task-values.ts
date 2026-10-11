@@ -1,4 +1,6 @@
-import type { ChangeView, Offered, Room } from "./data.ts";
+import type { ChangeView, Offered, ReviewRequest, Room } from "./data.ts";
+import { canonicalize, isMemberRef, isScopeRef } from "@generalbusiness/artroom-bytes";
+import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import { classify, editPath, type Extent } from "@generalbusiness/artroom-platform";
 interface TaskContext {
   defaults: Record<string, { on?: number; fields?: Record<string, string> }>;
@@ -11,7 +13,7 @@ export function issueTaskValues(typed: Record<string, string>): Record<string, s
 }
 
 /** Technical form values come from the authenticated selected version and membership projections. */
-export function changeTaskContext(change: ChangeView): TaskContext {
+export function changeTaskContext(change: ChangeView, room?: Room): TaskContext {
   const selected = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
   const defaults: TaskContext["defaults"] = {};
   if (selected) {
@@ -22,8 +24,26 @@ export function changeTaskContext(change: ChangeView): TaskContext {
   const choices: TaskContext["choices"] = {};
   if (change.reviewExtents !== undefined && change.reviewExtents !== null) choices["review-verdict"] = { extent: change.reviewExtents };
   if (change.reviewMembers !== undefined && change.reviewMembers !== null) for (const kind of ["request-review-own", "request-review-any"]) choices[kind] = { requested: change.reviewMembers };
+  if (selected && room) {
+    const requests = matchingReviewRequests(room, change);
+    choices["review-verdict"] = { ...choices["review-verdict"], request: requests === null ? [] : requests.length ? requests.map(request => ({ label: `Request ${request.id} from ${request.requesterRef!.member}`, value: String(request.id) })) : [{ label: "Voluntary review", value: "" }] };
+    if (requests && requests.length < 2) defaults["review-verdict"]!.fields!["request"] = requests.length ? String(requests[0]!.id) : "";
+  }
   return { defaults, choices };
 }
+
+/** Only complete native party identity can bind a request. Display labels cannot. */
+export function matchingReviewRequests(room: Room, change: ChangeView): ReviewRequest[] | null {
+  const member = room.me?.ref;
+  if (!isScopeRef(change.ref) || change.ref.scope !== change.scope || !isMemberRef(member)
+    || canonicalize(member.membership) !== canonicalize(room.membership) || !Array.isArray(change.requests)) return null;
+  const open = change.requests.filter(request => request.state === "open");
+  if (open.some(request => !isMemberRef(request.requestedRef) || !isMemberRef(request.requesterRef))) return null;
+  return open.filter(request => canonicalize(request.requestedRef) === canonicalize(member));
+}
+
+/** Captured dialog identity and choice. Null is explicitly voluntary; undefined is an unmade choice. */
+export interface ReviewSelection { scope: ScopeRef | null; member: MemberRef | null; request: number | null | undefined }
 
 /** Applicability uses full policy bound by the data reader to this recorded
  * one-file version. Held extents never supply missing patterns. */
@@ -57,7 +77,7 @@ export function requestedReviewCandidates(change: ChangeView): { label: string; 
 
 /** A retained ordinary review must keep its selected version AND requirement.
  * This is presentation qualification; the native lane/destination still judge it. */
-export function reviewSelectionProblem(room: Room, change: ChangeView, manifest: number, extent: string): string | null {
+export function reviewSelectionProblem(room: Room, change: ChangeView, manifest: number, extent: string, selection?: ReviewSelection): string | null {
   if (change.currentManifest !== manifest) return "This version is no longer current. Keep this draft and choose the new version explicitly.";
   if (change.state !== "open") return "This change is no longer open for ordinary review. This draft keeps its original version.";
   if (!extent) return "Choose a review requirement before submitting this version.";
@@ -67,6 +87,17 @@ export function reviewSelectionProblem(room: Room, change: ChangeView, manifest:
   const candidates = change.reviewMembersByExtent?.[extent];
   if (!candidates || !room.me) return "Current reviewer authority could not be read for this requirement. This draft is kept.";
   if (!candidates.some(candidate => candidate.value === room.me!.handle)) return "You are no longer eligible to review this requirement. Keep the draft and choose an eligible requirement explicitly.";
+  if (selection) {
+    if (!isScopeRef(selection.scope) || !isScopeRef(change.ref) || selection.scope.scope !== change.scope || canonicalize(selection.scope) !== canonicalize(change.ref)) return "The selected review lane could not be verified. This draft is kept.";
+    if (!isMemberRef(selection.member) || !isMemberRef(room.me.ref) || canonicalize(selection.member) !== canonicalize(room.me.ref)
+      || canonicalize(room.me.ref.membership) !== canonicalize(room.membership)) return "The selected reviewer identity changed or could not be verified. This draft is kept.";
+    if (selection.request === undefined) return "Choose which review request to answer. This draft is kept.";
+    if (selection.request !== null) {
+      const request = change.requests.find(request => request.id === selection.request);
+      if (!request || request.state !== "open" || !isMemberRef(request.requestedRef) || !isMemberRef(request.requesterRef)
+        || canonicalize(request.requestedRef) !== canonicalize(selection.member)) return "The selected review request is no longer open for this member. This draft is kept.";
+    }
+  }
   return null;
 }
 

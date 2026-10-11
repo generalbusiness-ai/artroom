@@ -34,7 +34,7 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isMemberRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
@@ -72,7 +72,7 @@ export interface Room {
   name?: string;
   key: KeyId;
   /** The caller's role and actions in membership, or null when the key is no active member's. */
-  me: Standing | null;
+  me: (Standing & { ref?: MemberRef }) | null;
   /** The read session the caller presents, or null when membership gave none; then reads are signed reads. */
   reader: ReadSession | null;
   /** Why membership gave no session, or null when it gave one. */
@@ -360,7 +360,7 @@ export interface Manifest {
     content?: string | null } | null;
 }
 export interface Review { id: number; state: string; reviewer: string | null; manifest: number | null; verdict: string | null; extent: string | null }
-export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null }
+export interface ReviewRequest { id: number; state: string; requested: string | null; requester: string | null; requestedRef: MemberRef | null; requesterRef: MemberRef | null }
 export interface Job { id: number; state: string; name: string | null; manifest: number | null }
 export interface Link { id: number; state: string; issue: ScopeId | null; how: string | null }
 export interface Extent { name: string; approvals: number; approver: string; checks: string[]; class: string; patterns?: string[] }
@@ -372,6 +372,8 @@ export interface Publication { id: number; state: string; reason: string | null;
 export interface Merge { id: number; state: string; manifest: number | null; reason: string | null; commit: string | null; publication: Publication | null }
 
 export interface ChangeView {
+  /** Actual authenticated lane identity, including its incarnation. */
+  ref?: ScopeRef;
   /** Full native policy bound to this current recorded one-file version; null means unknown applicability. */
   reviewPolicy?: { manifest: number; source: FactRef; extents: PolicyExtent[] } | null;
   /** The actual proposal item used by transitions. */
@@ -568,7 +570,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const reviewPolicy = current && (typeof content === "string" || listFile !== null)
     ? await reviewPolicyOf(room, summary.scope, proposal, rulesItem, current.id) : null;
   return {
-    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers, reviewMembersByExtent, reviewPolicy,
+    scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers, reviewMembersByExtent, reviewPolicy,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: manifests.map((m) => ({
       selectedReports: reportsOf(m, definition),
@@ -579,7 +581,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
       } : m === selected && listFile ? { ...listFile, page: siteAddress(room, listFile.path) } : null,
     })),
     reviews: (await all("review")).map((r) => ({ id: r.id, state: r.state, reviewer: memberOf(r.parties["reviewer"]), manifest: localId(r.refs["manifest"]), verdict: text(r.values["verdict"]), extent: text(r.values["extent"]) })),
-    requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]) })),
+    requests: (await all("review-request")).map((r) => ({ id: r.id, state: r.state, requested: memberOf(r.parties["requested"]), requester: memberOf(r.parties["requester"]), requestedRef: isMemberRef(r.parties["requested"]) ? structuredClone(r.parties["requested"]) : null, requesterRef: isMemberRef(r.parties["requester"]) ? structuredClone(r.parties["requester"]) : null })),
     jobs: (await all("job")).map((j) => ({ id: j.id, state: j.state, name: text(j.values["name"]), manifest: localId(j.refs["manifest"]) })),
     links: (await all("link")).map((l) => ({ id: l.id, state: l.state, issue: scopeOf(l.refs["issue"]), how: text(l.values["how"]) })),
     merges: (await all("merge")).map((m) => ({

@@ -73,10 +73,12 @@ test("a missing author-controller relation is unavailable, and foreign incarnati
 test("standing is recomputed from the current exact key link; retired keys and inactive controllers cannot carry cached permission", () => {
   const before = rows();
   expect(currentStanding(before, membership, keyId(9))?.actions).toEqual(["change.review", "change.comment"]);
+  expect(currentStanding(before, membership, keyId(9))?.ref).toEqual(ref("@agent"));
   const controllerLost = before.map((item) => item.id === 105 ? { ...item, state: "retired" } : item);
   expect(currentStanding(controllerLost, membership, keyId(9))?.actions).toEqual(["change.comment"]);
   const ownLost = before.map((item) => item.id === 109 ? { ...item, state: "compromised" } : item);
   expect(currentStanding(ownLost, membership, keyId(9))).toBeNull();
   const moved = before.map((item) => item.id === 109 ? { ...item, refs: { member: 3 } } : item);
   expect(currentStanding(moved, membership, keyId(9))?.handle).toBe("@reviewer");
+  expect(currentStanding(moved, membership, keyId(9))?.ref).toEqual(ref("@reviewer"));
 });
