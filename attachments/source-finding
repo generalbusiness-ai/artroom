@@ -1,0 +1,112 @@
+{
+  "base": "64b8f97971adcb59193d6e8be572cba782208a80",
+  "request": "3f08557547c4df666e44f150fe8d0209d43c8af9",
+  "promise": "727a384f212a1134606970905a57f8f64b4d6f9e",
+  "source_read_only": true,
+  "runtime_attempted": false,
+  "observed_live_lines": null,
+  "files": [
+    {
+      "path": "packages/scope/src/worker.ts",
+      "sha256": "644cf6f8d644c1ab6202ae8ada8e4fcf626700c198f2f7460c7535d77e21a6a8"
+    },
+    {
+      "path": "packages/scope/src/host-wiring.ts",
+      "sha256": "4319506d9e1886b5d1dde421f7a7ffa19a5c6a56abcca74d535d67158dcf89d9"
+    },
+    {
+      "path": "packages/scope/src/github-wiring.ts",
+      "sha256": "53cf896c020dbd75d570e2e6986a7b145bcb45babf13a629edf45e04e36daa62"
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "sha256": "bba04cf1e5cc53b301e7622cfbc8aa223416cee85823654a471615951dc77154"
+    },
+    {
+      "path": "packages/lanes/src/change.ts",
+      "sha256": "288f002aa8b5ff2d249616786e0a26f1ffa2b9b51b16f76e6dc8193e2feddbc5"
+    },
+    {
+      "path": "packages/lanes/src/demo.ts",
+      "sha256": "0a9843a501849bd783f6f7b4081bfca87116be170451c93f5f7226b78e22c989"
+    },
+    {
+      "path": "packages/derive/src/capability/hold.ts",
+      "sha256": "1c091f920293743a9be442e972f202ce94abcbcbb4eb7d268adbad91262cc49b"
+    },
+    {
+      "path": "packages/platform/src/reservation.ts",
+      "sha256": "ec8074a505d45f2457b436c45a9fcf0748529b2ee9078d554c5d3bafe7d713b0"
+    }
+  ],
+  "findings": [
+    {
+      "path": "packages/lanes/src/change.ts",
+      "lines": [
+        448,
+        479,
+        480,
+        529,
+        829,
+        842
+      ],
+      "fact": "Current changeDemo admits one initial propose-file only. Replacement propose-manifest requires hold, instance, base, integration, tree, complete, selected and decisions; selected and decisions can be empty with no goal/plan. It requires staged hold capability root/check."
+    },
+    {
+      "path": "packages/cli/src/commands.ts",
+      "lines": [
+        1492,
+        1507,
+        1558
+      ],
+      "fact": "proposingFiles requires source-list changeDemo3 and does not own hold staging for current changeDemo. Generic act shapes/signs/submits but performs no capability preparation."
+    },
+    {
+      "path": "packages/scope/src/worker.ts",
+      "lines": [
+        329,
+        330,
+        331,
+        332,
+        333
+      ],
+      "fact": "outsideOf selects configured Git host by recordedHost; null selects NO_OUTSIDE."
+    },
+    {
+      "path": "packages/scope/src/host-wiring.ts",
+      "lines": [
+        54,
+        65,
+        68,
+        73
+      ],
+      "fact": "recordedHost returns only register/destination recorded host; any lane returns null. hostBound authorizes register/destination versioned owners only."
+    },
+    {
+      "path": "packages/scope/src/github-wiring.ts",
+      "lines": [
+        80,
+        82,
+        85,
+        89
+      ],
+      "fact": "GitHub wiring constructs RegisterHost and DestinationHost; hold@1 owner is not authorized/implemented."
+    },
+    {
+      "path": "packages/platform/src/reservation.ts",
+      "lines": [
+        192,
+        200
+      ],
+      "fact": "Reservation check1 compares retained manifest base with actual head. Replacement must have integration tree and first parent matching current base, so merely naming current head as integration is invalid."
+    }
+  ],
+  "required_work": "Implement production lane hold host wiring and lawful staged integration creation/receipt settlement, or obtain an explicitly adopted current-lane replacement contract; do not activate optional changeDemo3 merely to evade current contract. Then implement composite runner and observe isolatedhost expected lines.",
+  "forbidden_shortcuts": [
+    "fresh edit/propose on current head in new lane",
+    "scripted capability or authority grants on actual run",
+    "claim native test stand-in lines as live observations",
+    "fabricate expected observed transcript",
+    "blind retry unresolved signed mutations"
+  ]
+}
