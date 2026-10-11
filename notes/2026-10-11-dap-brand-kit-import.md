@@ -64,3 +64,13 @@ PY
 | `brand/gen6.py` | `93a1e8f71cd762859d7cfbb82e043d1289f6afe25da284b0ba2bcf940f4097b8` |
 | `brand/tail-sheet.svg` | `785b68152f2ac91105d940ff419c29eeecf88d30e4b528509f932a558bdc3f28` |
 | `brand/tokens.css` | `288136b104f15ae153a46e4f8b4917f924d6f1f17aeba22a9feb3939ddc77f80` |
+
+## Review checks
+
+The one normal gate at source commit `0e1d61f30cac9919b826795aec43e0c197d8fa1d` and tree `c2a360731b62958491755eac1c198d119c104082` failed (original handle `88625`). Installation was skipped and whitespace passed. Typechecking failed because existing external dependency links were broken; tests did not run.
+
+After the dependency view was repaired without installing packages, bounded typecheck `85840` failed because shared workspace links loaded distinct nominal `GitProgram` identities from main and this worktree. With workspace links corrected, typecheck `4327` passed in 5.49 seconds elapsed and 18.90 CPU seconds. The first test launch stopped in pretest because the checkout’s `node_modules` was a symlink; no test body ran.
+
+After the owned dependency directory replaced that symlink, bounded test completion `51564` passed: 1,025 Vitest cases, two existing recording skips, eight source and pool Node cases, and 37 Counter Node cases. This test command took 89.69 seconds elapsed and 134.14 CPU seconds. These are separate bounded completions, not a passed replacement gate. The original failed gate and intermediate failures remain retained. No gate was repeated.
+
+Durable evidence is `/Users/hughpyle/play/artroom-diagnostics/brand-kit-import/bounded-completion-final.json`, SHA-256 `47727f8976f9b6103add3d56cf2e265a13f71e06a3aa23bcce09c647f628884c`. The delivery commit after these checks changes only this note; the copied kit bytes and authored README remain the checked source.
