@@ -170,7 +170,7 @@ twenty-five exact terms; the demo does not. The rule, applied to every
 caption, page label and narrated line:
 
 1. If the word names a thing the application owns, use the application's
-   word. The repository says issue, pull request, assign, merge, branch,
+   word. The repository says issue, change, assign, merge, branch,
    clone. The Counter says turn, count, next. The jam says theme,
    instrument, solo, bar.
 2. If the word names something the room does to that thing, use the one
@@ -188,11 +188,12 @@ Glossary, record word then surface word:
 | Record | Surface |
 |---|---|
 | scope, entry, act | the room, a step, an action |
+| found, claim | create (a person creates a room; nobody says found) |
 | commitment: offered, accepted, fulfilled | a promise: offered, taken, kept |
 | hold | working on it, with a time limit |
 | plan, concern | the split, a part |
 | report, accept-report | handed in, accepted |
-| manifest | a version of the change |
+| manifest | a version of the change (the page says change, not pull request; Hugh 11 Oct 17:00) |
 | integration commit | the combined commit |
 | extent | an area of the repository |
 | rules scope, controller | the rules, the person who owns them |
