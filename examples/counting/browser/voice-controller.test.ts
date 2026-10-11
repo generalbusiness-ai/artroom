@@ -6,7 +6,7 @@ import { domainBytes, keyIdOfSecret, newIncarnation, scopeIdOf, sign, textDigest
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { createVoiceController, type ActorIdentity, type Completion, type CustodyLock, type PendingReport,
   type AudioStart, type PreparedEnvelope, type ReportOutcome, type SpeechPort, type TurnToken } from "./voice-controller.ts";
-import { activeAttempt, actURL, contextKey, envelopeKey, markActive, terminalJournal, type RefusalJudgment } from "./journal.ts";
+import { activeAttempt, actURL, contextKey, envelopeKey, markActive, terminalJournal, validAudioStart, type RefusalJudgment } from "./journal.ts";
 
 const secret = new Uint8Array(32).fill(61);
 const reference = (kind: ActorIdentity["scope"]["kind"]) => ({scope:scopeIdOf({v:1,kind,definition:COUNTING_DEFINITION,creator:null,cause:textDigest(`FAKE controller ${kind}`),ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(6)),kind});
@@ -25,8 +25,21 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
   const submitted: PreparedEnvelope[] = [];
   const reconciled: PreparedEnvelope[] = [];
   let lockTail = Promise.resolve();
+  let nextLockGate: { entered():void; grant:Promise<void>; afterWork?():void } | null = null;
+  const holdNextLock = (afterWork?:()=>void) => {
+    let entered!:()=>void, release!:()=>void;
+    const requested=new Promise<void>(resolve=>{entered=resolve;});
+    const grant=new Promise<void>(resolve=>{release=resolve;});
+    nextLockGate={entered,grant,...(afterWork?{afterWork}:{})};
+    return{requested,release};
+  };
+  const audioOrder:string[]=[];
   const lock: CustodyLock = { run<T>(work: () => Promise<T>): Promise<T> {
-    const run = lockTail.then(work);
+    const gate=nextLockGate;nextLockGate=null;
+    const run = gate ? lockTail.then(async()=>{
+      gate.entered();await gate.grant;
+      const value=await work();gate.afterWork?.();return value;
+    }) : lockTail.then(work);
     lockTail = run.then(() => undefined, () => undefined);
     return run;
   } };
@@ -66,7 +79,7 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     voices: () => [{ id: "fake", name: "Fake voice" }, { id: "second", name: "Second fake" }],
     play(text, voiceId, callbacks) {
       const call = { text, voiceId, ...callbacks, canceled: false };
-      calls.push(call);
+      calls.push(call);audioOrder.push("play");
       return () => { call.canceled = true; call.end(); call.error(); };
     },
   };
@@ -75,8 +88,8 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     current: () => owned,
     store: {
       load: async () => custody.saved,
-      loadStart:async()=>custody.start&&wrongStartRead?{...custody.start,audioId:"x".repeat(22)}:custody.start??null,
-      saveStart:async marker=>{if(failStart)throw new Error("FAKE start save failed");assert.equal(custody.saved,null);assert.equal(custody.start??null,null);custody.start=structuredClone(marker);},
+      loadStart:async()=>{if(custody.start)audioOrder.push("marker-readback");return custody.start&&wrongStartRead?{...custody.start,audioId:"x".repeat(22)}:custody.start??null;},
+      saveStart:async marker=>{if(failStart)throw new Error("FAKE start save failed");assert.equal(custody.saved,null);assert.equal(custody.start??null,null);custody.start=structuredClone(marker);audioOrder.push("marker-saved");},
       archiveStart:async marker=>{assert.equal(JSON.stringify(marker.turn),audioObsoleteTurn);assert.deepEqual(custody.start,marker);custody.start=null;},
       save: async p => {if(saveWait)await saveWait; if (failSave) throw new Error("fake private storage failure"); custody.saved = p; custody.start=null; },
       clear: async () => { custody.saved = null; },
@@ -102,7 +115,7 @@ function fixture(saved: PendingReport | null = null, shared?: { saved: PendingRe
     },
   });
   const observe = (t: TurnToken = turn()) => controller.observe({ fresh: true, authorized: true, turn: t });
-  return { controller, observe, calls, prepared, submitted, reconciled, custody, archives,
+  return { controller, observe, calls, prepared, submitted, reconciled, custody, archives, holdNextLock, audioOrder,
     result: (r: ReportOutcome) => { result = r; }, saveFails: () => { failSave = true; }, archiveFails: () => { failArchive=true; },
     loseView: () => { owned = false; }, time: (n: number) => { clock = n; },
     waitPrepare: (p: Promise<void>) => { prepareWait = p; },
@@ -418,4 +431,28 @@ test("Audio start failure and mismatched readback block sound; voice switch reta
   const f=fixture();let release!:()=>void;f.waitSave(new Promise<void>(resolve=>{release=resolve;}));f.result({status:"unknown"});await f.controller.ready;f.observe();f.controller.arm("fake");await drain();f.calls[0]!.end();await drain();assert.equal(f.prepared.length,1);assert.ok(f.custody.start);
   f.controller.invalidate();f.observe();release();await drain();assert.ok(f.custody.saved);assert.equal(f.custody.start,null);assert.equal(f.controller.state().pending,"unknown");assert.equal(f.controller.state().audioUncertain,undefined);assert.equal(f.submitted.length,0);
   const exact=structuredClone(f.custody.saved!.envelope);await f.controller.checkPending();assert.deepEqual(f.reconciled,[exact]);assert.deepEqual(f.custody.saved!.envelope,exact);assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[1,1,0]);
+});
+
+
+// Fake lock/store/speech only: no native scope, actual browser media or provider.
+test("A stale pre-audio lock grant releases an unsent pledge; a fresh notice while busy starts it once after release",async()=>{
+  const f=fixture();await f.controller.ready;
+  const gate=f.holdNextLock(()=>{
+    assert.equal(f.custody.start??null,null);
+    assert.deepEqual([f.calls.length,f.prepared.length,f.submitted.length],[0,0,0],"stale locked work has no custody/media/report effect");
+    f.observe();
+    assert.equal(f.calls.length,0,"fresh notice cannot start while the original lock remains busy");
+  });
+  f.observe();assert.equal(f.controller.arm("fake"),true);
+  await gate.requested;assert.equal(f.custody.start??null,null);assert.equal(f.calls.length,0);
+  f.controller.observe({fresh:false,authorized:true});gate.release();await drain();
+  assert.ok(f.custody.start,"fresh exact never-played pledge recovers after a pre-write stale return");
+  assert.equal(validAudioStart(f.custody.start,identity),true);
+  assert.deepEqual(f.custody.start.turn,turn());
+  assert.deepEqual(f.audioOrder,["marker-saved","marker-readback","play"]);
+  assert.deepEqual(f.calls.map(c=>[c.text,c.voiceId]),[["1","fake"]]);
+  assert.deepEqual([f.prepared.length,f.submitted.length,f.reconciled.length],[0,0,0]);
+  f.observe();f.observe();await drain();
+  assert.deepEqual(f.audioOrder,["marker-saved","marker-readback","play"],"persisted audio is never replayed by duplicate notices");
+  assert.equal(f.controller.state().phase,"speaking");f.controller.dispose();
 });

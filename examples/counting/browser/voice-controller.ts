@@ -366,13 +366,20 @@ export function createVoiceController(options: {
         turnKey(active) === turnKey(turn) && observation.authorized && sameContext(turn) && now() < turn.expiresAt &&
         (!observation.turn || turnKey(observation.turn) === turnKey(turn));
       busy = true;
-      let effectEntered=false;
+      let effectEntered=false, releasedUnsent=false;
       void options.lock.run(async () => {
         if (!options.store.saveStart || !options.store.loadStart) throw new Error("Durable audio-start custody is unavailable.");
         const prior = await options.store.load();
         const started = await options.store.loadStart();
-        if (!usable(turn) || generation !== audioGeneration) return;
         if (prior || started) throw new Error("A prior voice attempt remains in private custody.");
+        if (!usable(turn) || generation !== audioGeneration) {
+          // The locked reads found no custody and no marker write began. This
+          // reservation is definitely unsent, so it must not consume the pledge.
+          attempted.delete(turnKey(turn));
+          if (active && turnKey(active) === turnKey(turn)) active = null;
+          releasedUnsent = true;
+          return;
+        }
         const marker = retained<AudioStart>({ turn, voiceId, audioId: b64url(crypto.getRandomValues(new Uint8Array(16))), startedAt: now() });
         await options.store.saveStart(marker);
         audioStart = marker;
@@ -399,6 +406,8 @@ export function createVoiceController(options: {
       }).catch(() => { stopAudio();completion=null;if(effectEntered)blockAudio();else blockCustody();emit("blocked","Private audio-start custody or playback failed. No fulfillment was sent; do not replay the attempt."); }).finally(() => {
         busy=false;
         if (completion && usable(completion.turn) && !pending && !custodyBlocked) void reportCompletion();
+        // A fresh observation may have arrived while this unsent work was busy.
+        else if (releasedUnsent && armedVoice) start(armedVoice);
       });
       return true;
   };
