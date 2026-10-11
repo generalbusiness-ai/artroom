@@ -4,15 +4,25 @@ Planner, 11 October 2026, 14:10 Eastern. Successor to plan 024. Direction
 from Hugh, recorded in planner request `36372c32`: record the positioning,
 re-order the video, and add the rules requirements for the concurrent-edit
 story. Hugh records the video himself with voice-over and rehearses on
-Sunday 12 October; the practice script (builder request `f77085ed`, due
+Monday 12 October; the practice script (builder request `f77085ed`, due
 tonight) is the shot list he rehearses from.
 
-Two assumptions, stated because the request and the morning's direction
-differ. The freeze is Monday 13 October, as Hugh said at 08:15 (plan 028);
-the request says Sunday 12. The lead phrase below is the claim of the
-video and the README; plan 028's sentence ("a framework for building
-collaborative applications for people and agents, on an event-sourced
-actor model") is the description that follows it. Hugh may change either.
+Dates. Today, 11 October 2026, is a Sunday. The freeze is Monday 12
+October at 23:00 Eastern: Hugh's "Monday" (08:15) and the request's
+"2026-10-12" are the same day. Plan 028 named the weekdays wrong and its
+"Monday 13 October" means this Monday. The recording is Tuesday 13
+October and the submission closes Wednesday 14 October at 23:59 Pacific.
+
+One assumption: the lead phrase below is the claim of the video and the
+README, and plan 028's sentence ("a framework for building collaborative
+applications for people and agents, on an event-sourced actor model") is
+the description that follows it. Hugh may change it.
+
+Estimates decide what is live in the video, never what is built. Hugh's
+standing direction is that schedule estimates do not constrain
+functionality: every step below keeps its owner and its request, and the
+complete work proceeds with review as progress is made, after the
+submission where it does not fit before the freeze.
 
 ## Positioning
 
@@ -109,13 +119,15 @@ says so.
 - Witness: a lane scenario in which a report outside its concern's paths
   is refused `path-outside-concern` and the same report inside them is
   accepted; the gate passes; the checker's full review.
-- Fallback: if the builder's estimate does not fit before the freeze,
-  the beat becomes one narrated line over the existing refusal shot
-  (shot 10 of the 7 October script, the change to the rules extent
-  refused by name).
+- Fallback, for the video only: if the builder's estimate does not fit
+  before the freeze, the beat becomes one narrated line over the existing
+  refusal shot (shot 10 of the 7 October script, the change to the rules
+  extent refused by name). The guard itself is built in full regardless,
+  under the same request, with its witness, gate and full review, after
+  the docs head and after the submission if need be.
 - Estimate: the builder states it against the freeze; the planner expects
   it not to fit beside the rename and docs heads, and plans the narrated
-  line.
+  line for the video.
 
 ## Order of the builder's work, and nothing beside it
 
@@ -124,8 +136,9 @@ says so.
 3. Step 3, the stale-base rehearsal shot, with its observed run.
 4. The component rename head (plan 028 step 2).
 5. The documentation head (plan 028 step 3), carrying the positioning.
-6. Step 1, the concern path guard, only if its estimate fits before
-   Monday; otherwise the narrated line.
+6. Step 1, the concern path guard: live in the video only if its
+   estimate fits before the freeze; built in full either way, after the
+   docs head.
 7. Redeploy every host, rehearse the 26 (now 27) shots, publish the six
    packages as `dap-*`.
 8. The fork cost measurement (plan 029 item 0) only in an idle hour.
@@ -138,14 +151,60 @@ not a full one.
 
 | Date (Eastern) | Gate | Owner |
 |---|---|---|
-| Sat 11 Oct, 22:00 | Practice script on main | Builder |
-| Sun 12 Oct | Rehearsal day: Hugh runs every part from the practice script on the deployed hosts; the stale-base shot observed; the rename head reviewed | Hugh, builder, checker |
-| Mon 13 Oct | Freeze: docs head landed, hosts redeployed from the renamed main, packages published; recording | All |
-| Tue 14 Oct | Submission by 23:59 Pacific | Hugh |
+| Sun 11 Oct, 22:00 | Practice script on main | Builder |
+| Mon 12 Oct | Rehearsal day: Hugh runs every part from the practice script on the deployed hosts; the stale-base shot observed; the rename head reviewed and landed; the docs head reviewed | Hugh, builder, checker |
+| Mon 12 Oct, 23:00 | Freeze: docs head landed, hosts redeployed from the renamed main, packages published | All |
+| Tue 13 Oct | Recording from the frozen main | Hugh |
+| Wed 14 Oct | Submission by 23:59 Pacific | Hugh |
 
 If a gate slips by more than half a day, the next one moves down a level:
 the concurrency beat to narration; the docs head to the product-name-only
 rename; the jam to the procedural page as it is.
+
+## The words
+
+Direction from Hugh, recorded in planner request `1efcbdc0`: the demo's
+words follow the platform's own split, and the plain words are shared
+across the three applications on purpose. The model needs about
+twenty-five exact terms; the demo does not. The rule, applied to every
+caption, page label and narrated line:
+
+1. If the word names a thing the application owns, use the application's
+   word. The repository says issue, pull request, assign, merge, branch,
+   clone. The Counter says turn, count, next. The jam says theme,
+   instrument, solo, bar.
+2. If the word names something the room does to that thing, use the one
+   shared plain word, the same in all three segments: a promise (offered,
+   taken, kept), working on it with a time limit, allowed to, refused
+   because (the plain reason, never the guard's name), the rules, the
+   record, the room.
+3. If the word names a rule, say which rule.
+
+The sameness must be seen, not asserted: "Paul promised issue #1", "the
+synth agent promised the next bar", "device B promised the next count".
+
+Glossary, record word then surface word:
+
+| Record | Surface |
+|---|---|
+| scope, entry, act | the room, a step, an action |
+| commitment: offered, accepted, fulfilled | a promise: offered, taken, kept |
+| hold | working on it, with a time limit |
+| plan, concern | the split, a part |
+| report, accept-report | handed in, accepted |
+| manifest | a version of the change |
+| integration commit | the combined commit |
+| extent | an area of the repository |
+| rules scope, controller | the rules, the person who owns them |
+| destination | the repository (the role a repository plays for a room; a Counter or jam room has one too) |
+| register, directory, membership, inbox | not said |
+| grant | allowed to |
+| guard failed with reason x | refused, because x, in plain words |
+| reservation, receipt, first head | not said; "published" and "checked" |
+
+Four words stay as they are because they carry the claim: room, record,
+rules, refused. The practice script carries this section as its glossary,
+and every line in it passes the three-part test.
 
 ## What changes in the shot list
 

@@ -99,7 +99,7 @@ Mapping of the `hold@1` records to host operations:
 
 | `hold@1` kind | On the hosting's own Git service | On GitHub |
 |---|---|---|
-| `fork` | `repository.fork(<destination name>-h<hold id>-<attempt>, {defaultBranchOnly: true, readOnly: false})`; the outcome records `{host, namespace, name, id}` and the time `info` reported the status left `forking` | A repository fork by the App into the organization, named the same way, or, where the installation lacks fork rights, a branch `hold/<hold id>` on the destination's repository with an installation token restricted to contents write on that one repository: the stated fallback, recorded as such in the outcome |
+| `fork` | `repository.fork(<destination name>-h<hold id>-<attempt>, {defaultBranchOnly: true, readOnly: false})`; the outcome records `{host, namespace, name, id}` and the time `info` reported the status left `forking` | A repository fork by the App into the organization, named the same way. Where the installation cannot fork, the hold gets no workspace at the host: the outcome records `fork: none`, the performer pushes to a repository of their own, and the report names that repository with the commit (item 2 reads it by the App's read of the named repository). No branch on the destination's repository and no token to it, ever: the governing rule has no exception |
 | `mint` | `fork.createToken("write", seconds until the hold ends)`; the outcome records the handle and the end the service reported, never the token; plaintext to the hold's custody, given once to the holder's session | An installation token restricted to the fork's ID with contents write; GitHub fixes one hour, so a hold longer than an hour gets a new mint at each epoch, recorded as a new `mint` attempt |
 | `head` | `fork.info()` and `log` of its default branch | The fork's default branch head by the App |
 | `revoke` | `fork.revokeToken(plaintext)` at hold end or epoch change; unconfirmed revocation leaves the token's custody and a handle, as creation does today | Installation tokens expire; the record notes the end |
@@ -113,10 +113,20 @@ next attempt number, and the earlier name is owed a deletion, swept by a
 timed rule in the destination that retries owed deletions.
 
 Events: the forked event confirms creation when the creation answer was
-lost. The push event carries no pusher identity, so the fork is the
-identity of the pusher: a push to fork F is a push by F's holder in F's
-epoch, and the destination records it as such. Nothing is derived from a
-push event that the fork's own `log` cannot confirm.
+lost. The push event carries no pusher identity. The fork is therefore
+evidence of authorized custody, not proof of who pushed: a push to fork F
+is recorded as "a push under hold H's custody in epoch E", and the record
+never says "pushed by the holder". Trust assumptions, recorded here and in
+the outcome entries: the host restricts writes to a fork to the holders
+of tokens scoped to it; the destination gives the token's plaintext once,
+to the session of the key that took the hold; a push by anyone else means
+the token left that session, which the record cannot distinguish from
+the holder's own push. Nothing is derived from a push event that the
+fork's own `log` cannot confirm. Witness for the boundary: a scenario in
+which a push to a fork whose hold has ended, or whose epoch has passed,
+opens no report and leaves the hold's record unchanged, and a push within
+the hold is recorded under custody wording; the independent reader
+replays both.
 
 Builder requests to file, after the submission:
 
@@ -203,10 +213,10 @@ in the staging fork.
 | 3. Staging fork | | 3a |
 | 4. Repository per instance | | after 1 to 3 |
 
-The freeze is Monday 13 October by Hugh's direction of 08:15 today (plan
-028); the request of 12:50 says Sunday 12 October. Nothing in this plan
-but the measurement is before either date, so the difference does not
-change this plan.
+The freeze is Monday 12 October 2026 at 23:00 Eastern. Today, 11 October,
+is a Sunday; plan 028 and the first text of this plan named the weekday
+wrong. Hugh's "Monday" and the request's "2026-10-12" are the same day.
+Nothing in this plan but the measurement is before it.
 
 ## Order
 
