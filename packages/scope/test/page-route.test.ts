@@ -12,7 +12,7 @@ test("the Worker serves the page at /page/: its HTML and script under a same-ori
   expect([html.status, html.headers.get("content-type"), await html.text()]).toEqual([200, "text/html; charset=utf-8", PAGE_HTML]);
   expect(PAGE_HTML).toContain('<script type="module" src="page.js"></script>');
   const policy = html.headers.get("content-security-policy") ?? "";
-  expect(policy.split("; ")).toEqual(expect.arrayContaining(["default-src 'none'", "script-src 'self'", "connect-src 'self'", "frame-ancestors 'none'"]));
+  expect(policy.split("; ")).toEqual(expect.arrayContaining(["default-src 'none'", "script-src 'self'", "connect-src 'self'", "font-src 'self'", "frame-ancestors 'none'"]));
   expect(policy).not.toContain("unsafe-eval");
   expect(policy).not.toMatch(/script-src[^;]*unsafe-inline/);
 

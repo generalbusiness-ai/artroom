@@ -7,12 +7,13 @@ import type { Summary } from "@generalbusiness/artroom-contract";
 import type { ObservationState } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { mountCountingStage } from "./app.ts";
+import { stageView, type StagePresentation } from "./view.ts";
 import { nativeGateway, type CommandStore, type StageGateway } from "./client.ts";
 import type { CountingView } from "./model.ts";
 import type { ActorIdentity, AudioStart, PendingReport, PreparedEnvelope } from "./voice-controller.ts";
 class Element {
   children:Element[]=[];dataset:Record<string,string>={};hidden=false;disabled=false;className="";textContent="";value="";onclick?:()=>void;onchange?:()=>void;
-  classList={toggle:()=>{}};
+  classes=new Set<string>();classList={toggle:(name:string,on:boolean)=>{if(on)this.classes.add(name);else this.classes.delete(name);}};
   setAttribute(){} append(...elements:Element[]){this.children.push(...elements);} replaceChildren(...elements:Element[]){this.children=elements;}
   contains(element:Element):boolean{return this===element||this.children.some(child=>child.contains(element));}
   querySelectorAll(selector:string):Element[]{return this.children.flatMap(child=>[...(selector==="[data-focus-key]"&&child.dataset["focusKey"]?[child]:[]),...child.querySelectorAll(selector)]);}
@@ -108,6 +109,29 @@ test("Explicit Resume command fences active playback before dispatch and display
     elements(root).find(e=>e.textContent==="Arm voice")!.onclick!();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(plays,1);assert.equal(playedVoice,"alternate");assert.equal(cancelled,false);
     commandPending=true;app.repaint();const resume=elements(root).find(e=>e.textContent==="Resume original command")!;assert.equal(resume.hidden,false);resume.onclick!();
     await new Promise<void>(resolve=>setImmediate(resolve));
-    assert.equal(resumes,1);assert.deepEqual([prepares,posts,plays],[0,0,1]);assert.equal(elements(root).some(e=>e.className==="notice"&&e.textContent===refusal),true);
+    assert.equal(resumes,1);assert.deepEqual([prepares,posts,plays],[0,0,1]);assert.equal(elements(root).some(e=>e.className==="notice"&&e.textContent===refusal&&e.classes.has("refused")),true);
   }finally{app.dispose();Object.assign(globalThis,{document:oldDocument,HTMLElement:oldHTMLElement,HTMLButtonElement:oldButton});}
+});
+
+// Fake DOM and already classified presentation inputs: no native receipt or audio proof.
+test("Counter acknowledgement requires a recorded local effect and keeps playback, unknown and refusal messages",()=>{
+  const oldDocument=globalThis.document,oldHTMLElement=globalThis.HTMLElement,oldButton=globalThis.HTMLButtonElement;
+  Object.assign(globalThis,{document:{createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null},HTMLElement:Element,HTMLButtonElement:Element});
+  const root=new Element(),noop=()=>{},ui=stageView(root as unknown as HTMLElement,{control:noop,arm:noop,disarm:noop,check:noop,checkReport:noop,resumeCommand:noop,resumeReport:noop,correct:noop,connect:noop,disconnect:noop},{voices:()=>[],play:()=>noop});
+  try{
+    const base:StagePresentation={fresh:true,connection:"Connected"};
+    const acknowledgement=()=>elements(root).find(e=>e.className==="acknowledgement")!.textContent;
+    ui.render(base);assert.equal(acknowledgement(),"");
+    ui.render({...base,voice:{phase:"recorded",message:"Verified report",armed:false}});assert.equal(acknowledgement(),"dap.");
+    ui.render({...base,command:"dap.",commandOutcome:"recorded"});assert.equal(acknowledgement(),"dap.");
+    ui.render({...base,command:"dap.",commandOutcome:"recorded",voice:{phase:"speaking",message:"Playing",armed:true}});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.textContent,"Playing on this device");
+    ui.render({...base,command:"dap.",commandOutcome:"recorded",commandUnknown:true});assert.equal(acknowledgement(),"");
+    ui.render({...base,fresh:false,command:"dap.",commandOutcome:"recorded",voice:{phase:"idle",message:"Awaiting the scope",armed:false}});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.hidden,false);assert.equal(elements(root).find(e=>e.className==="notice")!.textContent,"Awaiting the scope");
+    ui.render({...base,command:"dap.",commandOutcome:"recorded",voice:{phase:"refused",message:"Refused",armed:false,pending:"refused"}});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.classes.has("refused"),true);
+    ui.render({...base,voice:{phase:"unknown",message:"Check",armed:false,pending:"unknown"}});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.textContent,"Report unknown. Check the original request.");
+    ui.render({...base,voice:{phase:"refused",message:"Refused",armed:false,pending:"refused"}});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.textContent,"Report needs a current successor proposal.");
+    ui.render({...base,command:"Same message",commandOutcome:"refused"});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.classes.has("refused"),true);
+    for(const commandOutcome of ["unknown","blocked"] as const){ui.render({...base,command:"Same message",commandOutcome});assert.equal(acknowledgement(),"");assert.equal(elements(root).find(e=>e.className==="notice")!.classes.has("refused"),false);}
+    ui.render({...base,command:"The original command remains unresolved.",voice:{phase:"recorded",message:"Verified report",armed:false}});assert.equal(acknowledgement(),"");
+  }finally{Object.assign(globalThis,{document:oldDocument,HTMLElement:oldHTMLElement,HTMLButtonElement:oldButton});}
 });

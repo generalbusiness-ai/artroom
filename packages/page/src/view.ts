@@ -57,7 +57,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
     const values = all.filter((row) => (filter === "all" || (filter === "open" ? !["closed", "published", "merged", "cancelled"].includes(row.state ?? "") : kind === "issue" ? row.state === "closed" : ["published", "merged"].includes(row.state ?? ""))) && `${row.title ?? ""} ${row.number ?? ""}`.toLowerCase().includes(query.value.toLowerCase()));
     for (const button of filters.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.getAttribute("data-filter") === filter));
     content.replaceChildren(values.length ? h("ul", { class: `work-list ${kind === "change" ? "change-list" : ""}` }, values.map((row) => h("li", { class: "work-row" },
-      h("span", { class: kind === "issue" && row.state !== "closed" ? "issue-ring" : "work-icon", "aria-hidden": "true" }, kind === "issue" ? (row.state === "closed" ? "✓" : "") : "⑂"),
+      h("span", { class: `entry-marker${["closed", "published", "merged"].includes(row.state ?? "") ? " recorded" : ""}`, "aria-hidden": "true" }),
       h("div", { class: "work-copy" }, h("a", { class: "work-title", href: `#/${kind}/${row.scope}` }, h("span", {}, or(row.title, "Untitled")), h("span", { class: "work-meta" }, `#${or(row.number, "?")}${row.draft ? " · Draft" : ""}`))),
       h("div", { class: "row-end" }, state(row.state === "closed" ? "Closed" : row.state === "published" || row.state === "merged" ? "Merged" : or(row.state, "Unknown"))),
     ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? `No ${label.toLowerCase()} yet.` : "No matches.")));
@@ -213,7 +213,7 @@ export function answerText(acted: Acted): string[] {
   return [known, ...recovery, ...(acted.observation === null ? [] : [`Observation unknown: ${acted.observation} Inspect artroom log ${acted.scope}${a.answer === "accepted" ? ` and artroom show ${a.receipt.fact.at.scope}:${a.receipt.fact.seq}` : ""} before submitting another act; do not resubmit to recover observation.`])];
 }
 export function answerLine(acted: Acted): HTMLElement {
-  return h("div", { class: "answer", role: "status" }, h("p", {}, `Known answer for ${acted.kind} on ${acted.scope}${acted.on === null ? "" : `, item ${acted.on}`}.`), answerText(acted).map((line) => h("p", {}, line)));
+  return h("div", { class: "answer", role: "status" }, h("p", {}, `Known answer for ${acted.kind} on ${acted.scope}${acted.on === null ? "" : `, item ${acted.on}`}.`), answerText(acted).map((line) => h("p", {}, line)), acted.answer.answer === "accepted" && acted.observation === null ? h("p", { class: "dap-ack" }, "dap.") : null);
 }
 /** The actual failure screen keeps known results visible when a view reload fails. */
 export function failureScreen(error: unknown, known: readonly Acted[] = []): HTMLElement {

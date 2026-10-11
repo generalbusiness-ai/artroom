@@ -288,7 +288,7 @@ function shots(stage: Stage): Shot[] {
     {
       title: "The room's page", scene: "the story page", who: "member",
       typed: () => ["GET", `${service}/page/`],
-      expect: { code: 0, lines: () => page("Artroom", null) },
+      expect: { code: 0, lines: () => page("dap", null) },
     },
   ];
   if (stage.manifest) {
