@@ -172,6 +172,15 @@ optional skips, and the chained Node checks (8 repository cases and 37
 Counting browser cases). These checks establish bootstrap behavior, with
 the witness limitations stated above.
 
+The selected-cohort expiry correction was checked on 11 October 2026.
+CLI compilation and both existing custody cases passed for application and
+Counting, using labelled memory stores and a fake configured service. The
+normal Page build passed and reproduced the unchanged generated module.
+An initial tool-hash guard typo stopped before any build; that outcome is
+retained. The native application case was unchanged and was not repeated.
+The corrected Counter parent remains intact. A new ordinary gate and
+independent Source review are still required for this successor.
+
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
 membership, the rules scope and the destination are created and
