@@ -55,11 +55,13 @@ test("Explicit Resume command fences active playback before dispatch and display
   const scope=ref("lane"),membership=ref("membership"),member={membership,member:"@ada" as const},identity:ActorIdentity={origin:"https://fake-resume.test",deployment:"FAKE",scope,membership,member,definition:COUNTING_DEFINITION,publicKey:keyIdOfSecret(secret)};
   let audioStart:AudioStart|null=null;
   let publish:((state:ObservationState<Summary>,view?:CountingView)=>void)|undefined,commandPending=false,cancelled=false,resumes=0,prepares=0,posts=0,plays=0,end:(()=>void)|undefined;
-  const observation={refresh(){},cancel(){},done:Promise.resolve()};
+  let refreshes=0,settleRefresh:(()=>void)|undefined,releaseRefresh:(()=>void)|undefined;
+  const observation={refresh(){refreshes++;releaseRefresh=settleRefresh;},cancel(){},done:Promise.resolve()};
   const refusal="guard-failed: running-state — the native service refused Pause";
   const gateway={observe(emit:typeof publish){publish=emit;return observation;},prepare:async()=>{prepares++;throw new Error("stale playback must not prepare");},submit:async()=>{posts++;return{status:"unknown" as const};},reconcile:async()=>({status:"unknown" as const}),command:async()=>({status:"unknown" as const}),checkCommand:async()=>null,
     resumeCommand:async()=>{assert.equal(cancelled,true,"old playback is fenced before the command gateway runs");resumes++;commandPending=false;end?.();return{status:"refused" as const,reason:refusal};},commandResumeReady:()=>commandPending,pendingCommand:()=>commandPending?"pause":null,restoreCommand:async()=>{},dispose(){}} as unknown as StageGateway;
-  const speech={voices:()=>[{id:"fake",name:"Fake"}],play:(_text:string,_voice:string,callbacks:{end():void;error():void})=>{plays++;end=callbacks.end;return()=>{cancelled=true;callbacks.end();callbacks.error();};}};
+  let playedVoice:string|undefined;
+  const speech={voices:()=>[{id:"fake",name:"Fake"},{id:"alternate",name:"Alternate"}],play:(_text:string,voiceId:string,callbacks:{end():void;error():void})=>{plays++;playedVoice=voiceId;end=callbacks.end;return()=>{cancelled=true;callbacks.end();callbacks.error();};}};
   const root=new Element(),app=mountCountingStage(root as unknown as HTMLElement,{speech,connect(){},now:()=>100});
   try{
     await app.attach({identity,speech,gateway,store:{load:async()=>null,loadStart:async()=>audioStart,saveStart:async marker=>{audioStart=structuredClone(marker);},save:async()=>{throw new Error("no new report expected");},clear:async()=>{}},lock:{run:async work=>work()},current:()=>true});
@@ -91,8 +93,19 @@ test("Explicit Resume command fences active playback before dispatch and display
     }
     // Truly empty command custody still reaches the existing playback/refusal
     // journey below; malformed originals were not cleared to obtain it.
-    publish!({status:"current",snapshot:{value:summary}} as unknown as ObservationState<Summary>,view);
-    elements(root).find(e=>e.textContent==="Arm voice")!.onclick!();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(plays,1);assert.equal(cancelled,false);
+    const current={status:"current",snapshot:{value:summary}} as unknown as ObservationState<Summary>;
+    publish!(current,view);
+    // A real selector change invalidates local voice freshness even though no
+    // native head changed. Its requested observation stays deferred here.
+    settleRefresh=()=>publish!(current,view);
+    const staleArm=elements(root).find(e=>e.textContent==="Arm voice")!,select=elements(root).find(e=>e.dataset["focusKey"]==="voice")!;
+    select.value="alternate";select.onchange!();
+    assert.equal(elements(root).find(e=>e.textContent==="Arm voice")!.disabled,true,"selection waits for the requested native observation");
+    staleArm.onclick!();await new Promise<void>(resolve=>setImmediate(resolve));
+    assert.deepEqual([plays,prepares,posts],[0,0,0]);assert.equal(audioStart,null,"no speech marker is saved before a fresh native observation");
+    assert.equal(refreshes,1);assert.equal(typeof releaseRefresh,"function");releaseRefresh!();
+    assert.equal(elements(root).find(e=>e.textContent==="Arm voice")!.disabled,false);assert.equal(plays,0,"fresh observation does not automatically Arm");
+    elements(root).find(e=>e.textContent==="Arm voice")!.onclick!();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(plays,1);assert.equal(playedVoice,"alternate");assert.equal(cancelled,false);
     commandPending=true;app.repaint();const resume=elements(root).find(e=>e.textContent==="Resume original command")!;assert.equal(resume.hidden,false);resume.onclick!();
     await new Promise<void>(resolve=>setImmediate(resolve));
     assert.equal(resumes,1);assert.deepEqual([prepares,posts,plays],[0,0,1]);assert.equal(elements(root).some(e=>e.className==="notice"&&e.textContent===refusal),true);
