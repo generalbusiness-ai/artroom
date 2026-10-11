@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import type { Answer } from "@generalbusiness/artroom-contract";
 import type { ChangeView, Room } from "../src/data.ts";
-import { changeCondition, changeScreen, issueScreen, roomScreen, rulesScreen } from "../src/view.ts";
+import { answerLine, changeCondition, changeScreen, issueScreen, roomScreen, rulesScreen } from "../src/view.ts";
 import type { ListState } from "../src/list-context.ts";
 
 // A DOM-construction stand-in, not a browser. It witnesses the facts the view
@@ -168,4 +168,20 @@ test("verified invalid-path source exposes the editor mount independently of pre
   expect(screen.textContent).toContain("Choose a file path inside this room");
   expect(screen.all("details").some(node=>node.attributes["class"]==="source-preview")).toBe(false);
   expect(render(view({manifests:[{...selected,file:{...selected.file,content:null}}]})).all("div").filter(node=>node.attributes["data-action-slot"]==="edit")).toEqual([]);
+});
+
+// The receipt is retained in full; unknown observation and refusal never gain an acknowledgement.
+test("dap acknowledgement requires an accepted receipt and a known observation", () => {
+  vi.stubGlobal("document", document);
+  const receipt = { fact: { at: { scope: "sc_exact", inc: "in_exact" }, seq: 91, hash: "sha256:exact" } };
+  const acted = { kind: "comment", scope: "sc_exact", on: 7, observation: null, answer: { answer: "accepted", receipt } } as Parameters<typeof answerLine>[0];
+  const accepted = answerLine(acted) as unknown as Element;
+  for (const fact of ["sc_exact:91", "in_exact", "sha256:exact"]) expect(accepted.textContent).toContain(fact);
+  expect(accepted.all("p").at(-1)?.textContent).toBe("dap.");
+  for (const changed of [
+    { ...acted, observation: "The view could not be read." },
+    { ...acted, answer: { answer: "refused", reason: "guard-failed" } },
+    { ...acted, answer: { answer: "unavailable", reason: "busy" } },
+    { ...acted, answer: { answer: "mismatch", reason: "different-intent" } },
+  ]) expect((answerLine(changed as never) as unknown as Element).all("p").some((p) => p.textContent === "dap.")).toBe(false);
 });
