@@ -53,6 +53,7 @@ October, and the first against a deployment of the current main.
 | 04:25 to 05:17 | Jam: six tarballs pinned by digest on `request/jam-native-integration` (`654e5709`); review `1eee58df0` filed. |
 | 04:51 | Counter defect found during the browser run (changing the voice silently disarmed the stage); repaired at `24d8e71f`, review `fd6a703a1` filed. |
 | 05:34 to 06:30 | Browser walkthrough evidence on main: an issue created, commented and closed; a change proposed with new rules and a file. Two of the wrapper runs stopped early and are recorded as stops, not passes. |
+| 06:53 | Walkthrough finds a UI defect: a review verdict submitted without naming the open review request leaves that request unresolved after merge. Builder filed the fix (`b2eccf8dd`) and owns it. |
 
 ## Where it slowed
 
@@ -67,7 +68,7 @@ producing evidence on main.
 
 | Lane | State at 07:00 | What closes it |
 |---|---|---|
-| Core workroom and UI | On main and deployed; 26-shot rehearsal matched on the isolated host; browser evidence for issue, comment, close and proposal | Checker's evidence review; a GitHub-host rehearsal on the live host once Hugh pins the register |
+| Core workroom and UI | On main and deployed; 26-shot rehearsal matched on the isolated host; browser evidence for issue, comment, close and proposal; one UI defect found (review request left unresolved), fix in progress | Checker's evidence review; the review-binding fix landed; a GitHub-host rehearsal on the live host once Hugh pins the register |
 | Counter | Deployed and provisioned with three agents and a controller; the Arm/voice repair awaits review; no run with speech yet | Review of `24d8e71f`, then the three-device run with distinct voices; recording once macOS allows capture |
 | Jam | Procedural page live; native branch built against the pinned SDK tarballs, unreviewed; model binding checked in documentation only | Review `1eee58df0`; a native deployment only after it, and only if time remains before the freeze |
 
