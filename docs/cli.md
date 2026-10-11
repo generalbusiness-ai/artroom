@@ -67,7 +67,9 @@ and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be founded. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
 register's genesis records both. Only a definitely unsent legacy plan may
-be replaced. An explicitly selected plan remains exact.
+be replaced. A selected application or Counting plan always retains its
+original envelope, version, register and deadline, including when planning
+is repeated.
 
 ```
 Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
@@ -79,13 +81,28 @@ intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
 `plan-mismatch`; a plan whose time is over is refused as `plan-expired`.
-A definitely unsent expired legacy plan may be replaced. Keep a selected
-or attempted plan for recovery: do not create a second install after an
-uncertain answer. An attempted replay sends the original signed request;
-the service may recover its previously accepted genesis even after expiry.
-After founding, the receipt must name the planned register, definition and
-intent. Its acceptance is a service acknowledgement; independent history
-verification remains separate.
+An expired plan that was never attempted sends nothing. A definitely
+unsent legacy plan can be planned again in the same config. A selected
+application or Counting plan cannot: keep that original config directory unchanged and
+use a separate empty `ARTROOM_HOME` directory for a new plan. Use that same
+new directory for every later command, and configure the host's
+`registerScope` with the new plan's ID before installing. Do not copy over
+or delete the original config or keys.
+
+For example, set `ARTROOM_HOME` to a new private directory, then run
+`artroom install --plan <base-url> --cohort <cohort> --host <host>
+--namespace <namespace>`, using `application` or `counting-commitments`
+for `<cohort>`. After configuring the new register ID,
+run `artroom install --planned --cohort <cohort>` with the same
+`ARTROOM_HOME`. This creates separate custody and a new operator key; it
+does not renew or replace the expired original.
+
+An attempted or acknowledged original must instead be reconciled from its
+original directory with `install --planned`. Expiry does not prove that a
+request was never accepted and does not authorize a replacement. After
+founding, the receipt must match the original planned register, definition
+and intent. Its acceptance is a service acknowledgement; independent
+history verification remains separate.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.
