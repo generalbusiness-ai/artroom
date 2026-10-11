@@ -1,0 +1,211 @@
+{
+  "format": "artroom-isolated-rehearsal3bd-deployment-proof-1",
+  "directive": "14c7d3d3df35f2faf0898ceec66da2c45729e828",
+  "source_head": "3bd18314efed78ee757b5b2f9d5bdb3198250c1d",
+  "source_tree": "0be9f4dae4c8f60ee5074275b9e18c7eb77add2a",
+  "url": "https://artroom-rehearsal.inguz.workers.dev",
+  "worker": "artroom-rehearsal",
+  "account_id": "6e953d231f1c9aadffbf59537a82e13a",
+  "actual_deploy": {
+    "original_handle": 90154,
+    "terminal": 0,
+    "initial_version": "a6694a81-193d-4ba9-8921-8e4f057b7958"
+  },
+  "session_secret_put": {
+    "tool_returned_terminal0_directly": true,
+    "no_live_session_handle": true,
+    "subsequent_version": "eaa6457b-5a9b-41d3-89e9-93e3f4e05efd",
+    "fresh_crypto_random_secret_private_PATH": "/private/tmp/artroom-rehearsal3bd-deployment/session.secret",
+    "mode": "0o600",
+    "values_printed": false,
+    "stdin": true
+  },
+  "register_pin": {
+    "original_handle": 40615,
+    "terminal": 0,
+    "current_version": "79b41fbd-f96b-462f-a53a-c42387e2c57d",
+    "percentage": 100,
+    "actual_registerScope": "sc_i3bcdk3gvv4vvcnzarfrydcqxsm5no5vejnvsdpom4daa24mnuua",
+    "local_exact_public_profile": {
+      "registerScope": "sc_i3bcdk3gvv4vvcnzarfrydcqxsm5no5vejnvsdpom4daa24mnuua",
+      "namespace": "artroom-demo",
+      "host": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+      "maxBytes": 8388608,
+      "credentialIdentity": "adapter-attempt"
+    },
+    "public_input_sha256": "b33822c0d393080804173ea908d8c4af037375f4f581a3d92600150b21218467",
+    "native_original_notAfter": "2026-10-11T07:56:11Z",
+    "d026_samePTY72648_resume_signalled_after_metadata_confirmation": true,
+    "provider_plaintext_remote_readback": "Unavailable forsecretbinding; notclaimed. ExactinputSHA+putsuccess+actualbinding/version checked; nativeclaim/creationremote acceptance remainsrun obligation."
+  },
+  "resource_isolation": {
+    "SCOPES_class": "DeployedScope",
+    "SCOPES_namespace_id": "23afaac62d62446398a8a9411b2dd195",
+    "new_Worker_own_SQLite_namespace": true,
+    "DEPLOYMENT": "artroom-rehearsal-20261011",
+    "ARTIFACTS_namespace": "artroom-demo",
+    "artifact_namespace_shared_supported_by_same3bd": "ExplicitRootinterpretation: existingphysical/logicalnamespace, isolatedfreshregister/uniquerepos, noexistingrepo/Corewrites; hardcodednamespaceguard andexactremote constraints preserveSource.",
+    "own_SESSION_SECRET_and_ARTIFACTS_CONFIG": true,
+    "Core_API_or_settings_secret_Source_calls": false
+  },
+  "config": {
+    "path": "/private/tmp/artroom-rehearsal3bd-deployment/wrangler.json",
+    "sha256": "51f7f09cfccfb6e44bab035358bc4dccc64663a408553b344aa2ad0a86c4806b",
+    "native_main_abs_input": "/Users/hughpyle/play/artroom/packages/scope/src/worker.ts",
+    "source_edits_or_namespace_alias": false,
+    "tool": "existing pinnedWrangler4.147.0 fromscratch",
+    "UIbuild_install_tests_gate": false
+  },
+  "phases": {
+    "deploy": {
+      "exit": 0,
+      "wallSeconds": 4.08,
+      "cpuSeconds": 0.99,
+      "private_log_sha256": "13e481af1b0222fd63e3287aa5e5d8a8eac02803a5a0dd44d810d67adedce2c3"
+    },
+    "session-put": {
+      "exit": 0,
+      "wallSeconds": 1.07,
+      "cpuSeconds": 0.52,
+      "private_log_sha256": "af5e399bb46c73a8778b97b1f00367ae41c0fc07319ec2849fc001c996042a7a"
+    },
+    "artifacts-pin": {
+      "exit": 0,
+      "wallSeconds": 1.12,
+      "cpuSeconds": 0.53,
+      "private_log_sha256": "66a44cb52bba5c846f9649d25354823d06c3e3815a228f0a46ecbc930d784fc7"
+    }
+  },
+  "readback": {
+    "Worker": "artroom-rehearsal",
+    "version": "79b41fbd-f96b-462f-a53a-c42387e2c57d",
+    "percentage": 100,
+    "bindings": [
+      {
+        "name": "ARTIFACTS",
+        "type": "artifacts",
+        "namespace": "artroom-demo"
+      },
+      {
+        "name": "ARTIFACTS_CONFIG",
+        "type": "secret_text"
+      },
+      {
+        "name": "DEPLOYMENT",
+        "type": "plain_text",
+        "text": "artroom-rehearsal-20261011"
+      },
+      {
+        "name": "SCOPES",
+        "type": "durable_object_namespace",
+        "class_name": "DeployedScope",
+        "namespace_id": "23afaac62d62446398a8a9411b2dd195"
+      },
+      {
+        "name": "SESSION_SECRET",
+        "type": "secret_text"
+      }
+    ],
+    "public_input_profile": {
+      "config": {
+        "registerScope": "sc_i3bcdk3gvv4vvcnzarfrydcqxsm5no5vejnvsdpom4daa24mnuua",
+        "namespace": "artroom-demo",
+        "host": "6e953d231f1c9aadffbf59537a82e13a.artifacts.cloudflare.net",
+        "maxBytes": 8388608,
+        "credentialIdentity": "adapter-attempt"
+      },
+      "input_sha256": "b33822c0d393080804173ea908d8c4af037375f4f581a3d92600150b21218467",
+      "Worker": "artroom-rehearsal",
+      "Core_mutation": false,
+      "notAfter": "2026-10-11T07:56:11Z",
+      "provider_storage": "stdin secret put asRoot/d026selected; serverreceivesstring, valuesnotreturnedbysecretmetadataAPI; exactlocalpublicinput+nativeclaimlaterverify semantics"
+    },
+    "remote_secret_value_readback": "Unavailable byproviderdesign; exactlocalinputSHA+successfulput+bindingmetadata, nativeclaim laterchecksrealhostremote",
+    "Core_calls_or_mutations": false
+  },
+  "public_whitelist": [
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/wrangler.json",
+      "bytes": 679,
+      "sha256": "51f7f09cfccfb6e44bab035358bc4dccc64663a408553b344aa2ad0a86c4806b"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/before.json",
+      "bytes": 641,
+      "sha256": "39944e939b5251a1ab95c1217cdc2c240a1f57407b51c67abd77327714e89d5b"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/public-artifacts-profile.json",
+      "bytes": 638,
+      "sha256": "345e6a2e03e9187360ed2b5cea817854b553a88a1f643bc4d62852302c662dea"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/public-pin-readback.json",
+      "bytes": 1546,
+      "sha256": "2155f15046fb69329fca4aa90761418f981644f7cf080a87a936aecc3b3de7b9"
+    }
+  ],
+  "private_provider_records": [
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/name-check.log",
+      "bytes": 491,
+      "sha256": "10b64159434b982f3d2f5bd8ac45e32f97b33b6ce77a33313d63cea8cdc3b619"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/deploy.log",
+      "bytes": 818,
+      "sha256": "13e481af1b0222fd63e3287aa5e5d8a8eac02803a5a0dd44d810d67adedce2c3"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/deploy.time",
+      "bytes": 29,
+      "sha256": "9b555f56e0c96f1c867a3fbea588ea55f5a1f79da63918c2a6300e523364ed3a"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/session-put.log",
+      "bytes": 299,
+      "sha256": "af5e399bb46c73a8778b97b1f00367ae41c0fc07319ec2849fc001c996042a7a"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/session-put.time",
+      "bytes": 29,
+      "sha256": "7c46f7f9bf393d23194992b8aeebcc8b8986f8a64aed97f0e5bcae49582b63f3"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/artifacts-pin.log",
+      "bytes": 301,
+      "sha256": "66a44cb52bba5c846f9649d25354823d06c3e3815a228f0a46ecbc930d784fc7"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/artifacts-pin.time",
+      "bytes": 29,
+      "sha256": "38c5e8afd6e7447afd9bf35a5dc566a0f8648aa98c17aaddbc4b17128ebbe80e"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/deployment-readback.json",
+      "bytes": 865,
+      "sha256": "94c0d016b9752dbbc1c03f24e8a8db3470c8b9e714f591f4c954aa8a6abf060d"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/version-readback.json",
+      "bytes": 2334,
+      "sha256": "b00ec3abc2fb6b3fa4644e22280931cc5386d068375b282b9902bba1e8bc7819"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/pinned-deployments.json",
+      "bytes": 1266,
+      "sha256": "b1b6c39bb7bac74048ad4331e55a25157e62b5e0e2ff8b9c92c26e8c9002ee95"
+    },
+    {
+      "path": "/private/tmp/artroom-rehearsal3bd-deployment/pinned-version-readback.json",
+      "bytes": 2417,
+      "sha256": "71c15899c081cb7651fb7065477934c3040b9f6145643dcc173ac2f2c6a65608"
+    }
+  ],
+  "qualifications": [
+    "NewWorkerName10007absence beforedeploy; notglobalreservation.",
+    "Worker/DB/settings isolated. Artifact service supportednamespace shared; actualnewrepos andnativeR3claim mustestablish exactremote andnoCoreinterference.",
+    "No 26-shot/nativeclaim/replay/browser/audio acceptance claimed; d026 owns the actualinteractive original runner.",
+    "No Core setting or secret read/write and no rawprovidersecret output. Newserviceauthuses itsnewprivatekey; Core credentialsnotcopied."
+  ]
+}

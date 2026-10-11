@@ -1,0 +1,366 @@
+{
+  "classification": "PUBLIC bounded actual rehearsal result",
+  "request": "14c7d3d3df35f2faf0898ceec66da2c45729e828; existing full Core 03f0/a118",
+  "source": {
+    "root": "/Users/hughpyle/play/artroom",
+    "head": "3bd18314efed78ee757b5b2f9d5bdb3198250c1d",
+    "tree": "0be9f4dae4c8f60ee5074275b9e18c7eb77add2a",
+    "binding": "Currentlandedmain and deploymentSource3bd; scripts/demo-run,rehearse,capture-context/artifacts-wiring byteequal earlier04d6prep"
+  },
+  "originalSession": 72648,
+  "terminalChunk": "c6f364",
+  "exit": 0,
+  "service": "https://artroom-rehearsal.inguz.workers.dev",
+  "deploymentVersionBeforePlan": "eaa6457b-5a9b-41d3-89e9-93e3f4e05efd",
+  "activePinnedVersion": "79b41fbd-f96b-462f-a53a-c42387e2c57d",
+  "pinReadback": {
+    "path": "/private/tmp/artroom-rehearsal3bd-deployment/public-pin-readback.json",
+    "size": 1546,
+    "sha256": "2155f15046fb69329fca4aa90761418f981644f7cf080a87a936aecc3b3de7b9"
+  },
+  "plannedRegister": "sc_i3bcdk3gvv4vvcnzarfrydcqxsm5no5vejnvsdpom4daa24mnuua",
+  "originalNotAfter": "2026-10-11T07:56:11Z",
+  "host": "artifacts",
+  "namespace": "artroom-demo",
+  "shotCounts": {
+    "total": 26,
+    "matching": 26,
+    "mismatch": 0,
+    "notRun": 0,
+    "expectedRefusals": [
+      17,
+      20
+    ]
+  },
+  "shots": [
+    {
+      "shot": 1,
+      "title": "Plan the install",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:42:11.551Z",
+      "seconds": 226.8
+    },
+    {
+      "shot": 2,
+      "title": "Install as planned",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:45:58.362Z",
+      "seconds": 0.6
+    },
+    {
+      "shot": 3,
+      "title": "Claim the room",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:45:58.931Z",
+      "seconds": 6.7
+    },
+    {
+      "shot": 4,
+      "title": "Publish the rules",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:05.602Z",
+      "seconds": 0.3
+    },
+    {
+      "shot": 5,
+      "title": "Activate the issue definition",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:05.853Z",
+      "seconds": 0.3
+    },
+    {
+      "shot": 6,
+      "title": "Activate the change definition",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:06.193Z",
+      "seconds": 0.4
+    },
+    {
+      "shot": 7,
+      "title": "Invite a member",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:06.635Z",
+      "seconds": 0.3
+    },
+    {
+      "shot": 8,
+      "title": "The member joins",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:06.889Z",
+      "seconds": 1.6
+    },
+    {
+      "shot": 9,
+      "title": "Invite a maintainer",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:08.457Z",
+      "seconds": 0.3
+    },
+    {
+      "shot": 10,
+      "title": "The maintainer joins",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:08.714Z",
+      "seconds": 1.4
+    },
+    {
+      "shot": 11,
+      "title": "Clone by the room's token",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:10.094Z",
+      "seconds": 1.4
+    },
+    {
+      "shot": 12,
+      "title": "The clone's history",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:11.493Z",
+      "seconds": 0.0
+    },
+    {
+      "shot": 13,
+      "title": "Open an issue",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:11.507Z",
+      "seconds": 1.7
+    },
+    {
+      "shot": 14,
+      "title": "Comment on it",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:13.241Z",
+      "seconds": 0.6
+    },
+    {
+      "shot": 15,
+      "title": "Assign it",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:13.815Z",
+      "seconds": 0.6
+    },
+    {
+      "shot": 16,
+      "title": "Edit a page in an open folder, closing the issue",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:14.366Z",
+      "seconds": 8.4
+    },
+    {
+      "shot": 17,
+      "title": "Edit in a controlled folder: refused by name",
+      "exit": 1,
+      "matches": true,
+      "at": "2026-10-11T07:46:22.743Z",
+      "seconds": 6.0
+    },
+    {
+      "shot": 18,
+      "title": "The rules scope's controller approves",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:28.702Z",
+      "seconds": 0.4
+    },
+    {
+      "shot": 19,
+      "title": "Merge: it publishes",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:29.089Z",
+      "seconds": 4.7
+    },
+    {
+      "shot": 20,
+      "title": "The bad path: refused by name",
+      "exit": 1,
+      "matches": true,
+      "at": "2026-10-11T07:46:33.774Z",
+      "seconds": 6.1
+    },
+    {
+      "shot": 21,
+      "title": "The issues: closed by the merge",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:39.886Z",
+      "seconds": 0.2
+    },
+    {
+      "shot": 22,
+      "title": "The verifier, every scope",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:46:40.091Z",
+      "seconds": 44.3
+    },
+    {
+      "shot": 23,
+      "title": "The site's front page",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:47:24.424Z",
+      "seconds": 1.1
+    },
+    {
+      "shot": 24,
+      "title": "The page published by the edit",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:47:25.498Z",
+      "seconds": 0.9
+    },
+    {
+      "shot": 25,
+      "title": "The page published after the approval",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:47:26.418Z",
+      "seconds": 1.1
+    },
+    {
+      "shot": 26,
+      "title": "The room's page",
+      "exit": 0,
+      "matches": true,
+      "at": "2026-10-11T07:47:27.545Z",
+      "seconds": 0.0
+    }
+  ],
+  "nativeVerification": [
+    {
+      "kind": "register",
+      "scope": "sc_i3bcdk3gvv4vvcnzarfrydcqxsm5no5vejnvsdpom4daa24mnuua",
+      "entry": 3,
+      "result": "consistent"
+    },
+    {
+      "kind": "directory",
+      "scope": "sc_ojanjqzynu762l6g22nwjts3s3rmzgoi6frdqmuzeomicfl4yalq",
+      "entry": 23,
+      "result": "consistent"
+    },
+    {
+      "kind": "membership",
+      "scope": "sc_ljfwigncjwn7pvhol2ned7azylvym7q4a5x4olxu7j2qednt6wja",
+      "entry": 10,
+      "result": "consistent"
+    },
+    {
+      "kind": "rules",
+      "scope": "sc_ru7vnejlwcmd7ooplvabh2q2jdgfryr6fdpofd24b4anivgnzoba",
+      "entry": 10,
+      "result": "consistent"
+    },
+    {
+      "kind": "destination",
+      "scope": "sc_hkb23mxnvbz6lxflgy7lnvefn3f5qw322mockbl2pfp2ond6sx3a",
+      "entry": 35,
+      "result": "consistent"
+    },
+    {
+      "kind": "lane",
+      "scope": "sc_mnqmqeaibkoo3htq2b4mk2a75gk4svn45is7nx7r7h7zf5kehuaa",
+      "entry": 5,
+      "result": "consistent"
+    },
+    {
+      "kind": "lane",
+      "scope": "sc_3c6qz6smvyweqzxmh6ecenc747drmzzzc7kunf6cryvgclfqlbha",
+      "entry": 12,
+      "result": "consistent"
+    },
+    {
+      "kind": "lane",
+      "scope": "sc_stsvibprlta4m3qujhwctg2lw52pscta333cy4gb4n3r6bbqjuaq",
+      "entry": 13,
+      "result": "consistent"
+    },
+    {
+      "kind": "lane",
+      "scope": "sc_nqq73e7wkatw27xhjichksuzdw2424oaessjv2hbmgpz5j44z34q",
+      "entry": 8,
+      "result": "consistent"
+    },
+    {
+      "kind": "inbox",
+      "scope": "sc_qmntzcr6zvjdf24ztfsj3gpizodh2crw26v4w6puxebsfr652lha",
+      "entry": 1,
+      "result": "consistent"
+    },
+    {
+      "kind": "inbox",
+      "scope": "sc_a7yftqa3g2bdau4cwt5qtua4e6frs4bnlxfgan5yb3sjjia6wvxq",
+      "entry": 1,
+      "result": "consistent"
+    },
+    {
+      "kind": "inbox",
+      "scope": "sc_efgimhf3bqw4z46jpfiomxaxvdmbmgineokcvcli6nhufzjspqla",
+      "entry": 1,
+      "result": "consistent"
+    }
+  ],
+  "verifierFinalLine": "All consistent: 12 scopes.",
+  "timing": {
+    "wallSeconds": 317.48,
+    "localUserSeconds": 4.83,
+    "localSystemSeconds": 0.51,
+    "localCpuSeconds": 5.34,
+    "operatorWaitIncluded": true,
+    "shot1IncludingWaitSeconds": 226.8,
+    "remoteCpu": "not measured"
+  },
+  "sourceBeforeAfter": {
+    "sameHeadTree": true,
+    "cleanAfter": true,
+    "fourReviewedSourceHashesUnchanged": {
+      "scripts/demo-run.ts": "b844fa8ff1be89e1ba702a7b933fd0325edbf491ef69784da5b29b5f6d60bf1d",
+      "scripts/demo/rehearse.ts": "9dd8e848033d2e4db03683d9ed8090568d0338da77f07c5190056bc681a8ab02",
+      "scripts/demo/capture-context.ts": "9cfe911411c806d0729e395689989935bed921e97f578904e1f0b2fe07b29a67",
+      "packages/scope/src/artifacts-wiring.ts": "4e32c4a239f51f5a30a269ab1aa6c867996df408be58293437440705f51a4bdd"
+    },
+    "wholeSourceInventory": "not newly repeated"
+  },
+  "outputs": {
+    "transcript": {
+      "path": "/private/tmp/artroom-isolated26-rehearsal-20261011-one/out/transcript.md",
+      "size": 26000,
+      "sha256": "b2253da4f21c47fb082b2b5a0e48389eb6a4bd817d59956bd9bf239757529d24"
+    },
+    "room": {
+      "path": "/private/tmp/artroom-isolated26-rehearsal-20261011-one/out/room.json",
+      "size": 1023,
+      "sha256": "225efbbbb1889dc80274f8cd4068d2d37179319bda6d831950f0fbb605eebc8c"
+    }
+  },
+  "privateRetainedHashOnly": {
+    "stdout": {
+      "path": "/private/tmp/artroom-isolated26-rehearsal-runtime-one/private-stdout.log",
+      "size": 11140,
+      "sha256": "2843f64f2a9bde26119ed7be7007857cbcff6341c0771d2507cbabeab19fe730"
+    }
+  },
+  "limits": [
+    "Core settings/secrets untouched. Rehearsal Worker SCOPES/settings/session key are separate; external artroom-demo artifact namespace is shared.",
+    "Approved pin input plus secret-put/binding/version readback; provider does not return secret plaintext.",
+    "Transcript invitations are truncated to at most eight characters; no original invitation or session headers are disclosed.",
+    "No manifest extension, replay rerun, GitHub adapter acceptance, Counter browser/audio, Jam native or global completion claim.",
+    "Private homes, keys, config, capture-observations and custody bodies are not whitelisted."
+  ]
+}
