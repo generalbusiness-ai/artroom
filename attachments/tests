@@ -1,0 +1,30 @@
+{
+  "projection": "PUBLIC_CLOSED_PROJECTION",
+  "candidateHead": "dc45183c2fbfa7b0ad9425c439e275f6a289fc31",
+  "originalVitest": {
+    "exit": 1,
+    "passed": 1024,
+    "failed": 4,
+    "skipped": 2
+  },
+  "correctedTitleCaseCompletion": {
+    "exit": 0,
+    "passed": 4,
+    "skippedRecorder": 1
+  },
+  "repositoryNode": {
+    "passed": 8,
+    "failed": 0
+  },
+  "counterNode": {
+    "passed": 39,
+    "failed": 0
+  },
+  "retainedOutputSHA256": {
+    "original": "6955601c3b836bdb8f2ac6ee3e304d6c9e6ffee57b510de87576a49c262c1ebc",
+    "corrected": "8e80ab455dda5210d68731756d06ebbba7b6371e3582208b22e24d883c088917",
+    "repository": "15100de62be8a365acfb7dc5671b59e81881a800582a32464d160b31e8bffcc0",
+    "counter": "2b277def711d2e2a36deaa9577ed2f7240f78ce1b14aedf6dd42e132ecb471e7"
+  },
+  "limits": "Separate runs; four original failures corrected and individually completed. Existing recorder skips remain. No second gate or whole-suite rerun; no native acceptance claim."
+}

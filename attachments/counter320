@@ -1,0 +1,101 @@
+{
+  "projection": "PUBLIC_CLOSED_PROJECTION",
+  "candidateHead": "dc45183c2fbfa7b0ad9425c439e275f6a289fc31",
+  "viewSourceSHA256": "f6891088ab030c090db50e422b1ab68694b17dade60b88c6d394a298cd287920",
+  "productionCSSSHA256": "d89d8334fcf0b2e881adcf15f8d9d2c096e6a9c8c81886dab19c9be678c19f3b",
+  "fixtureSHA256": "ff6e9165a1de533db33afcb9d03ea277a6c5e0fa270e06cc927c43245404d361",
+  "compiler": "esbuild 0.28.1 API, completed before browser",
+  "actualWrapperExit": 0,
+  "rows": [
+    {
+      "colorScheme": "light",
+      "httpStatus": 200,
+      "title": "dap",
+      "status": "Initialize first",
+      "viewport": 320,
+      "scrollWidth": 320,
+      "bodyScrollWidth": 320,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 135,
+        "right": 320,
+        "bottom": 135
+      },
+      "headingBox": {
+        "x": 108,
+        "y": 22,
+        "width": 83.75,
+        "height": 90,
+        "right": 191.75,
+        "bottom": 112
+      },
+      "statusBox": {
+        "x": 211.75,
+        "y": 22,
+        "width": 103.609375,
+        "height": 17,
+        "right": 315.359375,
+        "bottom": 39
+      },
+      "overlayCount": 0,
+      "meaningful": true,
+      "fit": true,
+      "errorCount": 0,
+      "blockedRequestCount": 0,
+      "screenshot": {
+        "path": "/Users/hughpyle/play/artroom-diagnostics/counter-320-qa/counter-light-320.png",
+        "sha256": "9b7a77794f55ca8a36509f5ec8d5410958f434781135d1efea828f41648fa9e6"
+      }
+    },
+    {
+      "colorScheme": "dark",
+      "httpStatus": 200,
+      "title": "dap",
+      "status": "Initialize first",
+      "viewport": 320,
+      "scrollWidth": 320,
+      "bodyScrollWidth": 320,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 135,
+        "right": 320,
+        "bottom": 135
+      },
+      "headingBox": {
+        "x": 108,
+        "y": 22,
+        "width": 83.75,
+        "height": 90,
+        "right": 191.75,
+        "bottom": 112
+      },
+      "statusBox": {
+        "x": 211.75,
+        "y": 22,
+        "width": 103.609375,
+        "height": 17,
+        "right": 315.359375,
+        "bottom": 39
+      },
+      "overlayCount": 0,
+      "meaningful": true,
+      "fit": true,
+      "errorCount": 0,
+      "blockedRequestCount": 0,
+      "screenshot": {
+        "path": "/Users/hughpyle/play/artroom-diagnostics/counter-320-qa/counter-dark-320.png",
+        "sha256": "62120356749f54f4f590dc77441a43d2272ff703b9c568ed9869701963f24f05"
+      }
+    }
+  ],
+  "limits": "Presentation fixture only. No app bootstrap, enrollment, identity, transport, native acts, speech, microphone, model, audio, POST or websocket. It does not prove initialized board or hosted native acceptance.",
+  "firstAttempt": {
+    "actualExit": 1,
+    "browserOrBuildRan": false,
+    "reason": "Incorrect guard compared minified production CSS with authored CSS. Corrected to committed production CSS equality; original script preserved."
+  }
+}

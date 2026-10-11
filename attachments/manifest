@@ -1,0 +1,47 @@
+{
+  "projection": "PUBLIC_CLOSED_PROJECTION",
+  "request": "b11ef33a0afad672eb0b30575042df90de2c1dca",
+  "candidateHead": "dc45183c2fbfa7b0ad9425c439e275f6a289fc31",
+  "pairedJamHead": "48307a6a1ae445204ed68378c4a35cba9814ef86",
+  "files": [
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/page-brand-review-public/compiler.json",
+      "sha256": "6c06906185516579220a1739c2980deb17b38ff8d500df35d130f6ec8d457749"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/page-brand-review-public/tests.json",
+      "sha256": "efceef1adf081b996481096670814913b52a43bad9e3bfa4a301518d73d6bb98"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/page-brand-review-public/whitespace.json",
+      "sha256": "6832a737c9f387faad46219a2ca6f9e4bcbe975d38f7a23f78be19d0eb961615"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/page-brand-review-public/counter-320.json",
+      "sha256": "52b37bb126809123f06b87cb72f71197f545c263efc6a0650090fa0f74bf3398"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/page-brand-fresh-guard-compile-control/public-result.json",
+      "sha256": "db7e397cd9680bf287f991419c2ef80440b3428f3112383c82028d5004f49761"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/jam-page-brand-source/build-four-resume/public-result.json",
+      "sha256": "8327a3d5ccd2f8770c6401cb0df98b87dff9ce5e9da3e75d6d91a7e5c569d30e"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/jam-brand-provider/managed-plan-r3.json",
+      "sha256": "9ebd145a25ea001bbab3b75c83ace25a97bad2ab780af8339ec1b221e1f748f2"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/jam-brand-provider/headers-preserved.txt",
+      "sha256": "d497f7219e939f954cdf55a43b45c6cea29a84a1c3274bbc10cadeae1cb31f4e"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/jam-brand-provider/headers-proposed.txt",
+      "sha256": "04b257c39c3b83bbfb353447ac4b6657e0f7af7008cee2143b1244f87ab9c414"
+    }
+  ],
+  "originalGateRemainsFailed": true,
+  "rawLogsPrivateConfigsNativeCapturesEncodedProgramsIncluded": false,
+  "nativeOrCustodyActions": 0
+}

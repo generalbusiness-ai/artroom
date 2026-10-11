@@ -1,0 +1,16 @@
+{
+  "projection": "PUBLIC_CLOSED_PROJECTION",
+  "candidateHead": "dc45183c2fbfa7b0ad9425c439e275f6a289fc31",
+  "compiledHead": "868d398d7836605ba9f06d7833999b80866c29b7",
+  "command": "npm run typecheck",
+  "actualTerminalExit": 0,
+  "observedHandle": 88639,
+  "retainedCompilerOutputSHA256": "d051eae71dd0d9a65040c2e0d0e9ddbd32e694d1565d7f4a32463c88f34503e4",
+  "originalGate": {
+    "head": "ebfaae7fff8e0b02fa02d3a3d7f8c1313a3aed9c",
+    "exit": 1,
+    "compilerExit": 1,
+    "testsRan": false
+  },
+  "limits": "Full compiler completion after failed gate; later code change is one rehearsal expected-title string. Original gate is still failed."
+}
