@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-11-dap-brand-kit-import.md","body":{"commit":"0e8d5b5e9de1a2c897358d6dad9d4407068c71bb","path":"notes/2026-10-11-dap-brand-kit-import.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:048613731fa51eb899b25389fa2f9edbc63ce274","text":"Merge retired a covered predecessor; the successor is at brand/fonts/LICENSE-OpenRunde.txt."}
