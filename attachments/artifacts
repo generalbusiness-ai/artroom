@@ -1,0 +1,14 @@
+{
+  "head": "be75a53d0e3b8bc9bd5907658d30060bfec56d7d",
+  "promise": "65b40b584e0b9adf0b6b2d58069a97c5f990a0b9",
+  "artifacts": {
+    "docs/deploy.md": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:07c8a373113997845eb4c14d02fee9ec2d87214e",
+    "packages/cli/src/commands.ts": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a99c6ccafa6e1504391940c111e56c898b43eeb5",
+    "packages/cli/src/line.ts": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d2b759b40da7979c08449e7917f1e7c745ec8e6",
+    "packages/cli/test/install-cohort.test.ts": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:40a796ddba3be5bf68399aadbd4f5ffb7659cdd5",
+    "packages/scope/src/page-assets.ts": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7becbe1e749f2de2e11ef3c97eca150de36a1762",
+    "packages/scope/test/application-establish.test.ts": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e0d2c813aade933d051ecd6ece86f32e6b000b7b",
+    "docs/cli.md": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:92b8b35ba7abc3f219ff6eefd8fcb34c1dd8d61d"
+  },
+  "primary": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:92b8b35ba7abc3f219ff6eefd8fcb34c1dd8d61d"
+}

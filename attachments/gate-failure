@@ -1,0 +1,25 @@
+{
+  "head": "be75a53d0e3b8bc9bd5907658d30060bfec56d7d",
+  "tree": "afe795ab6e12191ec31f4bb9eff0d0e6db9a0505",
+  "paths": 1313,
+  "lock": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+  "handle": 22598,
+  "terminal": 1,
+  "whitespace": 0,
+  "typecheck": 0,
+  "Vitest": {
+    "pass": 1024,
+    "fail": 1,
+    "skip": 2,
+    "total": 1027
+  },
+  "failure": {
+    "file": "packages/cli/test/files.test.ts",
+    "reason": "existing5000ms timeout",
+    "cause": "not established"
+  },
+  "Node": "UNRUN afterVitestfailure",
+  "source_before_after_exact": true,
+  "outer_time": "real 92.68\nuser 128.95\nsys 30.97\n",
+  "gate_log_sha256": "c660ef6d71de2e1135cad7003bb5f28b565f52af551fe539e09b50b56e3bf754"
+}

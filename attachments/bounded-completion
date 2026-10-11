@@ -1,0 +1,42 @@
+{
+  "head": "be75a53d0e3b8bc9bd5907658d30060bfec56d7d",
+  "tree": "afe795ab6e12191ec31f4bb9eff0d0e6db9a0505",
+  "ordinary_gate": {
+    "handle": 22598,
+    "terminal": 1,
+    "result": "1024PASS1existing5000msTimeout2originalSKIP",
+    "no_whole_gate_repeat": true
+  },
+  "bounded_files": {
+    "terminal": 0,
+    "whole_cases": 2,
+    "pass": 2,
+    "timeout": "original5000ms unchanged",
+    "cause": "not established"
+  },
+  "previously_unrun_Node": {
+    "handle": 5053,
+    "terminal": 0,
+    "cases": 8,
+    "pass": 8
+  },
+  "previously_unrun_Counting_Node": {
+    "handle": 55839,
+    "terminal": 0,
+    "cases": 37,
+    "pass": 37
+  },
+  "source_before_after_exact": true,
+  "clean": true,
+  "raw_logs": "private hash-only",
+  "timings": {
+    "files": "real 0.86\nuser 1.02\nsys 0.18\n",
+    "node": "real 1.14\nuser 1.15\nsys 0.08\n",
+    "browser": "real 1.85\nuser 2.61\nsys 0.10\n"
+  },
+  "log_hashes": {
+    "files": "7116c1b0162b88c9a7bafa328b9c759966119c0bac9a7fa702a7509fe963ca62",
+    "node": "d759fc99112f5ab46e44da78d5102f725b92a5ea0b847bbe8014367cc07aba10",
+    "browser": "43fc364d240e040b37e9091ce2be11a2efb46f2407dba5c055c8b6d745d82198"
+  }
+}
