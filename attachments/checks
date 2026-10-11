@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "kind": "explicit public whitelist/status record; original raw logs remain retained private",
+  "result": "/tmp/artroom-counter-recovery-public-checks/public-result.json",
+  "resultSha256": "00d0e476f7c8d35462d0548c47e1b691b284d416810860c5eff01670b4fcc82b",
+  "whitelist": [
+    {
+      "path": "/tmp/artroom-counter-d520-browser-focused-one-r2/result.json",
+      "bytes": 6795,
+      "sha256": "f380e0e8fc8601c9014ae4cbc1630ea02a628c88455e6f94375d536a536f04ee",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-app-baseline-one/result.json",
+      "bytes": 3484,
+      "sha256": "3d5f5e9e464c97dfec6de1fd14239511ef8a815cabfe8e1f7ba434e3ce8efb57",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-presence-control-one/result.json",
+      "bytes": 3213,
+      "sha256": "648ef3e9b292ea13a95c58b1e3cc7e78e87fdce19686038977261239775f7160",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-presence-control-one/whole-app-control.log",
+      "bytes": 1072,
+      "sha256": "415c9f38e7004e6ad06c672b99abca99152e13d8026ea476aabd53e93b517e0b",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-presence-control-outer.time",
+      "bytes": 777,
+      "sha256": "7f27cc3dd28e5c89fe896d06ee8c5542f57376756ef5cf14f7914ef5c53eb334",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-assets-one/counting-assets.log",
+      "bytes": 58,
+      "sha256": "77061401b659de38436785e6267f4fd1dffd3751777d055d02ee179d4aef0754",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-assets-one/counting-assets.time",
+      "bytes": 29,
+      "sha256": "7fd05877509e9f011261ede88e46ecc8bfeef3ac916ee578a03da64ff26f46ee",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-assets-one/page-assets.log",
+      "bytes": 196,
+      "sha256": "3bc69a2ce0b1a18d8f346b9e365e3af72802a0501c96cdaa8182dcf6451f7238",
+      "policy": "raw private hash-only evidence; no public body"
+    },
+    {
+      "path": "/tmp/artroom-counter-3188-assets-one/page-assets.time",
+      "bytes": 777,
+      "sha256": "98a05ccad8c13b26d5a1087d61f34f5294c340a5db419bacdaf819cd6aa1301b",
+      "policy": "raw private hash-only evidence; no public body"
+    }
+  ],
+  "noStateFilingOrFormalApproval": true,
+  "noNewRuntime": true
+}

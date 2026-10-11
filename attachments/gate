@@ -1,0 +1,13 @@
+{
+  "head": "d2264140057d0e3d98a54fcc4fb4b2af907a7411",
+  "tree": "2450ab2d7f1f651039c4f26a1c1d82261deea00b",
+  "source_paths": 1313,
+  "lock": "d4e56733d6e4a2db479f15b8d99983315deb2a010dc45ccbe790a0f305580097",
+  "original_handle": 83728,
+  "terminal": 0,
+  "source_before_after_exact": true,
+  "ordinary_gate_once": true,
+  "gate_log_sha256": "035b934ae9aab4d0fbcc358c833fbe7e7c6dde13e6f656c0225ee428d793a0fd",
+  "outer_time": "real 92.29\nuser 129.36\nsys 20.64\n",
+  "summary": "\n> gate\n> bash scripts/gate.sh\n\nhead d2264140057d0e3d98a54fcc4fb4b2af907a7411  tree 2450ab2d7f1f651039c4f26a1c1d82261deea00b  changed files 0\ninstall    skipped: node_modules was installed from this package-lock.json\nwhitespace exit 0  elapsed    0.0 s  cpu    0.0 s\ntypecheck  exit 0  elapsed    5.5 s  cpu   18.5 s\ntest       exit 0  elapsed   86.6 s  cpu  131.3 s\n  Tests  1025 passed | 2 skipped (1027)\n  \u2139 pass 8\n  \u2139 pass 37\ngate passed; logs in /var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.ZOKB0qtNJa\n"
+}
