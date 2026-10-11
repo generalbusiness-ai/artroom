@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/demo/rehearse.ts","body":{"commit":"3d400d49feded9c26e3180293067de6e0669bb92","path":"scripts/demo/rehearse.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:02214eca78f04eb967fab6152e9ccaec7d76a6bb","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser-build/index.html."}
