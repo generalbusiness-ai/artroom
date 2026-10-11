@@ -502,7 +502,9 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   const attempt = installAttemptOf(plan);
   if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
   if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
-    return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. Nothing was sent. Plan again, and set the new register ID.`);
+    return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. ${counting
+      ? "No request was sent by this run. Keep this original config directory unchanged. For a new Counting plan, use a separate empty ARTROOM_HOME directory; configure the host with that new plan's register ID before installing."
+      : "Nothing was sent. Plan again, and set the new register ID."}`);
   }
   const matches = (receipt: unknown): receipt is NonNullable<PlannedInstall["acknowledged"]>["receipt"] => isReceipt(receipt)
     && receipt.definition === plan.definition && receipt.intent === intentDigest(plan.founding.intent)

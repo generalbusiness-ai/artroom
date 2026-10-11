@@ -17,6 +17,8 @@ export interface StageGateway extends Reporter {
   checkCommand():Promise<ReportOutcome|null>;
   resumeCommand():Promise<ReportOutcome|null>;
   commandResumeReady():boolean;
+  /** A retained command is present even when its private kind is malformed.
+   * Only an explicitly empty slot returns null; unknown is a display label. */
   pendingCommand():string|null;
   restoreCommand():Promise<void>;
   dispose():void;
@@ -64,11 +66,15 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
     if(!isRecord(held)||Object.keys(held).some(k=>!["kind","envelope","journal"].includes(k))||!Object.hasOwn(held,"kind")||!Object.hasOwn(held,"envelope")||typeof held["kind"]!=="string"||!["initialize","participate","activate","deactivate","force-deactivate","remove-participant","start","commit","fail","cancel","pause","reset"].includes(held["kind"])||!validEnvelope(held["envelope"],identity)||held["envelope"].signed.intent.kind!==held["kind"]||!fitsPending(identity,held))return false;
     return !Object.hasOwn(held,"journal")||validJournal(held["journal"] as AttemptJournal,identity,held["envelope"]);
   };
+  const retainCommandPresence=(held:unknown)=>{
+    pending=held===null?null:"unknown";commandPrepared=false;
+    if(commandRecord(held)){pending=held.kind;commandPrepared=resumableJournal(held.journal,identity,held.envelope);}
+  };
   const clearCommand=async(envelope:PreparedEnvelope,result:ReportOutcome):Promise<ReportOutcome>=>{
     if(result.status==="unknown"||result.status==="blocked")return result;
-    current();const retained=await options.commandStore.load();current();
+    current();const retained=await options.commandStore.load();current();retainCommandPresence(retained);
     if(!retained?.journal||!commandRecord(retained)||envelopeKey(retained.envelope)!==envelopeKey(envelope)||!validJournal(retained.journal,identity,envelope)||activeAttempt(retained.journal).phase!==result.status)return{status:"unknown",reason:"The exact terminal command could not be recovered."};
-    await options.commandStore.clear();current();pending=null;commandPrepared=false;observer?.refresh();return result;
+    await options.commandStore.clear();current();retainCommandPresence(null);observer?.refresh();return result;
   };
   const dispatchReport=async(envelope:PreparedEnvelope,readOnly:boolean):Promise<ReportOutcome>=>options.lock.run(async()=>{
     const result=await (readOnly?dispatcher.check(options.voiceStore,envelope):dispatcher.run(options.voiceStore,envelope));
@@ -89,18 +95,18 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
     resumeReady:report=>{const turn=view&&assignedTurn(view,identity);return usable()&&fresh&&!!view&&!!ownedParticipant(view,identity)&&!!turn&&Date.now()<turn.expiresAt&&same(turn,report.completion.turn)&&validReport(report,identity)&&resumableJournal(report.journal,identity,report.envelope);},
     resume:envelope=>options.lock.run(async()=>{current();const held=await options.voiceStore.load();if(!fresh||!held||!validReport(held,identity)||!resumableJournal(held.journal,identity,envelope)||!view||!ownedParticipant(view,identity)||Date.now()>=held.completion.turn.expiresAt||!same(assignedTurn(view,identity),held.completion.turn))return{status:"blocked",reason:"The original report has no current definitely-unsent dispatch proof."};const result=await dispatcher.run(options.voiceStore,envelope);const after=await options.voiceStore.load();current();return after&&validReport(after,identity)&&envelopeKey(after.envelope)===envelopeKey(envelope)?{...result,custody:structuredClone(after)}:result;}),
     correctionReady:reservation,refresh:()=>observer?.refresh(),
-    async prepare(completion){if(await options.commandStore.load())throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("fulfill",completion);},
+    async prepare(completion){current();const commandHeld=await options.commandStore.load();current();retainCommandPresence(commandHeld);if(pending!==null)throw new Error("Another exact command remains pending.");const held=await options.voiceStore.load();if(held&&!reservation(held))throw new Error("Private correction capacity or a known refusal is unavailable.");const turn=view&&assignedTurn(view,identity);if(!turn||!same(turn,completion.turn))throw new Error("The completed turn is no longer current.");return prepare("fulfill",completion);},
     submit:envelope=>dispatchReport(envelope,false),
     reconcile:envelope=>dispatchReport(envelope,true),
-    async command(kind,details={}){return options.lock.run(async()=>{current();if(await options.voiceStore.load()||await options.commandStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind,undefined,details);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();await options.commandStore.save(held);}catch{return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();pending=kind;const result=await dispatcher.run(options.commandStore,envelope);const retained=await options.commandStore.load();current();commandPrepared=!!retained&&commandRecord(retained)&&resumableJournal(retained.journal,identity,retained.envelope);return clearCommand(envelope,result);});},
-    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;commandPrepared=false;return null;}pending=held.kind;if(!commandRecord(held)){commandPrepared=false;return{status:"blocked",reason:"The malformed original command remains in private custody."};}commandPrepared=resumableJournal(held.journal,identity,held.envelope);const result=await dispatcher.check(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
-    async resumeCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();if(!held){pending=null;commandPrepared=false;return null;}pending=held.kind;
+    async command(kind,details={}){return options.lock.run(async()=>{current();const existing=await options.commandStore.load();current();retainCommandPresence(existing);if(pending!==null||await options.voiceStore.load())return{status:"unknown",reason:"Check the retained request before another command."};let envelope:PreparedEnvelope;try{envelope=await prepare(kind,undefined,details);}catch{return{status:"blocked",reason:"This candidate is unavailable locally. Nothing was signed or submitted."};}try{const journal=appendPrepared(envelope);const held={kind,envelope,journal};if(!fitsPending(identity,held))throw new Error();pending="unknown";commandPrepared=false;await options.commandStore.save(held);retainCommandPresence(held);}catch{try{const retained=await options.commandStore.load();current();retainCommandPresence(retained);}catch{pending="unknown";commandPrepared=false;}return{status:"blocked",reason:"Private command custody is unavailable. Nothing was submitted."};}current();const result=await dispatcher.run(options.commandStore,envelope);const retained=await options.commandStore.load();current();retainCommandPresence(retained);return clearCommand(envelope,result);});},
+    async checkCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();current();retainCommandPresence(held);if(held===null)return null;if(!commandRecord(held))return{status:"blocked",reason:"The malformed original command remains in private custody."};const result=await dispatcher.check(options.commandStore,held.envelope);return clearCommand(held.envelope,result);});},
+    async resumeCommand(){return options.lock.run(async()=>{current();const held=await options.commandStore.load();current();retainCommandPresence(held);if(held===null)return null;
       const voiceHeld=await options.voiceStore.load();current();if(!fresh||voiceHeld||!commandRecord(held)||!resumableJournal(held.journal,identity,held.envelope)){commandPrepared=false;return{status:"blocked",reason:"The original command has no current definitely-unsent dispatch proof."};}
       commandPrepared=false;const result=await dispatcher.run(options.commandStore,held.envelope);return clearCommand(held.envelope,result);
     });},
     commandResumeReady:()=>usable()&&fresh&&commandPrepared,
     pendingCommand:()=>pending,
-    async restoreCommand(){const held=await options.commandStore.load();current();pending=held?.kind??null;commandPrepared=!!held&&commandRecord(held)&&resumableJournal(held.journal,identity,held.envelope);},
+    async restoreCommand(){const held=await options.commandStore.load();current();retainCommandPresence(held);},
     dispose(){alive=false;lifetime.abort();observer?.cancel();session=null;view=undefined;ownSecret.fill(0);},
   };
 }

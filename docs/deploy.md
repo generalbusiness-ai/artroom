@@ -60,8 +60,13 @@ register exists. Plan first, then set the setting, then install:
 4. **Install.** Run `artroom install --planned`. It checks that the plan
    still makes that ID, founds the register, and prints
    `Installed: register sc_..., ..., as planned.` A plan whose time is
-   over is refused as `plan-expired`, and nothing is sent: plan again and
-   set the new ID.
+   over and was never attempted is refused as `plan-expired`. For a
+   definitely unsent legacy plan, plan again and set the new ID. A selected
+   Counting plan stays exact: preserve its original directory and use a
+   separate empty `ARTROOM_HOME` for a new plan, host configuration and
+   subsequent commands ([cli.md](cli.md)). An attempted or acknowledged
+   original needs reconciliation from its original directory; expiry
+   cannot authorize a replacement.
 5. **Claim.** Run `artroom claim <name> --handle @you`. The register
    sends its creation at once. If the claim still gives up waiting, run
    the same command again: it goes on from the pending claim and signs

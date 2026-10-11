@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/artroom-contract";
-import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { COUNTING_COHORT } from "@generalbusiness/artroom-platform";
 import { command, install, installPlanned, memoryStore, planInstall, type Config, type Context, type Store } from "../src/index.ts";
@@ -84,6 +84,39 @@ test("closed cohort selection preserves legacy defaults and refuses retained bin
   expect((await command(s.ctx, ["install", "--planned", "--host", "artifacts", "--cohort", COHORT])).code).toBe(2);
   expect((await command(s.ctx, ["install", "--planned", "--cohort", COHORT])).code).toBe(0);
   expect((await s.store.config())!.register!.scope).toBe(original.plan!.register);
+
+  // A separate memory store stands for an empty ARTROOM_HOME directory.
+  // The expired selected plan is retained; planning there cannot renew it.
+  const expired = scenario();
+  const where = ["--cohort", COHORT, "--host", "artifacts", "--namespace", "room"];
+  expect((await command(expired.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
+  const expiredConfig = (await expired.store.config())!;
+  const deadline = timeMs(expiredConfig.plan!.founding.intent.notAfter)!;
+  expired.ctx.now = () => deadline + 1;
+  const before = expired.metrics();
+  expect((await command(expired.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
+  for (const args of [
+    ["install", "--planned", "--cohort", COHORT],
+    ["install", "--planned"],
+    ["install", SERVICE, ...where],
+  ]) {
+    const refused = await command(expired.ctx, args);
+    expect(refused.code).toBe(1);
+    expect(refused.lines[0]).toContain("For a new Counting plan, use a separate empty ARTROOM_HOME directory");
+    expect(refused.lines[0]).not.toContain("Plan again");
+    expect([await expired.store.config(), expired.bodies]).toEqual([expiredConfig, []]);
+  }
+  expect([expired.metrics().saves, expired.metrics().keyWrites]).toEqual([before.saves, before.keyWrites]);
+  const separate = scenario();
+  separate.ctx.now = expired.ctx.now;
+  expect((await command(separate.ctx, ["install", "--plan", SERVICE, ...where])).code).toBe(0);
+  const freshPlan = (await separate.store.config())!.plan!;
+  expect([freshPlan.definition, freshPlan.founding.intent.fields]).toEqual([expiredConfig.plan!.definition, { ...expiredConfig.plan!.founding.intent.fields, founders: [freshPlan.founding.intent.actor] }]);
+  expect(freshPlan.register).not.toBe(expiredConfig.plan!.register);
+  expect(timeMs(freshPlan.founding.intent.notAfter)!).toBeGreaterThan(separate.ctx.now());
+  expect((await command(separate.ctx, ["install", "--planned", "--cohort", COHORT])).code).toBe(0);
+  expect((await separate.store.config())!.register!.scope).toBe(freshPlan.register);
+  expect([await expired.store.config(), expired.bodies]).toEqual([expiredConfig, []]);
 });
 
 test("selected delivery requires exact plan and attempt readback and recovers the original envelope after reply or final-save loss", async () => {
@@ -94,6 +127,10 @@ test("selected delivery requires exact plan and attempt readback and recovers th
     const pending = (await s.store.config())!;
     expect([pending.register, pending.plan?.attempted]).toEqual([undefined, expect.stringMatching(/^sha256:/)]);
     const original = canonicalize(pending.plan!.founding);
+    // Expiry cannot replace a possibly delivered or acknowledged original.
+    s.ctx.now = () => timeMs(pending.plan!.founding.intent.notAfter)! + 901_000;
+    expect((await planInstall(s.ctx, SERVICE, { cohort: COHORT })).code).toBe(0);
+    expect(await s.store.config()).toEqual(pending);
     expect((await install(s.ctx, SERVICE, { cohort: COHORT })).code).toBe(0);
     const kept = (await s.store.config())!;
     expect([kept.register!.scope, canonicalize(kept.plan!.founding), new Set(s.bodies).size]).toEqual([pending.plan!.register, original, 1]);
