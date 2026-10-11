@@ -1,0 +1,31 @@
+/* dap design tokens, seed. Light first; dark follows the same names. */
+:root {
+  --dap-green: #123F2B;   /* forest green: logo, links, primary actions */
+  --dap-green-deep: #0B2E1F;
+  --dap-green-tint: #DCE9E0;
+  --dap-ink: #16180F;     /* text, dark surfaces */
+  --dap-bone: #F3F1EA;    /* light surfaces */
+  --dap-line: #D8D5CB;
+  --dap-mute: #6B6A5F;
+  --dap-white: #FFFFFF;
+  --dap-bg: var(--dap-bone);
+  --dap-fg: var(--dap-ink);
+  --dap-accent: var(--dap-green);
+  --dap-font-sans: "IBM Plex Sans", system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --dap-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --dap-radius: 0;        /* the identity is sharp: no rounded corners on surfaces */
+  --dap-cut: 9px;         /* a 45 degree cut at the bottom-right corner of buttons: the tail's place */
+  --dap-unit: 8px;        /* the grid module */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --dap-bg: #121410; --dap-fg: #ECEAE2; --dap-line: #2C2F27; --dap-mute: #A3A295;
+    --dap-accent: #5FA880;   /* lighter green so links pass contrast on ink */
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --dap-bg: #121410; --dap-fg: #ECEAE2; --dap-line: #2C2F27; --dap-mute: #A3A295;
+  --dap-accent: #5FA880;
+  color-scheme: dark;
+}

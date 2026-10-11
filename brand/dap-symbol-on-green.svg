@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">dap symbol on green</title>
+  <rect width="256" height="256" fill="#123F2B"/>
+  <g transform="translate(20.5 20.5) scale(1.5)"><path fill="#F3F1EA" d="M72 0 L144 72 L72 144 L0 72 Z M72 33.8 L33.8 72 L72 110.2 L110.2 72 Z M101 132 L137 96 L137 132 Z"/></g>
+</svg>
