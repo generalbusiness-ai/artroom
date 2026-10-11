@@ -5,7 +5,7 @@ Builder promise: `40f8bba4d1b6447c0c7569222736a02e341662bb`.
 
 `brand/` contains all 38 files from `~/play/dap-logo-concepts/kit`, with unchanged bytes. The named generator was absent from `kit/`; `brand/gen6.py` copies `~/play/dap-logo-concepts/gen6.py` unchanged. `brand/README.md` records the origin and the generator’s actual output limits.
 
-Focused checks compared every copied file with its source, parsed all SVGs and the web manifest, and regenerated the 13 master SVGs in a scratch directory. All 13 matched the supplied masters byte for byte. The generator does not produce the distribution files, CSS tokens, or guidelines. No application code, UI, dependency, or deployment changed. The gate has not run; the builder will decide and record the review gate separately.
+Focused checks compared every copied file with its source, parsed all SVGs and the web manifest, and regenerated the 13 master SVGs in a scratch directory. All 13 matched the supplied masters byte for byte. The generator does not produce the distribution files, CSS tokens, or guidelines. No application code, UI, dependency, or deployment changed. The gate and bounded completion outcomes are recorded under Review checks below.
 
 ## Copied file SHA-256 digests
 
@@ -69,8 +69,10 @@ PY
 
 The one normal gate at source commit `0e1d61f30cac9919b826795aec43e0c197d8fa1d` and tree `c2a360731b62958491755eac1c198d119c104082` failed (original handle `88625`). Installation was skipped and whitespace passed. Typechecking failed because existing external dependency links were broken; tests did not run.
 
-After the dependency view was repaired without installing packages, bounded typecheck `85840` failed because shared workspace links loaded distinct nominal `GitProgram` identities from main and this worktree. With workspace links corrected, typecheck `4327` passed in 5.49 seconds elapsed and 18.90 CPU seconds. The first test launch stopped in pretest because the checkout’s `node_modules` was a symlink; no test body ran.
+After dependencies were restored in a scratch directory outside the checkout, bounded typecheck `85840` failed because shared workspace links loaded distinct nominal `GitProgram` identities from main and this worktree. With workspace links corrected, typecheck `4327` passed in 5.49 seconds elapsed and 18.90 CPU seconds. The first test launch stopped in pretest because the checkout’s `node_modules` was a symlink; no test body ran.
 
-After the owned dependency directory replaced that symlink, bounded test completion `51564` passed: 1,025 Vitest cases, two existing recording skips, eight source and pool Node cases, and 37 Counter Node cases. This test command took 89.69 seconds elapsed and 134.14 CPU seconds. These are separate bounded completions, not a passed replacement gate. The original failed gate and intermediate failures remain retained. No gate was repeated.
+After the owned dependency directory replaced that symlink, bounded test completion `51564` passed: 1,025 Vitest cases, two existing recording skips, eight source and pool Node cases, and 37 Counter Node cases. This test command took 89.69 seconds elapsed and 134.14 CPU seconds. These are separate bounded completions, not a passed replacement gate. The original failed gate and intermediate failures remain retained. No gate was repeated. Root restored 105 dependencies offline in the scratch directory. The public proof’s `dependency_install: false` describes this agent’s checks; it does not describe root’s scratch recovery.
 
 Durable evidence is `/Users/hughpyle/play/artroom-diagnostics/brand-kit-import/bounded-completion-final.json`, SHA-256 `47727f8976f9b6103add3d56cf2e265a13f71e06a3aa23bcce09c647f628884c`. The delivery commit after these checks changes only this note; the copied kit bytes and authored README remain the checked source.
+
+The first documentation append stood at commit `52709897e3dfe7373ba1516efdedefaf9129cc0a`; this accuracy correction changes only the delivery note. The checked source and tree remain the pair recorded above.
