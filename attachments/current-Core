@@ -1,0 +1,165 @@
+{
+  "format": "artroom-core-final3bd-deployment-public-proof-1",
+  "planner_directive": "338d33156a94aae16401617edf596c35b37ec6c8",
+  "request": "e60a3ca5ce320ba4af84478ff5f88ff4d6be63fe",
+  "promise": "1071bbedf512505b6a11ab0feefb15778b7cfcb0",
+  "deployed_head": "3bd18314efed78ee757b5b2f9d5bdb3198250c1d",
+  "deployed_tree": "0be9f4dae4c8f60ee5074275b9e18c7eb77add2a",
+  "remote_verified": "Root verified final main3bd after SDK72f/application8a881 receipts; reused exact receipt context without another remote query.",
+  "actual_deploy": {
+    "original_handle": 18963,
+    "terminal": 0,
+    "wrangler": "4.147.0 from existing pinned scratch tool",
+    "command": "wrangler deploy --config currentMain/packages/scope/wrangler.jsonc --name artroom-scope --keep-vars --outdir external bundle",
+    "url": "https://artroom-scope.inguz.workers.dev",
+    "version": "34dc12b9-78d1-4974-8036-899f7015ba76",
+    "keep_vars": true,
+    "existing_resources": [
+      "SCOPES DeployedScope SQLite/v1",
+      "ARTIFACTS artroom-demo"
+    ],
+    "secret_or_register_pin_mutation": false,
+    "time": {
+      "wallSeconds": 6.28,
+      "userSeconds": 0.9,
+      "systemSeconds": 0.15,
+      "cpuSeconds": 1.05
+    }
+  },
+  "http": {
+    "original_handle": 88075,
+    "terminal": 0,
+    "responses": [
+      {
+        "path": "/page/",
+        "status": 200,
+        "bytes": 18706,
+        "sha256": "28e4c1a631e31e5af2bacb551c33f00ea31aa062d8a45d0f014c13c07898d376",
+        "expected_immutable3bd_sha256": "28e4c1a631e31e5af2bacb551c33f00ea31aa062d8a45d0f014c13c07898d376",
+        "exact_hash_match": true,
+        "content_type": "text/html; charset=utf-8",
+        "csp": "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "nosniff": "nosniff",
+        "referrer_policy": "no-referrer",
+        "cache_control": "no-cache"
+      },
+      {
+        "path": "/page/page.js",
+        "status": 200,
+        "bytes": 556465,
+        "sha256": "ed59d8fea9d0364a1dc32ca8b88aff7da3d2128615d8b84834a4cfb7ceb13de2",
+        "expected_immutable3bd_sha256": "ed59d8fea9d0364a1dc32ca8b88aff7da3d2128615d8b84834a4cfb7ceb13de2",
+        "exact_hash_match": true,
+        "content_type": "text/javascript; charset=utf-8",
+        "csp": "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "nosniff": "nosniff",
+        "referrer_policy": "no-referrer",
+        "cache_control": "no-cache"
+      },
+      {
+        "path": "/counting/",
+        "status": 200,
+        "bytes": 307,
+        "sha256": "69f8c245802e5380ff48abccab2068ffaf57480cdfcfc30e6eba994ee1308ff6",
+        "expected_immutable3bd_sha256": "69f8c245802e5380ff48abccab2068ffaf57480cdfcfc30e6eba994ee1308ff6",
+        "exact_hash_match": true,
+        "content_type": "text/html; charset=utf-8",
+        "csp": "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "nosniff": "nosniff",
+        "referrer_policy": "no-referrer",
+        "cache_control": "no-cache"
+      },
+      {
+        "path": "/counting/counting.js",
+        "status": 200,
+        "bytes": 131742,
+        "sha256": "4abb932897ce5c11952a363cb357d29fa682c396ac994c050e50616f46ec15e9",
+        "expected_immutable3bd_sha256": "4abb932897ce5c11952a363cb357d29fa682c396ac994c050e50616f46ec15e9",
+        "exact_hash_match": true,
+        "content_type": "text/javascript; charset=utf-8",
+        "csp": "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "nosniff": "nosniff",
+        "referrer_policy": "no-referrer",
+        "cache_control": "no-cache"
+      },
+      {
+        "path": "/counting/counting.css",
+        "status": 200,
+        "bytes": 5132,
+        "sha256": "f4d0f6c03a458f82d0e5c7ffdeda89d9c38aebec09374adb995c0e8227046eec",
+        "expected_immutable3bd_sha256": "f4d0f6c03a458f82d0e5c7ffdeda89d9c38aebec09374adb995c0e8227046eec",
+        "exact_hash_match": true,
+        "content_type": "text/css; charset=utf-8",
+        "csp": "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "nosniff": "nosniff",
+        "referrer_policy": "no-referrer",
+        "cache_control": "no-cache"
+      }
+    ],
+    "all5responses200_hash_exact": true,
+    "boundary": "Read-only Mozilla/5.0 HTTP assets; no rendered-browser/native/audio claim"
+  },
+  "public_whitelist": [
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/before.json",
+      "bytes": 2542,
+      "sha256": "6b42ac56a779f48a5d6ae42a370bb7a55f2706ae9101eec6cd52c2bd6975a492"
+    },
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/public-http-proof.json",
+      "bytes": 3468,
+      "sha256": "27666b5eac56134f7cf4f517d8438234ad7edca3ca191e8d4f6b821875f768fe"
+    }
+  ],
+  "raw_provider_private": [
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/deploy.log",
+      "bytes": 662,
+      "sha256": "b8f2a7542f65a56f92d89890dea924f3d0dc39502a4632be505e7235d8c492ce"
+    },
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/deploy.time",
+      "bytes": 29,
+      "sha256": "5f89852d3d1fd29078974b1c1e99e0dfea0b753732e54805ccb4dd4f7759aee2"
+    }
+  ],
+  "opaque_bundle_hashes": [
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/bundle/worker.js.map",
+      "bytes": 4823191,
+      "sha256": "05cc9ee1eb831c4c5407803b51f88e605b3706375fa32f65163482c300e2695c",
+      "classification": "hash only; no semantic/transitive-secret review"
+    },
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/bundle/worker.js",
+      "bytes": 2398163,
+      "sha256": "f1a8dfcf5a88ec086117405cb80728848e17b7bb4c2b8da85a8bad21e84e0d36",
+      "classification": "hash only; no semantic/transitive-secret review"
+    },
+    {
+      "path": "/private/tmp/artroom-core-main3bd-deployment/bundle/README.md",
+      "bytes": 114,
+      "sha256": "8aba44d7f110c4c37419b8b37f82a9821fac1eafb39f268d87ee50d37fd63020",
+      "classification": "hash only; no semantic/transitive-secret review"
+    }
+  ],
+  "source_after": {
+    "observed_main_head": "3bd18314efed78ee757b5b2f9d5bdb3198250c1d",
+    "clean": true,
+    "exact_3bd": true,
+    "Source_edits_or_UIbuild_install_tests_gate_nativebootstrap": false,
+    "owned_current_Main_dependency_view": "Prior corrected d4e view reused; no new view changes"
+  },
+  "prior_deploy_preserved": {
+    "head": "04d6fd4a5eecd420d5dc7b301555c89428bb57a1",
+    "version": "63996172-8033-48a0-9f7b-1b88ba18b09c",
+    "proof": "/private/tmp/artroom-core-main04d-deployment/public-proof.json",
+    "superseded_for_currentMain_claim": true
+  },
+  "qualification": [
+    "This is one changed-Source deployment: new application CLI closure changes the Page generated module by70B; it is not an unchanged retry of04d.",
+    "Core is now finalMain3bd; /page/ and/counting/ served assets match that head, but no real native3agent/audio/26-shot rehearsal/fullparent acceptance follows from HTTP bytes.",
+    "Counter separate artroom-counting config/bootstrap remains owned byu1 under c09/a148; no Core register/vars/secrets overwrite.",
+    "No publicSDKpublication, new login/secretvaluesread, native bootstrap, UIrebuild, tests or gate repeated."
+  ]
+}
