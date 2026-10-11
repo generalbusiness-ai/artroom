@@ -55,7 +55,19 @@ Counter's 39 Node browser checks pass. Original failures remain in the
 evidence. These separate completions do not turn the original gate green.
 The completion records are in `page-brand-bounded-completion`.
 
-Rehearsal deployment, asset readback, and hosted light/dark screenshots
-remain to be recorded. This delivery does not close
+Candidate `cb610e9e` is deployed to the isolated rehearsal Worker as version
+`0923a3ca-e912-41c9-b11a-387c1a997e44`. Actual before/after reads agree on
+the existing namespace, deployment identity, bindings, and runtime.
+All 22 public files match the candidate bytes. The proof is
+`rehearsal-brand-deploy/deploy-one/public-result.json`.
+
+Hosted room and Counter checks pass in light and dark at 1280 and 390
+pixels. All three font families load, wordmarks render, and no page errors
+or horizontal overflow are observed. Room inspection opens, and Counter's
+connection dialog opens without submitting anything. Eight entry captures
+and two interaction captures are in `hosted-brand-qa-source/run-one`.
+These anonymous entry checks do not prove native acceptance or playback.
+The procedural Jam companion has local rendering evidence; its hosted
+publication remains separate and unrun. This delivery does not close
 the full room, Counter, or native Jam requests. The original Counter
 report at generation 0, turn 8, count 5 remains preserved.
