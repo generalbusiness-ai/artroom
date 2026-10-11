@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:09c33d093146b962e32cba2af7170066206ad64a","text":"Merge retired a covered predecessor; the successor is at scripts/brand-assets.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0dfdbc4ba7f601776f94a295762c8a7ef90b9a79","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/counting-assets.ts."}
