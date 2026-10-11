@@ -191,5 +191,6 @@
     "scope": "Only relatedCounter keys/request/handle/status/pointers read; no publication of whole continuity file"
   },
   "noRuntime": true,
-  "noSourceEdits": true
+  "noSourceEdits": true,
+  "readScope": "Retained safe metadata/status/census fields decoded; raw body.log bytes were only hashed opaquely to verify existing seals, never decoded or published. No generatedasset body, privateconfig/toolbundle/livekey/audio or broad continuity content was read."
 }
