@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:69ec9c0a7e5e8fc59ab80d242bdad21ddd866ccc","text":"Republished at 37a9bd0b8d2a1cf5cb191c106fc07e295467154f; the successor stands at notes/2026-10-11-dap-brand-kit-import.md."}
+{"kind":"artifact","text":"examples/counting/browser/voice-controller.ts at exact 6a86738ebd18b78fe33a788343beedf2122e9aac on request/counter-preaudio-lock, under promise git:sha1…b7da731 on request git:sha1…8fce074","body":{"commit":"6a86738ebd18b78fe33a788343beedf2122e9aac","path":"examples/counting/browser/voice-controller.ts"}}
