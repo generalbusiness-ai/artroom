@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:649b2911a76d2d60755414e3249aa566d7245304","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/line.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:65b30f559682c40c0ecbc60d8458511e7d74355c","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/voice-controller.test.ts."}
