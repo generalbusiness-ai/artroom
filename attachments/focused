@@ -1,0 +1,26 @@
+{
+  "actual_compiler_exit": 0,
+  "actual_body_exit": 0,
+  "counts": {
+    "numTotalTests": 2,
+    "numPassedTests": 2,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "cases": [
+    {
+      "name": "closed cohort selection preserves legacy defaults and refuses retained binding conflicts without replacing custody",
+      "status": "passed"
+    },
+    {
+      "name": "selected delivery requires exact plan and attempt readback and recovers the original envelope after reply or final-save loss",
+      "status": "passed"
+    }
+  ],
+  "head": "d5205690babf2017fc1bb7409d8d5198ddbb97f0",
+  "tree": "e5d0daf6dbaa0375c924f3a66a789b7d86aa50f1",
+  "pre_post_source_tool_guard": "PASS",
+  "source_paths": 1312,
+  "workspace_count": 12,
+  "qualifications": "Memory stores/fake configured service. No native host/directory/filesystem custody acceptance."
+}
