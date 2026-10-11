@@ -13,8 +13,9 @@
   --dap-bg: var(--dap-bone);
   --dap-fg: var(--dap-ink);
   --dap-accent: var(--dap-green);
-  --dap-font-sans: "IBM Plex Sans", system-ui, -apple-system, Helvetica, Arial, sans-serif;
-  --dap-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --dap-font-sans: "Open Runde", system-ui, -apple-system, Helvetica, Arial, sans-serif;   /* text and headings, self-hosted */
+  --dap-font-label: "Teletype33", ui-monospace, Menlo, monospace;   /* eyebrows, chips, receipts, the "dap." line; 13px minimum, no extra tracking */
+  --dap-font-mono: "Sometype Mono", ui-monospace, Menlo, monospace;   /* code, hashes, tables */
   --dap-radius: 0;        /* the identity is sharp: no rounded corners on surfaces */
   --dap-cut: 9px;         /* a 45 degree cut at the bottom-right corner of buttons: the tail's place */
   --dap-unit: 8px;        /* the grid module */
