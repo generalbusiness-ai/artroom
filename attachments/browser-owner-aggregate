@@ -1,0 +1,53 @@
+{
+  "counter_frozen": {
+    "head": "84d3b39eaeca84a9395d290fafb617f995bb01e8",
+    "tree": "79d3c8b91ee697edef31ea44294f49ddcd98eddf",
+    "clean": true,
+    "browser_handle": 36812,
+    "browser_terminal": 0,
+    "files": 3,
+    "cases": 37,
+    "asset_refresh": "actual0",
+    "native_all14": "nextUNRUNatlastobservation"
+  },
+  "counter_browser_body": {
+    "original_bootstrap": "exit9removedNodeflagbeforetestsUNRUN",
+    "corrected_handle": 54610,
+    "status": "TERMINAL1",
+    "scope": "3wholebrowserfiles no nativepassyet",
+    "terminal": 1,
+    "reported": 28,
+    "pass": 26,
+    "fail": 2,
+    "failure": "VoicecancellationretainsaudioStartbutnotcustodyBlocked;clientmodulebeforecaseimportstriperror",
+    "next": "Actualcustodystatefix+existingesbuildmetafile3entries,newsubjectchecks;no nativecredit"
+  },
+  "counter_browser_next": {
+    "handle": 28690,
+    "status": "28690TERMINAL1",
+    "earlier_preflights": "node3/4actualbeforecasecanonicalpath+tmprealpath failures retained",
+    "subject": "uncommittedexpandedcustodyfix/exactguards",
+    "native_all14": "UNRUN",
+    "terminal": 1,
+    "cases": 37,
+    "pass": 36,
+    "fail": 1,
+    "original141": "PASS",
+    "durable_marker_cases": "PASS",
+    "failure": "Stickyfixtureglobalobsoletealiasesdistinctrealcompletion/audio predicates",
+    "repair": "IndependentaudioObsolete fixturecontrol preservingcompletionobsolete andoriginalexpectedjourney"
+  },
+  "counter_final_audio_peer": {
+    "path": "/private/tmp/artroom-counter-audio-custody-independent-review/84d-source-review.json",
+    "sha256": "c87593141b1ca52fc14b08576600f449fa7d86e9f84d4826679762fc73fd93bc",
+    "root_read": "FULLpacket/metadata-correction;18immutablehashesverified",
+    "finding": "none in boundedrepair",
+    "original_hashlineage": "correctedFALSEworkingvoice nothistoricaltestedhash"
+  },
+  "provenance": {
+    "continuity_path": "/tmp/artroom-builder-current-continuity.json",
+    "continuity_sha256_when_read": "da3a2cbab8ab6009f638a19498a15cae9f2870105b906980ee046674cf58de6b",
+    "projection_only": true,
+    "no_actual_percase_ledger_or_raw_log_decode": true
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "v": 1,
+  "status": "Explicit PUBLIC bounded retained Counter native/pure metadata projection; no new runtime",
+  "checkerRequest": "d3230144ee74437e6facb634d375d14bc6a994e1",
+  "builderPromise": "d4b1aa5081ac23fe8f63bc12dd3a9fe3bd7b4052",
+  "currentReview": {
+    "request": "fac2e357542a8ef7254e6ec4ae89c28fde07e39c",
+    "checker_promise": "de897478be9e5bb9dbcb608750b9332ba12a6450",
+    "head": "fb6f923ee75123fc045fd4368af4a1a41cda32e2",
+    "status": "promised"
+  },
+  "testedSource": {
+    "head": "84d3b39eaeca84a9395d290fafb617f995bb01e8",
+    "tree": "79d3c8b91ee697edef31ea44294f49ddcd98eddf"
+  },
+  "outcomes": [
+    {
+      "originalRuntimeHandle": 93213,
+      "head": "84d3b39eaeca84a9395d290fafb617f995bb01e8",
+      "tree": "79d3c8b91ee697edef31ea44294f49ddcd98eddf",
+      "exit": 0,
+      "wholeFiles": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "unhandledErrors": 0,
+      "lifecycle": {
+        "selection": true,
+        "collectedModules": 2,
+        "started": 2,
+        "results": 2,
+        "end": "passed",
+        "missing": 0,
+        "duplicates": 0,
+        "retries": 0,
+        "repeats": 0,
+        "builtinCountsMatch": true
+      },
+      "originalCompleteResult": {
+        "path": "/tmp/artroom-counter-native-two/complete-result.json",
+        "bytes": 640,
+        "sha256": "41c16ef9bcbd569bc59e5b703917c7a442f5f198c0e79c56af48afd7d1735708"
+      },
+      "sourceRootAtRun": "/private/tmp/artroom-demo-counter-composed",
+      "toolPoolMetadata": "Explicit same-run planned threads/cloudflare-pool matches accepted Reporter module selection; no standalone retained tool binary/version/hash inventory found in these result directories",
+      "timingFromOriginalMetadata": {
+        "vitestDurationSeconds": 1.95
+      },
+      "timingQualification": "Vitest duration only; native process wall/CPU and source before/after snapshots absent here. Tool elapsed is explicitly not CPU."
+    },
+    {
+      "originalRuntimeHandle": 71102,
+      "head": "84d3b39eaeca84a9395d290fafb617f995bb01e8",
+      "tree": "79d3c8b91ee697edef31ea44294f49ddcd98eddf",
+      "exit": 0,
+      "wholeFiles": 5,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "unhandledErrors": 0,
+      "lifecycle": {
+        "selection": true,
+        "collectedModules": 5,
+        "started": 10,
+        "results": 10,
+        "end": "passed",
+        "missing": 0,
+        "duplicates": 0,
+        "retries": 0,
+        "repeats": 0,
+        "builtinCountsMatch": true
+      },
+      "originalCompleteResult": {
+        "path": "/tmp/artroom-counter-pure-one/complete-result.json",
+        "bytes": 802,
+        "sha256": "ff86f2c9c9bef1fa9a6e4692c462be541ab647738b960818ca4d6234613dece3"
+      },
+      "sourceRootAtRun": "/private/tmp/artroom-demo-counter-composed",
+      "toolPoolMetadata": "Explicit same-run planned threads/cloudflare-pool matches accepted Reporter module selection; no standalone retained tool binary/version/hash inventory found in these result directories",
+      "sourceBeforeSnapshot": {
+        "sha256": "68ae4452a33407729dee901fd65ad98f7b4aa9c3c5004760569eb2ca8ff3f752",
+        "paths": 1307,
+        "clean": true
+      },
+      "ownerRetainedSourceBeforeAfterExact": true,
+      "timingFromOriginalMetadata": {
+        "wallSeconds": 1.24,
+        "userSeconds": 2.32,
+        "sysSeconds": 0.32,
+        "cpuSeconds": 2.64
+      },
+      "timingQualification": "Retained owner result fields; no separate time file found in this directory. Not a whole-gate measurement."
+    }
+  ],
+  "currentFb6Correspondence": {
+    "selectedTestFiles": 7,
+    "additionalPinnedRelevantSourcesAndGeneratedObject": 14,
+    "all21GitObjectsEqual": true,
+    "file": {
+      "path": "/tmp/artroom-counter-d323-public-evidence/source-correspondence.json",
+      "bytes": 6026,
+      "sha256": "51829eb97e3af7bdba2ec041a6428ed9ec98939bf25b5536fbfb506bae77c9ee"
+    },
+    "limit": "Exact21path byte equality supports reuse at those paths only. It does not establish every transitive test/tool input atfb6 or a newly executedfb6 focused pass."
+  },
+  "existingReportAndOwnerIDs": {
+    "CounterRequest": "c612acc60c1b02577c7814b8026ad6d398f54023",
+    "CounterBuilderPromise": "96ce76dbe95b0247193bf7ac5d4df47937915350",
+    "aggregateCounterAssertion": "9db1eae61bb4bc347d162f793fee90407a97ab0a",
+    "aggregateAssertionQualification": "Continuity identifies an aggregateCounter gate/source assertion; not claimed as a separate standalone native93213 or pure71102 report",
+    "standaloneNativePureReportIDs": "No separate report-act identifiers found in the bounded retained metadata; original handles and exact existing projection paths are available",
+    "sourcePacket": {
+      "path": "/tmp/artroom-counter-composition-packet/packet.json",
+      "bytes": 2102,
+      "sha256": "4c0499ae61487f8470137e2c7797a2638d0c1f0727db264167c0d136dbeeb359"
+    }
+  },
+  "originalFailureKept": {
+    "path": "/tmp/artroom-counter-native-one/bootstrap-result.json",
+    "metadata": {
+      "exit": 1,
+      "bodies": "unrun",
+      "reason": "existing Reporter rejects --project filter",
+      "source": "84d3b39eaeca84a9395d290fafb617f995bb01e8",
+      "elapsedToolSeconds": 0.64
+    },
+    "sha256": "dbe8aa98f5221b682ffbb3601f5b257b7c32b7b5efc8431b161198fa3988109e",
+    "qualification": "Existing Reporter --project selection refused before any native body; not native assertion evidence. Positive native93213 is a distinct later original run."
+  },
+  "nativeBoundaryQualification": "Owner continuity and frozen native header identify real native R6/D6/M5 factory/enrollment/current membership/C1 evaluator/SQLite/HTTP sessions/alarms/restart/proven replay, with one admin person and two enrolledagents. Git-host answers/monotonic clock are stand-ins; no inspector/fabricatedgrant/founding/speech in the C1case. Routecase is same-origin staticasset/URLcredential policy. This is not three-agent deployed automatic audio/browser acceptance.",
+  "pureBoundaryQualification": "Four Countingschema/model/refold/fairness/timer/cap cases; explicitM1 data/cohort; two fullcatalog golden cases; twoCLI custody cases with fake service/memory store; static Countingasset consistency. Threads tests are not native admission/browser/provider proof.",
+  "absenceLimits": [
+    "Native complete result has frozen head/tree but no separately retained before/after Source snapshot or standalone tool checksum/version command record in that directory.",
+    "Pure source-before1307paths and owner sourceBeforeAfterExact flag exist; a separate aftersnapshot is not retained in that directory.",
+    "No complete commands/standalone tool timing are fabricated from pool names or today\u2019s tool view; native1.95s is Vitestduration only.",
+    "No independent approval or newfb6 runtime/gate/deployment/browser/provider/audio acceptance is transferred.",
+    "Raw diagnostic/JSON/config bodies are not declassified. Only whitelisted retained complete-result fields and normalized census/source-object metadata are made PUBLIC."
+  ],
+  "privateHashOnly": [
+    {
+      "path": "/tmp/artroom-counter-native-two/plan.json",
+      "bytes": 794,
+      "sha256": "2e403244e3ce191f1687788eb5a4811a95911f1cb9042b4ffa05a294db966fab"
+    },
+    {
+      "path": "/tmp/artroom-counter-native-two/vitest.json",
+      "bytes": 1765,
+      "sha256": "c29077b83b2de4863ef77afac001aa2087cc8b63505bd1439d719d2d2b2170b3"
+    },
+    {
+      "path": "/tmp/artroom-counter-native-two/coverage.jsonl",
+      "bytes": 4103,
+      "sha256": "a6290a3bca9040588455f2e0e1011026838aee5e7e68d90b3ef51e37a4981312"
+    },
+    {
+      "path": "/tmp/artroom-counter-native-two/body.log",
+      "bytes": 718,
+      "sha256": "7a2cea829262dd8ffbc0601cf97ac3429dfc47a01c476354d8c85e85e81b106e"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/plan.json",
+      "bytes": 2338,
+      "sha256": "898c3e7a7c45c2ca226dd2c69f393a04f9656b41bed01577ccc34e929b1705f2"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/vitest.json",
+      "bytes": 5429,
+      "sha256": "369007d5ef08bf54207bfc6f81f7fa50db07bf134f51f011a42ad61fbbf9a2a4"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/coverage.jsonl",
+      "bytes": 15655,
+      "sha256": "ac21bb750afa6951fd2b951b56b3c3d266e5525ccea2f07b0029890afdc52293"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/body.log",
+      "bytes": 2073,
+      "sha256": "1a0d9d1fbd5a879650263bb66be0f0adec15360cb8e5455092843fde98423e61"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/source-before.json",
+      "bytes": 148705,
+      "sha256": "68ae4452a33407729dee901fd65ad98f7b4aa9c3c5004760569eb2ca8ff3f752"
+    }
+  ],
+  "continuityBinding": {
+    "path": "/tmp/artroom-builder-current-continuity.json",
+    "sha256": "da3a2cbab8ab6009f638a19498a15cae9f2870105b906980ee046674cf58de6b",
+    "scope": "Only relatedCounter keys/request/handle/status/pointers read; no publication of whole continuity file"
+  },
+  "noRuntime": true,
+  "noSourceEdits": true
+}

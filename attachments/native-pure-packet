@@ -1,0 +1,46 @@
+{
+  "v": 1,
+  "status": "PUBLIC explicit safe retained metadata/census whitelist",
+  "request": "d3230144ee74437e6facb634d375d14bc6a994e1",
+  "builderPromise": "d4b1aa5081ac23fe8f63bc12dd3a9fe3bd7b4052",
+  "whitelist": [
+    {
+      "path": "/tmp/artroom-counter-d323-public-evidence/public-proof.json",
+      "bytes": 9069,
+      "sha256": "73661ef8693a7bbb01534174d2c72b46fdadd7c1eea20e44d176d4c270e61bdb"
+    },
+    {
+      "path": "/tmp/artroom-counter-d323-public-evidence/case-census.json",
+      "bytes": 7971,
+      "sha256": "29ba230dbab1f28394351de9cbca0935f8527a6546c736a7122ee4a4803e5b45"
+    },
+    {
+      "path": "/tmp/artroom-counter-d323-public-evidence/source-correspondence.json",
+      "bytes": 6026,
+      "sha256": "51829eb97e3af7bdba2ec041a6428ed9ec98939bf25b5536fbfb506bae77c9ee"
+    },
+    {
+      "path": "/tmp/artroom-counter-d323-public-evidence/review.txt",
+      "bytes": 1443,
+      "sha256": "a1f4aa5e7e2d3b92f4256299e8d0d6e1c9fb72d41f72dd262f5438f08af32c4c"
+    },
+    {
+      "path": "/tmp/artroom-counter-native-two/complete-result.json",
+      "bytes": 640,
+      "sha256": "41c16ef9bcbd569bc59e5b703917c7a442f5f198c0e79c56af48afd7d1735708"
+    },
+    {
+      "path": "/tmp/artroom-counter-pure-one/complete-result.json",
+      "bytes": 802,
+      "sha256": "ff86f2c9c9bef1fa9a6e4692c462be541ab647738b960818ca4d6234613dece3"
+    },
+    {
+      "path": "/tmp/artroom-counter-native-one/bootstrap-result.json",
+      "bytes": 181,
+      "sha256": "dbe8aa98f5221b682ffbb3601f5b257b7c32b7b5efc8431b161198fa3988109e"
+    }
+  ],
+  "privateExcluded": "No raw body.log, builtin rawJSON/coverage/plan, source-before fullmanifest, generatedassets, livekeys/audio or wholecontinuity; no automatic following of paths/hashreferences",
+  "scope": "Original runtime93213/71102 only, exact Source/test correspondence and absence limits; no approval or runtime transfer",
+  "noRuntime": true
+}
