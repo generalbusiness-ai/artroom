@@ -37,6 +37,7 @@ The symbol reads at 16 px from the master drawing. The small cut in `dap-symbol-
 | Ink | #16180F | 22 24 15 | Text, dark surfaces |
 | Bone | #F3F1EA | 243 241 234 | Light surfaces |
 | White | #FFFFFF | 255 255 255 | Reversed logo on green or ink |
+| Garnet | #7A1F2E | 122 31 46 | Refusals and removals only; never the logo |
 
 CMYK and Pantone matches are to be chosen at the first print job; the HEX values are the reference until then.
 

@@ -3,13 +3,13 @@
 Request: `719d2b572ce54d50aec5d4cdfdcadda9333a969d`.
 Builder promise: `40f8bba4d1b6447c0c7569222736a02e341662bb`.
 
-`brand/` contains all 38 files from `~/play/dap-logo-concepts/kit`, with unchanged bytes. The named generator was absent from `kit/`; `brand/gen6.py` copies `~/play/dap-logo-concepts/gen6.py` unchanged. `brand/README.md` records the origin and the generator’s actual output limits.
+`brand/` contains all 38 files from `~/play/dap-logo-concepts/kit`. The initial import preserved every byte. Planner amendment `0d8ffdbe2ea133afe46f74dc85b86b8c31c1ccf3` then changed only `tokens.css` and the Colour section of `GUIDELINES.md`, as recorded below. The named generator was absent from `kit/`; `brand/gen6.py` copies `~/play/dap-logo-concepts/gen6.py` unchanged. `brand/README.md` records the origin and the generator’s actual output limits.
 
 Focused checks compared every copied file with its source, parsed all SVGs and the web manifest, and regenerated the 13 master SVGs in a scratch directory. All 13 matched the supplied masters byte for byte. The generator does not produce the distribution files, CSS tokens, or guidelines. No application code, UI, dependency, or deployment changed. The gate and bounded completion outcomes are recorded under Review checks below.
 
-## Copied file SHA-256 digests
+## Original copied file SHA-256 digests
 
-The following script computes every copied file’s digest from the committed tree. It excludes the authored README. Run it from the repository root at this delivery commit.
+The table records every original copied file’s digest at import commit `0e1d61f30cac9919b826795aec43e0c197d8fa1d`. The script computes current committed digests, excluding the authored README. Only the two amended files differ from the original table; their final digests appear below.
 
 ```sh
 python3 - <<'PY'
@@ -76,3 +76,16 @@ After the owned dependency directory replaced that symlink, bounded test complet
 Durable evidence is `/Users/hughpyle/play/artroom-diagnostics/brand-kit-import/bounded-completion-final.json`, SHA-256 `47727f8976f9b6103add3d56cf2e265a13f71e06a3aa23bcce09c647f628884c`. The delivery commit after these checks changes only this note; the copied kit bytes and authored README remain the checked source.
 
 The first documentation append stood at commit `52709897e3dfe7373ba1516efdedefaf9129cc0a`; this accuracy correction changes only the delivery note. The checked source and tree remain the pair recorded above.
+
+## Garnet amendment
+
+Planner amendment `0d8ffdbe2ea133afe46f74dc85b86b8c31c1ccf3` adds garnet for refusals and removals only. It does not change the logo. The light tokens are `--dap-garnet: #7A1F2E` and `--dap-garnet-tint: #F1DEE1`. Both the dark media query and explicit dark selector use `#D98A96` and `#3A1C22`. The Colour section states the restricted use.
+
+Of the 38 original kit files, 36 retain their source bytes and two carry this authorized amendment. The separately supplied generator also remains unchanged. Final amended file digests are:
+
+| File | SHA-256 |
+|---|---|
+| `brand/tokens.css` | `7526723c25f6855126461b69b3ce5ba1b992ef1e83c0824b7ee6859d49742e13` |
+| `brand/GUIDELINES.md` | `1797bd5c28ae1394fd0448b331258bc11d70d503d1b8083d0aefdcc8c4d3c19c` |
+
+Focused checks confirmed the exact token pairs in all three selectors and the guideline restriction. The garnet-on-tint contrast ratios are 7.89:1 in light mode and 5.86:1 in dark mode, calculated from sRGB relative luminance. Only the two authorized assets, the README provenance, and this note changed. No application source or live consumer changed, so the prior bounded checks were not repeated.

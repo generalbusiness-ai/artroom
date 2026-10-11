@@ -3,6 +3,8 @@
   --dap-green: #123F2B;   /* forest green: logo, links, primary actions */
   --dap-green-deep: #0B2E1F;
   --dap-green-tint: #DCE9E0;
+  --dap-garnet: #7A1F2E; /* refusals and removals only */
+  --dap-garnet-tint: #F1DEE1;
   --dap-ink: #16180F;     /* text, dark surfaces */
   --dap-bone: #F3F1EA;    /* light surfaces */
   --dap-line: #D8D5CB;
@@ -21,11 +23,13 @@
   :root:not([data-theme="light"]) {
     --dap-bg: #121410; --dap-fg: #ECEAE2; --dap-line: #2C2F27; --dap-mute: #A3A295;
     --dap-accent: #5FA880;   /* lighter green so links pass contrast on ink */
+    --dap-garnet: #D98A96; --dap-garnet-tint: #3A1C22;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --dap-bg: #121410; --dap-fg: #ECEAE2; --dap-line: #2C2F27; --dap-mute: #A3A295;
   --dap-accent: #5FA880;
+  --dap-garnet: #D98A96; --dap-garnet-tint: #3A1C22;
   color-scheme: dark;
 }
