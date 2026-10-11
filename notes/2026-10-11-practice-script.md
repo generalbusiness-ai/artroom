@@ -40,18 +40,18 @@ minute. Keep the terminal commands below available for a cutaway, rather
 than typing the whole setup in the recording.
 
 ```sh
-	artroom install --plan <base-url> --host artifacts --namespace artroom-demo
-	# The operator pins the printed register before continuing.
-	artroom install --planned
-	artroom claim <take-name> --handle @hugh
-	artroom invite @una --role member
-	artroom invite @paul --role maintainer
-	# In Una's fresh context, use her own invitation.
-	artroom join <una-invitation>
-	artroom clone site
-	git -C site log --oneline
-	# In Paul's fresh context, use his own invitation.
-	artroom join <paul-invitation>
+  artroom install --plan <base-url> --host artifacts --namespace artroom-demo
+  # The operator pins the printed register before continuing.
+  artroom install --planned
+  artroom claim <take-name> --handle @hugh
+  artroom invite @una --role member
+  artroom invite @paul --role maintainer
+  # In Una's fresh context, use her own invitation.
+  artroom join <una-invitation>
+  artroom clone site
+  git -C site log --oneline
+  # In Paul's fresh context, use his own invitation.
+  artroom join <paul-invitation>
 ```
 
 The [observed 7 October script, corrected on 8 October](2026-10-07-demo-script-draft.md)
@@ -79,7 +79,7 @@ room.”
 Terminal fallback, observed on 8 October:
 
 ```sh
-	artroom issue open --title 'Add a getting-started page' --body 'A page that says how to clone and edit.'
+  artroom issue open --title 'Add a getting-started page' --body 'A page that says how to clone and edit.'
 ```
 
 Printed shape: `Opened issue #1: Add a getting-started page. Its lane is …`.
@@ -98,8 +98,8 @@ Printed shape: `Opened issue #1: Add a getting-started page. Its lane is …`.
 Terminal fallback, observed on 8 October:
 
 ```sh
-	artroom issue comment <issue-number> 'I will take this.'
-	artroom issue assign <issue-number> @paul
+  artroom issue comment <issue-number> 'I will take this.'
+  artroom issue assign <issue-number> @paul
 ```
 
 Printed shapes: `Commented: entry …, hash …` and
@@ -123,8 +123,8 @@ Printed shapes: `Commented: entry …, hash …` and
 Terminal fallback, observed on 8 October:
 
 ```sh
-	artroom edit guide/start.md --file start.md --closes <issue-number>
-	artroom issues
+  artroom edit guide/start.md --file start.md --closes <issue-number>
+  artroom issues
 ```
 
 Printed shapes: `Proposed guide/start.md (53 bytes) as change …, version 5.`,
@@ -135,8 +135,9 @@ Use the take's actual bytes, version, and issue count on screen.
 ### 2:20 to 2:50. Show the concurrent-edit beat
 
 - **On screen:** two changes made against the same published base.
-- **Do:** publish the first. Attempt to publish the second. Have its
-  integrator propose it again against the new head, then publish it.
+- **Do:** publish the first. Attempt to publish the second. Ask the
+  person who proposed the second change to propose it again against the
+  new head, then publish it.
 - **Appears:** a refusal because the second change's base is out of date,
   followed by a second publication. **To be confirmed:** the rehearsal
   shot and its exact output have not yet been observed. The internal
@@ -164,7 +165,7 @@ a textual merge or a test result for the observed rehearsal shot.
 Observed terminal command:
 
 ```sh
-	artroom edit AGENTS.md --file agents.md
+  artroom edit AGENTS.md --file agents.md
 ```
 
 Observed printed shape:
@@ -187,8 +188,8 @@ Observed printed shape:
 Observed terminal fallback:
 
 ```sh
-	artroom act review-verdict --on <controlled-change> --set manifest=<current-version> --set verdict=approve --set extent=rules
-	artroom merge <controlled-change>
+  artroom act review-verdict --on <controlled-change> --set manifest=<current-version> --set verdict=approve --set extent=rules
+  artroom merge <controlled-change>
 ```
 
 Printed shapes: `Took effect: entry …, hash …`,
@@ -258,10 +259,10 @@ or human collaboration as events that happened in this procedural clip.
 Prepare this room off camera with:
 
 ```sh
-	artroom install --plan <base-url> --host github.com --namespace generalbusiness-ai
-	# The operator pins this new register in GITHUB_APP_CONFIG.
-	artroom install --planned
-	artroom claim <github-take-name> --handle @hugh
+  artroom install --plan <base-url> --host github.com --namespace generalbusiness-ai
+  # The operator pins this new register in GITHUB_APP_CONFIG.
+  artroom install --planned
+  artroom claim <github-take-name> --handle @hugh
 ```
 
 ### 5:35 to 6:15. Show the verifier
@@ -270,7 +271,7 @@ Prepare this room off camera with:
 - **Do:** run the verifier on the room used in the take.
 
 ```sh
-	artroom verify --all
+  artroom verify --all
 ```
 
 - **Appears:** the 8 October default rehearsal printed each history
@@ -312,7 +313,7 @@ Prepare this room off camera with:
    separate `founder`, `member`, and `maintainer` config directories.
 
    ```sh
-	node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host github.com --namespace generalbusiness-ai --scratch <new-scratch-directory> --out <new-scratch-directory>/out --name <unique-room-name>
+    node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host github.com --namespace generalbusiness-ai --scratch <new-scratch-directory> --out <new-scratch-directory>/out --name <unique-room-name>
    ```
 
    The current default has 26 shots. The new stale-base shot and its
@@ -356,6 +357,8 @@ Use the application's word for the application's thing: issue, pull
 request, assign, merge, branch, and clone for the repository; turn, count,
 and next for Counter; theme, instrument, solo, and bar for Jam. Use one
 shared plain word for what the room does. Name the rule when naming a rule.
+
+The page labels a proposed change “change” where GitHub says pull request. Say “change” on camera to match the screen until Hugh decides otherwise.
 
 This is the glossary from plan 030:
 
