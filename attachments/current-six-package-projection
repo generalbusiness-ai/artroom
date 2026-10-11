@@ -1,0 +1,254 @@
+{
+  "explicit_public_whitelist": "This bounded projection, six tarballs, release manifest/checker result metadata only. No opaque compiled JavaScript or nativecapture body disclosure. Raw execution logs stay hash-only.",
+  "original_execution_handle": 94781,
+  "actual_producer_exit": 0,
+  "actual_checker_exit": 0,
+  "individual_compile_pack_exits": "No separate perpackage exit ledger retained. Existing producer requires every compiler/pack success before terminal0; completechecker likewise requires all stated contexts/journeys.",
+  "source": {
+    "root": "/private/tmp/artroom-sdk-final-main-producer",
+    "head": "3bd18314efed78ee757b5b2f9d5bdb3198250c1d",
+    "tree": "0be9f4dae4c8f60ee5074275b9e18c7eb77add2a"
+  },
+  "main_remote_receipt_reported_by_root": "8a881a6a0c1ec0adcd11f6a307ec48728c8eb07e",
+  "stage": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one",
+  "version": "0.1.0-dev.2",
+  "packages": [
+    {
+      "name": "@generalbusiness/artroom-contract",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-contract-0.1.0-dev.2.tgz",
+      "bytes": 33218,
+      "sha256": "fbf2ce4d8cdd14c85fa2b802a6ff8b9df9e0b625fdfd270df20ec8352a1c6a58",
+      "integrity": "sha512-pNt4ilZh6mdlo8jcARWx7t1oo02j+XMRngv97P7f1PdYjRho4eXQfUB10T1uAzGN2UVTa11/tCEaALnG/+UXlA==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-contract-0.1.0-dev.2.tgz"
+    },
+    {
+      "name": "@generalbusiness/artroom-bytes",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-bytes-0.1.0-dev.2.tgz",
+      "bytes": 31385,
+      "sha256": "3ad60c796b2185876c395db38ee4bbf661c01ced8438fe539db5d249b6399db6",
+      "integrity": "sha512-WG0tZ7B1kJYl4nG4ikEGKOoHgq9ZV1d44OJ8ipcFNpatq6L/P98l+WfrawBtaZRdQ6cNAXz7FLV2iUWRjpSwAA==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-bytes-0.1.0-dev.2.tgz"
+    },
+    {
+      "name": "@generalbusiness/artroom-client",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-client-0.1.0-dev.2.tgz",
+      "bytes": 36474,
+      "sha256": "47de0e5da487dc592470b0e82aa4fcb26ecd6092c97dc3118f0d267420101a11",
+      "integrity": "sha512-5arNE5TBAsi5bPcvkkRwS2DYd0Wsc2b1SFoQnTsew2ZaIcggFNmWUa4rM9nyFbFpcPBqaXK6VN5sIL9VLrP8RA==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-client-0.1.0-dev.2.tgz"
+    },
+    {
+      "name": "@generalbusiness/artroom-derive",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-derive-0.1.0-dev.2.tgz",
+      "bytes": 346672,
+      "sha256": "7c271437a8c529828969e775880a1efdb999e911d50531816639f546e5934f21",
+      "integrity": "sha512-BBIoRK1lMAMC4gV8sZWa2a4p9xLOTpu2g23/IvZeajPnVGhWbjOPQGLqOx4s1Xxu7OAppx8CPAnUed+0iXmQvw==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-derive-0.1.0-dev.2.tgz"
+    },
+    {
+      "name": "@generalbusiness/artroom-platform",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-platform-0.1.0-dev.2.tgz",
+      "bytes": 142408,
+      "sha256": "5475050193dae3b31b2e7d176cc1e7ebcfd08e47e9d57b3cfe2e114087e085b7",
+      "integrity": "sha512-584qElfjKtv47Oe6hyu8vklz/uVm44D4roxQm1FrVbQDQY0lSh0fHgmloIIFQIBjrR+xRqHsy2Nbg/4344yOTw==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-platform-0.1.0-dev.2.tgz"
+    },
+    {
+      "name": "@generalbusiness/artroom-replay",
+      "version": "0.1.0-dev.2",
+      "tarball": "generalbusiness-artroom-replay-0.1.0-dev.2.tgz",
+      "bytes": 47151,
+      "sha256": "2ecc290a509cc248272fd70bb60ba478a630f7723f50a087cb42ea0081b31256",
+      "integrity": "sha512-ew/xAqYtt1ZlOvBiPFIlc3U9bXmBZx4wyG24raU+yPLNF7R9oj5FAm8DMY4PgxuoDrL87klvxZtzezDUk2KElA==",
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/tarballs/generalbusiness-artroom-replay-0.1.0-dev.2.tgz"
+    }
+  ],
+  "metadata_seals": {
+    "release_manifest": {
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/release-manifest.json",
+      "bytes": 468280,
+      "sha256": "8f21a3c9c30e0e90d7ae034e0918cf1a4112cbcde8da1f49dddfb710507dc2ac"
+    },
+    "complete_checker_result": {
+      "path": "/private/tmp/artroom-sdk-final-main-localdev2-stage-one/checks/result.json",
+      "bytes": 155577,
+      "sha256": "3ac79c81396449d76892cc0c5e47e18610a347e8c2cf8118c8adc3d786b798b8"
+    },
+    "execution_public_status": {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/public-status.json",
+      "bytes": 449,
+      "sha256": "6bc30347e5b46d47f4700c17af3dc63a781bb2689879e123d17141d5efe6a738"
+    }
+  },
+  "actual_checked_outcomes": {
+    "six_archive_sri_contents_exports_closure": "PASS",
+    "compiledOutputJourney": "passed",
+    "testingFixtureClone": "native call preserved; private type erased; public variant signature unchanged; nested clone leaves original intact",
+    "full_replay_result": "consistent",
+    "full_replay_why": null,
+    "full_report": {
+      "mode": "replay",
+      "target": {
+        "at": {
+          "scope": "sc_fbfkixstdygtwefeqoclws7x4zq5f2vytow7wtge5cmnecxz2bpa",
+          "inc": "in_ekulvsf2uowdm5zulqzyyaejxi",
+          "kind": "rules"
+        },
+        "seq": 2,
+        "hash": "sha256:2c0c7ab6776ffbe980ac6c429cdab7e5ee7a09f9dece7f55482a7c7000cedf9f"
+      },
+      "coverage": [
+        {
+          "scope": {
+            "scope": "sc_fbfkixstdygtwefeqoclws7x4zq5f2vytow7wtge5cmnecxz2bpa",
+            "inc": "in_ekulvsf2uowdm5zulqzyyaejxi",
+            "kind": "rules"
+          },
+          "from": 0,
+          "through": 2
+        },
+        {
+          "scope": {
+            "scope": "sc_akmhqw6nfcu7iug7fqhqaizs37zi53wueukcbdsuvjlq2pjozrza",
+            "inc": "in_t3scmjeqlihh4qsifasylb33d4",
+            "kind": "directory"
+          },
+          "from": 0,
+          "through": 3
+        },
+        {
+          "scope": {
+            "scope": "sc_yhh4i4oxt4fp56ujbz3lp4paes4oclmxicgvmgw4ow2w6e7hdkpq",
+            "inc": "in_ahcxpkbdibgzrqp3svp6d72fpe",
+            "kind": "register"
+          },
+          "from": 0,
+          "through": 4
+        },
+        {
+          "scope": {
+            "scope": "sc_pahwgielqa4tf35tuvhp5gw2tlgm3qzocwjdkogmbrlvsi7zsmfq",
+            "inc": "in_kp2o5xfeat3beqn6j77bzglsgm",
+            "kind": "membership"
+          },
+          "from": 0,
+          "through": 4
+        },
+        {
+          "scope": {
+            "scope": "sc_tx2jn5r4bvbjkiiq2gpaimp5vacryddkvhdalxts7hypzrmypooq",
+            "inc": "in_4idx233syzgj2bwdwfqee5vtzy",
+            "kind": "inbox"
+          },
+          "from": 0,
+          "through": 0
+        }
+      ],
+      "anchors": [],
+      "dependencies": {
+        "verified": 11,
+        "anchored": 0,
+        "missing": []
+      },
+      "trusts": [
+        "the service clock: each entry's time is taken as recorded",
+        "the service's answer for each source history that was replayed: no anchor was given for it",
+        "that each incarnation was minted once",
+        "that a provisional scope dispatched no held send before its confirmation",
+        "delivery times: when each message was delivered",
+        "observation-read: that each read behind a retained observation was made as recorded, that it began at the stated time, that a fresh value was not held from an earlier read under a new number, and that no restart came between two entries of one run",
+        "each outcome's evidence, and that the outside write happened: the answer of the outside system is taken as the entry records it. `own-answer`: that an answer was that attempt's own. `host-read`: that a read returned what was recorded",
+        "the bounds: each scope is taken to run under the bounds this replay was given",
+        "platform-code: that the rules this replay ran for platform:directory@2 are the rules of that name and version",
+        "platform-code: that the rules this replay ran for platform:inbox@1 are the rules of that name and version",
+        "platform-code: that the rules this replay ran for platform:membership@2 are the rules of that name and version",
+        "platform-code: that the rules this replay ran for platform:register@2 are the rules of that name and version",
+        "platform-code: that the rules this replay ran for platform:rules@2 are the rules of that name and version"
+      ],
+      "redacted": [],
+      "result": "consistent"
+    },
+    "foreign_control_result": "missing-dependency",
+    "foreign_control_missing": [
+      {
+        "at": {
+          "inc": "in_t3scmjeqlihh4qsifasylb33d4",
+          "kind": "directory",
+          "scope": "sc_akmhqw6nfcu7iug7fqhqaizs37zi53wueukcbdsuvjlq2pjozrza"
+        },
+        "hash": "sha256:91c422bb6b6bc6a4cfa9d3179f502f067fea8c1928f6e4ae9512c168471641af",
+        "seq": 0
+      }
+    ],
+    "consumer_contexts": [
+      {
+        "mode": "NodeNext",
+        "resolution_file_count": 296
+      },
+      {
+        "mode": "Bundler",
+        "resolution_file_count": 169
+      },
+      {
+        "mode": "ambient-only-no-DOM-no-Node",
+        "resolution_file_count": 60
+      }
+    ],
+    "browser_compiled_closure": {
+      "input_count": 119,
+      "bundle_sha256": "9c54a78a9371d2cda0636f0833ca2f76ca4d5325d8b04101a1b31f7346d5cbaa",
+      "metafile_sha256": "eb8ee7b4d39c0fdd48d184e2311dca828d5ea9b847d60fc93f39bbcd8e43f2cf",
+      "qualification": "compiled closure bundle, not physical browser or public registry execution"
+    }
+  },
+  "capture_binding": {
+    "path": "/private/tmp/artroom-public-sdk-six-fourth-native-capture-public-one.json",
+    "bytes": 96949,
+    "sha256": "f01d6a82fb57f72bceb8160b9f0bf6f3a8b32a443bbf87a112b044efbd190833",
+    "scope": "Retained opaque PUBLIC historical2 capture checked byactualcompiledreplay/proven grants/exactmissingdirectoryfact. No freshnativeR6/F1/Jam creation orcapture generated."
+  },
+  "tool_source_view_before_after": "ActualguardPASS,1315trackedsource/current12workspace/117ownedlinks/pinnedNode/npm/TSnative/esbuild/opaquef01 capture unchanged. Existinglockedcachedview only, no packagesinstalled.",
+  "development_authority": "Planner338d permits these exact digest/SRI-pinned staged artifacts forJam development pendingnpm authority. Localstage/compiledclosure only: NOT publicregistry publication/install, no registryquery/credentialoperation.",
+  "private_execution_log_hash_only": [
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/producer.log",
+      "bytes": 81,
+      "sha256": "b61deca96fbe2f3e7b97092ed1e70232c45e472732892b1566d11277d910c9a9"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/producer.time",
+      "bytes": 29,
+      "sha256": "d389366f053f24421844d8e3489ff9afa143c08f6630e566e6e9adad79a74386"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/producer.status",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/checker.log",
+      "bytes": 98,
+      "sha256": "ffe75b035c006a93c41749833a870089b5c689036ec78311e7f0d9c97d29ca23"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/checker.time",
+      "bytes": 29,
+      "sha256": "c870b090e4f4241e8ec6b394a55fd7edbe0761d55d4a5690c7b6b61176655160"
+    },
+    {
+      "path": "/private/tmp/artroom-sdk-final-main-output-one/checker.status",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    }
+  ],
+  "qualifications": [
+    "Newall6artifactidentities observed fromthisrun; oldstage preserved. Actualfirst4/replay happenedbyteidentical; newplatformchanged, cannottransferoldplatformSRI.",
+    "PlatformcatalognowincludesF1 5/5/4 andCounting6/6/5 withhistoricalpins/default3. ExactJam selectednativecohort/bounds/grants/readers mustcome from actualprovisioning.",
+    "No nativecapture/test/gate/browserrender/deployment/publicpublication repeats ornewSource edits. FullJam/Core/Counter acceptance remains separate."
+  ]
+}
