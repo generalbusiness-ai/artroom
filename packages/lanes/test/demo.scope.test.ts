@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, inject, test, onTestFinished } from "vitest";
 import type { ScopeId } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
-import type { Fetch } from "@generalbusiness/artroom-client";
+import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
@@ -60,12 +60,12 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
       const wired = new Set<ScopeId>();
       try {
         const at = await make();
-        const { stage, drained } = testStage(at, wired);
+        const { stage, people, drained } = testStage(at, wired);
         const next: number[] = [];
         const rehearsal = await rehearse({ ...stage, manifest: true, beforeShot: async (shot) => { next.push(shot.n); } });
         const failed = rehearsal.shots.filter((shot) => !shot.match).map((shot) => `${shot.n}. ${shot.title}: ${shot.why}\n${shot.lines.join("\n")}`);
         expect(failed, failed.join("\n\n")).toEqual([]);
-        expect([rehearsal.ok, rehearsal.shots.length, next]).toEqual([true, 31, Array.from({ length: 31 }, (_, i) => i + 1)]);
+        expect([rehearsal.ok, rehearsal.shots.length, next]).toEqual([true, 32, Array.from({ length: 32 }, (_, i) => i + 1)]);
         expect(rehearsal.shots.slice(15, 21).map((shot) => shot.title)).toEqual([
           "Edit a page in an open folder, closing the issue", "Activate the manifest-list change definition",
           "Prepare the committed two-text-file branch two-pages", "Propose a two-text-file branch: published",
@@ -73,13 +73,14 @@ describe("the demo runner's rehearsal on real scopes. The Git host, git and the 
         ]);
         expect(rehearsal.shots[18]!.lines[0]).toMatch(/^Proposed 2 files as change sc_/);
         expect(rehearsal.shots[20]!.lines[1]).toContain("rules-not-met:rules");
+        await concurrencyWitness(people.founder!, rehearsal, at.stand.pushes.filter(push => push.ref === "refs/heads/main").map(push => push.commit));
         const directory = rehearsal.room.directory!;
         for (const file of branchFiles("two-pages")) {
           const page = await stage.get(`${SERVICE}/site/${directory}/HEAD/${file.path}`);
           expect([page.status, page.body.includes(new TextDecoder().decode(file.bytes).split("\n\n")[1]!.trim())]).toEqual([200, true]);
         }
         expect((await stage.get(`${SERVICE}/site/${directory}/HEAD/guide/controlled.md`)).status).toBe(404);
-        expect(rehearsal.shots.find((shot) => shot.title === "The verifier, every scope")!.lines.at(-1)).toBe("All consistent: 14 scopes.");
+        expect(rehearsal.shots.find((shot) => shot.title === "The verifier, every scope")!.lines.at(-1)).toBe("All consistent: 16 scopes.");
         const text = transcript(rehearsal, { service: SERVICE, host, namespace: at.namespace, started: "in the test", how: "Git capture and preparation are STAND-INs." });
         expect(text).not.toMatch(/artroom-invite:[A-Za-z0-9_-]{9}/);
         const published = rehearsal.shots[18]!;
@@ -305,6 +306,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     log: (directory) => { expect(waiting, "git started before pacing completed").toBe(false); return stage.log(directory); },
     told: (shot) => { told.push(shot.n); events.push(`after ${shot.n}`); },
   });
+  expect(rehearsal.shots.filter(shot => !shot.match).map(shot => `${shot.n}: ${shot.why}\n${shot.lines.join("\n")}`)).toEqual([]);
   expect(events).toEqual(rehearsal.shots.flatMap((shot) => [`before ${shot.n}`, `after ${shot.n}`]));
   expect(next).toEqual(rehearsal.shots.map(({ n, title, scene, who, typed }) => ({ n, title, scene, who, typed })));
   expect(rehearsal.shots.every((shot) => shot.seconds === 0), "pre-shot waits must be outside shot durations").toBe(true);
@@ -314,8 +316,8 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const rows = text.split("\n").filter((line) => /^\| \d+\. /.test(line));
   const failed = rehearsal.shots.filter((shot) => !shot.match).map((shot) => `${shot.n}. ${shot.title}: ${shot.why}\n${shot.lines.join("\n")}`);
   expect(failed, failed.join("\n\n")).toEqual([]);
-  expect([rehearsal.ok, told, rows.length, rows.every((row) => row.endsWith(" | yes |"))]).toEqual([true, rehearsal.shots.map((shot) => shot.n), 26, true]);
-  expect(text).toContain("Result: all 26 shots printed what the script expects.");
+  expect([rehearsal.ok, told, rows.length, rows.every((row) => row.endsWith(" | yes |"))]).toEqual([true, rehearsal.shots.map((shot) => shot.n), 27, true]);
+  expect(text).toContain("Result: all 27 shots printed what the script expects.");
   expect(rehearsal.shots[0]!.typed).toContain(`--host ${at.host} --namespace ${at.namespace}`);
   expect(rehearsal.shots[0]!.note).toContain(`${at.host === "github.com" ? "GITHUB_APP_CONFIG" : "ARTIFACTS_CONFIG"}.registerScope`);
   if (at.stand instanceof Hub) {
@@ -323,7 +325,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     expect(at.stand.mintedPermissions.filter((permission) => permission === "read")).toHaveLength(1);
   }
   // The room's ids are what the shots printed, for the captures.
-  expect(Object.keys(rehearsal.room).sort()).toEqual(["controlled", "destination", "directory", "issue", "membership", "published", "refused", "register", "rules", "service"]);
+  expect(Object.keys(rehearsal.room).sort()).toEqual(["controlled", "destination", "directory", "issue", "membership", "published", "refused", "register", "reproposed", "rules", "service", "stale"]);
 
   // Real native genesis and actual creator send entries anchor the capture's
   // lane hints to the full refs kept by claim/join, without a new grant.
@@ -347,10 +349,12 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // Each of the shots that the table lists as the script's outcomes is what the room holds: the issue is closed, the branch
   // holds the three commits after the founding one in order, and the refused change is not on it.
   const lines = (n: number) => rehearsal.shots[n - 1]!.lines;
-  expect(lines(21)[0]).toMatch(/^#1 {2}closed \(completed\) {2}Add a getting-started page; assigned to @paul; lane sc_/);
+  expect(lines(22)[0]).toMatch(/^#1 {2}closed \(completed\) {2}Add a getting-started page; assigned to @paul; lane sc_/);
   const pushed = at.stand.pushes.filter((push) => push.ref === "refs/heads/main").map((push) => push.commit);
-  expect([pushed.length, lines(16)[2]!.includes(pushed[1]!), lines(19)[0]!.includes(pushed[2]!)]).toEqual([3, true, true]);
-  expect(lines(22).at(-1)).toBe("All consistent: 12 scopes.");
+  expect([pushed.length, lines(16)[2]!.includes(pushed[1]!), lines(19).some(line => line.startsWith("Published:") && line.includes(pushed[2]!))]).toEqual([4, true, true]);
+  expect(lines(23).at(-1)).toBe("All consistent: 14 scopes.");
+
+  await concurrencyWitness(people.founder!, rehearsal, pushed);
 
   // No secret is in the transcript: neither the invitation links, nor any person's key, nor any credential of the host.
   const links = [rehearsal.shots[6]!, rehearsal.shots[8]!].map((shot) => shot.lines[1]!);
@@ -365,14 +369,14 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // Control: the judgment tells a different outcome from the expected one. The refused edit's expectation does not take the
   // published merge (its exit code differs); the published merge's expectation does not take the lines of another change's
   // publication (its lane differs); a table with such a row says no, and the result names the shot.
-  const kept = { directory: rehearsal.room.directory!, controlled: rehearsal.room.controlled! };
+  const kept = { directory: rehearsal.room.directory!, controlled: rehearsal.room.controlled!, publishedCommit: pushed[1]! };
   const [s16, s17, s19] = [16, 17, 19].map((n) => rehearsal.shots[n - 1]!) as [Taken, Taken, Taken];
   expect(judged(s17.expected, { code: s19.code as 0, lines: s19.lines }, { ...kept })).toBe("exit 0, where 1 is expected");
-  expect(judged(s19.expected, { code: 0, lines: s16.lines.slice(2) }, { ...kept })).toMatch(/^line 1 is not "Published: commit <controlledCommit>, by the merge \{controlled\}:<seq>\."$/);
+  expect(judged(s19.expected, { code: 0, lines: s16.lines.slice(2) }, { ...kept })).toBe(`2 lines, where ${s19.expected.lines.length} are expected`);
   expect(judged(s19.expected, { code: 0, lines: s19.lines }, { ...kept })).toBeNull();
   const changed = { ...rehearsal, shots: rehearsal.shots.map((shot) => (shot.n === 19 ? { ...shot, match: false, why: "line 1 differs" } : shot)), ok: false };
   const told2 = transcript(changed, { service: SERVICE, host: at.host, namespace: at.namespace, started: "", how: "" });
-  expect([told2.includes("Result: 1 of 26 shots did not print what the script expects: 19."), told2.split("\n").filter((line) => line.endsWith(" | no |")).length]).toEqual([true, 1]);
+  expect([told2.includes("Result: 1 of 27 shots did not print what the script expects: 19."), told2.split("\n").filter((line) => line.endsWith(" | no |")).length]).toEqual([true, 1]);
   // A captured register whose saved plan disagrees must not reach the pin
   // hook or any later command. The command still produces its normal lines;
   // this control changes only the saved correspondence the runner must check.
@@ -384,4 +388,43 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   } });
   expect([pins, saves, stopped.ok, stopped.shots[0]!.why, stopped.shots.slice(1).every((shot) => shot.code === -1)]).toEqual([0, 1, false, "planned install identity is missing or inconsistent", true]);
   await drained();
+}
+
+/** Real native proposals and retained merges, tied to the command transcript. */
+async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed: string[]): Promise<void> {
+  // Invariant: reservation check 1 sees the winner and loser on the same old
+  // base, keeps the refused lane, and only a distinct new change publishes.
+  // The scopes are real; Git host and scheduler remain the stand-ins above.
+  const config = (await founder.store.config())!;
+  const secret = (await founder.store.secret(config.key))!;
+  const session = await requestSession(SERVICE, config.repository!.membership.scope, sessionRequest(config.repository!.membership, secret, timeOf(timeMs(net.clock.now)! + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), { fetch: founder.fetch! });
+  expect(session.ok).toBe(true);
+  if (!session.ok) return;
+  const transport = signedReads(httpTransport(SERVICE, { fetch: founder.fetch! }), secretSigner(secret), { now: founder.now! });
+  const controlled = new ScopeHandle(transport, rehearsal.room.controlled as ScopeId, session.session.reader());
+  const stale = new ScopeHandle(transport, rehearsal.room.stale as ScopeId, session.session.reader());
+  const replacement = new ScopeHandle(transport, rehearsal.room.reproposed as ScopeId, session.session.reader());
+  const proposals = async (node: ScopeHandle) => {
+    const read = await node.history();
+    expect(read.ok).toBe(true);
+    return read.ok ? read.value.map(sealed => sealed.entry).filter(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "propose-file") : [];
+  };
+  const [winnerProposal, staleProposal, newProposal] = await Promise.all([proposals(controlled), proposals(stale), proposals(replacement)]);
+  const fields = (entry: typeof winnerProposal[number]) => entry.input.type === "act" ? entry.input.signed.intent.fields : {};
+  expect(fields(staleProposal[0]!).base).toBe(fields(winnerProposal[0]!).base);
+  const beforeWinner = rehearsal.shots.find(shot => shot.title === "Merge: it publishes")!.lines;
+  const loserAdmission = beforeWinner.findIndex(line => line.includes(`entry ${stale.scope}:`) && line.includes(`:${staleProposal[0]!.seq},`));
+  const winnerPublication = beforeWinner.findIndex(line => line.startsWith("Published:"));
+  expect(loserAdmission).toBeGreaterThanOrEqual(0);
+  expect(winnerPublication).toBeGreaterThan(loserAdmission);
+  expect(beforeWinner.slice(loserAdmission + 1, winnerPublication)).toContain(`$ artroom merge ${controlled.scope}`);
+
+  expect(fields(newProposal[0]!).base).toBe(pushed.at(-2));
+  expect(fields(newProposal[0]!).base).not.toBe(fields(staleProposal[0]!).base);
+  expect(newProposal[0]!.input.type === "act" && staleProposal[0]!.input.type === "act" && newProposal[0]!.input.signed.intent.actor === staleProposal[0]!.input.signed.intent.actor).toBe(true);
+  expect(stale.scope).not.toBe(replacement.scope);
+  const [oldState, newState] = await Promise.all([stale.items("merge"), replacement.items("merge")]);
+  expect(oldState.ok && oldState.value.find(item => item.type === "merge")).toMatchObject({ state: "refused", values: { reason: "out-of-date" } });
+  expect(newState.ok && newState.value.find(item => item.type === "merge")).toMatchObject({ state: "published", values: { commit: pushed.at(-1) } });
+
 }

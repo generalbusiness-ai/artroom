@@ -6,7 +6,7 @@ import type { Config } from "../../packages/cli/src/store.ts";
 import type { Context } from "../../packages/cli/src/commands.ts";
 import type { Room } from "./rehearse.ts";
 
-export const CAPTURE_SCOPES = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused"] as const;
+export const CAPTURE_SCOPES = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "stale", "reproposed", "refused"] as const;
 type Name = typeof CAPTURE_SCOPES[number];
 interface Birth { self: Sealed; creator: Sealed | null }
 export interface CaptureObservations {
@@ -56,7 +56,7 @@ export function captureBinding(config: Config, observed: CaptureObservations, se
     if (!birth || !sealed(birth.self)) return stop();
     const e = birth.self.entry;
     const input = e.input;
-    const kind = ["issue", "published", "controlled", "refused"].includes(name) ? "lane" : name;
+    const kind = ["issue", "published", "controlled", "stale", "reproposed", "refused"].includes(name) ? "lane" : name;
     if (e.seq !== 0 || e.prev !== null || e.at.kind !== kind || input.type !== "genesis" || input.decision !== "applied" || input.inc !== e.at.inc || input.seed.kind !== e.at.kind
       || scopeIdOf(input.seed) !== e.at.scope || !isScopeId(hints[name]) || hints[name] !== e.at.scope) return stop();
     refs[name] = e.at;
@@ -71,7 +71,7 @@ export function captureBinding(config: Config, observed: CaptureObservations, se
       || ("decision" in creator.entry.input && creator.entry.input.decision !== "applied") || !same(input.source.at, parent) || !same(creator.entry.at, parent) || input.source.seq !== creator.entry.seq || input.source.hash !== creator.hash) return stop();
     const send = creator.entry.sends.find((s) => s.n === input.n);
     if (!send || !same(send.to, input.seed) || !same(send.message, input.message)) return stop();
-    if (["issue", "published", "controlled", "refused"].includes(name)
+    if (["issue", "published", "controlled", "stale", "reproposed", "refused"].includes(name)
       && (creator.entry.input.type !== "act" || creator.entry.input.signed.intent.kind !== (name === "issue" ? "open-issue" : "open-pr"))) return stop();
   }
   const room: Room = { service: address(config.service) };

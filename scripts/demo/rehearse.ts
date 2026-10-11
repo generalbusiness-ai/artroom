@@ -11,7 +11,8 @@
  * one, and nothing else that it prints holds a secret (a read token is never printed by `artroom clone`; a key is printed by its ID).
  */
 
-import { canonicalize, intentDigest, isPlatformDefinition, isReceipt, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, platformName, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { b64url, digestBytes, entryHash, canonicalize, intentDigest, isPlatformDefinition, isReceipt, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, platformName, scopeIdOf, timeOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads } from "@generalbusiness/artroom-client";
 import { command, type Context, type Outcome } from "@generalbusiness/artroom-cli";
 import { DEMO_DIGESTS, MANIFEST_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/artroom-lanes";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
@@ -26,6 +27,7 @@ export const FILES: Readonly<Record<string, Uint8Array>> = {
   "change-demo.json": utf8(canonicalize(changeDemo)),
   "change-demo3.json": utf8(canonicalize(changeDemo3)),
   "start.md": utf8("# Getting started\n\nClone the room, then edit a page.\n"),
+  "concurrent.md": utf8("# Concurrent edit\n\nA second change, proposed again after the head advances.\n"),
   "agents.md": utf8("# Agents\n\nAsk before you push.\n"),
 };
 
@@ -97,6 +99,8 @@ export interface Room {
   issue?: string;
   published?: string;
   controlled?: string;
+  stale?: string;
+  reproposed?: string;
   refused?: string;
 }
 
@@ -244,9 +248,32 @@ function shots(stage: Stage): Shot[] {
       expect: { code: 0, lines: () => [took("controlled")] },
     },
     {
-      title: "Merge: it publishes", scene: "11", who: "maintainer",
-      typed: (v) => ["artroom", "merge", need(v, "controlled")],
-      expect: { code: 0, lines: () => ["Published: commit <controlledCommit>, by the merge {controlled}:<seq>.", `Page: ${site("AGENTS.md")}`] },
+      title: "Merge: it publishes", scene: "11, both changes admitted before publication", who: "maintainer",
+      typed: (v) => ["prepare-concurrent-and-merge", need(v, "publishedCommit"), need(v, "controlled")],
+      expect: { code: 0, lines: () => [
+        "Proposal base: {publishedCommit}.",
+        "$ artroom act open-pr <...>", "Took effect: entry {directory}:<staleOpening>, hash <staleOpeningHash>.", "Exit 0.",
+        "Opened change: <stale>.",
+        "$ artroom act ask-rules <...>", "Took effect: entry {stale}:<seq>, hash <hash>.", "Exit 0.",
+        "$ artroom act propose-file <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.",
+        "$ artroom merge {controlled}", "Published: commit <controlledCommit>, by the merge {controlled}:<seq>.",
+        `Page: ${site("AGENTS.md")}`, "Exit 0.",
+      ] },
+    },
+    {
+      title: "A stale change is refused, then re-proposed as a new change", scene: "concurrency, freeze route", who: "maintainer",
+      typed: (v) => ["stale-reproposal", need(v, "publishedCommit"), need(v, "controlledCommit")],
+      // Development expectation from the production CLI format; live-host
+      // observation remains required before these lines are filed as observed.
+      expect: { code: 0, lines: () => [
+        "Old base: {publishedCommit}; new base: {controlledCommit}.",
+        "$ artroom merge {stale}",
+        "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: artroom merge {stale}", "Exit 1.",
+        "$ artroom edit guide/concurrent.md --file concurrent.md",
+        `Proposed guide/concurrent.md (${bytes("concurrent.md")} bytes) as change <reproposed>, version <reproposedVersion>.`,
+        "Published: commit <reproposedCommit>, by the merge {reproposed}:<seq>.",
+        `Page: ${site("guide/concurrent.md")}`, "Exit 0.",
+      ] },
     },
     {
       title: "The bad path: refused by name", scene: "10 (the bad path of the 19:50 run)", who: "maintainer",
@@ -265,9 +292,9 @@ function shots(stage: Stage): Shot[] {
       title: "The verifier, every scope", scene: "12", who: "member",
       typed: () => ["artroom", "verify", "--all"],
       expect: { code: 0, lines: (v) => [
-        ...[["register", "register"], ["directory", "directory"], ["membership", "membership"], ["rules", "rules"], ["destination", "destination"], ["lane", "issue"], ["lane", "published"], ["lane", "controlled"], ["lane", "refused"], ["inbox", "founderInbox"], ["inbox", "memberInbox"], ["inbox", "maintainerInbox"]]
+        ...[["register", "register"], ["directory", "directory"], ["membership", "membership"], ["rules", "rules"], ["destination", "destination"], ["lane", "issue"], ["lane", "published"], ["lane", "controlled"], ["lane", "stale"], ["lane", "reproposed"], ["lane", "refused"], ["inbox", "founderInbox"], ["inbox", "memberInbox"], ["inbox", "maintainerInbox"]]
           .flatMap(([kind, name]) => [`${kind} {${name}}, entry <seq>: consistent.`, ...(kind === "destination" && v["registerDefinition"] === "platform:register@3" ? ["Cleanup status: destination {destination}, entry <seq>: no reservation is recorded as cleanup-owed."] : [])]),
-        "All consistent: 12 scopes.",
+        "All consistent: 14 scopes.",
       ] },
     },
     {
@@ -288,7 +315,7 @@ function shots(stage: Stage): Shot[] {
     {
       title: "The room's page", scene: "the story page", who: "member",
       typed: () => ["GET", `${service}/page/`],
-      expect: { code: 0, lines: () => page("Artroom", null) },
+      expect: { code: 0, lines: () => page("dap", null) },
     },
   ];
   if (stage.manifest) {
@@ -313,13 +340,25 @@ function shots(stage: Stage): Shot[] {
       expect: { code: 1, lines: () => ["Proposed 2 files as change <manifestRefused>, version <manifestRefusedVersion>.", "Not published: the merge {manifestRefused}:<seq> is refused, rules-not-met:rules. The change {manifestRefused} stays open at version {manifestRefusedVersion}. When it may be merged, run: artroom merge {manifestRefused}"] },
     });
     const merged = list.find((shot) => shot.title === "Merge: it publishes")!;
-    merged.expect.lines = () => ["Published: commit <controlledCommit>, by the merge {controlled}:<seq>."];
+    merged.typed = (v) => ["prepare-concurrent-and-merge", need(v, "manifestCommit"), need(v, "controlled")];
+    const concurrency = list.find(shot => shot.title === "A stale change is refused, then re-proposed as a new change")!;
+    concurrency.typed = (v) => ["stale-reproposal", need(v, "manifestCommit"), need(v, "controlledCommit")];
+    const concurrencyLines = concurrency.expect.lines;
+    concurrency.expect.lines = (v) => concurrencyLines(v).map(line => line.replace("{publishedCommit}", "{manifestCommit}"));
+    const mergeLines = merged.expect.lines;
+    merged.expect.lines = (v) => {
+      const lines = mergeLines(v).map(line => line.replace("{publishedCommit}", "{manifestCommit}"));
+      lines[9] = "Took effect: entry {stale}:<staleSource>, hash <hash>.";
+      lines.splice(11, 0, "$ artroom act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
+      lines.splice(lines.length - 2, 1); // The manifest-list merge has no legacy Page line.
+      return lines;
+    };
     const verify = list.find((shot) => shot.title === "The verifier, every scope")!;
     const before = verify.expect.lines;
     verify.expect.lines = (v) => {
       const lines = before(v);
       const afterPublished = lines.findIndex((line) => line.startsWith("lane {published},")) + 1;
-      return [...lines.slice(0, afterPublished), "lane {manifestPublished}, entry <seq>: consistent.", "lane {manifestRefused}, entry <seq>: consistent.", ...lines.slice(afterPublished, -1), "All consistent: 14 scopes."];
+      return [...lines.slice(0, afterPublished), "lane {manifestPublished}, entry <seq>: consistent.", "lane {manifestRefused}, entry <seq>: consistent.", ...lines.slice(afterPublished, -1), "All consistent: 16 scopes."];
     };
   }
   return list;
@@ -349,7 +388,7 @@ const escaped = (text: string) => text.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
 function pattern(template: string, v: Found, named: Set<string>): RegExp {
   let source = "";
   for (const part of template.split(/(<[A-Za-z]+>|<\.\.\.>|\{[A-Za-z]+\})/)) {
-    if (part === "<...>") source += ".*?";
+    if (part === "<...>") source += "[\\s\\S]*?";
     else if (/^<[A-Za-z]+>$/.test(part)) {
       const name = part.slice(1, -1);
       source += named.has(name) ? `\\k<${name}>` : `(?<${name}>\\S+?)`;
@@ -425,6 +464,74 @@ export async function plannedOperator(ctx: Context, stage: Pick<Stage, "service"
   return founding.intent.actor;
 }
 
+/** The freeze route uses existing generic acts and a normal fresh-head edit.
+ * Each command is recorded with its actual exit. A mismatch stops this
+ * composite before another mutation; no unknown request is retried. */
+async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controlled: string, expected: { code: number; lines: string[] }, v: Found, manifest: boolean): Promise<Outcome> {
+  const lines = [`Proposal base: ${oldBase}.`];
+  const failure = (reason = "required result did not match"): Outcome => ({ code: 1, lines: [...lines, `Composite stopped: ${reason}. No mutation was retried.`] });
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !isScopeId(controlled)) return failure();
+  const config = await ctx.store.config();
+  if (!config?.repository) return failure();
+  const secret = await ctx.store.secret(config.key);
+  if (!secret) return failure();
+  const now = ctx.now?.() ?? Date.now();
+  const session = await requestSession(config.service, config.repository.membership.scope, sessionRequest(config.repository.membership, secret, timeOf(now + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))), ctx.fetch ? { fetch: ctx.fetch } : {});
+  if (!session.ok) return failure();
+  const transport = signedReads(httpTransport(config.service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(secret), ctx.now ? { now: ctx.now } : {});
+  const handle = (scope: string) => new ScopeHandle(transport, scope as never, session.session.reader());
+  const run = async (args: string[], code: number, start: number, end: number) => {
+    const result = await command(ctx, args);
+    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
+  };
+  const definition = manifest ? MANIFEST_DIGESTS.demo : DEMO_DIGESTS.change;
+  if (!await run(["act", "open-pr", "--on", "directory", "--set", `definition=${definition}`, "--set", "title=Concurrent edit on the previous head", "--set", "draft=false", "--value", manifest ? "change-demo3.json" : "change-demo.json"], 0, 2, 3)) return failure();
+  const opening = await handle(config.repository.directory.scope).entry(Number(v["staleOpening"]));
+  if (!opening.ok || !entryHash(opening.value.entry).startsWith(v["staleOpeningHash"]!) || opening.value.entry.input.type !== "act" || opening.value.entry.input.signed.intent.kind !== "open-pr") return failure("opening entry did not match");
+  const seed = opening.value.entry.sends.find((send) => "kind" in send.to && send.to.kind === "lane")?.to;
+  if (!seed || !("definition" in seed) || seed.definition !== definition) return failure("opened lane seed did not match");
+  v["stale"] = scopeIdOf(seed);
+  lines.push(`Opened change: ${v["stale"]}.`);
+  const ready = async (scope: string, predicate: (summary: Awaited<ReturnType<ScopeHandle["summary"]>>) => boolean) => {
+    for (let i = 0; i < (ctx.tries ?? 120); i++) {
+      if (predicate(await handle(scope).summary())) return true;
+      if (ctx.pause) await ctx.pause([config.repository!.directory.scope, scope as `sc_${string}`, config.repository!.rules]);
+      else await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return false;
+  };
+  if (!await ready(v["stale"], read => read.ok && read.value.items.some(item => item.type === "proposal"))) return failure();
+  if (!await run(["act", "ask-rules", "--on", v["stale"], "--target", "0"], 0, 6, 7)) return failure();
+  if (!await ready(v["stale"], read => read.ok && read.value.items.some(item => item.type === "rules" && typeof item.values["revision"] === "number"))) return failure();
+  if (!await run(["act", "propose-file", "--on", v["stale"], "--set", `base=${oldBase}`, "--set", "path=guide/concurrent.md", "--set", `digest=${digestBytes(FILES["concurrent.md"]!)}`, "--set", `size=${bytes("concurrent.md")}`, "--set", `content=${new TextDecoder().decode(FILES["concurrent.md"])}`], 0, 9, 10)) return failure();
+  if (manifest) {
+    const source = await handle(v["stale"]).entry(Number(v["staleSource"]));
+    if (!source.ok || source.value.entry.input.type !== "act" || source.value.entry.input.signed.intent.kind !== "propose-file") return failure();
+    const entry = { at: source.value.entry.at, seq: source.value.entry.seq, hash: entryHash(source.value.entry) };
+    if (!await run(["act", "propose-manifest", "--on", v["stale"], "--set", `base=${oldBase}`, "--set", `files=${JSON.stringify([{ path: "guide/concurrent.md", entry, digest: digestBytes(FILES["concurrent.md"]!) }])}`], 0, 12, 13)) return failure();
+  }
+  const offset = manifest ? 3 : 0;
+  if (!await run(["merge", controlled], 0, 12 + offset, expected.lines.length - 1)) return failure();
+  return { code: 0, lines };
+}
+
+/** Merge the already-admitted loser, then open a distinct fresh-head change. */
+async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found): Promise<Outcome> {
+  const lines = [`Old base: ${oldBase}; new base: ${newBase}.`];
+  const failure = (): Outcome => ({ code: 1, lines: [...lines, "Composite stopped: required result did not match. No mutation was retried."] });
+  if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
+  const run = async (args: string[], code: number, start: number, end: number) => {
+    const result = await command(ctx, args);
+    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
+  };
+  if (!await run(["merge", v["stale"]], 1, 2, 3)) return failure();
+  if (!await run(["edit", "guide/concurrent.md", "--file", "concurrent.md"], 0, 5, expected.lines.length - 1)) return failure();
+  if (!isScopeId(v["reproposed"]) || v["reproposed"] === v["stale"]) return failure();
+  return { code: 0, lines };
+}
+
 /** Runs every shot in order, each as the person it names, and keeps going after a shot that does not match while it can. */
 export async function rehearse(stage: Stage): Promise<Rehearsal> {
   const now = () => (stage.now ? stage.now() : Date.now());
@@ -454,6 +561,8 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     let outcome: Outcome;
     const shows = expected.lines.find((line) => line.startsWith("Shows: \""))?.slice(8, -1) ?? null;
     if (words[0] === "GET") outcome = seen(await stage.get(words[1]!), shows);
+    else if (words[0] === "prepare-concurrent-and-merge") outcome = await prepareConcurrentAndMerge(await personOf(shot.who), words[1]!, words[2]!, expected, v, stage.manifest ?? false);
+    else if (words[0] === "stale-reproposal") outcome = await staleReproposal(await personOf(shot.who), words[1]!, words[2]!, expected, v);
     else if (words[0] === "prepare-branch") outcome = stage.prepareBranch ? await stage.prepareBranch(words[1]!, branchFiles(words[1]!)) : { code: 1, lines: ["No local Git branch preparation is configured."] };
     else if (words[0] === "git") outcome = await stage.log(words[2]!);
     else outcome = await command(await personOf(shot.who), words.slice(1));
@@ -468,7 +577,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     // Ordinary output mismatches remain diagnostic and may continue. A newly
     // captured scope identity cannot drive another person's command or hook
     // when the producer did not return the complete expected result.
-    const names = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused", "manifestPublished", "manifestRefused"]
+    const names = ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused", "manifestPublished", "manifestRefused", "stale", "reproposed"]
       .filter((name) => expected.lines.some((line) => line.includes(`<${name}>`)));
     if (names.length > 0) {
       const config = await (await personOf(shot.who)).store.config();
@@ -490,7 +599,7 @@ export async function rehearse(stage: Stage): Promise<Rehearsal> {
     stage.told?.(done);
   }
   const room: Room = { service: slash(stage.service) };
-  for (const name of ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "refused"] as const) if (v[name] !== undefined) room[name] = v[name];
+  for (const name of ["register", "directory", "membership", "rules", "destination", "issue", "published", "controlled", "stale", "reproposed", "refused"] as const) if (v[name] !== undefined) room[name] = v[name];
   return { shots: taken, room, ok: taken.every((shot) => shot.match) };
 }
 
@@ -499,7 +608,7 @@ function quoted(word: string): string {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, "'\\''")}'`;
 }
 
-const cell = (lines: readonly string[]) => lines.map((line) => line.replace(/\|/g, "\\|").replace(/</g, "&lt;")).join("<br>") || "(nothing)";
+const cell = (lines: readonly string[]) => lines.map((line) => line.replace(/\|/g, "\\|").replace(/</g, "&lt;").replace(/\r?\n/g, "<br>")).join("<br>") || "(nothing)";
 
 /** The transcript: for each shot, its time, the command as typed, the lines printed, the seconds taken and whether they match; then the table. */
 export function transcript(rehearsal: Rehearsal, heading: { service: string; host: string; namespace: string; started: string; how: string }): string {
