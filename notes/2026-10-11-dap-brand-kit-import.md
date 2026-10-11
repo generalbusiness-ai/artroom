@@ -92,15 +92,15 @@ Focused checks confirmed the exact token pairs in all three selectors and the gu
 
 ## Current supplied font snapshot
 
-The source kit later added `fonts.css`, four Open Runde WOFF2 files, `Teletype33.ttf`, and two font licences. Its tokens and guidelines replaced the earlier IBM Plex typography with Open Runde, Teletype33, and Sometype Mono. The builder froze the current source list and bytes before importing these updates. No font was downloaded or adopted by a served application.
+The supplied kit now includes Open Runde, Teletype33, and its Narrow derivative, with the supplied conversion script and licences. The builder froze the current source list and bytes before importing these updates. No font was downloaded or adopted by a served application. Earlier supplied snapshots remain in the external diagnostics directory.
 
-The frozen 46-file source snapshot is `/Users/hughpyle/play/artroom-diagnostics/brand-kit-import/supplied-kit-font-snapshot.json`, SHA-256 `2102905a5f6c7241742236a676135563e77ee06d196c7cf18847691e70fb533e`; byte copies are beside it in `supplied-kit-font-snapshot/`. Every current source file was copied byte for byte, then the authorized garnet amendment was reapplied because the source kit did not yet include it. Thus 44 of the 46 current kit files remain byte-identical, while `tokens.css` and `GUIDELINES.md` contain only the approved garnet additions. Both licence files retain their source bytes. The separately imported generator remains unchanged.
+The current 48-file source snapshot is `/Users/hughpyle/play/artroom-diagnostics/brand-kit-import/supplied-kit-narrow-snapshot.json`, SHA-256 `932b329c377bfe7277b02bee8c495f7e5548ac1b796752b36951997a963499a0`; byte copies are beside it in `supplied-kit-narrow-snapshot/`. Every current source file was copied byte for byte, then the authorized garnet amendment was retained. Only `tokens.css` and `GUIDELINES.md` differ from the supplied snapshot, solely by the approved garnet additions. The font files, conversion script, and licences retain their supplied bytes. The separately imported parent generator remains unchanged.
 
-The table below records the frozen current source hash and final imported hash for all 46 kit files, plus the parent generator. Earlier tables preserve the initial import and amendment chronology.
+The table below records the current frozen source hash and final imported hash for every kit file, plus the parent generator.
 
 | File | Current supplied SHA-256 | Final SHA-256 |
 |---|---|---|
-| `brand/GUIDELINES.md` | `bfe166e10d7abf647f869a4be1c5176c7de54846ea081cca59d851e0dd49faff` | `3601afd6eb10a8dcf9775caa114dd9a407d53dafabf5ec0f6c280590d0fa1855` |
+| `brand/GUIDELINES.md` | `8c2ee32f6f8ad3f625f73ddbe3e604ecb1c93da8ce823f3f192a65b3e8eecbe4` | `f99f8f06c9d1096b35bd4a99cfe32ed6e6bebdd2bf0ab79d554609371d9e3240` |
 | `brand/alt-wordmark-garnet.svg` | `e4bb3072d73a923ae01b127ff5e0afa318240aff68eacc8c27d0bc76af019c2f` | `e4bb3072d73a923ae01b127ff5e0afa318240aff68eacc8c27d0bc76af019c2f` |
 | `brand/alt-wordmark-ink.svg` | `e01c079475ed9a33b1aae3149052d5b5102a8a5a7073b8bc6854156193ea1d82` | `e01c079475ed9a33b1aae3149052d5b5102a8a5a7073b8bc6854156193ea1d82` |
 | `brand/alt-wordmark-violet.svg` | `47f2d4f76a4c31b9825575285330b8322b7d11222330b139986a48316bdb66e8` | `47f2d4f76a4c31b9825575285330b8322b7d11222330b139986a48316bdb66e8` |
@@ -142,10 +142,12 @@ The table below records the frozen current source hash and final imported hash f
 | `brand/fonts/OpenRunde-Medium.woff2` | `169d786a5984c8a9d6f5ee4b019ae882a3a2e9896a44e2c28f8d5b9bab12555e` | `169d786a5984c8a9d6f5ee4b019ae882a3a2e9896a44e2c28f8d5b9bab12555e` |
 | `brand/fonts/OpenRunde-Regular.woff2` | `da42a03569a63e4ae09ea2943bd530fce8bbf72ea4609618232c86f54c705e76` | `da42a03569a63e4ae09ea2943bd530fce8bbf72ea4609618232c86f54c705e76` |
 | `brand/fonts/OpenRunde-Semibold.woff2` | `51bb1591ab0b4b4c423165ce00b424293e0d87839a3b22027077b03323c097ae` | `51bb1591ab0b4b4c423165ce00b424293e0d87839a3b22027077b03323c097ae` |
+| `brand/fonts/Teletype33-Narrow.ttf` | `8e47ce627884f9eb9e292bc1d4e306f6e09510045248a7b295969e11d39a46c8` | `8e47ce627884f9eb9e292bc1d4e306f6e09510045248a7b295969e11d39a46c8` |
 | `brand/fonts/Teletype33.ttf` | `88c98c0fb16550f515d8765e0ef1cf421ca16d793a0605381e30da3675f352e1` | `88c98c0fb16550f515d8765e0ef1cf421ca16d793a0605381e30da3675f352e1` |
-| `brand/fonts.css` | `55fc9ab52b706caacc3c91e4a3f0b07740c1f06337062bdcbdff085a7bd41188` | `55fc9ab52b706caacc3c91e4a3f0b07740c1f06337062bdcbdff085a7bd41188` |
+| `brand/fonts/narrow_teletype.py` | `a330a7233d85e1b8810619e20fade1430142dca03515ad00a39e16d39ff4398b` | `a330a7233d85e1b8810619e20fade1430142dca03515ad00a39e16d39ff4398b` |
+| `brand/fonts.css` | `f6580e6b87829111e20338465510b2148371bf2f38853121e2a3d3e6509f3fe6` | `f6580e6b87829111e20338465510b2148371bf2f38853121e2a3d3e6509f3fe6` |
 | `brand/tail-sheet.svg` | `785b68152f2ac91105d940ff419c29eeecf88d30e4b528509f932a558bdc3f28` | `785b68152f2ac91105d940ff419c29eeecf88d30e4b528509f932a558bdc3f28` |
 | `brand/tokens.css` | `43c352d3cec9fedb874cafba9349a34cad7c98a12297b6ac73e87b2d0e6bc508` | `f757efbd09fa66cbabb504eeb7d0ffc54e754ef92f7c9d2322f9d3d041cf7933` |
 | `brand/gen6.py` | `93a1e8f71cd762859d7cfbb82e043d1289f6afe25da284b0ba2bcf940f4097b8` | `93a1e8f71cd762859d7cfbb82e043d1289f6afe25da284b0ba2bcf940f4097b8` |
 
-Focused checks verified all current source rows and both amended final hashes. Application source and live UI remain unchanged; no gate, compiler, or suite was repeated for this asset update.
+Focused checks verified all current source rows, both amended final hashes, and the local font URL targets. Application source and live UI remain unchanged; no generator, gate, compiler, or suite was run for this asset update.

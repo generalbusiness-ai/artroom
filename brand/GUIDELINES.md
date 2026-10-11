@@ -49,7 +49,7 @@ Cyan and amber are reserved for woah and keep. Do not use them with the dap logo
 
 - **Wordmark.** Constructed paths, not a font. Never type it.
 - **Interface and documents.** Open Runde (400, 500, 600, 700) for text and headings: a softly rounded cut of Inter, SIL Open Font License, self-hosted from `fonts/`. Fallback stack: `system-ui, -apple-system, Helvetica, Arial, sans-serif`.
-- **Labels and receipts.** Teletype33 for eyebrows, chips, receipts and the "dap." line: the Teletype Model 33 typewheel with lowercase, CC0, self-hosted from `fonts/`. Use it at 13 px or larger and without extra letter spacing; it is already wide. Fallback: `ui-monospace, Menlo, monospace`.
+- **Labels and receipts.** Teletype33 for eyebrows, chips, receipts and the "dap." line: the Teletype Model 33 typewheel with lowercase, CC0, self-hosted from `fonts/`. The kit uses `Teletype33-Narrow.ttf`, a derivative with the advance width set to 540 units from the original 614 (`fonts/narrow_teletype.py` makes it); the original stays in `fonts/` for terminal emulation only. Use it at 13 px or larger and without extra letter spacing. Fallback: `ui-monospace, Menlo, monospace`.
 - **Code and data.** Sometype Mono (400, 500) for code blocks, hashes and tables, SIL Open Font License, from Google Fonts or self-hosted. Fallback: `ui-monospace, Menlo, monospace`.
 - **Voice.** "dap." is the one-word acknowledgement the room returns when an act takes effect: the last line of the CLI, the toast, the receipt.
 
