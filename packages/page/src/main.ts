@@ -351,10 +351,11 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
     button.addEventListener("click", () => { if (room && offer) claimDialog(room, offer.kept, offer.configured, button); });
     return button;
   };
+  const wordmark = () => h("div", { class: "wordmark" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
   return [skip,
-    h("aside", { class: "rail" }, h("div", { class: "wordmark" }, "Artroom"), roomSwitch(), navigation(),
+    h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(),
       offer ? create() : null, h("div", { class: "rail-bottom" }, h("a", { class: "nav-item", href: "#/settings", ...(destination === "settings" ? { "aria-current": "page" } : {}) }, "Settings"), accountControl())),
-    h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
+    h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, wordmark(), roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
 }
 

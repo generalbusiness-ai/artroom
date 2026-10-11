@@ -24,7 +24,7 @@
 import { PAGE_HTML, PAGE_JS } from "./page-assets.ts";
 
 /** Scripts of this origin only; reads and acts to this origin only; no frame, no form sent elsewhere, no base address. */
-const PAGE_POLICY = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const PAGE_POLICY = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 const headers = (type: string): Record<string, string> => ({
   "content-type": type, "content-security-policy": PAGE_POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "cache-control": "no-cache",

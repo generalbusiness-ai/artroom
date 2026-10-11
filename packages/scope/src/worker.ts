@@ -88,6 +88,7 @@ import { NO_OUTSIDE, type Outside } from "./operations.ts";
 import { isSite, site } from "./site/route.ts";
 import { isPage, page } from "./page.ts";
 import { isCounting, countingPage } from "./counting.ts";
+import { isBrand, brand } from "./brand.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -438,6 +439,6 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
 export default {
   fetch: async (request: Request, env: Env): Promise<Response> => {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
-    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : route(request, env.SCOPES);
+    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
   },
 };

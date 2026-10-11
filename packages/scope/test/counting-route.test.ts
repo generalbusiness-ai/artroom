@@ -8,7 +8,7 @@ import { COUNTING_ASSETS } from "../src/counting-assets.ts";
 test("the Worker serves only the three public Counting assets under one same-origin policy and refuses URL credentials before static dispatch", async () => {
   const request = (path: string, method = "GET", headers?: HeadersInit) => new Request(`https://scopes.test${path}`, { method, ...(headers ? {headers} : {}) });
   const get = (path: string, method = "GET", headers?: HeadersInit) => worker.fetch(request(path, method, headers), {} as Env);
-  const policy = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  const policy = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
   const checkHeaders = (response: Response, type: string) => {
     expect(Object.fromEntries(["content-type", "content-security-policy", "x-content-type-options", "referrer-policy", "cache-control"].map(name => [name, response.headers.get(name)]))).toEqual({
       "content-type": type, "content-security-policy": policy, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "cache-control": "no-cache",

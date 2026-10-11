@@ -30,9 +30,10 @@ The lead claim: dap is a programmable, general-purpose coordination
 fabric. The verifier line, "nothing you saw depends on trusting our
 database", stays as the supporting proof, not the way in.
 
-The hosting surface, said once in one line: a Worker, the hosting's own
-Git service as the repository host, the published pages, and the same
-record running on GitHub.
+The hosting surface, said once in one line, never as a service count: the
+hosting's own Git service holds one repository per hold, the Worker runs
+the room, the published pages are the record, and the same record runs
+on GitHub.
 
 ## The order of the video
 
@@ -153,6 +154,7 @@ not a full one.
 |---|---|---|
 | Sun 11 Oct, 22:00 | Practice script on main | Builder |
 | Mon 12 Oct | Rehearsal day: Hugh runs every part from the practice script on the deployed hosts; the stale-base shot observed; the rename head reviewed and landed; the docs head reviewed | Hugh, builder, checker |
+| Mon 12 Oct, before 23:00 | Glossary gate: every line of the practice script passes the three-part words test; the no-merge sentence and the Counter line present; the pass recorded in the sprint report | Planner, builder |
 | Mon 12 Oct, 23:00 | Freeze: docs head landed, hosts redeployed from the renamed main, packages published | All |
 | Tue 13 Oct | Recording from the frozen main | Hugh |
 | Wed 14 Oct | Submission by 23:59 Pacific | Hugh |
@@ -160,6 +162,53 @@ not a full one.
 If a gate slips by more than half a day, the next one moves down a level:
 the concurrency beat to narration; the docs head to the product-name-only
 rename; the jam to the procedural page as it is.
+
+## Four changes after the second entrant sweep
+
+Direction from Hugh, 11 October 18:45 Eastern, recorded in planner request
+`5b61978d` after the second sweep of the field (a code search on the
+hosting's Git service identifiers found about twenty more entrants; the
+strongest ones read well because they use one plain vocabulary, and one of
+them leads with a results table and a long video).
+
+1. Words first. The words rule and glossary below are a gate on the shot
+   list before the freeze, not a later pass: before Monday 23:00 every
+   caption, page label and narrated line in the practice script passes
+   the three-part test, and the planner records the pass in the sprint
+   report. The gates table carries this row.
+2. Say that we chose not to merge text. One sentence in the repository
+   segment, in plain words, right before the concurrency beat: "A clean
+   textual merge can still be wrong, and only a test catches it, if one
+   exists. So the room never merges text: it prevents by rule, composes
+   by selection, and refuses when stale." The three-step ladder above
+   stays as requested; this sentence names it.
+3. Show one number, labelled by how it was taken. The cheapest honest
+   number we own is the count from the scripted rehearsal run on the
+   isolated host once the stale-base shot lands: shots run, holds taken,
+   refusals, publications, and the time from the stale merge attempt to
+   its refusal, each labelled "observed run" on screen with the host and
+   the run's date. The fork cost measurement (plan 029 item 0) replaces it
+   only if the idle hour comes before the freeze; its labels are "observed
+   run" or "metrics read". No proxy and no reconstruction is presented as
+   a measurement. The builder's stale-base shot request records the time
+   to refuse from the observed run; the practice script carries the
+   numbers once observed.
+4. The order stands: repository, then Counter and jam on the same fabric,
+   then back to the repository. Within the Counter segment, name the
+   concurrency beat in so many words within its first minute: "a merge
+   conflict with the code removed: three agents, one shared state,
+   exclusive turns, an expiry, a restart, every turn signed", and say why
+   three is the honest number: two is a handoff, three is the smallest
+   count that shows a contested turn, a bystander tracking the shared
+   state, and a restart at once; more adds nothing the record does not
+   already show. The hosting surface is one line, not a service count: the
+   hosting's Git service holds one repository per hold, the Worker runs
+   the room, the pages are the record, and the same record runs on GitHub.
+
+The practice script is amended by a builder request filed with this
+section: the no-merge sentence verbatim in section 1, the Counter line in
+section 2, and the observed numbers in section 1 once the stale-base shot
+has run.
 
 ## The words
 
