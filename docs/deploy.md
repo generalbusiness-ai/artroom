@@ -62,8 +62,8 @@ register exists. Plan first, then set the setting, then install:
    `Installed: register sc_..., ..., as planned.` A plan whose time is
    over and was never attempted is refused as `plan-expired`. For a
    definitely unsent legacy plan, plan again and set the new ID. A selected
-   Counting plan stays exact: preserve its original directory and use a
-   separate empty `ARTROOM_HOME` for a new plan, host configuration and
+   application or Counting plan stays exact: preserve its original directory
+   and use a separate empty `ARTROOM_HOME` for a new plan, host configuration and
    subsequent commands ([cli.md](cli.md)). An attempted or acknowledged
    original needs reconciliation from its original directory; expiry
    cannot authorize a replacement.

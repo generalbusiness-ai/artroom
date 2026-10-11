@@ -7,9 +7,9 @@ import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAs
 
 export const USAGE = [
   "Usage:",
-  "  artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort counting-commitments]",
-  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort counting-commitments]",
-  "  artroom install --planned [--cohort counting-commitments]",
+  "  artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
+  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
+  "  artroom install --planned [--cohort application|counting-commitments]",
   "  artroom claim <name> [--handle @you] [--branch main] [--again]",
   "  artroom invite <@member> --role <role> [--hours 24]",
   "  artroom join <link>",
@@ -75,7 +75,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
   switch (name) {
     case "install": {
       const cohorts = parsed.flags.get("cohort");
-      if (cohorts && (cohorts.length !== 1 || cohorts[0] !== "counting-commitments")) return { code: 2, lines: ["--cohort takes exactly one value: counting-commitments.", USAGE] };
+      if (cohorts && (cohorts.length !== 1 || (cohorts[0] !== "application" && cohorts[0] !== "counting-commitments"))) return { code: 2, lines: ["--cohort takes exactly one value: application or counting-commitments.", USAGE] };
       const cohort = cohorts?.[0] as InstallCohort | undefined;
       const host = flag("host"), namespace = flag("namespace");
       const where = { ...((cohort ? host !== undefined : !!host) ? { host: host! } : {}), ...((cohort ? namespace !== undefined : !!namespace) ? { namespace: namespace! } : {}), ...(cohort ? { cohort } : {}) };

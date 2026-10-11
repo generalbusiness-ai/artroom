@@ -47,7 +47,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`artroom install <base-url> [--host <git-host>] [--namespace <name>]`**
+**`artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
 founds the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -59,7 +59,7 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>]`**
+**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
 signs the same `install` intent and founds nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will found,
@@ -67,44 +67,119 @@ and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be founded. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
 register's genesis records both. Only a definitely unsent legacy plan may
-be replaced. A selected Counting plan always retains its original envelope,
-version, register and deadline, including when planning is repeated.
+be replaced. A selected application or Counting plan always retains its
+original envelope, version, register and deadline, including when planning
+is repeated.
 
 ```
 Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`artroom install --planned`** founds the planned register, with the kept
+**`artroom install --planned [--cohort application|counting-commitments]`** founds the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
-version is not the one this command founds under, is refused as
+version is not supported by the installed catalog, is refused as
 `plan-mismatch`; a plan whose time is over is refused as `plan-expired`.
 An expired plan that was never attempted sends nothing. A definitely
 unsent legacy plan can be planned again in the same config. A selected
-Counting plan cannot: keep that original config directory unchanged and
+application or Counting plan cannot: keep that original config directory unchanged and
 use a separate empty `ARTROOM_HOME` directory for a new plan. Use that same
 new directory for every later command, and configure the host's
 `registerScope` with the new plan's ID before installing. Do not copy over
 or delete the original config or keys.
 
 For example, set `ARTROOM_HOME` to a new private directory, then run
-`artroom install --plan <base-url> --cohort counting-commitments --host
-<host> --namespace <namespace>`. After configuring the new register ID,
-run `artroom install --planned --cohort counting-commitments` with the same
+`artroom install --plan <base-url> --cohort <cohort> --host <host>
+--namespace <namespace>`, using `application` or `counting-commitments`
+for `<cohort>`. After configuring the new register ID,
+run `artroom install --planned --cohort <cohort>` with the same
 `ARTROOM_HOME`. This creates separate custody and a new operator key; it
 does not renew or replace the expired original.
 
 An attempted or acknowledged original must instead be reconciled from its
 original directory with `install --planned`. Expiry does not prove that a
 request was never accepted and does not authorize a replacement. After
-founding, the receipt must match the original planned identity.
+founding, the receipt must match the original planned register, definition
+and intent. Its acceptance is a service acknowledgement; independent
+history verification remains separate.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.
 ```
 
 [deploy.md](deploy.md) says why and when to plan first.
+
+### An explicitly selected application room
+
+Omitting `--cohort` keeps the legacy default. `--cohort application` selects
+`APPLICATION_COHORT`: register@5, directory@5, membership@4, rules@3,
+destination@2 and inbox@1, each with the `platform:` prefix.
+`--cohort counting-commitments` retains its separate register@6,
+directory@6 and membership@5 lineage. Both choices use the existing exact
+planned-install custody. Unknown or multiple choices, another retained
+cohort, service, host or namespace refuse before signing or sending.
+`install --planned` may omit the selection: it uses the saved definition
+and signature. It never upgrades a plan to a newer catalog version.
+
+For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
+and a deployed service that supports all six exact application pins:
+
+```sh
+artroom install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
+# Configure that host's registerScope with the printed planned ID.
+artroom install --planned --cohort application
+artroom claim <label> --handle @operator
+```
+
+Keep the operator key and pending envelopes in that private directory;
+share public full scope references and actual genesis pins, never keys or
+session headers. An uncertain install retries `--planned`; an unfinished
+claim repeats the same claim without `--again`. Verify the actual directory,
+membership, rules and destination creation and confirmation before using
+the room. The selected bootstrap does not validate, activate or create Jam.
+
+The provisioning owner must next validate the exact application declaration
+with public `validateDefinition` under the deployed bounds, retain its
+canonical bytes and `definitionDigest`, and activate that digest and all
+required declaration dependencies in the actual rules scope. The authorized
+`establish-application` act on directory@5 names that digest, bounded
+canonical genesis `values` and `execution=recorded-do`. Supply declaration
+bytes beside it; the factory supplies the trusted opener and membership.
+Keep the exact signed creation request before submission and reconcile its
+accepted fact and confirmed child seed after an unknown answer. Do not
+create a second application to replace an uncertain first one.
+
+Membership must explicitly grant the declaration's domain actions to the
+intended role or agent. Enrollment and a read session alone grant no domain
+act. Respect the deployed grant reuse window after permission changes.
+Provision each verifier reader for the target and every foreign history it
+needs; a room session may not read another root or membership. Retain the
+actual deployed bounds, exact platform catalog, capability versions and
+parameters with the public configuration. Missing history or unsupported
+pins remain verification failures. Jam must consume genuine published SDK
+packages; this CLI bootstrap proves no registry, deployment, microphone,
+model, playback or distributed-user acceptance.
+
+Application bootstrap checks on 2026-10-10: the first focused attempt
+stopped in the CLI source compiler before any case ran. The explicit
+literal lookup repair passed CLI source, CLI test and Scope test compilers,
+both existing CLI custody cases, and the existing native application
+factory case. The normal Page build then refreshed its generated module;
+all other tracked files and the guarded dependency view stayed unchanged.
+The ordinary changed-source gate passed: 1,025 Vitest cases, two original
+optional skips, and the chained Node checks (8 repository cases and 37
+Counting browser cases). These checks establish bootstrap behavior, with
+the witness limitations stated above.
+
+The selected-cohort expiry correction was checked on 11 October 2026.
+CLI compilation and both existing custody cases passed for application and
+Counting, using labelled memory stores and a fake configured service. The
+normal Page build passed and reproduced the unchanged generated module.
+An initial tool-hash guard typo stopped before any build; that outcome is
+retained. The native application case was unchanged and was not repeated.
+The corrected Counter parent remains intact. A new ordinary gate and
+independent Source review are still required for this successor.
 
 **`artroom claim <name> [--handle @you] [--branch main] [--again]`**
 signs the register's `found` act. It then waits until the directory,
