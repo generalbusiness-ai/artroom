@@ -173,8 +173,8 @@ test("verified invalid-path source exposes the editor mount independently of pre
 // The receipt is retained in full; unknown observation and refusal never gain an acknowledgement.
 test("dap acknowledgement requires an accepted receipt and a known observation", () => {
   vi.stubGlobal("document", document);
-  const receipt = { fact: { at: { scope: "sc_exact", inc: "in_exact" }, seq: 91, hash: "sha256:exact" } };
-  const acted = { kind: "comment", scope: "sc_exact", on: 7, observation: null, answer: { answer: "accepted", receipt } } as Parameters<typeof answerLine>[0];
+  const receipt = { fact: { at: { scope: "sc_exact", inc: "in_exact", kind: "lane" as const }, seq: 91, hash: "sha256:exact" }, definition: "sha256:definition", intent: "sha256:intent", effects: [], sends: [], epoch: 0 } as const;
+  const acted: Parameters<typeof answerLine>[0] = { service: "https://fake.test", directory: "sc_directory", membership: { scope: "sc_membership", inc: "in_exact", kind: "membership" }, key: "key_exact", kind: "comment", scope: "sc_exact", on: 7, before: { seq: 90, hash: "sha256:before" }, after: { seq: 91, hash: "sha256:exact" }, observation: null, answer: { answer: "accepted", receipt } };
   const accepted = answerLine(acted) as unknown as Element;
   for (const fact of ["sc_exact:91", "in_exact", "sha256:exact"]) expect(accepted.textContent).toContain(fact);
   expect(accepted.all("p").at(-1)?.textContent).toBe("dap.");
