@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e14042c6ea49eb25f170b4dfe80510c40117a2fc","text":"Merge retired a covered predecessor; the successor is at examples/counting/commitments.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2b8f24c747dc2b50bea63645f580aa6fba5c897","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/counting-assets.ts."}
