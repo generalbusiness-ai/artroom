@@ -39,8 +39,22 @@ It generated `counting.js` at 131834 bytes, SHA-256
 `5b6e432ff9a4cba360f0551a75f0afffb0e2bc3c7518ba96957050860fa22ba8`,
 and the matching Worker asset module. The HTML and CSS bytes are unchanged.
 
-At this Source freeze, the ordinary gate and independent review remain owed.
+At the first Source freeze, the ordinary gate and independent review remained owed.
 The scripted witness proves the controller boundary. It does not establish
 browser audibility, deployed Counter completion, or the cause of the observed
 live page closure. No browser, native act, deployment, or provider operation was
 run for this Source correction.
+
+
+The ordinary `npm run gate` then passed at
+`e3c9333ea38e1664baab835c1f714d0126118b93`, tree
+`1fa86b396a257201557aec2249d8c18e1d6d4de4`.
+Whitespace, type checks, and tests all exited 0. Installation was skipped by
+the existing lock stamp. Vitest reported 1025 passes and two existing optional
+skips out of 1027 tests. The repository Node checks passed eight tests, and the
+browser Node checks passed 38. All 1320 tracked file hashes remained unchanged.
+The outer command took 102.73 seconds of wall time and 164.14 seconds of CPU.
+
+This final amendment changes only this note. The tested code and generated
+assets are unchanged. Independent Source review, normal landing, deployment,
+and real Counter acceptance remain separate obligations.
