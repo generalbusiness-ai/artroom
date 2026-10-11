@@ -1,0 +1,179 @@
+{
+  "v": 1,
+  "status": "Read-only Source reconciliation; all3 already carried; no duplicate implementation",
+  "planningAssertion": "338d33156a94aae16401617edf596c35b37ec6c8",
+  "sourceSubjects": {
+    "landedA127": {
+      "head": "a1277d9c43bdaff1873e61f0a3d2444fc5f72b53",
+      "tree": "7f9bf06ee29e56b040e5cce07408ad240a2401fe",
+      "landingQualification": "Landing supplied by Root/planning context; this agent verifies historical Git ancestry/bytes, not a new remote receipt"
+    },
+    "fb6": {
+      "head": "fb6f923ee75123fc045fd4368af4a1a41cda32e2",
+      "tree": "bef12a58ff0cf285b8d1b4ab46c15309d40d07a5",
+      "qualification": "Preserved fixes; current broader review remains separate"
+    }
+  },
+  "requests": [
+    {
+      "request": "3024ef222c3448013f99790285b09cfc7e03a1d4",
+      "disposition": "ALREADY CARRIED by landed a127 and unchanged at fb6",
+      "commits": [
+        "92f5e92534bbdd6b1991f79e51e1fb0717a65316",
+        "66ce1125c00a15242f5b277de8d5b580e5ed81ba"
+      ],
+      "source": [
+        "packages/replay/src/verify.ts:867",
+        "packages/lanes/test/wiring.scope.test.ts:80"
+      ],
+      "evidence": "Verifier reconstructs holders with Math.max(1,o.holders.length) and still compares full canonical observation. Existing W2 uses an actual authorized zero-holder membership change, confirmed native judge row, no anchors, policy refusal and restoration; replay reaches the preserved original ancestry-only incomplete limit. Existing oldmost0 control distinguishes that row. No replacement implementation is required.",
+      "limits": "Does not turn the separately known unwalked ancestry into full consistent replay.",
+      "ancestry": {
+        "92f5e92534bbdd6b1991f79e51e1fb0717a65316": {
+          "a127": true,
+          "fb6": true
+        },
+        "66ce1125c00a15242f5b277de8d5b580e5ed81ba": {
+          "a127": true,
+          "fb6": true
+        }
+      }
+    },
+    {
+      "request": "564d5fc95c9b263ced580b9533f875cfaf25e1b2",
+      "disposition": "ALREADY CARRIED by landed a127 and unchanged at fb6",
+      "commits": [
+        "941b113f4134c34019f80a176f28587cef49425e"
+      ],
+      "source": [
+        "packages/platform/src/destination-objects.ts:166",
+        "packages/scope/src/github-host.ts:199",
+        "packages/platform/test/edit.test.ts:72",
+        "packages/scope/test/artifacts-host.test.ts:246"
+      ],
+      "evidence": "editTree batches a path trie and writes each affected directory only in final form; no superseded roots accumulate. Sender totals bytes/duplicate IDs before new Uint8Array copies. Existing real-Git witness checks reachable objects/order/modes/hash/parent/conflicts; provider witness covers all64 fitting final+base closure, aggregate refusal before copy/send and caller mutation after owned capture. No replacement implementation is required.",
+      "limits": "No measured OOM, memory factor or new provider/runtime acceptance is inferred.",
+      "ancestry": {
+        "941b113f4134c34019f80a176f28587cef49425e": {
+          "a127": true,
+          "fb6": true
+        }
+      }
+    },
+    {
+      "request": "9016b9de38ec72648e92274a1f695a9cd91d4384",
+      "disposition": "ALREADY CARRIED by landed a127 and unchanged at fb6",
+      "commits": [
+        "5ff68af433847aed4b6b2211b4789e10146fb24e",
+        "0dd52d2b125d07e40b169fe8b504fbac0595c9f9"
+      ],
+      "source": [
+        "packages/page/src/retained-editor.ts:22",
+        "packages/page/src/retained-editor.ts:60",
+        "packages/page/test/retained-editor.test.ts:60",
+        "packages/page/test/retained-editor.test.ts:110"
+      ],
+      "evidence": "Back to edit is available only for current, not-busy, wholly-unattempted prepared/stopped tasks with no answer/verification/partial locators; callback rechecks the same predicate. Draft is retained; new Prepare then explicit Confirm are required. Cached Confirm is retired by same-task/current/busy/preparing checks. Existing mounted witness covers stale base/read failure, fresh preparation, cached callbacks and unknown/accepted-partial exclusions; original native zero-POST stale-base witness remains byte-identical. No replacement implementation is required.",
+      "limits": "Loaded-Page editor recovery only; no C4 durable/browser recovery or deployment claim.",
+      "ancestry": {
+        "5ff68af433847aed4b6b2211b4789e10146fb24e": {
+          "a127": true,
+          "fb6": true
+        },
+        "0dd52d2b125d07e40b169fe8b504fbac0595c9f9": {
+          "a127": true,
+          "fb6": true
+        }
+      }
+    }
+  ],
+  "sourceCorrespondence": {
+    "packages/replay/src/verify.ts": {
+      "a127": "d94f28edbd25626afebfd610027b02d923e94aff",
+      "fb6": "d94f28edbd25626afebfd610027b02d923e94aff"
+    },
+    "packages/lanes/test/wiring.scope.test.ts": {
+      "a127": "cf21f71c3ece568c845602c194b989739adc9836",
+      "fb6": "cf21f71c3ece568c845602c194b989739adc9836"
+    },
+    "packages/platform/src/destination-objects.ts": {
+      "a127": "9b1b83d4c16f1c382ac4b20274273014a7873ff7",
+      "fb6": "9b1b83d4c16f1c382ac4b20274273014a7873ff7"
+    },
+    "packages/platform/test/edit.test.ts": {
+      "a127": "0b37e8dceb1c3f83b011529f4b2e7e37907d765e",
+      "fb6": "0b37e8dceb1c3f83b011529f4b2e7e37907d765e"
+    },
+    "packages/scope/src/github-host.ts": {
+      "a127": "3fb88d4e988bd75d472ae170abc332c6fa61020c",
+      "fb6": "3fb88d4e988bd75d472ae170abc332c6fa61020c"
+    },
+    "packages/scope/test/artifacts-host.test.ts": {
+      "a127": "754cd2691d09522b1b13835a782fcd8dd707a78a",
+      "fb6": "754cd2691d09522b1b13835a782fcd8dd707a78a"
+    },
+    "packages/page/src/retained-editor.ts": {
+      "a127": "fbae12c50347271b6bd70c909ac232b5d91074eb",
+      "fb6": "fbae12c50347271b6bd70c909ac232b5d91074eb"
+    },
+    "packages/page/test/retained-editor.test.ts": {
+      "a127": "2becc340027098a666abaf2843ae1640278abff8",
+      "fb6": "2becc340027098a666abaf2843ae1640278abff8"
+    },
+    "packages/page/test/retained-editor.scope.test.ts": {
+      "a127": "363c68ce3ba7656ea9f9d506eb6355d61b681713",
+      "fb6": "363c68ce3ba7656ea9f9d506eb6355d61b681713"
+    }
+  },
+  "canonicalInspect": {
+    "repo": "/Users/hughpyle/play/artroom",
+    "agent": "builder",
+    "observedFrontier": {
+      "genesis": "589bca982736a2361d15d53f7572375ef2f7aaf3",
+      "head": "947908eb4b98d4e1c6af28cd89e8c4570a793dcd",
+      "depth": 31282
+    },
+    "statuses": [
+      {
+        "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3024ef222c3448013f99790285b09cfc7e03a1d4",
+        "decision": "effective",
+        "commitmentStatus": "stale",
+        "stale": true,
+        "staleBecause": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f1fde53b1e5ee313d94b53f4edb9a5f44fd52281"
+      },
+      {
+        "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:564d5fc95c9b263ced580b9533f875cfaf25e1b2",
+        "decision": "effective",
+        "commitmentStatus": "stale",
+        "stale": true,
+        "staleBecause": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f1fde53b1e5ee313d94b53f4edb9a5f44fd52281"
+      },
+      {
+        "request": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9016b9de38ec72648e92274a1f695a9cd91d4384",
+        "decision": "effective",
+        "commitmentStatus": "stale",
+        "stale": true,
+        "staleBecause": "git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f1fde53b1e5ee313d94b53f4edb9a5f44fd52281"
+      }
+    ],
+    "limit": "Historical explicit inspector view, not a new administrative fulfillment verdict or authoritative latest all-lease view; Root files durable reconciliation"
+  },
+  "existingControlProofPointers": [
+    {
+      "path": "/tmp/artroom-replay66-baseline-complete-proof.json",
+      "sha256": "4d88ce56dd43994c0eb440980bc7be2cd65cc202170c0f116a2ec0dbd4e2369e"
+    },
+    {
+      "path": "/tmp/artroom-replay66-control-complete-proof.json",
+      "sha256": "f8c36e114d40c6af296125adb633dd6105d9aa015952de4b198850d80715307c"
+    },
+    {
+      "path": "/tmp/artroom-editor9016-controls-complete-result.json",
+      "sha256": "b16f69d35d9418733312129298109c45745839d4d0d653e4f6e1380a20b13f24"
+    }
+  ],
+  "readCoverage": "All3 complete exact request texts/conditions/observed state; bounded actual frozen implementation/witness spans and relevant ancestor commits, not complete repository/module re-review. Broad combined output truncations earn no extra full coverage. No runtime repeated.",
+  "noNamingWork": true,
+  "noSourceEdits": true,
+  "noRuntime": true
+}
