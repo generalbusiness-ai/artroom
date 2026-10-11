@@ -71,13 +71,13 @@ test("Explicit Resume command fences active playback before dispatch and display
     const envelope:PreparedEnvelope={signed:{intent,sig:sign(secret,domainBytes(DOMAINS.intent,intent))},grants:[],beside:{}};
     for(const missing of [true,false]){
       const held:unknown=missing?{envelope}:{kind:"",envelope};const original=JSON.stringify(held);
-      let writes=0,clears=0,voiceWrites=0,controls=0,emit:typeof publish;
+      let writes=0,clears=0,voiceWrites=0,controls=0,emit:typeof publish,blockedAudioStart:AudioStart|null=null;
       const commandStore:CommandStore={load:async()=>held as Awaited<ReturnType<CommandStore["load"]>>,save:async()=>{writes++;},clear:async()=>{clears++;}};
       const restored=nativeGateway(identity,secret,{current:()=>true,lock:{run:async work=>work()},voiceStore:{load:async()=>null,save:async()=>{voiceWrites++;},clear:async()=>{clears++;}},commandStore,fetch:async()=>{posts++;throw new Error("No malformed command transport");},actFetch:async()=>{posts++;throw new Error("No malformed command POST");}});
       const mountedGateway={...gateway,observe(callback:typeof publish){emit=callback;return observation;},command:async(...args:Parameters<StageGateway["command"]>)=>{controls++;return restored.command(...args);},checkCommand:()=>restored.checkCommand(),resumeCommand:()=>restored.resumeCommand(),commandResumeReady:()=>restored.commandResumeReady(),pendingCommand:()=>restored.pendingCommand(),restoreCommand:()=>restored.restoreCommand(),dispose:()=>restored.dispose()};
       const blockedRoot=new Element(),blocked=mountCountingStage(blockedRoot as unknown as HTMLElement,{speech,connect(){},now:()=>100});
       try{
-        await blocked.attach({identity,speech,gateway:mountedGateway,store:{load:async()=>null,loadStart:async()=>null,saveStart:async()=>{voiceWrites++;},save:async()=>{voiceWrites++;},clear:async()=>{clears++;}},lock:{run:async work=>work()},current:()=>true});
+        await blocked.attach({identity,speech,gateway:mountedGateway,store:{load:async()=>null,loadStart:async()=>blockedAudioStart,saveStart:async marker=>{voiceWrites++;blockedAudioStart=structuredClone(marker);},save:async()=>{voiceWrites++;},clear:async()=>{clears++;}},lock:{run:async work=>work()},current:()=>true});
         const current={status:"current",snapshot:{value:summary}} as unknown as ObservationState<Summary>;
         emit!(current,view);elements(blockedRoot).find(e=>e.textContent==="Arm voice")!.onclick!();await new Promise<void>(resolve=>setImmediate(resolve));
         assert.equal(plays,0,"malformed command presence fences sound before any voice marker");
