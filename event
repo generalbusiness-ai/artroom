@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8f9fd19a6c0418f6c78f315c79e863790d252bdd","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser-build/counting.js."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:9150194a565b7d7f9d1925c60e2665fe9b2ca842","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/app.test.ts."}
