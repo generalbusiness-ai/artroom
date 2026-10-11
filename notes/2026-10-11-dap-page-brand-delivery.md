@@ -45,7 +45,17 @@ acts, enrollment, speech, music playback, or model calls ran in that QA.
 See `page-brand-browser-one`, `page-brand-browser-final`, and
 `page-brand-interactions` for the exact captures and metadata.
 
-The single review gate, rehearsal deployment/readback and light/dark
-hosted screenshots remain to be recorded. This delivery does not close
+The single gate at `ebfaae7` failed during compilation of the new tests.
+The missing script declaration and incomplete typed receipt fixture are
+corrected in `868d398d`. The full compiler completion passes. The previously
+unrun test phase passed 1,024 cases and failed four rehearsal cases that
+still expected the old room title. Commit `9f71cf7a` changes that expectation
+to `dap`; all four cases then pass. The repository's eight Node checks and
+Counter's 39 Node browser checks pass. Original failures remain in the
+evidence. These separate completions do not turn the original gate green.
+The completion records are in `page-brand-bounded-completion`.
+
+Rehearsal deployment, asset readback, and hosted light/dark screenshots
+remain to be recorded. This delivery does not close
 the full room, Counter, or native Jam requests. The original Counter
 report at generation 0, turn 8, count 5 remains preserved.
