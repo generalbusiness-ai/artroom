@@ -18,7 +18,7 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
-import type { Answer, FieldValue, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, enrollmentAssociation, fieldValue, joinAssociation, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
@@ -26,7 +26,7 @@ import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, ro
 import { editPath } from "@generalbusiness/artroom-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
-import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, requestedReviewCandidates, reviewSelectionProblem, taskForm, taskReviewExtents } from "./tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, requestedReviewCandidates, reviewSelectionProblem, taskForm, taskReviewExtents, type ReviewSelection } from "./tasks.ts";
 import type { Send } from "./actions.ts";
 import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
@@ -117,7 +117,8 @@ interface WorkbenchDialog {
   dialog: HTMLDialogElement; body: HTMLElement; context: string; route: string; kind: "record" | "review" | "source";
   opener: string; manifest?: number; action?: string; message: HTMLElement; binding: string;
   reviewDisabled?: Set<HTMLElement>;
-  review?: { room: Room; change: Awaited<ReturnType<typeof loadChange>>; blocked: boolean; offered: boolean };
+  review?: { room: Room; change: Awaited<ReturnType<typeof loadChange>>; blocked: boolean; offered: boolean; requestOffered: boolean };
+  reviewBinding?: { scope: ScopeRef | null; member: MemberRef | null; fixed: string | undefined; choices: readonly string[] };
 }
 let workbenchDialog: WorkbenchDialog | null = null;
 const settingsContext = (kept: Settings): string => JSON.stringify([location.origin, kept.place, kept.secret, kept.register ?? null]);
@@ -193,6 +194,15 @@ function inspectedScreen(screen: HTMLElement, panel: HTMLElement, context: strin
   return screen;
 }
 
+/** A fixed request or voluntary choice never changes when another request arrives. */
+function selectedReviewRequest(dialog: WorkbenchDialog, typed: string | undefined): ReviewSelection {
+  const held = dialog.reviewBinding;
+  let request: number | null | undefined;
+  if (held?.fixed !== undefined) request = (typed ?? "") === held.fixed ? held.fixed === "" ? null : Number(held.fixed) : undefined;
+  else request = typed && held?.choices.includes(typed) ? Number(typed) : undefined;
+  return { scope: held?.scope ?? null, member: held?.member ?? null, request };
+}
+
 function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send: Send, context: ActionContext, fields: readonly string[], label: string, association: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>): HTMLElement {
   const form = taskForm(act, send, context, fields, label);
   if (!form.hasAttribute("data-act") || act.kind !== "review-verdict") return form;
@@ -208,25 +218,30 @@ function nextTask(act: Awaited<ReturnType<typeof actsOn>>["acts"][number], send:
       if (!owned || workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
       const latest = await loadChange(room, scopeOfReview);
       if (workbenchDialog !== owned || context.current?.() === false) throw new Error("This review is no longer selected. Its draft is kept; nothing was signed.");
-      const problem = reviewSelectionProblem(room, latest, Number(manifest), typed["extent"] ?? "");
+      const problem = !owned.review?.requestOffered ? "The native review request field is unavailable. This draft is kept." : reviewSelectionProblem(room, latest, Number(manifest), typed["extent"] ?? "", selectedReviewRequest(owned, typed["request"]));
       if (problem) { owned.message.textContent = problem; owned.message.removeAttribute("hidden"); throw new Error(problem); }
     }), context, fields, label);
     openWorkbench(`Review version ${manifest}`, content, association, key, "review", { manifest: Number(manifest), action: act.kind });
     owned = workbenchDialog;
-    if (owned) { owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true }; owned.reviewDisabled = new Set(content.querySelectorAll<HTMLElement>("[disabled]")); }
-    content.addEventListener("input", () => { if (workbenchDialog === owned && owned?.review) reconcileReview(association, owned.review.room, owned.review.change, owned.review.blocked, owned.review.offered); });
+    if (owned) {
+      owned.reviewBinding = { scope: change.ref ? structuredClone(change.ref) : null, member: room.me?.ref ? structuredClone(room.me.ref) : null, fixed: context.defaults?.[act.kind]?.fields?.["request"], choices: (context.choices?.[act.kind]?.["request"] ?? []).map(choice => choice.value) };
+      owned.review = { room, change, blocked: !!context.pending || !!context.uncertain, offered: true, requestOffered: act.fields.some(field => field.name === "request" && field.type === "item") };
+      owned.reviewDisabled = new Set(content.querySelectorAll<HTMLElement>("[disabled]"));
+    }
+    content.addEventListener("input", () => { if (workbenchDialog === owned && owned?.review) reconcileReview(association, owned.review.room, owned.review.change, owned.review.blocked, owned.review.offered, owned.review.requestOffered); });
   });
   return button;
 }
 
-function reconcileReview(context: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>, blocked: boolean, offered = true): void {
+function reconcileReview(context: string, room: Room, change: Awaited<ReturnType<typeof loadChange>>, blocked: boolean, offered = true, requestOffered = true): void {
   const selected = workbenchDialog;
   if (selected?.kind !== "review" || selected.context !== context || selected.route !== location.hash) return;
-  selected.review = { room, change, blocked, offered };
+  selected.review = { room, change, blocked, offered, requestOffered };
   const last = lastActs.get(context);
   const requestBlocked = blocked || !!sending.get(context) || !!last && (last.answer.answer === "unavailable" || last.answer.answer === "mismatch" || last.observation !== null);
   const extent = selected.body.querySelector<HTMLInputElement | HTMLSelectElement>('[name="field:extent"]')?.value ?? "";
-  const problem = reviewSelectionProblem(room, change, selected.manifest!, extent);
+  const request = selected.body.querySelector<HTMLInputElement | HTMLSelectElement>('[name="field:request"]')?.value;
+  const problem = !requestOffered ? "The native review request field is unavailable. This draft is kept." : reviewSelectionProblem(room, change, selected.manifest!, extent, selectedReviewRequest(selected, request));
   // A failed preparation has no submitted original to fence. Keep the exact
   // draft editable for deliberate correction; initially unavailable controls stay unavailable.
   if (!requestBlocked) for (const control of selected.body.querySelectorAll<HTMLElement>("input, textarea, select")) {
@@ -673,7 +688,7 @@ async function draw(focus = false): Promise<void> {
         ...(current ? Object.fromEntries(["review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
         ...(change.proposal === undefined ? {} : Object.fromEntries(["edit-own", "edit-any", "ready-own", "ready-any", "request-review-own", "request-review-any"].map((kind) => [kind, { on: change.proposal! }]))),
       };
-      const taskContext = changeTaskContext(change);
+      const taskContext = changeTaskContext(change, loaded);
       const applicable = taskReviewExtents(change);
       if (change.reviewMembersByExtent !== undefined && taskContext.choices["review-verdict"]) {
         if (applicable === null) delete taskContext.choices["review-verdict"];
@@ -710,10 +725,10 @@ async function draw(focus = false): Promise<void> {
         }
         const next = nextChangeAction(loaded, change, acts.acts, primary);
         if (!next && change.state === "open" && applicable === null) screen.querySelector('[data-action-slot="next"]')?.append(h("p", { class: "muted", role: "status" }, "The rules policy for this recorded version could not be verified. Native actions remain in Advanced."));
-        reconcileReview(association, loaded, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"));
+        reconcileReview(association, loaded, change, !!context.pending || !!context.uncertain, acts.acts.some(act => act.kind === "review-verdict"), acts.acts.some(act => act.kind === "review-verdict" && act.fields.some(field => field.name === "request" && field.type === "item")));
         if (next && !context.pending && !context.uncertain) {
           const label = next.kind === "merge" ? "Merge change" : next.kind.startsWith("request-review") ? "Request review" : "Review change";
-          const control = nextTask(next, send, context, ["verdict", "body", "extent", ...(change.reviewMembers ? ["requested"] : [])], label, association, loaded, change);
+          const control = nextTask(next, send, context, ["verdict", "body", "extent", "request", ...(change.reviewMembers ? ["requested"] : [])], label, association, loaded, change);
           screen.querySelector('[data-action-slot="next"]')?.append(control);
           if (control.hasAttribute("data-act") || control.hasAttribute("data-task-act")) represented.push(next.kind);
         }

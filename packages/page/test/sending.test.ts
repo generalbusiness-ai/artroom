@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 
 // The real shell handlers over a minimal DOM and a scripted data boundary.
 // No browser, native scope or transport runs; the submit-phase callback is
@@ -247,19 +248,21 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   }
   const root=new Node('div'),body=new Node('body');body.append(root);
   const doc={createElement:(tag:string)=>new Node(tag),createElementNS:(_ns:string,tag:string)=>new Node(tag),getElementById:(id:string)=>id==='page'?root:body.all().find(node=>node.attrs['id']===id)??null,querySelectorAll:(selector:string)=>body.querySelectorAll(selector),body,get activeElement(){return focused;}};
-  const place={directory:'directory',membership:{scope:'membership',kind:'membership',inc:'one'}};
+  const fixtureDigest=digestBytes(new Uint8Array([1]));
+  const place={directory:'directory',membership:{scope:scopeIdOf({v:1,kind:'membership',definition:fixtureDigest,creator:null,cause:fixtureDigest,ordinal:0}),kind:'membership',inc:newIncarnation(new Uint8Array(16))}};
   const settings={place,secret:'device'};
-  const room={session:{service:'https://page.test',secret:new Uint8Array(32)},...place,rules:'rules',destination:'destination',key:'key',me:{handle:'@reader',role:'maintainer',actions:['change.review','change.merge','issue.open']},reader:{}};
+  const room={session:{service:'https://page.test',secret:new Uint8Array(32)},...place,rules:'rules',destination:'destination',key:'key',me:{handle:'@reader',role:'maintainer',actions:['change.review','change.merge','issue.open'],ref:{membership:place.membership,member:'@reader'}},reader:{}};
   const issue={scope:'issue',definition:'definition',head:{seq:1,hash:'head'},intent:0,title:'Native issue',number:1,body:null,state:'open',requester:'@author',assignees:[],conditions:[],comments:[],closeReason:null};
-  const change={scope:'change',definition:'definition',head:{seq:2,hash:'head'},proposal:0,title:'Selected change',number:2,body:null,state:'open',author:'@author',currentManifest:12,
+  const changeScope=scopeIdOf({v:1,kind:'lane',definition:fixtureDigest,creator:null,cause:fixtureDigest,ordinal:0});
+  const change={scope:changeScope,ref:{scope:changeScope,kind:'lane',inc:newIncarnation(new Uint8Array(16).fill(1))},definition:'definition',head:{seq:2,hash:'head'},proposal:0,title:'Selected change',number:2,body:null,state:'open',author:'@author',currentManifest:12,
     manifests:[{id:12,state:'current',authors:['@author'],integrator:'@author',base:'a'.repeat(40),integration:null,tree:null,complete:true,selectedReports:[],file:{path:'AGENTS.md',digest:'digest',size:4,page:'latest',content:'Text'}}],
-    reviews:[],requests:[],jobs:[],links:[],merges:[],comments:[],rules:{approvals:0,ownerMayReview:false,revision:1,checks:[],extents:[{name:'rules',approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
+    reviews:[],requests:[{id:6,state:'open',requested:'@reader',requester:'@author',requestedRef:room.me.ref,requesterRef:{membership:place.membership,member:'@author'}}],jobs:[],links:[],merges:[],comments:[],rules:{approvals:0,ownerMayReview:false,revision:1,checks:[],extents:[{name:'rules',approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
     // Synthetic presentation fixture; the native task-data case proves the real policy binding.
     reviewPolicy:{manifest:12,source:{at:{scope:'rules',kind:'rules',inc:'one'},seq:1,hash:'hash'},extents:[{name:'rules',patterns:['AGENTS.md'],approvals:1,approver:'rules.publish',checks:[],class:'authority'}]},
     reviewExtents:[{label:'rules',value:'rules'}],reviewMembers:[{label:'@reader',value:'@reader'}],reviewMembersByExtent:{rules:[{label:'@reader',value:'@reader'}]},
   };
   const comment={kind:'comment',step:'open',on:'comment',line:'Comment',fields:[{name:'body',type:'text',required:true}]};
-  const review={kind:'review-verdict',step:'open',on:'review',line:'Review',fields:[{name:'manifest',type:'item',required:true},{name:'extent',type:'text',required:false},{name:'verdict',type:'enum',required:true,choices:[{label:'Approve',value:'approve'}]},{name:'body',type:'text',required:false}]};
+  const review={kind:'review-verdict',step:'open',on:'review',line:'Review',fields:[{name:'manifest',type:'item',required:true},{name:'request',type:'item',required:false},{name:'extent',type:'text',required:false},{name:'verdict',type:'enum',required:true,choices:[{label:'Approve',value:'approve'}]},{name:'body',type:'text',required:false}]};
   const create={kind:'open-issue',step:'open',on:'lane',line:'Open',fields:[{name:'definition',type:'digest',required:true,choices:[{label:'Issue',value:'native-pin'}]},{name:'title',type:'text',required:true},{name:'conditions',type:'list',required:true}]};
   const posts=vi.fn();const attempts:{args:unknown[];finish:(answer:'accepted'|'refused')=>void;lose:()=>void}[]=[];
   let attempted=gate();
@@ -268,7 +271,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     return new Promise((resolve,reject)=>attempts.push({args,finish:answer=>{const result={kind:args[2],scope:args[1],on:null,answer:answer==='accepted'?{answer,receipt:{fact:{at:{scope:args[1],inc:'one',kind:'lane'},seq:3,hash:'hash'}}}:{answer,reason:'guard-failed'},before:{seq:2,hash:'old'},after:{seq:3,hash:'new'},observation:null};(args[4]as(value:unknown)=>void)(result);resolve(result);},lose:()=>reject(new Error('Reply lost'))}));
   });
   vi.doMock('@generalbusiness/artroom-bytes',async()=>({...await vi.importActual<typeof import('@generalbusiness/artroom-bytes')>('@generalbusiness/artroom-bytes'),b64url:()=> 'device',unb64url:()=>new Uint8Array(32),keyIdOfSecret:()=> 'key'}));
-  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,openRoom:async()=>room,listLanes:async()=>({issues:[{scope:'issue',number:1,title:'Native issue',state:'open'}],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope==='change'?[comment,review]:[comment],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:vi.fn(),siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
+  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,openRoom:async()=>room,listLanes:async()=>({issues:[{scope:'issue',number:1,title:'Native issue',state:'open'}],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope===change.scope?[comment,review]:[comment],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:vi.fn(),siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
   vi.doMock('../src/retained-editor.ts',()=>({retainedEditor:()=>new Node('div')}));
   let redraw!:()=>void;const location={origin:'https://page.test',hash:'#/'};
   vi.stubGlobal('document',doc);vi.stubGlobal('location',location);vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify(settings)});vi.stubGlobal('window',{addEventListener:(_name:string,callback:()=>void)=>{redraw=callback;}});
@@ -305,10 +308,24 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     rendered=gate();attempts[5]!.lose();await rendered.promise;
     expect(root.querySelector<Node>('form[data-act="comment"] [name="field:body"]')!.value).toBe('Refused text');
 
-    location.hash='#/change/change';await refresh();
+    location.hash='#/change/'+change.scope;await refresh();
     root.querySelector<Node>('[data-task-act="review-verdict"]')!.emit('click');dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="review-verdict"]')!;
     edit(form,'body','Keep this selected review');await refresh();
+    expect(form.querySelector<Node>('[name="field:request"]')!.value).toBe('6');
+    // A later request changes the unopened task's choices, never this dialog's original.
+    change.requests.push({...change.requests[0]!,id:9});await refresh();
+    expect(form.querySelector<Node>('[name="field:request"]')!.value).toBe('6');
+    expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(false);
     const before=act.mock.calls.length;
+    change.requests[0]!.state='met';rendered=gate();form.emit('submit');await rendered.promise;
+    expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
+    expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Keep this selected review');
+    change.requests[0]!.state='open';await refresh();
+    const sameNameElsewhere={...room.me.ref,membership:{...place.membership,inc:newIncarnation(new Uint8Array(16).fill(2))}};
+    change.requests[0]!.requestedRef=sameNameElsewhere;rendered=gate();form.emit('submit');await rendered.promise;
+    expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
+    change.requests[0]!.requestedRef=room.me.ref;await refresh();
+
     // FIRST failure has no prior native refusal whose branch could repair the controls.
     change.reviewMembersByExtent={rules:[]};rendered=gate();form.emit('submit');await rendered.promise;
     expect(act).toHaveBeenCalledTimes(before);expect(posts).toHaveBeenCalledTimes(before);
@@ -331,7 +348,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     change.reviewMembersByExtent={rules:[{label:'@reader',value:'@reader'}]};change.state='closed';await refresh();
     form.emit('submit');expect(act).toHaveBeenCalledTimes(before);expect(dialog.textContent).toContain('no longer open');
     change.state='open';await refresh();
-    attempted=gate();form.emit('submit');await attempted.promise;await done(6,'refused');
+    attempted=gate();form.emit('submit');await attempted.promise;expect((attempts[6]!.args[3]as{fields:Record<string,string>}).fields['request']).toBe('6');await done(6,'refused');
     expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(false);
     // A role/controller loss between the last draw and submit is caught BEFORE data.act.
     change.reviewMembersByExtent={rules:[]};rendered=gate();form.emit('submit');await rendered.promise;
@@ -348,7 +365,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(dialog.open).toBe(false);expect(root.textContent).toContain('Selected change');
     // A submitted unknown report remains fenced; definite-unsent recovery does not release it.
     root.querySelector<Node>('[data-task-act="review-verdict"]')!.emit('click');dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="review-verdict"]')!;
-    edit(form,'body','Keep unknown original review');attempted=gate();form.emit('submit');await attempted.promise;
+    edit(form,'request','9');edit(form,'body','Keep unknown original review');attempted=gate();form.emit('submit');await attempted.promise;
     rendered=gate();attempts[8]!.lose();await rendered.promise;
     expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Keep unknown original review');
     expect(form.querySelector<Node>('[name="field:body"]')!.hasAttribute('disabled')).toBe(true);

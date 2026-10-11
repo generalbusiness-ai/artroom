@@ -1,12 +1,12 @@
 /** Presentation over one complete authenticated membership summary. These
  * choices neither issue a grant nor certify the destination's admission. */
-import type { Item, KeyId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Item, KeyId, MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, isKeyId, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { CONTROLLER, EXTENT_CLASSES, EXTENTS_MOST, ROLE_LISTS, RULES_EXTENT, isActions, type Extent, type Role } from "@generalbusiness/artroom-platform";
 import type { Standing } from "@generalbusiness/artroom-cli";
 
 type Choice = { label: string; value: string };
-type Member = { item: Item; actions: readonly string[]; controller: string | null | undefined; live: boolean };
+type Member = { item: Item; ref: MemberRef; actions: readonly string[]; controller: string | null | undefined; live: boolean };
 
 type HeldExtent = Omit<Extent, "patterns">;
 const heldFields = ["name", "approvals", "approver", "checks", "class"];
@@ -43,7 +43,7 @@ function rosterOf(items: readonly Item[], membership: ScopeRef): Map<string, Mem
     const controller = kind === "agent"
       ? isMemberRef(controllerParty) && canonicalize(controllerParty.membership) === canonicalize(membership) ? controllerParty.member : undefined
       : (kind === "person" || kind === "checker") && (controllerParty === null || controllerParty === undefined) ? null : undefined;
-    members.set(handle, { item, actions: isActions(actions) ? actions : [], controller, live: item.state === "active" && keyed.has(item.id) });
+    members.set(handle, { item, ref: party, actions: isActions(actions) ? actions : [], controller, live: item.state === "active" && keyed.has(item.id) });
   }
   return members;
 }
@@ -55,13 +55,13 @@ function controlled(member: Member, members: Map<string, Member>): boolean {
 /** Current offered standing follows the actual key-to-member link. Native
  * grants permit comments while an agent's controller is inactive; other
  * standing actions need that controller's active member and active key. */
-export function currentStanding(items: readonly Item[], membership: ScopeRef, key: KeyId): Standing | null {
+export function currentStanding(items: readonly Item[], membership: ScopeRef, key: KeyId): (Standing & { ref: MemberRef }) | null {
   const members = rosterOf(items, membership);
   const own = items.find((item) => item.type === "key" && item.state === "active" && item.values["id"] === key);
   const member = members && [...members.values()].find((member) => member.live && member.item.id === own?.refs["member"]);
   if (!member || !members) return null;
   const actions = controlled(member, members) ? member.actions : member.actions.filter((action) => action === "issue.comment" || action === "change.comment");
-  return { role: member.item.values["role"] as Role, handle: String(member.item.values["handle"]), actions };
+  return { role: member.item.values["role"] as Role, handle: String(member.item.values["handle"]), actions, ref: structuredClone(member.ref) };
 }
 
 /** Each extent uses its recorded approver action. An absent author-controller

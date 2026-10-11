@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
-import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, taskForm } from "../src/tasks.ts";
+import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskForm } from "../src/tasks.ts";
+import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -191,10 +193,52 @@ test("a Merge task uses the exact observed manifest and selected issue reports w
 
 test("task defaults retain selected issue-report order and never fall back to an older manifest or checker jobs", () => {
   const reports = [{ at: { kind: "lane", scope: "second-issue", inc: "second" }, seq: 9, hash: "second-hash" }, { at: { kind: "lane", scope: "first-issue", inc: "first" }, seq: 4, hash: "first-hash" }];
-  const change = { currentManifest: 12, proposal: 0, manifests: [{ id: 11, state: "superseded", selectedReports: [] }, { id: 12, state: "current", selectedReports: reports }], jobs: [{ id: 99, state: "passed" }], reviewExtents: [{ label: "Docs", value: "docs" }], reviewMembers: [{ label: "@reviewer", value: "@reviewer" }] } as never;
+  const change = { currentManifest: 12, proposal: 0, manifests: [{ id: 11, state: "superseded", selectedReports: [] }, { id: 12, state: "current", selectedReports: reports }], jobs: [{ id: 99, state: "passed" }], reviewExtents: [{ label: "Docs", value: "docs" }], reviewMembers: [{ label: "@reviewer", value: "@reviewer" }] } as unknown as ChangeView;
   expect(changeTaskContext(change).defaults?.["merge"]?.fields).toEqual({ manifest: "12", reports: JSON.stringify(reports) });
   const unreadable = { ...change as object, currentManifest: null } as never;
   expect(changeTaskContext(unreadable).defaults?.["merge"]).toBeUndefined();
+  // Synthetic complete identity, not a native grant. Same handle in another
+  // membership incarnation cannot attach another person's request.
+  const fixtureDigest = digestBytes(new Uint8Array([1]));
+  const membership: ScopeRef = { scope: scopeIdOf({ v: 1, kind: "membership", definition: fixtureDigest, creator: null, cause: fixtureDigest, ordinal: 0 }), inc: newIncarnation(new Uint8Array(16)), kind: "membership" };
+  const lane: ScopeRef = { scope: scopeIdOf({ v: 1, kind: "lane", definition: fixtureDigest, creator: null, cause: fixtureDigest, ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(1)), kind: "lane" };
+  const member: MemberRef = { membership, member: "@reviewer" };
+  const requester: MemberRef = { membership, member: "@author" };
+  const room = { membership, me: { handle: "@reviewer", ref: member } } as unknown as Room;
+  const request = (id: number, requestedRef: MemberRef = member, state = "open") => ({ id, state, requested: "@reviewer", requester: "@author", requestedRef, requesterRef: requester });
+  const requested = { ...change, scope: lane.scope, ref: lane, state: "open", reviewMembersByExtent: { docs: [{ label: "@reviewer", value: "@reviewer" }] }, reviewPolicy: { manifest: 12, source: {} as never, extents: [{ name: "docs", patterns: ["README.md"], approvals: 1, approver: "change.review", checks: [], class: "content" }] }, manifests: [{ ...change.manifests[1]!, authors: [], file: { path: "README.md" } }], requests: [request(7, { ...member, membership: { ...membership, inc: newIncarnation(new Uint8Array(16).fill(2)) } }), request(8, member, "met"), request(6)] } as unknown as ChangeView;
+  const context = changeTaskContext(requested, room);
+  expect(context.defaults["review-verdict"]!.fields).toEqual({ manifest: "12", request: "6" });
+  const actualReview: Offered = { ...review, fields: [...review.fields, { name: "extent", type: "text", required: false }, { name: "request", type: "item", required: false }] };
+  const sent: unknown[] = [];
+  const form = asElement(taskForm(actualReview, (...args) => sent.push(args), context, ["verdict", "body", "extent", "request"], "Review change"));
+  form.all().find(node => node.name === "field:verdict")!.value = "approve";
+  form.event("submit");
+  expect((sent[0] as unknown[])[2]).toEqual({ manifest: "12", request: "6", extent: "docs", verdict: "approve" });
+  const captured = { scope: lane, member, request: 6 };
+  expect(reviewSelectionProblem(room, { ...requested, requests: [...requested.requests, request(9)] }, 12, "docs", captured)).toBeNull();
+  expect(reviewSelectionProblem(room, { ...requested, requests: [request(6, member, "met")] }, 12, "docs", captured)).toContain("no longer open");
+  expect(reviewSelectionProblem(room, { ...requested, requests: [request(6, { ...member, membership: { ...membership, inc: newIncarnation(new Uint8Array(16).fill(3)) } })] }, 12, "docs", captured)).toContain("no longer open");
+  const multiple = changeTaskContext({ ...requested, requests: [request(6), request(9)] }, room);
+  expect(multiple.defaults["review-verdict"]!.fields?.["request"]).toBeUndefined();
+  expect(multiple.choices["review-verdict"]!["request"]!.map(choice => choice.value)).toEqual(["6", "9"]);
+  const choiceSent: unknown[] = [];
+  const choiceForm = asElement(taskForm(actualReview, (...args) => choiceSent.push(args), multiple, ["verdict", "body", "extent", "request"], "Review change"));
+  const chooser = choiceForm.all().find(node => node.name === "field:request")!;
+  expect(chooser.tag).toBe("select"); expect(chooser.hasAttribute("required")).toBe(true);
+  chooser.value = "9"; choiceForm.all().find(node => node.name === "field:verdict")!.value = "approve"; choiceForm.event("submit");
+  expect((choiceSent[0] as unknown[])[2]).toMatchObject({ request: "9" });
+  const unavailable = asElement(taskForm({ ...actualReview, fields: actualReview.fields.filter(field => field.name !== "request") }, () => expect.fail("schema cannot bind"), context, ["verdict", "body", "extent", "request"], "Review change"));
+  expect(unavailable.hasAttribute("data-act")).toBe(false);
+  expect(changeTaskContext(requested, { ...room, me: null }).choices["review-verdict"]!["request"]).toEqual([]);
+
+  expect(reviewSelectionProblem(room, requested, 12, "docs", { ...captured, request: undefined })).toContain("Choose which review request");
+  const voluntary = changeTaskContext({ ...requested, requests: [] }, room);
+  expect(voluntary.defaults["review-verdict"]!.fields?.["request"]).toBe("");
+  const plain = asElement(taskForm(actualReview, () => {}, voluntary, ["verdict", "body", "extent", "request"], "Review change"));
+  expect(plain.textContent).toContain("Voluntary review");
+  expect(reviewSelectionProblem(room, requested, 12, "docs", { ...captured, request: null })).toBeNull();
+
 });
 
 test("Create issue asks for title and description and intentionally uses the title as its native condition", () => {

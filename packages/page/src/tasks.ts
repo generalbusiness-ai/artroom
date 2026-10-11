@@ -5,7 +5,7 @@ import { h, icon } from "./view.ts";
 import { issueTaskValues } from "./task-values.ts";
 import { controlKey } from "./focus.ts";
 export { changeTaskContext } from "./task-values.ts";
-export { nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskReviewExtents } from "./task-values.ts";
+export { nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskReviewExtents, type ReviewSelection } from "./task-values.ts";
 
 interface IssueDialog { dialog: HTMLDialogElement; form: HTMLElement; message: HTMLElement; context: ActionContext; close(restore?: boolean): void; initialDisabled: Set<HTMLElement> }
 const issueDialogs = new Map<string, IssueDialog>();
@@ -43,15 +43,21 @@ export function taskForm(act: Offered, send: Send, context: ActionContext, field
   if (act.kind === "review-verdict" && !act.fields.some(field => field.name === "extent")) return h("p", { class: "muted", role: "status" }, "This declaration cannot name an ordinary review requirement. Its native action remains in Advanced.");
   if (act.kind.startsWith("request-review") && context.choices?.[act.kind]?.["requested"]?.length === 0) return h("p", { class: "muted", role: "status" }, "No eligible reviewer is available for this version.");
   const fixed = context.defaults?.[act.kind];
+  const requests = context.choices?.[act.kind]?.["request"];
+  if (act.kind === "review-verdict" && requests !== undefined) {
+    if (!act.fields.some(field => field.name === "request" && field.type === "item")) return h("p", { class: "muted", role: "status" }, "This declaration cannot bind an ordinary review request. Its native action remains in Advanced.");
+    if (requests.length === 0) return h("p", { class: "muted", role: "status" }, "Current review request identities could not be verified. This draft is kept.");
+  }
   const unsupportedChoice = fields.filter((field) => act.fields.some((value) => value.name === field) && ["extent", "requested"].includes(field) && context.choices?.[act.kind]?.[field] === undefined);
   const missing = [...missingFields(act, context, fields), ...unsupportedChoice];
   if (missing.length) return h("p", { class: "muted", role: "status" }, `${label} is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from this version's recorded facts.`);
   const shown: Offered = { ...act, fields: act.fields.filter((field) => fields.includes(field.name) || fixed?.fields?.[field.name] !== undefined || (context.choices?.[act.kind]?.[field.name] ?? field.choices)?.length === 1) };
-  if (act.kind === "review-verdict") shown.fields = shown.fields.map(field => field.name === "extent" ? { ...field, required: true } : field);
+  if (act.kind === "review-verdict") shown.fields = shown.fields.map(field => field.name === "extent" || field.name === "request" && requests !== undefined && requests.length > 1 && fixed?.fields?.["request"] === undefined ? { ...field, required: true } : field);
   const recipients = context.choices?.[act.kind]?.["requested"];
   const namedReview = act.kind.startsWith("request-review") && recipients?.length === 1 ? `Request review from ${recipients[0]!.label}` : undefined;
   const submitLabel = namedReview ?? (label === "Issue action" ? act.kind.startsWith("reopen") ? "Reopen issue" : act.kind.startsWith("close") ? "Close issue" : undefined : undefined);
   const form = actionForm(shown, send, { ...context, ...(submitLabel ? { submitLabel } : {}) }, true);
+  if (act.kind === "review-verdict" && requests?.length === 1) form.append(h("p", { class: "muted", "data-review-request": "" }, requests[0]!.label));
   if (act.kind === "comment") form.setAttribute("class", "composer");
   return form;
 }

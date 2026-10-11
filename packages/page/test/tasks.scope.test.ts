@@ -31,10 +31,16 @@ test("Create issue task values and conversation comments produce native recorded
     const authored = await loadChange(room, row.scope);
     expect(authored.currentManifest).toEqual(expect.any(Number));
     expect(authored.reviewMembers?.map((value) => value.value)).toContain("@rita");
-    expect((await act(room, row.scope, "request-review-own", { fields: { requested: fieldValue(room, "member", "@rita") } })).answer.answer).toBe("accepted");
-    const selected = await loadChange(controller, row.scope), reviewValues = changeTaskContext(selected).defaults!["review-verdict"]!.fields!;
+    const requested = await act(room, row.scope, "request-review-own", { fields: { requested: fieldValue(room, "member", "@rita") } });
+    expect(requested.answer.answer).toBe("accepted");
+    if (requested.answer.answer !== "accepted") throw new Error("Native review request unavailable");
+    const request = requested.answer.receipt.fact.seq;
+    const selected = await loadChange(controller, row.scope), reviewValues = changeTaskContext(selected, controller).defaults!["review-verdict"]!.fields!;
     expect(selected.reviewExtents?.map((value) => value.value)).toContain("source");
-    expect((await act(controller, row.scope, "review-verdict", { fields: { manifest: Number(reviewValues["manifest"]), verdict: "approve", extent: "source" } })).answer.answer).toBe("accepted");
+    expect(selected.requests.find(value => value.id === request)?.requestedRef).toEqual(controller.me?.ref);
+    expect(reviewValues["request"]).toBe(String(request));
+    expect((await act(controller, row.scope, "review-verdict", { fields: { manifest: Number(reviewValues["manifest"]), request: Number(reviewValues["request"]), verdict: "approve", extent: "source" } })).answer.answer).toBe("accepted");
+    expect((await loadChange(controller, row.scope)).requests.find(value => value.id === request)?.state).toBe("met");
     const mergeValues = changeTaskContext(await loadChange(room, row.scope)).defaults!["merge"]!.fields!;
     const current = (await loadChange(room, row.scope)).manifests.find((value) => value.id === Number(mergeValues["manifest"]))!;
     expect(current.selectedReports).toEqual([]); // Authenticated source-only selection, not a checker-log substitute.

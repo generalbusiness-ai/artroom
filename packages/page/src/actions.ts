@@ -41,7 +41,7 @@ const labels: Record<string, string> = {
 };
 const fieldLabels: Record<string, string> = {
   body: "Description", title: "Title", path: "Path", content: "Content", requested: "Reviewer",
-  verdict: "Decision", extent: "Review requirement", manifest: "Version", reason: "Reason", approvals: "Required approvals",
+  request: "Review request", verdict: "Decision", extent: "Review requirement", manifest: "Version", reason: "Reason", approvals: "Required approvals",
   ownerMayReview: "Allow author review", singleControllerException: "Single controller exception", checks: "Checks",
   labels: "Labels", extents: "Review requirements", conditions: "Conditions", definition: "Definition", draft: "Draft",
 };
