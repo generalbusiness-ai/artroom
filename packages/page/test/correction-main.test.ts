@@ -24,7 +24,7 @@ test("Main mounts a new corrected-proposal control for verified invalid-path tex
   const editor=vi.fn(()=>{const e=new Element('button');e.append('Create corrected proposal');return e;});
   vi.doMock('../src/retained-editor.ts',()=>({retainedEditor:editor}));
   vi.doMock('../src/claim.ts',()=>({allowedClaim:vi.fn(),claimRoom:vi.fn(),claimStatus:vi.fn()}));
-  vi.stubGlobal('document',{getElementById:()=>root,createElement:(tag:string)=>new Element(tag)});
+  vi.stubGlobal('document',{getElementById:()=>root,createElementNS:(_namespace:string,tag:string)=>new Element(tag),createElement:(tag:string)=>new Element(tag)});
   const location={origin:'https://page.test',hash:'#/change/invalid-change'};vi.stubGlobal('location',location);
   vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify({place,secret:'device'}),setItem:vi.fn()});
   let redraw!:()=>void;vi.stubGlobal('window',{addEventListener:(_name:string,handler:()=>void)=>{redraw=handler;}});

@@ -1,70 +1,109 @@
-# Counting stage: source startup and remaining acceptance
+# Counting commitments: deployed stage and device setup
 
-2026-10-09. U1 request197d4aac175f2c8582d58a8292ff9e8305f05630 / promise6694067f91de49473d471c97f8735e3909d323ef. Full counting4073e756 remains open. This browser source uses C0 pin435d and W1's actual authenticated observer exports; it does not establish a native application, enroll a member or provide acoustic/hosted evidence.
+This stage targets C1 `counting-commitments`, pin
+`sha256:b55824346382d9b158be4cadd9d098008f8129147fba772537778e2f738d5271`,
+and the explicit M1 cohort register@6, directory@6, membership@5, rules@3,
+destination@2 and inbox@1. The old C0 declaration and pin remain shipped;
+this stage does not migrate old applications or private history.
 
-Root composes exact C0 and W1 source before review. The normal source path uses the existing cached tooling, without dependency/lockfile changes:
+The production Worker serves `/counting/`, `/counting/counting.js` and
+`/counting/counting.css` on the same origin as its native scope API. Build
+its three public assets before compiling or deploying the Worker:
 
 ```sh
-node node_modules/vite/bin/vite.js --config examples/counting/browser/vite.config.ts
+node examples/counting/scripts/assets.mjs
 ```
 
-Open the printed localhost URL for index.html. It begins disconnected with no seeded count. preview.html is explicitly FAKE transport, FAKE session/scope data, FAKE speech and a fixed fake clock for rendered source QA; it never invokes browser speechSynthesis, a microphone, TTS/model service or provider. The fake route scripts expected browser paths and does NOT prove C0 native admission, F1 authority, DO persistence or audible output. Captures use isolated dummy contexts/keys only.
+The builder writes `examples/counting/browser-build/` and the committed
+`packages/scope/src/counting-assets.ts`. The asset witness compares a fresh
+write-free build with the committed module. The deployment includes no fake
+preview, keys, sessions or recorded fixture data. `preview.html` remains an
+explicit local fake transport/session/scope/speech/clock QA surface. It is
+not served by the production route and proves no native or audible outcome.
 
-## Actual device setup is separate
+## Establish and enroll before connecting
 
-F1's proposed supported cohort is directory@5, membership@4, rules@3 and destination@2. application.establish is separately authorized for an admin/controller; counting.establish/control/join/leave/spoken must be configured under actual native membership policy. There is no NEWEST alias, old-room upgrade or universal owner grant. F1 source/closure choice, normal source review/gate and actual deployment/enrollment remain dependencies. A public descriptor claiming a cohort is not an independent native establishment proof; use verified F1 output and native read/session correspondence.
+The operator uses the explicit Counting cohort for install planning, then
+pins the actual register in the configured Git host, installs the retained
+plan and establishes the actual C1 application through the native factory.
+The activated declaration, complete closure, native creator's opener,
+membership and application full references must be verified. The factory
+supplies no counting domain grant by implication. Configure the fourteen
+C1 acts under the actual membership policy, with controller and agent grants
+separate. Preserve ordinary pending install/enrollment envelopes.
 
-Establishment opens C0's untimed configuration. The actual controller first submits Initialize, which creates the paused board; only then do actors Join and the controller Start. The stage exposes Initialize when the verified configuration exists without a board. It cannot skip that act or fabricate a board. The browser's proposal helper supplies candidate roster/number/successor fields; C0 guards independently check them before any native count changes.
+Each runner uses its own independently enrolled member/device key. An agent
+member is added as kind `agent`, then receives an agent-key invitation and
+its native enrolment; a person with a role named agent is not equivalent.
+The application controller initializes the paused board. Participation is
+initially inactive; a device chooses a usable voice and activates. Start
+opens claims without selecting a speaker. Eligible active devices may commit
+the next number; native fairness and the complete ordered active basis
+choose which single pledge is admitted, not a browser round robin.
 
-Each browser/tab is ONE independently enrolled member/device, with its own key and header-only read session. Do not use Artroom Page's ambient Settings key or have the operator sign as another actor. An operator/controller may use only their OWN enrolled key. Existing room enrollment/invitation/seat/key facilities must establish the three actual identities and grants first; this stage does not pretend that its Connect button enrolls anyone. No production key-generation/upload-to-server or model-key flow is introduced.
+Connect requires a verified public device-binding JSON and that device's
+own local enrolled key file. The key loader accepts the existing owner-only
+base64url seed or exactly 32 raw bytes. It reads the key into this device's
+memory, verifies its public ID and clears the loader copy. No private key or
+session token belongs in a URL, log, screenshot, IndexedDB or shared Page
+Settings. The public binding has origin, deployment, full lane scope,
+application definition, full membership, complete MemberRef, publicKey and
+cohort `{directory:"platform:directory@6",membership:"platform:membership@5",
+rules:"platform:rules@3",destination:"platform:destination@2"}`. Use actual
+native output, never symbolic identifiers. Production Connect requires the
+current origin. An authenticated read is not an act grant.
 
-Connect takes a verified public device-binding JSON plus that device's local enrolled key file. The existing CLI key store writes an owner-only base64url seed; the loader also accepts exactly32 raw bytes. The key is read only into this device's memory, checked against its public key, and never placed in a URL, log, screenshot, IndexedDB or shared settings. Do not share the private file. Public shape (symbolic values below are NOT valid deployed identifiers):
+## Pledge, audio and fulfillment are different events
 
-```json
-{
-  "origin": "https://your-verified-service",
-  "deployment": "the-trusted-session-deployment",
-  "scope": {"scope": "<actual full app ID>", "inc": "<actual incarnation>", "kind": "lane"},
-  "definition": "sha256:435d9f5745048183d3cf0392ce909cd76909fd69ee368dfc57e142ba96af1d09",
-  "membership": {"scope": "<actual membership ID>", "inc": "<actual incarnation>", "kind": "membership"},
-  "member": {"membership": {"scope": "<same membership ID>", "inc": "<same incarnation>", "kind": "membership"}, "member": "@your-agent"},
-  "publicKey": "<that enrolled key's public ID>",
-  "cohort": {"directory": "platform:directory@5", "membership": "platform:membership@4", "rules": "platform:rules@3", "destination": "platform:destination@2"}
-}
-```
+Arm is explicit per device and usable voice. An armed active runner may
+propose a commitment; an unknown commit stays silent. Only a fresh complete
+authorized view of that device's current admitted pledge starts local speech.
+The UI distinguishes the promised number from the last fulfilled number.
+The native 30-second deadline belongs to the accepted pledge. Its board timer
+expires before the promise timer; both must settle before another commitment.
+Reset requires paused or finished without a live pledge. It preserves roster
+and native history and does not resolve private unknown requests.
 
-F1 establishes a lane-kind application. The lane and membership full references above are symbolic; use F1's exact verified output, never invented identifiers. The gateway verifies the exact C0 pin/full scope and W1 verifies deployment/member/key/membership session binding. Read permission is not an act grant: the native scope checks counting.* authority on every submitted act. Unsupported factory, missing grants, unavailable sessions, mismatched identity or inaccessible scope remain visible failures. No arbitrary URL resolution/factory fallback is attempted.
+Before any sound, one random audio ID and the full identity/turn/voice/start
+time are committed and read back in the existing private voice slot under its
+Web Lock. Missing locking, storage or exact readback blocks audio. Interrupted
+starts remain uncertain and never replay automatically. After actual completion,
+the marker stays with the exact signed Fulfill report. The native scope alone
+advances lastNumber. Error/cancel/context changes fence callbacks before
+cancellation; resolve a failed or uncertain pledge without reporting completion.
 
-## Private completion and playback boundary
+Before a report or control POST, the exact whole envelope is privately saved,
+then marked inflight and read back before dispatch. Unknown commit, fulfillment
+or control outcomes retain that original request, block fresh signatures and
+never trigger another sound. Check is read-only and follows the exact original
+native receipt and signed entry. Explicit Resume is only a definitely-unsent
+first dispatch under a current captured context. A returned phase or a newer
+head is not settlement. Known-refused correction preserves the completed audio,
+all previous refused envelopes and judgments; it never speaks again. Malformed,
+legacy, inflight and unknown histories remain blocked and intact.
 
-Explicit Arm selects a usable browser voice for THIS device; an armed actor may play each new fresh assigned own turn once. Another actor's card has no local speech control. Native snapshots alone supply global number/speaker; local playback, completed audio, pending signed report and recorded completion remain separate. Controller actions invalidate callbacks BEFORE cancellation; every callback binds deployment/origin/full refs/generation/serial/N/member/key/audio generation. Voice selection/disconnection/context change cancel safely. No claim of audible exactly-once across crashes/devices.
+Private custody keeps at most eight attempts per completion, 64 KiB per record
+and 32 total active/archive slots. Original C0 slots still count; no silent
+eviction occurs. A current confirmed native outcome can archive resolved history
+atomically. An interrupted audio-only marker can be archived intact only after
+a fresh authorized native view proves its pledge is no longer live, using the
+explicit Check action; a new explicit Arm is then required. This is origin-
+private application custody, not encrypted OS storage. Deploy trusted code under
+the route's self-only CSP.
 
-Before any report/control POST, one exact signed envelope is committed into this origin's private IndexedDB slot for that identity. The source requires a Web Lock; missing lock/storage blocks sending. It holds at most one voice completion and one control request per identity, 64KiB per record and32 total private slots; unresolved slots are not silently evicted. User keys/read tokens are never stored there. Same-origin scripts can access IndexedDB; deploy only trusted code/CSP. This is private application custody, not an encrypted OS vault or a server journal.
+## Evidence still required
 
-Unknown dispatch blocks new signatures/audio replay and retains the original request. A head notice or newer count never settles it. Check report/command uses only accepted exact-intent settlement for legacy, inflight or unknown attempts, then verifies full fact/pin/intent/exact signed entry. There is no resubmit button for those attempts. Check report is read-only for every phase, including prepared: it never dispatches, signs, replays speech or reinterprets a later refusal as settlement. A separate explicit Resume original report action is available only for a fully validated definitely-unsent prepared history under a current captured context/key, a fresh gateway read and the exact original assigned completion token. It first-dispatches the same original envelope through durable inflight save/readback; it never prepares a new signature or speech. Inflight, unknown, legacy, malformed or otherwise unresolved prior history cannot Resume. Check report remains a stable identity-owned footer action when the participant has left the joined roster or no turn is assigned. Check command is also read-only for every phase. A separate explicit Resume original command restores its authorized definitely-unsent FIRST dispatch: the closed command record/kind, whole signed envelope/key/context and all earlier known-refused history are checked under the same identity lock; inflight save/readback and single-use transport correlation precede the exact original POST. It never prepares, signs or speaks. Inflight, unknown, legacy, malformed and unresolved prior history cannot Resume.
+Source and fake DOM/speech/transport witnesses are not deployment evidence.
+The native C1/M1 witness uses actual factory creation, agent enrollment, grants,
+HTTP sessions, contention, all acts, ordered expiry, restart and proven replay;
+its Git host answers and clock are labeled stand-ins. Actual deployment must
+bind a landed main head, asset hashes, Worker deployment ID and URL. Demonstrate
+three independently enrolled actors with distinguishable usable voices, automatic
+peer updates, actual local sound, unknown-reply/restart recovery and the final
+natural recording. Local browser speech is not audible exactly-once across
+crashes/devices or permission to replay an uncertain attempt.
 
-A received FIRST reply from the explicitly configured trusted service can be a known refusal; it is distinct from recovery after an answer was lost. U1's local TrustedActFetch requires redirect:error and actual final response URL/redirected/media metadata. One captured request/context closure checks the exact scope-ID route, whole outgoing envelope, full scope/incarnation/kind/key/pin/membership/deployment context, application/json and native Answer/status consistency before accepting that service reply. The SDK supplies the existing bounded raw-byte/timeout/closed-Answer parser. Ordinary Fetch alone is insufficient; a fake/injected adapter cannot acquire native authority by inventing headers. Production trusts the configured service, not metadata as a grant or a cryptographically signed refusal. Act permission is still judged natively on every submission.
-
-Private v2 history retains prepared→inflight→unknown/refused/recorded transitions. The dispatcher commits inflight BEFORE fetch, re-reads exact active phase/envelope, and checks unchanged custody before writing a terminal phase. Restored inflight is unknown even if a crash preceded actual sending. A fresh first refusal's reason/name/head plus configured route/context/request fingerprints must commit before the controller exposes known refusal or permits correction. Failed marker commit sends nothing; failed refusal commit keeps the exact attempt unknown. A closed runtime envelope validator checks the original signed shape/signature, matching full scope/key, grant shapes and the exact current Counting Beside schema: empty, because its pinned acts declare no detached text, retained values or presented facts. Even empty side keys and reserved/undeclared side fields are rejected before inflight or POST. The outgoing body is built from those declared fields explicitly. Malformed stored bytes remain blocked and intact. Controller/UI and gateway share complete journal/refusal validation, including signature, recognized reason, judgedAt and optional name. The actual gateway captures its complete post-operation custody before releasing the identity lock; controller handoff compares that raw complete record before normalization. A recorded clear/archive needs that exact handoff plus a current recorded result from the gateway’s receipt/full-entry verifier, never an opaque cached phase or enum. Terminal clear reloads exact phase/envelope/completion under the same identity lock. The controller releases its preparation lock before the dispatcher takes it, then re-acquires it for exact journal/completion settlement; there is no nested lock or weaker cached enum deciding a clear.
-
-After a known guard/revision roster refusal and a fresh matching own turn/read authorization, Update report may sign ONE corrected proposal, preserving the OLD refused envelope/judgment in the same completion history without speaking again. Native authority remains independent from read permission. The UI reserves exact next-envelope growth before exposing correction; the actual saved record is checked again before POST. Each completion has at most8 attempts, subordinate to64KiB per slot and32 slots: eight maximum-size envelopes are not guaranteed to fit. At count/byte capacity all prior attempts remain and further signing/sending is blocked. An unknown attempt anywhere prevents another signature. Legacy journal-less attempts remain unknown. Native timeout/reset/leave/speaker/context change invalidates playback and prevents correcting an obsolete completion; it does not erase unresolved custody. A fully validated known outcome on an obsolete turn can leave the active voice pointer only when every retained attempt is resolved: earlier valid attempts are necessarily known refused; the active attempt is either a validated known refusal or a freshly receipt-confirmed recorded result. A cached recorded phase without fresh native receipt confirmation remains unresolved; it cannot clear or archive from that phase tag alone. A current recorded reconciliation may clear or archive only after the gateway verifies the receipt/full original signed entry; obsolete results archive intact through that fresh confirmation path. The gateway must have a fresh native snapshot showing participant removal, a changed generation/serial, an already recorded number or a changed exact assignment. Ordinary pause/refresh is insufficient. The existing IndexedDB object store atomically copies the intact identity/completion/envelopes/judgments to a content-keyed archive before deleting the active pointer. Archives count toward the same32 total slots and64KiB each; archiving atomically replaces the active slot, so32 existing slots remain32. Creating a later active slot must still fit the same32 total limit; full capacity preserves archived history and blocks the new slot. No archive eviction, unknown-history archive or retargeted completion is allowed. Archival disarms speech and requires a new explicit Arm. The browser never increments recorded count optimistically.
-
-Protocol evidence: packages/contract/src/result.ts:69 defines refused as reason/name?/judgedAt only; contract/src/read.ts:19 defines Settlement as Read<Receipt>. scope/src/worker.ts:193–198/266 returns the native JSON/status submit answer. scope/src/core.ts:627 returns unsealed refusal, while :740–749 returns only an accepted exact-intent receipt. client/src/http.ts:29 exposes insufficient OrdinaryFetch metadata; its existing parser and client/src/answers.ts:48 remain in use. Following an accepted receipt recomputes entry hash/full reference in client/src/handle.ts:99–111, then U1 checks the exact submitted signed envelope and pin/intent. First-service trust and retained accepted proof are different boundaries; no new Core/wire/cryptographic-response protocol is introduced.
-
-Focused client.test.ts uses actual SDK/W1/signing over explicitly fake HTTP/session/history/memory custody: first correlated refusal; wrong-route unknown with no subsequent POST and accepted-only recovery; prepared restore using identical bytes under two serialized controllers; inflight/legacy restore with no POST; journal-save failures and active-history compare races; local blocked candidate with zero custody/POST. The controller's fake speech tests cover full completion fences, preserved refused histories/quota, lock handoff, unknown/legacy and fresh post-refusal reads. These are source boundary witnesses, not native authority, actual HTTPS, IndexedDB crash, acoustic or provider proof. Retained629 screenshots show ordinary fake layout before this dispatcher successor; they do not exercise its new refusal boundary.
-
-## Minimum later real acceptance
-
-After F1/C0/W1/U1 source review, coordinated gate and real deployment, enroll three independent members/keys and configure three distinct usable voices. Arm each via its own gesture before Start. Run a short natural sequence; add a fourth, leave the current/noncurrent actors, pause/resume and reset, with automatic native snapshot/head synchronization. Separately verify canceled/stale end callbacks, trusted-first roster-refused correction without replay and lost-refusal recovery remaining unknown, lost acknowledgment exact custody/reconciliation, reconnect and real DO restart at known native frontier. Exercise real session expiry/revocation within actual windows. Measure acknowledgment, peer-visible update and audio turn gap separately. Acoustic distinction/end/cancel behavior, native authority/admission, provider/deployment and recording are NOT proved by fake source QA. No actual speech/audio/mic/model/provider/hosting/recording occurs in this U1 step.
-
-## Preparation repairs: source-only handoff
-
-The successor from b4 addresses planner330181 and checker3acd16. Its new/changed witnesses are authored but not executed. Existing b4 fake test results remain evidence of their exact prior source only; the629 desktop/mobile captures predate the dispatcher and these repairs. The original W1 scratch dependency was468cd797; current W1 source45177075 is still a separate branch and must be concretely composed before types/build or normal review. This browser worktree does not contain that W1 source. No new counting14-act refinement, Core/SDK wire change, new pins, competing watch/store, browser/audio/provider/native execution or gate is included.
-
-After Root's full source reading and the single execution owner release, run the changed fake SDK/custody witnesses and controller witnesses plus app.test.ts's fake DOM-surface roster-removal scenario; then the concrete composed browser typecheck. Meaningful controls must reach an observable boundary: weaken the complete envelope checks coherently enough that malformed prepared custody can produce a POST/inflight write; restoring only one preflight may survive the independent readback guard. Likewise, the shared refusal validator has controller and gateway defenses, so record any surviving local fault honestly. Remove both terminal checks if necessary to expose the valid active-unknown archive fault; removing one may survive the other. The earlier malformed [unknown,refused] history fails journal validation and is not a distinguishing terminal control. The current source plan claims no unexecuted control result. Do not run a sweep. The existing storage transaction still needs later actual IndexedDB crash/abort/lock/reload/quota evidence; fake memory/DOM assertions cannot prove that boundary. Complete appropriate coordinated gate and ordinary same-head Source review remain owed.
-
-Planner994530 clarifies the explicit Resume/Check separation and net archive quota. The successor also binds every retained spoken envelope's generation/serial/N to its original immutable completion; native guards still decide admission. The full-kind mismatch fixture changes lane to task, rather than comparing lane with itself. No execution result is claimed for these amended witnesses.
-
-Plannerad1ad2 selects read-only semantics for every Check control. The successor extends the existing two-tab command witness: both Check calls retain the whole prepared record and issue zero POST; two concurrent explicit Resume calls consume the FIRST ticket once with unchanged original envelope. Every uncertain history remains reconciliation-only. This is authored source coverage, not an executed result.
-
-The app treats explicit command Resume as a controller mutation: it invalidates local playback before the gateway call, fencing synchronous cancellation and late callbacks. A received trusted refusal remains visible with its supplied reason/guard context or a refusal fallback; it is never displayed as success. A new authored fake-DOM scenario uses the real mounted voice controller and synchronous fake cancellation to check this order and refusal display. No execution or browser claim is attached.
+This source is being composed under request `c612acc60c1b02577c7814b8026ad6d398f54023`,
+promise `96ce76dbe95b0247193bf7ac5d4df47937915350`, within convergence `e60a3ca5`.
+Current build/check/native/browser/deployment outcomes are recorded separately;
+this text claims none before they run.

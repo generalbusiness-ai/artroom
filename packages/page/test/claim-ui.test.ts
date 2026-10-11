@@ -10,8 +10,14 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     handlers = new Map<string, (event: { preventDefault(): void }) => void>();
     constructor(readonly tag: string) {}
     setAttribute(key: string, value: string) { this.attrs[key] = value; if (key === "value") this.value = value; }
+    hasAttribute(key: string) { return Object.hasOwn(this.attrs, key); }
+    getAttribute(key: string) { return this.attrs[key] ?? null; }
+    querySelector() { return null; }
+    querySelectorAll() { return this.all().filter(element => element.attrs["data-focus-key"] !== undefined); }
+    all(): Element[] { return [this, ...this.children.flatMap(child => typeof child === "string" ? [] : child.all())]; }
     removeAttribute(key: string) { delete this.attrs[key]; }
     append(...children: (Element | string)[]) { this.children.push(...children); }
+    prepend(...children: (Element | string)[]) { this.children.unshift(...children); }
     replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
     addEventListener(key: string, callback: (event: { preventDefault(): void }) => void) { this.handlers.set(key, callback); }
     fire(key: string) { this.handlers.get(key)?.({ preventDefault() {} }); }
@@ -21,6 +27,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     find(predicate: (element: Element) => boolean): Element | undefined { if (predicate(this)) return this; for (const child of this.children) if (child instanceof Element) { const found = child.find(predicate); if (found) return found; } return undefined; }
   }
   const root = new Element("div");
+  const body = new Element("body");
   const register = { kind: "register", scope: "register", inc: "one" };
   let settings: { place: { directory: string; membership: { kind: string; scope: string; inc: string } }; secret: string; register: typeof register; label?: { text: string; place: { directory: string; membership: { kind: string; scope: string; inc: string } }; register: typeof register } } = { place: { directory: "room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device", register };
   settings.label = { text: "Original local label", place: settings.place, register };
@@ -36,8 +43,8 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     openRoom: async () => ({ session: { service: "https://page.test", secret: new Uint8Array(32) }, ...settings.place, rules: "rules", name: "Recorded repository", me: { handle: "@founder" } }),
     actsOn: async () => ({ acts: [], hidden: 0 }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", actAssociation: () => "association", act: vi.fn(), fieldValue: vi.fn(), joinRoom: vi.fn(), loadChange: vi.fn(), loadIssue: vi.fn(), loadRules: vi.fn(), placeOf: vi.fn(),
   }));
-  vi.doMock("../src/view.ts", () => ({ h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); element.children = children.flat().filter((child) => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; }, roomScreen: () => new Element("main"), actsPanel: () => new Element("section"), failureScreen: () => new Element("main"), changeScreen: vi.fn(), issueScreen: vi.fn(), rulesScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn() }));
-  vi.stubGlobal("document", { getElementById: () => root }); vi.stubGlobal("HTMLDialogElement", Element);
+  vi.doMock("../src/view.ts", () => ({ icon: () => new Element("svg"), h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); element.children = children.flat().filter((child) => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; }, roomScreen: () => new Element("main"), actsPanel: () => new Element("section"), failureScreen: () => new Element("main"), changeScreen: vi.fn(), issueScreen: vi.fn(), rulesScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn() }));
+  vi.stubGlobal("document", { getElementById: () => root, body }); vi.stubGlobal("HTMLDialogElement", Element);
   vi.stubGlobal("location", { origin: "https://page.test", hash: "#/" });
   const save = vi.fn((_key: string, value: string) => { if (failSave) throw new Error("Storage full"); settings = JSON.parse(value) as typeof settings; });
   vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(settings), setItem: save });
@@ -46,7 +53,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   try {
     await import("../src/main.ts"); await rendered.promise;
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
-    let dialog = root.find((element) => element.tag === "dialog")!;
+    let dialog = body.find((element) => element.tag === "dialog")!;
     let input = dialog.find((element) => element.tag === "input")!; input.value = "Local intent";
     let form = dialog.find((element) => element.tag === "form")!;
     form.fire("submit"); await attempted.promise; form.fire("submit"); expect(claim).toHaveBeenCalledTimes(1);
@@ -57,7 +64,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(dialog.textContent).toContain("Resume creation");
     dialog.fire("cancel");
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
-    dialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    dialog = body.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
     input = dialog.find((element) => element.tag === "input")!; form = dialog.find((element) => element.tag === "form")!;
     expect(input.value).toBe("Local intent"); expect(input.attrs["disabled"]).toBe("");
     attempted = gate(); form.fire("submit"); await attempted.promise;
@@ -73,7 +80,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(settings.label?.text).toBe("Original local label");
     expect(dialog.textContent).toContain("storage of the room settings could not be verified");
     expect(dialog.textContent).toContain("created-room");
-    expect(root.children).toContain(dialog);
+    expect(body.children).toContain(dialog);
     expect(save).toHaveBeenCalledTimes(1);
     failSave = false; save.mockClear();
     attempted = gate(); form.fire("submit"); await attempted.promise;
@@ -85,7 +92,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(save).not.toHaveBeenCalled();
     rendered = gate(); redraw(); await rendered.promise;
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
-    const nextDialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    const nextDialog = body.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
     nextDialog.find((element) => element.tag === "input")!.value = "Useful local name";
     attempted = gate(); nextDialog.find((element) => element.tag === "form")!.fire("submit"); await attempted.promise;
     rendered = gate(); finish({ operation: "first", repository: { directory: { scope: "verified-room" }, membership: settings.place.membership }, label: "Useful local name", pending: false, outcome: { code: 0, lines: [] } }); await rendered.promise;
@@ -94,7 +101,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     expect(root.textContent).toContain("Useful local name");
     expect(root.textContent).toContain("Recorded repository");
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
-    const secondDialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    const secondDialog = body.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
     secondDialog.find((element) => element.tag === "input")!.value = "Second local room";
     attempted = gate(); secondDialog.find((element) => element.tag === "form")!.fire("submit"); await attempted.promise;
     expect(claim.mock.calls.at(-1)![4]).toMatchObject({ mode: "new", operation: "first" });
@@ -113,7 +120,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
       return { repository: null, pending: true, label: "Queued local name", outcome: { code: 1, lines: [] } };
     });
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
-    const queuedDialog = root.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
+    const queuedDialog = body.children.filter((element): element is Element => element instanceof Element && element.tag === "dialog").at(-1)!;
     queuedDialog.find((element) => element.tag === "input")!.value = "Queued local name";
     queuedDialog.find((element) => element.tag === "form")!.fire("submit"); await queued.promise;
     settings = { ...settings, secret: "another-device" };

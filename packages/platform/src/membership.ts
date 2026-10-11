@@ -139,7 +139,7 @@ export const ROLE_TABLE: readonly (readonly [actions: readonly string[], roles: 
 ];
 
 /** The table of each version. */
-export const ROLE_TABLE_OF: Readonly<Record<string, typeof ROLE_TABLE>> = { [MEMBERSHIP_1]: ROLE_TABLE_1, [MEMBERSHIP]: ROLE_TABLE, "platform:membership@4": [...ROLE_TABLE, [["application.establish"], ["admin"]]] };
+export const ROLE_TABLE_OF: Readonly<Record<string, typeof ROLE_TABLE>> = { [MEMBERSHIP_1]: ROLE_TABLE_1, [MEMBERSHIP]: ROLE_TABLE, "platform:membership@4": [...ROLE_TABLE, [["application.establish"], ["admin"]]], "platform:membership@5": [...ROLE_TABLE, [["application.establish"], ["admin"]]] };
 
 /** The actions that the table of section 3.2 gives one role, in the order of its rows. */
 export const actionsIn = (role: Role): string[] => ROLE_TABLE.flatMap(([actions, roles]) => (roles.includes(role) ? actions : []));
@@ -178,7 +178,7 @@ export const FIRST_ACTIONS: { readonly [role in Role]: readonly string[] } = {
 };
 
 /** The first lists of each version. */
-export const FIRST_ACTIONS_OF: Readonly<Record<string, typeof FIRST_ACTIONS>> = { [MEMBERSHIP_1]: FIRST_ACTIONS_1, [MEMBERSHIP]: FIRST_ACTIONS, "platform:membership@4": { ...FIRST_ACTIONS, admin: [...FIRST_ACTIONS.admin, "application.establish"] } };
+export const FIRST_ACTIONS_OF: Readonly<Record<string, typeof FIRST_ACTIONS>> = { [MEMBERSHIP_1]: FIRST_ACTIONS_1, [MEMBERSHIP]: FIRST_ACTIONS, "platform:membership@4": { ...FIRST_ACTIONS, admin: [...FIRST_ACTIONS.admin, "application.establish"] }, "platform:membership@5": { ...FIRST_ACTIONS, admin: [...FIRST_ACTIONS.admin, "application.establish"] } };
 
 /**
  * The form of a handle (section 3.1; section 12.1.8, rows q and r): `@`,
@@ -560,6 +560,16 @@ export const membership: PlatformData = {
   rules: {},
   // Membership opens no operation.
   outcomes: {},
+};
+
+/** Every native opening shares these live-item bounds, including invitations. */
+export const membership5: PlatformData = {
+  ...membership,
+  items: {
+    ...membership.items,
+    member: { ...membership.items["member"]!, max: 16 },
+    key: { ...membership.items["key"]!, max: 32 },
+  },
 };
 
 // ---------------------------------------------------------------- reading membership's state

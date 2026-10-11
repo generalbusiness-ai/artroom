@@ -4,6 +4,7 @@ import type { Answer } from "@generalbusiness/artroom-contract";
 import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 import { LIST_QUERY_LIMIT, type ListState } from "./list-context.ts";
+import { controlKey } from "./focus.ts";
 
 type Child = Node | string | null | undefined | false;
 
@@ -13,6 +14,19 @@ export function h(tag: string, attrs: Record<string, string> = {}, ...children: 
   for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
   for (const child of children.flat()) if (child !== null && child !== undefined && child !== false) el.append(child);
   return el;
+}
+/** The accepted outline icon family, with no text in an accessible name. */
+export function icon(name: "more" | "close" | "plus"): SVGSVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  for (const [attribute, value] of Object.entries({ viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "1.75", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false" })) svg.setAttribute(attribute, value);
+  if (name === "more") {
+    for (const x of [5, 12, 19]) { const circle = document.createElementNS(ns, "circle"); circle.setAttribute("cx", String(x)); circle.setAttribute("cy", "12"); circle.setAttribute("r", "1"); svg.append(circle); }
+  } else {
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", name === "close" ? "M18 6 6 18M6 6l12 12" : "M12 5v14M5 12h14"); svg.append(path);
+  }
+  return svg;
 }
 const or = (value: string | number | null | undefined, empty = "Not recorded"): string => value === null || value === undefined || value === "" ? empty : String(value);
 const list = (values: readonly string[], empty = "Not recorded"): string => values.length ? values.join(", ") : empty;
@@ -32,11 +46,11 @@ export function whoLine(room: Room): HTMLElement {
 }
 
 /** One list destination, without repeating room identity from the switcher. */
-export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: LaneRow[] }, kind: "issue" | "change" = "issue", context?: { state: ListState; changed(state: ListState): void }): HTMLElement {
+export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: LaneRow[] }, kind: "issue" | "change" = "issue", context?: { state: ListState; changed(state: ListState): void; focusKey?: string }): HTMLElement {
   const label = kind === "issue" ? "Issues" : "Changes";
   const all = kind === "issue" ? lanes.issues : lanes.changes;
   let filter = context?.state.filter ?? "open";
-  const query = h("input", { type: "search", value: context?.state.query ?? "", maxlength: String(LIST_QUERY_LIMIT), placeholder: `Search ${label.toLowerCase()}`, "aria-label": `Search ${label.toLowerCase()}` }) as HTMLInputElement;
+  const query = h("input", { type: "search", value: context?.state.query ?? "", maxlength: String(LIST_QUERY_LIMIT), placeholder: `Search ${label.toLowerCase()}`, "aria-label": `Search ${label.toLowerCase()}`, ...(context?.focusKey ? { "data-focus-key": controlKey(context.focusKey, `search:${kind}`) } : {}) }) as HTMLInputElement;
   const content = h("div", { "data-list": "" });
   const filters = h("div", { class: "filters", "aria-label": `Filter ${label.toLowerCase()}` });
   const render = () => {
@@ -49,7 +63,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
     ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? `No ${label.toLowerCase()} yet.` : "No matches.")));
   };
   for (const value of ["open", kind === "issue" ? "closed" : "merged", "all"]) {
-    const button = h("button", { type: "button", class: "filter", "data-filter": value }, value[0]!.toUpperCase() + value.slice(1));
+    const button = h("button", { type: "button", class: "filter", "data-filter": value, ...(context?.focusKey ? { "data-focus-key": controlKey(context.focusKey, `filter:${kind}:${value}`) } : {}) }, value[0]!.toUpperCase() + value.slice(1));
     button.addEventListener("click", () => { filter = value as ListState["filter"]; context?.changed({ query: query.value, filter }); render(); });
     filters.append(button);
   }

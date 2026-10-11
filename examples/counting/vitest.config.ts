@@ -11,5 +11,5 @@ export default defineConfig({
     { find: "@generalbusiness/artroom-bytes", replacement: source("bytes/src/index.ts") },
     { find: "@generalbusiness/artroom-contract", replacement: source("contract/src/index.ts") },
   ] },
-  test: { include: ["definition.test.ts"], environment: "node", pool: "threads" },
+  test: { include: ["definition.test.ts", "commitments.test.ts"], environment: "node", pool: "threads" },
 });

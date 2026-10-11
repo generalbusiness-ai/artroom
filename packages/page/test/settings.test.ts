@@ -14,6 +14,8 @@ test("Settings ignores a legacy service origin with a message before requests an
     className = "";
     constructor(readonly tag: string) {}
     setAttribute(name: string, value: string) { this.attrs[name] = value; if (name === "value") this.value = value; }
+    getAttribute(name: string) { return this.attrs[name] ?? null; }
+    hasAttribute(name: string) { return Object.hasOwn(this.attrs, name); }
     removeAttribute(name: string) { delete this.attrs[name]; }
     append(...children: (Element | string)[]) { this.children.push(...children); }
     replaceChildren(...children: (Element | string)[]) { this.children = children; if (this.textContent.includes("Observation unknown")) unread(); }
@@ -25,7 +27,17 @@ test("Settings ignores a legacy service origin with a message before requests an
       for (const child of this.children) if (child instanceof Element) { const found = child.find(predicate); if (found) return found; }
       return null;
     }
-    querySelector(selector: string) { return this.find((element) => element.attrs["id"] === selector.slice(1)); }
+    querySelectorAll(selector: string): Element[] {
+      const matches = (element: Element) => {
+        if (selector.startsWith("#")) return element.attrs["id"] === selector.slice(1);
+        const attribute = /^([a-z][a-z0-9-]*)?\[([a-z0-9-]+)\]$/.exec(selector);
+        if (attribute) return (!attribute[1] || element.tag === attribute[1]) && element.hasAttribute(attribute[2]!);
+        return element.tag === selector;
+      };
+      const descendants = this.children.flatMap(child => child instanceof Element ? [child, ...child.querySelectorAll("*")] : []);
+      return selector === "*" ? descendants : descendants.filter(matches);
+    }
+    querySelector(selector: string) { return this.querySelectorAll(selector)[0] ?? null; }
     fire(name: string) { this.handlers.get(name)!({ preventDefault() {} }); }
   }
   const root = new Element("div");

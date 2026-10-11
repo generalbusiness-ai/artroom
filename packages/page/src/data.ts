@@ -38,9 +38,11 @@ import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isS
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { LINK, describe, expectedOf, heldActs, linkOf, standing, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, platform, type Role } from "@generalbusiness/artroom-platform";
+import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/artroom-platform";
+import type { Extent as PolicyExtent } from "@generalbusiness/artroom-platform";
 import { knownLIST1 } from "./source-support.ts";
+import { currentStanding, reviewCandidates } from "./membership-projection.ts";
 
 /** Who is reading and signing, and where. `fetch` and `now` replace the runtime's, as a test does. */
 export interface Session {
@@ -109,6 +111,16 @@ async function summaryOf(handle: ScopeHandle): Promise<{ summary: Summary; at: H
   if (!read.ok) throw new Unreadable(`Cannot read ${handle.scope}: ${read.reason}.`);
   if (!read.complete || read.next !== undefined) throw new Unreadable(`Cannot read ${handle.scope}: incomplete summary.`);
   return { summary: read.value, at: read.at };
+}
+
+/** Refresh only the existing complete authenticated roster. Session renewal is
+ * not a fresh permission observation; a failed roster read cannot retain old standing. */
+async function refreshStanding(room: Room): Promise<Standing | null> {
+  room.me = null;
+  const { summary } = await summaryOf(handleOf(room, room.membership.scope));
+  if (canonicalize(summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The roster names another membership incarnation.");
+  room.me = currentStanding(summary.items, room.membership, room.key);
+  return room.me;
 }
 
 /** Collect only a complete enumeration. Existing caller budgets stay unchanged. */
@@ -245,7 +257,7 @@ export async function openRoom(session: Session, place: Place): Promise<Room> {
   room.destination = destination;
   const recordedRepository = repository.values["repository"];
   if (recordedRepository && typeof recordedRepository === "object" && !Array.isArray(recordedRepository) && "name" in recordedRepository && typeof recordedRepository["name"] === "string") room.name = recordedRepository["name"];
-  room.me = standing((await summaryOf(handleOf(room, place.membership.scope))).summary.items, key);
+  await refreshStanding(room);
   return room;
 }
 
@@ -360,6 +372,8 @@ export interface Publication { id: number; state: string; reason: string | null;
 export interface Merge { id: number; state: string; manifest: number | null; reason: string | null; commit: string | null; publication: Publication | null }
 
 export interface ChangeView {
+  /** Full native policy bound to this current recorded one-file version; null means unknown applicability. */
+  reviewPolicy?: { manifest: number; source: FactRef; extents: PolicyExtent[] } | null;
   /** The actual proposal item used by transitions. */
   proposal?: number;
   /** Actual current item; never a retained-version fallback for a mutation. */
@@ -367,9 +381,58 @@ export interface ChangeView {
   /** Choices from held rules and authenticated membership; null means unavailable. */
   reviewExtents?: { label: string; value: string }[] | null;
   reviewMembers?: { label: string; value: string }[] | null;
+  /** Per held extent, current presentation candidates; null means its authority is unavailable, not destination readiness. */
+  reviewMembersByExtent?: Record<string, { label: string; value: string }[] | null> | null;
   scope: ScopeId; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; author: string | null;
   manifests: Manifest[]; reviews: Review[]; requests: ReviewRequest[]; jobs: Job[]; links: Link[]; merges: Merge[]; rules: LaneRules | null; comments: Comment[];
+}
+
+/** Known rules versions change policy only in publish, recording published=self.
+ * A later non-policy entry is harmless; any later publish makes this held
+ * update's full patterns unavailable, even if its five-field projection agrees. */
+async function reviewPolicyOf(room: Room, change: ScopeRef, proposal: Item, held: Item | undefined, manifest: number): Promise<NonNullable<ChangeView["reviewPolicy"]> | null> {
+  try {
+    const source = held?.refs["source"], named = proposal.refs["rulesScope"];
+    if (!held || !isFactRef(source) || !fullScopeRef(named) || source.at.scope !== room.rules || source.at.kind !== "rules"
+      || canonicalize(source.at) !== canonicalize(named) || held.values["revision"] !== source.seq) return null;
+    const handle = handleOf(room, source.at.scope);
+    const { summary, at } = await summaryOf(handle);
+    if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(source.at) || at.seq < source.seq
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return null;
+    const rules = summary.items.find(item => item.type === "rules" && item.state === "current");
+    if (!rules) return null;
+    const published = rules.refs["published"] ?? 0;
+    if (typeof published !== "number" || !Number.isSafeInteger(published) || published < 0 || published > source.seq) return null;
+    const read = await handle.entry(source.seq);
+    if (!read.ok || !read.complete || read.next !== undefined) return null;
+    const entry = read.value.entry;
+    if (entry.seq !== source.seq || canonicalize(entry.at) !== canonicalize(source.at)
+      || entryHash(entry) !== source.hash || read.value.hash !== source.hash) return null;
+    const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+    const sends = entry.sends.filter(send => canonicalize(send.to) === canonicalize(change) && send.message.class === "request"
+      && send.message.type === "relate" && record(send.message.body) && send.message.body["name"] === "rules");
+    if (sends.length !== 1) return null;
+    const message = sends[0]!.message;
+    if (message.class !== "request" || message.type !== "relate") return null;
+    const body = message.body;
+    if (!record(body) || body["state"] !== "current" || !isFactRef(body["item"])
+      || canonicalize(body["item"].at) !== canonicalize(source.at) || body["item"].seq !== rules.id || body["item"].hash !== rules.opened
+      || !record(body["detail"])) return null;
+    const detail = body["detail"];
+    for (const name of ["approvals", "ownerMayReview", "checks", "extents"]) {
+      const value = held.values[name] ?? (name === "checks" ? [] : null);
+      if (canonicalize(detail[name] ?? (name === "checks" ? [] : null)) !== canonicalize(value)) return null;
+      if (name !== "extents" && canonicalize(rules.values[name] ?? (name === "checks" ? [] : null)) !== canonicalize(value)) return null;
+    }
+    const approvals = rules.values["approvals"], checks = rules.values["checks"] ?? [];
+    if (typeof approvals !== "number" || !Array.isArray(checks)) return null;
+    const full = rules.values["extents"] ?? firstExtents({ approvals, checks: checks as unknown as { name: string; required: boolean }[] });
+    if (!isExtents(full)) return null;
+    const projected = full.map(({ name, approvals, approver, checks, class: of }) => ({ name, approvals, approver, checks, class: of }));
+    if (canonicalize(projected) !== canonicalize(held.values["extents"])) return null;
+    return { manifest, source, extents: full.map(extent => ({ ...extent, patterns: [...extent.patterns], checks: [...extent.checks] })) };
+  } catch { return null; }
 }
 
 const localId = (value: FieldValue | null | undefined): number | null => (typeof value === "number" ? value : null);
@@ -488,20 +551,24 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const reviewExtents = Array.isArray(extents) && extents.every((extent) => extent && typeof extent === "object" && !Array.isArray(extent) && typeof extent["name"] === "string")
     ? extents.map((extent) => ({ label: String((extent as Record<string, FieldValue>)["name"]), value: String((extent as Record<string, FieldValue>)["name"]) })) : null;
   let reviewMembers: { label: string; value: string }[] | null = null;
+  let reviewMembersByExtent: ChangeView["reviewMembersByExtent"] = null;
   if (current) {
     try {
+      room.me = null;
       const membership = await summaryOf(handleOf(room, room.membership.scope));
       if (canonicalize(membership.summary.scope) !== canonicalize(room.membership)) throw new Unreadable("The reviewer roster names another membership incarnation.");
-      const authorsParty = current.parties["authors"];
-      if (!Array.isArray(authorsParty) || authorsParty.some((author) => canonicalize(author.membership) !== canonicalize(room.membership))) throw new Unreadable("The manifest authors name another membership incarnation.");
-      const authors = membersOf(authorsParty);
-      reviewMembers = holdersOf(membership.summary.items, "change.review").filter((member) => !authors.includes(member)).map((member) => ({ label: member, value: member }));
+      room.me = currentStanding(membership.summary.items, room.membership, room.key);
+      const candidates = reviewCandidates(membership.summary.items, room.membership, current.parties["authors"], rulesItem?.values["ownerMayReview"], extents);
+      reviewMembers = candidates?.members ?? null;
+      reviewMembersByExtent = candidates?.byExtent ?? null;
     } catch { /* Missing authority offers no invented reviewer choices. */ }
   }
   const content = selected && typeof selected.values["path"] === "string" ? await manifestContent(handle, summary.scope, selected) : null;
   const listFile = selected && selected.values["files"] !== undefined ? await manifestListFile(handle, summary.scope, selected, definition, summary.definition, await all("source")) : null;
+  const reviewPolicy = current && (typeof content === "string" || listFile !== null)
+    ? await reviewPolicyOf(room, summary.scope, proposal, rulesItem, current.id) : null;
   return {
-    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers,
+    scope, definition: summary.definition, head: at, proposal: proposal.id, currentManifest: current?.id ?? null, reviewExtents, reviewMembers, reviewMembersByExtent, reviewPolicy,
     number: localId(proposal.values["number"]), title: text(proposal.values["title"]), body: await textOf(handle, proposal.values["body"]), state: proposal.state, author: memberOf(proposal.parties["author"]),
     manifests: manifests.map((m) => ({
       selectedReports: reportsOf(m, definition),
@@ -701,9 +768,10 @@ async function shapeOf(room: Room, handle: ScopeHandle, summary: Summary): Promi
  */
 export async function actsOn(room: Room, scope: ScopeId): Promise<{ acts: Offered[]; hidden: number }> {
   await fresh(room);
+  const me = await refreshStanding(room);
   const handle = handleOf(room, scope);
   const { shape } = await shapeOf(room, handle, (await summaryOf(handle)).summary);
-  const { acts, hidden } = heldActs(shape, room.me);
+  const { acts, hidden } = heldActs(shape, me);
   const definitions = acts.some(([, a]) => Object.values(a.fields).some((f) => domainOf(f) === DEFINITION_DOMAIN)) ? await activeDefinitions(room) : [];
   return {
     acts: acts.map(([kind, a]) => ({

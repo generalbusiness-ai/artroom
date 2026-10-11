@@ -1,7 +1,12 @@
 /** Forms present the scope's offered acts; authority and typing stay in data.ts. */
 import type { Offered } from "./data.ts";
+import { controlKey } from "./focus.ts";
 
 export interface ActionContext {
+  /** Task copy derived from the actual subject/choice, never an extra act. */
+  submitLabel?: string;
+  /** Same selected room/key/route; a dialog never follows a new context. */
+  current?: () => boolean;
   /** Exact subjects read by the shell, never guessed from a display number. */
   defaults?: Record<string, { on?: number; fields?: Record<string, string> }>;
   primary?: readonly string[];
@@ -19,7 +24,7 @@ export interface ActionContext {
   draftKey?: string;
 }
 
-export type Send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void) => void;
+export type Send = (kind: string, on: string, typed: Record<string, string>, accepted?: () => void, beforeSign?: () => Promise<void>) => void;
 type Child = HTMLElement | string | null;
 const element = (tag: string, attrs: Record<string, string> = {}, ...children: (Child | Child[])[]): HTMLElement => {
   const node = document.createElement(tag);
@@ -42,9 +47,16 @@ const fieldLabels: Record<string, string> = {
 };
 const drafts = new Map<string, Record<string, string>>();
 const draftVersions = new Map<string, number>();
+const renderedDrafts = new WeakMap<HTMLElement, () => void>();
 const own = <T>(record: Record<string, T> | undefined, name: string): T | undefined => record && Object.hasOwn(record, name) ? record[name] : undefined;
 const technical = new Set(["base", "digest", "size", "definition", "draft", "conditions", "reports", "manifest", "earlier", "request", "replyTo", "mentions", "thread", "number", "opener"]);
 const labelOf = (name: string) => own(fieldLabels, name) ?? name.replace(/-/g, " ");
+
+/** Reuse B8's draft state at publication, after any awaited reads or acceptance.
+ * This is a render projection, not a second draft store or request journal. */
+export function reconcileActionDrafts(container: HTMLElement): void {
+  for (const form of container.querySelectorAll<HTMLElement>("form[data-act]")) renderedDrafts.get(form)?.();
+}
 
 /** Supported domain forms remain ordinary controls; other declarations stay in Inspect. */
 export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Send, last: HTMLElement | null, context: ActionContext = {}): HTMLElement {
@@ -54,7 +66,7 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
     panel.append(record);
   }
   if (context.uncertain || context.pending) {
-    const refresh = element("button", { type: "button", class: "primary" }, "Check status");
+    const refresh = element("button", { type: "button", class: "primary", "data-status-recovery": "", ...(context.draftKey ? { "data-focus-key": controlKey(context.draftKey, "check-status") } : {}) }, "Check status");
     if (!context.refresh) refresh.setAttribute("disabled", "");
     refresh.addEventListener("click", () => context.refresh?.());
     if (!context.statusShown) panel.append(element("p", { role: "status" }, context.pending ? "Sending request" : "Request outcome unknown"));
@@ -69,7 +81,7 @@ export function actsPanel(offered: { acts: Offered[]; hidden: number }, send: Se
   }
   panel.append(...ordinary);
   if (advanced.length > 0 || offered.hidden > 0) {
-    const inspect = element("details", { class: "inspect-actions" }, element("summary", {}, "Inspect"), ...advanced);
+    const inspect = element("details", { class: "inspect-actions" }, element("summary", {}, "Advanced"), ...advanced);
     if (offered.hidden > 0) inspect.append(element("p", { class: "muted" }, `${offered.hidden} actions require another role.`));
     panel.append(inspect);
   }
@@ -88,7 +100,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   const advanced: HTMLElement[] = [];
   if (act.step === "transition") {
     const fixed = defaults?.on;
-    const input = element("input", { name: "on", type: fixed === undefined ? "number" : "hidden", min: "0", value: fixed === undefined ? (own(draft, "on") ?? "") : String(fixed), required: "" }) as HTMLInputElement;
+    const input = element("input", { name: "on", type: fixed === undefined ? "number" : "hidden", min: "0", value: fixed === undefined ? (own(draft, "on") ?? "") : String(fixed), required: "", ...(draftKey ? { "data-focus-key": controlKey(draftKey, "target") } : {}) }) as HTMLInputElement;
     controls.push(input);
     form.append(fixed === undefined ? element("label", {}, "Item", input) : input);
   }
@@ -96,6 +108,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     const fixed = own(defaults?.fields, field.name);
     const choices = own(choicesFor, field.name) ?? field.choices;
     const attrs: Record<string, string> = { name: `field:${field.name}`, "data-type": field.type };
+    if (draftKey) attrs["data-focus-key"] = controlKey(draftKey, `field:${field.name}`);
     if (field.required) attrs["required"] = "";
     const value = fixed ?? own(draft, field.name) ?? "";
     let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -111,6 +124,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
         choices.map((choice) => element("option", { value: choice.value, ...(choice.value === value ? { selected: "" } : {}) }, choice.label))) as HTMLSelectElement;
       if (choices.length === 0) input.setAttribute("disabled", "");
     } else if (field.name === "body" || field.name === "content" || field.type === "list") {
+      if (field.name === "body" && act.kind === "comment") attrs["placeholder"] = "Add a comment…";
       input = element("textarea", { ...attrs, rows: field.name === "content" ? "8" : "3" }, value) as HTMLTextAreaElement;
     } else {
       input = element("input", { ...attrs, type: "text", value }) as HTMLInputElement;
@@ -123,7 +137,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     else form.append(label);
   }
   if (advanced.length) form.append(element("details", {}, element("summary", {}, "More options"), advanced));
-  const button = element("button", { type: "submit", class: primary ? "primary" : "" }, own(labels, act.kind) ?? act.kind);
+  const button = element("button", { type: "submit", class: primary ? "primary" : "", ...(draftKey ? { "data-focus-key": controlKey(draftKey, "submit") } : {}) }, context.submitLabel ?? own(labels, act.kind) ?? act.kind);
   if (blocked || act.fields.some((field) => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined)) button.setAttribute("disabled", "");
   if (blocked) for (const control of controls) control.setAttribute("disabled", "");
   form.append(button);
@@ -153,6 +167,18 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
       if (current && (draftVersions.get(draftKey) ?? 0) === submittedVersion && JSON.stringify(current) === JSON.stringify(submittedDraft)) drafts.delete(draftKey);
     } : undefined;
     if (accepted) send(act.kind, on, typed, accepted); else send(act.kind, on, typed);
+  });
+  if (draftKey) renderedDrafts.set(form, () => {
+    const current = drafts.get(draftKey) ?? {};
+    for (const control of controls) {
+      if (control.name === "on") { if (defaults?.on === undefined) control.value = own(current, "on") ?? ""; continue; }
+      const name = control.name.slice(6);
+      const field = act.fields.find(field => field.name === name)!;
+      const choices = own(choicesFor, name) ?? field.choices;
+      if (own(defaults?.fields, name) !== undefined || choices?.length === 1) continue;
+      const value = own(current, name) ?? "";
+      control.value = choices && !choices.some(choice => choice.value === value) ? "" : value;
+    }
   });
   return form;
 }
