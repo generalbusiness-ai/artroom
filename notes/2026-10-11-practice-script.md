@@ -33,7 +33,7 @@ Show the page first. Use a terminal only for the steps that require it.
 
 Say the hosting sentence once in the whole recording.
 
-### 0:15 to 1:15. Found, invite, join, and clone
+### 0:15 to 1:15. Create, invite, join, and clone
 
 Show the prepared room while speaking. Compress these steps into one
 minute. Keep the terminal commands below available for a cutaway, rather
@@ -62,7 +62,7 @@ retains the complete printed lines. Recognizable results include
 Those commands on the next recording deployment are **to be confirmed**.
 Blur invitations. Never show a signing key or a read token.
 
-**Say:** “Hugh founds a room, sets its rules, and invites Una and Paul.
+**Say:** “Hugh creates a room, sets its rules, and invites Una and Paul.
 Each works with their own key. Una clones the repository through the
 room.”
 
@@ -248,7 +248,7 @@ or human collaboration as events that happened in this procedural clip.
 ### 5:15 to 5:35. Show GitHub as the linked host
 
 - **On screen:** the take's public repository under `generalbusiness-ai`
-  on GitHub, with its founding commit and published changes.
+  on GitHub, with its initial commit and published changes.
 - **Do:** open the URL printed by this GitHub-backed take's clone.
 - **Appears:** **to be confirmed:** today's fresh rehearsal's repository
   and commits. The [8 October GitHub transcript](2026-10-08-demo-github-transcript.md)
@@ -353,18 +353,17 @@ Use these fallbacks when a part is not ready:
 
 ## 7. Use the same plain words
 
-Use the application's word for the application's thing: issue, pull
-request, assign, merge, branch, and clone for the repository; turn, count,
+Use the application's word for the application's thing: issue, change,
+assign, merge, branch, and clone for the repository; turn, count,
 and next for Counter; theme, instrument, solo, and bar for Jam. Use one
 shared plain word for what the room does. Name the rule when naming a rule.
-
-The page labels a proposed change “change” where GitHub says pull request. Say “change” on camera to match the screen until Hugh decides otherwise.
 
 This is the glossary from plan 030:
 
 | Record | Surface |
 |---|---|
 | scope, entry, act | the room, a step, an action |
+| found, claim | create |
 | commitment: offered, accepted, fulfilled | a promise: offered, taken, kept |
 | hold | working on it, with a time limit |
 | plan, concern | the split, a part |
