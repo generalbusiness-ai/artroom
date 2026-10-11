@@ -1,0 +1,239 @@
+{
+  "v": 1,
+  "sealedAt": "2026-10-11T07:59:44.129848+00:00",
+  "request": "c612acc60c1b02577c7814b8026ad6d398f54023",
+  "builderPromise": "96ce76dbe95b0247193bf7ac5d4df47937915350",
+  "source": {
+    "root": "/private/tmp/artroom-counter-live-04d",
+    "head": "04d6fd4a5eecd420d5dc7b301555c89428bb57a1",
+    "tree": "a2696eeb60b3260513a771e32eccbabde36b1fca",
+    "clean": true
+  },
+  "deployment": {
+    "origin": "https://artroom-counting.inguz.workers.dev",
+    "deployment": "artroom-counting-v1",
+    "worker": "artroom-counting",
+    "namespaceId": "baba17560b7f488da9f7eb5917a7d36d",
+    "initialVersion": "7dcf99d9-5394-4185-ab57-5a46ab710f0e",
+    "definition": "platform:register@6",
+    "register": {
+      "scope": "sc_sms6mpdhqhl6uc4gduqbtpgeahao6vh7ijah4wwbwzgcl5w5aguq",
+      "inc": "in_jpz5747jt6mbopuqo7w6aamzry",
+      "kind": "register"
+    },
+    "actualInstallExit": 0,
+    "originalPlanNotAfter": "2026-10-11T07:47:08Z",
+    "originalPlanUsed": true,
+    "installedContextIsNewCounterOnly": true,
+    "CoreOverwrite": false
+  },
+  "originalHandles": {
+    "deploy": {
+      "handle": 8191,
+      "terminalExit": 0
+    },
+    "secretBinding": {
+      "handle": 22796,
+      "terminalExit": 0,
+      "secretNamesOnly": [
+        "SESSION_SECRET",
+        "GITHUB_APP_PRIVATE_KEY",
+        "GITHUB_CREATION_TOKEN",
+        "GITHUB_APP_CONFIG"
+      ]
+    },
+    "claim": {
+      "handle": 35582,
+      "terminalExit": 0
+    },
+    "helperFirst": {
+      "handle": 58237,
+      "terminalExit": 1,
+      "verifiedSteps": 13,
+      "stop": "Native summary unavailable, incomplete or inactive after accepted create; no repeated creation"
+    },
+    "readonlyStopDiagnosis": {
+      "handle": 10966,
+      "terminalExit": 0,
+      "originalChildActiveConfirmed": true,
+      "causalQualification": "Later native active reads are consistent with transient confirmation; original failing read result was not captured, so cause is not proved."
+    },
+    "initializeContinuation": {
+      "handle": 73302,
+      "terminalExit": 0,
+      "prepareExit": 1,
+      "firstPostExit": 0,
+      "originalCreationUnchanged": true,
+      "verifiedSteps": 14
+    },
+    "readonlyNativeProof": {
+      "handle": 18947,
+      "terminalExit": 0,
+      "wallSeconds": 3.73,
+      "userSeconds": 1.1,
+      "systemSeconds": 0.4,
+      "signedOriginalEntriesVerified": 14,
+      "independentReadAccess": 4,
+      "activeAgents": 3,
+      "mutationPosts": 0,
+      "retainedDiagnostic": "one Node DEP0205 module.register deprecation warning"
+    }
+  },
+  "native": {
+    "scope": {
+      "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+      "kind": "lane",
+      "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+    },
+    "definition": "sha256:b55824346382d9b158be4cadd9d098008f8129147fba772537778e2f738d5271",
+    "board": {
+      "id": 2,
+      "state": "paused",
+      "target": 10,
+      "lastNumber": 0,
+      "serial": 0
+    },
+    "headAtRead": {
+      "hash": "sha256:9663c5cf68821d20d05f460b1ebc6ed5d58fd306518b38c7b1f696049cb57c3a",
+      "seq": 8
+    },
+    "roleGrantFacts": [
+      {
+        "step": "admin",
+        "fact": {
+          "at": {
+            "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+            "kind": "membership",
+            "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+          },
+          "hash": "sha256:eb68af2f0bca9743fee10959f774795d479fdda38f52dacc5bf513a7016442cf",
+          "seq": 5
+        },
+        "definition": "platform:membership@5",
+        "kind": "set-actions",
+        "actor": "key_rTBJUXjMvWxlx6HbsxnXhxyWBsjBtwJ2izlOsXlpoxc",
+        "exactSignedEntryVerified": true
+      },
+      {
+        "step": "agent",
+        "fact": {
+          "at": {
+            "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+            "kind": "membership",
+            "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+          },
+          "hash": "sha256:a1185cb81ccdaf3e21387248ca47d6ddb18d5b17f6f77036ddf5780dca72cb3a",
+          "seq": 6
+        },
+        "definition": "platform:membership@5",
+        "kind": "set-actions",
+        "actor": "key_rTBJUXjMvWxlx6HbsxnXhxyWBsjBtwJ2izlOsXlpoxc",
+        "exactSignedEntryVerified": true
+      }
+    ],
+    "repository": {
+      "host": "github.com",
+      "id": "1414073913",
+      "name": "rmg3fmzlou246blpbhwb73b7pizefa5lqv2bitnymlpoojsxapya-1",
+      "namespace": "generalbusiness-ai",
+      "url": "https://github.com/generalbusiness-ai/rmg3fmzlou246blpbhwb73b7pizefa5lqv2bitnymlpoojsxapya-1"
+    },
+    "publicGitHubApiReadVerified": true
+  },
+  "sourceAndToolGuard": "Existing reviewed helper guard before and after readonly proof: exact clean source head/tree/lock, actual12 workspace24aliases/25exports, owned dependency view and cached TSX closure. Core not written. No new checkout installs or provider mutations after initialize.",
+  "whitelist": [
+    {
+      "path": "/tmp/artroom-counter-live-04d-native-public-proof-one/public-result.json",
+      "bytes": 17629,
+      "sha256": "486424050faa182753b0df2f844b1d2e6a619a70ba3858254b4e128a3d97206a",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-native-public-proof-one/public-github-repository.json",
+      "bytes": 431,
+      "sha256": "dc6c44b83f888e72f7b42e1f06eab12ed5d142d7b5ab59c6adcb9a5613895b75",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-helper-continuation-one/public-bootstrap.json",
+      "bytes": 3455,
+      "sha256": "a2aecf8ec2d0895c8da5a20f3614c628935b66c0f6565a26a85de1612c9285c6",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-readonly-stop-one/public-result.json",
+      "bytes": 3211,
+      "sha256": "9c72e1c7bce966082012c57ed5d93a5cdcd66e7d53a16e747be458c8f831691d",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-live-04d-helper-public/counting-controller.json",
+      "bytes": 837,
+      "sha256": "5bb6abbecdd9ce6ae468ee0e7d32ecd5cd9899b04cb9026716a3b216c1325596",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-live-04d-helper-public/counting-agent-1.json",
+      "bytes": 831,
+      "sha256": "3b01cc9d5065514a74796bca0c38a5cdece57b278e86ab44f72706f3c0719883",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-live-04d-helper-public/counting-agent-2.json",
+      "bytes": 831,
+      "sha256": "848ea480cfdda488261ec88e8ee029e0e359a76583afcbc13d2217deaa3d0ad3",
+      "disclosure": "explicit public projection"
+    },
+    {
+      "path": "/private/tmp/artroom-counter-live-04d-helper-public/counting-agent-3.json",
+      "bytes": 833,
+      "sha256": "8fc3612301fc19cbf4dc07802363d002c94f72a7ae1a29fe29d27e6d158ef822",
+      "disclosure": "explicit public projection"
+    }
+  ],
+  "rawPrivateHashOnly": [
+    {
+      "path": "/tmp/artroom-counter-live-04d-native-public-proof-one/body.log",
+      "bytes": 252,
+      "sha256": "034bb321eaa7065b8f3150741dfbfc5fb03d41c3290fcac76b7a36fb9a89afa3",
+      "disclosure": "hash only; raw retained privately"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-native-public-proof-one/time.log",
+      "bytes": 968,
+      "sha256": "6196d8ff2f7f0bf8270ddca4571240ab921ae14bf748724ca01a243dc780a03e",
+      "disclosure": "hash only; raw retained privately"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-deploy-one/body.log",
+      "bytes": 716,
+      "sha256": "8b22d79a1299fc5336baa5daf13acd4bb683e4106fa68c164c12b3c869afc1e3",
+      "disclosure": "hash only; raw retained privately"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-deploy-one/time.log",
+      "bytes": 777,
+      "sha256": "fa0e95fedad7bc50781e5b5c68713c6531b485ff6fd11f13f4c475e1c6aa1ffb",
+      "disclosure": "hash only; raw retained privately"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-claim-one/body.log",
+      "bytes": 589,
+      "sha256": "b813678871549ef31bdf03fac427b0c4b05893ce8db724dfd4aac6ab5713c5ff",
+      "disclosure": "hash only; raw retained privately"
+    },
+    {
+      "path": "/tmp/artroom-counter-live-04d-claim-one/time.log",
+      "bytes": 777,
+      "sha256": "976d95056abe775b74b6423ccca254028bcafd0cb83c3a3a75599e08a3c89924",
+      "disclosure": "hash only; raw retained privately"
+    }
+  ],
+  "limitations": [
+    "Native exact signed entry and authenticated current read proof; not independent replay verification.",
+    "Actual agent keys were generated in separate key files in the controlled bootstrap home; this does not prove separate physical devices or OS-encrypted browser storage.",
+    "This packet itself performs no Arm, Start, speech, recording, or browser assertions. Historical bootstrap browserAudio UNRUN is retained; newer browser evidence belongs to its owner.",
+    "No complete parent Counter acceptance, Jam acceptance, or deployment of Core changes is claimed.",
+    "Initial deploy name-check stdout-only parser assertion failed because the10007 absence result was on stderr; retained combined stdout/stderr confirmed absence. It did not cause another name query or deployment."
+  ]
+}
