@@ -328,3 +328,20 @@ finds no "admission", "admit", "ordering", em-dash, "software scale",
 as "not found" in an exit-code list, in test file names such as
 `founding-real.test.ts`, and in the quoted README sentence that the
 destination writes ("Founded by <handle> through the room ...").
+
+## Revision 2, 12 October 2026
+
+The checker's second review (report `ee490c5d`) asked for one change,
+made by the planner on the same branch:
+
+- **Room glossary, both forms of a version.** `apps/room/docs/room-terms.md`
+  no longer says that every version of a change is a selection of reports
+  with an integration commit. It describes the two forms the change
+  definition permits: the one-file version that `propose-file` opens (path,
+  digest and size; the destination supplies the integration commit and the
+  tree) and the report version that `propose-manifest` opens. It also
+  separates the words the page shows from the native item names: the
+  definition keeps `proposal` for the change item and `manifest` for a
+  version (`packages/lanes/src/change.ts`).
+
+Link check rerun at this head: `node scripts/check-doc-links.mjs`.

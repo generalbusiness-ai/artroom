@@ -33,10 +33,16 @@ planned and split, its discussion, and whether it is open.
 
 ## Change
 
-A **change** lane holds a proposed change to the repository. Each version
-of a change is an exact selection of reports and an exact integration
-commit. The change also holds its reviews, check jobs, threads and links
-to issues.
+A **change** lane holds a proposed change to the repository. A change
+has versions, and a version takes one of two forms. A one-file version,
+which the page and the `edit` command open with `propose-file`, names the
+path, the digest and the size of one file; the destination supplies the
+integration commit and the tree when it reserves the publication. A
+report version, which `propose-manifest` opens, names an exact selection
+of reports with its integration commit and tree. Both forms are complete
+versions. In the lane's definition the change itself is the item named
+`proposal` and each version is a `manifest`. The change also holds its
+reviews, check jobs, threads and links to issues.
 
 ## Review
 
@@ -59,11 +65,13 @@ local Git commit and a merged change are three different states.
 
 ## Words the room no longer uses
 
-The earlier model of the room used three words that the source no longer
-has:
+The earlier pages used three words that the page no longer shows. The
+native item names in the definitions did not all change with them.
 
-- **Proposal** is now a version of a change. A newer version does not
-  replace the evidence about an older one.
+- **Proposal**, as the page said it, is now a version of a change; the
+  definition keeps `proposal` as the name of the change item and calls a
+  version a `manifest`. A newer version does not replace the evidence
+  about an older one.
 - **Policy** is now the rules scope, together with the definitions it
   activates. The earlier policy package is parked and is not run.
 - **Attention queue** is now each member's inbox scope,
