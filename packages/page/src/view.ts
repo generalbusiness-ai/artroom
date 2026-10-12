@@ -60,7 +60,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
       h("span", { class: `entry-marker${["closed", "published", "merged"].includes(row.state ?? "") ? " recorded" : ""}`, "aria-hidden": "true" }),
       h("div", { class: "work-copy" }, h("a", { class: "work-title", href: `#/${kind}/${row.scope}` }, h("span", {}, or(row.title, "Untitled")), h("span", { class: "work-meta" }, `#${or(row.number, "?")}${row.draft ? " · Draft" : ""}`))),
       h("div", { class: "row-end" }, state(row.state === "closed" ? "Closed" : row.state === "published" || row.state === "merged" ? "Merged" : or(row.state, "Unknown"))),
-    ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? `No ${label.toLowerCase()} yet.` : "No matches.")));
+    ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? kind === "change" ? "No changes yet. The page proposes a text change from a change already recorded here; the first change in a room comes from a connected device or agent." : "No issues yet." : "No matches.")));
   };
   for (const value of ["open", kind === "issue" ? "closed" : "merged", "all"]) {
     const button = h("button", { type: "button", class: "filter", "data-filter": value, ...(context?.focusKey ? { "data-focus-key": controlKey(context.focusKey, `filter:${kind}:${value}`) } : {}) }, value[0]!.toUpperCase() + value.slice(1));
