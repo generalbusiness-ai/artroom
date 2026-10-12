@@ -38,8 +38,9 @@
  * has passed its ordinary read and servability checks. The versions page's
  * tag is of every ref it lists; its rows are validated before 304 as well.
  *
- * A refusal is plain text: the reason, a colon and a sentence, with the
- * status that says the same, and `Cache-Control: no-store`. Its body holds
+ * A refusal is plain text for a machine reader, or a short Pages document
+ * when a browser asks for HTML. Both keep the refusal status and
+ * `Cache-Control: no-store`. Its body holds
  * nothing of the repository. No session is read: every site is public to
  * whoever has the room's directory scope ID.
  */
@@ -64,9 +65,33 @@ const ROOM_PAGE = "/page/";
 export type SiteRefusal = "bad-request" | "method-not-allowed" | "not-found" | "not-published" | "too-large" | "host-not-configured" | "unreadable";
 const STATUS: Record<SiteRefusal, number> = { "bad-request": 400, "method-not-allowed": 405, "not-found": 404, "not-published": 404, "too-large": 413, "host-not-configured": 503, unreadable: 502 };
 
-/** A refusal. `step`: the step of the read that failed, as the header `x-site-step`; the body does not say it. */
-export function refused(reason: SiteRefusal, sentence: string, step?: SiteStep): Response {
-  return new Response(`${reason}: ${sentence}\n`, { status: STATUS[reason], headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...(step ? { "x-site-step": step } : {}) } });
+/** A refusal. The browser representation exposes no provider error or private input. */
+export function refused(reason: SiteRefusal, sentence: string, step?: SiteStep, browser?: { request: Request; room?: string }): Response {
+  const html = browser?.request.headers.get("accept")?.split(",").some(part => {
+    const [type, ...parameters] = part.trim().toLowerCase().split(";");
+    if (type?.trim() !== "text/html") return false;
+    const quality = parameters.find(parameter => /^\s*q\s*=/.test(parameter));
+    const q = quality === undefined ? 1 : Number(quality.slice(quality.indexOf("=") + 1).trim());
+    return Number.isFinite(q) && q > 0 && q <= 1;
+  }) === true;
+  const headers = { "content-type": html ? "text/html; charset=utf-8" : "text/plain; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "vary": "Accept", ...(step ? { "x-site-step": step } : {}) };
+  if (!html) return new Response(`${reason}: ${sentence}\n`, { status: STATUS[reason], headers });
+  const explanations: Record<SiteRefusal, string> = {
+    "bad-request": "This Pages address is not valid.",
+    "method-not-allowed": "Pages can be read with GET.",
+    "not-found": "No published page is available at this address.",
+    "not-published": "The room has no confirmed published page at this address.",
+    "too-large": "This page is too large to read here.",
+    "host-not-configured": `This host does not read the repository of ${browser?.room ?? "this room"}.`,
+    unreadable: "The published page could not be read.",
+  };
+  const body = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pages</title>
+<style>body{margin:0;font:16px/1.6 system-ui,sans-serif;color:#1f2328;background:#fff}header,main{max-width:42rem;margin:0 auto;padding:1.5rem 1rem}header img{width:72px;height:42px}.wordmark-dark{display:none}a{color:#0969da}h1{font-size:1.5rem}@media(prefers-color-scheme:dark){body{color:#f0f6fc;background:#0d1117}a{color:#4493f8}.wordmark-light{display:none}.wordmark-dark{display:inline}}</style></head>
+<body><header><a href="${ROOM_PAGE}"><img class="wordmark-light" src="/brand/dap-wordmark.svg" alt="dap" width="72" height="42"><img class="wordmark-dark" src="/brand/dap-wordmark-white.svg" alt="dap" width="72" height="42"></a></header><main><h1>Pages</h1>
+<p>The room publishes a change's pages at this address once the host reads its repository.</p>
+<p>${escapeHtml(explanations[reason])}</p><p><a href="${ROOM_PAGE}">Back to the room</a></p></main></body></html>\n`;
+  return new Response(body, { status: STATUS[reason], headers: { ...headers, "content-security-policy": PAGE_POLICY, "referrer-policy": "no-referrer" } });
 }
 
 /** A text with every secret it may hold taken out: the given secrets, an authorization's value, a URL's user and query. */
@@ -229,14 +254,16 @@ ${body}</main>
 /** One request to the site route. `fetch`: the transport to the Git host, for a test's scripted host. */
 export async function site(request: Request, env: SiteEnv, fetch?: (request: Request) => Promise<Response>): Promise<Response> {
   const url = new URL(request.url);
-  if (credentialInUrl(url)) return refused("bad-request", "a credential in an address is not used");
-  if (request.method !== "GET") return refused("method-not-allowed", "the site answers GET only");
+  let roomName: string | undefined;
+  const refusal = (reason: SiteRefusal, sentence: string, step?: SiteStep) => refused(reason, sentence, step, { request, ...(roomName === undefined ? {} : { room: roomName }) });
+  if (credentialInUrl(url)) return refusal("bad-request", "a credential in an address is not used");
+  if (request.method !== "GET") return refusal("method-not-allowed", "the site answers GET only");
   const parsed = parse(url);
-  if (!parsed) return refused("bad-request", "a site address names a directory, a ref and a path, with no empty, '.' or '..' segment");
+  if (!parsed) return refusal("bad-request", "a site address names a directory, a ref and a path, with no empty, '.' or '..' segment");
   // No ref: the published branch.
   if (parsed.ref === null) return new Response(null, { status: 302, headers: { location: `/site/${segment(parsed.directory)}/HEAD/`, "cache-control": "no-store" } });
   const { directory, ref, path, trailing } = parsed;
-  if (path.length > 64 || utf8.encode(path.join("/")).length > 8192) return refused("unreadable", "publication-history-limit", "objects");
+  if (path.length > 64 || utf8.encode(path.join("/")).length > 8192) return refusal("unreadable", "publication-history-limit", "objects");
   const versions = ref === "versions" && path.length === 0;
 
   let room;
@@ -244,30 +271,31 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     room = await roomOf(env.SCOPES, directory);
   } catch (e) {
     logged("room", e);
-    return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room");
+    return refusal("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room");
   }
-  if (!room) return refused("not-found", "no room has that directory");
+  if (!room) return refusal("not-found", "no room has that directory");
+  roomName = room.repository.name;
   let publication;
   try { publication = await publicationOf(env.SCOPES, directory, room); }
-  catch (e) { logged("room", e); return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room"); }
-  if (!publication) return refused("not-published", "the room has no confirmed publication");
+  catch (e) { logged("room", e); return refusal("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the room could not be read", "room"); }
+  if (!publication) return refusal("not-published", "the room has no confirmed publication");
   // Full canonical object IDs take precedence over branch-like hash names.
   const immutable = /^[0-9a-f]{40}$/.test(ref);
   const names = ref === "HEAD" ? [`refs/heads/${room.branch}`] : [`refs/heads/${ref}`, `refs/tags/${ref}`];
   const selected = publication.refs.find((r) => names.includes(r.ref));
-  if (!versions && !immutable && !selected) return refused("not-published", "the room has not published that ref");
+  if (!versions && !immutable && !selected) return refusal("not-published", "the room has not published that ref");
   let proof: import("./publication.ts").PublishedCommitProof | undefined;
   if (!versions) {
     try {
       const selection = await publishedCommitOf(env.SCOPES, directory, room, immutable ? ref : selected!.target);
       if (!selection.ok) return selection.reason === "publication-history-limit"
-        ? refused("unreadable", "publication-history-limit", "room")
-        : refused("not-published", "the room has no written publication receipt for that commit");
+        ? refusal("unreadable", "publication-history-limit", "room")
+        : refusal("not-published", "the room has no written publication receipt for that commit");
       proof = selection.proof;
-    } catch (e) { logged("room", e); return refused("unreadable", "the publication proof could not be read", "room"); }
+    } catch (e) { logged("room", e); return refusal("unreadable", "the publication proof could not be read", "room"); }
   }
   const open = readerOf(env, room, fetch);
-  if (!open) return refused("host-not-configured", "this deployment does not read that room's repository");
+  if (!open) return refusal("host-not-configured", "this deployment does not read that room's repository");
 
   let opened: Opened;
   try {
@@ -275,7 +303,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
   } catch (e) {
     const failed = e instanceof StepError ? e.step : "open";
     logged(failed, e);
-    return refused("unreadable", "the repository could not be read", failed);
+    return refusal("unreadable", "the repository could not be read", failed);
   }
   // The step of the read in progress, which a failure names.
   let step: SiteStep = "refs";
@@ -286,18 +314,18 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     ? new Response(null, { status: 304, headers: cached }) : null;
   const eligible = async (answer: Response): Promise<Response> => {
     const now = await roomOf(env.SCOPES, directory);
-    if (!now || canonicalize(now) !== canonicalize(room)) return refused("not-published", "the room identity changed during this read");
+    if (!now || canonicalize(now) !== canonicalize(room)) return refusal("not-published", "the room identity changed during this read");
     if (!versions && proof) {
       const currentProof = await publishedCommitOf(env.SCOPES, directory, now, proof.commit);
-      if (!currentProof.ok) return currentProof.reason === "publication-history-limit" ? refused("unreadable", "publication-history-limit", "room") : refused("not-published", "the publication is no longer eligible");
+      if (!currentProof.ok) return currentProof.reason === "publication-history-limit" ? refusal("unreadable", "publication-history-limit", "room") : refusal("not-published", "the publication is no longer eligible");
       if (!immutable) {
         const latest = await publicationOf(env.SCOPES, directory, now);
-        if (latest?.refs.find(r => r.ref === selected!.ref)?.target !== proof.commit) return refused("unreadable", "the latest publication changed during this read", "room");
+        if (latest?.refs.find(r => r.ref === selected!.ref)?.target !== proof.commit) return refusal("unreadable", "the latest publication changed during this read", "room");
       }
-      if (canonicalize(currentProof.proof) !== canonicalize(proof)) return refused("unreadable", "the publication record changed during this read", "room");
+      if (canonicalize(currentProof.proof) !== canonicalize(proof)) return refusal("unreadable", "the publication record changed during this read", "room");
     } else {
       const currentPublication = await publicationOf(env.SCOPES, directory, now);
-      if (canonicalize(currentPublication) !== canonicalize(publication)) return refused("unreadable", "the publication record changed during this read", "room");
+      if (canonicalize(currentPublication) !== canonicalize(publication)) return refusal("unreadable", "the publication record changed during this read", "room");
     }
     return answer;
   };
@@ -307,7 +335,7 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     if (versions) {
       for (const row of publication.refs) {
         const selection = await publishedCommitOf(env.SCOPES, directory, room, row.target);
-        if (!selection.ok) return selection.reason === "publication-history-limit" ? refused("unreadable", "publication-history-limit", "room") : refused("not-published", "the room has no written publication receipt for that commit");
+        if (!selection.ok) return selection.reason === "publication-history-limit" ? refusal("unreadable", "publication-history-limit", "room") : refusal("not-published", "the room has no written publication receipt for that commit");
         await verifiedReceipt(reader, selection.proof, at);
       }
       return await eligible(await versionsPage(reader, room.repository.name, room.branch, publication.refs, base, at, html));
@@ -324,11 +352,11 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     for (let i = 0; i < path.length; i++) {
       const name = utf8.encode(path[i]!);
       entry = tree.find((e) => sameName(e, name)) ?? null;
-      if (!entry || (i < path.length - 1 && entry.kind !== "tree")) return refused("not-found", "no file is at that path");
+      if (!entry || (i < path.length - 1 && entry.kind !== "tree")) return refusal("not-found", "no file is at that path");
       if (entry.kind === "tree") tree = await reader.tree(entry.id);
     }
-    if (entry !== null && entry.kind !== "tree" && trailing && path.length > 0) return refused("not-found", "no directory is at that path");
-    if (entry !== null && (entry.kind === "gitlink" || entry.mode === "120000")) return refused("not-found", "a submodule or a symbolic link is not served");
+    if (entry !== null && entry.kind !== "tree" && trailing && path.length > 0) return refusal("not-found", "no directory is at that path");
+    if (entry !== null && (entry.kind === "gitlink" || entry.mode === "120000")) return refusal("not-found", "a submodule or a symbolic link is not served");
 
     const prefix = `${base}${segment(ref)}/`;
     const href = (parts: readonly string[], dir: boolean) => prefix + parts.map(segment).join("/") + (dir && parts.length > 0 ? "/" : "");
@@ -363,8 +391,8 @@ export async function site(request: Request, env: SiteEnv, fetch?: (request: Req
     }));
   } catch (e) {
     logged(step, e, opened);
-    if (e instanceof GitRefusal && e.reason === "too-large" && e.what === "page") return refused("too-large", `a file of more than ${FILE_BYTES} bytes is not served`, step);
-    return refused("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the repository could not be read", step);
+    if (e instanceof GitRefusal && e.reason === "too-large" && e.what === "page") return refusal("too-large", `a file of more than ${FILE_BYTES} bytes is not served`, step);
+    return refusal("unreadable", e instanceof Error && e.message === "publication-history-limit" ? "publication-history-limit" : "the repository could not be read", step);
   } finally {
     await opened.close();
   }

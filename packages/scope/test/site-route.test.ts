@@ -10,7 +10,7 @@ import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";
 import type { Binding } from "../src/namespace.ts";
 import type { SiteEnv } from "../src/site/host.ts";
-import { FILE_BYTES, redacted, site } from "../src/site/route.ts";
+import { FILE_BYTES, redacted, refused, site } from "../src/site/route.ts";
 import { net } from "../src/testing.ts";
 import { soon } from "./net.ts";
 import { Platform, rita, sam, settle } from "./repository.ts";
@@ -458,6 +458,37 @@ test("refusals: a missing page, a bad ref, a file over the size bound at the rea
     expect(body.startsWith(`${reason}: `)).toBe(true);
     expect(body).not.toContain("<");
   }
+  // Representation changes do not change admission, status or machine answers.
+  const htmlRequest = new Request("https://room.test/site/not-a-scope/HEAD/", { headers: { accept: "text/html" } });
+  const browserStatuses = { "bad-request": 400, "method-not-allowed": 405, "not-found": 404, "not-published": 404, "too-large": 413, "host-not-configured": 503, unreadable: 502 } as const;
+  for (const reason of Object.keys(browserStatuses) as (keyof typeof browserStatuses)[]) {
+    const response = refused(reason, "private provider detail must not appear", "objects", { request: htmlRequest, room: '<script>foreign</script>"' });
+    const body = await response.text();
+    expect(response.status).toBe(browserStatuses[reason]);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-site-step")).toBe("objects");
+    expect(body).toContain("<h1>Pages</h1>");
+    expect(body).toContain('href="/page/"');
+    expect(body).not.toContain("private provider detail");
+    expect(body).not.toContain("<script>");
+    if (reason === "host-not-configured") expect(body).toContain("This host does not read the repository of &lt;script&gt;foreign&lt;/script&gt;&quot;.");
+  }
+  for (const accept of ["application/json", "text/html;q=0", "*/*"]) {
+    const response = refused("not-published", "the room has no confirmed publication", undefined, { request: new Request("https://room.test/site/x/HEAD/", { headers: { accept } }) });
+    expect([response.status, await response.text()]).toEqual([404, "not-published: the room has no confirmed publication\n"]);
+  }
+  const unconfigured = await get(`/site/${D.name}/HEAD/README.md`, { headers: { accept: "text/html" } }, { SCOPES: publishedScopes });
+  expect(unconfigured.status).toBe(503);
+  expect(await unconfigured.text()).toContain("This host does not read the repository of ");
+  const unpublished = await get(`/site/${D.name}/${"e".repeat(40)}/README.md`, { headers: { accept: "text/html" } }, { SCOPES: publishedScopes });
+  expect(unpublished.status).toBe(404);
+  const unpublishedBody = await unpublished.text();
+  expect(unpublishedBody).toContain("The room has no confirmed published page at this address.");
+  expect(unpublishedBody).not.toContain("This host does not read");
   // The bound is the real one: a file of exactly FILE_BYTES is read; one byte more is refused above.
   const edge = host.commit({ "edge.md": "a".repeat(FILE_BYTES) }, "edge\n");
   host.refs.set("refs/tags/edge", edge);

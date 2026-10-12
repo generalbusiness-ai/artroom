@@ -274,7 +274,6 @@ function proposeFromRecordedSource(room: Room, rows: Awaited<ReturnType<typeof l
   const permitted = !!room.me?.actions.includes("change.propose");
   if (context.pending || context.uncertain || rows.length === 0 || !permitted) button.setAttribute("disabled", "");
   if (!permitted) host.append(h("p", { class: "muted small" }, "Your current member cannot propose a text change."));
-  else if (rows.length === 0) host.append(h("p", { class: "muted small" }, "No recorded change is available here as a text source."));
   button.addEventListener("click", () => {
     if (button.hasAttribute("disabled")) return;
     const binding = settingsContext(settings() ?? { place: null, secret: "" });

@@ -50,7 +50,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   const root = new Element("div");
   type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
-  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: [], ref: { membership: context.place.membership, member: "@reader" } } };
+  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: ["change.propose"], ref: { membership: context.place.membership, member: "@reader" } } };
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>, accepted?: () => void) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
@@ -69,7 +69,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   const drain = async () => { for (let turn = 0; turn < 20; turn++) await Promise.resolve(); };
   vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key", isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value }));
   vi.doMock("../src/data.ts", () => ({
-    act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: ["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own"].map((kind) => ({ kind, fields: [] })), hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
+    act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: ["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own", "open-pr"].map((kind) => ({ kind, fields: [] })), hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
     openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership, name: `Recorded ${context.place.directory}` }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
     joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: vi.fn(),
   }));
@@ -92,6 +92,15 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     // Main owns these public association hosts; the view stand-in must expose them.
     expect(root.querySelectorAll('[data-request-context]').map(node=>node.getAttribute('data-request-context'))).toEqual(['room/member/directory']);
     expect(root.querySelectorAll('[data-task-context]').map(node=>node.getAttribute('data-task-context'))).toEqual(['room/member/directory']);
+    // A complete empty source list keeps Propose change disabled without a
+    // second absence paragraph in the toolbar. The view owns the list copy.
+    location.hash = "#/?kind=change"; rendered = gate(); redraw(); await rendered.promise;
+    const propose = root.all().find(node => node.getAttribute("aria-label") === "Propose change")!;
+    expect(propose.hasAttribute("disabled")).toBe(true);
+    expect(root.textContent).not.toContain("No recorded change is available here as a text source");
+    propose.handlers.get("click")?.({ preventDefault() {} });
+    await drain(); expect(dataAct).not.toHaveBeenCalled();
+    location.hash = "#/"; rendered = gate(); redraw(); await rendered.promise;
     const beforePending = panels.length;
     send("comment", "", Object.fromEntries([["__proto__", "literal field"]]));
     await attempt.promise;
