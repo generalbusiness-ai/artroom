@@ -9,7 +9,7 @@ import { checkOriginal, joinInvitation, originalJoin, type JoinStorage } from ".
 const origin = "https://page-custody.test";
 const ref = (kind: ScopeRef["kind"]): ScopeRef => ({ scope: scopeIdOf({ v: 1, kind, definition: "platform:membership@2", creator: null, cause: textDigest("TEST custody " + kind), ordinal: 0 }), kind, inc: newIncarnation(new Uint8Array(16).fill(7)) });
 const directory = ref("directory"), membership = ref("membership");
-const invitation = (n = 1, secret = "TEST invitation secret") => "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service: origin, repository: { directory, membership, rules: ref("rules").scope, destination: ref("destination").scope }, invitation: n, secret, handle: "@ada", definition: "platform:membership@2" })));
+const invitation = (n = 1, secret = "TEST invitation secret", targetMembership = membership, handle = "@ada") => "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service: origin, repository: { directory, membership: targetMembership, rules: ref("rules").scope, destination: ref("destination").scope }, invitation: n, secret, handle, definition: "platform:membership@2" })));
 const lock = { run: async <T>(work: () => Promise<T>) => work() };
 const now = () => Date.parse("2026-10-12T00:00:00Z");
 function fixture() {
@@ -41,7 +41,7 @@ function fixture() {
     const returned = badEntry ? { ...entry!, time: "2026-10-12T00:00:01Z" } : entry!;
     return Response.json({ ok: true, at: { seq: 5, hash: receipt!.fact.hash }, complete: true, value: { entry: returned, hash: entryHash(returned) } });
   };
-  return { storage, fetch, counters: () => ({ posts, settles, entries }), lose: () => { lost = true; }, missing: () => { missing = true; }, badEntry: () => { badEntry = true; }, refuse: () => { refused = true; }, values };
+  return { storage, fetch, counters: () => ({ posts, settles, entries }), lose: () => { lost = true; }, missing: () => { missing = true; }, badEntry: () => { badEntry = true; }, refuse: (value = true) => { refused = value; }, get writes() { return writes; }, values };
 }
 
 test("scripted lost enrollment survives reload and changed invitation without rekey or resubmission; read-only check verifies the original receipt and entry", async () => {
@@ -118,4 +118,49 @@ test("scripted known refusal keeps the same invitation terminal but a different 
     }
   }
   expect(full, "bounded custody must stop before evicting a prior refusal").toBe(true);
+});
+
+
+test("scripted A-refused B-refused A replay and reload return the exact archived answer without replacing current B custody", async () => {
+  const f = fixture(); f.refuse();
+  const membershipB = { ...membership, scope: scopeIdOf({ v: 1, kind: "membership", definition: "platform:membership@2", creator: null, cause: textDigest("TEST other target"), ordinal: 0 }) };
+  const inviteA = invitation(), inviteB = invitation(2, "TEST other invitation", membershipB, "@beau");
+  let preparations = 0;
+  const options = { fetch: f.fetch, now: () => { preparations++; return now(); }, lock };
+  const first = await joinInvitation(origin, inviteA, f.storage, options);
+  const second = await joinInvitation(origin, inviteB, f.storage, options);
+  expect([first.status, second.status, f.counters().posts]).toEqual(["refused", "refused", 2]);
+  expect(second.place.membership).toEqual(membershipB);
+  const currentBytes = [...f.values.values()][0]!, writesBefore = f.writes, preparationsBefore = preparations;
+  const currentPublic = originalJoin(origin, f.storage);
+  const reloaded: JoinStorage = {
+    getItem: key => f.values.get(key) ?? null,
+    setItem: () => { throw new Error("TEST archived replay must not write custody"); }
+  };
+  for (const storage of [f.storage, reloaded]) {
+    const replay = await joinInvitation(origin, inviteA, storage, options);
+    expect(replay.status).toBe("refused");
+    expect([replay.key, replay.place, replay.handle, replay.answer]).toEqual([first.key, first.place, first.handle, first.answer]);
+    expect(f.counters().posts).toBe(2);
+    expect(preparations).toBe(preparationsBefore);
+    expect(f.writes).toBe(writesBefore);
+    // No private envelope or seed is printed if byte preservation fails.
+    expect([...f.values.values()][0] === currentBytes).toBe(true);
+    expect(originalJoin(origin, storage)).toEqual(currentPublic);
+  }
+});
+
+test("scripted archived A refusal cannot hide an unknown current B enrollment on replay or reload", async () => {
+  const f = fixture(); f.refuse();
+  const first = await joinInvitation(origin, invitation(), f.storage, { fetch: f.fetch, now, lock });
+  f.refuse(false); f.lose();
+  const second = await joinInvitation(origin, invitation(2), f.storage, { fetch: f.fetch, now, lock });
+  expect([first.status, second.status]).toEqual(["refused", "unknown"]);
+  const before = [...f.values.values()][0]!, writesBefore = f.writes;
+  const reloaded: JoinStorage = { getItem: key => f.values.get(key) ?? null, setItem: () => { throw new Error("TEST unknown replay must not write"); } };
+  const replay = await joinInvitation(origin, invitation(), reloaded, { fetch: f.fetch, now, lock });
+  expect([replay.status, replay.key, f.counters().posts]).toEqual(["unknown", second.key, 2]);
+  expect(originalJoin(origin, reloaded)?.status).toBe("unknown");
+  expect(f.writes).toBe(writesBefore);
+  expect([...f.values.values()][0] === before).toBe(true);
 });

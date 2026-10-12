@@ -99,6 +99,15 @@ export async function joinInvitation(origin: string, invitation: string, storage
   return locked(origin, options, async () => {
     current(options);
     let row = read(origin, storage);
+    // Only a terminal current slot may expose an archived terminal answer.
+    // Unknown/prepared custody must remain the UI's unresolved original.
+    if (row && (row.phase === "refused" || row.phase === "verified")) {
+      const prior = row.history?.find(prior => prior.prepared.link === target.link);
+      if (prior) return {
+        ...publicOf(row), place: structuredClone(prior.prepared.place), handle: prior.prepared.handle,
+        status: "refused", reason: `Refused because ${prior.refusal.reason}.`, answer: structuredClone(prior.refusal)
+      };
+    }
     if (row?.phase === "refused") {
       if (row.prepared.link === target.link) return checked(row, storage, options);
       if ((row.history?.length ?? 0) >= MAX_REFUSALS) throw new Error("Private enrollment refusal history is full. Nothing was replaced.");
