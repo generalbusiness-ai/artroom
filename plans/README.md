@@ -467,6 +467,17 @@ checks with the tested and delivery tree identities and an explicit
 source/tests-unchanged statement. It does not repeat the full gate for
 documents alone. Any further source repair keeps its relevant checks.
 
+[031: One MCP service for every dap application](031-2026-10-12-generic-mcp-service.md)
+is Draft 1, dated 2026-10-12, under Hugh's direction of that day. It
+replaces the MCP plan's tool list, written for the earlier room model, with
+ten generic tools over the scope model: reads, the derived list of acts a
+caller may sign, one signing submit, and the helpers every composition
+needs. It states what proves each of Hugh's four claims (complete, readable,
+one service for every application, efficient), keeps the adopted decisions
+of `775acdd3` that still hold, and is to be built in a cloud session on a
+branch with checker review of the head. Status: DRAFT 1, filed for checker
+review.
+
 ## Other original planning reports
 
 Two original reports still owe independent review and source integration.
