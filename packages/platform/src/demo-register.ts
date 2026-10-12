@@ -4,6 +4,12 @@ import { intentDigest } from "@generalbusiness/artroom-bytes";
 import type { Rules } from "@generalbusiness/artroom-derive";
 import { register, registerRules } from "./register.ts";
 export const DEMO_REGISTER = "platform:register@7" as const;
+/** Explicit future web founding cohort; the original demo register keeps its pin. */
+export const WEB_DEMO_REGISTER = "platform:register@8" as const;
+export const WEB_DEMO_COHORT = {
+  register: WEB_DEMO_REGISTER, directory: "platform:directory@7", membership: "platform:membership@2",
+  rules: "platform:rules@4", destination: "platform:destination@3",
+} as const;
 export const DEMO_PURPOSE = "demo-start" as const;
 const purpose = { type: "enum", of: [DEMO_PURPOSE] } as const;
 const item = register.items["register"]!, install = register.acts["install"]!;
@@ -24,3 +30,6 @@ export const demoRegisterRules: Rules = {
     },
   },
 };
+
+/** Version 8 keeps the same demo admission data; its named directory mapping differs. */
+export const webDemoRegister: PlatformData = { ...demoRegister };

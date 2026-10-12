@@ -3,7 +3,7 @@ import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusin
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import type { PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
 import { d } from "@generalbusiness/artroom-derive/testing";
-import { APPLICATION_COHORT, COUNTING_COHORT, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
+import { APPLICATION_COHORT, COUNTING_COHORT, DEMO_REGISTER, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
 import { rita } from "./support-founding.ts";
 
 // The planner's decision of 2026-10-07: a changed definition carries a new version; a scope pins its version at its genesis and is
@@ -52,8 +52,8 @@ test("every shipped version resolves to its own data, pinned by digest, and vers
   expect(["platform:rules@1", "platform:rules@2", "platform:rules@3"].map(named => platform(named)!.data.items["rules"]!.values["ownerMayReview"]!.default)).toEqual([false, false, false]);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
   expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
-  // Explicit application and prospective Rules4 pins do not replace the existing default cohort.
-  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4"]);
+  // Explicit application and demo pins do not replace the existing default cohort.
+  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4", DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT.directory]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.
@@ -71,6 +71,7 @@ test("a rule reads its own version from the scope's genesis: the register of eac
   const at = { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` };
   const found = (definition: PlatformDefinition) => ({ input: { type: "act", signed }, own: (seq: number) => (seq === 0 ? { entry: { input: { type: "genesis", seed: genesisOf(definition) } } } : null), resolved: { at } }) as unknown as RuleGiven;
   expect((["platform:register@1", "platform:register@2", "platform:register@3"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2", "platform:directory@3"]);
+  expect([DEMO_REGISTER, WEB_DEMO_REGISTER].map(named => directorySeed(found(named)).definition)).toEqual(["platform:directory@3", WEB_DEMO_COHORT.directory]);
 
   const roleTable = (platform("platform:membership@1")!.rules["role-table"] as Extract<PlatformRule, { place: "effect" }>);
   const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as unknown as readonly { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));
