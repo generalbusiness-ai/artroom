@@ -577,7 +577,7 @@ Asks the scope that owns a resource for one step of a capability. With kind: for
 
 ### `items`
 
-A page of one item type of a scope, in one of two traversals, each with its own cursor: the live items, from the scope's summary (the default); or, with final: true, the retained final items. A cursor continues only the traversal it came from.
+A page of one item type of a scope, in one of two traversals, each with its own cursor: the live items, from the scope's summary (the default); or, with final: true, the retained final items. The cursor is not checked against its traversal: to continue, call again with the same scope, type and final flag.
 
 ```json
 {
