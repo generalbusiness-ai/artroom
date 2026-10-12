@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/demo/rehearse.ts","body":{"commit":"58f258123542a16b114aa638ec88d9fa1d0f8d53","path":"scripts/demo/rehearse.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:09a21a57ce61b899ee036dc9b8133f5311a1dab7","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-11-stale-refusal-rehearsal-delivery.md."}
