@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bc0a607564d8a87712258dbfe649eb1df7c01308"}
+{"kind":"artifact","text":"packages/page/src/data.ts at exact 967bbbadc094f5119d4acc31a742a94209ceb4a6 on request/empty-room-configured-status, under promise git:sha1…a9b2d0b on request git:sha1…71520b8","body":{"commit":"967bbbadc094f5119d4acc31a742a94209ceb4a6","path":"packages/page/src/data.ts"}}
