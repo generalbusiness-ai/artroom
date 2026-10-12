@@ -107,8 +107,9 @@ test("an uncertain subject keeps one status home while its known request remains
 });
 
 test("a single eligible choice is fixed and drafts stay with their room, member and exact version", () => {
-  const offered = { acts: [review], hidden: 0 };
-  const context = { primary: ["review-verdict"], draftKey: "room-A/member-A/scope", defaults: { "review-verdict": { fields: { manifest: "9" } } }, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }] } } };
+  const withRequest: Offered = { ...review, fields: [...review.fields, { name: "request", type: "item", required: false }] };
+  const offered = { acts: [withRequest], hidden: 0 };
+  const context = { primary: ["review-verdict"], draftKey: "room-A/member-A/scope", defaults: { "review-verdict": { fields: { manifest: "9", request: "6" } } }, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }], request: [{ label: "Request 6", value: "6" }] } } };
   const first = asElement(actsPanel(offered, () => {}, null, context));
   const body = first.all().find((node) => node.name === "field:body")!;
   body.value = "Unsent review";
@@ -116,6 +117,32 @@ test("a single eligible choice is fixed and drafts stay with their room, member 
   expect(first.all().filter((node) => node.tag === "select")).toHaveLength(0);
   const saved = (extra = {}) => asElement(actsPanel(offered, () => {}, null, { ...context, ...extra })).all().find((node) => node.name === "field:body")!.value;
   expect(saved()).toBe("Unsent review");
+  const current = (requests: readonly { label: string; value: string }[], fixed?: string) => asElement(actsPanel(offered, (...args) => sent.push(args), null, {
+    ...context, defaults: { "review-verdict": { fields: { manifest: "9", ...(fixed !== undefined ? { request: fixed } : {}) } } },
+    choices: { "review-verdict": { ...context.choices["review-verdict"], request: requests } },
+  })).all().find(node => node.tag === "form")!;
+  const sent: unknown[] = [];
+  const many = current([{ label: "Request 6", value: "6" }, { label: "Request 9", value: "9" }]);
+  expect(many.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
+  expect(many.all().find(node => node.name === "field:request")!.value).toBe("6");
+  const replaced = current([{ label: "Request 9", value: "9" }], "9");
+  const request = replaced.all().find(node => node.name === "field:request")!;
+  expect(request.tag).toBe("select");expect(request.value).not.toBe("9");
+  expect(replaced.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
+  expect(replaced.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  replaced.event("submit");expect(sent).toEqual([]);
+  request.value = "9";replaced.event("change");
+  expect(replaced.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  replaced.event("submit");expect(sent).toEqual([["review-verdict", "", { manifest: "9", request: "9", verdict: "approve", body: "Unsent review" }]]);
+  // An explicit voluntary selection remains a draft choice when a new sole request arrives.
+  const voluntary = current([{ label: "Voluntary review", value: "" }], "");
+  const voluntaryRequest = voluntary.all().find(node => node.name === "field:request")!;
+  expect(voluntary.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  voluntaryRequest.value = "";voluntary.event("change");
+  expect(voluntary.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  const newSole = current([{ label: "Request 10", value: "10" }], "10");
+  expect(newSole.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  expect(newSole.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
   expect(saved({ draftKey: "room-B/member-A/scope" })).toBe("");
   expect(saved({ draftKey: "room-A/member-B/scope" })).toBe("");
   expect(saved({ defaults: { "review-verdict": { fields: { manifest: "10" } } } })).toBe("");

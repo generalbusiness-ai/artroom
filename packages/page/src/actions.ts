@@ -93,9 +93,19 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   const choicesFor = own(context.choices, act.kind);
   const blocked = context.uncertain || context.pending || context.blockedKinds?.includes(act.kind);
   const closeReason = ["close-own", "close-any"].includes(act.kind) ? act.fields.find(field => field.name === "reason" && field.type === "enum") : undefined;
-  // Exact-version defaults are part of the key: a version change never reuses a stale review draft.
-  const draftKey = context.draftKey ? JSON.stringify([context.draftKey, act.kind, defaults ?? null]) : null;
+  // Review request choices can grow without changing the selected version.
+  // Keep their selection in the draft, rather than in its version identity.
+  const defaultFields = defaults?.fields;
+  const draftDefaults = act.kind === "review-verdict" && defaultFields && own(defaultFields, "manifest") !== undefined
+    ? { ...defaults, fields: Object.fromEntries(Object.entries(defaultFields).filter(([name]) => name !== "request")) } : defaults;
+  const draftKey = context.draftKey ? JSON.stringify([context.draftKey, act.kind, draftDefaults ?? null]) : null;
   const draft = draftKey ? drafts.get(draftKey) ?? {} : {};
+  const requestChoices = own(choicesFor, "request") ?? act.fields.find(field => field.name === "request")?.choices;
+  const originalRequest = own(draft, "request");
+  const fixedRequest = own(defaultFields, "request");
+  const correctRequest = act.kind === "review-verdict" && originalRequest !== undefined
+    && (!requestChoices || !requestChoices.some(choice => choice.value === originalRequest) || fixedRequest !== undefined && fixedRequest !== originalRequest);
+  const chooseRequest = "__choose_review_request__";
   const controls: (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[] = [];
   const form = element("form", { "data-act": act.kind });
   const advanced: HTMLElement[] = [];
@@ -106,14 +116,15 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     form.append(fixed === undefined ? element("label", {}, "Item", input) : input);
   }
   for (const field of act.fields) {
-    const fixed = own(defaults?.fields, field.name);
+    const correctingRequest = correctRequest && field.name === "request";
+    const fixed = correctingRequest ? undefined : own(defaults?.fields, field.name);
     const choices = own(choicesFor, field.name) ?? field.choices;
     const attrs: Record<string, string> = { name: `field:${field.name}`, "data-type": field.type };
     if (draftKey) attrs["data-focus-key"] = controlKey(draftKey, `field:${field.name}`);
     if (field.required || field === closeReason) attrs["required"] = "";
     const value = fixed ?? own(draft, field.name) ?? "";
     let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-    if (fixed !== undefined || choices?.length === 1) {
+    if (!correctingRequest && (fixed !== undefined || choices?.length === 1)) {
       input = element("input", { ...attrs, type: "hidden", value: fixed ?? choices![0]!.value }) as HTMLInputElement;
       form.append(input);
       controls.push(input);
@@ -121,7 +132,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     }
     if (choices) {
       input = element("select", attrs,
-        element("option", { value: "" }, choices.length ? `Choose ${labelOf(field.name).toLowerCase()}` : "No eligible choice"),
+        element("option", { value: correctingRequest ? chooseRequest : "", ...(correctingRequest && !choices.some(choice => choice.value === value) ? { selected: "" } : {}) }, choices.length ? `Choose ${labelOf(field.name).toLowerCase()}` : "No eligible choice"),
         choices.map((choice) => element("option", { value: choice.value, ...(choice.value === value ? { selected: "" } : {}) }, choice.label))) as HTMLSelectElement;
       if (choices.length === 0) input.setAttribute("disabled", "");
     } else if (field.name === "body" || field.name === "content" || field.type === "list") {
@@ -142,6 +153,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   if (blocked || act.fields.some((field) => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined)) button.setAttribute("disabled", "");
   if (blocked) for (const control of controls) control.setAttribute("disabled", "");
   form.append(button);
+  if (correctRequest) form.append(element("p", { role: "status" }, "The original review request is no longer offered. Choose a current request to continue; your review text is kept."));
   const read = (): { on: string; typed: Record<string, string> } => {
     let on = "";
     const typed: Record<string, string> = Object.create(null) as Record<string, string>;
@@ -154,13 +166,18 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   let submitted = false;
   const reasonChosen = () => !closeReason || closeReason.choices?.some(choice => choice.value === controls.find(control => control.name === "field:reason")?.value) === true;
   const requiredChoiceUnavailable = act.fields.some(field => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined);
+  const requestChosen = () => !correctRequest || requestChoices?.some(choice => choice.value === controls.find(control => control.name === "field:request")?.value) === true;
   const updateSubmit = () => {
-    if (!closeReason) return;
-    if (blocked || submitted || requiredChoiceUnavailable || !reasonChosen()) button.setAttribute("disabled", "");
+    if (!closeReason && !correctRequest) return;
+    if (blocked || submitted || requiredChoiceUnavailable || !reasonChosen() || !requestChosen()) button.setAttribute("disabled", "");
     else button.removeAttribute("disabled");
   };
+  const draftValues = (on: string, typed: Record<string, string>): Record<string, string> => {
+    const request = act.kind === "review-verdict" ? controls.find(control => control.name === "field:request") : undefined;
+    return { ...typed, on, ...(request ? { request: request.value } : {}) }; // Keep explicit voluntary selection, without adding an empty native field.
+  };
   const edited = () => {
-    if (draftKey) { const { on, typed } = read(); drafts.set(draftKey, { ...typed, on }); draftVersions.set(draftKey, (draftVersions.get(draftKey) ?? 0) + 1); }
+    if (draftKey) { const { on, typed } = read(); drafts.set(draftKey, draftValues(on, typed)); draftVersions.set(draftKey, (draftVersions.get(draftKey) ?? 0) + 1); }
     updateSubmit();
   };
   form.addEventListener("input", edited);
@@ -168,9 +185,9 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   updateSubmit();
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (blocked || button.hasAttribute("disabled") || closeReason && (submitted || !reasonChosen())) return;
+    if (blocked || button.hasAttribute("disabled") || (closeReason && (submitted || !reasonChosen())) || !requestChosen()) return;
     const { on, typed } = read();
-    const submittedDraft = { ...typed, on };
+    const submittedDraft = draftValues(on, typed);
     if (draftKey) drafts.set(draftKey, submittedDraft);
     const submittedVersion = draftKey ? draftVersions.get(draftKey) ?? 0 : null;
     // Block repeated clicks while the shell's signed operation is awaiting its answer.
@@ -189,9 +206,9 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
       const name = control.name.slice(6);
       const field = act.fields.find(field => field.name === name)!;
       const choices = own(choicesFor, name) ?? field.choices;
-      if (own(defaults?.fields, name) !== undefined || choices?.length === 1) continue;
+      if (!(correctRequest && name === "request") && (own(defaults?.fields, name) !== undefined || choices?.length === 1)) continue;
       const value = own(current, name) ?? "";
-      control.value = choices && !choices.some(choice => choice.value === value) ? "" : value;
+      control.value = choices && !choices.some(choice => choice.value === value) ? correctRequest && name === "request" ? chooseRequest : "" : value;
     }
     updateSubmit();
   });
