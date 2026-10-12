@@ -23,8 +23,8 @@ Production uses `performance.now()`. The result and transcript label the
 clock method, date, service, and Git host. Elapsed time includes CLI work
 and round-trip waiting. It excludes the fresh proposal and publication.
 The measurement is local to the runner, not server-only latency or a native
-history fact. No live refusal time, hold count, or publication count has
-been observed for this route.
+history fact. The hosted evidence below supplies the observed refusal
+time and the two publications in this concurrency route.
 
 ## Existing evidence
 
@@ -146,8 +146,57 @@ Local evidence remains outside the repository:
 
 ## Remaining work
 
-Checker review and an isolated hosted rehearsal remain owed. The hosted
-expected lines and elapsed time remain unobserved and must precede final
-child approval and landing. Actual counts must come from that recorded run.
+Final checker evidence review and child landing remain owed. The hosted
+run and separately labelled completion are recorded below.
 The full same-lane manifest successor remains separate work under Plan 029.
 This bounded child does not satisfy or close the parent request and promise.
+
+## Observed isolated hosted run
+
+The reviewed runner at `c8cb6c538` ran `github27-freeze-two` against
+`https://artroom-rehearsal.inguz.workers.dev`, with public repositories
+in `generalbusiness-ai` on GitHub. Protected runtime and binding metadata
+remained unchanged apart from the three intended GitHub credential names
+and provider versions. The served scope source tree is
+`ddde538aa08478594cb99f4d45d86aea8e4e401c`, equal to the deployed branded
+runtime. Final provider version: `a06502bd-4162-43e3-87d5-7b30d9a42217`.
+
+All 27 shots completed. Twenty-five matched their expected lines; shot 23
+reported all fourteen scopes consistent. Shots 24 and 26 returned HTTP
+502, so the original runner exited 1. Exactly one later anonymous GET of
+each failed page returned HTTP 200 and the expected type and title;
+`AGENTS.md` also contained its expected text. The original failed rows
+remain preserved. No native act or rehearsal was repeated.
+
+Shot 20 matched its complete stale-refusal and fresh-publication sequence.
+Observed run, runner timer: **2,586.628125 ms**, using `performance.now()`
+at `2026-10-12T01:40:23.340Z`. This includes CLI work and network waiting
+but excludes the new proposal and publication.
+
+Bounded signed native reads then verified the sealed capture bindings,
+three lane histories and destination history. Both original proposals
+name base `7d84a42eba48386e0d49d8af5ab1482e0dc39d2b`. The winner published
+`6ca64836a33f47160348722cc7c39a08f7998fc4`. The stale lane retained its
+`out-of-date` refusal. The same actual signing actor proposed the fresh,
+distinct lane on the winner's commit and published
+`4c18564813c5012b33ab7018dec0726666b6b9b6`. Native timestamps corroborate
+the observed CLI order, without claiming a global cross-scope clock.
+
+Closed public evidence, outside the repository:
+
+- Original runner terminal: `97151b91b0467e1355a0743c7004fc1a7c21bd3d0b90bcc9d083aa2c9884c266`.
+- All 27 rows, verifier and timer: `8b11a0758b9fef963621b527500855581ddfa4d7053006b038639038ca14b1cc`.
+- Later two public page reads: `5384744394dcb0d29f269cc84edd37b49a2124fbda3b11d064a2e7d70fda6f02`.
+- Native proposer, base, refusal and publication facts: `8bf934d63c0278a167ff1fb7f3a69d687d310e33eda8f0b29ac4d9c0f09f332a`.
+- Protected served-runtime metadata: `0eda823fc47276370b1f8b9c8f894337f73ec26f0d05f42b5270b32980372513`.
+
+The first local launch exited 13 at its initial input pause because a
+Python heredoc gave the child EOF. Its original local plan and key remain
+preserved; production correspondence checks found no attempted or
+acknowledged founding. The corrected run used a fresh directory and plan
+with the same live terminal throughout. No original plan was retried.
+
+This successor changes only this note and `docs/demo.md`. Runtime and
+test source remain byte-identical to the reviewed and observed runner.
+No gate or test was repeated for these documentation changes. The failed
+original gate and its accepted bounded completion remain as stated above.

@@ -30,10 +30,14 @@ fresh config directory.
 | 22, 23 | `artroom issues` shows #1 closed; `artroom verify --all` reports fourteen scopes consistent | 8, 12 |
 | 24 to 27 | The site's front page, the two published pages, and the room's page at `/page/` | 7, 9, 11 |
 
-Each shot states the exit code and the lines it expects, taken from the
-observed run of the 23:00 sprint report, except the new stale-base row.
-Its development expectations follow the production CLI format and still
-require an observed rehearsal-host run. The controlled change and the
+Each shot states the exit code and the lines it expects. The isolated
+GitHub rehearsal `github27-freeze-two`, run on 12 October 2026 UTC,
+observed the new stale-base row at source `c8cb6c538`. All 27 shots ran;
+25 matched, including fourteen consistent scopes. The front-page and
+`AGENTS.md` reads returned HTTP 502. One later anonymous read of each
+returned the expected HTTP 200, content type, title and page text. Those
+later reads are separate evidence; the original run remains failed.
+The controlled change and the
 stale change name the same earlier published base. Both proposals are
 admitted before the controlled publication; the second merge follows it. The result's
 `staleRefusal` field and transcript report runner-local elapsed milliseconds
@@ -44,6 +48,14 @@ publication, and is not server-only latency or a native history fact.
 Injected test clocks are labelled separately. The freeze route uses a
 new change lane; same-lane manifest replacement remains separate work
 under plan 029.
+
+Observed run, runner timer: **2,586.628125 ms**, measured with
+`performance.now()` at `2026-10-12T01:40:23.340Z`, against
+`https://artroom-rehearsal.inguz.workers.dev`, with Git host `github.com`.
+Subsequent signed native reads confirm the shared old base, retained
+out-of-date refusal, same proposer, distinct fresh lane and publication
+on the winner's commit. Native timestamps corroborate the recorded CLI
+sequence; they do not define a global order across scopes.
 
 An expected line is a template:
 `<name>` is any text without a space, `<...>` is any text, and `{name}` is
