@@ -2,19 +2,22 @@
 
 For a room admin and a person joining that room, this page explains the source CLI invitation path, the actions a role permits, and why a member, a device key and an agent controller are different identities.
 
-**Source guide — cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** It assumes a supplied, configured source CLI; it supplies no public installation, hosted bootstrap or recovery wizard.
+**Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** It assumes a supplied, configured source CLI; it supplies no public installation, hosted bootstrap or recovery wizard.
+
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](../../../docs/README.md#names-in-transition).
 
 In the admin's existing room context:
 
 ```sh
-artroom invite @rita --role member --hours 24
+dap invite @rita --role member --hours 24
 ```
 
 Pass the printed invitation only to its intended recipient. In the recipient's fresh CLI context:
 
 ```sh
-artroom join '<original invitation link>'
-artroom acts membership
+dap join '<original invitation link>'
+dap acts membership
 ```
 
 The invitation carries a one-time secret, not the member's private signing key. Keep it out of shared notes, screenshots and logs. The CLI makes and privately keeps the device key. Do not paste a private signing key into the invitation or documentation. [Invitation and Join source](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L691)
@@ -44,7 +47,7 @@ Join saves its exact signed request privately before sending. After a lost reply
 For an active key item you have identified in the actual membership record, an actor holding `membership.manage` can deliberately retire it through the declared generic act:
 
 ```sh
-artroom act revoke-key --on membership \
+dap act revoke-key --on membership \
   --target <key-item> --set as=retired
 ```
 
