@@ -484,7 +484,16 @@ test("refusals preserve machine reasons and statuses while browsers get safe Pag
   const unconfigured = await get(`/site/${D.name}/HEAD/README.md`, { headers: { accept: "text/html" } }, { SCOPES: publishedScopes });
   expect(unconfigured.status).toBe(503);
   expect(await unconfigured.text()).toContain("This host does not read the repository of ");
-  const unpublished = await get(`/site/${D.name}/${"e".repeat(40)}/README.md`, { headers: { accept: "text/html" } }, { SCOPES: publishedScopes });
+  // SCRIPTED absence of a confirmed publication; arbitrary commits in publishedScopes
+  // receive scripted proof, so they cannot represent an unpublished room.
+  const unpublishedScopes: Binding = {
+    idFromName: (name) => env.PLATFORM.idFromName(name),
+    get: (id) => {
+      const object = env.PLATFORM.get(id) as unknown as import("../src/site/publication.ts").SitePublicationPeer & { siteRoom(): Promise<import("../src/namespace.ts").Sourced | null> };
+      return { siteRoom: () => object.siteRoom(), siteDestination: () => object.siteDestination(), sitePublication: async () => null };
+    },
+  };
+  const unpublished = await get(`/site/${D.name}/HEAD/README.md`, { headers: { accept: "text/html" } }, { SCOPES: unpublishedScopes });
   expect(unpublished.status).toBe(404);
   const unpublishedBody = await unpublished.text();
   expect(unpublishedBody).toContain("The room has no confirmed published page at this address.");
