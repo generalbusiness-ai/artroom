@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Entry, Item, MemberRef, Receipt, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
-import type { Fetch, HeadStreamFetch } from "@generalbusiness/artroom-client";
+import { secretSigner, type Fetch, type HeadStreamFetch } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION } from "../commitments-pin.ts";
 import { assignedTurn, canCommit, countingView, proposal } from "./model.ts";
 import { nativeGateway, type CommandStore } from "./client.ts";
@@ -39,7 +39,7 @@ async function fixture(joined=true) {
   };
   const stream:HeadStreamFetch=async(url,init)=>{assert.equal(init.redirect,"error");return{status:200,url,redirected:false,headers:new Headers({"content-type":"application/x-ndjson"}),body:new ReadableStream<Uint8Array>({start(c){c.enqueue(new TextEncoder().encode(JSON.stringify({at:head})+"\n"));}})};};
   const connect=async()=>{
-    const gateway=nativeGateway(identity,secret,{current:()=>true,lock,voiceStore:{load:async()=>null,save:async()=>{throw new Error("unused fake voice");},clear:async()=>{}},commandStore:commands,fetch:fake,headFetch:stream,
+    const gateway=nativeGateway(identity,secretSigner(secret),{current:()=>true,lock,voiceStore:{load:async()=>null,save:async()=>{throw new Error("unused fake voice");},clear:async()=>{}},commandStore:commands,fetch:fake,headFetch:stream,
       actFetch:async(url,init)=>{assert.equal(init.redirect,"error");const response=await fake(url,{...init,signal:init.signal as never});return{status:metadata==="wrong-status"?200:response.status,body:response.body,headers:new Headers({"content-type":metadata==="wrong-media"?"text/html":"application/json"}),url:metadata==="wrong-url"?url+"/different":url,redirected:metadata==="redirected"};}});
     await new Promise<void>((resolve,reject)=>gateway.observe(state=>{if(state.status==="current")resolve();else if(["error","forbidden","unsupported"].includes(state.status))reject(new Error(`Fake gateway setup ${state.status}`));}));return gateway;
   };
@@ -85,10 +85,10 @@ test("FAKE known-refusal journal-save failure fences correction; unavailable loc
     assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.retained(),original);assert.equal(f.counters().posts,1);
   }finally{f.gateway.dispose();}
   const blocked=await fixture(false);try{
-    assert.equal((await blocked.gateway.command("activate")).status,"blocked");assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
+    const unsent=await blocked.gateway.command("activate");assert.equal(unsent.status,"blocked");assert.equal("definitelyUnsent" in unsent && unsent.definitelyUnsent,true);assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
   }finally{blocked.gateway.dispose();}
   const written=await fixture();try{
-    written.writeThenFail();assert.equal((await written.gateway.command("start")).status,"blocked");
+    written.writeThenFail();const uncertain=await written.gateway.command("start");assert.equal(uncertain.status,"blocked");assert.equal("definitelyUnsent" in uncertain,false);
     const original=written.retained();assert.ok(original);assert.equal(written.gateway.pendingCommand(),"start");assert.equal(written.gateway.commandResumeReady(),true);
     assert.equal((await written.gateway.checkCommand())?.status,"unknown");assert.equal(written.retained(),original);
     assert.equal((await written.gateway.command("start")).status,"unknown");assert.deepEqual(written.counters(),{posts:0,settles:1,saves:1,clears:0});

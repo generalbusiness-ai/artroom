@@ -277,6 +277,32 @@ test("A fresh next own assignment arriving during submit or reconciliation start
   }
 });
 
+// Actual controller and retained report transitions; Reporter, custody and
+// speech remain the fixture's labelled stand-ins, with no native/audio proof.
+test("Verified fulfillment archive keeps the selected voice armed for a fresh next pledge without replaying the completed token", async () => {
+  const f=fixture();await f.controller.ready;f.observe();
+  assert.equal(f.controller.arm("second"),true);await drain();
+  assert.equal(f.calls.length,1);const firstStart=structuredClone(f.custody.start);
+  f.duringSubmit(()=>{
+    // The scripted native observation has advanced while the verified reply
+    // is still in flight. Archiving must not end this explicit local Join.
+    f.obsolete(true);f.controller.observe({fresh:true,authorized:true});
+  });
+  f.calls[0]!.end();await drain();
+  assert.equal(f.archives.length,1);const archived=f.archives[0]!;
+  assert.equal(activeAttempt(archived.journal!).phase,"recorded");
+  assert.equal(terminalJournal(archived.journal,identity,archived.envelope,true),true);
+  assert.deepEqual(archived.audioStart,firstStart);assert.deepEqual(archived.envelope,f.submitted[0]);
+  assert.equal(f.custody.saved,null);assert.equal(f.controller.state().armed,true);
+  assert.equal(f.controller.state().voiceId,"second");assert.equal(f.calls.length,1);
+  f.observe();await drain();assert.equal(f.calls.length,1,"the completed token remains in played-turn memory");
+  const next=turn({serial:2,N:2});f.observe(next);await drain();
+  f.observe(next);f.calls[0]!.end();f.calls[0]!.error();await drain();
+  assert.deepEqual(f.calls.map(call=>[call.text,call.voiceId]),[["1","second"],["2","second"]]);
+  assert.deepEqual([f.prepared.length,f.submitted.length],[1,1],"late old callbacks cannot complete the next pledge");
+  f.controller.dispose();
+});
+
 test("The played-token ceiling disarms new speech without discarding unresolved exact custody", async () => {
   const f = fixture(null, undefined, 2); await f.controller.ready; f.observe(); f.controller.arm("fake"); await drain();
   f.calls[0]!.end(); await drain(); f.observe(turn({ generation: 1, serial: 1 })); await drain();

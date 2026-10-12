@@ -1,4 +1,4 @@
-// The existing three-entry U1 recipe: transpile real workspace sources, inspect the metafile, then Node's own test runner.
+// Transpile the four owning browser witnesses from real workspace sources, inspect their metafile, then use Node's test runner.
 import { build } from "esbuild";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { realpathSync, readdirSync, existsSync } from "node:fs";
@@ -18,7 +18,7 @@ if(JSON.parse(await readFile(resolve(root,"node_modules/esbuild/package.json"),"
 const dependencyRoots=[];
 for(const name of readdirSync(resolve(root,"node_modules"))){if(name.startsWith("." )||name==="@generalbusiness")continue;const candidates=name.startsWith("@")?readdirSync(resolve(root,"node_modules",name)).map(child=>name+"/"+child):[name];
   for(const name of candidates){const supplied=resolve(root,"node_modules",name),manifest=resolve(supplied,"package.json");if(!existsSync(manifest))continue;const pkg=JSON.parse(await readFile(manifest,"utf8"));if(lockData.packages?.["node_modules/"+name]?.version===pkg.version)dependencyRoots.push(realpathSync(supplied));}}
-const names=["client","voice-controller","app"];
+const names=["client","voice-controller","app","device-key"];
 const entries=names.map(name=>resolve(root,`examples/counting/browser/${name}.test.ts`));
 const output=realpathSync(await mkdtemp(resolve(tmpdir(),"artroom-counting-node-")));
 const aliases=Object.fromEntries(["client","bytes","contract"].map(name=>[`@generalbusiness/artroom-${name}`,resolve(root,`packages/${name}/src/index.ts`)]));
@@ -26,7 +26,7 @@ const result=await build({entryPoints:entries,absWorkingDir:root,bundle:true,pla
 const meta=JSON.stringify(result.metafile);if(Buffer.byteLength(meta)>4*1024*1024)throw new Error("Counting witness metafile exceeds its bound.");
 await writeFile(resolve(output,"metafile.json"),meta);
 const inputs=Object.keys(result.metafile.inputs),outputs=Object.entries(result.metafile.outputs);
-if(inputs.length>10000||outputs.length!==3)throw new Error("Unexpected Counting witness build inventory.");
+if(inputs.length>10000||outputs.length!==names.length)throw new Error("Unexpected Counting witness build inventory.");
 const source=new Set();
 for(const name of inputs){const supplied=resolve(root,name),path=realpathSync(supplied);
   if(inside(root,path)&&!inside(resolve(root,"node_modules"),supplied))source.add(path);
@@ -34,7 +34,7 @@ for(const name of inputs){const supplied=resolve(root,name),path=realpathSync(su
 }
 for(const name of ["packages/client/src/observe.ts","packages/client/src/head-stream.ts","packages/client/src/index.ts","packages/client/src/intent.ts","packages/bytes/src/index.ts","packages/contract/src/index.ts","examples/counting/commitments.ts","examples/counting/commitments-pin.ts",...entries.map(path=>relative(root,path))])if(!source.has(realpathSync(resolve(root,name))))throw new Error("Counting witness omitted a current source dependency.");
 const files=outputs.map(([name,info])=>{const path=realpathSync(resolve(root,name));if(!inside(output,path)||!info.entryPoint||!entries.includes(realpathSync(resolve(root,info.entryPoint))))throw new Error("Unexpected Counting witness entry or output.");return path;});
-if(new Set(files.map(path=>basename(path))).size!==3||new Set(outputs.map(([,info])=>info.entryPoint)).size!==3)throw new Error("Duplicate Counting witness output.");
+if(new Set(files.map(path=>basename(path))).size!==names.length||new Set(outputs.map(([,info])=>info.entryPoint)).size!==names.length)throw new Error("Duplicate Counting witness output.");
 
 await writeFile(resolve(output,"source.json"),JSON.stringify({root,entries,outputs:files}));
 const run=spawnSync(process.execPath,["--test",...files],{cwd:root,stdio:"inherit",env:Object.fromEntries(Object.entries(process.env).filter(([name])=>name!=="NODE_PATH"&&name!=="NODE_OPTIONS"))});

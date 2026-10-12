@@ -41,12 +41,28 @@ opens claims without selecting a speaker. Eligible active devices may commit
 the next number; native fairness and the complete ordered active basis
 choose which single pledge is admitted, not a browser round robin.
 
-Connect requires a verified public device-binding JSON and that device's
-own local enrolled key file. The key loader accepts the existing owner-only
-base64url seed or exactly 32 raw bytes. It reads the key into this device's
-memory, verifies its public ID and clears the loader copy. No private key or
-session token belongs in a URL, log, screenshot, IndexedDB or shared Page
-Settings. The public binding has origin, deployment, full lane scope,
+Hugh authorized remembered demo signing keys on 11 October 2026 at 21:15
+Eastern. Import one JSON file with `v: 1` and an `identities` list containing
+Ada, Beau and Cleo. Each entry has `name`, `binding` and a base64url `seed`.
+The seed-containing file is private. Existing separate public-binding and
+32-byte or base64url key files remain accepted through Setup help.
+
+Import verifies each public key, imports its seed immediately as a
+non-extractable WebCrypto Ed25519 signing key, and clears mutable input and
+key buffers. Origin-private IndexedDB keeps only CryptoKey objects and
+closed public bindings, in a separate devices store. Remember my choice
+keeps the chosen identity and voice. Returning reconnects that identity
+without arming sound or joining automatically. API nonextractability
+prevents key export; it does not guarantee encrypted or hardware storage
+or prevent malicious same-origin code from using the key. Immutable JSON
+strings cannot be securely erased. No seed or session token belongs in a
+URL, log, screenshot, IndexedDB or shared Page Settings.
+
+Forget this device disconnects and clears remembered credentials and
+choice, including notification to other mounted Counter tabs. It leaves
+pending commands, audio starts and original reports intact. Exact reimport
+can recover those records; Forget never makes their outcomes known.
+The public binding has origin, deployment, full lane scope,
 application definition, full membership, complete MemberRef, publicKey and
 cohort `{directory:"platform:directory@6",membership:"platform:membership@5",
 rules:"platform:rules@3",destination:"platform:destination@2"}`. Use actual
@@ -55,7 +71,13 @@ current origin. An authenticated read is not an act grant.
 
 ## Pledge, audio and fulfillment are different events
 
-Arm is explicit per device and usable voice. An armed active runner may
+Join is an explicit gesture after choosing an available English (US)
+voice. It connects, participates if needed, activates the own participant
+and arms that voice under existing guards. Partial completion is shown
+plainly. Leave disarms locally before guarded deactivation; a live pledge
+or unknown request can prevent native deactivation and remains recoverable.
+Voice availability is checked again before playback; no fallback voice
+is substituted. A joined active runner may
 propose a commitment; an unknown commit stays silent. Only a fresh complete
 authorized view of that device's current admitted pledge starts local speech.
 The UI distinguishes the promised number from the last fulfilled number.
@@ -87,7 +109,7 @@ and 32 total active/archive slots. Original C0 slots still count; no silent
 eviction occurs. A current confirmed native outcome can archive resolved history
 atomically. An interrupted audio-only marker can be archived intact only after
 a fresh authorized native view proves its pledge is no longer live, using the
-explicit Check action; a new explicit Arm is then required. This is origin-
+explicit Check action; a new explicit Join is then required. This is origin-
 private application custody, not encrypted OS storage. Deploy trusted code under
 the route's self-only CSP.
 

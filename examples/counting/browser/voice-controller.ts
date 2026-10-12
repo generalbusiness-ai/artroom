@@ -228,7 +228,10 @@ export function createVoiceController(options: {
     if (attempt?.phase === "recorded" && result.status === "recorded" && result.custody) {
       // A failed clear retains the exact attempt; reconcile it again, never re-sign.
       if(observation.fresh&&observation.authorized&&options.reporter.obsolete?.(report.completion)===true&&options.store.archive){
-        await options.store.archive(result.custody,true);armedVoice=null;
+        // A verified completed report may release custody without ending the
+        // explicit local Join. The attempted-token set still prevents replay;
+        // only a fresh next own pledge may use the selected voice again.
+        await options.store.archive(result.custody,true);
       }else await options.store.clear();
       if (!current()) return false;
       pending = null;
