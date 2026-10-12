@@ -1,10 +1,12 @@
 /**
  * The two MCP wire revisions, each by its own rules (plan 031, section 7).
  * This is the minimal JSON-RPC handler that the plan allows in place of an
- * SDK, because no published SDK serves both: the v2 server package serves
- * 2025-era traffic only statelessly, without sessions or a `GET` stream,
- * and the v1 package does not serve 2026-07-28. It implements each revision's
- * required method set in full.
+ * SDK when it implements each served revision's required method set in
+ * full, as this does. `@modelcontextprotocol/server` 2.3.1 also implements
+ * the 2026-07-28 revision, with a streamable HTTP transport that has
+ * optional sessions; this handler is kept because it is witnessed against
+ * the real client in both revisions over both transports, and a switch
+ * would need those witnesses again (the delivery note says so).
  *
  * | | 2025-11-25 | 2026-07-28 |
  * |---|---|---|

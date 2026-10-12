@@ -15,6 +15,10 @@ export const SESSION_TOKEN = "STANDIN-SESSION-TOKEN-must-never-appear";
 export const READ_CREDENTIAL = "STANDIN-READ-CREDENTIAL-must-appear-once";
 const T = "2099-01-01T00:00:00Z";
 
+/**
+ * One scope of the stand-in. Its items are two traversals, as a scope's are: `items`, the live ones its summary holds, and
+ * `final`, the retained final ones its items route pages; the items tool's `final: true` reads the second, separately.
+ */
 interface Scope { ref: ScopeRef; definition: Digest | PlatformDefinition; entries: Sealed[]; items: Item[]; retained: Map<string, string>; final: Item[] }
 
 /** How many retained final items one page of the stand-in's items route holds: small, so a search crosses pages. */

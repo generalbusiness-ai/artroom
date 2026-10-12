@@ -18,7 +18,11 @@ The server runs where the command line runs, with the same config
 directory (`ARTROOM_HOME`). Set the room up first with `artroom install`
 and `artroom claim`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
-there as `artroom join` does.
+there as `artroom join` does. The link holds the invitation's secret.
+`join`'s own result never repeats it. The join that membership admits
+holds it, as its signed input, so a history read of membership (`step`,
+`record`) returns it to whoever may read that history, as the native
+record does for any member's session.
 
 ### Over stdio
 
@@ -400,7 +404,7 @@ Creates a scope with no existing target, and records it in your configuration so
 
 ### `join`
 
-Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret, which no result repeats.
+Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.
 
 ```json
 {
@@ -564,7 +568,7 @@ Asks the scope that owns a resource for one step of a capability. With kind: for
 
 ### `items`
 
-A page of one item type of a scope: live ones from the summary, then the retained final ones, with a cursor.
+A page of one item type of a scope, in one of two traversals, each with its own cursor: the live items, from the scope's summary (the default); or, with final: true, the retained final items. A cursor continues only the traversal it came from.
 
 ```json
 {
@@ -583,7 +587,7 @@ A page of one item type of a scope: live ones from the summary, then the retaine
       },
       "final": {
         "type": "boolean",
-        "description": "true: the retained final items; the default is the live ones"
+        "description": "true: the traversal of the retained final items, separate from the live one; the default is the live items"
       },
       "cursor": {
         "type": "string"
