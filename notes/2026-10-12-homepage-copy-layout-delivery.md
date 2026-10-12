@@ -30,7 +30,9 @@ The actual browser result is
 `/Users/hughpyle/play/artroom-diagnostics/homepage-tagline-geometry-source-r2/output-one/public-result.json`,
 SHA-256 `cec8f7905c87f5656aae088d9da712b4041e1416480419ab01ca63ab2d6d3bf5`.
 Root's visual qualification is in `root-fidelity-public.json` in that geometry
-directory. These are local static checks. External destinations were intercepted;
+directory, SHA-256
+`2b5604c4fd066fce4e5e3755c1655d2053f419edb459291c5c2594353fe18028`.
+These are local static checks. External destinations were intercepted;
 no deployed copy, native authority, provider or audio acceptance follows.
 
 This continuation normally merges landed wordmark main
