@@ -40,6 +40,7 @@ test("four built homepages preserve the approved copy, every link, child headers
     assert.deepEqual(icons.map(icon => [icon.attributes["aria-label"], icon.attributes.href]), [["GitHub repository", GITHUB], ["Documentation", DOCS]]);
     const support = html => html.match(/<p class="([^"]+)">(?:The room records who did what, and why\.|Sound starts when you press Play\.)<\/p>/)?.[1];
     assert.deepEqual([support(pages["room/index.html"]), support(pages["jam/index.html"])], ["support", "support"]);
+    assert.equal(await readFile(resolve(built, "_headers"), "utf8"), "/*\n  Cache-Control: public, max-age=0, must-revalidate, no-transform\n", "the built serving metadata preserves cache policy and forbids HTML transforms");
     const css = await readFile(resolve(built, "style.css"), "utf8");
     assert.match(css, /\.support\{[^}]*font-family:OpenRunde,system-ui,sans-serif;[^}]*font-size:20px;[^}]*font-weight:400;[^}]*line-height:1\.5/);
     for (const [master, asset] of [["dap-wordmark-green.svg", "dap.svg"], ["dap-symbol-small.svg", "favicon.svg"], ...["Regular", "Semibold", "Bold"].map(weight => [`fonts/OpenRunde-${weight}.woff2`, `fonts/OpenRunde-${weight}.woff2`])]) assert.deepEqual(await readFile(resolve(built, "brand", asset)), await readFile(resolve(root, "brand", master)));
