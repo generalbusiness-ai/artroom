@@ -107,3 +107,38 @@ homepage build or test was repeated. The new ordinary composition gate remains
 UNRUN; it will include the receiving homepage Node test wiring. Independent
 wordmark review, managed deployments and full application acceptance remain owed.
 All earlier results and failures keep their original heads.
+
+## Final composed browser evidence and ordinary gate
+
+The composed browser run passed the three Page views before its Counter heading
+locator failed in original session 82886. The Counter heading is a div.number,
+not a heading role. A harness-only correction completed that previously failed
+view in session 98318; no Page view, build or product Source was repeated. Root
+viewed all four captures and accepted their copy, layout, typography, palette,
+geometry and spacing. The visible keyboard focus outline remains intentional.
+The closed qualified result is
+`wordmark-composed-browser-source/qualified-browser-root-public.json`, SHA-256
+`79ee217be0683c6ee0f76243329020666998874a11e378d6e4644043ba619e97`.
+Page membership transport remains scripted. Homepage navigation was intercepted;
+these captures do not prove a deployed homepage, native membership or audio.
+The failed original pipeline remains failed in its retained evidence.
+
+The one new ordinary composition gate passed at clean
+`34dfe2805dfeb441971760e9e65ad47540200911`, tree
+`86b4b42d6cd7ddb5b6c585944cc44eb91db41af3`, in original session 46361.
+Vitest passed 1,041 cases and retained two original skips; 185 files passed and
+one was skipped. The chained Node checks passed 9 cases, including the receiving
+homepage witness, and 55 Counter cases. Whitespace, all workspace typechecks and
+tests exited zero; installation was skipped against the matching lock stamp.
+The wrapper took 136.30 wall seconds and 210.20 CPU seconds. Test-phase cost was
+127.13 wall seconds and 186.91 CPU seconds. This is an observation on the existing
+local tools and cache, not a speed comparison. All Source and dependency guards
+passed. The retained test log contains one RefcountedCanceler token and two
+SQLITE_CONSTRAINT tokens; no clean-log or physical drain claim follows.
+
+Closed gate evidence is `wordmark-composed-source/gate-34dfe/gate-one/public-proof.json`,
+SHA-256 `c622c08d036af6214bb5b7ce319f4cc965a3f41a618d901da94024a350374c80`.
+This successor changes only this note. Application Source, tests, package wiring
+and generated assets remain byte-identical to the gated head. Independent review,
+normal landing and managed deployments remain outstanding. The separate Jam
+sibling and all earlier failures, gates and browser proofs retain their own heads.
