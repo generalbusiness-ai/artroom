@@ -56,7 +56,7 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     await anonymous.body?.getReader().cancel();
     let offerStatus: number | null = null, offerTransportError: string | null = null;
     const offerFetch: FoundingOfferFetch = async (url, init) => {
-      let response: Response;
+      let response: Awaited<ReturnType<Fetch>>;
       try { response = await native(url, init); }
       catch (error) { offerTransportError = error instanceof Error ? error.name : "non-error"; throw error; }
       offerStatus = response.status;
