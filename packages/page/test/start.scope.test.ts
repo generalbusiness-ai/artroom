@@ -61,7 +61,8 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
       // redirect:error. Direct Worker.fetch has no network redirect to follow.
       // Manual preserves no-follow; SDK still checks exact URL/status/bounds.
       expect(init.redirect).toBe("error");
-      try { response = await native(url, { ...init, redirect: "manual" }); }
+      const noFollow = { ...init, redirect: "manual" as const };
+      try { response = await native(url, noFollow); }
       catch (error) { offerTransportError = error instanceof Error ? error.name : "non-error"; throw error; }
       offerStatus = response.status;
       // In-process Worker responses have no network URL; only this metadata is
