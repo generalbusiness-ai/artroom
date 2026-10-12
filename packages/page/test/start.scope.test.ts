@@ -54,13 +54,23 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     const anonymous = await native(`${origin}/v1/scopes/${register.scope}`);
     expect(anonymous.status).toBe(403);
     await anonymous.body?.getReader().cancel();
+    let offerStatus: number | null = null, offerTransportError: string | null = null;
     const offerFetch: FoundingOfferFetch = async (url, init) => {
-      const response = await native(url, init);
+      let response: Response;
+      try { response = await native(url, init); }
+      catch (error) { offerTransportError = error instanceof Error ? error.name : "non-error"; throw error; }
+      offerStatus = response.status;
       // In-process Worker responses have no network URL; only this metadata is
       // adapted. Real response status/body and native policy are unchanged.
       return { status: response.status, url, redirected: false, body: response.body };
     };
-    const offer = await lifetime.wait(() => foundingOffer(origin, { fetch: offerFetch }));
+    let offer: Awaited<ReturnType<typeof foundingOffer>> | undefined;
+    let offerFailed = false;
+    try { offer = await lifetime.wait(() => foundingOffer(origin, { fetch: offerFetch })); }
+    catch { offerFailed = true; }
+    expect([offerStatus, offerTransportError], "native offer HTTP response before codec acceptance").toEqual([200, null]);
+    expect(offerFailed, "bounded SDK acceptance of the actual native offer").toBe(false);
+    if (!offer) throw new Error("The actual native offer was not decoded.");
     expect([offer.definition, offer.register, offer.at.seq, offer.registerItem.revision, offer.registerItem.purpose]).toEqual([DEMO_REGISTER, register, 0, 1, DEMO_PURPOSE]);
     const values = new Map<string, string>(), readbacks = new Map<string, string>();
     const storage: ClaimStorage = { setItem: (key, bytes) => { lifetime.active(); values.set(key, bytes); }, getItem: key => { const bytes = values.get(key) ?? null; if (bytes !== null) readbacks.set(key, bytes); return bytes; } };
