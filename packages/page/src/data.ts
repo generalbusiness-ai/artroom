@@ -442,7 +442,7 @@ async function reviewPolicyOf(room: Room, change: ScopeRef, proposal: Item, held
     const handle = handleOf(room, source.at.scope);
     const { summary, at } = await summaryOf(handle);
     if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(source.at) || at.seq < source.seq
-      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return null;
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return null;
     const rules = summary.items.find(item => item.type === "rules" && item.state === "current");
     if (!rules) return null;
     const published = rules.refs["published"] ?? 0;
@@ -739,7 +739,7 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
       || canonicalize(repository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
     const handle = handleOf(room, room.rules), { summary, at } = await summaryOf(handle);
     if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(named)
-      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return unavailable;
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return unavailable;
     const rules = summary.items.filter(item => item.type === "rules");
     if (rules.length !== 1) return unavailable;
     const current = rules[0]!;
@@ -752,10 +752,10 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
     // a retired definition also proves that this room has been configured.
     const definitions = await itemsOf(handle, summary, "definition", at);
     if (definitions.length > 0) return { state: "configured" };
-    // Known rules1–3 initial item, not merely a missing/failed policy read.
+    // Known rules1–4 initial item; only the explicit rules4 pin defaults owner review to true.
     if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
       || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"
-      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== false || current.values["singleControllerException"] !== false
+      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== (summary.definition === "platform:rules@4") || current.values["singleControllerException"] !== false
       || ["checks", "labels", "extents"].some(name => current.values[name] !== undefined && current.values[name] !== null)) return unavailable;
     const after = await summaryOf(handle);
     const latestDirectory = await summaryOf(handleOf(room, room.directory));
