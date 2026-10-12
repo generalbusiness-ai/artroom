@@ -31,7 +31,7 @@ import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Out
 import type { ConfigPort } from "./inventory.ts";
 import { McpService } from "./service.ts";
 import type { Mode } from "./catalogue.ts";
-import { Wire, isFrame, newSession, revisionOf, type LegacySession, type Message } from "./wire.ts";
+import { Wire, frameOf, isFrame, isNotificationMethod, newSession, revisionOf, type LegacySession, type Message } from "./wire.ts";
 
 // ---------------------------------------------------------------- custody on files
 
@@ -414,6 +414,8 @@ export async function serveHttp(service: McpService, host: string, port: number,
     // The frame is checked before its revision is read: null, a scalar or an object without jsonrpc is an invalid request.
     if (!isFrame(message)) return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request: a JSON-RPC 2.0 object is expected." } });
     const m = message;
+    // A notification is accepted with 202 and no body. One whose method is only a request runs nothing and issues no session.
+    if (frameOf(m) === "notification" && !isNotificationMethod(m.method!)) { wire.ignored++; return bare(res, 202); }
     const revision = revisionOf(m, sessionId ? sessions.get(sessionId) ?? null : null);
     if (revision === "modern" || (revision === "none" && !sessionId && m.method !== "initialize")) {
       if (m.method === "subscriptions/listen") {

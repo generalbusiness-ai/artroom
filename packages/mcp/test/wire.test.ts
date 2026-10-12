@@ -275,6 +275,61 @@ describe("both MCP wire revisions, each by its own rules", () => {
     await done;
   });
 
+  // Invariant: a notification never gets a reply. Over HTTP it is answered 202 with no body; on stdio nothing is written. A method
+  // that is only a request (tools/call, initialize, tools/list), sent as a notification, runs nothing, issues no session and is
+  // counted; a real client is served after each.
+  test("notifications get no reply, and request-only methods sent as notifications run nothing", async () => {
+    const meta = { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} };
+    const s = await http();
+    try {
+      const c = client("modern");
+      await c.connect(new StreamableHTTPClientTransport(new URL(s.url), bearer(s)));
+      const healthy = async () => expect((await c.callTool({ name: "room", arguments: {} })).structuredContent).toMatchObject({ key: signer.key });
+      const raw = (body: unknown, session?: string) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...(session ? { "mcp-session-id": session } : {}) }, body: JSON.stringify(body) });
+      const opened = await raw({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "raw", version: "0" } } });
+      const legacy = opened.headers.get("mcp-session-id")!;
+      expect(legacy).toBeTruthy();
+      const before = s.wire.ignored;
+      const sent: [unknown, string | undefined, boolean][] = [
+        [{ jsonrpc: "2.0", method: "tools/call", params: { name: "room", arguments: {}, _meta: meta } }, undefined, true],
+        [{ jsonrpc: "2.0", method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "raw", version: "0" } } }, undefined, true],
+        [{ jsonrpc: "2.0", method: "tools/list", params: {} }, legacy, true],
+        [{ jsonrpc: "2.0", method: "notifications/initialized" }, legacy, false],
+        [{ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 9, _meta: meta } }, undefined, false],
+      ];
+      for (const [body, session] of sent) {
+        const quiet = standIn.requests.length;
+        const answer = await raw(body, session);
+        // No body, no session, and no read or act on the scope service.
+        expect([answer.status, await answer.text(), answer.headers.get("mcp-session-id"), standIn.requests.length - quiet], JSON.stringify(body).slice(0, 60)).toEqual([202, "", null, 0]);
+        await healthy();
+      }
+      expect(s.wire.ignored - before).toBe(3);
+      await c.close();
+    } finally { await s.close(); }
+
+    const mcp = new McpService({ service, signer, config: { read: async () => configOf(), addRoot: async () => {} }, custody: memoryStore() });
+    const input = new PassThrough(), output = new PassThrough();
+    const lines: Record<string, unknown>[] = [];
+    let rest = "";
+    output.on("data", (d: Buffer) => { rest += d.toString("utf8"); for (let i = rest.indexOf("\n"); i >= 0; i = rest.indexOf("\n")) { lines.push(JSON.parse(rest.slice(0, i)) as Record<string, unknown>); rest = rest.slice(i + 1); } });
+    const done = serveStdio(mcp, input, output);
+    const quiet = standIn.requests.length;
+    for (const body of [
+      { jsonrpc: "2.0", method: "tools/call", params: { name: "room", arguments: {}, _meta: meta } },
+      { jsonrpc: "2.0", method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "raw", version: "0" } } },
+      { jsonrpc: "2.0", method: "tools/list", params: { _meta: meta } },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 9, _meta: meta } },
+    ]) input.write(`${JSON.stringify(body)}\n`);
+    expect(standIn.requests.length).toBe(quiet);
+    input.write(`${JSON.stringify({ jsonrpc: "2.0", id: "after", method: "server/discover", params: { _meta: meta } })}\n`);
+    expect(await until(() => lines.some((l) => l["id"] === "after"), 10_000)).toBe(true);
+    expect(lines.map((l) => l["id"])).toEqual(["after"]);
+    input.end();
+    await done;
+  });
+
   // Invariant: a listen whose stream closes while its first snapshot is being read leaves nothing behind: no watcher, no listen
   // and no timer, and it is never acknowledged.
   test("a listen that disconnects before its snapshot leaves no watcher", async () => {

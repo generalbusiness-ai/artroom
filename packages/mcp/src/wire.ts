@@ -100,7 +100,12 @@ export function revisionOf(message: Message, session: LegacySession | null): "mo
   return "none";
 }
 
+/** The methods this server takes as notifications: those of the protocol's notifications/ namespace. */
+export const isNotificationMethod = (method: string): boolean => method.startsWith("notifications/");
+
 export class Wire {
+  /** Request-only methods received as notifications, and dropped unrun. */
+  ignored = 0;
   /** Open listen subscriptions, by the client stream they belong to, then by request ID. */
   readonly listens = new Map<object, Map<string, Listen>>();
   constructor(readonly service: McpService) {}
@@ -135,8 +140,16 @@ export class Wire {
     if (kind === "invalid") return error(null, -32600, "Invalid Request: a JSON-RPC 2.0 request, notification or response is expected.");
     if (kind === "response") return null;   // a response to a request of ours: the server makes none
     const m = message as Message;
-    const id = m.id ?? null;
     const notification = kind === "notification";
+    // A notification gets no reply, ever. A method that is only a request (initialize, tools/list, tools/call and the rest),
+    // received as a notification, is not run: it is counted and dropped before dispatch.
+    if (notification && !isNotificationMethod(m.method!)) { this.ignored++; return null; }
+    const answer = await this.#dispatch(m, notification, session, send, owner);
+    return notification ? null : answer;
+  }
+
+  async #dispatch(m: Message, notification: boolean, session: LegacySession | null, send: Send, owner: object): Promise<Message | null> {
+    const id = m.id ?? null;
     const revision = revisionOf(m, session);
     try {
       if (revision === "modern") return await this.#modern(m, notification, send, owner);
