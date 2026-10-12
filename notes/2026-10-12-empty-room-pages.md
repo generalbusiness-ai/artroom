@@ -16,6 +16,8 @@ The normal Page asset build completed once with exit 0. It generated the Page sc
 
 The ordinary `npm run gate` completed once with exit 0 at head `2773a7dd3fb2e995867ca1fc1f5d970da280f003`, tree `0340039e752d464e812860b604cafe2b8b1363ed`. Whitespace, typecheck and tests passed; installation was skipped against the unchanged lock stamp. Vitest reported 1,040 passes and the two original skips, followed by 8 and 55 Node passes with no failures, cancellations, skips or todo cases. The measured outer command took 112.38 seconds elapsed, 150.97 seconds user CPU and 23.17 seconds system CPU. The source, tools, immutable cache and private pool package stayed unchanged and the checkout stayed clean.
 
+The gate ran on the local macOS arm64 host with existing cached dependencies. Other agent checks ran concurrently; system load was not sampled.
+
 The public gate proof is `/tmp/artroom-empty-room229c-final-gate-one/public-proof.json`, SHA-256 `10919f8669cec90a24c34075993c26ec8492ce3c56e23e534d774c44c2f25c5e`. It retains the actual private phase paths and raw log hashes; generated files remain opaque. This note update changes only documentation after the tested head; source, tests and assets remain identical, so it does not repeat the gate.
 
 Earlier component results retain their named heads and failed wrappers. Site publication proof and Git responses in the focused witness are scripted boundaries, not live provider evidence. Full review, landing, hosted acceptance and a fresh human walkthrough remain separate obligations.
