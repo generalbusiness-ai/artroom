@@ -63,7 +63,7 @@ by this note; Hugh confirms them by adopting the note.
 | OAuth (item 8): identify, validate the client and redirect, consent, audience-bound credential, current authority at each call, revocation | Owed to stage 2, hosted. Section 7 keeps the four steps and adds the custody that the scope model needs. Not a prerequisite for the local server. |
 | Resources and prompts (item 9) | Owed to stage 2, with URIs mapped to the scope model: `dap://room`, `dap://scope/{id}`, `dap://scope/{id}/entry/{seq}`, `dap://scope/{id}/text/{digest}`; prompts `start`, `work-on`, `review`. Tools stay complete without them. |
 | Tasks, MCP Apps, subscriptions, elicitation | Owed, later, as the plan's stage 3. |
-| Stateless on the 2026-07-28 specification, with the legacy stateless mode for clients on the previous revision | Kept: version negotiation at `initialize`, both revisions served, no session ID for the older one (section 7); W7 drives a client at each. |
+| Stateless on the 2026-07-28 specification, with a legacy mode for clients on the previous revision | Kept and widened by Hugh's direction of 2026-10-12: both revisions served by negotiation at `initialize`, and both the stateful and the stateless modes of streamable HTTP, since some hosts still require the stateful one (section 7); W7 drives a client in each mode. |
 | Cold-agent acceptance on named hosts; conformance suite at a named specification snapshot | Owed after stage 1 lands, by the local builder with real hosts; the cloud session records what it ran and names the SDK and specification versions it conformed to. |
 | Bearer roster acts excluded; legacy bearer `check` RPC-only; bound declared check steps through generic `act` | The exclusions were about bearer signing by the room, which does not exist here: every act is signed by the caller's own key. A check step under a definition is an ordinary act. The checker's own obligations stay in the definitions that declare them. |
 
@@ -532,20 +532,38 @@ it in any other result. `entry` and `history` of the destination show the
 destination's own rule. W4 drives a credential through the server and
 asserts it appears in `credential`'s result and nowhere else.
 
-**Protocol revisions.** The plan's decision stands: the server speaks the
-current MCP specification revision that the pinned SDK implements
-(2026-07-28 when the plan was written) and the previous revision
-(2025-11-25), chosen by version negotiation at `initialize`: the client
-names the revision it wants and the server answers with that revision when
-it supports it, or with its newest otherwise. Both revisions carry tools,
-`listChanged` and `notifications/tools/list_changed`, structured content
-and output schemas, so the dynamic list of section 3 works on both. For
-clients on the older revision the server runs the legacy stateless mode:
-no session ID is required or issued, and nothing about a call depends on
-an earlier call. Every output schema has an object root, so a client of
-either revision receives the same structured content, never wrapped. The
-delivery note names the exact revisions the pinned SDK implements and
-which one each W7 client used.
+**Protocol revisions and both transport modes.** Hugh's direction,
+2026-10-12 14:44 Eastern: both MCP protocol revisions are supported,
+because some agent hosts still require the older stateful interface. The
+server speaks the current specification revision that the pinned SDK
+implements (2026-07-28 when the plan was written) and the previous
+revision (2025-11-25), chosen by version negotiation at `initialize`: the
+client names the revision it wants and the server answers with that
+revision when it supports it, or with its newest otherwise. Over streamable
+HTTP the server serves both modes of that transport:
+
+- **stateful**, as the previous revision requires: `initialize` issues a
+  session ID in `Mcp-Session-Id`, later requests carry it, a `GET` opens
+  the session's server-to-client stream, a `DELETE` ends the session, and
+  an unknown or ended session is answered `404` so the client initializes
+  again;
+- **stateless**, as the current revision allows: no session ID is required
+  or issued, and nothing about a call depends on an earlier call.
+
+Both revisions carry tools, `listChanged`, `notifications/tools/list_changed`,
+structured content and output schemas, so the dynamic list of section 3
+works on both. The notification travels on the session's open stream in
+stateful mode, and in stateless mode on the response stream of the call
+whose reads showed the change, so a client of either mode learns of it;
+a client that opens no stream re-fetches the list when it next lists.
+Every output schema has an object root, so a client of either revision
+receives the same structured content, never wrapped. Session state is
+small (the negotiated revision, the initialized flag and the last derived
+tool list for that session) and is never authority; stdio has one implicit
+session. The hosted endpoint of stage 2 needs a session store for the
+stateful mode and is designed with one. The delivery note names the exact
+revisions the pinned SDK implements and which revision and mode each W7
+client used.
 
 **SDK.** The implementation pins one MCP server SDK version in the reviewed
 commit, with the lockfile, and uses its stdio and streamable HTTP transports
@@ -613,7 +631,7 @@ never change for a digest, so a hosted server may cache them by digest.
 | (b) errors | **W4.** Table-driven over every reason of `RefusalReason`, `UnavailableReason`, `MismatchReason` and `ReadRefusal`, plus shape, transport, custody and credential errors: the sentence names the scope, the kind, the head when the answer carries one, the source of the finding, and a next step. Two cases use a definition with two unnamed guards and assert the sentence attributes neither. One case moves an item's state after the judgment and asserts the sentence reports the judged head, not the new state. One story drives a session token, a key, an invitation secret and a read credential through every tool and asserts the credential appears only in `credential`'s structured field and the others nowhere. | `packages/mcp/test/errors.test.ts` |
 | (d) efficient | **W5.** The budget tests of section 9 and the read counts of section 8 over the instrumented transport, cold and warm, with an expired and a refused session, created children, pagination of a large retained input, the list for each role with the demo and the full lane definitions, the count of `list_changed` notifications over the story, and standing and activation refresh. The delivery note reports the observed figures. | `packages/mcp/test/budget.test.ts` |
 | retries | **W6.** First MCP reply lost (the client never sees the result) and `settle` with the caller's key finds the receipt; two processes preparing the same identity at once, one locked out; the same key with a different meaning refused without sending; a restart between prepare and send resends the same bytes; a full store refuses a new preparation and names the unresolved keys; archive rotation keeps a resolved record findable for replay. | `packages/mcp/test/custody.test.ts` |
-| transports | **W7.** A real MCP client over stdio and over loopback HTTP, once at the current protocol revision and once negotiating the previous revision without a session ID, lists tools, calls `room` and an act tool, receives the same structured content, and receives a `list_changed` notification after an activation; the HTTP server refuses a request with an `Origin` header, a request without the per-launch bearer, and a bind address that is not loopback; `--generic` lists `acts` and `act` and the default does not. | `packages/mcp/test/wire.test.ts` |
+| transports | **W7.** A real MCP client over stdio and over loopback HTTP, once at the current revision in stateless mode and once at the previous revision in stateful mode with a session ID and an open stream, lists tools, calls `room` and an act tool, receives the same structured content, and receives a `list_changed` notification after an activation on its stream or its response; an ended or unknown session is answered `404` and the client initializes again; the HTTP server refuses a request with an `Origin` header, a request without the per-launch bearer, and a bind address that is not loopback; `--generic` lists `acts` and `act` and the default does not. | `packages/mcp/test/wire.test.ts` |
 
 Each test states its invariant in one sentence first (`docs/testing.md`).
 The scope tests use the test Worker pool of `packages/scope`, as the CLI's
