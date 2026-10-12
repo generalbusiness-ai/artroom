@@ -22,7 +22,7 @@ function setup(bounds?: Parameters<typeof fileStore>[1]) {
 
 /** A second process on the same store: `support/custody-child.ts`, under the repository's pinned TypeScript loader. */
 function child(asked: Record<string, unknown>): { done: Promise<{ code: number | null; out: string }>; line: (text: string) => Promise<void>; kill: () => void } {
-  const process_ = spawn(process.execPath, ["--import", "tsx", new URL("./support/custody-child.ts", import.meta.url).pathname, JSON.stringify(asked)], { cwd: new URL("../../..", import.meta.url).pathname, stdio: ["ignore", "pipe", "pipe"] });
+  const process_ = spawn(process.execPath, ["--import", "tsx", "--disable-warning=DEP0205", new URL("./support/custody-child.ts", import.meta.url).pathname, JSON.stringify(asked)], { cwd: new URL("../../..", import.meta.url).pathname, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   const waiting: { text: string; resolve: () => void }[] = [];
   process_.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8"); for (const w of waiting.splice(0)) { if (out.includes(w.text)) w.resolve(); else waiting.push(w); } });

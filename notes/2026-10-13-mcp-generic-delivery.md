@@ -154,6 +154,18 @@ In this session, after the last change to what each covers:
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
 | `npm run gate`, once, at `3efb954d` | FAILED at the test step: `Tests  4 failed \| 1095 passed \| 2 skipped (1101)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install, whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone, above. |
 
+## The planner's amendment after the second cloud gate
+
+On the planner's machine, Node 26.11.1 prints a `DEP0205` deprecation
+warning when the TypeScript loader registers itself, and the custody
+witness "two processes at the bound admit one key" read its children's
+stderr into the output it compared, so it failed there and passed on the
+cloud's Node 22. The planner added `--disable-warning=DEP0205` to the
+test's child processes, the flag the command line's own launcher already
+passes, and nothing else. The custody tests then passed on Node 26:
+`Tests  19 passed (19)`. The gate at this head is reported in the review
+request, not in this note, because this note was written in the cloud.
+
 ## Observed figures
 
 ### The list, per role
