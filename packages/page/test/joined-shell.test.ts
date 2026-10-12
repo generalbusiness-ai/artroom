@@ -27,10 +27,10 @@ test("joined room/account clicks disclose identity without leaving the room, and
       if (!prevented && this.tag === "summary" && this.parent?.tag === "details") {
         if (this.parent.hasAttribute("open")) this.parent.removeAttribute("open"); else this.parent.setAttribute("open", "");
       }
-      if (!prevented && this.tag === "a" && this.attrs.href?.startsWith("#")) location.hash = this.attrs.href;
+      if (!prevented && this.tag === "a" && this.attrs["href"]?.startsWith("#")) location.hash = this.attrs["href"];
     }
-    get value() { return this.attrs.value ?? ""; }
-    set value(value: string) { this.attrs.value = value; }
+    get value() { return this.attrs["value"] ?? ""; }
+    set value(value: string) { this.attrs["value"] = value; }
     focus() {}
     all(): Element[] { return [this, ...this.children.flatMap(c => c instanceof Element ? c.all() : [])]; }
     querySelectorAll() { return []; }
@@ -54,28 +54,28 @@ test("joined room/account clicks disclose identity without leaving the room, and
   const drain = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
   try {
     await import("../src/main.ts"); await drain();
-    const controls = root.all().filter(e => ["room-switch", "account"].includes(e.attrs.class));
+    const controls = root.all().filter(e => ["room-switch", "account"].includes(e.attrs["class"] ?? ""));
     expect(controls).toHaveLength(4); // Desktop and mobile presentations.
     for (const control of controls) {
       expect(control.tag).toBe("summary"); expect(control.hasAttribute("href")).toBe(false);
       control.click(); expect(location.hash).toBe("#/"); expect(control.parent?.hasAttribute("open")).toBe(true);
     }
-    expect(root.all().filter(e => e.attrs.class === "avatar").map(e => e.textContent)).toEqual(["H", "H"]);
-    expect(root.all().filter(e => e.attrs.class === "account-label").map(e => e.textContent)).toEqual(["@hugh-web", "@hugh-web"]);
-    const roomDisclosure = controls.find(e => e.attrs.class === "room-switch")!.parent!;
-    expect(roomDisclosure.all().find(e => e.tag === "p")?.attrs.title).toBe(room.directory);
-    const accountDisclosure = controls.find(e => e.attrs.class === "account")!.parent!;
+    expect(root.all().filter(e => e.attrs["class"] === "avatar").map(e => e.textContent)).toEqual(["H", "H"]);
+    expect(root.all().filter(e => e.attrs["class"] === "account-label").map(e => e.textContent)).toEqual(["@hugh-web", "@hugh-web"]);
+    const roomDisclosure = controls.find(e => e.attrs["class"] === "room-switch")!.parent!;
+    expect(roomDisclosure.all().find(e => e.tag === "p")?.attrs["title"]).toBe(room.directory);
+    const accountDisclosure = controls.find(e => e.attrs["class"] === "account")!.parent!;
     expect(accountDisclosure.textContent).toContain("@hugh-web (member)"); expect(accountDisclosure.textContent).toContain(room.key);
     for (const label of ["Join another room", "Change connection"]) {
       const link = root.all().find(e => e.tag === "a" && e.textContent === label)!;
-      expect(link.attrs.href).toBe("#/join");
+      expect(link.attrs["href"]).toBe("#/join");
     }
     roomDisclosure.all().find(e => e.tag === "a")!.click(); expect(location.hash).toBe("#/join"); redraw(); await drain();
     expect(root.all().find(e => e.tag === "h1")?.textContent).toBe("Join another room");
     expect(root.textContent).toContain("You are in Hugh's room as @hugh-web");
     const back = root.all().find(e => e.tag === "a" && e.textContent.includes("Back to Hugh's room"))!;
-    expect(back.attrs.href).toBe("#/");
-    expect(root.all().filter(e => e.attrs.class === "entry-choice").map(e => e.attrs.href)).toEqual(["#/invitation", "#/config"]);
+    expect(back.attrs["href"]).toBe("#/");
+    expect(root.all().filter(e => e.attrs["class"] === "entry-choice").map(e => e.attrs["href"])).toEqual(["#/invitation", "#/config"]);
     back.click(); expect(location.hash).toBe("#/");
     expect(setItem).not.toHaveBeenCalled(); expect(root.textContent).not.toContain("Settings");
   } finally { await drain(); vi.unstubAllGlobals(); vi.doUnmock("../src/data.ts"); vi.resetModules(); }
