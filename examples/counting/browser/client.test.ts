@@ -85,10 +85,10 @@ test("FAKE known-refusal journal-save failure fences correction; unavailable loc
     assert.equal((await f.gateway.command("start")).status,"unknown");assert.equal(f.retained(),original);assert.equal(f.counters().posts,1);
   }finally{f.gateway.dispose();}
   const blocked=await fixture(false);try{
-    assert.equal((await blocked.gateway.command("activate")).status,"blocked");assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
+    const unsent=await blocked.gateway.command("activate");assert.equal(unsent.status,"blocked");assert.equal("definitelyUnsent" in unsent && unsent.definitelyUnsent,true);assert.equal(blocked.retained(),null);assert.deepEqual(blocked.counters(),{posts:0,settles:0,saves:0,clears:0});
   }finally{blocked.gateway.dispose();}
   const written=await fixture();try{
-    written.writeThenFail();assert.equal((await written.gateway.command("start")).status,"blocked");
+    written.writeThenFail();const uncertain=await written.gateway.command("start");assert.equal(uncertain.status,"blocked");assert.equal("definitelyUnsent" in uncertain,false);
     const original=written.retained();assert.ok(original);assert.equal(written.gateway.pendingCommand(),"start");assert.equal(written.gateway.commandResumeReady(),true);
     assert.equal((await written.gateway.checkCommand())?.status,"unknown");assert.equal(written.retained(),original);
     assert.equal((await written.gateway.command("start")).status,"unknown");assert.deepEqual(written.counters(),{posts:0,settles:1,saves:1,clears:0});

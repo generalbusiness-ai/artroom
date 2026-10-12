@@ -28,7 +28,18 @@ export function mountCountingStage(root:HTMLElement,options:CountingStageOptions
   let device:MountedDevice|undefined,view:CountingView|undefined,fresh=false,connection="Not connected",voiceState:VoiceState|undefined,command:string|undefined,commandOutcome:CommandOutcome["status"]|undefined,commandBusy=false,observation:Observation|undefined;
   let voice:ReturnType<typeof createVoiceController>|undefined,epoch=0,unsubscribe:(()=>void)|undefined;
   let joined=false,joinBusy=false,joinReason:string|undefined,joinEpoch=0,releaseRunner:(()=>void)|undefined,selectedVoiceId:string|undefined;
-  const claimed=new Set<string>(),waiters=new Set<()=>void>();
+  type CandidateOutcome = "pending" | "recorded" | "refused" | "unsent" | "unknown" | "blocked";
+  interface CommitCandidate { key:string; tuple:string; outcome:CandidateOutcome }
+  // Notification suppression is separate from the controller's played-token
+  // memory. Keep every attempted state in this mounted context, bounded.
+  const candidates=new Map<string,CommitCandidate>(),latestCandidates=new Map<string,CommitCandidate>();
+  const candidateLimit=512;
+  let originalCandidate:CommitCandidate|undefined;
+  const waiters=new Set<()=>void>();
+  const candidateOutcome=(result:CommandOutcome):CandidateOutcome=>result.status==="blocked"&&"definitelyUnsent" in result&&result.definitelyUnsent===true?"unsent":result.status;
+  const rememberCandidate=(candidate:CommitCandidate|undefined,result:CommandOutcome|undefined)=>{
+    if(candidate&&result&&candidates.get(candidate.key)===candidate)candidate.outcome=candidateOutcome(result);
+  };
   const runner=options.runner??browserRunnerLease();
   const selected=()=>selectedVoiceId??(typeof options.selectedVoiceId==="function"?options.selectedVoiceId():options.selectedVoiceId);
   const current=(at:number)=>at===epoch&&!!device&&device.current();
@@ -57,12 +68,13 @@ export function mountCountingStage(root:HTMLElement,options:CountingStageOptions
   });
   const observeVoice=()=>{reconcileRunner();if(!device)return;const authorized=!["Access unavailable","Session expired","Setup unsupported","Disconnected","Connection unavailable"].includes(connection);const turn=view&&fresh?assignedTurn(view,device.identity):undefined;voice?.observe({fresh:fresh&&!device.gateway.pendingCommand()&&!commandBusy,authorized,...(turn?{turn}:{})});};
   const invalidate=()=>voice?.invalidate();
-  const controls=async(kind:Control,details:ProposalOptions={}):Promise<CommandOutcome|undefined>=>{
+  const controls=async(kind:Control,details:ProposalOptions={},candidate?:CommitCandidate):Promise<CommandOutcome|undefined>=>{
     if(!device||!device.current()||!fresh||commandBusy||device.gateway.pendingCommand())return;
     const at=epoch,held=device;commandBusy=true;fresh=false;invalidate();command="Working on it";commandOutcome=undefined;render();
     let result:CommandOutcome;
     try{result=await held.gateway.command(kind,details);}catch{result={status:"unknown",reason:"No complete answer was verified. Check the original request."};}
     if(!current(at))return;
+    rememberCandidate(candidate,result);
     commandOutcome=result.status;command=result.status==="recorded"?"dap.":result.reason??"The original request remains unresolved.";
     commandBusy=false;observeVoice();wake();render();
     if(!fresh)observation?.refresh();
@@ -71,8 +83,17 @@ export function mountCountingStage(root:HTMLElement,options:CountingStageOptions
   const claim=()=>{
     reconcileRunner();
     if(!joined||joinBusy||!releaseRunner||!device?.current()||!device||!view||!fresh||commandBusy||!voiceState?.armed||voiceState.pending||voiceState.audioUncertain||["blocked","loading","unknown","refused"].includes(voiceState.phase)||!canCommit(view,device.identity)||device.gateway.pendingCommand())return;
-    const b=view.board!;const key=JSON.stringify([joinEpoch,b.generation,b.serial,b.lastNumber+1]);
-    if(claimed.has(key))return;claimed.add(key);void controls("commit");
+    const b=view.board!;
+    const tuple=JSON.stringify([joinEpoch,b.generation,b.serial,b.lastNumber+1]);
+    const relevantState=canonicalize([b.id,b.revision,view.participants.filter(p=>p.state==="active").sort((a,b)=>a.id-b.id).map(p=>[p.id,p.revision,p.member])]);
+    const key=JSON.stringify([tuple,relevantState]);
+    if(candidates.has(key))return; // A new head alone never retries this state.
+    const previous=latestCandidates.get(tuple);
+    if(previous&&previous.outcome!=="refused"&&previous.outcome!=="unsent")return;
+    if(candidates.size>=candidateLimit){joined=false;voice?.disarm();release();refuse("automatic candidate memory is full. Reconnect before another Join; original private custody is retained.");return;}
+    const candidate:CommitCandidate={key,tuple,outcome:"pending"};
+    candidates.set(key,candidate);latestCandidates.set(tuple,candidate);originalCandidate=candidate;
+    void controls("commit",{},candidate);
   };
   const join=async(voiceId:string):Promise<void>=>{
     if(joinBusy||!device?.current())return;
@@ -110,10 +131,10 @@ export function mountCountingStage(root:HTMLElement,options:CountingStageOptions
     else {joinReason=undefined;render();}
   };
   const selectVoice=(id:string)=>{selectedVoiceId=id;options.selectVoice?.(id);joined=false;joinBusy=false;joinEpoch++;voice?.disarm();release();fresh=false;wake();observation?.refresh();render();};
-  const check=async()=>{if(!device)return;const at=epoch;try{const result=await device.gateway.checkCommand();if(at!==epoch)return;if(result){commandOutcome=result.status;command=result.status==="recorded"?"dap.":result.reason??"The original command remains unresolved.";}else {command=undefined;commandOutcome=undefined;await voice?.checkPending();}}catch{if(at===epoch){command="The original request remains unresolved.";commandOutcome="unknown";}}if(at===epoch){observeVoice();render();claim();}};
-  const resumeCommand=async()=>{if(!device||commandBusy)return;const at=epoch;commandBusy=true;fresh=false;invalidate();command="Working on the original command";commandOutcome=undefined;render();try{const result=await device.gateway.resumeCommand();if(at===epoch){commandOutcome=result?.status;command=result?.status==="recorded"?"dap.":result?.reason??"The original command remains unresolved.";}}catch{if(at===epoch){command="The original command remains unresolved.";commandOutcome="unknown";}}finally{if(at===epoch){commandBusy=false;observeVoice();wake();observation?.refresh();render();claim();}}};
+  const check=async()=>{if(!device)return;const at=epoch,originalKind=device.gateway.pendingCommand();try{const result=await device.gateway.checkCommand();if(at!==epoch)return;if(result){if(originalKind==="commit")rememberCandidate(originalCandidate,result);commandOutcome=result.status;command=result.status==="recorded"?"dap.":result.reason??"The original command remains unresolved.";}else {command=undefined;commandOutcome=undefined;await voice?.checkPending();}}catch{if(at===epoch){command="The original request remains unresolved.";commandOutcome="unknown";}}if(at===epoch){observeVoice();render();claim();}};
+  const resumeCommand=async()=>{if(!device||commandBusy)return;const at=epoch,originalKind=device.gateway.pendingCommand();commandBusy=true;fresh=false;invalidate();command="Working on the original command";commandOutcome=undefined;render();try{const result=await device.gateway.resumeCommand();if(at===epoch){if(originalKind==="commit")rememberCandidate(originalCandidate,result??undefined);commandOutcome=result?.status;command=result?.status==="recorded"?"dap.":result?.reason??"The original command remains unresolved.";}}catch{if(at===epoch){command="The original command remains unresolved.";commandOutcome="unknown";}}finally{if(at===epoch){commandBusy=false;observeVoice();wake();observation?.refresh();render();claim();}}};
   const checkReport=async()=>{if(!device)return;const at=epoch;try{await voice?.checkPending();}catch{ /* Retain blocked original custody. */ }if(at===epoch){render();claim();}};
-  const disconnect=()=>{const held=device;epoch++;joinEpoch++;joined=false;joinBusy=false;joinReason=undefined;release();device=undefined;fresh=false;view=undefined;connection="Not connected";unsubscribe?.();unsubscribe=undefined;voice?.dispose();voice=undefined;held?.gateway.dispose();held?.dispose?.();observation?.cancel();observation=undefined;voiceState=undefined;command=undefined;commandOutcome=undefined;commandBusy=false;claimed.clear();selectedVoiceId=undefined;wake();render();};
+  const disconnect=()=>{const held=device;epoch++;joinEpoch++;joined=false;joinBusy=false;joinReason=undefined;release();device=undefined;fresh=false;view=undefined;connection="Not connected";unsubscribe?.();unsubscribe=undefined;voice?.dispose();voice=undefined;held?.gateway.dispose();held?.dispose?.();observation?.cancel();observation=undefined;voiceState=undefined;command=undefined;commandOutcome=undefined;commandBusy=false;candidates.clear();latestCandidates.clear();originalCandidate=undefined;selectedVoiceId=undefined;wake();render();};
   const ui=stageView(root,{control:(kind,details)=>{void controls(kind,details);},join:id=>{void join(id);},leave:()=>{void leave();},selectVoice,forget:()=>{disconnect();options.forget?.();},changeIdentity:()=>{disconnect();(options.changeIdentity??options.connect)();},arm:id=>{if(device?.gateway.pendingCommand()||commandBusy)return;voice?.arm(id);},disarm:()=>{joined=false;joinBusy=false;joinEpoch++;release();fresh=false;voice?.disarm();wake();observation?.refresh();render();},check:()=>{void check();},checkReport:()=>{void checkReport();},resumeCommand:()=>{void resumeCommand();},resumeReport:()=>{void voice?.resumePending();},correct:()=>{void voice?.correctReport();},connect:options.connect,disconnect},options.speech);
   render();
   return{

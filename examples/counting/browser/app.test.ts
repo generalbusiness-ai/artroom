@@ -187,12 +187,14 @@ async function journeyFixture() {
   const summary={scope,status:"active",definition:COUNTING_DEFINITION,time:"2099-01-01T00:00:00Z",counts:[],items:[]} as Summary;
   let view:CountingView={summary,configuration:{id:0,revision:1,target:3,controller:member},board:{id:1,revision:1,state:"paused",target:3,generation:0,serial:0,lastNumber:0,lastSpeaker:null,number:null,speaker:null,until:null,pledge:null,lastFulfilledAt:null},participants:[],pledge:null,pendingPromise:null};
   let publish:((state:ObservationState<Summary>,view?:CountingView)=>void)|undefined,head=0,owns=true,leaseAvailable=true,pending:string|null=null;
-  let commandResult:"recorded"|"refused"|"unknown"="recorded",speechAvailable=true,plays=0,releases=0;
+  let commandResult:"recorded"|"refused"|"unknown"|"blocked"|"unsent"="recorded",speechAvailable=true,plays=0,releases=0;
+  let beforeReply:(()=>void)|undefined,replyObservation=true;
   const calls:string[]=[];
   let commandGate:Promise<void>|undefined,entered:(()=>void)|undefined;
   const emit=(status="current")=>publish!({status,...(status==="current"?{snapshot:{value:summary,at:{seq:head++,hash:textDigest("FAKE head")}}}:{})} as unknown as ObservationState<Summary>,view);
   const gateway={observe(callback:typeof publish){publish=callback;return{refresh(){emit();},cancel(){},done:Promise.resolve()};},restoreCommand:async()=>{},pendingCommand:()=>pending,commandResumeReady:()=>false,checkCommand:async()=>null,resumeCommand:async()=>null,dispose(){},
-    command:async(kind:string)=>{calls.push(kind);entered?.();if(commandGate)await commandGate;if(commandResult==="unknown"){pending=kind;return{status:"unknown" as const,reason:"Check the original request."};}if(commandResult==="refused"){emit();return{status:"refused" as const,reason:"native guard-failed"};}
+    command:async(kind:string)=>{calls.push(kind);entered?.();if(commandGate)await commandGate;const hook=beforeReply;beforeReply=undefined;hook?.();if(commandResult==="unknown"){pending=kind;return{status:"unknown" as const,reason:"Check the original request."};}if(commandResult==="refused"){if(replyObservation)emit();return{status:"refused" as const,reason:"native guard-failed"};}
+      if(commandResult==="blocked"||commandResult==="unsent"){if(replyObservation)emit();return{status:"blocked" as const,reason:"Local preparation stopped",...(commandResult==="unsent"?{definitelyUnsent:true as const}:{})};}
       if(kind==="participate")view={...view,participants:[{id:2,revision:1,member,state:"inactive"}]};
       if(kind==="activate"||kind==="deactivate")view={...view,participants:view.participants.map(p=>({...p,state:kind==="activate"?"active" as const:"inactive" as const,revision:p.revision+1}))};
       emit();return{status:"recorded" as const};},prepare:async()=>{throw new Error("No fulfilled report in this fixture");},submit:async()=>({status:"unknown" as const}),reconcile:async()=>({status:"unknown" as const})} as StageGateway;
@@ -200,7 +202,7 @@ async function journeyFixture() {
   const root=new Element(),app=mountCountingStage(root as unknown as HTMLElement,{speech,connect(){},now:()=>100,runner:{acquire:async()=>leaseAvailable?()=>{releases++;}:null}});
   const store={load:async()=>null,loadStart:async()=>null,save:async()=>{},clear:async()=>{}};
   await app.attach({name:"Ada",identity,speech,gateway,store,lock:{run:async work=>work()},current:()=>owns});
-  return{app,calls,emit,identity,gateway,speech,store,root,get view(){return view;},set view(next:CountingView){view=next;},get plays(){return plays;},get releases(){return releases;},set result(next:typeof commandResult){commandResult=next;},set voiceAvailable(next:boolean){speechAvailable=next;},set leaseAvailable(next:boolean){leaseAvailable=next;},set owns(next:boolean){owns=next;},holdCommand(){let release!:()=>void;commandGate=new Promise<void>(resolve=>{release=resolve;});const requested=new Promise<void>(resolve=>{entered=resolve;});return{requested,release};}};
+  return{app,calls,emit,identity,gateway,speech,store,root,get view(){return view;},set view(next:CountingView){view=next;},get plays(){return plays;},get releases(){return releases;},set result(next:typeof commandResult){commandResult=next;},beforeReply(work:()=>void){beforeReply=work;},set replyObservation(next:boolean){replyObservation=next;},set voiceAvailable(next:boolean){speechAvailable=next;},set leaseAvailable(next:boolean){leaseAvailable=next;},set owns(next:boolean){owns=next;},holdCommand(){let release!:()=>void;commandGate=new Promise<void>(resolve=>{release=resolve;});const requested=new Promise<void>(resolve=>{entered=resolve;});return{requested,release};}};
 }
 const flush=()=>new Promise<void>(resolve=>setImmediate(resolve));
 
@@ -220,10 +222,65 @@ test("Join refuses unusable voices and duplicate runner ownership before mutatio
 test("Automatic commits keep native fairness and do not retry a refused turn when only the observed head advances",async()=>mountedJourney(async f=>{
   f.emit();await f.app.join("us");f.calls.length=0;f.result="refused";
   f.view={...f.view,board:{...f.view.board!,state:"open",lastSpeaker:f.identity.member}};f.emit();await flush();assert.deepEqual(f.calls,["commit"],"the native solo exception permits consecutive turns");
-  f.emit();f.emit();await flush();assert.deepEqual(f.calls,["commit"],"same generation/serial/number has one automatic attempt");
+  f.emit();f.emit();await flush();assert.deepEqual(f.calls,["commit"],"the same accepted board and roster never retry after a head-only notification");
   const peer={membership:f.identity.membership,member:"@beau" as const};f.view={...f.view,board:{...f.view.board!,serial:1},participants:[...f.view.participants,{id:4,revision:1,member:peer,state:"active"}]};f.emit();await flush();assert.deepEqual(f.calls,["commit"],"two active participants forbid the previous speaker");
   f.view={...f.view,board:{...f.view.board!,lastSpeaker:peer}};f.emit();await flush();assert.deepEqual(f.calls,["commit","commit"],"a distinct native serial and eligible speaker admit the next attempt");
 }));
+
+test("A Pause-winning refused automatic commit recovers after Start at a new accepted revision without Leave or Join",async()=>mountedJourney(async f=>{
+  f.emit();await f.app.join("us");f.calls.length=0;f.result="refused";
+  const tuple=()=>[f.view.board!.generation,f.view.board!.serial,f.view.board!.lastNumber+1];
+  const originalTuple=tuple();
+  f.beforeReply(()=>{f.view={...f.view,board:{...f.view.board!,state:"paused",revision:3}};});
+  f.view={...f.view,board:{...f.view.board!,state:"open",revision:2}};
+  f.emit();await flush();assert.deepEqual(f.calls,["commit"]);assert.equal(f.app.joined(),true);
+  f.emit();f.emit();await flush();assert.deepEqual(f.calls,["commit"],"Pause and repeated heads do not admit a commit");
+  f.view={...f.view,board:{...f.view.board!,state:"open",revision:4}};
+  f.emit();await flush();assert.deepEqual(tuple(),originalTuple);assert.deepEqual(f.calls,["commit","commit"]);
+  assert.equal(f.app.joined(),true);assert.equal(f.releases,0);assert.equal(f.plays,0);
+  f.emit();await flush();assert.deepEqual(f.calls,["commit","commit"],"the corrected state also gets one attempt");
+}));
+
+for(const outcome of ["refused","unsent"] as const){
+  test(`Automatic ${outcome} correction wakes from a relevant accepted state received while the original command was busy`,async()=>mountedJourney(async f=>{
+    f.emit();await f.app.join("us");f.calls.length=0;f.result=outcome;f.replyObservation=false;
+    f.beforeReply(()=>{
+      f.view={...f.view,board:{...f.view.board!,state:"paused",revision:3}};f.emit();
+      f.view={...f.view,board:{...f.view.board!,state:"open",revision:4}};f.emit();
+      assert.deepEqual(f.calls,["commit"],"accepted Pause/Start observations cannot submit while the original is busy");
+    });
+    f.view={...f.view,board:{...f.view.board!,state:"open",revision:2}};f.emit();
+    await flush();
+    assert.deepEqual(f.calls,["commit","commit"],"the terminal outcome wakes the already fresh corrected state without another observation");
+    assert.equal(f.app.joined(),true);assert.equal(f.releases,0);assert.equal(f.plays,0);
+    await flush();assert.deepEqual(f.calls,["commit","commit"],"the corrected state does not loop on its own terminal outcome");
+  }));
+}
+
+test("A refused automatic commit corrects its accepted roster basis once while preserving fairness",async()=>mountedJourney(async f=>{
+  f.emit();await f.app.join("us");f.calls.length=0;f.result="refused";
+  const peer={membership:f.identity.membership,member:"@beau" as const};
+  f.view={...f.view,board:{...f.view.board!,state:"open",revision:2,lastSpeaker:peer},participants:[...f.view.participants,{id:4,revision:1,member:peer,state:"active"}]};
+  f.emit();await flush();assert.deepEqual(f.calls,["commit"]);
+  f.view={...f.view,participants:f.view.participants.map(p=>p.id===4?{...p,revision:2}:p)};
+  f.emit();await flush();assert.deepEqual(f.calls,["commit","commit"],"new accepted active basis permits a corrected proposal at the same board tuple");
+  f.view={...f.view,participants:[...f.view.participants].reverse()};
+  f.emit();await flush();assert.deepEqual(f.calls,["commit","commit"],"display order and new heads are not accepted basis changes");
+  f.view={...f.view,board:{...f.view.board!,revision:3,lastSpeaker:f.identity.member}};
+  f.emit();await flush();assert.deepEqual(f.calls,["commit","commit"],"a previous speaker still cannot take the next turn with two active participants");
+}));
+
+for(const outcome of ["unsent","blocked","unknown","recorded"] as const){
+  test(`Automatic ${outcome} outcome only permits relevant-state correction when definitely unsent`,async()=>mountedJourney(async f=>{
+    f.emit();await f.app.join("us");f.calls.length=0;f.result=outcome;
+    f.view={...f.view,board:{...f.view.board!,state:"open",revision:2}};
+    f.emit();await flush();assert.deepEqual(f.calls,["commit"]);
+    f.emit();await flush();assert.deepEqual(f.calls,["commit"],"same state never retries");
+    f.view={...f.view,board:{...f.view.board!,revision:3}};
+    f.emit();await flush();assert.deepEqual(f.calls,outcome==="unsent"?["commit","commit"]:["commit"]);
+    assert.equal(f.app.joined(),true);assert.equal(f.releases,0);assert.equal(f.plays,0);
+  }));
+}
 
 test("A stale Join context cannot activate, arm or repaint after its pending participation returns",async()=>mountedJourney(async f=>{
   f.emit();const gate=f.holdCommand();const joining=f.app.join("us");await gate.requested;f.app.disconnect();gate.release();await joining;
