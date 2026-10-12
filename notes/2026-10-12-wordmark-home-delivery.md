@@ -80,3 +80,30 @@ builders run after release. Three affected compiler contexts, the owning three
 Page cases, one Counter view case, new ordinary composition gate, wordmark review
 and managed deployments remain outstanding. This Source merge executes nothing
 and leaves the original donor and independent Jam branches untouched.
+
+## Composed Source checks and normal assets
+
+The approved focused runner passed at `7d45896332be5d4ef4f3ee7f1a7bfc771ee4dc16`,
+tree `c3f3e07c55bcf94dec773f13dcc6f5533452d60e`. Page Source, Page Test and Counter
+Source compilers each exited zero. Both whole owning Page files passed their three
+cases. The existing Counter acknowledgement case passed; the other nine titles
+in that file were not selected. These are stand-in DOM checks, not native or
+browser acceptance. The original runner was session 97339. Its closed public
+result is `wordmark-composed-source/checks-7d458/public-result.json` under the
+existing diagnostics directory, SHA-256
+`315dbd6a139738545e3e4e99ea067543ce5ede805778c010c5b457e067c2a650`.
+
+The normal Page and Counter builders then each ran once and exited zero. They
+replaced the stale placeholders with outputs from the composed application
+Source. Only Page assets, Counting assets and counting.js changed; Counting HTML
+and CSS stayed byte-identical. The Page module is 617,973 bytes, SHA-256
+`a75c6f9e67b506a6ca0e1ce217139330c2f8bbb31db6c2ef12f43d003a846e0a`.
+The Counting module is 169,218 bytes, SHA-256
+`1292cfedea8d23f7fc4c975399164f0965a9982c4ceb218b525b1ce6b15e2f4f`.
+The build result is `wordmark-composed-source/builds-7d458/public-result.json`,
+SHA-256 `74f810cb04d1158d8d01a39f0970bacf8f6093537dcbcc614c4a8f9a1c87192a`.
+All other tracked inputs and pinned dependency bytes were unchanged. No separate
+homepage build or test was repeated. The new ordinary composition gate remains
+UNRUN; it will include the receiving homepage Node test wiring. Independent
+wordmark review, managed deployments and full application acceptance remain owed.
+All earlier results and failures keep their original heads.
