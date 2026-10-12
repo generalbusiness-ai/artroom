@@ -17,7 +17,7 @@ import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, is
 import { TransportError, readCredential, signedIntent, type Fetch, type Signer } from "@generalbusiness/artroom-client";
 import { platform } from "@generalbusiness/artroom-platform";
 import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, generationOf, listed, selected, type Binding, type Held, type Inventory, type Mode, type Tool } from "./catalogue.ts";
-import { Custody, CustodyError, Lost, identityId, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
+import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
 import { describeAct, grantAction, onOf, schemaOf, type DefinitionLike } from "./describe.ts";
 import { answered, finding, type Finding } from "./errors.ts";
 import { Kept, definitionOf, readInventory, type ConfigPort, type Read_, type Root } from "./inventory.ts";
@@ -201,7 +201,7 @@ export class McpService {
       return await this.#perform(binding, given, binding.kind);
     } catch (error) {
       if (error instanceof Stop) return error.result;
-      if (error instanceof CustodyError) return failed({ error: "custody", state: error.why.held, key: String(given["idempotencyKey"] ?? ""), scope: String(given["target"] ?? given["scope"] ?? ""), ...("keys" in error.why ? { keys: error.why.keys } : {}), ...("recorded" in error.why ? { recorded: error.why.recorded } : {}) });
+      if (error instanceof CustodyError) return failed({ error: "custody", state: error.why.held, key: String(given["idempotencyKey"] ?? ""), scope: String(given["target"] ?? given["scope"] ?? ""), ...("keys" in error.why ? { keys: error.why.keys } : {}), ...("recorded" in error.why ? { recorded: error.why.recorded } : {}), ...("bytes" in error.why ? { bytes: error.why.bytes } : {}) });
       if (error instanceof TransportError) return failed({ error: "transport", scope: String(given["target"] ?? given["scope"] ?? "the scope"), submitted: false });
       throw error;
     }
@@ -325,8 +325,10 @@ export class McpService {
     const asked = { scope, kind, on: on as number | null, action: grantAction(act) };
     const guards = describeAct(definition, kind, act, { standing: "unknown" }, { pinned: summary.definition }, { definition: definition.name, kind, declaration, digests: [summary.definition] }, "").guards;
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
+    // What the envelope will carry, for custody's byte bound before anything is signed.
+    const carried = bytesOf({ fields: fieldsGiven, texts: textsGiven, values: valuesGiven, presented: presentedGiven ?? {} });
     if (preparing) {
-      const record = await this.custody.keep(identity, meaning, build, notAfter);
+      const record = await this.custody.keep(identity, meaning, build, notAfter, carried);
       const resource = await this.#scope(s, preparing.resource);
       const { summary: resourceSummary } = await this.#summary(resource.scope, resource.membership);
       const stepped = await this.custody.step(identity, resourceSummary.scope, preparing.capability, preparing.step, async (signed) => {
@@ -341,7 +343,7 @@ export class McpService {
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try { return await this.reads.transport.submit(scope, envelope.signed, [], envelope.beside); }
       catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
-    }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter });
+    }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: carried });
     const tool = binding?.name ?? "act";
     if ("lost" in kept) return failed({ error: "transport", scope, submitted: true });
     const said = answered(kept.answer, asked, guards);
@@ -599,16 +601,15 @@ export class McpService {
     });
     if (!settled) return ok({ answer: "not-found", sentence: `No record is kept under key ${String(key)} for that target.`, next: "Nothing was sent under this key from this server; sign with it." });
     const record = settled.record;
-    const outcomes = await this.custody.outcomes(identityId(identity), record);
-    const last = [...outcomes].reverse().find((o) => "answer" in o || "settled" in o);
-    const receipt: Receipt | null = settled.receipt ?? (last && "settled" in last ? last.settled : last && "answer" in last && last.answer.answer === "accepted" ? last.answer.receipt : null);
+    const last = settled.decided;
+    const receipt: Receipt | null = settled.receipt ?? (last?.answer.answer === "accepted" ? last.answer.receipt : null);
     const steps = Object.values(record.steps).map((st) => ({ resource: st.resource.scope, capability: st.capability, step: st.step, phase: st.phase, answer: st.answers.at(-1)?.answer ?? "unknown" }));
     const answer = record.phase === "accepted" ? "accepted" : record.phase === "refused" ? "refused" : record.phase === "mismatch" ? "mismatch" : "unknown";
     const sentence = answer === "accepted" ? `The act under key ${String(key)} was accepted: entry ${receipt?.fact.seq}.`
       : answer === "refused" ? `The act under key ${String(key)} was refused; the refusal is kept.`
       : answer === "mismatch" ? `The key ${String(key)} is on another intent of your key at that scope.`
       : `The outcome under key ${String(key)} is unknown: the scope gave no receipt for the exact envelope. The record stays unknown.`;
-    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: outcomes.length, last: last ?? null, steps });
+    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ?? null, steps });
   }
 
   async #membershipRef(given: unknown): Promise<ScopeRef | null> {
@@ -660,7 +661,7 @@ export class McpService {
         // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
         return founded.answer === "refused" ? { answer: "refused", reason: founded.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : founded as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
-    }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter });
+    }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: bytesOf({ definition: args["definition"], fields: fieldsGiven, texts: textsGiven, definitions }) });
     if ("lost" in kept) return failed({ error: "transport", scope: "the creation", submitted: true });
     if (kept.answer.answer === "accepted") {
       const scope = kept.answer.receipt.fact.at.scope;

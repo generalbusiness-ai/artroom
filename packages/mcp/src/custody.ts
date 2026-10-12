@@ -16,9 +16,16 @@
  *   another meaning is refused as `conflicting`, and nothing is sent.
  * - **Phase**: `prepared`, `sent` and `unknown` are unresolved, and are
  *   recovered by resending the same bytes. `accepted`, `refused` and
- *   `mismatch` are terminal: their outcome is returned and nothing is sent,
- *   unless the caller asks with `resubmit: true`; every later outcome is
- *   appended, never replacing an earlier one.
+ *   `mismatch` are terminal. `accepted` and `mismatch` are never sent again,
+ *   even with `resubmit: true`. A `refused` record is sent again only when
+ *   the caller asks with `resubmit: true`: the server first keeps a new
+ *   attempt, unresolved (`sent`), with the refusal kept as history, so a lost
+ *   or `unavailable` reply to the resend leaves the record unresolved and
+ *   `settle` asks the scope.
+ * - **The outcome**: always the newest decisive outcome of the current
+ *   attempt, chronologically: an answer that is not `unavailable`, or a
+ *   receipt from settlement. Every outcome is appended, never replacing an
+ *   earlier one, and each carries its attempt.
  * - **What resolves `unknown`**: a receipt from settlement, or a definitive
  *   `accepted`, `refused` or `mismatch` from the same scope and incarnation.
  *   Never `unavailable`, never `not-found` from settlement, and never the
@@ -26,9 +33,16 @@
  * - **Preparation steps**: each under its own identity (the intent's
  *   digest, the resource and its incarnation, the capability and the step),
  *   with its own phase and answer, apart from the act's phase. A step's
- *   answer is never the act's receipt.
- * - **Capacity**: at most 256 unresolved records, never evicted. Terminal
- *   records are archived by the store; outcomes past 64 move to a segment.
+ *   answer is never the act's receipt. A step keeps its first answer and its
+ *   latest 63; answers between them are not kept. The act's outcomes are
+ *   never dropped: that rule is for steps only.
+ * - **Capacity**: at most 256 unresolved records, never evicted, counted and
+ *   admitted under the store's exclusive section, so two processes cannot
+ *   both admit the 256th. A record is at most 2 MiB: an act whose envelope
+ *   would not fit is refused before it is signed, and outcomes that would
+ *   push a record past the bound move to its segment, which keeps every one.
+ *   Terminal records are archived by the store; outcomes past 64 inline move
+ *   to the segment.
  *
  * The store is a port: `memoryStore` here for a process that keeps nothing,
  * and the file store of `node.ts` under `ARTROOM_HOME/private/mcp-custody/`.
@@ -62,8 +76,8 @@ export interface Envelope {
 export type Phase = "prepared" | "sent" | "unknown" | "accepted" | "refused" | "mismatch";
 export const TERMINAL: ReadonlySet<Phase> = new Set(["accepted", "refused", "mismatch"]);
 
-/** One outcome of one sending. `lost`: no answer could be read. */
-export type Outcome = { at: string; answer: Answer } | { at: string; lost: true } | { at: string; settled: Receipt };
+/** One outcome of one sending, in its attempt. `lost`: no answer could be read. */
+export type Outcome = ({ at: string; answer: Answer } | { at: string; lost: true } | { at: string; settled: Receipt }) & { attempt: number };
 
 export interface Step {
   intent: Digest;
@@ -84,6 +98,8 @@ export interface CustodyRecord {
   /** The latest outcomes, at most `OUTCOMES_INLINE`; `count` is how many there have been. Older ones are in the record's segment. */
   outcomes: Outcome[];
   count: number;
+  /** The attempt now current: 1, and one more for each deliberate resubmission of a refusal. */
+  attempt: number;
   steps: Record<string, Step>;
   created: string;
   updated: string;
@@ -93,15 +109,20 @@ export interface CustodyRecord {
 export interface CustodyStore {
   /** An exclusive lock on one identity, or null when another holds it. */
   lock(id: string, notAfter: string): Promise<(() => Promise<void>) | null>;
+  /** Run `work` alone among every process sharing the store: admission against the capacity. */
+  exclusive<T>(work: () => Promise<T>): Promise<T>;
   read(id: string): Promise<CustodyRecord | null>;
   /** Write whole, then read back and compare; throws when the bytes read back differ. */
   write(id: string, record: CustodyRecord): Promise<void>;
   /** The records not yet terminal, oldest first: their identity digests and keys. */
   unresolved(): Promise<{ id: string; key: string; created: string }[]>;
-  /** Append outcomes to the record's segment, in order. */
-  segment(id: string, outcomes: readonly Outcome[]): Promise<void>;
-  /** Every outcome the segment holds, in order. */
-  segmented(id: string): Promise<Outcome[]>;
+  /**
+   * Put outcomes in the record's segment at position `at` (the count the segment holds by the record's account), in order.
+   * Anything the segment holds past `at`, from an interrupted earlier append, is cut first, so a repeat is idempotent.
+   */
+  segment(id: string, at: number, outcomes: readonly Outcome[]): Promise<void>;
+  /** At most `limit` outcomes of the segment from position `from`, in order, read as a bounded slice. */
+  segmented(id: string, from: number, limit: number): Promise<Outcome[]>;
 }
 
 export const identityId = (identity: Identity): string => digestBytes(utf8(canonicalize(identity))).slice(7);
@@ -112,7 +133,8 @@ export const stepId = (s: { intent: Digest; resource: ScopeRef; capability: stri
 /** Why custody sent nothing. */
 export type HeldBack =
   | { held: "conflicting"; recorded: string }
-  | { held: "full"; keys: string[] }
+  | { held: "full"; reason: "count"; keys: string[] }
+  | { held: "full"; reason: "bytes"; bytes: number }
   | { held: "locked" }
   | { held: "unreadable" }
   | { held: "too-large" };
@@ -130,6 +152,21 @@ export const validKey = keyBytes;
 /** What a call under custody gives back: the outcome, and whether it was sent now or kept from before. */
 export type Sent = { record: CustodyRecord; answer: Answer; retained: boolean } | { record: CustodyRecord; lost: true };
 
+/** Bytes a record keeps beside its envelope: identity, binding, phase, times, and room for its first outcome. */
+const RECORD_OVERHEAD = 64 * 1024;
+const bytesOf = (value: unknown): number => utf8(canonicalize(value as never)).length;
+
+/** The newest decisive outcome of the record's current attempt, chronologically; null while the attempt is unresolved. */
+export function decisive(outcomes: readonly Outcome[], attempt: number): { at: string; answer: Answer } | null {
+  for (let i = outcomes.length - 1; i >= 0; i--) {
+    const o = outcomes[i]!;
+    if (o.attempt !== attempt) return null;
+    if ("settled" in o) return { at: o.at, answer: { answer: "accepted", receipt: o.settled } };
+    if ("answer" in o && o.answer.answer !== "unavailable") return { at: o.at, answer: o.answer };
+  }
+  return null;
+}
+
 export class Custody {
   constructor(readonly store: CustodyStore, private readonly now: () => string) {}
 
@@ -144,20 +181,40 @@ export class Custody {
   }
 
   async #write(id: string, record: CustodyRecord): Promise<void> {
-    if (utf8(canonicalize(record)).length > RECORD_BYTES) throw new CustodyError({ held: "too-large" });
+    if (bytesOf(record) > RECORD_BYTES) throw new CustodyError({ held: "too-large" });
     try { await this.store.write(id, record); } catch { throw new CustodyError({ held: "unreadable" }); }
   }
 
-  /** Keep the outcome: inline up to the bound, the oldest moved to the segment. */
+  /**
+   * Keep an outcome: inline up to 64 and within the record's byte bound; the oldest move to the segment, which loses none. An
+   * outcome that alone would push the record past the bound goes to the segment directly.
+   */
   async #outcome(id: string, record: CustodyRecord, outcome: Outcome): Promise<void> {
     record.outcomes.push(outcome);
     record.count++;
-    if (record.outcomes.length > OUTCOMES_INLINE) await this.store.segment(id, record.outcomes.splice(0, record.outcomes.length - OUTCOMES_INLINE));
+    let spill = Math.max(0, record.outcomes.length - OUTCOMES_INLINE);
+    while (spill < record.outcomes.length && bytesOf({ ...record, outcomes: record.outcomes.slice(spill) }) > RECORD_BYTES) spill++;
+    if (spill > 0) {
+      const inSegment = record.count - record.outcomes.length;
+      await this.store.segment(id, inSegment, record.outcomes.splice(0, spill));
+    }
   }
 
-  /** Every outcome of a record, the segment's first. */
-  async outcomes(id: string, record: CustodyRecord): Promise<Outcome[]> {
-    return [...(record.count > record.outcomes.length ? await this.store.segmented(id) : []), ...record.outcomes];
+  /** The outcomes of a record from position `from` (0 is the first ever), at most `limit`: the segment's, then the inline ones. */
+  async outcomes(id: string, record: CustodyRecord, from = 0, limit = record.count): Promise<Outcome[]> {
+    const inSegment = record.count - record.outcomes.length;
+    const out: Outcome[] = [];
+    if (from < inSegment) out.push(...await this.store.segmented(id, from, Math.min(limit, inSegment - from)));
+    const inline = Math.max(0, from - inSegment);
+    out.push(...record.outcomes.slice(inline, inline + (limit - out.length)));
+    return out;
+  }
+
+  /** The decisive outcome of a record's current attempt, reading the segment only when the inline outcomes do not reach back far enough. */
+  async decided(id: string, record: CustodyRecord): Promise<{ at: string; answer: Answer } | null> {
+    const inline = decisive(record.outcomes, record.attempt);
+    if (inline || record.outcomes.length === record.count || record.outcomes[0]?.attempt !== record.attempt) return inline;
+    return decisive(await this.outcomes(id, record), record.attempt);
   }
 
   /** The record under an identity, or null. */
@@ -166,43 +223,57 @@ export class Custody {
   /**
    * Keep the envelope under its identity without sending it: the first
    * preparation. The record that holds it already is returned, when its
-   * meaning is the same; another meaning is refused.
+   * meaning is the same; another meaning is refused. `bytes` is the caller's
+   * account of what the envelope will carry (fields, texts, presented facts
+   * and values); it is checked against the record's bound before signing.
    */
-  async keep(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, notAfter: string): Promise<CustodyRecord> {
+  async keep(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, notAfter: string, bytes = 0): Promise<CustodyRecord> {
     const id = identityId(identity);
-    return this.#locked(id, notAfter, async () => this.#kept(id, identity, meaning, build));
+    return this.#locked(id, notAfter, async () => this.#kept(id, identity, meaning, build, bytes));
   }
 
-  async #kept(id: string, identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>): Promise<CustodyRecord> {
+  async #kept(id: string, identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, bytes: number): Promise<CustodyRecord> {
     const found = await this.#read(id);
     if (found) {
       if (found.meaning !== meaning) throw new CustodyError({ held: "conflicting", recorded: `${found.envelope.signed.intent.kind} on ${found.identity.target && "scope" in found.identity.target ? found.identity.target.scope : "a creation"}` });
       return found;
     }
-    const open = await this.store.unresolved();
-    if (open.length >= UNRESOLVED_MOST) throw new CustodyError({ held: "full", keys: open.slice(0, 8).map((o) => o.key) });
-    const { binding, envelope } = await build();
-    const at = this.now();
-    const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, steps: {}, created: at, updated: at };
-    await this.#write(id, record);
-    return record;
+    // Before signing: the envelope must fit a record with room for its first outcome.
+    if (bytes + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes });
+    return this.store.exclusive(async () => {
+      const open = await this.store.unresolved();
+      if (open.length >= UNRESOLVED_MOST) throw new CustodyError({ held: "full", reason: "count", keys: open.slice(0, 8).map((o) => o.key) });
+      const { binding, envelope } = await build();
+      const at = this.now();
+      const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at };
+      const size = bytesOf(record);
+      if (size + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes: size });
+      await this.#write(id, record);
+      return record;
+    });
   }
 
   /**
    * Send under custody. First preparation: keep, read back, send. A record
-   * that is unresolved: resend the same bytes. A terminal record: return its
-   * outcome and send nothing, unless `resubmit`.
+   * that is unresolved: resend the same bytes. An accepted or mismatch
+   * record: return its outcome and send nothing, whatever is asked. A refused
+   * record: return its refusal, or with `resubmit` keep a new unresolved
+   * attempt first and then send the same bytes.
    */
-  async send(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, deliver: (envelope: Envelope) => Promise<Answer>, options: { resubmit?: boolean; notAfter: string }): Promise<Sent> {
+  async send(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, deliver: (envelope: Envelope) => Promise<Answer>, options: { resubmit?: boolean; notAfter: string; bytes?: number }): Promise<Sent> {
     const id = identityId(identity);
     return this.#locked(id, options.notAfter, async () => {
-      const record = await this.#kept(id, identity, meaning, build);
-      if (TERMINAL.has(record.phase) && !options.resubmit) {
-        const last = [...record.outcomes].reverse().find((o): o is { at: string; answer: Answer } => "answer" in o)
-          ?? [...record.outcomes].reverse().filter((o): o is { at: string; settled: Receipt } => "settled" in o).map((o) => ({ at: o.at, answer: { answer: "accepted", receipt: o.settled } as Answer }))[0];
-        if (last) return { record, answer: last.answer, retained: true };
+      const record = await this.#kept(id, identity, meaning, build, options.bytes ?? 0);
+      if (TERMINAL.has(record.phase)) {
+        const last = await this.decided(id, record);
+        if (record.phase !== "refused" || !options.resubmit) {
+          if (!last) throw new CustodyError({ held: "unreadable" });
+          return { record, answer: last.answer, retained: true };
+        }
+        // A deliberate resubmission of a refusal: a new attempt, kept unresolved before anything is sent.
+        record.attempt++;
       }
-      if (!TERMINAL.has(record.phase)) record.phase = "sent";
+      record.phase = "sent";
       record.updated = this.now();
       await this.#write(id, record);
       let answer: Answer;
@@ -210,16 +281,15 @@ export class Custody {
         answer = await deliver(record.envelope);
       } catch (error) {
         if (!(error instanceof Lost)) throw error;
-        if (!TERMINAL.has(record.phase)) record.phase = "unknown";
-        await this.#outcome(id, record, { at: this.now(), lost: true });
+        record.phase = "unknown";
+        await this.#outcome(id, record, { at: this.now(), lost: true, attempt: record.attempt });
         record.updated = this.now();
         await this.#write(id, record);
         return { record, lost: true };
       }
       // `unavailable` resolves nothing; a definitive answer does.
-      if (answer.answer === "unavailable") { if (!TERMINAL.has(record.phase)) record.phase = "unknown"; }
-      else record.phase = answer.answer;
-      await this.#outcome(id, record, { at: this.now(), answer });
+      record.phase = answer.answer === "unavailable" ? "unknown" : answer.answer;
+      await this.#outcome(id, record, { at: this.now(), answer, attempt: record.attempt });
       record.updated = this.now();
       await this.#write(id, record);
       return { record, answer, retained: false };
@@ -229,25 +299,26 @@ export class Custody {
   /**
    * Settle: a terminal record's outcome, or the scope's settlement of the
    * recorded envelope. A receipt resolves the record as accepted; `not-found`
-   * and a lost reply resolve nothing. Signs nothing, sends no act.
+   * and a lost reply resolve nothing. Signs nothing, sends no act. The
+   * outcome given is always the newest decisive one of the current attempt.
    */
-  async settle(identity: Identity, read: (envelope: Envelope) => Promise<Receipt | null>): Promise<{ record: CustodyRecord; receipt: Receipt | null } | null> {
+  async settle(identity: Identity, read: (envelope: Envelope) => Promise<Receipt | null>): Promise<{ record: CustodyRecord; receipt: Receipt | null; decided: { at: string; answer: Answer } | null } | null> {
     const id = identityId(identity);
     const record = await this.#read(id);
     if (!record) return null;
-    if (TERMINAL.has(record.phase)) return { record, receipt: null };
+    if (TERMINAL.has(record.phase)) return { record, receipt: null, decided: await this.decided(id, record) };
     return this.#locked(id, record.envelope.signed.intent.notAfter, async () => {
       const fresh = (await this.#read(id))!;
-      if (TERMINAL.has(fresh.phase)) return { record: fresh, receipt: null };
+      if (TERMINAL.has(fresh.phase)) return { record: fresh, receipt: null, decided: await this.decided(id, fresh) };
       let receipt: Receipt | null = null;
       try { receipt = await read(fresh.envelope); } catch (error) { if (!(error instanceof Lost)) throw error; }
       if (receipt) {
         fresh.phase = "accepted";
-        await this.#outcome(id, fresh, { at: this.now(), settled: receipt });
+        await this.#outcome(id, fresh, { at: this.now(), settled: receipt, attempt: fresh.attempt });
         fresh.updated = this.now();
         await this.#write(id, fresh);
       }
-      return { record: fresh, receipt };
+      return { record: fresh, receipt, decided: await this.decided(id, fresh) };
     });
   }
 
@@ -273,7 +344,8 @@ export class Custody {
       try { answer = await deliver(fresh.envelope.signed); } catch (error) { if (!(error instanceof Lost)) throw error; }
       entry.phase = answer === null || answer.answer === "unavailable" ? "unknown" : "answered";
       entry.answers.push({ at: this.now(), answer });
-      if (entry.answers.length > OUTCOMES_INLINE) entry.answers.splice(0, entry.answers.length - OUTCOMES_INLINE);
+      // A step keeps its first answer and its latest 63 (see the header): the first is what the resource repeats for the same step.
+      if (entry.answers.length > OUTCOMES_INLINE) entry.answers.splice(1, entry.answers.length - OUTCOMES_INLINE);
       fresh.updated = this.now();
       await this.#write(id, fresh);
       return { record: fresh, step: entry, answer };
@@ -286,12 +358,18 @@ export function memoryStore(): CustodyStore & { records: Map<string, string> } {
   const records = new Map<string, string>();
   const segments = new Map<string, Outcome[]>();
   const locks = new Set<string>();
+  let queue: Promise<unknown> = Promise.resolve();
   return {
     records,
     lock: async (id) => {
       if (locks.has(id)) return null;
       locks.add(id);
       return async () => { locks.delete(id); };
+    },
+    exclusive: <T>(work: () => Promise<T>): Promise<T> => {
+      const run = queue.then(work, work);
+      queue = run.catch(() => undefined);
+      return run;
     },
     read: async (id) => { const text = records.get(id); return text === undefined ? null : JSON.parse(text) as CustodyRecord; },
     write: async (id, record) => {
@@ -301,7 +379,7 @@ export function memoryStore(): CustodyStore & { records: Map<string, string> } {
     },
     unresolved: async () => [...records.entries()].map(([id, text]) => [id, JSON.parse(text) as CustodyRecord] as const)
       .filter(([, r]) => !TERMINAL.has(r.phase)).sort(([, a], [, b]) => (a.created < b.created ? -1 : 1)).map(([id, r]) => ({ id, key: r.identity.key, created: r.created })),
-    segment: async (id, outcomes) => { segments.set(id, [...(segments.get(id) ?? []), ...structuredClone(outcomes as Outcome[])]); },
-    segmented: async (id) => structuredClone(segments.get(id) ?? []),
+    segment: async (id, at, outcomes) => { segments.set(id, [...(segments.get(id) ?? []).slice(0, at), ...structuredClone(outcomes as Outcome[])]); },
+    segmented: async (id, from, limit) => structuredClone((segments.get(id) ?? []).slice(from, from + limit)),
   };
 }

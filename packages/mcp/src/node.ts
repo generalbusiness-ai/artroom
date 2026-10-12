@@ -12,18 +12,22 @@
  *   403 with no body detail.
  * - **custody on files** under `ARTROOM_HOME/private/mcp-custody/`, owner
  *   only: one file per record, an exclusive lock file per identity, a
- *   temporary write renamed into place and read back, an append-only
- *   segment of outcomes per record, and append-only archive files with an
- *   index that is rewritten whole and renamed.
+ *   temporary write renamed into place and read back, a segment of outcomes
+ *   per record with an index of line ends, and archive files with an index.
+ *   Archival is one transaction under an archive lease: the archive file is
+ *   written whole under a temporary name and renamed, then the index, and
+ *   only then are the live records removed. Admission against the capacity
+ *   runs under a capacity lease. A lease or a lock is broken only when the
+ *   process that took it is gone.
  */
 
-import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Signer, Fetch } from "@generalbusiness/artroom-client";
-import { TERMINAL, type CustodyRecord, type CustodyStore, type Outcome } from "./custody.ts";
+import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Outcome } from "./custody.ts";
 import type { ConfigPort } from "./inventory.ts";
 import { McpService } from "./service.ts";
 import type { Mode } from "./catalogue.ts";
@@ -38,8 +42,33 @@ export interface FileStoreBounds {
   ageDays: number;
   /** The most bytes of one archive file. */
   archiveBytes: number;
+  /** A test's fault injection: called at each named point of an archival, where a crash may come. */
+  fault?: (point: "archive-written" | "index-published") => void;
 }
 export const FILE_STORE_BOUNDS: FileStoreBounds = { terminalMost: 1024, ageDays: 30, archiveBytes: 64 * 1024 * 1024 };
+
+/** How long admission waits for the capacity lease before it says the store is locked. */
+const LEASE_WAIT_MS = 10_000;
+
+const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
+
+/**
+ * Take a lock file: created exclusively, holding the process and the time. A file whose process is gone is broken and taken;
+ * one whose process lives is not. Its time and any deadline it records decide nothing: expiry is never an outcome.
+ */
+function takeFile(path: string, body: Record<string, unknown>): boolean {
+  const take = (): boolean => {
+    try { writeFileSync(path, JSON.stringify({ pid: process.pid, ...body }), { mode: 0o600, flag: "wx" }); return true; }
+    catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") return false; throw e; }
+  };
+  if (take()) return true;
+  let held: { pid?: unknown } | null = null;
+  try { held = JSON.parse(readFileSync(path, "utf8")) as { pid?: unknown }; } catch { held = null; }
+  // A file being written has no body yet: its taker lives. Only a whole file naming a process that is gone is broken.
+  if (!held || typeof held.pid !== "number" || alive(held.pid)) return false;
+  try { unlinkSync(path); } catch { /* another broke it first */ }
+  return take();
+}
 
 /** The custody store under `dir` (`ARTROOM_HOME/private/mcp-custody`). `now` is the clock of a test. */
 export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUNDS, now: () => number = Date.now): CustodyStore & { archived(): number } {
@@ -49,6 +78,7 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
   };
   const id = (name: string) => { if (!/^[0-9a-f]{64}$/.test(name)) throw new Error("not a record name"); return name; };
   const recordPath = (name: string) => join(records, `${id(name)}.json`);
+  const lockPath = (name: string) => join(locks, `${id(name)}.lock`);
   const indexPath = join(archives, "index.json");
   /** Whole file, owner-only, through a temporary name; then read back and compared. */
   const atomic = (path: string, text: string) => {
@@ -59,50 +89,103 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
   };
   type Index = Record<string, { file: string; offset: number; length: number }>;
   const index = (): Index => (existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) as Index : {});
-  const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
   const live = (): { name: string; record: CustodyRecord }[] => readdirSync(records).filter((f) => /^[0-9a-f]{64}\.json$/.test(f))
-    .map((f) => ({ name: f.slice(0, 64), record: JSON.parse(readFileSync(join(records, f), "utf8")) as CustodyRecord }));
+    .flatMap((f) => { try { return [{ name: f.slice(0, 64), record: JSON.parse(readFileSync(join(records, f), "utf8")) as CustodyRecord }]; } catch { return []; } });
+  const release = (path: string) => () => { try { unlinkSync(path); } catch { /* already gone */ } };
 
-  /** Move the oldest terminal records into the archive: past the count, or past the age. Unresolved records are never moved. */
-  const archive = () => {
-    const terminal = live().filter((r) => TERMINAL.has(r.record.phase)).sort((a, b) => (a.record.updated < b.record.updated ? -1 : 1));
-    const old = now() - bounds.ageDays * 86_400_000;
-    const moving = terminal.filter((r, i) => i < terminal.length - bounds.terminalMost || (timeMs(r.record.updated) ?? now()) < old);
-    if (moving.length === 0) return;
-    const table = index();
-    for (const { name } of moving) {
-      const text = readFileSync(recordPath(name), "utf8");
-      const bytes = Buffer.byteLength(text) + 1;
-      let n = 0;
-      while (existsSync(join(archives, `archive-${n}.jsonl`)) && statSync(join(archives, `archive-${n}.jsonl`)).size + bytes > bounds.archiveBytes) n++;
-      const file = `archive-${n}.jsonl`;
-      const path = join(archives, file);
-      const offset = existsSync(path) ? statSync(path).size : 0;
-      appendFileSync(path, `${text}\n`, { mode: 0o600 });
-      table[name] = { file, offset, length: bytes - 1 };
+  /**
+   * Move the oldest terminal records into the archive, past the count or the age, as one transaction under the archive lease.
+   * Another process archiving holds the lease, and this run moves nothing. A record whose lock another holds is skipped.
+   * Order: the archive file, whole, renamed into place; then the index, renamed into place; then the live records removed. A
+   * crash before the index is published leaves every record live and the new archive file unreferenced; the next archival
+   * removes unreferenced files and temporary names. A crash after it leaves records both live and archived; the live file is
+   * read first, and the next archival removes it.
+   */
+  const archive = (owned: string) => {
+    const leasePath = join(archives, "archive.lease");
+    if (!takeFile(leasePath, { time: new Date(now()).toISOString() })) return;
+    const held: (() => void)[] = [];
+    try {
+      const table = index();
+      const referenced = new Set(Object.values(table).map((e) => e.file));
+      for (const f of readdirSync(archives)) {
+        if (f.endsWith(".tmp") || (/^archive-\d+\.jsonl$/.test(f) && !referenced.has(f))) unlinkSync(join(archives, f));
+      }
+      const terminal = live().filter((r) => TERMINAL.has(r.record.phase)).sort((a, b) => (a.record.updated < b.record.updated ? -1 : 1));
+      const old = now() - bounds.ageDays * 86_400_000;
+      const due = terminal.filter((r, i) => i < terminal.length - bounds.terminalMost || (timeMs(r.record.updated) ?? now()) < old);
+      const moving: { name: string; text: string }[] = [];
+      for (const { name } of due) {
+        if (name !== owned) {
+          if (!takeFile(lockPath(name), { time: new Date(now()).toISOString(), archiving: true })) continue;
+          held.push(release(lockPath(name)));
+        }
+        moving.push({ name, text: readFileSync(recordPath(name), "utf8") });
+      }
+      if (moving.length === 0) return;
+      let n = Math.max(-1, ...readdirSync(archives).map((f) => /^archive-(\d+)\.jsonl$/.exec(f)).filter((m) => m !== null).map((m) => Number(m![1]))) + 1;
+      let batch: string[] = [];
+      let size = 0;
+      const flush = () => {
+        if (batch.length === 0) return;
+        const file = `archive-${n++}.jsonl`;
+        const temporary = join(archives, `${file}.${process.pid}.${randomUUID()}.tmp`);
+        writeFileSync(temporary, batch.join(""), { mode: 0o600, flag: "wx" });
+        renameSync(temporary, join(archives, file));
+        for (const pending of entries.splice(0)) table[pending.name] = { file, offset: pending.offset, length: pending.length };
+        batch = []; size = 0;
+      };
+      const entries: { name: string; offset: number; length: number }[] = [];
+      for (const { name, text } of moving) {
+        const bytes = Buffer.byteLength(text) + 1;
+        if (size > 0 && size + bytes > bounds.archiveBytes) flush();
+        entries.push({ name, offset: size, length: bytes - 1 });
+        batch.push(`${text}\n`);
+        size += bytes;
+      }
+      flush();
+      bounds.fault?.("archive-written");
       atomic(indexPath, JSON.stringify(table));
-      unlinkSync(recordPath(name));
+      bounds.fault?.("index-published");
+      for (const { name, text } of moving) {
+        // Removed only when it is still what was archived.
+        if (existsSync(recordPath(name)) && readFileSync(recordPath(name), "utf8") === text) unlinkSync(recordPath(name));
+      }
+    } finally {
+      for (const r of held) r();
+      release(leasePath)();
     }
+  };
+
+  const segmentPaths = (name: string) => ({ data: join(segments, `${id(name)}.jsonl`), ends: join(segments, `${id(name)}.ends`) });
+  /** The end offsets of a segment's lines, `from` up to `to` entries; whole 8-byte entries only. */
+  const endsOf = (path: string, from: number, to: number): number[] => {
+    if (!existsSync(path) || to <= from) return [];
+    const count = Math.floor(statSync(path).size / 8);
+    const last = Math.min(to, count);
+    if (last <= from) return [];
+    const buffer = Buffer.alloc((last - from) * 8);
+    const fd = openSync(path, "r");
+    try { readSync(fd, buffer, 0, buffer.length, from * 8); } finally { closeSync(fd); }
+    return Array.from({ length: last - from }, (_, i) => Number(buffer.readBigUInt64LE(i * 8)));
   };
 
   return {
     archived: () => Object.keys(index()).length,
     lock: async (name, notAfter) => {
       ensure();
-      const path = join(locks, `${id(name)}.lock`);
-      const take = (): boolean => {
-        try { writeFileSync(path, JSON.stringify({ pid: process.pid, time: new Date(now()).toISOString(), notAfter }), { mode: 0o600, flag: "wx" }); return true; }
-        catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") return false; throw e; }
-      };
-      if (!take()) {
-        // A lock is broken only when its process is gone and its time is older than the intent's deadline.
-        try {
-          const held = JSON.parse(readFileSync(path, "utf8")) as { pid: number; time: string; notAfter: string };
-          if (!alive(held.pid) && (timeMs(held.time) ?? 0) < (timeMs(held.notAfter) ?? 0) && now() > (timeMs(held.notAfter) ?? Infinity)) { unlinkSync(path); if (!take()) return null; }
-          else return null;
-        } catch { return null; }
+      const path = lockPath(name);
+      return takeFile(path, { time: new Date(now()).toISOString(), notAfter }) ? async () => { release(path)(); } : null;
+    },
+    exclusive: async <T>(work: () => Promise<T>): Promise<T> => {
+      ensure();
+      const path = join(dir, "capacity.lease");
+      const until = Date.now() + LEASE_WAIT_MS;
+      while (!takeFile(path, { time: new Date(now()).toISOString() })) {
+        if (Date.now() > until) throw new CustodyError({ held: "locked" });
+        await new Promise((resolve) => setTimeout(resolve, 5));
       }
-      return async () => { try { unlinkSync(path); } catch { /* already gone */ } };
+      try { return await work(); } finally { release(path)(); }
     },
     read: async (name) => {
       ensure();
@@ -118,16 +201,36 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
     write: async (name, record) => {
       ensure();
       atomic(recordPath(name), canonicalize(record));
-      // An archived record that is written again lives as a file again; the index entry is dropped.
-      const table = index();
-      if (table[name]) { delete table[name]; atomic(indexPath, JSON.stringify(table)); }
-      if (TERMINAL.has(record.phase)) archive();
+      if (TERMINAL.has(record.phase)) archive(name);
     },
     unresolved: async () => { ensure(); return live().filter((r) => !TERMINAL.has(r.record.phase)).sort((a, b) => (a.record.created < b.record.created ? -1 : 1)).map((r) => ({ id: r.name, key: r.record.identity.key, created: r.record.created })); },
-    segment: async (name, outcomes) => { ensure(); appendFileSync(join(segments, `${id(name)}.jsonl`), outcomes.map((o) => `${JSON.stringify(o)}\n`).join(""), { mode: 0o600 }); },
-    segmented: async (name) => {
-      const path = join(segments, `${id(name)}.jsonl`);
-      return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l) as Outcome) : [];
+    segment: async (name, at, outcomes) => {
+      ensure();
+      const { data, ends } = segmentPaths(name);
+      const kept = endsOf(ends, 0, at);
+      if (kept.length < at) throw new Error(`the segment of ${name} holds fewer outcomes than its record counts`);
+      // Cut what an interrupted append left past the record's count, in both files, then append.
+      const base = at === 0 ? 0 : kept[at - 1]!;
+      if (existsSync(data)) truncateSync(data, base); else writeFileSync(data, "", { mode: 0o600 });
+      if (existsSync(ends)) truncateSync(ends, at * 8); else writeFileSync(ends, "", { mode: 0o600 });
+      const lines = outcomes.map((o) => Buffer.from(`${JSON.stringify(o)}\n`, "utf8"));
+      appendFileSync(data, Buffer.concat(lines), { mode: 0o600 });
+      const offsets = Buffer.alloc(lines.length * 8);
+      let end = base;
+      lines.forEach((line, i) => { end += line.length; offsets.writeBigUInt64LE(BigInt(end), i * 8); });
+      appendFileSync(ends, offsets, { mode: 0o600 });
+    },
+    segmented: async (name, from, limit) => {
+      const { data, ends } = segmentPaths(name);
+      if (limit <= 0 || !existsSync(data)) return [];
+      const offsets = endsOf(ends, Math.max(0, from - 1), from + limit);
+      const start = from === 0 ? 0 : offsets.shift();
+      if (start === undefined || offsets.length === 0) return [];
+      const end = offsets.at(-1)!;
+      const buffer = Buffer.alloc(end - start);
+      const fd = openSync(data, "r");
+      try { readSync(fd, buffer, 0, buffer.length, start); } finally { closeSync(fd); }
+      return buffer.toString("utf8").split("\n").filter((l) => l.length > 0).map((l) => JSON.parse(l) as Outcome);
     },
   };
 }
