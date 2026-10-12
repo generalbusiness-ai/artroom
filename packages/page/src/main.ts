@@ -20,7 +20,7 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, createdIssue, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, issueCreation, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { bindDisclosures, openDialog, releaseDialog } from "./popups.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
@@ -110,6 +110,36 @@ let lastVerifiedContext: string | null = null;
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
+interface CreationFollow { result: Acted; timer?: ReturnType<typeof setTimeout>; active: boolean }
+let creationFollow: CreationFollow | null = null;
+function cancelCreationFollow(): void {
+  if (!creationFollow) return;
+  creationFollow.active = false;
+  if (creationFollow.timer !== undefined) clearTimeout(creationFollow.timer);
+  creationFollow = null;
+}
+/** One bounded read at a time while native creation is positively pending; no new submission. */
+async function followCreatedIssue(room: Room, result: Acted, current: () => boolean): Promise<void> {
+  cancelCreationFollow();
+  const owned: CreationFollow = { result, active: true };
+  creationFollow = owned;
+  let reads = 0;
+  const active = () => owned.active && creationFollow === owned && lastActs.get(actAssociation(room, room.directory)) === result && current();
+  const check = async (): Promise<void> => {
+    if (!active()) { if (creationFollow === owned) cancelCreationFollow(); return; }
+    const read = await issueCreation(room, result, active); reads++;
+    if (!active()) { if (creationFollow === owned) cancelCreationFollow(); return; }
+    if (read.state === "confirmed") {
+      cancelCreationFollow();
+      location.hash = `#/issue/${read.child.scope}`;
+      await draw();
+    } else if (read.state === "pending") {
+      owned.timer = setTimeout(() => { void check(); }, Math.min(500 * 2 ** Math.min(reads - 1, 4), 5_000));
+    } else cancelCreationFollow(); // Unavailable/malformed: retain the known Answer and manual read action.
+  };
+  await check();
+}
+
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
@@ -504,6 +534,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
+    cancelCreationFollow();
     if (refusalDialog?.context === association) closeRefusal();
     showLocally(h("p", { role: "status" }, "Sending request"), true, "Sending request");
     void (async () => {
@@ -820,6 +851,7 @@ async function draw(focus = false): Promise<void> {
       return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record"));
     }
     const kind = destination === "changes" ? "change" : "issue";
+    const capturedListRoute = location.hash;
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
     const lanes = await listLanes(room);
     const offered = await actsOn(room, room.directory);
@@ -827,10 +859,7 @@ async function draw(focus = false): Promise<void> {
     const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
     const panel = await panelFor(loaded, loaded.directory, {}, { offered, settled: async (result, current) => {
       if (result.kind !== "open-issue") return;
-      const child = await createdIssue(loaded, result);
-      if (!child || !current()) return; // Accepted but not yet confirmed: refresh the list; never guess a child.
-      location.hash = `#/issue/${child.scope}`;
-      await draw();
+      await followCreatedIssue(loaded, result, current);
     }, tasks: (acts, send, context) => {
       if (destination === "changes") {
         const open = acts.acts.find(act => act.kind === "open-pr");
@@ -845,6 +874,12 @@ async function draw(focus = false): Promise<void> {
       // declaration from Inspect (for example a custom required field).
       return control.hasAttribute("data-task-act") ? [open.kind] : [];
     } });
+    const original = lastActs.get(actAssociation(loaded, loaded.directory));
+    if (original?.kind === "open-issue" && original.answer.answer === "accepted" && original.observation === null) {
+      const check = h("button", { type: "button" }, "Check created issue");
+      check.addEventListener("click", () => { if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== originalContext || location.hash !== capturedListRoute) return; void followCreatedIssue(loaded, original, () => currentDraw === drawing && settingsContext(settings() ?? { place: null, secret: "" }) === originalContext && location.hash === capturedListRoute); });
+      screen.append(h("p", {}, check));
+    }
     return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record"));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
@@ -861,5 +896,5 @@ async function draw(focus = false): Promise<void> {
   }
 }
 
-window.addEventListener("hashchange", () => { void draw(true); });
+window.addEventListener("hashchange", () => { cancelCreationFollow(); void draw(true); });
 void draw();

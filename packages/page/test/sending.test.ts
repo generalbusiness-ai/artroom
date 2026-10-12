@@ -318,7 +318,8 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   const close={kind:'close-own',step:'transition',on:'intent',line:'Close',fields:[{name:'reason',type:'enum',required:false,choices:[{label:'Completed',value:'completed'},{label:'Not planned',value:'not-planned'}]}]};
   let listedIssue=false;
   const childRead=gate(), releaseChild=gate();
-  const createdChild=vi.fn(async(_room:unknown,_result:unknown)=>{childRead.resolve();await releaseChild.promise;listedIssue=true;return issue.ref;});
+  let creationReads=0, childConfirmed=false;
+  const createdChild=vi.fn(async(_room:unknown,_result:unknown)=>{if(++creationReads===1){childRead.resolve();await releaseChild.promise;}if(!childConfirmed)return {state:'pending'};listedIssue=true;return {state:'confirmed',child:issue.ref};});
   const posts=vi.fn();const attempts:{args:unknown[];finish:(answer:'accepted'|'refused')=>void;lose:()=>void}[]=[];
   let attempted=gate();
   const act=vi.fn((...args:unknown[])=>{
@@ -330,7 +331,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   vi.doMock('@generalbusiness/artroom-bytes',async()=>({...await vi.importActual<typeof import('@generalbusiness/artroom-bytes')>('@generalbusiness/artroom-bytes'),b64url:()=> 'device',unb64url:()=>new Uint8Array(32),keyIdOfSecret:()=> 'key'}));
   // resetModules keeps cached manual mocks. Use this case's actual view.
   vi.doMock('../src/view.ts', async () => vi.importActual<typeof import('../src/view.ts')>('../src/view.ts'));
-  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,initializationStillCurrent:async()=>true,roomInitialization:async()=>({state:"configured"}),createdIssue:createdChild,openRoom:async()=>room,listLanes:async()=>({issues:listedIssue?[{scope:issue.scope,number:1,title:'Native issue',state:'open'}]:[],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope==='rules'?[publish,otherRule]:scope===change.scope?[comment,review]:[comment,close],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:async()=>loadedRules,siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
+  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,initializationStillCurrent:async()=>true,roomInitialization:async()=>({state:"configured"}),issueCreation:createdChild,openRoom:async()=>room,listLanes:async()=>({issues:listedIssue?[{scope:issue.scope,number:1,title:'Native issue',state:'open'}]:[],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope==='rules'?[publish,otherRule]:scope===change.scope?[comment,review]:[comment,close],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:async()=>loadedRules,siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
   vi.doMock('../src/retained-editor.ts',()=>({retainedEditor:()=>new Node('div')}));
   let redraw!:()=>void;const location={origin:'https://page.test',hash:'#/'};
   vi.stubGlobal('document',doc);vi.stubGlobal('location',location);vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify(settings)});vi.stubGlobal('window',{addEventListener:(_name:string,callback:()=>void)=>{redraw=callback;}});
@@ -383,11 +384,23 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(form.querySelector<Node>('[name="field:title"]')!.value).toBe('Original creation draft');
     expect(body.querySelectorAll<Node>('dialog').filter(node=>node.open)).toHaveLength(1);
     attempted=gate();form.emit('submit');await attempted.promise;
+    vi.useFakeTimers();
     rendered=gate();attempts[1]!.finish('accepted');await childRead.promise;
     expect(location.hash).toBe('#/'); // A known acceptance alone does not supply a child address.
     releaseChild.resolve();await rendered.promise;
-    expect(dialog.open).toBe(false);expect(root.textContent).toContain('Native issue');
+    expect(location.hash).toBe('#/');expect(root.textContent).not.toContain('Native issue');
     expect(createdChild).toHaveBeenCalledTimes(1);
+    const nativePosts = posts.mock.calls.length, nativeActs = act.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(110_000); // Virtual time only: legitimate pending creation outlives the old twenty-read cutoff.
+    expect(createdChild.mock.calls.length).toBeGreaterThan(20);
+    expect(location.hash).toBe('#/');
+    expect([posts.mock.calls.length,act.mock.calls.length]).toEqual([nativePosts,nativeActs]);
+    childConfirmed=true;rendered=gate();await vi.advanceTimersByTimeAsync(5_000);await rendered.promise;
+    vi.useRealTimers();
+    expect(dialog.open).toBe(false);expect(root.textContent).toContain('Native issue');
+    expect(createdChild.mock.calls.length).toBeGreaterThan(21);
+    expect(createdChild.mock.calls[1]?.[1]).toBe(createdChild.mock.calls[0]?.[1]);
+    expect([posts.mock.calls.length,act.mock.calls.length]).toEqual([nativePosts,nativeActs]);
     expect(createdChild.mock.calls[0]?.[0]).toBe(room);
     expect(location.hash).toBe(`#/issue/${issue.scope}`);
     location.hash='#/';await refresh();
@@ -491,6 +504,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(true);
     const unknownAttempts=act.mock.calls.length;form.emit('submit');await refresh();expect(act).toHaveBeenCalledTimes(unknownAttempts);expect(posts).toHaveBeenCalledTimes(unknownAttempts);
   } finally {
+    vi.clearAllTimers();vi.useRealTimers();
     // Every held fake attempt is drained before removing its document.
     for(const attempt of attempts)attempt.lose();for(let n=0;n<30;n++)await Promise.resolve();
     vi.unstubAllGlobals();vi.doUnmock('../src/view.ts');vi.doUnmock('../src/data.ts');vi.doUnmock('../src/retained-editor.ts');vi.doUnmock('@generalbusiness/artroom-bytes');vi.resetModules();

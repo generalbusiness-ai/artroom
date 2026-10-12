@@ -33,7 +33,7 @@
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/artroom-contract";
 import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
@@ -899,32 +899,66 @@ export interface Acted {
   service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
   answer: Answer; before: Head; after: Head | null; observation: string | null;
 }
-/** Resolve only the native directory row opened by this exact accepted request. */
-export async function createdIssue(room: Room, result: Acted): Promise<ScopeRef | null> {
-  if (result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
-    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return null;
+export type IssueCreation = { state: "confirmed"; child: ScopeRef } | { state: "pending" } | { state: "unavailable" };
+/** Read only the original accepted creation; missing proof is never a pending outcome. */
+export async function issueCreation(room: Room, result: Acted, current: () => boolean = () => true): Promise<IssueCreation> {
+  const unavailable: IssueCreation = { state: "unavailable" };
+  if (!current() || result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
+    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return unavailable;
   try {
     await fresh(room);
+    if (!current()) return unavailable;
     const receipt = result.answer.receipt, handle = handleOf(room, room.directory);
     const source = await handle.entry(receipt.fact.seq);
-    if (!source.ok || !source.complete || source.next !== undefined) return null;
+    if (!current()) return unavailable;
+    if (!source.ok || !source.complete || source.next !== undefined) return unavailable;
     const entry = source.value.entry;
     if (entry.seq !== receipt.fact.seq || canonicalize(entry.at) !== canonicalize(receipt.fact.at) || entryHash(entry) !== receipt.fact.hash || source.value.hash !== receipt.fact.hash
       || entry.input.type !== "act" || entry.input.signed.intent.kind !== "open-issue" || !verifySignedIntent(entry.input.signed)
-      || canonicalize(entry.input.signed.intent.to) !== canonicalize(receipt.fact.at) || entry.input.signed.intent.actor !== room.key || intentDigest(entry.input.signed.intent) !== receipt.intent) return null;
+      || canonicalize(entry.input.signed.intent.to) !== canonicalize(receipt.fact.at) || entry.input.signed.intent.actor !== room.key || intentDigest(entry.input.signed.intent) !== receipt.intent) return unavailable;
     const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
-    if (creates.length !== 1) return null;
+    if (creates.length !== 1) return unavailable;
     const seed = creates[0]!.to;
-    if (!isSeed(seed) || seed.kind !== "lane" || canonicalize(seed.creator) !== canonicalize(receipt.fact.at) || seed.cause !== receipt.intent) return null;
-    const { summary } = await summaryOf(handle);
-    if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return null;
+    if (!isSeed(seed) || seed.kind !== "lane" || canonicalize(seed.creator) !== canonicalize(receipt.fact.at) || seed.cause !== receipt.intent) return unavailable;
+    const { summary, at } = await summaryOf(handle);
+    if (!current()) return unavailable;
+    if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return unavailable;
     const row = summary.items.find(item => item.id === receipt.fact.seq && item.type === "lane" && item.values["kind"] === "issue");
     const child = row?.refs["scope"];
-    if (!row || row.state !== "listed" || !fullScopeRef(child) || child.kind !== "lane" || child.scope !== scopeIdOf(seed)) return null;
+    if (!row || row.state !== "listed") return unavailable;
+    const pending = async (provisional: boolean): Promise<IssueCreation> => {
+      const dutyId: DutyId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      if (!receipt.sends.includes(dutyId)) return unavailable;
+      if (!current()) return unavailable;
+      const read = await handle.followDuty(dutyId);
+      if (!current()) return unavailable;
+      if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
+      const duty = read.value;
+      if (duty.duty !== dutyId || duty.class !== "request" || duty.held || canonicalize(duty.to) !== canonicalize(seed) || duty.diagnosis !== null) return unavailable;
+      const final = await summaryOf(handle);
+      if (!current()) return unavailable;
+      if (canonicalize(final.summary.scope) !== canonicalize(receipt.fact.at)) return unavailable;
+      // A normal listed row has no child reference until create.applied.
+      // An applied result can precede the earlier projection or child confirmation.
+      if ((!provisional && duty.result === null) || (duty.result?.clause === "applied" && (provisional || duty.result.seq > at.seq))) return { state: "pending" };
+      return unavailable;
+    };
+    if (child === undefined || child === null) return await pending(false);
+    if (!fullScopeRef(child) || child.kind !== "lane" || child.scope !== scopeIdOf(seed)) return unavailable;
+    if (!current()) return unavailable;
     const read = await summaryOf(handleOf(room, child.scope));
-    if (read.summary.status !== "active" || canonicalize(read.summary.scope) !== canonicalize(child) || !read.summary.items.some(item => item.type === "intent")) return null;
-    return structuredClone(child);
-  } catch { return null; }
+    if (!current()) return unavailable;
+    if (canonicalize(read.summary.scope) !== canonicalize(child) || !read.summary.items.some(item => item.type === "intent")) return unavailable;
+    if (read.summary.status === "provisional") return await pending(true);
+    if (read.summary.status !== "active") return unavailable;
+    return { state: "confirmed", child: structuredClone(child) };
+  } catch { return unavailable; }
+}
+
+/** Immediate selection only; callers needing later native confirmation use issueCreation. */
+export async function createdIssue(room: Room, result: Acted): Promise<ScopeRef | null> {
+  const read = await issueCreation(room, result);
+  return read.state === "confirmed" ? read.child : null;
 }
 
 /** Memory-only association; contains no signing key or current permission. */

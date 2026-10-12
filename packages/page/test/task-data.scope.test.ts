@@ -2,10 +2,10 @@ import { expect, test } from "vitest";
 import { digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
-import { act, actsOn, createdIssue, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
+import { act, actsOn, issueCreation, createdIssue, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
 import { demo, type Demo } from "./support/demo.ts";
 import { ScopeHandle, httpTransport, secretSigner, signedReads, REPLY_BYTES, REPLY_SECONDS } from "@generalbusiness/artroom-client";
-import type { ScopeId, FactRef } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type ScopeId, type FactRef } from "@generalbusiness/artroom-contract";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { Platform } from "../../scope/test/repository.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
@@ -133,8 +133,11 @@ test("native task data supplies active issue choices, detached Description, exac
   let lastStarted = "none", lastCompleted = "none";
   let badSelection = false, unavailableMembers = false, unavailableExtents = false, noCurrent = false;
   let membershipPath = "";
+  let holdIssueCreation = true, creationPosts = 0;
+  let directoryActPath = "";
   console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "setup", lastCompleted);
   const d = await demo((fetch, owner) => async (url, init) => {
+    if (init?.method === "POST" && new URL(url).pathname === directoryActPath) creationPosts++;
     const response = await fetch(url, init);
     if (unavailableMembers && new URL(url).pathname === membershipPath && init?.method !== "POST") {
       await owner.required(async () => { await response.body?.getReader().cancel(); });
@@ -150,12 +153,13 @@ test("native task data supplies active issue choices, detached Description, exac
       if (noCurrent && item.type === "manifest") (item as unknown as { state: string }).state = "superseded";
     }
     return Response.json(read);
-  }, null, { invitation: false });
+  }, null, { invitation: false, holdIssueCreation: () => holdIssueCreation });
   console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
   try {
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "rules-and-issue-choices", lastCompleted);
     const room = await openRoom(d.as(await d.secretOf(d.rita)), placeOf(JSON.stringify(d.config))!);
     membershipPath = `/v1/scopes/${d.M.name}`;
+    directoryActPath = `/v1/scopes/${d.D.name}/acts`;
     const extents = firstExtents({ approvals: 0, checks: [] });
     const publishedRules = await act(room, room.rules, "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: fieldValue(room, "code", JSON.stringify(extents)) } });
     expect(publishedRules.answer.answer, JSON.stringify(publishedRules.answer)).toBe("accepted");
@@ -167,7 +171,20 @@ test("native task data supplies active issue choices, detached Description, exac
     if (created.answer.answer !== "accepted") throw new Error("Issue opening was not accepted");
     console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "rules-and-issue-choices");
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "accepted-entry-and-native-child", lastCompleted);
-    const child = await completeIssue(d, room, created.answer.receipt.fact);
+    const originalFact = created.answer.receipt.fact;
+    expect(creationPosts).toBe(1);
+    // The transport holds this actual native create; the original accepted row has no child yet.
+    const pendingRead = await d.sessionOwner.required(() => d.D.stub.summary(room.reader!.reader()));
+    expect(pendingRead.ok).toBe(true);
+    if (!pendingRead.ok) throw new Error("Original accepted directory row unreadable");
+    const originalRow = pendingRead.value.items.find(item => item.id === originalFact.seq && item.type === "lane");
+    expect([originalRow?.state, originalRow?.refs["scope"] ?? null]).toEqual(["listed", null]);
+    expect(await issueCreation(room, created)).toEqual({ state: "pending" });
+    holdIssueCreation = false;
+    d.advanceClock(PROPOSED_BOUNDS.dispatchRetrySeconds * 1_000); // The owned stand-in clock releases the first native retry backoff; no client ACT.
+    const child = await completeIssue(d, room, originalFact);
+    expect(creationPosts).toBe(1);
+    expect(created.answer.receipt.fact).toEqual(originalFact);
     console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "accepted-entry-and-native-child");
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "issue-description", lastCompleted);
     const issue = (await listLanes(room)).issues.find((row) => row.title === "Clear task")!;
