@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { issueDemo } from "@generalbusiness/artroom-lanes";
+import { change, issueDemo } from "@generalbusiness/artroom-lanes";
 import { lane as deriveLane } from "@generalbusiness/artroom-derive/testing";
 import { counting } from "../../../examples/counting/definition.ts";
-import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Inventory } from "../src/index.ts";
+import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, describedOf, generationOf, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Inventory } from "../src/index.ts";
 import { ACTIVE_DEMO, MEMBERSHIP, declared, demoInventory, heldOf, lane, standingOf } from "./support/catalogue.ts";
 
 const DOC = readFileSync(new URL("../../../docs/mcp.md", import.meta.url), "utf8");
@@ -96,5 +96,60 @@ describe("descriptions are derived from the whole declaration", () => {
       if (typeof b.act.grant === "string") expect(standingOf("member").known && (standingOf("member") as { actions: readonly string[] }).actions).toContain(b.act.grant);
     }
     expect(lane(9, issueDemo).definition.name).toBe("issue");
+  });
+
+  // Invariant: a description speaks for one meaning: two definitions whose act and item rows match but whose rule body or
+  // profile differs are two declarations, each tool's text holds its own rule body, and the names, the texts and the generation
+  // do not depend on the order of the scopes.
+  test("same rows, a different rule body or profile: two tools, each with its own meaning", () => {
+    const relaxed = { ...counting, rules: { ...counting.rules, "spoken-plan": "true" } };
+    const profiled = { ...counting, profile: { name: "restricted", version: 2 } };
+    const roots: Parameters<typeof heldOf>[] = [["sc_c1", "root", definitionDigest(counting), declared(counting)], ["sc_c2", "root", definitionDigest(relaxed), declared(relaxed)]];
+    const inventoryOf = (order: Parameters<typeof heldOf>[]) => room(order, "member", ["counting.spoken", "counting.join"]);
+    const spoken = (inv: Inventory) => bindingsOf(inv, WORDS).filter((b) => b.definition === "counting" && b.kind === "spoken");
+    const [a, b] = spoken(inventoryOf(roots));
+    expect([spoken(inventoryOf(roots)).length, a!.name.startsWith("counting.spoken@"), b!.name.startsWith("counting.spoken@")]).toEqual([2, true, true]);
+    const texts = spoken(inventoryOf(roots)).map((x) => describedOf(x, inventoryOf(roots), "default").complete);
+    expect(texts.filter((t) => t.includes(`the rule spoken-plan holds: ${counting.rules["spoken-plan"]}`))).toHaveLength(1);
+    expect(texts.filter((t) => t.includes("the rule spoken-plan holds: true"))).toHaveLength(1);
+    // join names no rule: one tool serves both digests.
+    expect(bindingsOf(inventoryOf(roots), WORDS).filter((x) => x.kind === "join" && x.definition === "counting").map((x) => x.digests.length)).toEqual([2]);
+    // A profile is part of the meaning too.
+    const withProfile = inventoryOf([roots[0]!, ["sc_c3", "root", definitionDigest(profiled), declared(profiled)]]);
+    expect(bindingsOf(withProfile, WORDS).filter((x) => x.kind === "join" && x.definition === "counting")).toHaveLength(2);
+    // Reordering the scopes changes no name, no text and no generation.
+    const sent = (inv: Inventory) => bindingsOf(inv, WORDS).filter((x) => listed(x, inv)).map((x) => [x.name, actTool(x, inv, "default").description]);
+    const options = { mode: "default" as const, tools: null, words: WORDS };
+    const [forward, backward] = [inventoryOf(roots), inventoryOf([...roots].reverse())];
+    expect(sent(backward)).toEqual(sent(forward));
+    expect(generationOf(bindingsOf(backward, WORDS), backward, options)).toBe(generationOf(bindingsOf(forward, WORDS), forward, options));
+  });
+
+  // Invariant: what a tool says of authority and inputs is complete and true: with the standing unknown on some memberships of
+  // its scopes, the tool is listed and never said to be held; presented facts are closed properties of the input schema, required
+  // as the act declares; and a capability's item range keeps its exception.
+  test("partly unknown standing, presented facts in the schema, and a capability's exception", () => {
+    const inventory = room([["sc_g1", "root", definitionDigest(counting), declared(counting), "sc_unknown_membership" as never]], "member", ["counting.join"]);
+    const join = bindingsOf(inventory, WORDS).find((x) => x.definition === "counting" && x.kind === "join")!;
+    const mixed: Inventory = { ...inventory, scopes: [...inventory.scopes, heldOf("sc_g2", "root", definitionDigest(counting), declared(counting))] };
+    const both = bindingsOf(mixed, WORDS).find((x) => x.definition === "counting" && x.kind === "join")!;
+    expect([listed(join, inventory), listed(both, mixed)]).toEqual([true, true]);
+    const text = actTool(both, mixed, "default").description;
+    expect(text).toContain("your standing is unknown on some scopes of this kind");
+    expect(text).not.toMatch(/holds/);
+    // change's propose-manifest presents an optional pin.
+    const changeInventory = room([["sc_ch", "lane", definitionDigest(change), declared(change)]], "member", ["change.propose"]);
+    const manifest = bindingsOf(changeInventory, WORDS).find((x) => x.definition === "change" && x.kind === "propose-manifest")!;
+    const presented = (actTool(manifest, changeInventory, "default").inputSchema["properties"] as Record<string, Record<string, unknown>>)["presented"]!;
+    expect([presented["additionalProperties"], presented["required"], Object.keys(presented["properties"] as object)]).toEqual([false, [], ["pin"]]);
+    const pin = (presented["properties"] as Record<string, Record<string, unknown>>)["pin"]!;
+    expect([pin["required"], pin["additionalProperties"], pin["description"]]).toEqual([["at", "seq", "hash"], false, "an entry of kind hold@1:check under issue; optional"]);
+    const required: ActLike = { ...manifest.act, presents: { pin: { kind: ["k"], under: "d", required: true } } };
+    const schema = actTool({ ...manifest, act: required }, changeInventory, "default").inputSchema;
+    expect([(schema["required"] as string[]).includes("presented"), ((schema["properties"] as Record<string, Record<string, unknown>>)["presented"]!["required"])]).toEqual([true, ["pin"]]);
+    // A capability argument over an item range keeps the range's exception.
+    const range = { type: "t", states: ["a"], except: ["also.x"] };
+    const act: ActLike = { step: "transition", on: "t", grant: "g", also: { x: { item: "t", by: "f" } }, fields: { f: { type: "text", max: 9, required: true } }, guards: [{ capability: { name: "hold", guard: "staged", with: { c: { items: range, slot: "s" } } } }], effects: [] };
+    expect(inline(guardSentences({ name: "x", genesis: "g0", items: { t: {} }, acts: { a: act } }, act, { pinned: "sha256:x" })[0]!)).toMatch(/the s of each t that is a, except /);
   });
 });

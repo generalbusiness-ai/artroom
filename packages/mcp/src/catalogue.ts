@@ -21,9 +21,10 @@
  */
 
 import type { Digest, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, digestBytes, hex, sha256, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, hex, isPlatformDefinition, sha256, utf8 } from "@generalbusiness/artroom-bytes";
 import { actInputSchema, describeAct, grantAction, type ActLike, type DefinitionLike, type Described, type Who } from "./describe.ts";
 import { surfaceOf, wordsDigest, type Words } from "./words.ts";
+import { markRefusals, markText } from "./marks.ts";
 
 /** Where a scope of the inventory sits. */
 export type Place = "register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "lane" | "root";
@@ -101,10 +102,35 @@ function itemsNamed(act: unknown, items: Readonly<Record<string, unknown>>): Rec
   return Object.fromEntries([...named].sort().map((name) => [name, items[name]]));
 }
 
-/** The digest of an act declaration, with the item types it names (section 3, "One tool per act declaration"). */
-export function declarationDigest(definition: DefinitionLike, kind: string): Digest {
+/** The names of the rules an act's guards name, and the platform marks (`{ code, row }`) they carry, anywhere in them. */
+function rendered(act: unknown): { rules: Set<string>; marks: Map<string, { code: string; row: string }> } {
+  const rules = new Set<string>();
+  const marks = new Map<string, { code: string; row: string }>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (typeof v !== "object" || v === null) return;
+    const o = v as Record<string, unknown>;
+    if (typeof o["rule"] === "string") rules.add(o["rule"]);
+    if (typeof o["code"] === "string") marks.set(`${o["code"]} ${String(o["row"] ?? "")}`, { code: o["code"], row: String(o["row"] ?? "") });
+    for (const x of Object.values(o)) walk(x);
+  };
+  walk(act);
+  return { rules, marks };
+}
+
+/**
+ * The digest of an act declaration and everything its rendering reads (section 3, "One tool per act declaration"): the act, the
+ * item types it names, the bodies of the rules its guards name, the definition's profile, and, for a platform definition, the
+ * text and refusal names of each mark it carries in the pinned version. Two definitions whose rows match but whose rule bodies,
+ * profile or marks differ are two declarations, so no description can speak for the other's meaning.
+ */
+export function declarationDigest(definition: DefinitionLike, kind: string, pinned?: string): Digest {
   const act = definition.acts[kind];
-  return digestBytes(utf8(canonicalize({ act, items: itemsNamed(act, definition.items) })));
+  const { rules, marks } = rendered(act);
+  const bodies = Object.fromEntries([...rules].sort().map((name) => [name, definition.rules?.[name] ?? null]));
+  const marked = pinned === undefined || !isPlatformDefinition(pinned) ? {} : Object.fromEntries([...marks.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, m]) => [k, [markText(pinned, m), [...markRefusals(pinned, m.code)]]]));
+  const profile = (definition as { profile?: unknown }).profile ?? null;
+  return digestBytes(utf8(canonicalize({ act, items: itemsNamed(act, definition.items), rules: bodies, profile, marks: marked } as never)));
 }
 
 /** The variant of a binding identity: hex of a digest over it, `chars` long. */
@@ -119,7 +145,7 @@ export function bindingsOf(inventory: Inventory, words: Words): Binding[] {
     const d = held.definition;
     for (const kind of Object.keys(d.acts).sort()) {
       if (kind === d.genesis) continue;
-      const declaration = declarationDigest(d, kind);
+      const declaration = declarationDigest(d, kind, held.pinned);
       const key = `${d.name}\n${kind}\n${declaration}`;
       let binding = byIdentity.get(key);
       if (!binding) {
@@ -157,7 +183,7 @@ export function whoOf(binding: Binding, inventory: Inventory): Who {
   const action = grantAction(binding.act);
   const standings = [...new Set(binding.scopes.map((s) => s.membership))].map((m) => (m === null ? undefined : inventory.standing[m]));
   if (standings.some((s) => s === undefined || !s.known)) {
-    return standings.every((s) => s === undefined || !s.known) ? { standing: "unknown" } : { standing: "mixed" };
+    return standings.every((s) => s === undefined || !s.known) ? { standing: "unknown" } : { standing: "partly-unknown" };
   }
   const known = standings as Extract<Standing, { known: true }>[];
   const holds = known.map((s) => action !== null && s.actions.includes(action));

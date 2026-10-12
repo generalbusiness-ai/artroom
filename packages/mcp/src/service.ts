@@ -313,7 +313,7 @@ export class McpService {
     const definition = await this.#definition(s, summary.definition, scope, membership);
     const act = definition.acts[kind];
     // The binding check, before anything is signed: the target's pinned definition and declaration are the ones this tool serves.
-    const declaration = act && kind !== definition.genesis ? declarationDigest(definition, kind) : null;
+    const declaration = act && kind !== definition.genesis ? declarationDigest(definition, kind, summary.definition) : null;
     // A tool bound to other declarations refuses before anything is signed, and the list is derived again.
     const stale = async (): Promise<CallResult> => {
       const fresh = await this.snapshot();
@@ -492,7 +492,7 @@ export class McpService {
       if (!act || kind === definition.genesis) return failed({ error: "shape", field: "describe", what: `is not an act of ${definition.name}`, declared: Object.keys(definition.acts).filter((k) => k !== definition.genesis).join(", ") });
       const binding = s.bindings.find((b) => b.definition === definition.name && b.kind === kind && b.digests.includes(summary.definition));
       const complete = binding ? describedOf(binding, s.read.inventory, this.mode).complete
-        : describeAct(definition, kind, act, { standing: "unknown" }, { pinned: summary.definition, active: s.read.inventory.active }, { definition: definition.name, kind, declaration: declarationDigest(definition, kind), digests: [summary.definition] }, "").complete;
+        : describeAct(definition, kind, act, { standing: "unknown" }, { pinned: summary.definition, active: s.read.inventory.active }, { definition: definition.name, kind, declaration: declarationDigest(definition, kind, summary.definition), digests: [summary.definition] }, "").complete;
       const part = sliceText(complete, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
       return ok({ scope, kind, tool: binding?.name ?? null, text: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total }, BOUNDS.large);
     }
@@ -741,7 +741,7 @@ export class McpService {
     const identity: Identity = { service: this.#service, membership: M, signer: this.#port.signer.key, target: M, key: key as string };
     const meaning = meaningOf({ join: textDigest(canonicalize(link as never)) });
     const build = async () => ({
-      binding: { definition: "platform:membership", kind: "join", declaration: declarationDigest(membershipData!, "join"), pinned: named },
+      binding: { definition: "platform:membership", kind: "join", declaration: declarationDigest(membershipData!, "join", named), pinned: named },
       envelope: { signed: await signedIntent(this.#port.signer, { to: M, kind: "join", fields, expected: expectedOf(act, [], null, fields) }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
     });
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);

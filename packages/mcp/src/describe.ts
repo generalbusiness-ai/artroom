@@ -46,6 +46,8 @@ export type Who =
   | { standing: "holds"; role: string }
   | { standing: "lacks"; role: string | null }
   | { standing: "unknown" }
+  /** Known on some of the binding's memberships and unknown on others: never said to be held, and still listed. */
+  | { standing: "partly-unknown" }
   | { standing: "mixed" };
 
 /** What a rendering needs besides the act: the definition's pinned name or digest, and the choices of a definition value place. */
@@ -100,6 +102,7 @@ export function actSentence(kind: string, act: ActLike, who: Who): string {
     sign = who.standing === "holds" ? `needs ${action}, which your role (${who.role}) holds`
       : who.standing === "lacks" ? `needs ${action}, which your role${who.role ? ` (${who.role})` : ""} does not hold`
       : who.standing === "mixed" ? `needs ${action}, which your role holds on some scopes of this kind`
+      : who.standing === "partly-unknown" ? `needs ${action}; your standing is unknown on some scopes of this kind, and each scope decides`
       : `needs ${action}; your standing here is unknown`;
   }
   return `${kind}: ${what}; ${sign}${transitionOf(act)}`;
@@ -315,7 +318,7 @@ export function sentence(g: unknown, at: Scope): Sentence {
 
 function capabilityArg(arg: unknown, at: Scope): string {
   if (isRecord(arg) && arg["each"] !== undefined && typeof arg["as"] === "string") return `${operand(arg["value"], at)} for each ${arg["as"]} in ${operand(arg["each"], at)}`;
-  if (isRecord(arg) && isRecord(arg["items"]) && typeof arg["slot"] === "string") { const r = range(arg["items"], at); return `the ${arg["slot"]} of each ${r.type} that is ${r.states}${r.where}`; }
+  if (isRecord(arg) && isRecord(arg["items"]) && typeof arg["slot"] === "string") { const r = range(arg["items"], at); return `the ${arg["slot"]} of each ${r.type} that is ${r.states}${r.where}${r.except}`; }
   return operand(arg, at);
 }
 
@@ -462,6 +465,30 @@ export function onOf(act: ActLike): "required" | "absent" {
   return act.step === "transition" || (act.step === "comment" && act.on !== null) ? "required" : "absent";
 }
 
+/** A presented fact: an entry by its scope reference, its position and its hash. */
+const FACT_SCHEMA = {
+  type: "object",
+  properties: {
+    at: { type: "object", properties: { scope: { type: "string" }, inc: { type: "string" }, kind: { type: "string" } }, required: ["scope", "inc", "kind"], additionalProperties: false },
+    seq: { type: "integer", minimum: 0 },
+    hash: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+  },
+  required: ["at", "seq", "hash"],
+  additionalProperties: false,
+} as const;
+
+/** The facts an act presents, each by the name it declares, with the kinds and the definition it must be under; closed. */
+function presentedSchema(act: ActLike): Schema {
+  const presents = Object.entries(act.presents ?? {});
+  return {
+    type: "object",
+    description: "Facts presented beside the intent, by the names the act declares.",
+    properties: Object.fromEntries(presents.map(([name, p]) => [name, { ...FACT_SCHEMA, description: `an entry of kind ${or(p.kind)} under ${p.under}${p.required ? "" : "; optional"}` }])),
+    required: presents.filter(([, p]) => p.required).map(([name]) => name),
+    additionalProperties: false,
+  };
+}
+
 /** The controls of an act tool, at the top level; the declared fields under `fields`, so no field can collide with a control. */
 export function actInputSchema(act: ActLike, setting: Setting, target: "required" | "optional"): Schema {
   const beside = besideOf(act);
@@ -473,9 +500,10 @@ export function actInputSchema(act: ActLike, setting: Setting, target: "required
     resubmit: { type: "boolean", description: "Send a refused envelope again, deliberately. The default is false." },
     fields: { type: "object", properties: Object.fromEntries(fields.map(([n, f]) => [n, schemaOf(f, setting)])), required: fields.filter(([, f]) => f.required).map(([n]) => n), additionalProperties: false },
     ...(beside.texts ? { texts: { type: "array", items: { type: "string" }, description: "Detached texts whose digests the fields name." } } : {}),
-    ...(beside.presented ? { presented: { type: "object", description: "Facts presented beside the intent, by the names the act declares: { at, seq, hash }." } } : {}),
+    ...(beside.presented ? { presented: presentedSchema(act) } : {}),
     ...(beside.values ? { values: { type: "array", items: { type: "string" }, description: "Values beside the intent, each its canonical JSON text." } } : {}),
   };
-  const required = ["idempotencyKey", ...(target === "required" ? ["target"] : []), ...(onOf(act) === "required" ? ["on"] : []), ...(fields.some(([, f]) => f.required) ? ["fields"] : [])];
+  const required = ["idempotencyKey", ...(target === "required" ? ["target"] : []), ...(onOf(act) === "required" ? ["on"] : []), ...(fields.some(([, f]) => f.required) ? ["fields"] : []),
+    ...(Object.values(act.presents ?? {}).some((p) => p.required) ? ["presented"] : [])];
   return { type: "object", properties, required, additionalProperties: false };
 }

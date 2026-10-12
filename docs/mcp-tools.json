@@ -764,7 +764,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "ask-rules",
-          "declaration": "sha256:73db9f108305b5b88749e06ac3da698206c7583bb978c503f52584211ad8baa3",
+          "declaration": "sha256:405421e21bc8bacb49371a9deb7adb638b7bf4c796ecc89d85388fd4cc9ae0be",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -875,7 +875,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "cancel-merge",
-          "declaration": "sha256:f01c9c0f8b3da9dec87fa9a4bb7904ee70a880fc5a3bafd965521453a7ffd186",
+          "declaration": "sha256:fb080872e8587741a8c222d9c30a134a50840b09f91d5df62dd72a3a7d6107a0",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -986,7 +986,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "close-own",
-          "declaration": "sha256:be924ecff680e006d58e690316fee9e9477635d3c421941e933abf2023a509d8",
+          "declaration": "sha256:47a0b9a2a23d9c9ad60150b6af0bb57ec275112c280e58c73eddfc01118d8bed",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1136,7 +1136,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "comment",
-          "declaration": "sha256:43f415b36af05cc148821c10fc16c4de5f6b56d9cce66f72da14782ef0485679",
+          "declaration": "sha256:877c3c493b6304f9c50323cd8e4896ef8e918488ecd970e7459c21737b14ff65",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1277,7 +1277,7 @@
         "dap/binding": {
           "definition": "platform:directory",
           "kind": "open-pr",
-          "declaration": "sha256:755a6ff09fe1ddbe31d6d75b6500a5a447dfc919940dedead4c0ceb4fc063de6",
+          "declaration": "sha256:22221698e98bdb88b47d22c513e2f41cb27d10a3dfb814ba57dab73c479a4315",
           "digests": [
             "platform:directory@3"
           ]
@@ -1414,7 +1414,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "edit-own",
-          "declaration": "sha256:94bf177a784fe57523b3d2b423d5e79f2ae7ee5854dc97788fdabd04477e2073",
+          "declaration": "sha256:e512924535b8dfd5d7c742c5ad54d89f89fbaeebfe9b2974eb555126c5cb03f8",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1545,7 +1545,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "link-own",
-          "declaration": "sha256:2258e7f8992f821957fa4b6139ca071f687a9fb8bbccef77c61332f9ff8a4761",
+          "declaration": "sha256:f9c0900112ceb94e20911a92cc026295036b089283d48313637ea8f4f1d7066c",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1673,7 +1673,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "merge",
-          "declaration": "sha256:045c6488d6c3ec8ff62431bb393de085ca7c6a526252c1d2e89dc50b88305363",
+          "declaration": "sha256:0cb811b20e7f1564a9de1e6ff69cae987a1bae83bb66d745d6c00bc3549b7a23",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1803,7 +1803,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "offer",
-          "declaration": "sha256:2cf5eca74fba080d3846bdefd43dfff066923e9c9becbdacc709ff1d2e59c55d",
+          "declaration": "sha256:97e0eb1969742a7f7ee8980b5f839f79837ad7625ecf1424780752f5a797ff4e",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -1939,7 +1939,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "propose-file",
-          "declaration": "sha256:b3ec9ff2ae5e8f9d56d89c90c607ac718d18663872a406f8726efd284e4b036e",
+          "declaration": "sha256:51bd382b4419782e779a74b4f210258a4ae9ab43e2ff21cb0d5a437f491530b9",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2099,7 +2099,51 @@
           },
           "presented": {
             "type": "object",
-            "description": "Facts presented beside the intent, by the names the act declares: { at, seq, hash }."
+            "description": "Facts presented beside the intent, by the names the act declares.",
+            "properties": {
+              "pin": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "type": "string"
+                      },
+                      "inc": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "scope",
+                      "inc",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "seq": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "at",
+                  "seq",
+                  "hash"
+                ],
+                "additionalProperties": false,
+                "description": "an entry of kind hold@1:check under issue; optional"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -2170,7 +2214,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "propose-manifest",
-          "declaration": "sha256:f684952e8ca60579fbbcb9f16c3323e14b61e8f391dc725e8dd157d8bea5f2ae",
+          "declaration": "sha256:0be9225c76ea6ca21191456f831d484c45e542869f1f198e0533a2bad2860104",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2281,7 +2325,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "ready-own",
-          "declaration": "sha256:3a731ff1df5526eda5caf413836f75fd10f9b4e2e0028d782aa5eb084be3e5ac",
+          "declaration": "sha256:3a2ea00565d32def01fc1248c77c5b1bb73ae1b3eb942d407a8c783ff1f712fc",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2392,7 +2436,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "release-hold",
-          "declaration": "sha256:4fac87b570383522f3d9da0398614206e702c6e2aa31a8faa878f19f92b51a89",
+          "declaration": "sha256:0da4dc97a2cc945f7618193b211c29f1bbffa800130db42470679fa840b74016",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2522,7 +2566,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "request-check",
-          "declaration": "sha256:6a8012e56c51d1cfcfe0a0b5694de5a753eb6fd04f53d6dc250317030b887271",
+          "declaration": "sha256:48a106adaaf8a84ee36ad161b4a5f1f933d2ec37bc3cb125b4c5cd19324625b3",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2647,7 +2691,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "request-review-own",
-          "declaration": "sha256:628e672a12fa7601ba9dc31535ee334aa1ed51f28abb56f29a6bffda59a70152",
+          "declaration": "sha256:bde431b98426c1037ae67694e17aeee1c54cc843946135bb4e6ec43670b0a16e",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2795,7 +2839,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "review-verdict",
-          "declaration": "sha256:d78980e031afd77e9111848e4c83e97377f1b675efab0335393952bcbc64fff3",
+          "declaration": "sha256:9294319dc41d3447d9a40bb309947462df71849ff5e015f06f39ff8ce28cb6e8",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -2919,7 +2963,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "accept",
-          "declaration": "sha256:fa2fb3bfe0334abd36d6faf8a9b7368f806d32d45d745f7e7f2c1903c999107c",
+          "declaration": "sha256:63f7fb8022ffec15deea67eed2336711f7c60899794bc35a6599506f36c8a2b0",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -3038,7 +3082,7 @@
         "dap/binding": {
           "definition": "change",
           "kind": "take-hold",
-          "declaration": "sha256:80651367ea4bdc323a9f8b83f0681b702ba9a838cba737d953996a3170807aa6",
+          "declaration": "sha256:3c3908c006a309d870c7ad5d1f0b5012387d496d9a5b8dfb920d711febc562bf",
           "digests": [
             "sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2"
           ]
@@ -3148,7 +3192,7 @@
         "dap/binding": {
           "definition": "platform:inbox",
           "kind": "dismiss",
-          "declaration": "sha256:a29b115e68858bc087cbff47b85cd0ea4e9a29c27531e45c604aee02a71a1d06",
+          "declaration": "sha256:b3a45cb87c52f0efed2e48879bf67fe76f3f7406cf381c93a8fff4dddee1d744",
           "digests": [
             "platform:inbox@1"
           ]
@@ -3258,7 +3302,7 @@
         "dap/binding": {
           "definition": "platform:inbox",
           "kind": "mark-read",
-          "declaration": "sha256:2a33491f3dc0ea207684d03d4a5ae925edd4967dbb0df5564a1c60c9a4ef1d6f",
+          "declaration": "sha256:c965d74a07ee30aac8bac052016138232965d3dc43402ca2b23861c1f59c1f80",
           "digests": [
             "platform:inbox@1"
           ]
@@ -3388,7 +3432,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "accept-report",
-          "declaration": "sha256:c07eb03076a64726915fca8667ce3cd0453086d8f95e1ccb87ff6d1546174edd",
+          "declaration": "sha256:d48a7b76cb47124385e94176137bf92b1466e5d05dccf29a05ce1b8fb804d3be",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -3523,7 +3567,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "assign",
-          "declaration": "sha256:18db871820c576867b46e1c211cb05f0920b8463eaa5720dc59c670e809433ae",
+          "declaration": "sha256:3f75c12af9ec98dacded48213adb16beeac9e623a5496ad904ed0128dd53a6e4",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -3642,7 +3686,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "close-any",
-          "declaration": "sha256:fa4e20d6a44f08b97f2569d35b6ad6992dc98aea6db6fed54e36dc5c47005b94",
+          "declaration": "sha256:f478a38cfcf0b6d18450b3c194058bc5e7aa98c4163d60864a79dbe89b4e1e27",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -3761,7 +3805,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "close-own",
-          "declaration": "sha256:3e15c88aa614e95c3bfbec102109daab8654d7a035e829820a1d714039d8a64c",
+          "declaration": "sha256:985a48ddebde73d56e70abd1356eee25f690779123957cfb28f4dd1a8c186216",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -3906,7 +3950,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "comment",
-          "declaration": "sha256:9ce22ca24ad3da964b3356b659dc7453a59597a0619114c5fe27e66b3cdc9b77",
+          "declaration": "sha256:cacb4ef48a201752b272f54ce4550a60ccf69982ccf7230bfa1b677229d16d8e",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4053,7 +4097,7 @@
         "dap/binding": {
           "definition": "platform:directory",
           "kind": "open-issue",
-          "declaration": "sha256:f958b61a1479d4c472d7a22c86ca827872d37ef0d6a98644a92545b3cebc84b4",
+          "declaration": "sha256:36e84474a83efe3efb2ba562d8f084a7ae5ada506d58daf41be17bc7f02a8523",
           "digests": [
             "platform:directory@3"
           ]
@@ -4181,7 +4225,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "edit-own",
-          "declaration": "sha256:f7bf177f5088e0e4e78b3c0fba7d16445185dea971715b6002b87706e02f760b",
+          "declaration": "sha256:bd6504cb1813eea22ab96b7c75ae6c6ca6868b5cd6961cb88c97e943cd765916",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4343,7 +4387,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "report",
-          "declaration": "sha256:17e92ed8b5ace0d07fa122e6f771ee3d62316a5898e7c6b026ded9e666586f5d",
+          "declaration": "sha256:906202ff08b45fcff9bed0460c392d528e9775bf2f5a57df3b6dba6ac32fa6b9",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4465,7 +4509,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "offer",
-          "declaration": "sha256:8d232df7ac658c4daf29f4da41485e65924f07cb75301696689b9baf7d6cecd4",
+          "declaration": "sha256:8625c3bb9cb2db386b6aa385bedd4154c3b258a91a40a29a0b6846f958984a4d",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4576,7 +4620,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "reopen-own",
-          "declaration": "sha256:9aba78c3bf22d619494516e0511f2384d60e1440bd3c88f6b0571e8a845dd077",
+          "declaration": "sha256:d4b5b38a2e952165d89bc940752690f3fd05189b9608cb2797940da83d75a52a",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4700,7 +4744,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "accept",
-          "declaration": "sha256:abb60ea21a67af736fd394ad4f4401d9617354f5cd94578ca063a61f279bace5",
+          "declaration": "sha256:f30af158cec9c9c0b0ee90b8456396a754b0281df4721cf8dd38f7a4e9ea56ec",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4819,7 +4863,7 @@
         "dap/binding": {
           "definition": "issue",
           "kind": "take-hold",
-          "declaration": "sha256:2ae6d936be5fcaa8935f7f462ed6d5805b6587e480878ecdf09b4f2970cedb4c",
+          "declaration": "sha256:24f6b3c396756af5c2076cb416731c042e62a1c9708fa20b712c9f7bf936532d",
           "digests": [
             "sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e"
           ]
@@ -4951,7 +4995,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "invite-key",
-          "declaration": "sha256:05e5da27014ab33f37a416af1624919e8f4ee2908b58792675b7ae30a96631f9",
+          "declaration": "sha256:29eb9c425b4e0e5722d48724fd1978b4494b09d10fa753477678cd96067df1a1",
           "digests": [
             "platform:membership@2"
           ]
@@ -5072,7 +5116,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "revoke-key",
-          "declaration": "sha256:dbd1741d78e903908d7617832f70da86a68148789758faf1ad24575c60520976",
+          "declaration": "sha256:ae4fdf43ae4cac358c33aa9bb62f25206059ff70652c3be1f4dd9112a4f09621",
           "digests": [
             "platform:membership@2"
           ]
@@ -5200,7 +5244,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "set-actions",
-          "declaration": "sha256:a68ad9e59beae00cc90d348fd556fbaf7a427706455345aa92217a3a065b0a10",
+          "declaration": "sha256:0e17903680a6b089ae885055afca9ba8a9ee625161a3afafe55206e7c60de88e",
           "digests": [
             "platform:membership@2"
           ]
@@ -5337,7 +5381,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "add-member",
-          "declaration": "sha256:9a99f1328d11425ae5abc942902f6ad1741c5a8969a535c04db7ab8bb0da69f6",
+          "declaration": "sha256:b0c6a5d8b856cc7b2706642476db674c31e967506b2b8e55afdd8dd8e2d220ab",
           "digests": [
             "platform:membership@2"
           ]
@@ -5471,7 +5515,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "invite-member",
-          "declaration": "sha256:c1823a10e71e42f088680239b6c1f59043810f85d6c43dde163977a4d87ef0fc",
+          "declaration": "sha256:66037b250c0c6dbe5f3d03c056ba7d9bb9cd789e60b97ee9317111af81e74b35",
           "digests": [
             "platform:membership@2"
           ]
@@ -5581,7 +5625,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "remove-member",
-          "declaration": "sha256:a9aa0b2814840416dedfcce4254034fc037d881f37042a284b19d785da2da034",
+          "declaration": "sha256:a27f1efa536fbe531ad2adbccbf03d54123ed68187add4276246411b8e7668e1",
           "digests": [
             "platform:membership@2"
           ]
@@ -5703,7 +5747,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "set-role",
-          "declaration": "sha256:2d31e4685aef5efcff00484978d533d76b0e115efe869815da8a0f2d4e13517b",
+          "declaration": "sha256:5378e573033e6fa7ca35b9065a7c389fe777b57e7022864157b7117f0dd9c14a",
           "digests": [
             "platform:membership@2"
           ]
@@ -5813,7 +5857,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "add-branch-room",
-          "declaration": "sha256:0fd97b3e0e55f67d6207e61226f26ac25ebea74950d115c40e280dc0ba6ae708",
+          "declaration": "sha256:ba4e2d6611ee936a82fba7fc71140694ae378bd55fe6e55187d6eeb2fb446109",
           "digests": [
             "platform:destination@3"
           ]
@@ -5923,7 +5967,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "add-room",
-          "declaration": "sha256:ba56d1d24e5da86cef9f8bd88d974d96c9ed07eb5312287a7232589d2e6ca174",
+          "declaration": "sha256:d7670eb5ff88a6f0ea2476380307e202bff48503ca82caa3af8d1b765cbeaad2",
           "digests": [
             "platform:destination@3"
           ]
@@ -6047,7 +6091,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "adopt-head",
-          "declaration": "sha256:9dddfc2051bbe9a09313e9cb5f34b0e23bb79cee6dfeba19d006fd2e197787fe",
+          "declaration": "sha256:cc576c9756f70b6584707b6e1d94e7a7abff12dd1991bbe400febe0feaa4f649",
           "digests": [
             "platform:destination@3"
           ]
@@ -6166,7 +6210,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "read-token",
-          "declaration": "sha256:39e06d471a56e1d2a9a4bf2b91e8cd944adbf5e92dca0d893fcae670e2727cab",
+          "declaration": "sha256:3eea414acfe87aaa1ec4105712686e07c9e88918e3d8f78721fc0bd8daa81538",
           "digests": [
             "platform:destination@3"
           ]
@@ -6276,7 +6320,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "resend",
-          "declaration": "sha256:e8a0a84e6bb7dcf5a6d06e1eeb350e5a0ea626096fa086bd1241dc0db809dffd",
+          "declaration": "sha256:9c9f76da86ed279366ad4ccc08b13d279644b3997277a7f6b341330a45a27790",
           "digests": [
             "platform:destination@3"
           ]
@@ -6395,7 +6439,7 @@
         "dap/binding": {
           "definition": "platform:destination",
           "kind": "resend-receipt",
-          "declaration": "sha256:b7ada3ddda0309414c3ecd226d84eac99d5e422584d67f0df19bc84aa1636fca",
+          "declaration": "sha256:1c6b2ac5ee2c348c8a5d8c21b56ecd44c1e982ee55c70b4005518fc079adbf06",
           "digests": [
             "platform:destination@3"
           ]
@@ -6505,7 +6549,7 @@
         "dap/binding": {
           "definition": "platform:directory",
           "kind": "retry-import",
-          "declaration": "sha256:eb50f882a12eec58cebfe8f280be10d4d53c6ad0d64ddc81beeb94cdb34bba88",
+          "declaration": "sha256:324f2eba0119735f890f4b8a01ac891082b5ee32a0fa24abe02cb8bf732566fe",
           "digests": [
             "platform:directory@3"
           ]
@@ -6635,7 +6679,7 @@
         "dap/binding": {
           "definition": "platform:register",
           "kind": "found",
-          "declaration": "sha256:e2e96929618e7c12c3eb563de78e8c020106d6f7c771a1c3e1d0de06be4a1648",
+          "declaration": "sha256:3f30b267cadbe7a19a27e7566dd314d6f7e6705c8d80ad310a27b7cff81f2dfd",
           "digests": [
             "platform:register@3"
           ]
@@ -6760,7 +6804,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "enrol",
-          "declaration": "sha256:688f9d565e429494703870fe45a845a890397423875818c41650274f3200c60a",
+          "declaration": "sha256:8dc74bd8b1c53bd50bbd600872ec56aac362c8b4dbc90dd859eccce7c8acb852",
           "digests": [
             "platform:membership@2"
           ]
@@ -6873,7 +6917,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "first-key",
-          "declaration": "sha256:0265982df35b2ccaabf1e64c6b60c677c9007e6641bf7a1e45e5915e82da443f",
+          "declaration": "sha256:c596b1d988c9463df7795a45dceead41161e23b37f881664a0d523cc620ec34a",
           "digests": [
             "platform:membership@2"
           ]
@@ -6992,7 +7036,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "join",
-          "declaration": "sha256:ba4b3848a32184f6e33848f11aa4964f5113790803cd9d6f59e2cd498bd7f71e",
+          "declaration": "sha256:6ec0877846e09235b925eb90b192511f09302d2c817589de7a2b45791678b14f",
           "digests": [
             "platform:membership@2"
           ]
@@ -7111,7 +7155,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "rotate-recovery",
-          "declaration": "sha256:b2b351f1a3ca234c4182c4d9eca1c7343edb7171c19aa0652a9002873c989ff8",
+          "declaration": "sha256:9dd0d56b509a2f7f8f7ac3b4e6100331e80600ff5aaed87088cd5db497b0d758",
           "digests": [
             "platform:membership@2"
           ]
@@ -7215,7 +7259,7 @@
         "dap/binding": {
           "definition": "platform:membership",
           "kind": "seat",
-          "declaration": "sha256:955ac2db416ef1eeae675b45aaa6e1f73667f22e623a01c02ead466f81f914d3",
+          "declaration": "sha256:5f2aa2227bfc40dbbaabc15a79040ae37fe330c29d5feceaf5142eabd48bbaa4",
           "digests": [
             "platform:membership@2"
           ]
@@ -7341,7 +7385,7 @@
         "dap/binding": {
           "definition": "platform:rules",
           "kind": "activate",
-          "declaration": "sha256:26f4da3db0ee47d6acb1dbf85d6ca16bc402b9b56efbe4fcf4a4f9d312077325",
+          "declaration": "sha256:32cbed2e99025a2c29fc67acbf7814024180f37699c647021333d4de4cb7615d",
           "digests": [
             "platform:rules@2"
           ]
@@ -7467,7 +7511,7 @@
         "dap/binding": {
           "definition": "platform:rules",
           "kind": "keep-configuration",
-          "declaration": "sha256:829a87282943b549a1b1a44c15f811f039ed24f75c1d49c7eb6efa0deff92853",
+          "declaration": "sha256:b073635556017151066d8984c24339e97b81ed31ec8d2b6ebf426fd645123b25",
           "digests": [
             "platform:rules@2"
           ]
@@ -7652,7 +7696,7 @@
         "dap/binding": {
           "definition": "platform:rules",
           "kind": "publish",
-          "declaration": "sha256:a77f73ba37288dc97d94c334828453e709134558df9000dbd3c4299c26391b08",
+          "declaration": "sha256:47adf0dac0882715621d141ba929a2c4458d83417651a782453334a306df0f1c",
           "digests": [
             "platform:rules@2"
           ]
@@ -7762,7 +7806,7 @@
         "dap/binding": {
           "definition": "platform:rules",
           "kind": "retire-definition",
-          "declaration": "sha256:f54f0ed91539dd08be854427b4116db2eaaa9e2280064a02cef8a0ddc668aa48",
+          "declaration": "sha256:16b5a510487fe5a719a1b7f5f1cf9e51f6594f4449faf93069925ef45ea9ba4c",
           "digests": [
             "platform:rules@2"
           ]
@@ -7918,7 +7962,7 @@
         "dap/binding": {
           "definition": "platform:directory",
           "kind": "open-task",
-          "declaration": "sha256:9779f8f0dc61508cdfbfa91d9e3bb98abdab40a99dc83b82a091d59d9859a739",
+          "declaration": "sha256:c27076f02dc931e458ad452f0ad207f61ea347f6184a5c92cbb0acfd2222b1d4",
           "digests": [
             "platform:directory@3"
           ]

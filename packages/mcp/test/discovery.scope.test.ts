@@ -73,7 +73,7 @@ test("discovery: shared configuration, idle watch, heads against generations, cu
     const all = [...tools];
     for (let cursor = (await rita.service.page()).nextCursor; cursor; ) { const p = await rita.service.page(cursor); all.push(...p.tools); cursor = p.nextCursor; }
     const plant = all.find((t) => t.name === "garden.plant")!;
-    expect(plant.description).toContain("needs issue.comment, which your role holds on some scopes of this kind");
+    expect(plant.description).toContain("needs issue.comment; your standing is unknown on some scopes of this kind, and each scope decides");
     expect(all.find((t) => t.name === "issue.comment")!.description).toContain("which your role (admin) holds");
     const roomView = await rita.ok("room", {});
     expect(roomView["standing"]).toEqual(expect.arrayContaining([expect.objectContaining({ membership: rita.config.repository!.membership.scope, role: "admin" })]));
