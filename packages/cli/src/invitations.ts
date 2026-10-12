@@ -3,7 +3,7 @@
  * Callers serialize one Store and fence their captured Page context. */
 import type { Answer, Entry, FactRef, MemberRef, Receipt, SignedIntent, Summary, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, isMemberRef, isScopeRef, isScopeId, isRecord, isHead, isKeyId, REFUSAL_REASONS, unb64url, timeMs, isReceipt, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { agentKeyInvitationOf, encodeAgentKeyInvitation, httpTransport, ScopeHandle, secretSigner, signedIntent, signedReads } from "@generalbusiness/artroom-client";
+import { agentKeyInvitationOf, encodeAgentKeyInvitation, httpTransport, ScopeHandle, secretSigner, signedIntent, requestSession, sessionRequest } from "@generalbusiness/artroom-client";
 import { isHandle, platform } from "@generalbusiness/artroom-platform";
 import { expectedOf, LINK, linkOf, type Context, type DefinitionShape, type Link, type Outcome } from "./commands.ts";
 import type { Config, PendingInvitationIssue, Repository } from "./store.ts";
@@ -20,8 +20,14 @@ const uuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 const now = (ctx: Context) => ctx.now?.() ?? Date.now();
 function check(options: InvitationIssueOptions): void { if (options.current?.() === false) throw blocked(); }
 const wait = async <T>(options: InvitationIssueOptions, work: () => Promise<T>): Promise<T> => { check(options); const result = await work(); check(options); return result; };
-function handle(ctx: Context, config: Config, secret: Uint8Array): ScopeHandle {
-  return new ScopeHandle(signedReads(httpTransport(config.service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(secret), { now: () => now(ctx) }), config.repository!.membership.scope);
+async function readerFor(ctx: Context, service: string, membership: ScopeRef, secret: Uint8Array): Promise<string> {
+  const signed = sessionRequest(membership, secret, timeOf(Math.floor(now(ctx) / 1000) * 1000 + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16))));
+  const answer = await requestSession(service, membership.scope, signed, ctx.fetch ? { fetch: ctx.fetch } : {});
+  if (!answer.ok || answer.session.claims.key !== keyIdOfSecret(secret) || !same(answer.session.claims.membership, membership)) throw blocked();
+  return answer.session.reader(); // Volatile only; never stored or used as act authority.
+}
+function handle(ctx: Context, service: string, scope: import("@generalbusiness/artroom-contract").ScopeId, reader: string): ScopeHandle {
+  return new ScopeHandle(httpTransport(service, ctx.fetch ? { fetch: ctx.fetch } : {}), scope, reader);
 }
 async function summary(M: ScopeHandle, at: ScopeRef): Promise<Summary> {
   const read = await M.summary();
@@ -29,11 +35,10 @@ async function summary(M: ScopeHandle, at: ScopeRef): Promise<Summary> {
   return read.value;
 }
 const closed = (value: unknown, required: string[], optional: string[] = []): value is Record<string, unknown> => isRecord(value) && required.every(k => Object.hasOwn(value, k)) && Object.keys(value).every(k => required.includes(k) || optional.includes(k));
-async function boundDirectory(ctx: Context, service: string, secret: Uint8Array, repository: Repository, membership: Summary): Promise<Repository | null> {
+async function boundDirectory(ctx: Context, service: string, reader: string, repository: Repository, membership: Summary): Promise<Repository | null> {
   const roster = membership.items.find(item => item.type === "roster" && item.state === "open");
   if (!roster || !same(roster.refs["directory"], repository.directory)) return null;
-  const transport = signedReads(httpTransport(service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(secret), { now: () => now(ctx) });
-  const read = await new ScopeHandle(transport, repository.directory.scope).summary();
+  const read = await handle(ctx, service, repository.directory.scope, reader).summary();
   if (!read.ok || !read.complete || read.next !== undefined || read.value.status !== "active" || read.value.definition !== "platform:directory@3" || !same(read.value.scope, repository.directory)) return null;
   const item = read.value.items.find(item => item.type === "repository"), rules = item?.refs["rules"], destination = item?.refs["destination"];
   if (!item || !same(item.refs["membership"], repository.membership) || !isScopeRef(rules) || rules.kind !== "rules" || rules.scope !== repository.rules || !isScopeRef(destination) || destination.kind !== "destination" || destination.scope !== repository.destination) return null;
@@ -148,7 +153,12 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
   // Work on an owned copy: a memory Store may return its original key array.
   const key = secret.slice();
   try {
-    const actor = keyIdOfSecret(key), M = handle(ctx, config, key);
+    const actor = keyIdOfSecret(key);
+    let reader: string | undefined, currentHandle: ScopeHandle | undefined;
+    const membershipHandle = async (): Promise<ScopeHandle> => {
+      if (!currentHandle) { reader = await wait(options, () => readerFor(ctx, config!.service, config!.repository!.membership, key)); currentHandle = handle(ctx, config!.service, config!.repository!.membership.scope, reader); }
+      return currentHandle;
+    };
     let row: Issue;
     let pointer = config.invitationIssue;
     const chain = await snapshotChain(ctx, config, input, actor, options);
@@ -185,7 +195,7 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
     if (!pointer) await persist();
     const shape = platform("platform:membership@2")!.data as unknown as DefinitionShape;
     const prepare = async (kind: string, fields: Record<string, import("@generalbusiness/artroom-contract").FieldValue>): Promise<Stage> => {
-      const s = await wait(options, () => summary(M, row.repository.membership));
+      const s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership));
       const member = s.items.find(i => i.type === "member" && i.state === "active" && i.values["handle"] === config!.handle);
       const activeKey = member && s.items.find(i => i.type === "key" && i.state === "active" && i.refs["member"] === member.id && i.values["id"] === actor);
       const roster = s.items.find(i => i.type === "roster" && i.state === "open");
@@ -198,17 +208,17 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
       if (stage.refused) return "refused";
       if (options.mode === "check" || stage.receipt) {
         let settled: Awaited<ReturnType<ScopeHandle["settle"]>>;
-        try { settled = await wait(options, () => M.settle(stage.signed)); } catch { check(options); return "unknown"; }
-        if (!settled.ok || stage.receipt && !same(settled.value, stage.receipt) || !await wait(options, () => follow(M, stage.signed, settled.value))) return "unknown";
+        try { settled = await wait(options, async () => (await membershipHandle()).settle(stage.signed)); } catch { check(options); return "unknown"; }
+        if (!settled.ok || stage.receipt && !same(settled.value, stage.receipt) || !await wait(options, async () => follow(await membershipHandle(), stage.signed, settled.value))) return "unknown";
         if (!stage.attempted || !stage.receipt) { stage.attempted = true; stage.receipt = settled.value; await persist(); }
         return "verified";
       }
       stage.attempted = true; await persist();
       let answer: Answer;
-      try { answer = await wait(options, () => M.submit(stage.signed)); } catch { check(options); return "unknown"; }
+      try { answer = await wait(options, async () => (await membershipHandle()).submit(stage.signed)); } catch { check(options); return "unknown"; }
       if (answer.answer === "refused") { stage.refused = answer; await persist(); return "refused"; }
       if (answer.answer !== "accepted") return "unknown";
-      if (!await wait(options, () => follow(M, stage.signed, answer.receipt))) return "unknown";
+      if (!await wait(options, async () => follow(await membershipHandle(), stage.signed, answer.receipt))) return "unknown";
       stage.receipt = answer.receipt; await persist(); return "verified";
     };
     if (row.input.kind === "agent-key") {
@@ -226,10 +236,10 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
     }
     const result = await advance(row.invitation);
     if (result !== "verified") return status(result, result === "refused" ? `Native refusal: ${row.invitation.refused!.reason}${row.invitation.refused!.name ? " (" + row.invitation.refused!.name + ")" : ""}. The original invitation is retained.` : "The original invitation is retained.");
-    const receipt = row.invitation.receipt!, s = await wait(options, () => summary(M, row.repository.membership));
+    const receipt = row.invitation.receipt!, s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership));
     const invited = s.items.find(i => i.id === receipt.fact.seq && i.type === (row.input.kind === "person" ? "member" : "key"));
     if (!invited || invited.state !== "invited" || invited.values["inviteHash"] !== textDigest(row.secret) || invited.values["inviteEnds"] !== row.ends) return status("unknown", "The current native invitation could not be verified.");
-    const observedRepository = await wait(options, () => boundDirectory(ctx, row.service, key, row.repository, s));
+    const observedRepository = await wait(options, () => boundDirectory(ctx, row.service, reader!, row.repository, s));
     if (!observedRepository) return status("unknown", "The native directory and repository siblings could not be verified.");
     const repository = observedRepository;
     let link: string;
@@ -317,7 +327,7 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
         await save(config);
       }
       if (!verifySignedIntent(signed) || signed.intent.actor !== keyIdOfSecret(key) || signed.intent.kind !== "enrol" || signed.intent.on !== 0 || !same(signed.intent.to, link.repository.membership) || !same(signed.intent.fields, { invitation: link.invitation.seq, secret: link.secret }) || !same(signed.intent.expected, link.expected) || intentDigest(signed.intent) !== config!.join!.intent) return bad();
-      const M = new ScopeHandle(signedReads(httpTransport(link.service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(key), { now: () => now(ctx) }), link.repository.membership.scope);
+      let M = new ScopeHandle(httpTransport(link.service, ctx.fetch ? { fetch: ctx.fetch } : {}), link.repository.membership.scope);
       if (!same(await ctx.store.config(), heldConfig)) return bad();
       let receipt: Receipt;
       if (options.mode === "check" || config!.join!.accepted) {
@@ -335,6 +345,8 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
         if (answer.answer !== "accepted") return { code: 1, lines: ["The original agent enrollment remains unknown. Check it or Continue explicitly."] };
         receipt = answer.receipt;
       }
+      const reader = await readerFor(ctx, link.service, link.repository.membership, key);
+      M = handle(ctx, link.service, link.repository.membership.scope, reader);
       if (!await follow(M, signed, receipt)) return bad();
       config = { ...config!, join: { ...config!.join!, accepted: receipt.fact } }; await save(config);
       if (!same(await ctx.store.config(), config)) return bad();
@@ -348,10 +360,9 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
       const inbox = member.refs["inbox"];
       const birth = memberEntry.sends.find(send => "creator" in send.to && send.to.kind === "inbox");
       if (!birth || !("creator" in birth.to) || scopeIdOf(birth.to) !== inbox.scope) return bad();
-      const transport = signedReads(httpTransport(link.service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(key), { now: () => now(ctx) });
-      const observed = await boundDirectory(ctx, link.service, key, link.repository, s);
+      const observed = await boundDirectory(ctx, link.service, reader, link.repository, s);
       if (!observed) return bad();
-      const I = new ScopeHandle(transport, inbox.scope);
+      const I = handle(ctx, link.service, inbox.scope, reader);
       const [inboxRead, inboxBirth] = await Promise.all([I.summary(), I.entry(0)]);
       if (!inboxRead.ok || !inboxRead.complete || inboxRead.next !== undefined || inboxRead.value.status !== "active" || inboxRead.value.definition !== "platform:inbox@1" || !same(inboxRead.value.scope, inbox) || !inboxBirth.ok || !inboxBirth.complete || inboxBirth.next !== undefined || inboxBirth.value.entry.input.type !== "genesis" || !same(inboxBirth.value.entry.input.seed, birth.to) || !same(inboxBirth.value.entry.at, inbox) || entryHash(inboxBirth.value.entry) !== inboxBirth.value.hash) return bad();
       config = { ...config!, repository: { ...observed, inbox: inboxRead.value.scope.scope }, handle: link.handle };

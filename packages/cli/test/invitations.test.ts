@@ -3,15 +3,15 @@ import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
 import { join as pathJoin } from "node:path";
 import { tmpdir } from "node:os";
 import { fileStore } from "../src/files.ts";
-import type { Receipt, SignedIntent, Summary, Entry } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
+import type { Receipt, SignedIntent, Summary, Entry, DutyId } from "@generalbusiness/artroom-contract";
+import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/artroom-platform";
 import { Roster, rita, rules } from "../../platform/test/support.ts";
 import { command, enrolAgentKey, issueInvitation, linkOf, memoryStore, type Context, type Config, type Store } from "../src/index.ts";
 
 // Real SDK/envelopes/followReceipt/CLI Store and native M2 rules in memory.
-// Scripted HTTP authority/read pages/inbox confirmation; no native session,
+// Scripted HTTP/session authority/read pages/inbox confirmation; no native session,
 // Durable Object, browser, host, provider or full parent acceptance is proved.
 test("retained native agent opening and key invitation survive loss; independent enrollment Checks without replacement, follows exact native facts and preserves legacy person custody (HTTP and inbox STAND-INs)", async () => {
   const home = await mkdtemp(pathJoin(tmpdir(), "artroom-agent-custody-"));
@@ -20,7 +20,7 @@ test("retained native agent opening and key invitation survive loss; independent
   const directory = { scope: m.office.at.scope, inc: m.office.at.inc, kind: "directory" as const };
   const repository = { directory, membership: m.at, rules: directory.scope, destination: directory.scope };
   const receipts = new Map<string, Receipt>(), sent: SignedIntent[] = [];
-  let wrongDirectory = false;
+  let wrongDirectory = false, sessionRequests = 0, crossReads = 0;
   let lose: "add-member" | "enrol" | null = "add-member", loseSettle = false;
   const liveItems = () => Object.entries(m.definition.declared.items).flatMap(([type, item]) => m.state.page(type, Object.keys(item.states).filter(s => !item.states[s]!.final), null, 100).items).map(item => {
     if (item.type === "roster") return { ...item, refs: { ...item.refs, directory } }; // SCRIPTED directory creator projection.
@@ -33,6 +33,14 @@ test("retained native agent opening and key invitation survive loss; independent
   const reply = (value: unknown) => Response.json(value);
   const fetch: Fetch = async (url, init) => {
     const path = new URL(url).pathname;
+    if (path.endsWith("/sessions")) {
+      const asked = JSON.parse(init!.body!).request;
+      const activeKey = liveItems().find(item => item.type === "key" && item.state === "active" && item.values["id"] === asked.actor);
+      const member = activeKey && liveItems().find(item => item.type === "member" && item.id === activeKey.refs["member"]);
+      if (!member) return reply({ ok: false, reason: "unauthorized" });
+      sessionRequests++;
+      return reply({ ok: true, token: b64url(new Uint8Array(32).fill(29)), session: { v: 1, deployment: "SCRIPTED session", membership: m.at, member: member.values["handle"], key: asked.actor, reads: ["summary", "entry"], ends: asked.notAfter } });
+    }
     if (path.endsWith("/acts")) {
       const signed = (JSON.parse(init!.body!) as { signed: SignedIntent }).signed;
       sent.push(structuredClone(signed));
@@ -42,8 +50,9 @@ test("retained native agent opening and key invitation survive loss; independent
         const judged = m.submit(signed, { platform: rules, membership: m.at, grants: m.held(signed.intent.actor) });
         expect(judged.result, "the package's actual membership rules admit the scripted native input").toBe("write");
         if (judged.result !== "write") throw Error("Model admission refused");
-        receipt = { intent: digest, fact: m.fact(m.head.seq), definition: MEMBERSHIP };
-        receipts.set(digest, receipt);
+        const entry = m.entries.at(-1)!.entry, fact = m.fact(entry.seq);
+        const accepted: Receipt = { intent: digest, fact, definition: MEMBERSHIP, effects: entry.effects, sends: entry.sends.map((send): DutyId => `${entry.seq}.${send.n}`), epoch: entry.epoch };
+        receipts.set(digest, accepted); receipt = accepted;
       }
       if (signed.intent.kind === lose) { lose = null; throw Error("SCRIPTED lost accepted reply"); }
       return reply({ answer: "accepted", receipt });
@@ -56,6 +65,7 @@ test("retained native agent opening and key invitation survive loss; independent
     const agent = liveItems().find(item => item.type === "member" && item.values["kind"] === "agent");
     const source = agent && m.entries[agent.id]!.entry, birth = source?.sends.find(send => "creator" in send.to && send.to.kind === "inbox");
     if (birth && "creator" in birth.to && url.includes(scopeIdOf(birth.to))) {
+      expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
       const at = { scope: scopeIdOf(birth.to), inc: newIncarnation(new Uint8Array(16).fill(33)), kind: "inbox" as const };
       if (path.endsWith("/entries/0")) {
         const entry: Entry = { v: 1, at, seq: 0, prev: null, time: m.now, clamped: false, epoch: 0, input: { type: "genesis", seed: birth.to, inc: at.inc, kind: "establish", founding: null, source: m.fact(agent!.id), n: birth.n, message: birth.message.class === "request" ? birth.message : null, decision: "applied" }, uses: [], prepared: [], effects: [], sends: [] };
@@ -64,6 +74,7 @@ test("retained native agent opening and key invitation survive loss; independent
       return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED inbox head") }, value: { scope: at, status: "active", definition: "platform:inbox@1", time: m.now, items: [], counts: [] }, complete: true });
     }
     if (url.includes(directory.scope)) {
+      expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
       return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED directory head") }, complete: true, value: { scope: directory, status: "active", definition: "platform:directory@3", time: m.now, counts: [["repository", "ready", 1]], items: [{ id: 0, type: "repository", state: "ready", revision: 1, opened: textDigest("SCRIPTED repository"), attributed: [], parties: {}, values: {}, refs: { membership: m.at, rules: { ...directory, kind: "rules" }, destination: { ...directory, scope: wrongDirectory ? m.at.scope : directory.scope, kind: "destination" } } }] } });
     }
     if (path.includes("/entries/")) {
@@ -172,6 +183,7 @@ test("retained native agent opening and key invitation survive loss; independent
   expect([person.state, linkOf(person.link!)?.definition, agentKeyInvitationOf(person.link!)]).toEqual(["verified", "platform:membership@2", null]);
   expect((await command(receiving, ["join", person.link!])).code).toBe(1);
   expect((await receiver.config())!.join!.kind).toBe("enrol");
+  expect(sessionRequests > 0 && crossReads > 0).toBe(true);
   for (const folder of ["issuer", "agent"]) {
     for (const part of ["keys", "private"]) for (const filename of await readdir(pathJoin(home, folder, part))) {
       expect(/^[a-z][a-z0-9-]{0,31}\.(key|data)$/.test(filename)).toBe(true);
