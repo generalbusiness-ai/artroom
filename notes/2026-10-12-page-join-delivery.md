@@ -1,0 +1,37 @@
+# Deliver the existing-room join flow
+
+Request `07b283d8949d583a04bbc51d48441684b70fe4f7`, promise
+`f396bde8092a847d472adc55675ee1d0ec7e9602`. Source candidate
+`5f54bab60050e06f2628fb01cf3f842b2cc99802`; this delivery adds only the narrow
+documentation correction and this note after that verified code head. Full documentation request `5cc` remains open.
+
+The first screen offers Invitation link and Config and key. Invitation paste
+joins automatically. Config requires its matching key and one Join room action.
+Navigation and account controls appear after verified membership; the title
+uses the verified recorded room name. Route, connection and draw guards stop
+a late reply from selecting another context.
+
+Page retains its raw key and exact signed enrollment, including the invitation
+secret, before dispatch and verifies storage readback. This remains Page's
+raw-key policy, separate from Counter's CryptoKey policy. Unknown enrollment
+survives reload; Check status only reads and verifies the original receipt and
+entry. A known-refused same invitation sends no new enrollment. An explicit
+different invitation reuses the same key and preserves prior envelopes and
+refusals, bounded by eight prior refusals and a 64 KiB record.
+
+Focused evidence: compiler exit 0; custody four cases passed, then the five-case
+check of retained refusals passed. The first UI body passed five cases and failed the
+settings case. Its stale handler after partial write and incomplete DOM stand-in
+failures remain retained; the corrected settings case passed alone. These
+completion checks do not change the original failed results.
+
+Local Chromium evidence passed twelve 1280/390 light/dark captures and three
+journeys (`1b15d29e`), plus three empty 544x844 visual panels (`b28178b1`). The
+fidelity ledger is `d6d24594`. Browser DOM, storage, locks, cryptography and
+Page/SDK code are real; service replies are scripted. Native enrollment and
+hosted acceptance are not established by these checks.
+
+Gate: UNRUN. Isolated-host screenshots/deployment, checker full review, landing
+and production redeployment remain owed. Full title request `936` stays open.
+The Start-a-room amendment `010` is blocked on the service capability and a
+separate child request; this existing-room delivery does not close it.
