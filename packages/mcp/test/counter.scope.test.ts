@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
 import { canonicalize, keyIdOfSecret } from "@generalbusiness/artroom-bytes";
-import { APPLICATION_COHORT, FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
+import { valueDigest } from "@generalbusiness/artroom-derive";
+import { APPLICATION_COHORT, CONFIGURATION_DOMAIN, FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
 import { mcpRoom } from "./support/room.ts";
@@ -27,6 +28,11 @@ test("the Counter under its cohort: join, start, spoken, leave", async () => {
 
     // The Counter's definition activated with its bytes; the room's role list holds the Counter's actions.
     expect((await rita.ok("rules.activate", { fields: { digest: COUNTING_DEFINITION, name: "counting" }, values: [canonicalize(counting)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
+    // A check configuration kept by the rules scope, its bytes beside the act.
+    exercises("platform:rules", "keep-configuration", "values");
+    const configuration = { name: "unit", image: `sha256:${"a".repeat(64)}`, environment: {}, steps: [["npm", "test"]], judged: { passed: { exit: 0, line: "ok" }, failed: { exit: 1, line: "not ok" } }, limits: { seconds: 600, bytes: 65536 } };
+    const kept = await rita.ok("rules.keep-configuration", { fields: { digest: valueDigest(CONFIGURATION_DOMAIN, configuration), name: "unit" }, values: [canonicalize(configuration)], idempotencyKey: "configuration" });
+    expect(kept["answer"], JSON.stringify(kept)).toBe("accepted");
     const actions = [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "counting.control", "counting.join", "counting.spoken", "counting.leave"];
     expect((await rita.ok("member.actions", { on: 0, fields: { role: "admin", actions }, idempotencyKey: "actions" }))["answer"]).toBe("accepted");
     room.advance(301_000);   // the earlier grant's reuse window ends; no immediate-revocation claim

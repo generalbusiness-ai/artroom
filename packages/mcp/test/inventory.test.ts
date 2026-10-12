@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import type { DeclaredDefinition, PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
@@ -80,5 +80,23 @@ describe("every activity is reachable, and every act renders", () => {
       const named = [...(cells[1] ?? "").matchAll(/`([a-z][a-z0-9.-]*(?:@[0-9a-f]+)?)`/g)].map((m) => m[1]!).filter((n) => !n.startsWith("artroom") && !n.startsWith("git"));
       for (const name of named) expect(tools.has(name) || /@/.test(name), `${cells[0]} names ${name}`).toBe(true);
     }
+  });
+
+  // Invariant: the tool reference of docs/mcp.md is what tools/list sends: each generic tool's description and schemas verbatim,
+  // and docs/mcp-tools.json the whole list for an admin of the demo room. MCP_WRITE_DOCS=1 writes the file from the derivation.
+  test("the tool reference is the list as sent", async () => {
+    const mcp = new McpService({ service: "https://x", signer: secretSigner(new Uint8Array(32)), config: { read: async () => ({ service: "https://x" }), addRoot: async () => {} }, custody: memoryStore(), mode: "add" });
+    const generic = (await mcp.page()).tools;
+    for (const t of generic) {
+      expect(DOC, t.name).toContain(`### \`${t.name}\`\n\n${t.description}\n`);
+      expect(DOC, t.name).toContain(JSON.stringify({ inputSchema: t.inputSchema, ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}), annotations: t.annotations }, null, 2));
+    }
+    const inventory = demoInventory("admin");
+    const acts = bindingsOf(inventory, WORDS).filter((b) => listed(b, inventory)).map((b) => actTool(b, inventory, "default"));
+    for (const t of acts) expect(DOC, t.name).toContain(`| \`${t.name}\` | `);
+    const list = `${JSON.stringify({ tools: [...generic.filter((t) => t.name !== "actions" && t.name !== "act"), ...acts] }, null, 2)}\n`;
+    const file = new URL("../../../docs/mcp-tools.json", import.meta.url);
+    if (process.env["MCP_WRITE_DOCS"] === "1") writeFileSync(file, list);
+    expect(readFileSync(file, "utf8")).toBe(list);
   });
 });
