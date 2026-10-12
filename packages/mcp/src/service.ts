@@ -398,7 +398,7 @@ export class McpService {
       tool("text", "A retained input by scope, kind and digest: a definition, a foreign entry, a rule's input, a detached text, a snapshot, or a value in its byte domain; paged by bytes with offset.",
         { scope: scopeArg, kind: { enum: ["definition", "entry", "rule", "text", "snapshot", "value"] }, digest: { type: "string" }, domain: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope", "kind", "digest"], READ, (a) => this.#text(a)),
       tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
-        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, duty: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
+        { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, duty: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
       tool("settle", "What is known about the envelope under idempotencyKey on target (or the creation of definition): the act's phase and kept outcome, the scope's settlement for an act that is not final, and each preparation step apart. Signs nothing and sends no act.",
         { target: scopeArg, definition: { type: ["string", "object"] }, idempotencyKey: keyArg }, ["idempotencyKey"], READ, (a) => this.#settle(a)),
       tool("credential", "The one-time read credential for a read-token act your key signed (entry: its seq at the destination), read once from the destination's credential route with your session. Its result is a secret: the credential is in the structured field credential only, with the remote URL beside it. Use it with Git; it is not kept here.",
@@ -686,8 +686,16 @@ export class McpService {
       if (typeof args["seq"] === "number") return read.at.seq >= args["seq"] ? { head: read.at } : null;
       const states = Array.isArray(args["states"]) ? args["states"] as string[] : [];
       if (typeof args["item"] === "number" || typeof args["type"] === "string") {
-        const item = read.value.items.find((i) => (typeof args["item"] === "number" ? i.id === args["item"] : i.type === args["type"]) && (states.length === 0 || states.includes(i.state)));
-        return item ? { item, head: read.at } : null;
+        const match = (i: Item) => (typeof args["item"] === "number" ? i.id === args["item"] : i.type === args["type"]) && (states.length === 0 || states.includes(i.state));
+        const item = read.value.items.find(match);
+        if (item) return { item, head: read.at };
+        // An item in a final state is no longer live: with its type, the retained final items are read too, one page.
+        if (typeof args["item"] === "number" && typeof args["type"] === "string" && !read.value.items.some((i) => i.id === args["item"])) {
+          const final = await this.reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string));
+          const found = final.ok ? final.value.find(match) : undefined;
+          if (found) return { item: found, head: read.at, final: true };
+        }
+        return null;
       }
       return read.value.status === "active" ? { head: read.at, status: "active" } : null;
     };

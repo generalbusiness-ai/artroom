@@ -53,6 +53,8 @@ export interface Room {
   /** Wire the outside port of the register a story created, as the deployment's host setting would. */
   wireRegister(register: ScopeId): Promise<void>;
   advance(ms: number): void;
+  /** Drive this scope at every pause, as a deployment's alarms would: the destination, once the room exists. */
+  know(scope: ScopeId): void;
   now(): number;
   /** The next request whose path ends with `suffix` reaches the Worker, and its reply is lost: a STAND-IN for a dropped reply. */
   loseNextReply(suffix: string): void;
@@ -83,6 +85,7 @@ export function mcpRoom(): Room {
   }) as unknown as Fetch;
   return {
     now: () => lifetime.now(),
+    know: (scope) => { if (!known.some((node) => node.name === scope)) known.push(lifetime.platform(scope)); },
     loseNextReply: (suffix) => { lose = suffix; },
     pause, wait, active, fetch, done,
     platform: (scope) => lifetime.platform(scope),

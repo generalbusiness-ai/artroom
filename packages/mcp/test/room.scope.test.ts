@@ -35,6 +35,7 @@ export async function founded(room: Room, rita: Agent, mode: "default" | "generi
   const created = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as { seq: number }).seq });
   expect([created["timedOut"], (created["created"] as { kind: string }[]).map((c) => c.kind).sort()]).toEqual([false, ["destination", "directory", "membership", "rules"]]);
   expect(rita.config.repository).toBeDefined();
+  room.know(rita.config.repository!.destination);
   const seat = await step(rita, mode, { tool: "room.seat", scope: "membership", kind: "seat" }, { idempotencyKey: "seat" });
   const member = (seat["fact"] as { seq: number }).seq;
   await step(rita, mode, { tool: "room.first-key", scope: "membership", kind: "first-key" }, { fields: { member }, idempotencyKey: "first-key" });
@@ -158,7 +159,7 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
     const manifest = (proposed["fact"] as FactRef).seq;
     const merged = await step(rita, mode, { tool: "change.merge", scope: number, kind: "merge" }, { fields: { manifest, reports: [] }, idempotencyKey: "merge-1" });
     expect(merged["answer"], JSON.stringify(merged)).toBe("accepted");
-    const published = await rita.ok("wait", { scope: number, item: (merged["fact"] as FactRef).seq, states: ["published", "refused", "aborted"] });
+    const published = await rita.ok("wait", { scope: number, item: (merged["fact"] as FactRef).seq, type: "merge", states: ["published", "refused", "aborted"] });
     expect((published["item"] as { state: string }).state).toBe("published");
 
     // The issue closes; a read token and its credential, once, for Git.
