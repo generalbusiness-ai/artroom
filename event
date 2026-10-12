@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a3d1858c30a9b4ae4b0fc8d93b81e4e99612ae63","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-empty-room-pages.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a863822dc156ab1064963a3d1a129c646f7c3d4d","text":"Merge retired a covered predecessor; the successor is at packages/page/test/sending.test.ts."}
