@@ -347,3 +347,5 @@ made by the planner on the same branch:
 Link check rerun at this head: `node scripts/check-doc-links.mjs`.
 
 Filing note: the whole 33-path set is published once more at this head so that the review binds one head.
+
+Revision 3, 12 October 2026, 16:35: the branch is merged with main cf22cdc5 so that docs/deploy.md carries the landed homepage section (checker report cb479790); no other page content changes.
