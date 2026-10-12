@@ -16,7 +16,7 @@ dialog.innerHTML=`<form><div class="dialog-heading"><h2>Join room</h2><button ty
 <label>Voice · English (US)<select data-voice></select></label><label class="remember-choice"><input data-remember type="checkbox" checked>Remember my choice</label>
 <p class="setup-message" role="status"></p><details class="setup-help"><summary>Setup help</summary><p>Import the demo file once in each browser. Each identity needs its existing supported counting binding and enrolled key. Joining uses that identity’s current permissions.</p>
 <label>Public device binding<input data-binding type="file" accept="application/json,.json"></label><label>Own enrolled key file<input data-key type="file"></label><button type="button" data-legacy>Import legacy device</button></details>
-<div class="dialog-controls"><button type="button" data-cancel>Cancel</button><button type="submit" data-join>Join room</button></div></form>`;
+<div class="dialog-controls"><button type="button" data-cancel>Cancel</button><button type="submit" class="primary" data-join>Join room</button></div></form>`;
 document.body.append(dialog);
 const form=dialog.querySelector<HTMLFormElement>("form")!,message=dialog.querySelector<HTMLElement>(".setup-message")!,identities=dialog.querySelector<HTMLElement>("[data-identities]")!,saved=dialog.querySelector<HTMLElement>("[data-saved]")!;
 const voice=dialog.querySelector<HTMLSelectElement>("[data-voice]")!,rememberBox=dialog.querySelector<HTMLInputElement>("[data-remember]")!,bundle=dialog.querySelector<HTMLInputElement>("[data-bundle]")!,binding=dialog.querySelector<HTMLInputElement>("[data-binding]")!,key=dialog.querySelector<HTMLInputElement>("[data-key]")!,join=dialog.querySelector<HTMLButtonElement>("[data-join]")!;

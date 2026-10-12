@@ -90,3 +90,4 @@ dialog{max-height:calc(100dvh - 32px);overflow-y:auto}
 dialog fieldset{border:0;padding:0;margin:16px 0}dialog legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .demo-identity{margin:0}.dialog-close{border:0;background:transparent;clip-path:none!important;font-size:28px}
 .dialog-heading h2{font-size:32px;padding-right:40px}@media(max-width:760px){.dialog-heading h2{font-size:28px}}
+.number-stage .stage-connect,.number-stage .stage-join{flex:0 0 auto;min-height:64px}
