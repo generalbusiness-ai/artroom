@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { encode } from "gpt-tokenizer/encoding/o200k_base";
-import type { DeclaredDefinition, Item, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, definitionDigest, textDigest } from "@generalbusiness/artroom-bytes";
+import type { DeclaredDefinition, Item, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import { canonicalize, definitionDigest, intentDigest, textDigest } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/artroom-lanes";
@@ -35,7 +35,7 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
   for (const lane of lanes) stand.lane(lane);
   const config: McpConfig = { ...stand.config(), repository: { ...stand.config().repository!, inbox: inbox.scope } };
   const clock = { now: START };
-  const service = new McpService({ service: SERVICE, fetch: stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now,
+  const service = new McpService({ service: SERVICE, fetch: stand.fetch, signer, custody: options.custody ?? memoryStore(), mode: options.mode ?? "default", now: () => clock.now, pause: async () => {},
     ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
     config: { read: async () => structuredClone(config), addRoot: async (root) => { config.roots = [...(config.roots ?? []), root]; } } });
   return { stand, service, config, clock, key };
@@ -200,6 +200,49 @@ describe("what a call costs, end to end", () => {
     expect(seen["notHeld"]).toBeGreaterThan(0);
     expect(pages).toBeGreaterThan(1);
     await annotate(`room: 60 lanes, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
+  });
+
+  // Invariant: a history search goes on from where it stopped, with bounded work per poll or call and no fixed cutoff: a mint's
+  // outcome 100 entries after its act, a creation completed 100 entries after its act, and a final item on the fifth page of
+  // final items are each found, and no entry is read twice.
+  test("history searches go on from where they stopped, past any window", async ({ annotate }) => {
+    const s = roomOf("admin", [issueDemo]);
+    await s.service.page();
+    const entryReads = (requests: readonly string[]) => requests.filter((r) => /\/entries\/\d+$/.test(r));
+
+    // The credential: 100 entries between the act and its mint's outcome.
+    s.stand.fillerBeforeOutcome = 100;
+    const token = await s.service.call("repository.read-token", { on: 0, fields: { hours: 1 }, idempotencyKey: "far-token" });
+    const seq = (token.structuredContent["fact"] as { seq: number }).seq;
+    const calls: string[][] = [];
+    let got: CallResult;
+    do { const c = await counted(s, () => s.service.call("credential", { entry: seq })); got = c.result; calls.push(c.requests); } while (got.isError && calls.length < 20);
+    expect(got.isError, JSON.stringify(got.structuredContent)).toBe(false);
+    for (const c of calls) expect(entryReads(c).length).toBeLessThanOrEqual(17);
+    const searched = calls.flatMap(entryReads).filter((r) => !r.endsWith(`/entries/${seq}`));
+    expect(new Set(searched).size, "no entry of the search is read twice").toBe(searched.length);
+
+    // A creation completed by a later entry, 100 entries after the act, as an outside answer completes the register's found.
+    const lane = laneOf(s, 1);
+    const act = await s.service.call("issue.comment", { target: 1, fields: { body: "Make a scope." }, idempotencyKey: "far-create" });
+    const actSeq = (act.structuredContent["fact"] as { seq: number }).seq;
+    for (let i = 0; i < 100; i++) s.stand.append(lane, { type: "timed", item: 0, rule: "stand-in", due: "2099-01-01T00:00:00Z" } as never);
+    const intent = (lane.entries[actSeq]!.entry.input as { signed: SignedIntent }).signed.intent;
+    const seed: Seed = { v: 1, kind: "lane", definition: definitionDigest(issueDemo), creator: lane.ref, cause: intentDigest(intent), ordinal: 0 };
+    const child = s.stand.seeded(seed);
+    s.stand.append(lane, { type: "timed", item: 0, rule: "stand-in", due: "2099-01-01T00:00:00Z" } as never, [], [{ n: 1, to: seed, message: { class: "request", type: "create", body: null } } as never]);
+    const waited = await counted(s, () => s.service.call("wait", { scope: 1, entry: actSeq }));
+    expect([waited.result.structuredContent["timedOut"], (waited.result.structuredContent["created"] as { scope: string }[]).map((c) => c.scope)], JSON.stringify(waited.result.structuredContent)).toEqual([false, [child.scope]]);
+    const polls = waited.result.structuredContent["polls"] as number;
+    expect(polls).toBeGreaterThan(1);
+    const scanned = entryReads(waited.requests).filter((r) => !r.endsWith(`/entries/${actSeq}`) && !r.includes(child.scope));
+    expect(new Set(scanned).size).toBe(scanned.length);
+
+    // A final item on the fifth page of the retained final items: found by following the pages across polls.
+    for (let i = 0; i < 9; i++) lane.final.push({ id: 100 + i, type: "merge", state: "published", revision: 0, opened: null, parties: {}, refs: {}, values: {}, attributed: [] } as unknown as Item);
+    const final = await s.service.call("wait", { scope: 1, item: 108, type: "merge" });
+    expect([final.structuredContent["final"], (final.structuredContent["item"] as { id: number }).id, final.structuredContent["polls"]]).toEqual([true, 108, 2]);
+    await annotate(`searches: a mint outcome 100 entries on, in ${calls.length} credential calls; a creation 100 entries on, in ${polls} polls of one wait; a final item on page 5, in 2 polls`);
   });
 
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation

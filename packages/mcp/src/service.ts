@@ -62,6 +62,9 @@ export const INSTRUCTIONS = "Start with room. Each act tool says what it does, w
 const LIST_PAGE_BYTES = 256 * KIB;
 const WATCH_MS = 30_000;
 const WAIT_MOST_SECONDS = 60;
+/** The most entries one poll or call reads when it searches a history, and the most pages of final items; it goes on from there next time. */
+const SEARCH_ENTRIES = 16;
+const SEARCH_PAGES = 4;
 const SINGLETON_PLACES = ["register", "directory", "membership", "rules", "destination", "inbox"] as const;
 
 interface Snapshot {
@@ -114,6 +117,9 @@ export class McpService {
   readonly #tools: readonly string[] | null;
   #snapshot: Snapshot | null = null;
   #stale = false;
+  /** Where each history search goes on from: the next entry to read, or the next page's cursor. Kept in memory, never authority. */
+  readonly #searches = new Map<string, number>();
+  readonly #pages = new Map<string, string | undefined>();
   readonly #listeners = new Set<(generation: Digest) => void>();
   #stopWatch: (() => void) | null = null;
   #told: Digest | null = null;
@@ -787,11 +793,20 @@ export class McpService {
         const match = (i: Item) => (typeof args["item"] === "number" ? i.id === args["item"] : i.type === args["type"]) && (states.length === 0 || states.includes(i.state));
         const item = read.value.items.find(match);
         if (item) return { item, head: read.at };
-        // An item in a final state is no longer live: with its type, the retained final items are read too, one page.
+        // An item in a final state is no longer live: with its type, the retained final items are read too, following the pages
+        // across polls, a few pages a poll, from where the last poll stopped; at the last page the search starts over.
         if (typeof args["item"] === "number" && typeof args["type"] === "string" && !read.value.items.some((i) => i.id === args["item"])) {
-          const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string));
-          const found = final.ok ? final.value.find(match) : undefined;
-          if (found) return { item: found, head: read.at, final: true };
+          const key = `final ${scope} ${args["type"]}`;
+          let cursor = this.#pages.get(key);
+          for (let n = 0; n < SEARCH_PAGES; n++) {
+            const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string, cursor));
+            if (!final.ok) break;
+            const found = final.value.find(match);
+            if (found) { this.#pages.delete(key); return { item: found, head: read.at, final: true }; }
+            cursor = final.next;
+            if (cursor === undefined) break;
+          }
+          this.#pages.set(key, cursor);
         }
         return null;
       }
@@ -813,12 +828,19 @@ export class McpService {
     const seeds: { n: number; seed: Seed; from: number }[] = entry.sends.flatMap((send) => ("creator" in send.to ? [{ n: send.n, seed: send.to as Seed, from: seq }] : []));
     if (seeds.length === 0 && entry.input.type === "act") {
       // A creation that an outside answer completes, as the register's `found`: a later entry sends the create, caused by this intent.
+      // The search reads a few entries a poll and goes on from where it stopped, with no limit on how far; once it finds the entry,
+      // it starts there.
       const cause = intentDigest(entry.input.signed.intent);
-      for (let next = seq + 1; next < seq + 64; next++) {
-        const later = await this.#reads.read(membership, (t, r) => t.entry(scope, r, next));
+      const key = `created ${scope} ${seq}`;
+      let next = this.#searches.get(key) ?? seq + 1;
+      for (let n = 0; n < SEARCH_ENTRIES && seeds.length === 0; n++, next++) {
+        const at = next;
+        const later = await this.#reads.read(membership, (t, r) => t.entry(scope, r, at));
         if (!later.ok) break;
-        for (const send of later.value.entry.sends) if ("creator" in send.to && (send.to as Seed).cause === cause) seeds.push({ n: send.n, seed: send.to as Seed, from: next });
+        for (const send of later.value.entry.sends) if ("creator" in send.to && (send.to as Seed).cause === cause) seeds.push({ n: send.n, seed: send.to as Seed, from: at });
+        if (seeds.length > 0) break;
       }
+      this.#searches.set(key, next);
     }
     if (seeds.length === 0) return null;
     const children: { scope: ScopeId; ref: ScopeRef | null; kind: string; definition: string; status: string | null; by: string }[] = [];
@@ -872,20 +894,26 @@ export class McpService {
     if (!opening.ok) return failed({ error: "credential", destination: scope, why: `entry ${seq}: ${opening.reason}` });
     const input = opening.value.entry.input;
     if (input.type !== "act" || input.signed.intent.kind !== "read-token" || input.signed.intent.actor !== this.#port.signer.key) return failed({ error: "credential", destination: scope, why: `entry ${seq} is no read-token act your key signed` });
+    // The mint's outcome: searched a few entries a call, going on from where the last call stopped, with no limit on how far.
     const operation = `${seq}:0`;
+    const key = `credential ${scope} ${seq}`;
     let handle: string | null = null;
     let ended: string | null = null;
-    for (let next = seq + 1; next < seq + 64 && handle === null && ended === null; next++) {
-      const got = await this.#reads.read(membership, (t, r) => t.entry(scope, r, next));
+    let next = this.#searches.get(key) ?? seq + 1;
+    for (let n = 0; n < SEARCH_ENTRIES && handle === null && ended === null; n++, next++) {
+      const at = next;
+      const got = await this.#reads.read(membership, (t, r) => t.entry(scope, r, at));
       if (!got.ok) break;
       const i = got.value.entry.input;
       if (i.type === "outcome" && i.operation === operation) {
         if (i.result !== "confirmed") ended = i.result;
         else { const body = i.evidence.body as { token?: unknown }; if (typeof body?.token === "string") handle = body.token; }
+        break;
       }
     }
+    this.#searches.set(key, next);
     if (ended) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} is ${ended}` });
-    if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome yet; call wait` });
+    if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome up to entry ${next - 1}; call credential again, which goes on from entry ${next}, or wait first` });
     let answer: Read<{ token: string; ends: string; remote: string }>;
     try { answer = await readCredential(this.#service, scope, reader, handle, this.#port.fetch ? { fetch: this.#port.fetch } : {}); }
     catch { return failed({ error: "credential", destination: scope, why: "the credential reply was unavailable or invalid; the one-time credential may have been consumed" }); }

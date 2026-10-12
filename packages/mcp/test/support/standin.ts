@@ -5,7 +5,7 @@
  * every request. It shows what the server sends, reads and returns; it shows nothing about a scope's judgment, which the
  * `*.scope.test.ts` stories show on the real test Worker.
  */
-import type { Answer, DeclaredDefinition, Digest, Entry, Input, Item, KeyId, PlatformDefinition, Receipt, ScopeId, ScopeKind, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, Input, Item, KeyId, PlatformDefinition, Receipt, ScopeId, ScopeKind, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, entryHash, factRefOf, intentDigest, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import type { McpConfig } from "../../src/index.ts";
@@ -15,7 +15,10 @@ export const SESSION_TOKEN = "STANDIN-SESSION-TOKEN-must-never-appear";
 export const READ_CREDENTIAL = "STANDIN-READ-CREDENTIAL-must-appear-once";
 const T = "2099-01-01T00:00:00Z";
 
-interface Scope { ref: ScopeRef; definition: Digest | PlatformDefinition; entries: Sealed[]; items: Item[]; retained: Map<string, string> }
+interface Scope { ref: ScopeRef; definition: Digest | PlatformDefinition; entries: Sealed[]; items: Item[]; retained: Map<string, string>; final: Item[] }
+
+/** How many retained final items one page of the stand-in's items route holds: small, so a search crosses pages. */
+export const FINAL_PAGE = 2;
 
 const item = (id: number, type: string, state: string, values: Record<string, unknown> = {}, refs: Record<string, unknown> = {}): Item =>
   ({ id, type, state, revision: 0, opened: null, parties: {}, refs, values, attributed: [] }) as unknown as Item;
@@ -31,6 +34,8 @@ export class StandIn {
   sessions: "issue" | "refuse" | "forbid" = "issue";
   /** When an issued session ends. */
   sessionEnds = "2099-01-01T00:10:00Z";
+  /** Timed entries written between a read token's act and its mint's outcome: a long history between them. */
+  fillerBeforeOutcome = 0;
   membership!: ScopeRef; directory!: ScopeRef; rules!: ScopeRef; destination!: ScopeRef;
 
   constructor(readonly key: KeyId, role = "admin", actions: readonly string[] = ["membership.manage", "membership.invite", "rules.activate", "rules.publish", "destination.read-token", "issue.open", "inbox.own"]) {
@@ -46,7 +51,7 @@ export class StandIn {
     const ref: ScopeRef = { scope, inc: newIncarnation(new Uint8Array(16).fill(this.scopes.size + 1)), kind };
     const retained = new Map<string, string>();
     if (typeof definition !== "string") retained.set(`definition ${named}`, canonicalize(definition));
-    const s: Scope = { ref, definition: named, entries: [], items, retained };
+    const s: Scope = { ref, definition: named, entries: [], items, retained, final: [] };
     this.scopes.set(scope, s);
     this.append(s, { type: "genesis", seed: { v: 1, kind, definition: named, creator: null, cause: textDigest(kind), ordinal: 0 }, inc: ref.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" } as Input);
     return ref;
@@ -76,9 +81,19 @@ export class StandIn {
     return { service: SERVICE, repository: { directory: this.directory, membership: this.membership, rules: this.rules.scope, destination: this.destination.scope } };
   }
 
-  append(s: Scope, input: Input, effects: Entry["effects"] = []): Sealed {
+  /** A scope under exactly this seed, so its ID is the one a send names. */
+  seeded(seed: Seed, items: Item[] = []): ScopeRef {
+    const scope = scopeIdOf(seed);
+    const ref: ScopeRef = { scope, inc: newIncarnation(new Uint8Array(16).fill(this.scopes.size + 1)), kind: seed.kind };
+    const s: Scope = { ref, definition: seed.definition, entries: [], items, retained: new Map(), final: [] };
+    this.scopes.set(scope, s);
+    this.append(s, { type: "genesis", seed, inc: ref.inc, kind: "establish", founding: null, source: null, n: null, message: null, decision: "applied" } as Input);
+    return ref;
+  }
+
+  append(s: Scope, input: Input, effects: Entry["effects"] = [], sends: Entry["sends"] = []): Sealed {
     const seq = s.entries.length;
-    const entry: Entry = { v: 1, at: s.ref, seq, prev: seq === 0 ? null : s.entries[seq - 1]!.hash, time: T, clamped: false, epoch: 0, input, uses: [], prepared: [], effects, sends: [] };
+    const entry: Entry = { v: 1, at: s.ref, seq, prev: seq === 0 ? null : s.entries[seq - 1]!.hash, time: T, clamped: false, epoch: 0, input, uses: [], prepared: [], effects, sends };
     const sealed = { entry, hash: entryHash(entry) };
     s.entries.push(sealed);
     return sealed;
@@ -109,7 +124,12 @@ export class StandIn {
       case "entries": { const e = s.entries[Number(route[1])]; return e ? json(this.read(s, e)) : json({ ok: false, reason: "not-found" }); }
       case "history": return json(this.read(s, s.entries));
       case "log": return json(this.read(s, { scope: s.ref, definition: s.definition, entries: s.entries.map((e) => ({ seq: e.entry.seq, hash: e.hash, bytes: canonicalize(e.entry) })) }));
-      case "items": return json(this.read(s, []));
+      case "items": {
+        const from = Number(u.searchParams.get("cursor") ?? 0);
+        const of = s.final.filter((i) => i.type === route[1]);
+        const page = of.slice(from, from + FINAL_PAGE);
+        return json({ ...this.read(s, page), ...(from + FINAL_PAGE < of.length ? { next: String(from + FINAL_PAGE) } : {}) });
+      }
       case "outbox": return route[1] ? json({ ok: false, reason: "not-found" }) : json(this.read(s, []));
       case "retained": {
         const bytes = s.retained.get(`${route[1]} ${route[2]}`);
@@ -138,6 +158,7 @@ export class StandIn {
         if (signed.intent.kind === "read-token") {
           const handle = `handle-${sealed.entry.seq}`;
           this.credentials.set(handle, false);
+          for (let i = 0; i < this.fillerBeforeOutcome; i++) this.append(s, { type: "timed", item: 0, rule: "stand-in", due: T } as Input);
           this.append(s, { type: "outcome", operation: `${sealed.entry.seq}:0`, attempt: 1, owner: s.definition, kind: "mint-read", result: "confirmed", evidence: { basis: "own-answer", body: { token: handle, ends: "2099-01-01T01:00:00Z" } } } as Input);
         }
         return json({ answer: "accepted", receipt: this.receipt(s, sealed) });
