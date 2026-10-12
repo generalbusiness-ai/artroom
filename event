@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/demo/rehearse.ts","body":{"commit":"459ccf9244a66544f96c21bd56fefbcdc70dbc4a","path":"scripts/demo/rehearse.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0437dac09988267d2fbbb8338527b56aaa88372c","text":"Merge retired a covered predecessor; the successor is at packages/page/test/settings.test.ts."}
