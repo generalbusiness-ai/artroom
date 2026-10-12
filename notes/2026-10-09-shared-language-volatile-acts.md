@@ -14,8 +14,9 @@ the seven current correctness repairs and their coordinated gate ahead of
 runtime expansion. The original full volatile brief and all 14 sections remain.
 Amended again on 12 October 2026 under request
 `0d72a50b28c683046f6ea127d0ebe5b484f87822`: section 15 designs a journal
-archive in Git and the declaration of a durability level for each region. It
-adds a section and two pointers, and changes no other text.
+archive in Git, and section 16 makes the scope the unit that declares a
+durability level, withdrawing the regions of section 2. They add two sections
+and two pointers, and change no other text.
 
 ## 1. Guarantees, goals and current foundations
 
@@ -115,8 +116,8 @@ The proposed DO-journal adapter preserves that barrier; it never opts out with
 
 **Choice proposed for adoption:** execution belongs to a declared **state
 region**, not each invocation, transport, individual field or caller flag.
-All types/acts/timers in a region share its execution contract. Section 15.2
-names the three levels a region may declare. Initially the
+All types/acts/timers in a region share its execution contract. Section 16
+withdraws the region: a scope declares its level (15.2). Initially the
 only new region profile is `artroom-live@1`; ordinary recorded definitions keep
 their existing pinned format, profile and entry semantics unchanged.
 
@@ -1351,7 +1352,7 @@ request `578edf653772749b5fa9b47f6782f6db4d0ab720`. Read against main
 `cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`. Sections 1 to 14 are unchanged
 except for two pointers: one after the establishment table in section 1,
 and one at the start of section 2. Draft 2 of this section adds 15.2, the
-declaration, and renumbers what follows.
+declaration, and renumbers what follows. Draft 3 revises 15.2 for section 16.
 
 ### 15.1 The decision
 
@@ -1382,8 +1383,9 @@ Hugh decided five points on 12 October 2026:
 4. A detached text is not archived. The archive holds its digest only,
    inside the entry that names it.
 5. The definition drives the application, and it declares the durability
-   level of each region. The archive is one of those levels, declared in
-   the definition. It is not a setting of a deployment or of a scope kind.
+   level of its scope (section 16). The archive is one of those levels,
+   declared in the definition. It is not a setting of a deployment or of
+   a scope kind.
 
 The earlier protocol published a room's log to `refs/artroom/log`
 ([protocol.md](../docs/protocol.md), R-LOG-8 to R-LOG-10 and section 30).
@@ -1395,21 +1397,22 @@ checkpoint and no earlier format.
 
 ### 15.2 The declaration
 
-A region declares one of three levels. The level is part of the
-definition's bytes, so it is pinned by digest at genesis and never
-changes for that scope. No caller, transport or deployment setting
-selects it.
+A scope declares one of three levels. Section 16 makes the scope the
+only unit that carries a level, and withdraws the regions of section 2.
+The level is part of the definition's bytes, so it is pinned by digest
+when the scope is made and never changes for that scope. No caller,
+transport or deployment setting selects it.
 
 | Level | Declared as | What survives | Confirmation | Support |
 |---|---|---|---|---|
-| Live | A region of the application envelope with `execution: { name: "artroom-live", version: 1 }` (section 2) | Nothing | Applied | Designed in sections 2 to 14; not built |
-| Recorded | A recorded definition with no `archive` member | The journal in the Durable Object | Recorded, with a receipt | Built; every definition today |
-| Recorded and archived | A recorded definition with `archive: { name: "git-journal", version: 1 }` | The journal, and a copy in the room's repository that a clone can verify | Recorded, with a receipt; then Archived through N | Designed in this section; not built |
+| Live | `level: { name: "live", version: 1 }` | Nothing | Applied | Designed in sections 2 to 14 and 16; not built |
+| Recorded | No `level` member, or `level: { name: "recorded", version: 1 }` | The journal in the Durable Object | Recorded, with a receipt | Built; every definition today |
+| Archived | `level: { name: "archived", version: 1 }` | The journal, and a copy in the room's repository that a clone can verify | Recorded, with a receipt; then Archived through N | Designed in this section; not built |
 
 **Where it is written.** `DeclaredDefinition` gains one optional member:
 
 ```ts
-archive?: { name: "git-journal"; version: 1 };
+level?: { name: "live" | "recorded" | "archived"; version: 1 };
 ```
 
 An absent member means Recorded. So the bytes and digest of every
@@ -1419,30 +1422,28 @@ runtime or replay that does not know the member answers
 existing answer for a definition it has no code for. Whether today's
 validator already refuses an unknown member is owed a check in slice A0.
 
-The application envelope of section 2 does not restate the level of its
-recorded region. Its `host.recordedDefinition` names the recorded
-definition, and that definition's `archive` member is the declaration.
-Discovery reports the level of every region from those two places: a
-live region from its `execution`, the recorded region from the recorded
-definition.
-
-**One level for a recorded region.** A scope has one history, so the
-level covers every item type, act, handler and timed rule of the
-definition. A definition cannot archive some acts and not others.
+**One level for a scope.** A scope has one history, or none. The level
+covers every item type, act, handler and timed rule of its definition. An
+application that needs two levels is two scopes.
 
 **The declaration is a requirement; the room gives permission.** A room
 states at its claim whether its repository may hold an archive. The
 directory keeps that in its genesis.
 
-| Definition declares the archive | Room permits it | Result |
+| Definition declares Archived | Room permits it | Result |
 |---|---|---|
 | Yes | Yes | The scope is created and archives. |
 | Yes | No, or the room has no destination | The creation is refused, with the reason `archive-unavailable`. Nothing is created unarchived. |
-| No | Either | The scope is created and is Recorded only. |
+| No | Either | The scope is created at the level it declares. |
 
 The room's own membership, rules and destination scopes run platform
 definitions. They archive when the room permits it, because a lane's
 replay reads their histories (15.7). Inboxes and the register do not.
+
+This is not backward compatible, and Hugh accepted that on 12 October
+2026. Holding the permission needs new versions of the register, the
+directory and the three platform definitions. A room founded earlier
+does not gain the archive, and no migration is owed.
 
 **Relation to publication.** A definition may also declare acts whose
 result is written to the repository, as the `change` lane does. That is
@@ -1585,7 +1586,7 @@ archive?: {
 }
 ```
 
-A scope that is Recorded only has no `archive` member. The
+A scope whose level is Recorded or Live has no `archive` member. The
 client gains `followArchived(receipt)`: it reads the summary until
 `through` is at or past the receipt's position and the hashes agree, or
 it reports the state that prevents that. It derives no judgment.
@@ -1646,7 +1647,7 @@ judgment, a receipt or a publication.
 
 | Slice | Work | Witness |
 |---|---|---|
-| A0. Declaration | The `archive` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
+| A0. Declaration | The `level` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
 | A1. Layout | A pure function from entries and retained inputs to the objects and commit of 15.4, for both object formats. | The same input gives the same commit ID. Segment and fan-out boundaries at their limits. A text is never written. Real local Git reads the tree back byte for byte. |
 | A2. Git source | `gitSource` and the `--git` and `--texts` options. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. |
 | A3. Archiver | Target resolution, the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
@@ -1665,8 +1666,8 @@ review ([docs/testing.md](../docs/testing.md)).
 | J3 | The archive is readable by whoever can fetch the repository's refs. | For a public repository this publishes the lanes' histories and the room's membership history. The room's permission (15.2) is the consent. The claim must say so in plain words before a person gives it. |
 | J4 | The archive token is a write that no entry opened. | Review the adapter's prefix check as a security boundary in A3. |
 | J5 | A `conflict` has no automatic repair. | An operator reads the ref and decides. A later design may add a recorded repair act. |
-| J7 | How a creation learns the room's permission, and how an existing room gains it. | The directory holds the permission in its genesis and refuses a `create` of a declaring definition without it. This needs new versions of the register, directory and the three platform definitions. A room founded earlier cannot gain it; migration of a live scope is not designed. |
-| J8 | The acknowledgement barrier, if it is ever built. | It would be a fourth level, declared the same way, with a new `archive` name. Nothing here reserves its meaning. |
+| J7 | How a creation learns the room's permission. | Decided (15.2): the directory holds the permission in its genesis and refuses a `create` of a declaring definition without it. Not backward compatible. The exact new versions are owed in slice A0. |
+| J8 | The acknowledgement barrier, if it is ever built. | It would be a fourth level, declared the same way, with a new `level` name. Nothing here reserves its meaning. |
 | J6 | Histories that reach the scope's entry budget. | Unchanged: the archive follows the history that exists. Archival that frees service storage is not designed. |
 
 This amendment ran no product tests, gate, provider or deployment probes.
@@ -1674,3 +1675,137 @@ The provider's `send`, the `log` and `retained` reads, the `HistorySource`
 interface and the directory's `repository` item were read in source at
 the head above. The path from a lane's seed to its room's destination
 (15.5, step 1) was read as declarations only and is owed a witness in A3.
+
+## 16. The scope is the unit of durability (amendment, 12 October 2026)
+
+**Proposed design; no runtime adoption.** Same request and promise as
+section 15. Hugh decided on 12 October 2026 that the region is not needed
+apart from the scope. This section amends sections 1 to 14; where it and
+they differ, this section holds. The JSON examples of section 2 are not
+rewritten; 16.3 says how to read them.
+
+### 16.1 The decision
+
+The scope is the only unit. Each scope's definition declares one level:
+Live, Recorded or Archived (15.2). An application that needs live state
+beside recorded state is two scopes, composed as scopes already are.
+
+Withdrawn from section 2:
+
+- named regions, and `regions.*.execution`;
+- the `artroom-application-1` envelope and its `host.recordedDefinition`
+  binding;
+- the operation identity `(fullScopeRef, applicationDigest, region, act)`;
+- one scheduler that shares an object between live and recorded turns
+  (section 11).
+
+Kept, unchanged in meaning:
+
+- the Live guarantee: zero durability, and the results Applied and Reset;
+- generations and revisions, sessions, leases, duplicate aids, limits;
+- the live forms and their validation (section 2's table of extensions);
+- the presence, messaging and discussion-turn applications;
+- discover, invoke, query and watch (section 9);
+- crossings and deliberate promotion (section 10);
+- every static refusal of a durable effect in live state.
+
+Why. A scope has one history, so it could only ever hold one recorded
+region. The region therefore separated nothing but live from recorded,
+and it brought a second format, a second address and a shared scheduler
+to do so. One rule replaces them: every scope declares what survives.
+
+### 16.2 A live scope
+
+A live scope shares three things with every other scope: an ID that is
+the digest of its seed, one pinned definition, and its own Durable
+Object, named by its ID. It differs in the rest.
+
+| | Recorded or archived scope | Live scope |
+|---|---|---|
+| History | One hash chain | None. It writes no entry and no storage. |
+| State | Items folded from entries | Items held in memory |
+| Life | An incarnation, minted at the first entry | A generation G, minted at each start or reset |
+| Reference | ID, incarnation, kind | ID, generation, kind |
+| Can be cited as a fact | Yes, by `FactRef` | No. Nothing names an entry of it, because it has none. |
+| Replay | From its genesis | None. A report never covers it. |
+| Answer to an act | `accepted` with a receipt, and the other three | `applied`, `refused`, `reset`, `unavailable` (section 3) |
+| Made by | A recorded creation and its confirmation | Establishment on its host, below |
+
+**Its seed.** The kind is `live`, which is new. The creator is the host
+scope. The cause is the digest of the host's entry that established it.
+The definition is the digest of a definition whose level is Live. So the
+ID is known from the host's history, before the live scope ever runs.
+
+**Establishment.** A live scope is legitimate because a recorded entry
+says so. Section 2 proposes an owned `establish-application` act; under
+this section that act records, in a recorded scope, the live definition's
+digest and the live scope's ID, and the membership scope it reads. The
+entry is the durable fact. The live scope is what can be rebuilt from it.
+
+**It exists when addressed.** There is no creation handshake, because
+the live side cannot record one. When a live scope's object starts, it
+reads its establishing entry and its definition's bytes from its host,
+checks both against its own ID, mints G, and begins empty. If either
+cannot be read or does not match, it answers `unavailable` and holds
+nothing. When the object stops for any reason, the next start is a new
+generation. That is a Reset, not a recovery.
+
+**Authority.** A live act is judged under a grant read from the
+membership scope that the establishing entry names, as section 5 says.
+Nothing about sessions changes.
+
+### 16.3 Reading sections 2 to 14 under this section
+
+| Where | Was | Is |
+|---|---|---|
+| Section 1, the establishment table | Contracts of a region | Levels of a scope (15.2) |
+| Section 2, the three applications | An envelope with `regions.live` | A definition with `level: live`. Read each example by lifting the content of `regions.live` to the top level and dropping `format`, `host` and `regions`. |
+| Section 2, "one act transitions both recorded and live items" | Refused as a cross-region mutation | Cannot be written: an act is on one scope |
+| Section 2, coexistence | One scope identity with regions beside it | A host scope and its live scopes. Discovery from the host lists the live scopes it has established. |
+| Section 3, the pipeline | A turn in the region | A turn in the live scope's own object. No step changes. |
+| Sections 4 and 6, references | Scope, application digest, region, G, item | Live scope ID, G, item |
+| Section 5, the signing domain | Binds scope, application and region | Binds the live scope's ID and G |
+| Section 9, composite observation | Recorded and live parts of one scope | Two observations, one of each scope |
+| Section 10, crossings | Between regions | Between scopes. Live to recorded is still an explicit capture and a new signed act on the recorded scope. Recorded to live is still an ordinary authorized read. |
+| Section 11, fairness | One scheduler gives recorded turns precedence | Not needed. A live flood runs in another object and cannot delay the host's turns. Each object keeps its own limits. |
+| Section 14, phase 1 | The envelope and region types | The `level` member and the live forms in the definition |
+| Section 14, phase 3 | A live module beside Core in the host's object | A live mode of the one object class, chosen by the pinned level |
+| Section 14, "Same scope coexistence" | Live operations make no native entries in the scope | The host's head is the same before and after any live traffic |
+
+### 16.4 What it costs
+
+- **A live scope is a scope in less than the contract says.** The scope
+  contract defines a scope as a history, items and a definition, and says
+  nothing else is state. It must say plainly that a live scope has no
+  history, and list what does not apply to it: facts, receipts, replay,
+  checkpoints, the outbox, timed drains across a restart.
+- **A read of the host crosses objects.** A live view that shows host
+  state reads it through the namespace, with the host's own authorization.
+  Its cost is owed a measurement.
+- **More objects.** One for each live scope. An idle object that the
+  platform stops resets its live scope. That is within the guarantee, and
+  an application must be written to expect it.
+
+### 16.5 Witnesses added
+
+| Invariant | Witness |
+|---|---|
+| The level is in the definition | A definition with `level: live` and a `tell` send, a hold or an outside operation is refused whole by the validator. A recorded definition with a live form is refused the same way. |
+| Identity without history | The same host entry and definition give the same live scope ID on every start. Two starts give two generations. |
+| Establishment | A live scope whose establishing entry is absent, or names another definition, answers `unavailable` and holds no state. |
+| The host is untouched | Live traffic writes no entry on the host and does not delay a host turn. |
+| No citation | A field of type `fact` that names a live scope is refused. |
+
+### 16.6 Open points
+
+| Point | Question | Proposed |
+|---|---|---|
+| L1 | Do the live forms enter `artroom-definition-1`, or a new format? | A new format version for definitions that use them, so that no existing validator reads a live definition as a recorded one. Owner decision before phase 1. |
+| L2 | The kind `live` is new in the seed. | Add it to the kinds. A live scope's kind says nothing of its application; its definition does. |
+| L3 | Which scope records establishment, and how discovery lists live scopes. | The directory, by the act that section 2 proposes, with one item for each established live scope. Owner decision; it needs a new directory version. |
+| L4 | A live definition has no genesis act. | The member `genesis` is absent for level Live, and the validator requires that. |
+| L5 | Sections 5 to 9 were written for one object. | Read against this section for this amendment; a line-by-line pass is owed before phase 2, and any conflict found is decided for this section. |
+
+This section ran no product tests, gate or probes. The seed's members,
+the scope kinds and the single object class were read in source at main
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`.
