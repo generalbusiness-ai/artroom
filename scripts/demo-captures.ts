@@ -157,11 +157,12 @@ async function captures(chromium: Chromium, executablePath: string, sitting: Sit
       const bottom = await tab.evaluate(() => Math.max(document.documentElement.scrollHeight, ...[...document.querySelectorAll("body *")].map((e) => e.getBoundingClientRect().bottom + window.scrollY)));
       await tab.setViewportSize({ width: 1000, height: Math.min(Math.ceil(bottom) + 24, 1400) });
       const check = await tab.evaluate(() => ({ title: document.title,
+        recordedRoomName: document.querySelector(".room-switch .room-name > span")?.textContent ?? null,
         meaningful: !!document.querySelector("main")?.textContent?.trim(),
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
         overlay: !!document.querySelector("vite-error-overlay, nextjs-portal"),
       }));
-      if (!check.meaningful || check.horizontalOverflow || check.overlay || (new URL(tab.url()).pathname === "/page/" && check.title !== "Artroom")) throw new Error(`Invalid rendered capture ${name}: ${JSON.stringify(check)}`);
+      if (!check.meaningful || check.horizontalOverflow || check.overlay || (new URL(tab.url()).pathname === "/page/" && check.title !== (check.recordedRoomName ? `dap - workroom ${check.recordedRoomName}` : "dap - workroom"))) throw new Error(`Invalid rendered capture ${name}: ${JSON.stringify(check)}`);
       checks.push({ name, url: tab.url(), width: 1000, ...check });
       await tab.screenshot({ path });
       await tab.setViewportSize({ width: 1000, height: 800 });
@@ -312,7 +313,7 @@ async function claimWitness(chromium: Chromium, executablePath: string, sitting:
         targets: [...modal.querySelectorAll("button")].map((button) => button.getBoundingClientRect().height),
         overflow: document.documentElement.scrollWidth > innerWidth + 1 };
     });
-    if (dialogCheck.title !== "Artroom" || dialogCheck.origin !== sitting.service || dialogCheck.fontSize < 16 || dialogCheck.inputHeight < 44 || dialogCheck.targets.some((height) => height < 44) || dialogCheck.overflow) throw new Error("Create room dialog failed its phone identity or target-size checks.");
+    if (dialogCheck.title !== (native.founder.recordedName ? `dap - workroom ${native.founder.recordedName}` : "dap - workroom") || dialogCheck.origin !== sitting.service || dialogCheck.fontSize < 16 || dialogCheck.inputHeight < 44 || dialogCheck.targets.some((height) => height < 44) || dialogCheck.overflow) throw new Error("Create room dialog failed its phone identity or target-size checks.");
     await tab.screenshot({ path: join(out, "create-room-mobile.png") });
     const other = await founder.newPage(); watch(other);
     await other.goto(`${sitting.service}/page/#/`);
@@ -447,16 +448,17 @@ async function labelWitness(chromium: Chromium, executablePath: string, sitting:
       const shown = await tab.evaluate(() => {
         const switches = [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0);
         const current = switches[0];
-        const recorded = current?.querySelector(".room-recorded-name");
+        const recorded = current?.querySelector(".room-name > span");
+        const personal = current?.querySelector(".room-recorded-name");
         return { title: document.title, origin: location.origin, visibleSwitches: switches.length,
-          local: current?.querySelector('[title="Local room label"]')?.textContent,
-          recorded: recorded?.textContent, recordedTitle: recorded?.getAttribute("title"),
+          local: personal?.textContent,
+          recorded: recorded?.textContent, personalTitle: personal?.getAttribute("title"),
           switchHeight: current?.getBoundingClientRect().height,
           overflow: document.documentElement.scrollWidth > innerWidth + 1,
           editableFontSizes: [...document.querySelectorAll("input:not([type=hidden]),textarea,select")].map((element) => parseFloat(getComputedStyle(element).fontSize)),
         };
       });
-      if (shown.title !== "Artroom" || shown.origin !== sitting.service || shown.visibleSwitches !== 1 || shown.local !== "Field notebook" || shown.recorded !== actor.recordedName || shown.recordedTitle !== "Recorded repository name" || shown.overflow || shown.editableFontSizes.some((size) => size < 16) || (shown.switchHeight ?? 0) < 44) throw new Error(`The local-label layout lost its native name or narrow-layout contract: ${JSON.stringify(shown)}`);
+      if (shown.title !== (actor.recordedName ? `dap - workroom ${actor.recordedName}` : "dap - workroom") || shown.origin !== sitting.service || shown.visibleSwitches !== 1 || shown.local !== "Personal label: Field notebook" || shown.recorded !== actor.recordedName || shown.personalTitle !== "Personal label in this browser" || shown.overflow || shown.editableFontSizes.some((size) => size < 16) || (shown.switchHeight ?? 0) < 44) throw new Error(`The local-label layout lost its native name or narrow-layout contract: ${JSON.stringify(shown)}`);
       await tab.screenshot({ path: join(out, `local-label-${colorScheme}-320.png`) });
       // Change only the label's binding, not the actual configured native room.
       await tab.evaluate(() => {
@@ -466,7 +468,7 @@ async function labelWitness(chromium: Chromium, executablePath: string, sitting:
       });
       await tab.reload();
       await tab.getByRole("heading", { name: "Issues" }).waitFor({ state: "attached" });
-      const ignored = await tab.evaluate(() => [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0).map((element) => ({ name: element.querySelector(".room-name")?.textContent, local: !!element.querySelector('[title="Local room label"]') })));
+      const ignored = await tab.evaluate(() => [...document.querySelectorAll(".room-switch")].filter((element) => element.getBoundingClientRect().width > 0).map((element) => ({ name: element.querySelector(".room-name")?.textContent, local: !!element.querySelector('[title="Personal label in this browser"]') })));
       if (ignored.length !== 1 || ignored[0]!.local || ignored[0]!.name !== actor.recordedName) throw new Error("A local label bound to another membership incarnation leaked into the native room switch.");
       checks.push({ colorScheme, width: 320, ...shown, staleLabelBindingIgnored: true });
       await context.close();

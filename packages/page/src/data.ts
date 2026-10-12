@@ -33,8 +33,8 @@
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, definitionDigest, entryHash, isFactRef, isMemberRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt } from "@generalbusiness/artroom-contract";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
@@ -187,7 +187,7 @@ export function placeOf(typed: string): Place | null {
 
 /** Encoding checks before signing, not provenance or server authority.
  * Routing stays on the configured service; normalization matches httpTransport. */
-function admittedInvitation(session: Session, link: NonNullable<ReturnType<typeof linkOf>>): boolean {
+function admittedInvitation(session: Pick<Session, "service">, link: NonNullable<ReturnType<typeof linkOf>>): boolean {
   return typeof session.service === "string" && typeof link.service === "string"
     && session.service.replace(/\/+$/, "").length > 0
     && link.service.replace(/\/+$/, "") === session.service.replace(/\/+$/, "")
@@ -220,19 +220,41 @@ export function joinAssociation(session: Session, typed: string): string {
  * The hint is not proven provenance; the answer is membership's. This direct
  * request has no CLI-style saved enrollment envelope or durable recovery.
  */
-export async function joinRoom(session: Session, typed: string, submitting?: () => void): Promise<{ place: Place; answer: Answer }> {
+export interface PreparedJoin { place: Place; definition: string; handle: string; link: Digest; signed: SignedIntent }
+/** Encoding only: validate the explicit invitation before a key is prepared. */
+export function invitationTarget(service: string, typed: string): Omit<PreparedJoin, "signed"> {
+  if (typed.length > 16 * 1024) throw new Unreadable("The invitation exceeds its bound.");
   const link = linkOf(typed.trim());
-  if (!link) throw new Unreadable("That is not an invitation link from artroom invite.");
-  if (!admittedInvitation(session, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
-  const supplied = platform(link.definition!)!;
-  const shape = supplied.data as unknown as DefinitionShape;
+  if (!link || !admittedInvitation({ service }, link)) throw new Unreadable("The invitation does not match this configured service, complete repository references and an explicit supported membership version.");
+  return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, definition: link.definition!, handle: link.handle, link: textDigest(canonicalize(link)) };
+}
+/** The signed envelope is private because its fields contain the invitation secret. */
+export async function prepareJoin(session: Session, typed: string): Promise<PreparedJoin> {
+  const target = invitationTarget(session.service, typed), link = linkOf(typed.trim())!;
+  const shape = platform(target.definition)!.data as unknown as DefinitionShape;
   const fields = { invitation: link.invitation, secret: link.secret };
   const signing: Signing = session.now ? { now: session.now() } : {};
-  // A new key reads nothing in membership before the join, and `join` names its member by a mark, which has no key in `expected`.
-  const signed = await signedIntent(secretSigner(session.secret), { to: link.repository.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  const signed = await signedIntent(secretSigner(session.secret), { to: target.place.membership, kind: "join", fields, expected: expectedOf(shape.acts["join"]!, [], null, fields) }, signing);
+  return { ...target, signed };
+}
+/** Submit the original envelope, never sign a replacement in this operation. */
+export async function submitJoin(session: Session, prepared: PreparedJoin): Promise<Answer> {
+  return new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).submit(prepared.signed);
+}
+/** Read-only settlement of the original signed request. Missing is not proof of no dispatch. */
+export async function settleJoin(session: Session, prepared: PreparedJoin): Promise<Receipt | null> {
+  const result = await new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).settle(prepared.signed);
+  return result.ok ? result.value : null;
+}
+export async function verifyJoinReceipt(session: Session, prepared: PreparedJoin, receipt: Receipt): Promise<boolean> {
+  if (receipt.definition !== prepared.definition || receipt.intent !== intentDigest(prepared.signed.intent) || canonicalize(receipt.fact.at) !== canonicalize(prepared.place.membership)) return false;
+  const followed = await new ScopeHandle(transportOf(session), prepared.place.membership.scope, null).followReceipt(receipt);
+  return followed.ok && followed.entry.input.type === "act" && canonicalize(followed.entry.input.signed) === canonicalize(prepared.signed);
+}
+export async function joinRoom(session: Session, typed: string, submitting?: () => void): Promise<{ place: Place; answer: Answer }> {
+  const prepared = await prepareJoin(session, typed);
   submitting?.();
-  const answer = await new ScopeHandle(transportOf(session), link.repository.membership.scope, null).submit(signed);
-  return { place: { directory: link.repository.directory.scope, membership: link.repository.membership }, answer };
+  return { place: prepared.place, answer: await submitJoin(session, prepared) };
 }
 
 /**

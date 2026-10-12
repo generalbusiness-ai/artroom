@@ -1,5 +1,5 @@
 /**
- * The page in a browser: the settings kept in local storage, and one screen
+ * The page in a browser: the connection kept in local storage, and one screen
  * for each address after `#`.
  *
  * | Address | Screen |
@@ -8,7 +8,7 @@
  * | `#/issue/<scope>` | One issue, and the acts the caller may sign on it. |
  * | `#/change/<scope>` | One change, with its states, and the acts the caller may sign on it. |
  * | `#/rules` | The rules of this room, and the acts the caller may sign on the rules scope. |
- * | `#/settings` | The room and the key; joining a room with an invitation link. |
+ * | `#/join`, `#/invitation`, `#/config` | Choose an existing room connection. |
  *
  * The page is served by the scope Worker at `/page/` and reads that Worker.
  *
@@ -20,7 +20,7 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, enrollmentAssociation, fieldValue, joinAssociation, joinRoom, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
@@ -32,11 +32,13 @@ import { stateOf, keepState } from "./list-context.ts";
 import { retainedEditor } from "./retained-editor.ts";
 import { controlKey, keepFocus, restoreFocus } from "./focus.ts";
 import { allowedClaim, claimRoom, claimStatus, type ClaimRegister } from "./claim.ts";
+import { joinInvitation, checkOriginal, originalJoin, type JoinResult } from "./join-custody.ts";
 
 const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
-let roomDraft = "";
-let roomDraftContext = "";
+let invitationDraft = "";
+let configDraft = "";
+let connectionBusy = false;
 /** What this browser keeps: the room (no secret of it) and the key. */
 interface LocalLabel { text: string; place: Place; register?: ScopeRef }
 interface ClaimSelection { operation: string; place: Place; register: ScopeRef; origin: string; key: string }
@@ -83,7 +85,7 @@ function keep(kept: Settings): boolean {
 
 const sessionOf = (kept: Settings): Session => {
   const secret = unb64url(kept.secret);
-  if (!secret || secret.length !== 32) throw new Error("The key kept in this browser is not a 32-byte secret. Set a key in Settings.");
+  if (!secret || secret.length !== 32) throw new Error("The saved connection key is invalid. Join with an invitation or matching config and key.");
   return { service: location.origin, secret };
 };
 
@@ -93,6 +95,7 @@ let drawing = 0;
 const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
   if (n !== drawing) return;
   const previousFocus = keepFocus(root());
+  root().setAttribute("data-entry", String(children.some(child => child.getAttribute("class") === "entry-header")));
   root().replaceChildren(...children);
   reconcileActionDrafts(root());
   syncCurrentFences();
@@ -102,13 +105,10 @@ const showFor = (n: number, focus: boolean) => (...children: HTMLElement[]) => {
 
 
 const opened = new RoomOpening<Room>();
+let lastVerifiedContext: string | null = null;
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
-const joining = new ScopeSending();
-const joinAnswers = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
-/** Known replies remain discoverable where the person began joining; custody stays keyed by actual enrollment. */
-const joinRepliesByContext = new Map<string, { result: Awaited<ReturnType<typeof joinRoom>>; settings: Settings }>();
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
@@ -328,33 +328,33 @@ async function roomOf(kept: Settings, place: Place): Promise<Room> {
   return opened.get(roomContext(location.origin, place, kept.secret), () => openRoom(sessionOf(kept), place));
 }
 
+/** Actual membership standing and the current key establish room context. */
+function verifiedRoom(room: Room | null): room is Room & { me: NonNullable<Room["me"]> } {
+  return !!room?.me?.handle && room.key === keyIdOfSecret(room.session.secret);
+}
+const wordmark = () => h("div", { class: "wordmark" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
+function entryShell(...content: HTMLElement[]): HTMLElement[] {
+  return [h("header", { class: "entry-header" }, wordmark()), h("div", { class: "content entry-content", id: "page-main", tabindex: "-1" }, ...content)];
+}
 /** Room and account labels come from the recorded read, never prototype fixtures. */
 function shell(destination: Destination, room: Room | null, ...content: HTMLElement[]): HTMLElement[] {
+  if (!verifiedRoom(room)) return entryShell(...content);
   const offer = claimOffer;
   const kept = settings();
-  const directory = room?.directory ?? kept?.place?.directory;
-  const recordedName = room?.name || (directory ? `Room ${directory.slice(3, 11)}` : "Choose a room");
-  const local = room && kept ? labelFor(kept.label, { directory: room.directory, membership: room.membership }, kept.register)?.text : undefined;
-  const name = recordedName;
-  const account = room?.me?.handle || "Your key";
-  const shellContext = JSON.stringify([location.origin, directory ?? null, room?.membership ?? null, room?.key ?? null]);
-  const roomSwitch = () => h("a", { class: "room-switch", href: "#/settings", title: directory ?? "Choose a room", "aria-label": `Room settings: ${name}`, "data-focus-key": controlKey(shellContext, "room-settings") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄"));
-  const accountControl = () => h("a", { class: "account", href: "#/settings", "aria-label": `Account settings: ${account}`, "data-focus-key": controlKey(shellContext, "account-settings") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
+  const directory = room.directory;
+  const local = kept ? labelFor(kept.label, { directory, membership: room.membership }, kept.register)?.text : undefined;
+  const name = room.name;
+  const account = room.me.handle;
+  const shellContext = JSON.stringify([location.origin, directory, room.membership, room.key]);
+  const roomSwitch = () => name ? h("a", { class: "room-switch", href: "#/join", title: directory, "aria-label": `Change room: ${name}`, "data-focus-key": controlKey(shellContext, "room-connection") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄")) : null;
+  const accountControl = () => h("a", { class: "account", href: "#/join", "aria-label": `Change connection for ${account}`, "data-focus-key": controlKey(shellContext, "account-connection") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
-    ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) =>
-      h("a", { class: "nav-item", href, "data-focus-key": controlKey(shellContext, `nav:${kind}`), ...(destination === kind ? { "aria-current": "page" } : {}) }, label)),
-    room ? h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages") : null);
+    ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) => h("a", { class: "nav-item", href, "data-focus-key": controlKey(shellContext, `nav:${kind}`), ...(destination === kind ? { "aria-current": "page" } : {}) }, label)), h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages"));
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
-  skip.addEventListener("click", (event) => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
-  const create = () => {
-    const button = h("button", { class: "nav-item", type: "button", "data-focus-key": controlKey(shellContext, "create-room") }, "Create room");
-    button.addEventListener("click", () => { if (room && offer) claimDialog(room, offer.kept, offer.configured, button); });
-    return button;
-  };
-  const wordmark = () => h("div", { class: "wordmark" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
+  skip.addEventListener("click", event => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
+  const create = () => { const button = h("button", { class: "nav-item", type: "button", "data-focus-key": controlKey(shellContext, "create-room") }, "Create room"); button.addEventListener("click", () => { if (offer) claimDialog(room, offer.kept, offer.configured, button); }); return button; };
   return [skip,
-    h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(),
-      offer ? create() : null, h("div", { class: "rail-bottom" }, h("a", { class: "nav-item", href: "#/settings", ...(destination === "settings" ? { "aria-current": "page" } : {}) }, "Settings"), accountControl())),
+    h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(), offer ? create() : null, h("div", { class: "rail-bottom" }, accountControl())),
     h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, wordmark(), roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
 }
@@ -504,123 +504,89 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   return panel;
 }
 
-function settingsScreen(): HTMLElement {
-  const kept = settings();
-  const selectedContext = settingsContext(kept ?? { place: null, secret: "" });
-  let joinKey: string | null = null;
-  if (kept?.place) {
-    try { joinKey = enrollmentAssociation(sessionOf(kept), kept.place.membership); } catch { /* Invalid key cannot select a Join record. */ }
-  }
-  const screenDraw = drawing;
-  const context = JSON.stringify([kept?.place ?? null, kept?.secret ?? null, kept?.register ?? null]);
-  if (roomDraftContext !== context) { roomDraft = ""; roomDraftContext = context; }
-  const room = h("textarea", { name: "room", rows: "3", placeholder: "an invitation link (artroom-invite:...), or the content of the command line's config.json" }, roomDraft);
-  const secret = h("input", { name: "secret", type: "password", autocomplete: "off", placeholder: kept ? "kept; paste another to replace it" : "32-byte secret, base64url" });
-  const said = h("p", { class: "answer", role: "status", hidden: "" });
-  const tell = (good: boolean, text: string) => { said.textContent = text; said.className = `answer ${good ? "ok" : "bad"}`; said.removeAttribute("hidden"); };
-  if (ignoredSavedAddress) tell(false, "The saved connection address is ignored. This page reads the Worker that serves it. Your room and key are kept; save these settings to continue.");
-  const form = h("form", {},
-    h("label", {}, "Room ", room),
-    h("label", {}, "Key ", secret),
-    h("button", { type: "submit", class: "primary" }, "Save settings"),
-    h("button", { type: "button", id: "new-key" }, "Create key"),
-    h("button", { type: "button", id: "join" }, "Join room"),
-  );
-  const read = (newSecret: string | null): Settings | null => {
-    const typed = (room as HTMLTextAreaElement).value.trim();
-    const place = typed ? placeOf(typed) : kept?.place ?? null;
-    if (typed && !place) { tell(false, "That is neither an invitation link nor a config file that names a repository."); return null; }
-    let register = kept?.register;
-    if (typed && !typed.startsWith("artroom-invite:")) {
-      try {
-        const parsed = JSON.parse(typed) as { register?: unknown };
-        if (parsed.register !== undefined && (!isScopeRef(parsed.register) || parsed.register.kind !== "register")) { tell(false, "The register reference in this config is invalid."); return null; }
-        register = parsed.register as ScopeRef | undefined;
-      } catch { tell(false, "The config could not be read."); return null; }
-    } else if (typed) register = undefined;
-    const label = typed ? undefined : labelFor(kept?.label, place, register);
-    const chosenSecret = newSecret ?? ((secret as HTMLInputElement).value.trim() || kept?.secret || "");
-    const claimSelection = !typed && chosenSecret === kept?.secret ? kept?.claimSelection : undefined;
-    return { place, secret: chosenSecret, ...(register ? { register } : {}), ...(label ? { label } : {}), ...(claimSelection ? { claimSelection } : {}) };
-  };
-  const save = (next: Settings) => {
-    if (!keep(next)) { tell(false, "Storage of these settings could not be verified. Check the saved room and key before another action."); return; }
-    roomDraft = ""; (room as HTMLTextAreaElement).value = ""; opened.clear();
-    const sameRoute = location.hash === "#/";
-    location.hash = "#/";
-    if (sameRoute) queueMicrotask(() => { void draw(); });
-  };
-  form.addEventListener("submit", (event) => { event.preventDefault(); const next = read(null); if (next) save(next); });
-  form.querySelector("#new-key")!.addEventListener("click", () => { const next = read(b64url(crypto.getRandomValues(new Uint8Array(32)))); if (next) { if (!keep(next)) { tell(false, "Storage of the new key could not be verified. Check the saved room and key before another action."); return; } roomDraft = (room as HTMLTextAreaElement).value; roomDraftContext = JSON.stringify([next.place, next.secret, next.register ?? null]); opened.clear(); void draw(); } });
-  // Joining signs membership's `join` with the kept key and the link's secret. The link is not kept: only the room it names.
-  const joinButton = form.querySelector("#join")!;
-  const previousRecord = joinRepliesByContext.get(selectedContext) ?? (joinKey ? joinAnswers.get(joinKey) : undefined);
-  const previousJoin = previousRecord?.result;
-  if (previousJoin?.answer.answer === "accepted") {
-    joinButton.setAttribute("disabled", "");
-    const select = h("button", { type: "button" }, "Use joined room");
-    select.addEventListener("click", () => {
-      if (settingsContext(settings() ?? { place: null, secret: "" }) !== selectedContext) return;
-      save({ ...previousRecord!.settings, place: previousJoin.place });
-    });
-    form.append(select);
-  }
-  if (joinKey && joining.get(joinKey)) { joinButton.setAttribute("disabled", ""); tell(false, joining.get(joinKey)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room"); }
-  if (previousJoin) tell(previousJoin.answer.answer === "accepted", previousJoin.answer.answer === "accepted" ? `Joining was accepted by membership ${previousJoin.place.membership.scope}. The saved room was not changed after the settings context changed. Inspect that membership before choosing this room.` : `${nonacceptedAnswerText(previousJoin.answer)} Inspect membership ${previousJoin.place.membership.scope} and the original request.`);
-  if (previousJoin) form.append(h("details", { class: "inspection" }, h("summary", {}, "Inspect Join answer"), h("pre", {}, JSON.stringify(previousJoin.answer, null, 2))));
-  const offeredJoin = () => {
-    try {
-      const typed = (room as HTMLTextAreaElement).value;
-      if (!typed.trim().startsWith("artroom-invite:")) return;
-      const key = (secret as HTMLInputElement).value.trim() || kept?.secret || "";
-      const enrollment = joinAssociation(sessionOf({ place: kept?.place ?? null, secret: key }), typed);
-      const state = joining.get(enrollment);
-      if (state || joinAnswers.get(enrollment)?.result.answer.answer === "accepted") {
-        joinButton.setAttribute("disabled", "");
-        if (state) tell(false, state.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : "Joining room");
-      } else joinButton.removeAttribute("disabled");
-    } catch { /* The submit handler reports an invalid invitation or key. */ }
-  };
-  room.addEventListener("input", () => { roomDraft = (room as HTMLTextAreaElement).value; offeredJoin(); });
-  secret.addEventListener("input", offeredJoin);
-  joinButton.addEventListener("click", () => {
-    void (async () => {
-      const next = read(null);
-      if (!next) return;
-      const invitation = (room as HTMLTextAreaElement).value;
-      const current = () => settingsContext(settings() ?? { place: null, secret: "" }) === selectedContext;
-      let enrollment: string;
-      try { enrollment = joinAssociation(sessionOf(next), invitation); }
-      catch (error) { tell(false, error instanceof Error ? error.message : "The invitation could not be read."); return; }
-      if (!current() || joinAnswers.get(enrollment)?.result.answer.answer === "accepted" || !joining.begin(enrollment, "join")) return;
-      joinButton.setAttribute("disabled", "");
-      try {
-        const joined = await joinRoom(sessionOf(next), invitation, () => {
-          if (!current()) throw new Error("The room or key changed before joining. Nothing was sent.");
-          joining.submitting(enrollment);
-        });
-        const record = { result: joined, settings: next };
-        joinAnswers.set(enrollment, record);
-        if (joined.answer.answer !== "unavailable" && joined.answer.answer !== "mismatch") joinRepliesByContext.set(selectedContext, record);
-        if (joined.answer.answer === "unavailable" || joined.answer.answer === "mismatch") joining.failed(enrollment); else joining.answered(enrollment);
-        if (!current() || screenDraw !== drawing) return;
-        if (joined.answer.answer !== "accepted") return tell(false, `${nonacceptedAnswerText(joined.answer)} Inspect membership ${joined.place.membership.scope} and the original request before another join. Recovery requires the same signed envelope; this page does not retain it.`);
-        save({ ...next, place: joined.place });
-      } catch (error) {
-        joining.failed(enrollment);
-        if (current() && screenDraw === drawing) tell(false, joining.get(enrollment)?.state === "unknown" ? "The Join request outcome is unknown. Inspect membership and the original request. This page does not retain the exact signed request for automatic recovery; do not send a replacement." : error instanceof Error ? error.message : String(error));
-      } finally {
-        if (!joining.get(enrollment) && joinAnswers.get(enrollment)?.result.answer.answer !== "accepted") joinButton.removeAttribute("disabled");
+function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
+  const capturedDraw = drawing, capturedRoute = location.hash, capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
+  const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
+  const back = () => h("a", { class: "entry-back", href: "#/join" }, h("span", { "aria-hidden": "true" }, "‹"), "Back");
+  if (path === "join") return h("main", { class: "screen entry-screen" }, h("h1", {}, "Join a room"), h("p", { class: "entry-intro" }, "How would you like to join?"),
+    ignoredSavedAddress ? h("p", { class: "entry-answer" }, "The saved connection address is ignored. Your room and key are kept. Use a connection below; this page reads only its own service.") : null,
+    h("div", { class: "entry-choices" },
+      h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
+      h("a", { class: "entry-choice", href: "#/config" }, h("div", {}, h("h2", {}, "Config and key"), h("p", {}, "Use config.json and its matching device key.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›"))));
+  const message = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
+  const tell = (text: string, bad = false) => { if (!current()) return; message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; };
+  const selectRoom = async (next: Settings, expectedHandle?: string): Promise<boolean> => {
+    const room = await openRoom(sessionOf(next), next.place!);
+    if (!current()) return false;
+    if (!verifiedRoom(room) || expectedHandle !== undefined && room.me.handle !== expectedHandle) { tell("Refused because this key has no matching verified membership in this room.", true); return false; }
+    if (!keep(next)) {
+      // A failed readback can follow a successful write. Only this still-open
+      // screen may report it, and it promises no previous selection survived.
+      const selectedContext = settingsContext(settings() ?? { place: null, secret: "" });
+      if (drawing === capturedDraw && location.hash === capturedRoute && (selectedContext === capturedContext || selectedContext === settingsContext(next))) {
+        message.textContent = "The connection was verified, but its storage could not be read back. Check the original saved connection before another request.";
+        message.className = "entry-answer bad";
       }
-    })();
+      return false;
+    }
+    opened.clear(); invitationDraft = ""; configDraft = "";
+    location.hash = "#/"; void draw(true); return true;
+  };
+  if (path === "config") {
+    const config = h("textarea", { name: "config", required: "", spellcheck: "false", placeholder: "Paste the contents of config.json" }, configDraft) as HTMLTextAreaElement;
+    const key = h("input", { name: "key", type: "password", required: "", autocomplete: "off", placeholder: "Paste the matching device.key" }) as HTMLInputElement;
+    const submit = h("button", { type: "submit", class: "primary" }, "Join room");
+    const form = h("form", { class: "entry-form" }, h("label", {}, "config.json", config), h("label", {}, "Device key", key), submit);
+    config.addEventListener("input", () => { configDraft = config.value; });
+    form.addEventListener("submit", event => { event.preventDefault(); if (!current() || connectionBusy) return; void (async () => {
+      connectionBusy = true; submit.setAttribute("disabled", ""); tell("Working on joining the room");
+      let decodedSecret: Uint8Array | null = null;
+      try {
+        const typed = config.value.trim(), raw = key.value.trim(), place = placeOf(typed);
+        decodedSecret = unb64url(raw);
+        const secret = decodedSecret;
+        if (!typed || typed.startsWith("artroom-invite:") || !place || !secret || secret.length !== 32) { tell("Refused because config.json and its matching 32-byte device key are both required. Use the invitation path for an invitation link.", true); return; }
+        const parsed = JSON.parse(typed) as { register?: unknown };
+        if (parsed.register !== undefined && (!isScopeRef(parsed.register) || parsed.register.kind !== "register")) { tell("Refused because the config register reference is invalid.", true); return; }
+        if (await selectRoom({ place, secret: b64url(secret), ...(parsed.register ? { register: parsed.register as ScopeRef } : {}) })) key.value = "";
+      } catch (error) { tell(error instanceof Error ? error.message : "The room could not verify this config and key.", true); }
+      finally { decodedSecret?.fill(0); connectionBusy = false; if (current()) submit.removeAttribute("disabled"); }
+    })(); });
+    return h("main", { class: "screen entry-screen" }, back(), h("h1", {}, "Join with config and key"), h("p", { class: "entry-intro" }, "Both files are required."), form, message);
+  }
+  const invitation = h("textarea", { name: "invitation", spellcheck: "false", autocomplete: "off", placeholder: "artroom-invite:…" }, invitationDraft) as HTMLTextAreaElement;
+  const check = h("button", { type: "button", class: "link-button", hidden: "" }, "Check status");
+  const form = h("form", { class: "entry-form" }, h("label", {}, "Invitation link", invitation));
+  form.addEventListener("submit", event => event.preventDefault());
+  const resultOf = async (result: JoinResult | null) => {
+    if (!current()) { if (result?.status === "verified") result.secret.fill(0); return; }
+    if (!result) { tell("No original enrollment is retained. Paste an invitation to join."); return; }
+    if (result.status === "verified") { try { await selectRoom({ place: result.place, secret: b64url(result.secret) }, result.handle); } finally { result.secret.fill(0); } return; }
+    const unknown = result.status === "unknown" || result.status === "blocked";
+    tell(result.reason ?? (unknown ? "The original join is unresolved. Check status without sending a replacement." : "Refused because the invitation was not accepted."), true);
+    if (unknown) {
+      try { const original = originalJoin(location.origin, localStorage); if (original) { if (original.status === "unknown" || original.status === "refused") invitation.setAttribute("disabled", ""); else invitation.removeAttribute("disabled"); check.removeAttribute("hidden"); } else { invitation.removeAttribute("disabled"); check.setAttribute("hidden", ""); } }
+      catch { invitation.setAttribute("disabled", ""); check.setAttribute("hidden", ""); }
+    } else invitation.removeAttribute("disabled");
+  };
+  let held: ReturnType<typeof originalJoin> | undefined;
+  try { held = originalJoin(location.origin, localStorage); }
+  catch { tell("Original enrollment custody is unavailable. Nothing will be replaced.", true); invitation.setAttribute("disabled", ""); }
+  if (held) {
+    if (held.status === "unknown" || held.status === "refused") invitation.setAttribute("disabled", "");
+    check.removeAttribute("hidden");
+    tell(held.status === "verified" ? "The original join is verified. Check status to open its saved room, or paste another invitation." : held.status === "prepared" ? "The original join was prepared. Paste the same invitation to continue with that exact request." : "An original join is retained. Check status without sending a replacement.", held.status === "unknown" || held.status === "refused");
+  }
+  invitation.addEventListener("input", () => {
+    invitationDraft = invitation.value;
+    const typed = invitation.value.trim();
+    if (!current() || connectionBusy || !typed) return;
+    if (!typed.startsWith("artroom-invite:")) { tell("Paste the complete invitation link.", true); return; }
+    connectionBusy = true; invitation.setAttribute("disabled", ""); tell("Working on joining the room");
+    void joinInvitation(location.origin, typed, localStorage, { current }).then(resultOf).catch(error => tell(error instanceof Error ? error.message : "The original join could not be confirmed. Check status before another request.", true)).finally(() => { connectionBusy = false; if (current()) { try { if (originalJoin(location.origin, localStorage)) check.removeAttribute("hidden"); else invitation.removeAttribute("disabled"); } catch { /* Corrupt custody stays fenced. */ } } });
   });
-  const key = kept ? unb64url(kept.secret) : null;
-  return h("main", { class: "screen settings-screen" }, h("h1", {}, "Settings"),
-    h("p", {}, key && key.length === 32 ? `This browser keeps key ${keyIdOfSecret(key)}.` : "This browser keeps no key yet."),
-    said, form,
-    h("details", { class: "inspection" }, h("summary", {}, "Inspect connection"),
-      h("p", {}, kept?.place ? `Directory ${kept.place.directory}; membership ${kept.place.membership.scope}.` : "No room is set yet."),
-      h("p", { class: "muted" }, "An invitation enrols your key in membership. You can also use the command line's config.json and device.key. The page shows a key ID, never the key.")));
+  check.addEventListener("click", () => { if (!current() || connectionBusy) return; connectionBusy = true; check.setAttribute("disabled", ""); tell("Reading the original join status"); void checkOriginal(location.origin, localStorage, { current }).then(resultOf).catch(error => tell(error instanceof Error ? error.message : "The original join remains unresolved.", true)).finally(() => { connectionBusy = false; if (current()) check.removeAttribute("disabled"); }); });
+  return h("main", { class: "screen entry-screen" }, back(), h("h1", {}, "Join with an invitation"), h("p", { class: "entry-intro" }, "Paste your invitation link to join automatically."), form, message, check);
 }
 
 async function draw(focus = false): Promise<void> {
@@ -634,17 +600,26 @@ async function draw(focus = false): Promise<void> {
   const route = routeOf(location.hash);
   const kept = settings();
   const publish = showFor(currentDraw, focus);
+  let selectedRoom: Room | null = null;
   const originalContext = kept ? settingsContext(kept) : null;
   const show = (...children: HTMLElement[]) => {
     const current = settings();
     if (currentDraw !== drawing) return;
     if ((current ? settingsContext(current) : null) !== originalContext) { void draw(focus); return; }
+    lastVerifiedContext = verifiedRoom(selectedRoom) ? originalContext : null;
+    document.title = verifiedRoom(selectedRoom) && selectedRoom.name ? `dap - workroom ${selectedRoom.name}` : "dap - workroom";
     publish(...children);
   };
-  if (route.destination === "settings" || !kept || !kept.place || ignoredSavedAddress) return show(...shell("settings", null, settingsScreen()));
+  if (["join", "invitation", "config"].includes(route.destination) || !kept || !kept.place || ignoredSavedAddress) {
+    const path = route.destination === "invitation" || route.destination === "config" ? route.destination : "join";
+    return show(...entryShell(connectionScreen(path)));
+  }
+  if (originalContext !== lastVerifiedContext) show(...entryShell(h("main", { class: "screen entry-screen" }, h("h1", {}, "Opening your room"), h("p", { class: "entry-answer", role: "status" }, "Working on reading the room"))));
   let room: Room | null = null;
   try {
     room = await roomOf(kept, kept.place);
+    if (!verifiedRoom(room)) throw new Error("Refused because this key has no verified membership in this room.");
+    selectedRoom = room;
     if (kept.register && room.me?.handle && typeof navigator !== "undefined" && navigator.locks && typeof HTMLDialogElement !== "undefined") {
       try {
         const configured = await allowedClaim(sessionOf(kept), kept.register);
@@ -775,7 +750,8 @@ async function draw(focus = false): Promise<void> {
       const scope = route.scope ?? (route.destination === "rules" ? room?.rules : kept.place.directory);
       fence = scope ? sending.get(actAssociation(context, scope as ScopeId)) : undefined;
     } catch { /* Invalid current settings cannot match a known result. */ }
-    show(...shell(route.destination, room, failureScreen(error, known), ...(fence?.state === "unknown" ? [unknownRequest(fence.kind)] : [])));
+    selectedRoom = null;
+    show(...entryShell(failureScreen(error, known), ...(fence?.state === "unknown" ? [unknownRequest(fence.kind)] : [])));
   }
 }
 

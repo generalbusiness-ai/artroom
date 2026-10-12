@@ -1,97 +1,262 @@
 import { expect, test, vi } from "vitest";
+import {
+  b64url,
+  keyIdOfSecret,
+  newIncarnation,
+  scopeIdOf,
+  textDigest,
+} from "@generalbusiness/artroom-bytes";
 
-// Real Settings handlers over scripted DOM/data boundaries; native Join
-// encoding/submission is witnessed in join.test.ts and real-scope stories.
-test("Join fences duplicate requests and never applies an accepted reply to changed settings", async () => {
-  const gate = () => { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; };
-  let rendered = gate();
+// Actual entry handlers over scripted DOM/enrollment ports. Native exact
+// envelope persistence and verification belong to join-custody.test.ts.
+test("Invitation paste joins automatically once; Back and reload keep unknown enrollment fenced without premature room navigation", async () => {
   class Element {
-    children: (Element | string)[] = []; attrs: Record<string, string> = {}; value = ""; text = "";
+    children: (Element | string)[] = [];
+    attrs: Record<string, string> = {};
+    value = "";
+    className = "";
     handlers = new Map<string, (event: { preventDefault(): void }) => void>();
     constructor(readonly tag: string) {}
-    setAttribute(key: string, value: string) { this.attrs[key] = value; if (key === "value") this.value = value; }
-    removeAttribute(key: string) { delete this.attrs[key]; }
-    append(...children: (Element | string)[]) { this.children.push(...children); }
-    replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
-    addEventListener(key: string, callback: (event: { preventDefault(): void }) => void) { this.handlers.set(key, callback); }
-    fire(key: string) { this.handlers.get(key)?.({ preventDefault() {} }); }
+    setAttribute(k: string, v: string) {
+      this.attrs[k] = v;
+      if (k === "value") this.value = v;
+    }
+    getAttribute(k: string) {
+      return this.attrs[k] ?? null;
+    }
+    hasAttribute(k: string) {
+      return Object.hasOwn(this.attrs, k);
+    }
+    removeAttribute(k: string) {
+      delete this.attrs[k];
+    }
+    prepend(...c: (Element | string)[]) {
+      this.children.unshift(...c);
+    }
+    append(...c: (Element | string)[]) {
+      this.children.push(...c);
+    }
+    replaceChildren(...c: (Element | string)[]) {
+      this.children = c;
+    }
+    addEventListener(
+      k: string,
+      f: (event: { preventDefault(): void }) => void,
+    ) {
+      this.handlers.set(k, f);
+    }
+    fire(k: string) {
+      this.handlers.get(k)?.({ preventDefault() {} });
+    }
     focus() {}
-    set textContent(value: string) { this.text = value; }
-    get textContent(): string { return this.text || this.children.map((child) => typeof child === "string" ? child : child.textContent).join(" "); }
-    find(predicate: (element: Element) => boolean): Element | undefined { if (predicate(this)) return this; for (const child of this.children) if (child instanceof Element) { const found = child.find(predicate); if (found) return found; } return undefined; }
-    querySelector(selector: string) { return selector.startsWith("#") ? this.find((element) => element.attrs["id"] === selector.slice(1)) : this.querySelectorAll(selector)[0]; }
-    all(): Element[] { return [this, ...this.children.flatMap(child => child instanceof Element ? child.all() : [])]; }
-    querySelectorAll(selector: string) {
-      const part = /^([a-z-]+)?(?:\[([^=\]]+)(?:="([^"]*)")?\])?$/.exec(selector);
-      if (!part) throw new Error(`Unsupported scripted DOM selector: ${selector}`);
-      return this.all().slice(1).filter(element => (!part[1] || element.tag === part[1]) && (!part[2] || Object.hasOwn(element.attrs, part[2]) && (part[3] === undefined || element.attrs[part[2]] === part[3])));
+    get textContent(): string {
+      return this.children
+        .map((c) => (typeof c === "string" ? c : c.textContent))
+        .join(" ");
+    }
+    set textContent(s: string) {
+      this.children = [s];
+    }
+    all(): Element[] {
+      return [
+        this,
+        ...this.children.flatMap((c) => (c instanceof Element ? c.all() : [])),
+      ];
+    }
+    querySelectorAll(s: string) {
+      const p = /^([a-z-]+)?(?:\[([^=\]]+)(?:="([^"]*)")?\])?$/.exec(s);
+      return p
+        ? this.all()
+            .slice(1)
+            .filter(
+              (e) =>
+                (!p[1] || e.tag === p[1]) &&
+                (!p[2] ||
+                  (e.hasAttribute(p[2]) &&
+                    (p[3] === undefined || e.attrs[p[2]] === p[3]))),
+            )
+        : [];
+    }
+    querySelector(s: string) {
+      return this.querySelectorAll(s)[0] ?? null;
     }
   }
-  const root = new Element("div");
-  const original = { place: { directory: "original-room", membership: { kind: "membership", scope: "membership", inc: "one" } }, secret: "device" };
-  const target = { directory: "joined-room", membership: { kind: "membership", scope: "target-membership", inc: "two" } };
-  let invitationTarget = target;
-  let settings = original;
-  let redraw!: () => void;
-  const posts = vi.fn();
-  const join = vi.fn(async (_session: unknown, _typed: string, callback: () => void) => { callback(); posts(); throw new Error("Reply lost"); });
-  const decoded = (value: string) => new Uint8Array(32).fill(value === "typed-joining-key" ? 8 : value === "third-key" ? 3 : value === "fresh-key" ? 4 : 0);
-  const bytes = await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes");
-  vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...bytes, unb64url: decoded, keyIdOfSecret: (secret: Uint8Array) => `key${secret[0]}`, isScopeRef: () => false }));
-  vi.doMock("../src/data.ts", () => ({ enrollmentAssociation: (session: { service: string; secret: Uint8Array }, membership: unknown) => bytes.canonicalize([session.service, membership, `key${session.secret[0]}`]), joinAssociation: (session: { service: string; secret: Uint8Array }) => bytes.canonicalize([session.service, invitationTarget.membership, `key${session.secret[0]}`]), joinRoom: join, placeOf: () => invitationTarget, act: vi.fn(), actAssociation: vi.fn(), actsOn: vi.fn(), fieldValue: vi.fn(), listLanes: vi.fn(), loadChange: vi.fn(), loadIssue: vi.fn(), loadRules: vi.fn(), openRoom: vi.fn(), siteAddress: vi.fn() }));
-  vi.doMock("../src/view.ts", () => ({ icon: () => new Element("svg"), h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); element.children = children.flat().filter((child) => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; }, nonacceptedAnswerText: () => "Unknown", actsPanel: vi.fn(), answerLine: vi.fn(), changeScreen: vi.fn(), failureScreen: vi.fn(), issueScreen: vi.fn(), roomScreen: vi.fn(), rulesScreen: vi.fn() }));
-  const save = vi.fn((_key: string, value: string) => { settings = JSON.parse(value) as typeof settings; });
-  const location = { origin: "https://page.test", hash: "#/settings" };
-  vi.stubGlobal("document", { getElementById: () => root }); vi.stubGlobal("location", location);
-  vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(settings), setItem: save });
-  vi.stubGlobal("window", { addEventListener: (_key: string, callback: () => void) => { redraw = callback; } });
-  const drain = async () => { for (let turn = 0; turn < 20; turn++) await Promise.resolve(); };
-  const click = () => { root.find((element) => element.attrs["name"] === "room")!.value = "artroom-invite:secret-fixture"; root.querySelector("#join")!.fire("click"); };
+  const root = new Element("div"),
+    location = { origin: "https://page.test", hash: "#/invitation" };
+  const seed = new Uint8Array(32).fill(81),
+    key = keyIdOfSecret(seed);
+  const membership = {
+    kind: "membership" as const,
+    scope: scopeIdOf({
+      v: 1,
+      kind: "membership",
+      definition: "platform:membership@2",
+      creator: null,
+      cause: textDigest("UI fake membership"),
+      ordinal: 0,
+    }),
+    inc: newIncarnation(new Uint8Array(16).fill(3)),
+  };
+  const place = {
+    directory: scopeIdOf({
+      v: 1,
+      kind: "directory",
+      definition: "platform:directory@2",
+      creator: null,
+      cause: textDigest("UI fake directory"),
+      ordinal: 0,
+    }),
+    membership,
+  };
+  const publicOriginal = { status: "unknown", key, place, handle: "@ada" };
+  const values = new Map<string, string>();
+  let redraw!: () => void,
+    posts = 0,
+    checks = 0;
+  let finish!: (result: unknown) => void;
+  const join = vi.fn(async () => {
+    posts++;
+    return new Promise((resolve) => {
+      finish = resolve;
+    });
+  });
+  const original = () =>
+    values.has("SCRIPTED-original") ? publicOriginal : null;
+  const check = vi.fn(async () => {
+    checks++;
+    return {
+      ...publicOriginal,
+      reason:
+        "The original enrollment remains unknown. No replacement was sent.",
+    };
+  });
+  vi.doMock("../src/join-custody.ts", () => ({
+    joinInvitation: join,
+    originalJoin: original,
+    checkOriginal: check,
+  }));
+  const view =
+    await vi.importActual<typeof import("../src/view.ts")>("../src/view.ts");
+  vi.doMock("../src/view.ts", () => ({
+    ...view,
+    icon: () => new Element("svg"),
+    h: (
+      tag: string,
+      attrs: Record<string, string> = {},
+      ...children: unknown[]
+    ) => {
+      const e = new Element(tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      e.children = children
+        .flat()
+        .filter((c) => c !== null && c !== undefined && c !== false) as (
+        Element | string
+      )[];
+      return e;
+    },
+  }));
+  vi.stubGlobal("document", {
+    title: "",
+    activeElement: null,
+    getElementById: () => root,
+  });
+  vi.stubGlobal("location", location);
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => values.get(k) ?? null,
+    setItem: (k: string, v: string) => values.set(k, v),
+  });
+  vi.stubGlobal("window", {
+    addEventListener: (_k: string, f: () => void) => {
+      redraw = f;
+    },
+  });
+  const drain = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
   try {
-    await import("../src/main.ts"); await rendered.promise;
-    const prepared = gate(), release = gate();
-    join.mockImplementationOnce(async (_session, _typed, callback) => { prepared.resolve(); await release.promise; callback(); posts(); throw new Error("Must not submit"); });
-    click(); await prepared.promise; click(); expect(join).toHaveBeenCalledTimes(1);
-    settings = { ...original, secret: "other-key" }; release.resolve(); await drain(); expect(posts).not.toHaveBeenCalled();
-    settings = original; rendered = gate(); redraw(); await rendered.promise;
-    const submitted = gate(); let reply!: (value: unknown) => void;
-    join.mockImplementationOnce(async (session, typed, callback) => { expect((session as { secret: Uint8Array }).secret).toEqual(new Uint8Array(32).fill(8)); expect(typed).toBe("artroom-invite:secret-fixture"); callback(); posts(); submitted.resolve(); return new Promise((resolve) => { reply = resolve; }) as never; });
-    root.find((element) => element.attrs["name"] === "secret")!.value = "typed-joining-key";
-    click(); await submitted.promise;
-    settings = { place: { directory: "different-room", membership: { kind: "membership", scope: "other-membership", inc: "three" } }, secret: "other-key" };
-    const joinedPlace = target;
-    reply({ place: joinedPlace, answer: { answer: "accepted", receipt: { intent: "digest_original", definition: "platform:membership@2", fact: { at: target.membership, seq: 12, hash: "entry_original" } } } }); await drain(); expect(save).not.toHaveBeenCalled();
-    settings = original; rendered = gate(); redraw(); await rendered.promise;
-    expect(root.textContent).toContain("Joining was accepted by membership");
-    expect(root.textContent).toContain("entry_original");
-    root.find((element) => element.attrs["name"] === "secret")!.value = "typed-joining-key";
-    click(); await drain(); expect(join).toHaveBeenCalledTimes(2);
-    invitationTarget = { directory: "independent-room", membership: { kind: "membership", scope: "independent-membership", inc: "four" } };
-    root.find((element) => element.attrs["name"] === "secret")!.value = "fresh-key";
-    root.find((element) => element.attrs["name"] === "room")!.fire("input");
-    expect(root.querySelector("#join")!.attrs["disabled"]).toBeUndefined();
-    click(); await drain();
-    expect(join).toHaveBeenCalledTimes(3); expect(posts).toHaveBeenCalledTimes(2);
-    invitationTarget = target;
-    root.find((element) => element.tag === "button" && element.textContent === "Use joined room")!.fire("click");
-    expect(settings).toEqual({ place: joinedPlace, secret: "typed-joining-key" });
-    expect(location.hash).toBe("#/");
-    expect(join).toHaveBeenCalledTimes(3);
-    location.hash = "#/settings";
-    settings = { ...original, place: { ...original.place, directory: "selected-before-unknown" }, secret: "third-key" }; rendered = gate(); redraw(); await rendered.promise;
-    click(); await drain(); expect(posts).toHaveBeenCalledTimes(3);
-    rendered = gate(); redraw(); await rendered.promise;
-    root.find((element) => element.attrs["name"] === "room")!.value = "artroom-invite:secret-fixture";
-    root.find((element) => element.attrs["name"] === "room")!.fire("input");
-    expect(root.querySelector("#join")!.attrs["disabled"]).toBe("");
-    expect(root.textContent).toContain("does not retain the exact signed request");
-    click(); await drain(); expect(join).toHaveBeenCalledTimes(4);
-    root.find((element) => element.tag === "form")!.fire("submit"); // Save the same invitation target/key, changing selected room.
-    location.hash = "#/settings"; rendered = gate(); redraw(); await rendered.promise;
-    click(); await drain(); expect(join).toHaveBeenCalledTimes(4); expect(posts).toHaveBeenCalledTimes(3);
-    root.find((element) => element.attrs["name"] === "room")!.fire("input");
-    expect(root.querySelector("#join")!.attrs["disabled"]).toBe("");
-    settings = { ...settings, secret: "fresh-key" }; rendered = gate(); redraw(); await rendered.promise;
-    click(); await drain(); expect(join).toHaveBeenCalledTimes(5); expect(posts).toHaveBeenCalledTimes(4);
-  } finally { await drain(); vi.unstubAllGlobals(); for (const path of ["../src/data.ts", "../src/view.ts", "@generalbusiness/artroom-bytes"]) vi.doUnmock(path); }
+    await import("../src/main.ts");
+    const input = root.all().find((e) => e.attrs["name"] === "invitation")!;
+    expect(
+      root
+        .all()
+        .some((e) => e.attrs["name"] === "key" || e.attrs["name"] === "secret"),
+    ).toBe(false);
+    expect(
+      root
+        .all()
+        .filter((e) => e.tag === "button")
+        .map((e) => e.textContent),
+    ).toEqual(["Check status"]);
+    expect(root.textContent).not.toMatch(
+      /Settings|Save settings|Create key|Your key|Issues|Changes|Rules/,
+    );
+    input.value = "artroom-invite:SCRIPTED complete invitation";
+    input.fire("input");
+    input.fire("input");
+    expect(posts).toBe(1);
+    values.set("SCRIPTED-original", b64url(new Uint8Array([1]))); // Public fixture presence only; no real secret or envelope.
+    location.hash = "#/join";
+    redraw();
+    expect(root.textContent).toContain("How would you like to join?");
+    finish({
+      ...publicOriginal,
+      reason: "The original enrollment remains unknown.",
+    });
+    await drain();
+    expect(values.has("artroom-page")).toBe(false);
+    location.hash = "#/invitation";
+    redraw();
+    const restored = root.all().find((e) => e.attrs["name"] === "invitation")!;
+    expect(restored.hasAttribute("disabled")).toBe(true);
+    restored.fire("input");
+    expect(posts).toBe(1);
+    root
+      .all()
+      .find((e) => e.tag === "button" && e.textContent === "Check status")!
+      .fire("click");
+    await drain();
+    expect(checks).toBe(1);
+    expect(posts).toBe(1);
+    // A new module instance stands for reload; durable port presence survives.
+    vi.resetModules();
+    await import("../src/main.ts");
+    expect(
+      root
+        .all()
+        .find((e) => e.attrs["name"] === "invitation")!
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(posts).toBe(1);
+    expect(root.textContent).not.toMatch(/Your key|Issues|Changes|Rules/);
+    expect(document.title).toBe("dap - workroom");
+    let checked!: (result: unknown) => void;
+    check.mockImplementationOnce(
+      async () =>
+        new Promise((resolve) => {
+          checked = resolve;
+        }),
+    );
+    root
+      .all()
+      .find((e) => e.tag === "button" && e.textContent === "Check status")!
+      .fire("click");
+    await drain();
+    location.hash = "#/join";
+    redraw();
+    checked({
+      ...publicOriginal,
+      status: "verified",
+      secret: seed,
+      answer: { answer: "accepted" },
+    });
+    await drain();
+    expect(values.has("artroom-page")).toBe(false);
+    expect(location.hash).toBe("#/join");
+  } finally {
+    await drain();
+    vi.unstubAllGlobals();
+    vi.doUnmock("../src/join-custody.ts");
+    vi.doUnmock("../src/view.ts");
+    vi.resetModules();
+  }
 });

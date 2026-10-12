@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dap</title>
+<title>dap - workroom</title>
 <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
 <link rel="icon" sizes="any" href="/brand/favicon.ico">
 <style>
@@ -173,8 +173,6 @@
   .ok { color: var(--success); border-color: var(--success); }
   .bad { color: var(--error); border-color: var(--error); }
 
-  .settings-screen { max-width: 650px; }
-  .settings-screen > h1 { margin-bottom: 28px; }
   .form-layout { max-width: 650px; margin-inline: auto; }
   .form-layout h1 { margin-bottom: 28px; }
   .field { margin-bottom: 20px; }
@@ -292,6 +290,38 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
   }
+
+  /* Accepted entry preview: one centered task before verified room navigation. */
+  .artroom[data-entry="true"] { display: block; }
+  .entry-header { grid-column: 1 / -1; padding: 20px 32px; min-height: 88px; border-bottom: 1px solid var(--line); }
+  .entry-header .wordmark { min-width: 72px; width: 72px; margin: 0; }
+  .entry-content { grid-column: 1 / -1; width: calc(100% - 48px); max-width: 620px; margin: 80px auto 64px; padding: 0; }
+  .entry-content h1 { font-size: 36px; line-height: 1.2; letter-spacing: -1px; font-weight: 700; margin: 0 0 16px; }
+  .entry-intro { font-family: var(--font-sans); font-size: 18px; line-height: 1.55; color: var(--muted-ink); margin-bottom: 34px; }
+  .entry-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin: -28px 0 22px; color: var(--muted-ink); text-decoration: none; }
+  .entry-choices { border-top: 1px solid var(--line); }
+  .entry-choice { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 0; border-bottom: 1px solid var(--line); min-height: 104px; color: var(--ink); text-decoration: none; }
+  .entry-choice h2 { font-size: 19px; font-weight: 600; margin: 0 0 6px; }
+  .entry-choice p { font-family: var(--font-sans); font-size: 15px; color: var(--muted-ink); margin: 0; }
+  .entry-choice:hover h2 { color: var(--accent); }
+  .entry-chevron { font-size: 28px; color: var(--muted-ink); }
+  .entry-form { max-width: none; }
+  .entry-form label { display: block; margin-bottom: 28px; font-size: 14px; }
+  .entry-form input, .entry-form textarea { display: block; width: 100%; min-height: 50px; margin-top: 9px; padding: 12px 14px; font: 17px/1.5 var(--font-sans); }
+  .entry-form textarea { min-height: 136px; resize: vertical; }
+  .entry-form .primary { width: 100%; min-height: 48px; font-family: var(--font-sans); font-size: 16px; }
+  .entry-answer { font-family: var(--font-sans); min-height: 28px; margin-top: 20px; font-size: 16px; color: var(--muted-ink); }
+  .entry-answer.bad { color: var(--error); }
+  @media (max-width: 650px) {
+    .entry-header { min-height: 80px; padding: 18px; }
+    .entry-content { width: calc(100% - 36px); margin-top: 48px; }
+    .entry-content h1 { font-size: 30px; }
+    .entry-intro { font-size: 17px; }
+    .entry-back { margin-top: -20px; }
+    .entry-choice { gap: 14px; }
+    .entry-form input, .entry-form textarea { font-size: 16px; }
+  }
+
 </style>
 </head>
 <body>

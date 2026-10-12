@@ -219,7 +219,7 @@ export function answerLine(acted: Acted): HTMLElement {
 export function failureScreen(error: unknown, known: readonly Acted[] = []): HTMLElement {
   return h("main", { class: "screen" }, h("h1", {}, "Observation unknown"), h("p", { class: "answer bad" }, error instanceof Unreadable ? error.message : "The view could not be read."),
     known.map((result) => answerLine({ ...result, observation: result.observation ?? "The subsequent view could not be read." })),
-    h("p", {}, h("a", { href: "#/settings" }, "Settings")));
+    h("p", {}, h("a", { href: "#/join" }, "Join another room")));
 }
 
 export { actsPanel } from "./actions.ts";
