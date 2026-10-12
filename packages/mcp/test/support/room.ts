@@ -104,12 +104,11 @@ export function mcpRoom(): Room {
       const config: McpConfig = options.config ? (options.share ? options.config : structuredClone(options.config)) : { service: SERVICE };
       const requests: string[] = [];
       const counted: Fetch = (url, init) => { requests.push(`${init?.method ?? "GET"} ${new URL(url).pathname}`); return fetch(url, init); };
-      let tick: () => void = () => {};
       const service = new McpService({
         service: SERVICE, fetch: counted, signer: secretSigner(key), custody: memoryStore(), mode: options.mode ?? "default", ...(options.tools ? { tools: options.tools } : {}),
         ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
         now: lifetime.now, pause: (waiting) => pause(waiting),
-        every: (_ms, run) => { tick = run; return () => { tick = () => {}; }; },
+        every: () => () => {},
         config: {
           read: async () => structuredClone(config),
           addRoot: async (root: Root) => { config.roots = [...(config.roots ?? []).filter((r) => r.scope !== root.scope), root]; },
@@ -134,7 +133,8 @@ export function mcpRoom(): Room {
           }
           return names;
         },
-        tick: async () => { tick(); await wait(() => service.check()); },
+        // The watch's timer runs check; the test runs it once and awaits it.
+        tick: async () => { expect(service.watching).toBe(true); await wait(() => service.check()); },
       };
       if (options.subscribe) service.subscribe(() => { agent.told++; });
       return agent;

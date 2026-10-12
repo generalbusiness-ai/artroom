@@ -23,8 +23,12 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "5.20260815.1",
+    "@generalbusiness/artroom-derive": "0.1.0-dev.1",
+    "@generalbusiness/artroom-lanes": "0.1.0-dev.1",
+    "@generalbusiness/artroom-scope": "0.1.0-dev.1",
     "@modelcontextprotocol/client": "2.3.1",
     "@types/node": "26.6.3",
+    "gpt-tokenizer": "3.4.0",
     "vitest": "4.1.11"
   },
   "engines": {

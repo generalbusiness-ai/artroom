@@ -27,10 +27,14 @@ export class StandIn {
   /** Every request, as `METHOD path`. */
   readonly requests: string[] = [];
   readonly credentials = new Map<string, boolean>();
+  /** How membership answers a session request, and whether reads with a session are then refused: issue, refuse, or forbid. */
+  sessions: "issue" | "refuse" | "forbid" = "issue";
+  /** When an issued session ends. */
+  sessionEnds = "2099-01-01T00:10:00Z";
   membership!: ScopeRef; directory!: ScopeRef; rules!: ScopeRef; destination!: ScopeRef;
 
   constructor(readonly key: KeyId, role = "admin", actions: readonly string[] = ["membership.manage", "membership.invite", "rules.activate", "rules.publish", "destination.read-token", "issue.open", "inbox.own"]) {
-    this.membership = this.add("membership", "platform:membership@2", [item(0, "roster", "active", { adminActions: actions, maintainerActions: [], memberActions: [], agentActions: [], checkerActions: [] }), item(1, "member", "active", { handle: "@agent", role, kind: "person" }), item(2, "key", "active", { id: key }, { member: 1 })]);
+    this.membership = this.add("membership", "platform:membership@2", [item(0, "roster", "active", { adminActions: [], maintainerActions: [], memberActions: [], agentActions: [], checkerActions: [], [`${role}Actions`]: actions }), item(1, "member", "active", { handle: "@agent", role, kind: "person" }), item(2, "key", "active", { id: key }, { member: 1 })]);
     this.rules = this.add("rules", "platform:rules@2", [item(0, "rules", "published")]);
     this.destination = this.add("destination", "platform:destination@3", [item(0, "branch", "ready", { repository: { host: "artifacts", namespace: "n", name: "r", id: "1" } })]);
     this.directory = this.add("directory", "platform:directory@3", [item(0, "repository", "open", {}, { membership: this.membership, rules: this.rules, destination: this.destination })]);
@@ -55,6 +59,17 @@ export class StandIn {
     rules.items.push(item(rules.items.length + 1, "definition", "active", { name: definition.name, digest }));
     rules.retained.set(`definition ${digest}`, canonicalize(definition));
     this.append(rules, { type: "timed", item: 0, rule: "stand-in", due: T } as Input);
+  }
+
+  /** A lane under a declared definition: its scope, its row in the directory, and the definition active in the rules scope. */
+  lane(definition: DeclaredDefinition, title = definition.name): ScopeRef {
+    const ref = this.add("lane", definition);
+    const directory = this.scopes.get(this.directory.scope)!;
+    const number = directory.items.filter((i) => i.type === "lane").length + 1;
+    directory.items.push(item(directory.items.length, "lane", "open", { number, kind: definition.name, title, state: "open" }, { scope: ref }));
+    this.append(directory, { type: "timed", item: 0, rule: "stand-in", due: T } as Input);
+    if (!this.scopes.get(this.rules.scope)!.items.some((i) => i.values["digest"] === definitionDigest(definition))) this.activate(definition);
+    return ref;
   }
 
   config(): McpConfig {
@@ -84,8 +99,11 @@ export class StandIn {
     if (!s) return json({ ok: false, reason: "not-found" }, 404);
     const route = parts.slice(1);
     if (route[0] === "sessions") {
-      return json({ ok: true, token: SESSION_TOKEN, session: { v: 1, deployment: "standin", membership: s.ref, member: "@agent", key: this.key, reads: [], ends: "2099-01-01T00:10:00Z" } });
+      if (this.sessions === "refuse") return json({ ok: false, reason: "unauthorized" });
+      return json({ ok: true, token: SESSION_TOKEN, session: { v: 1, deployment: "standin", membership: s.ref, member: "@agent", key: this.key, reads: [], ends: this.sessionEnds } });
     }
+    const authorization = (init?.headers as Record<string, string> | undefined)?.["authorization"];
+    if (this.sessions === "forbid" && authorization?.includes(SESSION_TOKEN)) return json({ ok: false, reason: "forbidden" });
     if (route.length === 0) return json(this.read(s, { scope: s.ref, status: "active", definition: s.definition, time: T, items: s.items, counts: [] }));
     switch (route[0]) {
       case "entries": { const e = s.entries[Number(route[1])]; return e ? json(this.read(s, e)) : json({ ok: false, reason: "not-found" }); }
