@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, inject, test, onTestFinished } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId, SignedIntent } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -36,6 +36,59 @@ declare module "vitest" {
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of every scope that a command has waited on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces signs the intents; the wall clock times the shots. |
 describe("the demo runner's rehearsal on real scopes. The Git host, git and the scheduler are STAND-INs", () => {
+  test("on artifacts: a failed stale or replacement producer stops every later shot and mutation; the unavailable answer is injected before admission", async () => {
+    // The runner, CLI, planned install, read codecs and preceding native acts
+    // are real. Git hosting and scheduling retain the fixture's stand-ins.
+    // Only the targeted open-pr answer is scripted, before native admission.
+    // Earlier acts remain recorded. This stop promises no rollback.
+    for (const target of ["Merge: it publishes", "A stale change is refused, then re-proposed as a new change"]) {
+      net.hold = net.deaf = null;
+      const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: null });
+      onTestFinished(owner.close);
+      const wired = new Set<ScopeId>();
+      try {
+        const { stage } = testStage(ownHost(), wired);
+        let current = "", intercepted = false, laterMutations = 0;
+        const runnableAfterFault: number[] = [];
+        const rehearsal = await rehearse({
+          ...stage,
+          beforeShot: async shot => {
+            if (intercepted) runnableAfterFault.push(shot.n);
+            current = shot.title;
+          },
+          person: async who => {
+            const ctx = await stage.person(who);
+            const original = ctx.fetch!;
+            const fetch: Fetch = async (url, init) => {
+              const path = new URL(url).pathname;
+              const mutation = init?.method === "POST" && (path.endsWith("/acts") || path.endsWith("/preparations") || path === "/v1/scopes");
+              if (intercepted && mutation) laterMutations++;
+              if (!intercepted && current === target && path.endsWith("/acts") && init?.method === "POST") {
+                const body = JSON.parse(init.body!) as { signed: SignedIntent };
+                if (body.signed.intent.kind === "open-pr") {
+                  intercepted = true;
+                  return Response.json({ answer: "unavailable", reason: "busy" });
+                }
+              }
+              return original(url, init);
+            };
+            return { ...ctx, fetch, trustedFoundingService: { service: SERVICE, fetch } };
+          },
+        });
+        const failed = rehearsal.shots.find(shot => shot.title === target)!;
+        expect(intercepted, `targeted ${target} request must be intercepted`).toBe(true);
+        expect(failed.match).toBe(false);
+        expect(failed.lines.join("\n")).toContain("Composite stopped:");
+        expect(rehearsal.shots.slice(failed.n).length).toBeGreaterThan(0);
+        expect(rehearsal.shots.slice(failed.n).every(shot => shot.code === -1), `every later shot must stay unrun after ${target}`).toBe(true);
+        expect([laterMutations, runnableAfterFault], `no later mutation or runnable callback after ${target}`).toEqual([0, []]);
+      } finally {
+        owner.close(); net.hold = null;
+        for (const name of wired) platformOutside.delete(name);
+      }
+    }
+  }, 240_000);
+
   for (const [host, make] of [["artifacts", () => Promise.resolve(ownHost())], ["github.com", gitHub]] as const) {
     test(`on ${host}: every shot, from the planned install to the page, prints the exit code and the lines the script expects, and the transcript's table says yes for each; a shot whose outcome differs is a row that says no; no secret is in the transcript`, async () => {
       net.hold = net.deaf = null;
