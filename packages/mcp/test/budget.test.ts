@@ -8,7 +8,7 @@ import { canonicalize, definitionDigest, textDigest } from "@generalbusiness/art
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/artroom-lanes";
-import { McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
+import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
 import { fileStore } from "../src/node.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
@@ -55,19 +55,21 @@ const reads = (requests: readonly string[]) => requests.filter((r) => r.startsWi
 const posts = (requests: readonly string[]) => requests.filter((r) => r.startsWith("POST ") && !r.endsWith("/sessions")).length;
 
 /** `tools/list` as the server sends it: each page's result, in canonical JSON, with its byte and token counts. */
-async function listOf(service: McpService): Promise<{ tools: number; pages: number; bytes: number; tokens: number; largestTool: number }> {
+async function listOf(service: McpService): Promise<{ tools: number; pages: number; bytes: number; tokens: number; largestTool: number; sizes: number[] }> {
   let cursor: string | undefined;
   let tools = 0, pages = 0, bytes = 0, tokens = 0, largestTool = 0;
+  const sizes: number[] = [];
   do {
     const page = await service.page(cursor);
     const sent = canonicalize({ tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) } as never);
     tools += page.tools.length; pages++;
     bytes += new TextEncoder().encode(sent).length;
+    sizes.push(new TextEncoder().encode(sent).length);
     tokens += encode(sent).length;
     for (const t of page.tools) largestTool = Math.max(largestTool, new TextEncoder().encode(canonicalize(t as never)).length);
     cursor = page.nextCursor;
   } while (cursor);
-  return { tools, pages, bytes, tokens, largestTool };
+  return { tools, pages, bytes, tokens, largestTool, sizes };
 }
 
 describe("what a call costs, end to end", () => {
@@ -87,27 +89,30 @@ describe("what a call costs, end to end", () => {
     const token = await s.service.call("repository.read-token", { on: 0, fields: { hours: 1 }, idempotencyKey: "rt-0" });
     expect(token.isError, JSON.stringify(token.structuredContent)).toBe(false);
     const tokenSeq = (token.structuredContent["fact"] as { seq: number }).seq;
+    // A second read token: the cold call consumes the first credential, the warm call reads the second.
+    const token2 = await s.service.call("repository.read-token", { on: 0, fields: { hours: 1 }, idempotencyKey: "rt-1" });
+    const tokens = [tokenSeq, (token2.structuredContent["fact"] as { seq: number }).seq];
     let n = 0;
-    // Each tool: [name, arguments, reads bound (warm), response bound in bytes]. Bounds are section 8's.
+    // Each tool: [name, arguments, reads bound (warm), response bound in bytes]. Bounds are section 8's, for the whole response as
+    // the client receives it: the structured content and the text together.
     const tools: [string, () => Record<string, unknown>, number, number][] = [
-      ["room", () => ({}), 3, 8 * 1024 * 2],
-      ["inspect", () => ({ scope: 1 }), 1, 8 * 1024 * 2],
-      ["inspect describe", () => ({ scope: 1, describe: "comment" }), 2, 64 * 1024 * 2],
-      ["inspect declaration", () => ({ scope: 1, declaration: true }), 2, 64 * 1024 * 2],
-      ["items", () => ({ scope: 1, type: "comment" }), 1, 64 * 1024 * 2],
-      ["steps", () => ({ scope: 1 }), 1, 64 * 1024 * 2],
-      ["step", () => ({ scope: 1, seq: commentSeq }), 1, 64 * 1024 * 2],
-      ["record", () => ({ scope: 1 }), 1, 64 * 1024 * 2],
-      ["sends", () => ({ scope: 1 }), 1, 64 * 1024 * 2],
-      ["text", () => ({ scope: 1, kind: "text", digest: textDigest("First.") }), 1, 64 * 1024 * 2],
-      ["wait", () => ({ scope: 1, seq: commentSeq }), 1, 4 * 1024 * 2],
-      ["settle", () => ({ target: 1, idempotencyKey: "c-0" }), 1, 4 * 1024 * 2],
-      ["actions", () => ({ scope: 1 }), 3, 64 * 1024 * 2],
-      ["issue.comment", () => ({ target: 1, fields: { body: `Comment ${++n}.` }, idempotencyKey: `c-${n}` }), 2, 4 * 1024 * 2],
-      ["issue.create", () => ({ fields: { definition: definitionDigest(issueDemo), title: `Issue ${++n}`, conditions: ["c"] }, idempotencyKey: `i-${n}` }), 2, 4 * 1024 * 2],
-      ["credential", () => ({ entry: tokenSeq }), 1, 2 * 1024 * 2],
+      ["room", () => ({}), 3, BOUNDS.room],
+      ["inspect", () => ({ scope: 1 }), 1, BOUNDS.inspect],
+      ["inspect describe", () => ({ scope: 1, describe: "comment" }), 2, BOUNDS.large],
+      ["inspect declaration", () => ({ scope: 1, declaration: true }), 2, BOUNDS.large],
+      ["items", () => ({ scope: 1, type: "comment" }), 1, BOUNDS.large],
+      ["steps", () => ({ scope: 1 }), 1, BOUNDS.large],
+      ["step", () => ({ scope: 1, seq: commentSeq }), 1, BOUNDS.large],
+      ["record", () => ({ scope: 1 }), 1, BOUNDS.large],
+      ["sends", () => ({ scope: 1 }), 1, BOUNDS.large],
+      ["text", () => ({ scope: 1, kind: "text", digest: textDigest("First.") }), 1, BOUNDS.large],
+      ["wait", () => ({ scope: 1, seq: commentSeq }), 1, BOUNDS.act],
+      ["settle", () => ({ target: 1, idempotencyKey: "c-0" }), 1, BOUNDS.act],
+      ["actions", () => ({ scope: 1 }), 3, BOUNDS.large],
+      ["issue.comment", () => ({ target: 1, fields: { body: `Comment ${++n}.` }, idempotencyKey: `c-${n}` }), 2, BOUNDS.act],
+      ["issue.create", () => ({ fields: { definition: definitionDigest(issueDemo), title: `Issue ${++n}`, conditions: ["c"] }, idempotencyKey: `i-${n}` }), 2, BOUNDS.act],
+      ["credential", () => ({ entry: tokens.shift() }), 1, BOUNDS.credential],
     ];
-    // The response bounds above are doubled: the whole response carries the structured content and its text, which is the same JSON.
     const figures: string[] = [];
     for (const [label, args, bound, bytes] of tools) {
       const name = label.split(" ")[0]!;
@@ -115,15 +120,10 @@ describe("what a call costs, end to end", () => {
       s.service.reads.forget(M);
       const cold = await counted(s, () => s.service.call(name, args()));
       const warm = await counted(s, () => s.service.call(name, args()));
-      if (name === "credential") {
-        // A read credential is minted once: the warm call finds it read already, which is the scope's answer, not a cost.
-        expect(cold.result.isError, JSON.stringify(cold.result.structuredContent)).toBe(false);
-      } else {
-        expect([cold.result.isError, warm.result.isError], `${label}: ${JSON.stringify(warm.result.structuredContent)}`).toEqual([false, false]);
-      }
+      expect([cold.result.isError, warm.result.isError], `${label}: ${JSON.stringify(warm.result.structuredContent)}`).toEqual([false, false]);
       expect(sessions(cold.requests), label).toBe(1);
       expect(sessions(warm.requests), label).toBe(0);
-      expect(warm.bytes, label).toBeLessThanOrEqual(bytes);
+      expect([cold.bytes, warm.bytes].every((b) => b <= bytes), `${label}: ${cold.bytes} and ${warm.bytes} bytes, bound ${bytes}`).toBe(true);
       figures.push(`${label}: warm ${reads(warm.requests)} reads, ${posts(warm.requests)} posts; cold +${sessions(cold.requests)} session; ${warm.bytes} bytes (bound ${bound} reads)`);
       if (name !== "credential" && name !== "actions") expect(reads(warm.requests), `${label} reads ${warm.requests.join(", ")}`).toBeLessThanOrEqual(bound);
     }
@@ -179,6 +179,27 @@ describe("what a call costs, end to end", () => {
     expect([reads(warm.requests), sessions(warm.requests)]).toEqual([6, 0]);
     expect(sessions(cold.requests)).toBe(2);
     await annotate(`room with 2 roots and a second membership: warm ${reads(warm.requests)} reads; cold ${reads(cold.requests)} reads and ${sessions(cold.requests)} sessions`);
+  });
+
+  // Invariant: room pages every collection it returns (lanes, roots, standing, active definitions, act tools not held) by bytes,
+  // within its 8 KiB bound, with a continuation; every entry is reached once.
+  test("room pages its collections within its bound", async ({ annotate }) => {
+    const lanes = Array.from({ length: 60 }, () => issueDemo);
+    const s = roomOf("member", lanes);
+    for (let i = 0; i < 40; i++) s.config.roots = [...(s.config.roots ?? []), { scope: s.stand.add("lane", issueDemo).scope, membership: s.config.repository!.membership }];
+    const seen: Record<string, number> = {};
+    let cursor: string | undefined, pages = 0;
+    do {
+      const got = await counted(s, () => s.service.call("room", cursor ? { cursor } : {}));
+      expect(got.bytes, `room page ${pages + 1}`).toBeLessThanOrEqual(BOUNDS.room);
+      for (const k of ["lanes", "roots", "standing", "active", "notHeld"]) seen[k] = (seen[k] ?? 0) + (got.result.structuredContent[k] as unknown[]).length;
+      cursor = got.result.structuredContent["cursor"] as string | undefined;
+      pages++;
+    } while (cursor);
+    expect([seen["lanes"], seen["roots"], seen["standing"], seen["active"]]).toEqual([60, 40, 1, 1]);
+    expect(seen["notHeld"]).toBeGreaterThan(0);
+    expect(pages).toBeGreaterThan(1);
+    await annotate(`room: 60 lanes, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
   });
 
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation
@@ -239,9 +260,10 @@ describe("what a call costs, end to end", () => {
     for (let i = 0; i < 70; i++) {
       const sent = await counted(s, () => s.service.call("issue.comment", { target: 1, fields: { body: "Again." }, idempotencyKey: "again", ...(i > 0 ? { resubmit: true } : {}) }));
       expect(sent.result.structuredContent["answer"], JSON.stringify(sent.result.structuredContent)).toBe("refused");
+      // Every one of the 70: one read of the lane and one post, and nothing else (the session was taken by the list before).
+      expect([reads(sent.requests), posts(sent.requests), sessions(sent.requests)], `refusal ${i + 1}: ${sent.requests.join(", ")}`).toEqual([1, 1, 0]);
       last = sent.requests;
     }
-    expect([reads(last), posts(last)]).toEqual([1, 1]);
     const settled = (await s.service.call("settle", { target: 1, idempotencyKey: "again" })).structuredContent;
     expect([settled["answer"], settled["outcomes"]]).toEqual(["refused", 70]);
     await annotate(`resubmissions: 70 outcomes kept and readable; each resubmission ${reads(last)} read and ${posts(last)} post`);
@@ -297,7 +319,7 @@ describe("what a call costs, end to end", () => {
     const measure = async (label: string, role: "admin" | "maintainer" | "member" | "agent", lanes: readonly DeclaredDefinition[]) => {
       const s = roomOf(role, lanes);
       const list = await listOf(s.service);
-      expect(list.bytes / list.pages).toBeLessThanOrEqual(256 * 1024);
+      for (const [i, size] of list.sizes.entries()) expect(size, `${label}, ${role}: page ${i + 1}`).toBeLessThanOrEqual(256 * 1024);
       expect(list.largestTool).toBeLessThanOrEqual(256 * 1024);
       rows.push(`${label}, ${role}: ${list.tools} tools, ${list.pages} page(s), ${list.bytes} bytes, ${list.tokens} tokens`);
       return list;

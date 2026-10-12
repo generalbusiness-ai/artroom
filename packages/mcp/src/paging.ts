@@ -24,14 +24,25 @@ export function pageBy<T>(items: readonly T[], offset: number, limit: number): {
   return { page, next: null };
 }
 
-/** A slice of a text by UTF-8 bytes, from `offset`, at most `limit` bytes, never splitting a character. */
+/**
+ * A slice of a text by UTF-8 bytes, from `offset`, never splitting a character, whose JSON string as sent is at most `limit`
+ * bytes: escaping can make the sent form longer than the text, so the slice is measured as it is sent.
+ */
 export function sliceText(text: string, offset: number, limit: number): { text: string; next: number | null; total: number } {
   const bytes = utf8(text);
   let start = Math.max(0, Math.min(offset, bytes.length));
   while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start++;
-  let end = Math.min(bytes.length, start + limit);
-  while (end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--;
-  return { text: new TextDecoder().decode(bytes.subarray(start, end)), next: end < bytes.length ? end : null, total: bytes.length };
+  const cut = (n: number) => { let end = Math.min(bytes.length, start + n); while (end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--; return end; };
+  let take = limit;
+  let end = cut(take);
+  let part = new TextDecoder().decode(bytes.subarray(start, end));
+  for (let sent = bytesOf(part); sent > limit && end > start; sent = bytesOf(part)) {
+    take = Math.max(1, Math.floor(take * limit / sent) - 8);
+    end = cut(take);
+    if (end <= start) end = cut(take + 4);
+    part = new TextDecoder().decode(bytes.subarray(start, end));
+  }
+  return { text: part, next: end < bytes.length ? end : null, total: bytes.length };
 }
 
 export const cursorOf = (value: unknown): string => b64url(utf8(JSON.stringify(value)));

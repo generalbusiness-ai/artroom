@@ -78,7 +78,20 @@ type Run = (args: Args) => Promise<CallResult>;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (structured: Record<string, unknown>): string => JSON.stringify(structured);
-const ok = (structured: Record<string, unknown>): CallResult => ({ content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: false });
+/** Response bounds of plan 031, section 8, for the whole result as the client receives it: text and structured content together. */
+export const BOUNDS = { act: 4 * KIB, room: 8 * KIB, inspect: 8 * KIB, large: 64 * KIB, credential: 2 * KIB } as const;
+/** What a page of structured content may use of its bound: the rest is the envelope and the text that points at it. */
+const PAGE_SPARE = 512;
+const pageOf = (bound: number): number => bound - PAGE_SPARE;
+/**
+ * A result. The text repeats the structured content's JSON when the whole response fits its bound; otherwise the text says
+ * where the result is, and the JSON is sent once. A single item larger than a page is the one result that exceeds its bound.
+ */
+const ok = (structured: Record<string, unknown>, bound: number = BOUNDS.act): CallResult => {
+  const whole: CallResult = { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: false };
+  if (bytesOf(whole) <= bound) return whole;
+  return { content: [{ type: "text", text: `The result is in structuredContent: ${bytesOf(structured)} bytes of JSON, which this text does not repeat.` }], structuredContent: structured, isError: false };
+};
 const failed = (f: Finding): CallResult => { const said = finding(f); const structured = { error: said.error, message: said.sentence, next: said.next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
 
 class Stop extends Error { constructor(readonly result: CallResult) { super("stop"); } }
@@ -432,27 +445,34 @@ export class McpService {
     ]);
   }
 
+  /**
+   * `room`: the header on every page, and the room's collections (lanes, roots, standing, active definitions, the act tools not
+   * held, the scopes not read) paged together by bytes, in that order, with a cursor bound to the list's generation.
+   */
   async #room(args: Args): Promise<CallResult> {
     const s = await this.snapshot();
     const room = s.read.room;
-    const start = fromCursor<{ i: number }>(args["cursor"])?.i ?? 0;
     const lanes = (room?.lanes ?? []).map((l) => {
       const held = s.read.inventory.scopes.find((h) => h.scope === l.ref.scope);
       return { number: l.number, kind: l.kind, title: l.title, state: l.state, scope: l.ref.scope, definition: held?.definition.name ?? null, digest: held?.pinned ?? null };
     });
-    const page = lanes.slice(start, start + 50);
     const places = Object.fromEntries(SINGLETON_PLACES.map((p) => [p, s.read.inventory.scopes.find((h) => h.place === p) ?? null]).filter(([, h]) => h !== null).map(([p, h]) => [p, { scope: (h as Held).scope, definition: (h as Held).pinned }]));
     const standing = Object.entries(s.read.inventory.standing).map(([membership, st]) => (st.known ? { membership, handle: st.handle, role: st.role, key: st.key } : { membership, standing: "your standing here is unknown", why: st.reason }));
+    const roots = s.read.inventory.scopes.filter((h) => h.place === "root").map((h) => ({ scope: h.scope, definition: h.definition.name, digest: h.pinned, membership: h.membership }));
+    const sections = { lanes, roots, standing, active: s.read.inventory.active as unknown[], notHeld: s.hidden as unknown[], unread: s.read.unread as unknown[] };
+    type Section = keyof typeof sections;
+    const all = (Object.keys(sections) as Section[]).flatMap((section) => sections[section].map((value) => ({ section, value })));
+    const header = { service: this.#service, key: this.#port.signer.key, mode: this.mode, generation: s.generation, scopes: places };
+    const given = fromCursor<{ g: string; i: number }>(args["cursor"]);
+    const moved = given !== null && given.g !== s.generation;
+    const from = given && !moved ? Math.min(given.i, all.length) : 0;
+    const { page, next } = pageBy(all, from, pageOf(BOUNDS.room) - bytesOf(header) - 256);
+    const out: Record<string, unknown[]> = Object.fromEntries((Object.keys(sections) as Section[]).map((k) => [k, page.filter((e) => e.section === k).map((e) => e.value)]));
     return ok({
-      service: this.#service, key: this.#port.signer.key, mode: this.mode, generation: s.generation,
-      scopes: places,
-      lanes: page, ...(start + 50 < lanes.length ? { cursor: cursorOf({ i: start + 50 }) } : {}),
-      roots: s.read.inventory.scopes.filter((h) => h.place === "root").map((h) => ({ scope: h.scope, definition: h.definition.name, digest: h.pinned, membership: h.membership })),
-      standing,
-      active: s.read.inventory.active,
-      notHeld: s.hidden,
-      ...(s.read.unread.length > 0 ? { unread: s.read.unread } : {}),
-    });
+      ...header, ...out,
+      ...(next !== null ? { cursor: cursorOf({ g: s.generation, i: next }), more: `This page holds entries ${from + 1} to ${next} of ${all.length}; call room with cursor for the rest.` } : {}),
+      ...(moved ? { restarted: "The list's generation changed since the cursor was made; this page restarts at the first entry." } : {}),
+    }, BOUNDS.room);
   }
 
   async #inspect(args: Args): Promise<CallResult> {
@@ -467,19 +487,19 @@ export class McpService {
       const binding = s.bindings.find((b) => b.definition === definition.name && b.kind === kind && b.digests.includes(summary.definition));
       const complete = binding ? describedOf(binding, s.read.inventory, this.mode).complete
         : describeAct(definition, kind, act, { standing: "unknown" }, { pinned: summary.definition, active: s.read.inventory.active }, { definition: definition.name, kind, declaration: declarationDigest(definition, kind), digests: [summary.definition] }, "").complete;
-      const part = sliceText(complete, Number(args["offset"] ?? 0), 64 * KIB);
-      return ok({ scope, kind, tool: binding?.name ?? null, text: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total });
+      const part = sliceText(complete, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
+      return ok({ scope, kind, tool: binding?.name ?? null, text: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total }, BOUNDS.large);
     }
     if (args["declaration"] === true) {
       if (isPlatformDefinition(summary.definition)) {
         const data = canonicalize(platform(summary.definition)?.data ?? null);
-        const part = sliceText(data, Number(args["offset"] ?? 0), 64 * KIB);
-        return ok({ scope, definition: summary.definition, platform: true, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total });
+        const part = sliceText(data, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
+        return ok({ scope, definition: summary.definition, platform: true, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total }, BOUNDS.large);
       }
       const read = await this.#reads.read(membership, (t, r) => t.retained(scope, r, "definition", summary.definition as Digest));
       if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
-      const part = sliceText(read.value.bytes, Number(args["offset"] ?? 0), 64 * KIB);
-      return ok({ scope, definition: summary.definition, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total });
+      const part = sliceText(read.value.bytes, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
+      return ok({ scope, definition: summary.definition, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total }, BOUNDS.large);
     }
     // Live items, paged by bytes, bound to the head the summary was read at. A continuation at a moved head restarts.
     const head = `${at.at.seq}:${at.at.hash}`;
@@ -489,8 +509,8 @@ export class McpService {
     const definitionName = isPlatformDefinition(summary.definition) ? summary.definition : (this.kept.definitions.get(summary.definition)?.name ?? null);
     const counts = summary.counts.filter(([, , n]) => n > 0).map(([type, state, n]) => ({ type, state, n }));
     const header = { scope, ref: summary.scope, definition: definitionName, digest: summary.definition, status: summary.status, head: at.at, counts };
-    const { page, next } = pageBy(summary.items, from, 8 * KIB - bytesOf(header) - 256);
-    return ok({ ...header, items: page, ...(next !== null ? { cursor: cursorOf({ h: head, i: next }) } : {}), ...(moved ? { restarted: "The head moved since the cursor was made; this page restarts at the first item of the new head." } : {}) });
+    const { page, next } = pageBy(summary.items, from, pageOf(BOUNDS.inspect) - bytesOf(header) - 256);
+    return ok({ ...header, items: page, ...(next !== null ? { cursor: cursorOf({ h: head, i: next }) } : {}), ...(moved ? { restarted: "The head moved since the cursor was made; this page restarts at the first item of the new head." } : {}) }, BOUNDS.inspect);
   }
 
   async #items(args: Args): Promise<CallResult> {
@@ -503,15 +523,15 @@ export class McpService {
       const from = fromCursor<{ h: string; i: number }>(args["cursor"]);
       const head = `${at.at.seq}:${at.at.hash}`;
       const start = from && from.h === head ? from.i : 0;
-      const { page, next } = pageBy(all, start, 60 * KIB);
-      return ok({ scope, type, live: true, head: at.at, items: page, ...(next !== null ? { cursor: cursorOf({ h: head, i: next }) } : {}) });
+      const { page, next } = pageBy(all, start, pageOf(BOUNDS.large));
+      return ok({ scope, type, live: true, head: at.at, items: page, ...(next !== null ? { cursor: cursorOf({ h: head, i: next }) } : {}) }, BOUNDS.large);
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
     const read = await this.#reads.read(membership, (t, r) => t.items(scope, r, type, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
-    const { page, next } = pageBy(read.value, cursor?.i ?? 0, 60 * KIB);
+    const { page, next } = pageBy(read.value, cursor?.i ?? 0, pageOf(BOUNDS.large));
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
-    return ok({ scope, type, live: false, head: read.at, items: page, ...(cont ? { cursor: cont } : {}) });
+    return ok({ scope, type, live: false, head: read.at, items: page, ...(cont ? { cursor: cont } : {}) }, BOUNDS.large);
   }
 
   async #steps(args: Args): Promise<CallResult> {
@@ -521,9 +541,9 @@ export class McpService {
     const read = await this.#reads.read(membership, (t, r) => t.history(scope, r, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const lines = read.value.map(({ entry }) => lineOf(entry));
-    const { page, next } = pageBy(lines, cursor?.i ?? 0, 60 * KIB);
+    const { page, next } = pageBy(lines, cursor?.i ?? 0, pageOf(BOUNDS.large));
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
-    return ok({ scope, head: read.at, steps: page, ...(cont ? { cursor: cont } : {}) });
+    return ok({ scope, head: read.at, steps: page, ...(cont ? { cursor: cont } : {}) }, BOUNDS.large);
   }
 
   async #step(args: Args): Promise<CallResult> {
@@ -533,9 +553,9 @@ export class McpService {
     const read = await this.#reads.read(membership, (t, r) => t.entry(scope, r, seq));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const whole = canonicalize(read.value);
-    const part = sliceText(whole, Number(args["offset"] ?? 0), 60 * KIB);
-    if (part.next === null && Number(args["offset"] ?? 0) === 0) return ok({ scope, seq, hash: read.value.hash, entry: read.value.entry });
-    return ok({ scope, seq, hash: read.value.hash, json: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total });
+    const part = sliceText(whole, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
+    if (part.next === null && Number(args["offset"] ?? 0) === 0) return ok({ scope, seq, hash: read.value.hash, entry: read.value.entry }, BOUNDS.large);
+    return ok({ scope, seq, hash: read.value.hash, json: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total }, BOUNDS.large);
   }
 
   async #record(args: Args): Promise<CallResult> {
@@ -544,9 +564,9 @@ export class McpService {
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
     const read = await this.#reads.read(membership, (t, r) => t.log(scope, r, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
-    const { page, next } = pageBy(read.value.entries, cursor?.i ?? 0, 60 * KIB);
+    const { page, next } = pageBy(read.value.entries, cursor?.i ?? 0, pageOf(BOUNDS.large));
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
-    return ok({ scope: read.value.scope, definition: read.value.definition, head: read.at, entries: page, ...(cont ? { cursor: cont } : {}) });
+    return ok({ scope: read.value.scope, definition: read.value.definition, head: read.at, entries: page, ...(cont ? { cursor: cont } : {}) }, BOUNDS.large);
   }
 
   async #sends(args: Args): Promise<CallResult> {
@@ -555,14 +575,14 @@ export class McpService {
     const reader = await this.#reads.reader(membership);
     if (typeof args["duty"] === "string") {
       const read = await this.#reads.transport.duty(scope, reader, args["duty"] as `${number}.${number}`);
-      return read.ok ? ok({ scope, duty: read.value, head: read.at }) : failed({ error: "read", scope, reason: read.reason });
+      return read.ok ? ok({ scope, duty: read.value, head: read.at }, BOUNDS.large) : failed({ error: "read", scope, reason: read.reason });
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
     const read = await this.#reads.transport.outbox(scope, reader, cursor?.c);
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
-    const { page, next } = pageBy(read.value, cursor?.i ?? 0, 60 * KIB);
+    const { page, next } = pageBy(read.value, cursor?.i ?? 0, pageOf(BOUNDS.large));
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
-    return ok({ scope, head: read.at, sends: page, ...(cont ? { cursor: cont } : {}) });
+    return ok({ scope, head: read.at, sends: page, ...(cont ? { cursor: cont } : {}) }, BOUNDS.large);
   }
 
   async #text(args: Args): Promise<CallResult> {
@@ -575,8 +595,8 @@ export class McpService {
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     let value = read.value.bytes;
     if (kind === "text") { try { const t = parseStrict(value); if (typeof t === "string") value = t; } catch { /* kept as bytes */ } }
-    const part = sliceText(value, Number(args["offset"] ?? 0), 60 * KIB);
-    return ok({ scope, kind, digest, ...(read.value.domain ? { domain: read.value.domain } : {}), text: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total });
+    const part = sliceText(value, Number(args["offset"] ?? 0), pageOf(BOUNDS.large) - 1024);
+    return ok({ scope, kind, digest, ...(read.value.domain ? { domain: read.value.domain } : {}), text: part.text, ...(part.next !== null ? { offset: part.next } : {}), bytes: part.total }, BOUNDS.large);
   }
 
   async #prepare(args: Args): Promise<CallResult> {
@@ -888,8 +908,8 @@ export class McpService {
       return { kind: b.kind, tool: this.mode === "add" ? b.name : null, description: text.description, fields: Object.fromEntries(Object.entries(b.act.fields).map(([n, f]) => [n, schemaOf(f, { pinned: b.pinned, active: inventory.active })])), on: onOf(b.act), binding: { definition: b.definition, declaration: b.declaration, digests: b.digests } };
     });
     const from = fromCursor<{ i: number }>(args["cursor"])?.i ?? 0;
-    const { page, next } = pageBy(acts, from, 60 * KIB);
-    return ok({ scope, definition: definition.name, digest: summary.definition, acts: page, notHeld: bindings.filter((b) => !listed(b, inventory)).map((b) => b.kind), ...(next !== null ? { cursor: cursorOf({ i: next }) } : {}) });
+    const { page, next } = pageBy(acts, from, pageOf(BOUNDS.large));
+    return ok({ scope, definition: definition.name, digest: summary.definition, acts: page, notHeld: bindings.filter((b) => !listed(b, inventory)).map((b) => b.kind), ...(next !== null ? { cursor: cursorOf({ i: next }) } : {}) }, BOUNDS.large);
   }
 }
 
