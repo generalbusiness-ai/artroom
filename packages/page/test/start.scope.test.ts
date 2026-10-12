@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 import { expect, test } from "vitest";
 import type { Seed, SignedIntent, ScopeId } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, intentDigest, keyIdOfSecret, scopeIdOf, unb64url } from "@generalbusiness/artroom-bytes";
-import { foundingOffer, secretSigner, signedIntent, type Fetch, type FoundingOfferFetch } from "@generalbusiness/artroom-client";
+import { agentKeyInvitationOf, foundingOffer, secretSigner, signedIntent, type Fetch, type FoundingOfferFetch } from "@generalbusiness/artroom-client";
 import { DEMO_REGISTER, DEMO_PURPOSE } from "@generalbusiness/artroom-platform";
 import worker from "../../scope/src/worker.ts";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
@@ -15,6 +15,8 @@ import { TEST_DEPLOYMENT } from "../../scope/test/worker.ts";
 import { reader } from "../../scope/test/support.ts";
 import { ownHost } from "../../scope/test/hosts.ts";
 import { originalStart, startRoom } from "../src/start-custody.ts";
+import { connectInvitation, founderConnectionFiles, originalConnection, saveFounderRecoveryOnce } from "../src/connection-custody.ts";
+import { command, enrolAgentKey, linkOf, memoryStore, type Config, type Context } from "@generalbusiness/artroom-cli";
 import { openRoom } from "../src/data.ts";
 import type { ClaimLocks, ClaimStorage } from "../src/claim.ts";
 
@@ -152,5 +154,106 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     const room = await lifetime.wait(() => openRoom({ service: origin, secret: recovered!, fetch, now: lifetime.now }, { directory: O.name, membership: completed.repository!.membership }));
     expect([room.directory, room.membership, room.key, room.me?.handle, room.reader !== null]).toEqual([O.name, completed.repository!.membership, status.key, "@founder", true]);
     expect(originalStart(origin, reload)?.state).toBe("complete");
+    // The SAME native room now exercises every ready connection. No installer
+    // key or inspector credential is supplied to Page/CLI callers.
+    const binding = { key: status.key, operation: fresh.operation, membership: completed.repository!.membership };
+    const ready = { fetch: native, now: lifetime.now, locks, pause, tries: 16 };
+    const files = await lifetime.wait(() => founderConnectionFiles(origin, reload, binding, ready));
+    const exportedConfig = JSON.parse(files.config) as Config, exportedSeed = unb64url(files.key.trim())!;
+    try {
+      expect([exportedConfig.key, keyIdOfSecret(exportedSeed) === status.key, keyIdOfSecret(exportedSeed) === installer.key]).toEqual(["device", true, false]);
+      const cliFounder = memoryStore(); await cliFounder.keep("device", exportedSeed); await cliFounder.save(exportedConfig);
+      expect((await lifetime.wait(() => command({ store: cliFounder, fetch: native, now: lifetime.now }, ["acts", "membership"]))).code).toBe(0);
+    } finally { exportedSeed.fill(0); }
+    const savedRecovery = await lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready));
+    expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native founder backup, not the internal CLI recovery key.
+    await expect(lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
+    const creatorSent: SignedIntent[] = [];
+    let loseCreator: "add-member" | "invite-key" | null = "add-member", creatorCheck = false;
+    const creatorFetch: Fetch = async (url, init) => {
+      const path = new URL(url).pathname;
+      const signed = typeof init?.body === "string" ? (JSON.parse(init.body) as { signed?: SignedIntent }).signed : undefined;
+      if (path.endsWith("/acts") && signed) {
+        const name = [...values.keys()].find(key => key.startsWith("artroom-page-connections:"))!, bytes = values.get(name)!;
+        const journal = JSON.parse(bytes), row = journal.rows[journal.active], pointer = row.config.invitationIssue;
+        const kept = JSON.parse(row.private[pointer.request]);
+        const stage = signed.intent.kind === "add-member" ? kept.member : kept.invitation;
+        expect([readbacks.get(name) === bytes, pointer.actor === status.key, stage.attempted, canonicalize(stage.signed) === canonicalize(signed), signed.intent.actor === status.key]).toEqual([true, true, true, true, true]);
+        creatorSent.push(structuredClone(signed));
+      }
+      const response = await native(url, init);
+      if (path.endsWith("/acts") && signed?.intent.kind === loseCreator) { loseCreator = null; await response.body?.getReader().cancel(); throw new Error("STAND-IN lost accepted connection reply"); }
+      if (creatorCheck && path.endsWith("/settle") && signed && ["add-member", "invite-key"].includes(signed.intent.kind)) { await response.body?.getReader().cancel(); throw new Error("STAND-IN lost original connection settlement reply"); }
+      return response;
+    };
+    const input = { kind: "agent-key" as const, handle: "@native-agent", hours: 24 };
+    const begun = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "new" }));
+    expect([begun.state, begun.link === undefined, creatorSent.map(s => s.intent.kind)]).toEqual(["unknown", true, ["add-member"]]);
+    const opening = creatorSent[0]!;
+    let connectionPauses = 0;
+    creatorCheck = true;
+    const checkedConnection = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "check", pause: async () => { connectionPauses++; } }));
+    expect([checkedConnection.state, creatorSent.length, connectionPauses, checkedConnection.operation]).toEqual(["unknown", 1, 0, begun.operation]);
+    creatorCheck = false; loseCreator = "invite-key";
+    const next = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "continue" }));
+    expect([next.state, creatorSent.map(s => s.intent.kind)]).toEqual(["unknown", ["add-member", "add-member", "invite-key"]]);
+    expect(canonicalize(creatorSent[1]) === canonicalize(opening)).toBe(true);
+    const invitationEnvelope = creatorSent[2]!;
+    // The bounded existing dispatcher drives only recorded creation/confirmation.
+    const openingEntry = (await lifetime.wait(() => M.entries())).find(entry => entry.input.type === "act" && entry.input.signed.intent.idempotencyKey === opening.intent.idempotencyKey)!;
+    const agentInbox = await lifetime.wait(() => M.created(openingEntry.seq));
+    await pause([M.name, agentInbox.name, O.name]);
+    creatorCheck = true;
+    const beforeKeyCheck = creatorSent.length;
+    const keyChecked = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "check", pause: async () => { connectionPauses++; } }));
+    expect([keyChecked.state, creatorSent.length, connectionPauses]).toEqual(["unknown", beforeKeyCheck, 0]);
+    creatorCheck = false;
+    const issued = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "continue" }));
+    expect([issued.state, issued.operation, originalConnection(origin, reload, binding)?.kind]).toEqual(["verified", begun.operation, "agent-key"]);
+    expect(creatorSent.filter(s => s.intent.kind === "invite-key").every(s => canonicalize(s) === canonicalize(invitationEnvelope))).toBe(true);
+    const agentLink = issued.link!, tagged = agentKeyInvitationOf(agentLink)!;
+    expect([tagged.controller.member, canonicalize(tagged.controller.membership) === canonicalize(binding.membership), linkOf(agentLink)]).toEqual(["@founder", true, null]);
+    const receiver = memoryStore(), agentSent: SignedIntent[] = [];
+    let loseAgent = true, agentCheck = false, crossRoomReads = 0, ownSessionRequests = 0;
+    const agentFetch: Fetch = async (url, init) => {
+      const path = new URL(url).pathname;
+      const signed = path.endsWith("/acts") && typeof init?.body === "string" ? (JSON.parse(init.body) as { signed: SignedIntent }).signed : undefined;
+      if (signed) {
+        const config = (await receiver.config())!, raw = await receiver.private(config.join!.request);
+        const capsule = JSON.parse(new TextDecoder().decode(raw!));
+        expect([config.join!.kind, canonicalize(capsule.signed) === canonicalize(signed), signed.intent.actor === status.key, signed.intent.actor === installer.key]).toEqual(["enrol", true, false, false]);
+        agentSent.push(structuredClone(signed));
+      }
+      if (path.endsWith("/sessions")) ownSessionRequests++;
+      if (url.includes(O.name) || url.includes(agentInbox.name)) { expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossRoomReads++; }
+      const response = await native(url, init);
+      if (signed && loseAgent) { loseAgent = false; await response.body?.getReader().cancel(); throw new Error("STAND-IN lost accepted independent agent enrollment reply"); }
+      if (agentCheck && path.endsWith("/settle")) { await response.body?.getReader().cancel(); throw new Error("STAND-IN lost original agent settlement reply"); }
+      return response;
+    };
+    const agentContext: Context = { store: receiver, fetch: agentFetch, now: lifetime.now };
+    expect((await lifetime.wait(() => command(agentContext, ["join", agentLink]))).code).toBe(1);
+    const agentOriginal = agentSent[0]!, beforeAgentCheck = agentSent.length;
+    agentCheck = true;
+    expect((await lifetime.wait(() => command(agentContext, ["join", agentLink, "--check"]))).code).toBe(1);
+    expect(agentSent.length).toBe(beforeAgentCheck); agentCheck = false;
+    expect((await lifetime.wait(() => enrolAgentKey(agentContext, agentLink))).code).toBe(0);
+    expect(canonicalize(agentSent[1]) === canonicalize(agentOriginal)).toBe(true);
+    expect((await lifetime.wait(() => M.entries())).filter(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "enrol")).toHaveLength(1);
+    const agentConfig = (await receiver.config())!, agentSeed = (await receiver.secret(agentConfig.key))!.slice();
+    try {
+      const agentRoom = await lifetime.wait(() => openRoom({ service: origin, secret: agentSeed, fetch: agentFetch, now: lifetime.now }, { directory: agentConfig.repository!.directory.scope, membership: agentConfig.repository!.membership }));
+      expect([agentRoom.me?.handle, agentRoom.me?.role, agentRoom.reader !== null, agentConfig.repository?.inbox === agentInbox.name, ownSessionRequests > 0, crossRoomReads > 0]).toEqual(["@native-agent", "agent", true, true, true, true]);
+      const member = (await lifetime.wait(() => M.summary())).value.items.find(item => item.type === "member" && item.values["handle"] === "@native-agent")!;
+      expect([member.values["kind"], member.values["role"], canonicalize(member.parties["controller"]) === canonicalize(tagged.controller)]).toEqual(["agent", "agent", true]);
+      expect((await lifetime.wait(() => M.summary())).value.items.some(item => item.type === "key" && item.state === "active" && item.values["kind"] === "agent" && item.values["id"] === keyIdOfSecret(agentSeed) && item.refs["member"] === member.id)).toBe(true);
+    } finally { agentSeed.fill(0); }
+    const person = await lifetime.wait(() => connectInvitation(origin, reload, binding, { kind: "person", handle: "@native-person", role: "member", hours: 24 }, { ...ready, fetch: creatorFetch, mode: "new" }));
+    expect([person.state, linkOf(person.link!)?.definition, agentKeyInvitationOf(person.link!)]).toEqual(["verified", "platform:membership@2", null]);
+    const personStore = memoryStore();
+    expect((await lifetime.wait(() => command({ store: personStore, fetch: native, now: lifetime.now, pause, tries: 16 }, ["join", person.link!]))).code).toBe(0);
+    expect((await personStore.config())?.handle).toBe("@native-person");
+    expect((await lifetime.wait(() => M.summary())).value.items.find(item => item.type === "member" && item.values["handle"] === "@native-person")?.values["kind"]).toBe("person");
+
   } finally { recovered?.fill(0); lifetime.release(); }
 });
