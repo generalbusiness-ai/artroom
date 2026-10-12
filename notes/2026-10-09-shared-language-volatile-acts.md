@@ -12,6 +12,9 @@ That request commissions bounded implementation/planning; this amendment is its
 design/source-plan artifact, implements nothing and adopts no protocol. Keep
 the seven current correctness repairs and their coordinated gate ahead of
 runtime expansion. The original full volatile brief and all 14 sections remain.
+Amended again on 12 October 2026 under request
+`0d72a50b28c683046f6ea127d0ebe5b484f87822`: section 15 designs a journal
+archive in Git. It adds a section and one pointer, and changes no other text.
 
 ## 1. Guarantees, goals and current foundations
 
@@ -74,6 +77,9 @@ barrier. It does not expose a collection of archive/publication switches.
 | Live | Nothing: state/messages/dedup/timers may reset immediately. | Local application in G/N; Applied, no durable fact. Proposed executor/session/establishment support is still owed. |
 | Recorded, DO journal | Complete canonical acts, judgments and required evidence/pins, preserving native replay and custody duties. | Existing Core/SQLite journal commitment and its actual receipt/output gate. Reuse this working recorded path; generic application establishment is still owed. Optional later Git archive is not promised by this acknowledgment. |
 | Recorded, required Git/Artifacts custody | The complete declared journal/evidence closure in the exact required store, not merely a queue or current-state snapshot. | Final confirmation waits for verified required journal commitment. This capability is **UNSUPPORTED** until its actual backend, exact custody proof and recovery seam are delivered/adopted. It does not block the other two paths. |
+
+Section 15 separates the third row's archive from its barrier, and designs the
+archive only. The barrier below stays unsupported.
 
 The third row is an alternative journal barrier, not a third user question or
 another initial volatile mode. A binding that requires it cannot quietly use
@@ -1333,3 +1339,267 @@ Turn335–351 sealing; Core42 receipts; sessions419–465 head stream; Worker31�
 transition near1642. Comparisons use the exact local revisions above, targeted
 live/session/decorator/presence/storage/ADR sources, and cited primary documents.
 No claim of a full source audit, current deployed support or measured speedup.
+
+## 15. Journal archive in Git (amendment, 12 October 2026)
+
+**Proposed design; no runtime adoption.** Request
+`0d72a50b28c683046f6ea127d0ebe5b484f87822`, planner promise
+`fae322e0901ae73e961b1434c6fe55ec6d842b73`, resting on the durability
+request `578edf653772749b5fa9b47f6782f6db4d0ab720`. Read against main
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`. Sections 1 to 14 are unchanged
+except for one pointer after the establishment table in section 1.
+
+### 15.1 The decision
+
+Section 1 names one Git capability, "Recorded, required Git/Artifacts
+custody", and marks it unsupported. It joins two properties that can be
+delivered apart:
+
+| Property | Meaning | This amendment |
+|---|---|---|
+| Archive | A scope's entries and retained inputs are in a Git repository. A verifier needs a clone and nothing from the service. | Designed here, for adoption. |
+| Barrier | The final answer to an act waits until Git has confirmed those bytes. | Still unsupported. Not designed here. |
+
+The archive is written after the journal commitment, and it may lag. A
+recorded act keeps its existing meaning: Recorded is the DO journal
+commitment and its receipt. The archive adds one observation, **Archived
+through N**: every entry of the scope through position N is in the
+archive ref. A client that wants the stronger guarantee for one act waits
+until its receipt's position is at or below N.
+
+Hugh decided four points on 12 October 2026:
+
+1. Build the archive, not the barrier.
+2. Archive pushes use a deployment-level credential. Archive progress is
+   bookkeeping outside history. Archiving writes no entry.
+3. The first archived kinds are `lane`, `membership`, `rules` and
+   `destination`. Inboxes are left out. The register is shared across
+   rooms and is not archived to a room's repository.
+4. A detached text is not archived. The archive holds its digest only,
+   inside the entry that names it.
+
+The earlier protocol published a room's log to `refs/artroom/log`
+([protocol.md](../docs/protocol.md), R-LOG-8 to R-LOG-10 and section 30).
+The scope contract removed it: "No log is pushed to a Git ref"
+(`request/scope-contract`, its section 11.4). This design restores the
+property for scopes. It reuses that protocol's measured object bound and
+its rule for a lost push reply. It restores no room key, no signed
+checkpoint and no earlier format.
+
+### 15.2 What is archived
+
+For each archived scope, the archive holds:
+
+- every entry, as the canonical bytes that the `log` read returns;
+- every retained input of the kinds `definition`, `entry`, `rule`,
+  `snapshot` and `value`, as the `retained` read returns it.
+
+It does not hold:
+
+- a retained input of the kind `text`. The entry still holds the text's
+  digest. A tombstone therefore removes nothing from Git, because the
+  bytes were never there;
+- outbox rows, dispatcher marks, sessions, credentials or any other
+  bookkeeping. None of it is history, and no judgment reads it;
+- the folded state. A verifier folds the entries.
+
+A retained `entry` is a copy of one entry of another scope that a
+judgment used. An archived lane therefore carries single entries of
+scopes that are not archived themselves, such as the register's record of
+a claim. That is the same copy that the lane's own readers can read
+today.
+
+The archive is in the room's own repository at its destination's host.
+Whoever can fetch that repository's refs can read the archive. Reads of
+the service stay gated by sessions as they are now; the archive is a
+second, coarser door, and section 15.9 lists it as a point for review.
+
+### 15.3 Layout
+
+One ref for each archived scope:
+
+```
+refs/artroom/journal/<scope ID, 64 hex characters>
+```
+
+Each scope writes only its own ref. No write spans two scopes, as no
+transaction does.
+
+The tree of each archive commit:
+
+| Path | Content |
+|---|---|
+| `journal/v1/head.json` | Canonical JSON: `{ v: 1, scope: <ScopeRef>, through: <seq>, hash: <entry hash> }` |
+| `journal/v1/segments/<first>.jsonl` | Entries from `first` on, one canonical entry for each line; `first` is 12 decimal digits |
+| `journal/v1/retained/<kind>/<hex>` | One retained input's bytes, for the kinds `definition`, `entry`, `rule` and `snapshot` |
+| `journal/v1/retained/value/<domain>/<hex>` | One named value's bytes, under its byte domain |
+
+Rules:
+
+- **Segments.** A segment closes at 1,000 entries, or when the next line
+  would take it past the object bound B. Boundaries depend only on the
+  lines' lengths.
+- **The object bound.** B is 8 MiB. The hosting service refused a Git
+  object over 32 MiB when measured on 2 October 2026 (protocol.md,
+  section 30). A retained input is at most 1 MiB by the contract
+  (`RETAINED_INPUT_BYTES`). An entry line over B is not archived: the
+  archiver stops and reports `object-too-large`. Whether the contract
+  already bounds an entry below B is an open point (15.9).
+- **Fan-out.** A directory lists at most 4,096 names; above that it splits
+  by the rule of protocol.md R-LOG-19.
+- **The commit.** Its parent is the previous archive commit, or none. Its
+  author, committer and message are fixed text. Its time is the recorded
+  time of entry `through`. So the same entries and retained inputs give
+  the same commit ID, whoever builds it.
+- **Append only.** A segment other than the last never changes. A retained
+  file never changes. `head.json` is replaced in each commit.
+
+`head.json` is a statement, not a proof. It has no signature, because a
+scope holds no signing key (scope contract, D1-6).
+
+### 15.4 The writer
+
+The archiver runs in the archived scope's own Durable Object, after a
+commit, from the object's alarm. It never runs inside a turn and never
+delays an answer.
+
+1. **Target.** The scope finds its room's repository once: from its seed's
+   creator to the directory, then the destination that the directory's
+   `repository` item names. It keeps the answer as bookkeeping. A scope
+   with no such destination has no archive.
+2. **Plan.** It reads its own entries from `archivedThrough + 1` to its
+   head, bounded by a count and a byte limit for one pass, and builds the
+   commit of 15.3 on the last confirmed commit.
+3. **Mark.** It writes one bookkeeping row before any request leaves: the
+   parent, `through`, the commit ID and the time. At most one commit is
+   outstanding for a scope.
+4. **Send.** It sends the objects and one ref update with the expected old
+   value, through the provider's existing `send`
+   (`packages/scope/src/destination-host.ts`). It never forces.
+5. **Resolve.** It reads the ref back before it records any result:
+
+| The ref is | Result |
+|---|---|
+| The outstanding commit | Confirmed. `archivedThrough` becomes its `through`. |
+| The parent | Not written. Send the same commit again, with a delay that doubles. |
+| Anything else | `conflict`. Stop. Report it. Never overwrite. |
+
+A lost reply, a timeout or a restart leaves the row in place, and step 5
+decides. The archiver builds no second commit while one is outstanding.
+
+**The credential.** The provider gains one call that mints a short-lived
+write token for the archive, outside the scope's ledger of operations.
+The token stays inside the object, is used for one pass and is revoked or
+left to end. It is not recorded in any entry, so an archive pass writes
+no history and the archive can reach the head.
+
+This widens authority, and review should weigh it. Today every write to
+a repository is an operation that an entry opened. The archive token is
+not. Where the host's tokens cannot be limited to a ref prefix, the
+adapter enforces the prefix `refs/artroom/journal/` at `send`, and the
+archiver is trusted code in the same way as the destination's driver.
+
+**Fairness.** One pass has a bound on entries, bytes and time. A scope
+that is busy with turns archives later; it never refuses a turn in order
+to archive.
+
+### 15.5 What a read states
+
+`Summary` gains an optional member:
+
+```ts
+archive?: {
+  state: "current" | "behind" | "conflict" | "stopped";
+  through: number | null;      // last confirmed position, or null before the first
+  hash: Digest | null;         // that entry's hash
+  commit: string | null;       // the confirmed archive commit
+  reason?: string;             // for conflict and stopped
+}
+```
+
+A scope of a kind that is not archived has no `archive` member. The
+client gains `followArchived(receipt)`: it reads the summary until
+`through` is at or past the receipt's position and the hashes agree, or
+it reports the state that prevents that. It derives no judgment.
+
+### 15.6 The verifier
+
+`@generalbusiness/artroom-replay` gains a second source,
+`gitSource(directory)`, which implements `HistorySource`
+(`packages/replay/src/source.ts`) over a local clone. `verify` and the
+judges do not change.
+
+```
+artroom-replay --git <clone> <scope ID> [--mode integrity|replay]
+    [--head <seq>:<hash>] [--texts <directory>] [--json]
+```
+
+- Each foreign scope is read from its own ref in the same clone. A scope
+  with no ref there is `missing-dependency`, unless the caller gives an
+  anchor.
+- With no `--head`, the target is `head.json`, checked against the last
+  entry's own hash, and the report lists `archive-head` under `trusts`.
+- A detached text is absent. In integrity mode nothing needs it. In
+  replay mode an entry whose judgment reads a text is `incomplete`, and
+  the report counts those entries apart from other missing inputs. With
+  `--texts`, the verifier takes a text from the caller's directory and
+  checks it against its digest.
+
+Everything read from a clone is untrusted, with the same limits on bytes,
+entries and scopes as the HTTP source.
+
+### 15.7 What a clone shows, and what it does not
+
+A clone shows, with no call to the service:
+
+- the hash chain and each entry's bytes;
+- that the scope ID is the digest of the genesis's seed;
+- each actor's signature;
+- in replay mode, every judgment derived again, for the coverage stated.
+
+It does not show:
+
+- anything after `through`. The archive is a prefix;
+- that the ref was never rewritten. The service is the only writer and
+  holds no key of its own. A verifier that kept an earlier commit, a
+  receipt or a head detects a rewrite; one that kept nothing does not;
+- the bytes of a detached text;
+- what replay already takes on trust: the service's clock, and that each
+  recorded read of membership was made as recorded.
+
+The Git host is a second holder of the bytes, apart from the service. The
+archive makes verification independent of the service's availability and
+of its answers. It does not make the service unable to equivocate.
+
+### 15.8 Slices and witnesses
+
+Each slice is reviewable alone. No slice changes an entry's bytes, a
+judgment, a receipt or a publication.
+
+| Slice | Work | Witness |
+|---|---|---|
+| A1. Layout | A pure function from entries and retained inputs to the objects and commit of 15.3, for both object formats. | The same input gives the same commit ID. Segment and fan-out boundaries at their limits. A text is never written. Real local Git reads the tree back byte for byte. |
+| A2. Git source | `gitSource` and the `--git` and `--texts` options. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. |
+| A3. Archiver | Target resolution, the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
+| A4. Read and client | `Summary.archive` and `followArchived`. | Each state is reported. A receipt past `through` waits; a hash that differs is reported, not waited on. |
+| A5. Live run | One deployed room on the hosting service: archive, clone, replay offline. | A recorded run, bound to its source and deployment, with measured lag and push duration. |
+
+Run the tests of each slice while it is built, and the gate once before
+review ([docs/testing.md](../docs/testing.md)).
+
+### 15.9 Open points
+
+| Point | Question | Proposed |
+|---|---|---|
+| J1 | Is an entry's canonical line bounded below B by the contract? | Confirm in A1. If not, adopt protocol.md R-LOG-18's chunk rule before A3. |
+| J2 | A `value` or a retained `entry` may hold bytes that a session would not show to every member. | List the byte domains and foreign kinds in A1. Any that is narrower than "every member of the room" is left out as a text is, and reported the same way. |
+| J3 | The archive is readable by whoever can fetch the repository's refs. | For a public repository this publishes the lanes' histories. Make the archive opt-in for each room until a person-facing statement of that exists. |
+| J4 | The archive token is a write that no entry opened. | Review the adapter's prefix check as a security boundary in A3. |
+| J5 | A `conflict` has no automatic repair. | An operator reads the ref and decides. A later design may add a recorded repair act. |
+| J6 | Histories that reach the scope's entry budget. | Unchanged: the archive follows the history that exists. Archival that frees service storage is not designed. |
+
+This amendment ran no product tests, gate, provider or deployment probes.
+The provider's `send`, the `log` and `retained` reads, the `HistorySource`
+interface and the directory's `repository` item were read in source at
+the head above. The path from a lane's seed to its room's destination
+(15.4, step 1) was read as declarations only and is owed a witness in A3.
