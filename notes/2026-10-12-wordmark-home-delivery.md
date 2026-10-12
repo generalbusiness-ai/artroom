@@ -155,3 +155,71 @@ The external Jam commit's four changed paths are `README.md`,
 `notes/2026-10-12-wordmark-home-delivery.md`, `page/index.html` and
 `test/original-demo.test.ts`. These correct the last two path labels in the
 earlier Core reporting annotation; the Jam head and tree are unchanged.
+
+## Full wordmark delivery record
+
+The original request `06c863772e921b9ee724f89d20d2e192f8bee80e` and promise
+`f48c952d9f4a2b609b2771c24fcf9fbecd257bbe` cover the Page entry, rail and mobile
+wordmarks, Counter, and the committed Jam page. Each wordmark is an anchor to
+`https://dap.generalbusiness.ai/` named `dap homepage`. Room navigation and shell
+disclosures remain. The Core Source child was approved and normally landed at
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`, tree
+`42c2a234fc03bf2ff5dcf8ab8017d0a0796cc2a2`, with receipt
+`2d5d1e1f37cb55ffa0230fbc37d7a3e592dbb626`. Published main
+`8e4689b489fac9e29080b58d8b5c98f66f539d5a` preserves its ten wordmark paths.
+
+All three Core hosts were redeployed from the landed Source. Each has 100% traffic
+on the recorded version, with 22 public assets matched and protected resource
+metadata unchanged:
+
+- artroom-scope: `6cad9de7-a80d-4b78-bc3a-a41a8b3037b4`.
+- artroom-rehearsal: `f147cad5-942e-4da0-a0aa-e430ce1713a7`.
+- artroom-counting: `d7f10c6f-dc32-4ae3-838d-8de4ee868114`.
+
+The original Scope upload passed but its readback wrapper failed. Its read-only
+completion verified the same version and resources before qualifying the 22
+asset matches. There was no second upload. That failure remains in its original
+proof. Rehearsal and Counting each completed their original upload and readback.
+The combined closed proof is
+`/Users/hughpyle/play/artroom-diagnostics/wordmark-postland-deploy-source/three-core-public.json`,
+SHA-256 `9f8cba5bf39ab80db6a06af046af85374eb68ec8062e9132f5401950f1a2c60b`.
+
+The managed Jam page Source is committed on artroom-jam main at
+`b4b7c764199e5b9758771e43f8132c618858bf32`, tree
+`6f4e999396d719205c1834de24602dac69925959`. That repository contains the page,
+app Source, brand assets and managed-assets recipe. The Core evidence review
+`1c162db8b5ebd4ec5d248e88880156576cebcd2c` explicitly reviewed foreign Jam evidence;
+it did not confer foreign landing authority. The ratified bounded evidence child
+and the actual ordinary foreign Git operation remain separate records.
+Original session 8555 fast-forwarded and pushed once without force. Its receipt
+verified clean local main, origin/main and remote main at that exact commit.
+The receipt is
+`/Users/hughpyle/play/artroom-diagnostics/jam-wordmark-main-git-source/git-one/public-receipt.json`,
+SHA-256 `be55b28f9fbf1f687607c04c23c1f626d887d8e9ecd1c6c1b32df57d8e62295c`.
+
+The one managed Jam deployment, original session 6147, passed at version
+`8f53e237-b1c8-4d5b-b309-7ac2b5a3c99c`, with 100% traffic. All 19 served assets
+matched bytes, MIME types and the four expected response headers. The HTML title
+and homepage wordmark anchor matched. Runtime settings, bindings and the script
+remained unchanged. The staged page uses its committed HTML and 18 verified
+unchanged assets. Its retained app.js build is 48,745 bytes, not a fresh build
+claim. Closed deployment evidence is
+`/Users/hughpyle/play/artroom-diagnostics/jam-wordmark-managed-deploy-source/deploy-one/public-result.json`,
+SHA-256 `5692ad7dc7f319cf41b92a910d3e5ab4aed7b95a6459b735b7f547a9d3f5b404`.
+
+The latest ordinary Core gate, original session 1551, passed at
+`512034159159aa57404f4d5bab1f5f64ccbfe34c`: 1,041 Vitest passes, two original skips,
+and Node chains of 9 and 55 passes. It includes the current wordmark Code.
+Closed proof is
+`/Users/hughpyle/play/artroom-diagnostics/homepage-tagline-source/gate-source-r2/gate-one/public-proof.json`,
+SHA-256 `60867f74bbd8bde4601d2f4dff245c376a3834c000b16bc5fcc51e540366d7bf`.
+This final successor changes only this note. No gate, build, browser check or
+provider operation was repeated. Earlier gates and browser failures retain their
+original subjects and qualifications.
+
+The requested four deployments and static readbacks are now recorded for full
+review under the original request. That full review remains pending; the earlier
+Core child approval and Jam evidence-only review retain their bounded scope.
+These records do not prove native membership, audio or general human acceptance.
+Those broader application obligations remain separate and do not replace the
+wordmark checks or add new blockers to this static-link delivery.
