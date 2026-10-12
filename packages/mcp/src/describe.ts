@@ -295,7 +295,9 @@ export function sentence(g: unknown, at: Scope): Sentence {
   if (Array.isArray(g["anyOf"])) return named({ text: "one of:", group: (g["anyOf"] as unknown[]).map((alt) => guards(alt, here)) });
   if (isRecord(g["distinct"])) {
     const d = g["distinct"];
-    return named({ text: `no two ${String(d["as"])} in ${operand(d["list"], here)} have the same ${operand(d["key"], here)}` });
+    // A key that is the element itself: the elements are distinct.
+    const whole = isRecord(d["key"]) && d["key"]["element"] === d["as"] && d["key"]["part"] === undefined;
+    return named({ text: whole ? `no two elements of ${operand(d["list"], here)} are the same` : `no two ${String(d["as"])} in ${operand(d["list"], here)} have the same ${operand(d["key"], here)}` });
   }
   if (isRecord(g["sameSet"])) {
     const d = g["sameSet"];
