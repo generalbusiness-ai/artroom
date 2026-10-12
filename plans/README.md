@@ -468,7 +468,7 @@ source/tests-unchanged statement. It does not repeat the full gate for
 documents alone. Any further source repair keeps its relevant checks.
 
 [031: One MCP service for every dap application](031-2026-10-12-generic-mcp-service.md)
-is Draft 5, dated 2026-10-12, under Hugh's direction of that day. The
+is Draft 6, dated 2026-10-12, under Hugh's direction of that day. The
 tool list is dynamic: one tool per act declaration of each definition the
 room holds, bound to exact definition digests with variants where same-name
 definitions differ, generated from the declarations, listed for the
@@ -482,8 +482,10 @@ The note states what proves each of Hugh's four claims (complete,
 readable, one service for every application, efficient), maps every
 adopted decision of `775acdd3` to what it becomes under the scope model,
 and answers the corrections of reviews `ca8a00f6`, `85c4e1b0` and
-`1a18fff8`. It is to be built in a cloud session on a branch with checker
-review of the head. Status: DRAFT 5, filed for checker review.
+`1a18fff8`, and names every tool with the user-facing words of plan 030's
+glossary through a words table. It is to be built in a cloud session on a
+branch with checker review of the head. Status: DRAFT 6, filed for checker
+review.
 
 ## Other original planning reports
 
