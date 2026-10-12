@@ -42,6 +42,8 @@ export interface ServerPort {
   now?: () => number;
   /** Called between two polls of `wait`. The default waits one second; a test drives its scheduler here. */
   pause?: (waiting: readonly ScopeId[]) => Promise<void>;
+  /** The most bytes of one `tools/list` page. The default is 256 KiB (section 9); a test sets a small one to see cursors. */
+  listPageBytes?: number;
   /** The timer of the watch. The default is `setInterval`. */
   every?: (ms: number, run: () => void) => () => void;
 }
@@ -150,7 +152,7 @@ export class McpService {
       if (!at || at.g !== s.generation || !Number.isSafeInteger(at.i) || at.i < 0 || at.i > s.tools.length) throw new ListRestart();
       from = at.i;
     }
-    const { page, next } = pageBy(s.tools, from, LIST_PAGE_BYTES);
+    const { page, next } = pageBy(s.tools, from, this.#port.listPageBytes ?? LIST_PAGE_BYTES);
     return { tools: page, ...(next !== null ? { nextCursor: cursorOf({ g: s.generation, i: next }) } : {}), generation: s.generation };
   }
 
@@ -645,7 +647,10 @@ export class McpService {
       let shaped: { fields: Record<string, FieldValue>; texts: string[] };
       try { shaped = shapeFields(act, fieldsGiven, textsGiven, membership); }
       catch (error) { if (error instanceof Unshaped) return stop({ error: "shape", field: error.field, what: error.what, declared: error.declared }); throw error; }
-      const signed = await signedIntent(this.#port.signer, { to: null, kind, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
+      // A founding intent's kind is the founding's, not the genesis act's: `install` for a register, `found` for any other scope
+      // with no creator (the scope contract, section 7.1). The genesis act then applies with the intent's fields.
+      const founding = data!.name === "platform:register" ? "install" : "found";
+      const signed = await signedIntent(this.#port.signer, { to: null, kind: founding, fields: shaped.fields }, { idempotencyKey: key as string, now: this.#now() });
       return { binding: { definition: data!.name, kind, declaration: null, pinned: named }, envelope: { signed, beside: shaped.texts.length > 0 ? { texts: shaped.texts } : {}, creation: { definition, definitions } } as Envelope };
     };
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);

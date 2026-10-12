@@ -45,7 +45,8 @@ export interface Agent {
 }
 
 export interface Room {
-  agent(name: string, options?: { mode?: Mode; config?: McpConfig; secret?: Uint8Array; subscribe?: boolean; tools?: string[] }): Agent;
+  /** `share`: use this configuration object itself, as two connections of one `ARTROOM_HOME` share one config file. */
+  agent(name: string, options?: { mode?: Mode; config?: McpConfig; share?: boolean; secret?: Uint8Array; subscribe?: boolean; tools?: string[]; listPageBytes?: number }): Agent;
   pause(waiting?: readonly string[]): Promise<void>;
   wait<T>(action: () => Promise<T>): Promise<T>;
   active(): void;
@@ -100,12 +101,13 @@ export function mcpRoom(): Room {
     },
     agent(name, options = {}) {
       const key = options.secret ?? crypto.getRandomValues(new Uint8Array(32));
-      const config: McpConfig = options.config ? structuredClone(options.config) : { service: SERVICE };
+      const config: McpConfig = options.config ? (options.share ? options.config : structuredClone(options.config)) : { service: SERVICE };
       const requests: string[] = [];
       const counted: Fetch = (url, init) => { requests.push(`${init?.method ?? "GET"} ${new URL(url).pathname}`); return fetch(url, init); };
       let tick: () => void = () => {};
       const service = new McpService({
         service: SERVICE, fetch: counted, signer: secretSigner(key), custody: memoryStore(), mode: options.mode ?? "default", ...(options.tools ? { tools: options.tools } : {}),
+        ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
         now: lifetime.now, pause: (waiting) => pause(waiting),
         every: (_ms, run) => { tick = run; return () => { tick = () => {}; }; },
         config: {
