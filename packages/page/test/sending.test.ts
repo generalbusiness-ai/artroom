@@ -319,7 +319,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   let listedIssue=false;
   const childRead=gate(), releaseChild=gate();
   let creationReads=0, childConfirmed=false;
-  const createdChild=vi.fn(async(_room:unknown,_result:unknown)=>{if(++creationReads===1){childRead.resolve();await releaseChild.promise;}if(!childConfirmed)return {state:'pending'};listedIssue=true;return {state:'confirmed',child:issue.ref};});
+  const createdChild=vi.fn(async(_room:unknown,_result:unknown)=>{if(++creationReads===2){childRead.resolve();await releaseChild.promise;}if(!childConfirmed)return {state:'pending'};listedIssue=true;return {state:'confirmed',child:issue.ref};});
   const posts=vi.fn();const attempts:{args:unknown[];finish:(answer:'accepted'|'refused')=>void;lose:()=>void}[]=[];
   let attempted=gate();
   const act=vi.fn((...args:unknown[])=>{
@@ -385,16 +385,18 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(body.querySelectorAll<Node>('dialog').filter(node=>node.open)).toHaveLength(1);
     attempted=gate();form.emit('submit');await attempted.promise;
     vi.useFakeTimers();
-    rendered=gate();attempts[1]!.finish('accepted');await childRead.promise;
-    expect(location.hash).toBe('#/'); // A known acceptance alone does not supply a child address.
-    await refresh(); // A same-context redraw can expose the manual original check while its first lookup is held.
-    root.querySelectorAll<Node>('button').find(node=>node.textContent==='Check created issue')!.emit('click');
-    expect(createdChild).toHaveBeenCalledTimes(1);
-    expect(act.mock.calls.filter(call=>call[2]==='open-issue')).toHaveLength(2); // Original refused request, then accepted request; no replacement.
-    rendered=gate();releaseChild.resolve();await rendered.promise;
+    rendered=gate();attempts[1]!.finish('accepted');await rendered.promise;
     expect(location.hash).toBe('#/');expect(root.textContent).not.toContain('Native issue');
-    expect(createdChild).toHaveBeenCalledTimes(1);
+    expect(createdChild).toHaveBeenCalledTimes(1); // First pending read publishes the actual manual Check button.
     const nativePosts = posts.mock.calls.length, nativeActs = act.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(500);await childRead.promise; // Hold the next real scheduled read, without a fake hashchange.
+    expect(createdChild).toHaveBeenCalledTimes(2);
+    root.querySelectorAll<Node>('button').find(node=>node.textContent==='Check created issue')!.emit('click');
+    expect(createdChild).toHaveBeenCalledTimes(2); // Manual Check reuses the active read; there is no third lookup.
+    expect(act.mock.calls.filter(call=>call[2]==='open-issue')).toHaveLength(2); // Original refused request, then accepted request; no replacement.
+    releaseChild.resolve();await vi.advanceTimersByTimeAsync(0);
+    expect(location.hash).toBe('#/');expect(root.textContent).not.toContain('Native issue');
+    expect(createdChild).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(110_000); // Virtual time only: legitimate pending creation outlives the old twenty-read cutoff.
     expect(createdChild.mock.calls.length).toBeGreaterThan(20);
     expect(location.hash).toBe('#/');
