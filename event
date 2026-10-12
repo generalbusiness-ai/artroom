@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-12-observability-design.md","body":{"commit":"db95fb9a72efe95f23015a9892372e78886bf5b4","path":"notes/2026-10-12-observability-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:43cf05026367e7381a1c14fce8234df98adcfda5","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-observability-design.md."}
