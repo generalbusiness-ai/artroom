@@ -404,7 +404,7 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
     h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(), offer ? create() : null, h("div", { class: "rail-bottom" }, accountControl())),
     h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, wordmark(), roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
-  bindDisclosures(surfaces.flatMap(surface => [...surface.querySelectorAll<HTMLElement>("details.shell-disclosure")]), surfaces);
+  bindDisclosures(surfaces.flatMap(surface => [...surface.querySelectorAll<HTMLElement>("details.shell-disclosure")]), root());
   return surfaces;
 }
 

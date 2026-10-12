@@ -66,8 +66,7 @@ test("joined room/account clicks disclose identity without leaving the room, and
       prior = control.parent;
       expect(root.all().filter(node => node.tag === "details" && node.hasAttribute("open"))).toHaveLength(1);
     }
-    const outside = root.all().find(node => node.attrs["id"] === "page-main")!;
-    outside.handlers.get("click")!({ target: outside } as never);
+    root.handlers.get("click")!({ target: root } as never);
     expect(root.all().filter(node => node.tag === "details" && node.hasAttribute("open"))).toHaveLength(0);
     expect(root.all().filter(e => e.attrs["class"] === "avatar").map(e => e.textContent)).toEqual(["H", "H"]);
     expect(root.all().filter(e => e.attrs["class"] === "account-label").map(e => e.textContent)).toEqual(["@hugh-web", "@hugh-web"]);

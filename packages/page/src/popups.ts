@@ -1,6 +1,7 @@
 /** One room popup at a time. Closing a popup does not retire its owner's request. */
 let modal: { dialog: HTMLDialogElement; close(restore: boolean): void } | null = null;
 let disclosures: HTMLElement[] = [];
+const boundContainers = new WeakSet<HTMLElement>();
 export function releaseDialog(dialog: HTMLDialogElement): void {
   if (modal?.dialog === dialog) modal = null;
 }
@@ -18,13 +19,15 @@ export function openDialog(dialog: HTMLDialogElement, close: (restore: boolean) 
   dialog.showModal();
 }
 /** The shell supplies its actual desktop/mobile details and outside click surfaces. */
-export function bindDisclosures(nodes: HTMLElement[], surfaces: HTMLElement[]): void {
+export function bindDisclosures(nodes: HTMLElement[], container: HTMLElement): void {
   disclosures = nodes;
   for (const node of nodes) node.querySelector("summary")?.addEventListener("click", () => {
     const previous = modal; modal = null; previous?.close(false);
     for (const other of nodes) if (other !== node) other.removeAttribute("open");
   });
-  for (const surface of surfaces) surface.addEventListener("click", event => {
-    for (const node of nodes) if (!node.contains(event.target as Node)) node.removeAttribute("open");
+  if (boundContainers.has(container)) return;
+  boundContainers.add(container);
+  container.addEventListener("click", event => {
+    for (const node of disclosures) if (!node.contains(event.target as Node)) node.removeAttribute("open");
   });
 }
