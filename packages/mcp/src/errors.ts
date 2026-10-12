@@ -96,7 +96,8 @@ export function answered(answer: Answer, asked: Asked, guards: readonly Sentence
         if (answer.name) {
           const named = guards ? sentenceNamed(guards, answer.name) : null;
           const said = named ? inline(named) : `the guard named ${answer.name}; the act's declaration names no such guard`;
-          return { sentence: `${asked.scope} refused ${asked.kind}, because this does not hold: ${said} (${answer.name}), ${at(answer.judgedAt)}.`, next: answer.reason === "capability-refused" ? REFUSALS["capability-refused"](asked, answer.name).next : HINTS.again };
+          const tagged = said.endsWith(`(${answer.name})`) || said.includes(`(${answer.name},`) || said.includes(`, ${answer.name})`) ? said : `${said} (${answer.name})`;
+          return { sentence: `${asked.scope} refused ${asked.kind}, because this does not hold: ${tagged}, ${at(answer.judgedAt)}.`, next: answer.reason === "capability-refused" ? REFUSALS["capability-refused"](asked, answer.name).next : HINTS.again };
         }
         const all = guards && guards.length > 0 ? ` The act's guards are: ${guards.map(inline).join("; ")}.` : "";
         return { sentence: `${asked.scope} refused ${asked.kind}, because one of its guards does not hold, ${at(answer.judgedAt)}; the scope does not say which.${all}`, next: "Read the subjects the sentences name and compare; sign again with a new idempotencyKey." };
