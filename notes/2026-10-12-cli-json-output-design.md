@@ -343,7 +343,7 @@ bytes is the complete form today.
 The list is the role's: acts whose `grant` the caller's standing covers, plus
 acts whose grant is a rule (the rule decides at submission). `hidden` counts
 the rest. No act carries an `available` flag: guards are not evaluated here,
-and the scope's own judgment of a signed intent is the only admission. A
+and only the scope's own judgment of a signed intent makes it take effect. A
 finished Counter still lists `start`.
 
 Two heads: `at` is the scope's summary head and `caller.membership.at` is the
@@ -543,7 +543,7 @@ forms work; here it is `status: "refused"`, `error.reason: "guard-failed"`,
 ```
 
 A listing is a read of the directory at one head: it says which lanes exist,
-not what any of them admits. Statuses: `not-found`.
+not what any of them will accept. Statuses: `not-found`.
 
 ## 8. Rendering from one result
 
