@@ -1256,7 +1256,7 @@ works; the count given is the default recipe's.
 | Page: Merge | `inspect` on the change for its current version, `change.merge` with the version and the reports it selects, `wait` for the merge to be published, refused or aborted: 3 | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
 | `artroom edit <path> --file <file>` | `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` with the text inline, then as artroom merge: `inspect` on the change, `change.link-own` with the issue for --closes, `change.merge`, `wait`; 9 without --closes: 10 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`, `inspect`, `act` link-own, `act` merge, `wait`: 12 | 10 |
 | `artroom merge <change>` | `inspect` on the change for its current version, `change.merge`, `wait`: 3; with --closes, change.link-own first | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
-| `artroom propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` once per path, `change.propose-version` naming every path: 6 + n; then as artroom merge once the lane accepts the version. In the demo room the lane refuses that version (source-shape): see the note below | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act` per path, `act` propose-manifest: 8 + n | 6 + n |
+| `artroom propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then, under the manifest-list change definition and a version 3 destination: `change.create`, `wait` for the lane, `change.ask-rules`, `wait` for the rules item, `inspect` on the destination for the head, `change.propose-file` once per path with the base, path, digest, size and text, `change.propose-version` with the base and each file's entry and digest, `change.merge` with that version, `wait` for the merge to be published: 8 + n | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act` per path, `act` propose-manifest, `act` merge, `wait`: 10 + n | 8 + n |
 | Page: Check status | `settle` with the target and the key: 1 | `settle`: 1 | 1 |
 | Page: Record inspection | `room` for the role and key, `record` on membership: 2 | `room`, `record`: 2 | 2 |
 | A capability step | `prepare` at the resource, with the act's own target, kind and fields, then the act tool under the same key, such as `issue.hand-in`: 2 | `prepare`, `actions`, `act`: 3 | 2 |
@@ -1266,12 +1266,14 @@ Git steps: `clone` and `propose` use Git outside the server. The server
 returns the remote URL and a one-time credential; the agent's own Git, or
 a generic credential helper, uses them. The server runs no Git.
 
-`propose` in the demo room: the demo change definition's `propose-manifest`
-is the hold workflow's version, which takes a held hold, or a foreign hold
-with its presented pin, and the lane refuses a version with neither as
-`source-shape`. `artroom propose` needs `change3` or `change-demo3` under a
-destination at version 3 (see `docs/cli.md`), which the demo room does not
-run. The recipe test runs the recipe to that refusal and asserts it.
+`propose` runs, in the recipe test, in a room of its own under
+`change-demo3`, the manifest-list change definition, with a version 3
+destination: two files, a version that names both, accepted, and a merge
+that the room publishes. The destination builds the tree from the files'
+entries; the agent sends no tree. Under the demo change definition,
+`change-demo`, whose `propose-manifest` is the hold workflow's and which
+holds one version only, the same steps end in the lane's refusal of the
+version as `source-shape`; the recipe test asserts that refusal too.
 
 ## Budgets and observed figures
 

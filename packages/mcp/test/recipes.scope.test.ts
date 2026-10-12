@@ -1,11 +1,12 @@
 import { expect, test } from "vitest";
 import type { FactRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, digestBytes, keyIdOfSecret, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, digestBytes, keyIdOfSecret, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { firstExtents } from "@generalbusiness/artroom-platform";
-import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
+import { DEMO_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/artroom-lanes";
 import DOC from "../../../docs/mcp.md?raw";
 import { mcpRoom, type Agent } from "./support/room.ts";
+import { founded } from "./support/story.ts";
 
 type Mode = "default" | "generic";
 interface Ran { calls: string[]; n: number; answers: string[] }
@@ -32,6 +33,7 @@ const collapse = (calls: readonly string[]) => calls.filter((t, i) => t !== call
  */
 async function recipes(mode: Mode): Promise<Map<string, Ran>> {
   const ran = new Map<string, Ran>();
+  let demoRefusal = "";
   const room = mcpRoom();
   try {
     const rita = room.agent("rita", { mode });
@@ -202,7 +204,9 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
 
     // propose: the files, one propose-file each, then the version that names them. The demo change definition's propose-manifest
     // is the hold workflow's (a held hold, or a foreign hold with its pin): the lane refuses this version, by that guard's name.
-    await recipe("`artroom propose", [paul], async () => {
+    // Not a W1 row: the same steps under the demo change, whose propose-manifest is the hold workflow's and which holds one version
+    // only. Its version is refused, by name.
+    await (async () => {
       fresh(paul);
       const pr = accepted(await act(paul, "change.create", "directory", "open-pr", { fields: { definition: DEMO_DIGESTS.change, title: "Two files", draft: false }, idempotencyKey: "propose-open" }));
       const lane = ((await paul.ok("wait", { scope: "directory", entry: seqOf(pr) }))["created"] as { scope: string }[])[0]!.scope;
@@ -215,8 +219,8 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       for (const [path, content] of files) previous = seqOf(accepted(await act(paul, "change.propose-file", lane, "propose-file", { fields: { base: head, path, digest: digestBytes(utf8(content)), size: utf8(content).length, content }, idempotencyKey: `propose-${path}` })));
       const version = await act(paul, "change.propose-version", lane, "propose-manifest", { fields: { previous, instance: "i-1", selected: [], decisions: [], base: head, integration: head, tree: "d".repeat(40), complete: true }, idempotencyKey: "propose-version" });
       expect([version["answer"], version["reason"], version["name"]], JSON.stringify(version)).toEqual(["refused", "guard-failed", "source-shape"]);
-      return { n: files.length, answers: [`${String(version["answer"])} ${String(version["reason"])} ${String(version["name"])}`] };
-    });
+      demoRefusal = `${String(version["answer"])} ${String(version["reason"])} ${String(version["name"])}`;
+    })();
 
     await recipe("`artroom issue close", [paul], async () => { fresh(paul); accepted(await act(paul, "issue.close-own", 2, "close-own", { on: 0, fields: { reason: "completed" }, idempotencyKey: "close-2" })); });
     await recipe("Check status", [paul], async () => { expect((await paul.ok("settle", { target: 1, idempotencyKey: "comment-1" }))["answer"]).toBe("accepted"); });
@@ -236,6 +240,37 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       for (const scope of scopes) expect((await paul.ok("record", { scope }))["entries"]).toBeDefined();
       return { n: scopes.length };
     });
+    // propose, in full, in a room of its own whose change definition is the manifest-list one (change-demo3) under its version 3
+    // destination: the files' sources, the version that names them, accepted, then merged and published by the room.
+    const proposeRoom = mcpRoom();
+    try {
+      const una = proposeRoom.agent("una", { mode });
+      await founded(proposeRoom, una, mode);
+      fresh(una);
+      accepted(await act(una, "rules.publish", "rules", "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }));
+      fresh(una);
+      accepted(await act(una, "rules.activate", "rules", "activate", { fields: { digest: definitionDigest(changeDemo3), name: "change" }, values: [canonicalize(changeDemo3)], idempotencyKey: "activate-change3" }));
+      await recipe("`artroom propose", [una], async () => {
+        fresh(una);
+        const pr = accepted(await act(una, "change.create", "directory", "open-pr", { fields: { definition: definitionDigest(changeDemo3), title: "Two files", draft: false }, idempotencyKey: "propose-open" }));
+        const lane = ((await una.ok("wait", { scope: "directory", entry: seqOf(pr) }))["created"] as { scope: string }[])[0]!.scope;
+        accepted(await act(una, "change.ask-rules", lane, "ask-rules", { on: 0, idempotencyKey: "propose-ask" }));
+        expect((await una.ok("wait", { scope: lane, type: "rules" }))["timedOut"]).toBe(false);
+        const head = ((await una.ok("inspect", { scope: "destination" }))["items"] as { type: string; values: { head?: string } }[]).find((i) => i.type === "branch")!.values.head!;
+        const files = [["guide/one.md", "# One\n"], ["guide/two.md", "# Two\n"]] as const;
+        const sources: { path: string; entry: FactRef; digest: string }[] = [];
+        for (const [path, content] of files) {
+          const made = accepted(await act(una, "change.propose-file", lane, "propose-file", { fields: { base: head, path, digest: digestBytes(utf8(content)), size: utf8(content).length, content }, idempotencyKey: `propose-${path}` }));
+          sources.push({ path, entry: made["fact"] as FactRef, digest: digestBytes(utf8(content)) });
+        }
+        const version = accepted(await act(una, "change.propose-version", lane, "propose-manifest", { fields: { base: head, files: sources }, idempotencyKey: "propose-version" }));
+        const merged = accepted(await act(una, "change.merge", lane, "merge", { fields: { manifest: seqOf(version), reports: [] }, idempotencyKey: "propose-merge" }));
+        const published = await una.ok("wait", { scope: lane, item: seqOf(merged), type: "merge", states: ["published", "refused", "aborted"] });
+        expect((published["item"] as { state: string }).state, JSON.stringify(published)).toBe("published");
+        return { n: files.length, answers: [`version accepted at entry ${seqOf(version)}; merge published`] };
+      });
+    } finally { proposeRoom.done(); }
+    ran.set("demo propose refusal", { calls: [], n: 0, answers: [demoRefusal] });
     return ran;
   } finally { room.done(); }
 }
@@ -246,6 +281,7 @@ function compare(mode: Mode, ran: Map<string, Ran>): string[] {
   const lines: string[] = [];
   const differ: string[] = [];
   for (const [label, r] of ran) {
+    if (label === "demo propose refusal") { expect(r.answers).toEqual(["refused guard-failed source-shape"]); lines.push(`${mode}, the demo change's version: ${r.answers[0]}`); continue; }
     const row = rows.find((x) => x.activity.includes(label));
     if (!row) { differ.push(`no W1 row for ${label}`); continue; }
     const expected = recipeOf(row.cells[mode]);
@@ -255,7 +291,7 @@ function compare(mode: Mode, ran: Map<string, Ran>): string[] {
   }
   expect(differ, `${mode}: the recipes as run and docs/mcp.md's W1 inventory`).toEqual([]);
   // Every row of the table is executed, or names the row whose calls it shares.
-  for (const row of rows) expect([...ran.keys()].some((l) => row.activity.includes(l)) || /the same calls as/.test(row.cells.default), `${row.activity} is executed`).toBe(true);
+  for (const row of rows) expect([...ran.keys()].filter((l) => l !== "demo propose refusal").some((l) => row.activity.includes(l)) || /the same calls as/.test(row.cells.default), `${row.activity} is executed`).toBe(true);
   return lines;
 }
 
