@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at plans/README.md","body":{"commit":"e179059dff8a64a044a65d806d2e334f58cd1705","path":"plans/README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3d2c88476f587718efa5085ecb722c7380fb1043","text":"Merge retired a covered predecessor; the successor is at plans/031-2026-10-12-generic-mcp-service.md."}
