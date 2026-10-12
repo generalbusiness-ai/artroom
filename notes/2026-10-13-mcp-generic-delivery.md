@@ -121,8 +121,8 @@ of steps, or a proxy.
 | 1. Steps with no act | `prepare` without `kind` sends a capability step with no act under custody | the room story: `hold@1`'s instance, the report's stage and check, then the hand-in, accepted at entry 17, and its settlement, in both modes; the not-staged refusals stay their own witness |
 | 2. The full proposal | The `propose` recipe runs in a room of its own under `change-demo3` and its version 3 destination | `recipes.scope.test.ts`: two files, a version naming both, accepted, a merge published; 10 calls in the default mode and 12 in `--generic`; the demo change's `source-shape` refusal is its own check |
 | 3. Resubmissions at the bound | A resubmitted refusal becomes unresolved under the capacity lease, persisted there before delivery | `custody.test.ts`: two processes resubmitting refusals at 255 unresolved admit one; the other's refusal stays as it was |
-| 4. Every outcome spilled | The decisive outcome is read from the segment's end in bounded slices | `custody.test.ts`: an accepted outcome found with nothing inline, by send and settle, with no signature and no delivery |
-| 5. Lease reclamation | A dead owner's lock is broken under a reclaim lock after reading it again; release removes only the releaser's holding | `custody.test.ts`: four processes reclaim one dead lease, one enters; a release with another token leaves the lock |
+| 4. Every outcome spilled | The decisive outcome is read from the segment's end in bounded slices (made a slice-by-slice search in review b04a53c8, item 3) | `custody.test.ts`: an accepted outcome found with nothing inline, by send and settle, with no signature and no delivery |
+| 5. Lease reclamation | A dead owner's lock is broken under a reclaim lock after reading it again; release removes only the releaser's holding (a dead reclaimer blocks recovery since review b04a53c8, item 2) | `custody.test.ts`: four processes reclaim one dead lease, one enters; a release with another token leaves the lock |
 | 6. Archival under the lock | Each candidate is read again under its lock and skipped when no longer terminal | `custody.test.ts`: a resubmission between selection and lock stays live and counted |
 | 7. A root added elsewhere | The configuration is read on each call and the list derived again when it changed | `budget.test.ts`: a known name at a root added under a second membership is served under it; the witness fails without the check |
 | 8. Bounded settlement | settle projects each step's latest answer and pages the steps; prepare returns a projection | `budget.test.ts`: 20 steps of one key in 4 pages within 4 KiB |
@@ -132,7 +132,21 @@ of steps, or a proxy.
 | 12. The invitation's secret | The guarantee narrowed to `join`'s own result; the record is not masked | the tool's description, `docs/mcp.md` and this note |
 | 13. Prose | `items` says its two traversals; the wire's opening comment no longer claims the SDK serves only the older revision | `docs/mcp.md`, `wire.ts`, the stand-in |
 
-**Paths that differ from main.** After the third merge,
+## Corrections of review b04a53c8
+
+Origin's main had not moved since the last merge, so no merge was made in
+this round. The planner's amendment is kept.
+
+| Item | What changed | Witness |
+|---|---|---|
+| 1. Standalone steps have a lifecycle | A record of steps with no act has a terminal phase of its own, `settled`, reached when every step has a decisive answer; it is never accepted. A decisive step is kept and returned again without sending. A lost or unavailable answer leaves the record unresolved, and the same call sends the exact step again. `settle` answers `settled` | `custody.test.ts`, "standalone steps": a decisive step replayed with nothing sent; a restart between sending and the answer, then the answer kept; a lost step sent again byte for byte; new work admitted after 260 completed standalone steps |
+| 2. Reclaim-lock recovery | A reclaim lock is never broken. A dead reclaimer's file blocks recovery of that lock: each call is refused as `locked`, naming the file, with the next step for the operator. Node has no atomic conditional replace of a file, so the reviewer's second choice was taken | `custody.test.ts`: a reclaimer that died inside the reclaim section; four processes are refused and the custody call is refused as `locked`, naming the file; once it is removed, one of four processes enters |
+| 3. Bounded backward search | The decisive outcome is searched inline, then in the segment one slice of 64 at a time, newest first, stopping at the decisive outcome or at the start of the current attempt | `custody.test.ts`: with 300 lost replies, slices are read from 172, 108, 44 and 0, each at most 64; a record whose outcomes all moved is read in one slice of one |
+| 4. Bounded names | Capability and step names longer than 128 bytes are refused as a shape error before anything is kept or sent, and the result echoes less than 200 characters of the name | `budget.test.ts`: 100 KiB names, with and without an act, refused whole in results of at most 613 bytes, observed (bound 4 KiB), with no request and nothing unresolved |
+| 5. Notifications | A notification is never answered, on either transport. A request-only method sent as a notification is counted and dropped before dispatch; over HTTP it gets 202 with no body and no session | `wire.test.ts`: over HTTP, notification-shaped `tools/call`, `initialize` and `tools/list` (with a session) and two real notifications each get 202, an empty body, no session header and no scope request, with the real client's call after each; 3 counted. On stdio, the same five write nothing, and the next request gets the only line |
+| 6. The cursor's wording | `items` and its reference no longer say a cursor continues only its traversal; they tell callers to continue with the same scope, type and final flag | `docs/mcp.md`, `docs/mcp-tools.json`, regenerated from the descriptors |
+
+**Paths that differ from main.** After the third merge, and still at this round's head,
 `git diff --stat origin/main...HEAD` lists 58 files, all this branch's own:
 the 42 files of `packages/mcp`; `packages/cli/package.json`,
 `packages/cli/src/line.ts`, `packages/cli/src/main.ts`,
@@ -186,8 +200,9 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
-| `npx vitest run --project mcp` | `Tests  58 passed (58)` |
-| `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Test Files  6 passed (6)`, `Tests  8 passed (8)` |
+| `npx vitest run --project mcp`, after each item of review b04a53c8 | `Tests  66 passed (66)` after items 5 and 6 |
+| `npx vitest run --project scope packages/mcp/test --reporter=verbose`, after each item of review b04a53c8 | `Test Files  6 passed (6)`, `Tests  8 passed (8)` after items 5 and 6 |
+| `npx vitest run --project mcp packages/mcp/test/custody`, twice after the standalone lifecycle | `Tests  29 passed (29)` each time |
 | `npx vitest run --project mcp packages/mcp/test/custody`, three more times after the lease change | `Tests  23 passed (23)` each time |
 | `npx vitest run --project cli --project mcp --project page --project client` (after the join change of the second round) | `Tests  175 passed (175)` |
 | `npx vitest run --project scope packages/mcp/test packages/cli/test/join packages/cli/test/story` (after the join change of the second round) | `Tests  8 passed (8)` |
@@ -221,18 +236,18 @@ tokenizer gives other counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 146418 | 37722 |
-| Demo room, maintainer | 57 | 1 | 114502 | 29594 |
-| Demo room, member | 54 | 1 | 107927 | 27837 |
-| Demo room, agent | 52 | 1 | 102161 | 26398 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339044 | 88971 |
-| Demo room, admin, `--generic` | 16 | 1 | 15123 | 3558 |
+| Demo room, admin | 71 | 1 | 146481 | 37736 |
+| Demo room, maintainer | 57 | 1 | 114565 | 29608 |
+| Demo room, member | 54 | 1 | 107990 | 27851 |
+| Demo room, agent | 52 | 1 | 102224 | 26412 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339107 | 88985 |
+| Demo room, admin, `--generic` | 16 | 1 | 15186 | 3572 |
 
 The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
-The bytes grew in this round with the longer descriptions of `prepare`,
-`settle`, `join` and `items`.
+The bytes were taken again in the round of review b04a53c8, after the
+wording of `items` changed: 63 bytes more per list than before.
 
 ### Reads per tool
 
@@ -273,8 +288,8 @@ Worker:
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 288 |
-| `--generic` | 7 | 3 | 4 | 241 | 281 |
+| Default | 7 | 3 | 4 | 229 | 286 |
+| `--generic` | 7 | 3 | 4 | 241 | 283 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,
@@ -349,13 +364,12 @@ delivery's.
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
 - **`credential`'s reads**: 3 where plan 031 counts 1, as reported above.
-- **A narrow window in breaking a dead reclaim lock.** A dead owner's lock is
-  broken one process at a time, under a reclaim lock. A reclaim lock left by
-  a process that died inside that short section is moved aside and removed
-  only when it is the dead one that was read; a live one moved by mistake
-  is put back, but another process may take the place in the moment
-  between. The witness covers the lock itself, with four reclaimers; it
-  does not cover a reclaimer dying inside the reclaim section.
+- **A dead reclaimer needs an operator.** A reclaim lock is never broken,
+  so a process that died inside the short reclaim section leaves its lock
+  refused as `locked` until an operator removes the reclaim file named in
+  the refusal. Mutual exclusion holds; recovery is manual. Automatic
+  recovery would need an atomic conditional replace of a file, which Node
+  does not give.
 - **No gitseq request** was recorded from this session: no gitseq tool was
   available in the cloud container. The requester records one for this
   head.

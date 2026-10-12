@@ -84,6 +84,11 @@ request.
 A request with a version the server does not serve is answered with error
 `-32022`, whose data names the versions it serves and the one asked.
 
+A notification (a message with no ID) is never answered: over HTTP it gets
+status 202 and no body, and on stdio nothing is written. A method that is
+only a request, such as `tools/call`, `initialize` or `tools/list`, sent as
+a notification, is not run and issues no session.
+
 ## What the server lists
 
 The list has two parts.
@@ -198,8 +203,9 @@ caller's `idempotencyKey`, in the config directory's
   refused as full, for bytes, before it is signed. A record keeps up to 64
   outcomes inline; older ones, or ones that would push it past 2 MiB, move
   to a segment file beside it, which keeps every one and is read in bounded
-  slices; when every outcome has moved there, the decisive one is read from
-  the segment's end.
+  slices. The decisive outcome is searched inline first, then in the
+  segment one slice of 64 at a time, newest first, stopping at the decisive
+  outcome or at the start of the current attempt.
 - **Preparation steps** are kept apart from the act. A step keeps its first
   answer and its latest 63; the answers between them are not kept. The act's
   outcomes are never dropped.
@@ -212,11 +218,22 @@ caller's `idempotencyKey`, in the config directory's
   is gone, whatever its time; the passing of an intent's deadline is never
   an outcome. One process at a time breaks it, under a reclaim lock, after
   reading it again; a release removes only the releaser's own holding.
-  Archival reads each record again under its lock and skips one that is
-  no longer terminal.
+  A reclaim lock is never broken: if the process holding it died, every
+  call that needs that lock is refused as `locked`, naming the reclaim
+  file, until an operator removes it once no process of this
+  `ARTROOM_HOME` runs. Archival reads each record again under its lock and
+  skips one that is no longer terminal.
 - **Steps with no act.** `prepare` without `kind` sends a capability step
   that has no act, such as hold@1's instance: the step's own intent, kept
   under custody under the caller's key, with its answers kept as the step's.
+  Such a record is never an accepted act. A decisive answer is kept, and
+  the same call returns it again without sending; a lost or unavailable
+  answer leaves the record unresolved, and the same call sends the exact
+  step again. When every step of the record has a decisive answer, the
+  record is `settled`: terminal, archivable, and no longer counted against
+  the 256. `settle` answers `settled` for it.
+- **Names.** A capability or step name longer than 128 bytes is refused
+  whole, before anything is kept or sent.
 
 ## Tool reference
 
