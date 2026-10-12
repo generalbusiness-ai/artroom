@@ -54,7 +54,7 @@ export async function founded(room: Room, rita: Agent, mode: "default" | "generi
 /**
  * The room story. Returns the number of list changes each agent was told, step by step, for the delivery note.
  */
-async function story(mode: "default" | "generic"): Promise<{ told: Record<string, number>; requests: number }> {
+async function story(mode: "default" | "generic", lines: string[] = []): Promise<{ told: Record<string, number>; requests: number }> {
   const room = mcpRoom();
   try {
     const rita = room.agent("rita", { subscribe: true, mode });
@@ -144,11 +144,17 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
     expect([lost["sentence"], (lost["act"] as { phase: string }).phase]).toEqual([expect.stringMatching(/was lost; this step's outcome is unknown\. The act's phase is unchanged\./), "prepared"]);
     const recovered = await paul.ok("prepare", { ...report, resource: 2, capability: "hold@1", step: "check" });
     expect((recovered["step"] as { phase: string }).phase).toBe("answered");
+    // On this Worker the resource refuses both steps (capability-refused, not-staged): no hold of the change lane stages the
+    // issue's report. A refused step writes no entry, so the retry is answered with the same refusal; that a retry of an accepted
+    // step is answered with its first entry is custody.test.ts's case, with a scripted resource.
+    lines.push(`room story, ${mode}: steps at a foreign resource: ${[stage, check, again, lost, recovered].map((x) => String(x["sentence"]).replace(/^sc_\w+ /, "")).join(" | ")}`);
     const handIn = await step(paul, mode, { tool: "issue.hand-in", scope: 1, kind: "report" }, { fields: report.fields, idempotencyKey: report.idempotencyKey });
+    lines.push(`room story, ${mode}: hand-in answered ${String(handIn["answer"])} ${String(handIn["reason"] ?? "")} ${String(handIn["name"] ?? "")}`);
     const settledHandIn = await paul.ok("settle", { target: 1, idempotencyKey: report.idempotencyKey });
     expect(settledHandIn["answer"]).toBe(handIn["answer"]);
     const steps = settledHandIn["steps"] as { step: string; phase: string }[];
-    expect(steps.map((s) => [s.step, s.phase]).sort()).toEqual([["check", "answered"], ["stage", "answered"]]);
+    const foreign = (stage["step"] as { resource: string }).resource;
+    expect(steps.filter((s) => (s as unknown as { resource: string }).resource === foreign).map((s) => [s.step, s.phase]).sort()).toEqual([["check", "answered"], ["stage", "answered"]]);
     // A step's answer is never the act's receipt: the act's fact, if any, is the target's own entry.
     if (handIn["answer"] === "accepted") expect((handIn["fact"] as FactRef).at.scope).not.toBe((stage["step"] as { resource: string }).resource);
 
@@ -179,6 +185,7 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
     const credential = await paul.ok("credential", { entry: seq });
     expect(credential).toMatchObject({ credential: expect.any(String), remote: expect.stringMatching(/^https:/) });
     await settled(paul, 0, "the end of the story");
+    lines.push(`room story, ${mode}: requests to the scope service: rita ${rita.requests.length}, paul ${paul.requests.length}`);
     return { told: { founding: atFounding, rita: rita.told, paul: paul.told }, requests: rita.requests.length + paul.requests.length };
   } finally { room.done(); }
 }
@@ -186,13 +193,17 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
 // Invariant: through the act tools alone, agents of two roles create a room and do the whole demo story, every tool they call
 // was listed for their role at that moment, and a list change is told after an activation, a role change and the first lane of
 // a new declaration, and at no other step.
-test("the room story, through the act tools", async () => {
-  const { told } = await story("default");
-  console.log(`room story, default mode: list changes told: rita ${told["rita"]} (${told["founding"]} while founding), paul ${told["paul"]}`);
+test("the room story, through the act tools", async ({ annotate }) => {
+  const lines: string[] = [];
+  const { told } = await story("default", lines);
+  for (const line of lines) await annotate(line);
+  await annotate(`room story, default mode: list changes told: rita ${told["rita"]} (${told["founding"]} while founding), paul ${told["paul"]}`);
 }, 600_000);
 
 // Invariant: the same story through actions and act alone, in --generic mode.
-test("the room story, through actions and act", async () => {
-  const { told } = await story("generic");
-  console.log(`room story, --generic mode: list changes told: rita ${told["rita"]} (${told["founding"]} while founding), paul ${told["paul"]}`);
+test("the room story, through actions and act", async ({ annotate }) => {
+  const lines: string[] = [];
+  const { told } = await story("generic", lines);
+  for (const line of lines) await annotate(line);
+  await annotate(`room story, --generic mode: list changes told: rita ${told["rita"]} (${told["founding"]} while founding), paul ${told["paul"]}`);
 }, 600_000);
