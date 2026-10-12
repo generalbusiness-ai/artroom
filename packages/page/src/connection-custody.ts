@@ -112,7 +112,7 @@ export async function connectInvitation(origin: string, storage: ClaimStorage, e
       private: async name => row.private[name] === undefined ? null : utf8(row.private[name]!),
       keepPrivate: async (name, bytes) => {
         if (!/^[A-Za-z0-9._-]{1,160}$/.test(name)) throw unavailable();
-        const value = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        const value = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
         if (row.private[name] !== undefined && row.private[name] !== value) throw new Error("An original private connection snapshot is never overwritten.");
         update({ ...row, private: { ...row.private, [name]: value } });
       }
