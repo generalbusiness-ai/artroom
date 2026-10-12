@@ -85,8 +85,21 @@ utterances. It proves those browser boundaries, not native admission,
 provider deployment, human audibility, or three physical speaking devices.
 Earlier native count-five evidence is not acceptance of this candidate.
 
-**Gate: UNRUN.** Record the one ordinary gate's actual final head, tree,
-exit, and evidence here before review. No green gate is claimed.
+The ordinary gate ran once at `6788f5d2862d9f082d3d6cb4d88da2296e8df8ec`,
+tree `950545efe84c3936c59242298dd9dfe0bc1a3634`, and exited one.
+Whitespace and type checking passed; Vitest passed 1,031 tests with two
+existing skips and one failed Page asset correspondence check. The shared
+SDK signing addition changed the minified Page output; its HTML was
+unchanged. The normal Page generator refreshed the inherited asset.
+The failed asset check then passed. The originally unrun trailing Node
+suites passed eight tooling tests and 47 Counter browser tests. No whole
+Vitest suite or gate was repeated. The original failure remains recorded.
+
+Public evidence: `counter-demo-gate-one/public-result.json` and
+`counter-demo-gate-one/completion-public-result.json`, completion SHA256
+`9fb4efd15aae3bc61429d2612f4fe568478c48d05a1469906afa30d3329b36aa`. The final candidate adds only that generated
+asset repair and this result note after the gate head; independent review
+must retain the original-failure and bounded-completion distinction.
 The isolated rehearsal deployment, Hugh's three-browser rehearsal,
 checker full review, sealed landing, and Counter redeployment remain
 owed. No new hosting, native count, or audio outcome is claimed.
