@@ -1,0 +1,1521 @@
+{
+  "visibility": "PUBLIC bounded projection",
+  "observedAt": "2026-10-12T14:34:29.869Z",
+  "sourceHead": "459ccf9244a66544f96c21bd56fefbcdc70dbc4a",
+  "origin": "https://artroom-counting.inguz.workers.dev",
+  "deployment": "artroom-counting-v1",
+  "scope": {
+    "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+    "kind": "lane",
+    "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+  },
+  "membership": {
+    "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+    "kind": "membership",
+    "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+  },
+  "definition": "sha256:b55824346382d9b158be4cadd9d098008f8129147fba772537778e2f738d5271",
+  "at": {
+    "hash": "sha256:3bf5a0a93440071b3c728fe7a7dd271b4ba5afa56688077396ea6bdf43cf945a",
+    "seq": 123
+  },
+  "complete": true,
+  "board": {
+    "id": 2,
+    "revision": 108,
+    "state": "finished",
+    "target": 10,
+    "generation": 3,
+    "serial": 10,
+    "lastNumber": 10,
+    "lastSpeaker": {
+      "member": "@counting-one",
+      "membership": {
+        "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+        "kind": "membership",
+        "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+      }
+    },
+    "pledge": null,
+    "lastFulfilledAt": 123,
+    "number": null,
+    "speaker": null,
+    "until": null
+  },
+  "participants": [
+    {
+      "id": 3,
+      "revision": 4,
+      "member": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      },
+      "state": "active"
+    },
+    {
+      "id": 5,
+      "revision": 3,
+      "member": {
+        "member": "@counting-two",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      },
+      "state": "inactive"
+    },
+    {
+      "id": 7,
+      "revision": 3,
+      "member": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      },
+      "state": "inactive"
+    }
+  ],
+  "pledge": null,
+  "pendingPromise": null,
+  "controller": {
+    "member": "@counter-controller",
+    "membership": {
+      "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+      "kind": "membership",
+      "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+    }
+  },
+  "historyEntries": 124,
+  "historyHashChainVerified": true,
+  "timeline": [
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 103,
+        "hash": "sha256:27c944859aba083807a41bc2d6ff43edbeef133f2a75bccb343264574a9f014e"
+      },
+      "time": "2026-10-12T00:43:45.256Z",
+      "inputType": "act",
+      "kind": "start",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counter-controller"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:9022f478fbce25a79065f0325e211961030166616459b854fbf83e5aee0c455b",
+      "stateEffects": [
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 104,
+        "hash": "sha256:86207455c2ec1e26919f0b89e50807e3627cc0ee0ec592ad0580344538e09bab"
+      },
+      "time": "2026-10-12T00:43:45.455Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:f18262ffa4b540f6761ca4c86a390218c0e3b675f84034e50822013b5d476887",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 104,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 105,
+        "hash": "sha256:e987bc7de72c414aad2c3f398e46d29217fbe71709d70c48436a7a5b5f824fd4"
+      },
+      "time": "2026-10-12T00:43:46.559Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:cf0d8e4ba169cc717fa912c548f9eb6e61b57cb79afc73a45ac7e0f95e462931",
+      "stateEffects": [
+        {
+          "item": 104,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 106,
+        "hash": "sha256:bf6b681cc9cec808803fba3ed77029d5e9d14a80a620bd78a691bd43d4501682"
+      },
+      "time": "2026-10-12T00:43:46.902Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:c8732e592dfeb77b023a2d75f0e65ce2f10d9e06c8317ed1cb90073ae578b8c4",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 106,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 107,
+        "hash": "sha256:2cd2a7bc669fb31a45edbef87a50875091bc025fe25d1866af07827483c91dcb"
+      },
+      "time": "2026-10-12T00:43:47.933Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:905a2001c8dfb4c98beff958d36c84a8f2130b05e323dd296805bdda118b4c8f",
+      "stateEffects": [
+        {
+          "item": 106,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 108,
+        "hash": "sha256:80d68fd3337512249bbeb998107cd4f9cc34675e45c92da33be611dd5ad863ab"
+      },
+      "time": "2026-10-12T00:43:48.225Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:badec8c759e33f78053e80864b19e6924bcb665787f004e26d446580fd5d06c5",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 108,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 109,
+        "hash": "sha256:ad6c88ff651119be3a134e156982caf9336c0a3671b4da7b1701b44859d6e1aa"
+      },
+      "time": "2026-10-12T00:43:49.329Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:be68348843753834b43c8d9cbe95c48b2ca9e00d817cd015ad7b10f3946e01ad",
+      "stateEffects": [
+        {
+          "item": 108,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 110,
+        "hash": "sha256:ea1e82c80635dbdbf195ca672e1dd5c6aaa3cc5def5b90d255e03d7f5241477e"
+      },
+      "time": "2026-10-12T00:43:49.620Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:44c67c4764d63fa13164ef9db076d153148eaea633c78d27c509be46cae0e9e9",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 110,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 111,
+        "hash": "sha256:4b18a800fe386b364a9dd3ca93bdb8dc0f140e18adcf729838a258dd6ff724b6"
+      },
+      "time": "2026-10-12T00:43:50.703Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:16736a465d2d8fbf23b60d4e56d9c57566bdafaf503e534870418f787271059e",
+      "stateEffects": [
+        {
+          "item": 110,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 112,
+        "hash": "sha256:d4c924412c625a32cabddb4e9f5631e2cf2c59a0f75d589f5b723c576ef1fcc7"
+      },
+      "time": "2026-10-12T00:43:50.990Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:499076ee1c6760cacbdf3ce46cb01530a6fd3a9ae418c9d8b79ae1fa9c329320",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 112,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 113,
+        "hash": "sha256:67a7ba3eab4e50205b5052f84ae2a9ed4632f4d8bd0f1628932e5d373e47a738"
+      },
+      "time": "2026-10-12T00:43:52.132Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:a552aa23fb20a1daa2afb2c27f8e841fac0c2873c4afd56870e56f828175d9e0",
+      "stateEffects": [
+        {
+          "item": 112,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 114,
+        "hash": "sha256:5005a1e2f9ff3db24d1c71db52a1d425ab73125c0a612993cc74f0d16b6bc195"
+      },
+      "time": "2026-10-12T00:43:52.418Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:3eb30cf403ef61b5acd18d106cb58ea279e0ce320f28cd32512da737b4e36f1b",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 114,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 115,
+        "hash": "sha256:3518ea6635a8afed18cc5a93bd56748c29d2b77223aa7b8720dc8ef0a39a9201"
+      },
+      "time": "2026-10-12T00:43:53.632Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:76501a2038554129a5c9d158dc0ab22dbc87b4f48f59f0c3ee33e247f2e220c5",
+      "stateEffects": [
+        {
+          "item": 114,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 116,
+        "hash": "sha256:1181e9ed91d539c7051727f6dacefd5d72dbf7596aafec922279f4ca35092423"
+      },
+      "time": "2026-10-12T00:43:53.923Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:c0934e4fb263e92679a36dee6f21f00542770f0fe077bca939cd55dadbf6f7bd",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 116,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 117,
+        "hash": "sha256:357f4f7118ca6cec0559b1775a8d6f0099c81e513ae2f6507fbbfeb1ddb2e1e9"
+      },
+      "time": "2026-10-12T00:43:55.099Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:08e296636b11e5e14c7236f8fa8c61ea600f55a00745b94ba343823f2f38e531",
+      "stateEffects": [
+        {
+          "item": 116,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 118,
+        "hash": "sha256:365bbb259b43f1fbfe9394412b7d3def5f05dd7b21b7f36e5997059daf14bb2a"
+      },
+      "time": "2026-10-12T00:43:55.371Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:39f4339ca847d5941d1734342118bbf2458dd606cb6b271e960cf87857bea2c7",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 118,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 119,
+        "hash": "sha256:06e9fb3d1e23376f98ceff6524f72dba18cc543fc306a8a78a7feb8aac6e6af1"
+      },
+      "time": "2026-10-12T00:43:56.385Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:642ff66b4fc31c815053d82f2c36accbf32af70cb8df8d33a311723a53b905e2",
+      "stateEffects": [
+        {
+          "item": 118,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 120,
+        "hash": "sha256:b508c851dd3ad4cc50f45d3b185343b276ebc0505e424e3a4915619b5d2257e9"
+      },
+      "time": "2026-10-12T00:43:56.674Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:392b1a7d17cc5dc99c18a2a05c61042149029ff2f917bd17444497bd6ba34f69",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 120,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 121,
+        "hash": "sha256:29a4c6b738d7bd74888c91b3fc150141a407b34c190f36a9ff2487c319475b54"
+      },
+      "time": "2026-10-12T00:43:57.802Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:e8d8e47f39036fe7402438e1226ecec9b984294aad6b52937b796dd937f611d6",
+      "stateEffects": [
+        {
+          "item": 120,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "open"
+        }
+      ],
+      "openedItems": []
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 122,
+        "hash": "sha256:f4d5df3f837097e906a6acbe259579e3501980d093d485552acada7e21f3d1f1"
+      },
+      "time": "2026-10-12T00:43:58.102Z",
+      "inputType": "act",
+      "kind": "commit",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:525c6daa9f41ebdfe77e5f4e59e9c180b1c145db62b54258c9f84f6c1efc9d81",
+      "stateEffects": [],
+      "openedItems": [
+        {
+          "item": 122,
+          "type": "promise"
+        }
+      ]
+    },
+    {
+      "fact": {
+        "at": {
+          "inc": "in_v7pta2julcwaulf2fqh4wtfrsa",
+          "kind": "lane",
+          "scope": "sc_ejxcnvalwtu4ddigkaz5rx243dkp3bkci3j4ww6tztqk5zhwmnca"
+        },
+        "seq": 123,
+        "hash": "sha256:3bf5a0a93440071b3c728fe7a7dd271b4ba5afa56688077396ea6bdf43cf945a"
+      },
+      "time": "2026-10-12T00:43:59.198Z",
+      "inputType": "act",
+      "kind": "fulfill",
+      "acceptedActor": {
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        },
+        "member": "@counting-one"
+      },
+      "signatureVerified": true,
+      "retainedAuthorityMatchesActor": true,
+      "intent": "sha256:d6b61b2d5117bafd5b7fa14989d1e5c9c088f9e9337423175974723ac55efa5d",
+      "stateEffects": [
+        {
+          "item": 122,
+          "state": "fulfilled"
+        },
+        {
+          "item": 2,
+          "state": "finished"
+        }
+      ],
+      "openedItems": []
+    }
+  ],
+  "retainedPromises": [
+    {
+      "id": 10,
+      "state": "expired",
+      "revision": 2,
+      "n": 1,
+      "generation": 0,
+      "serial": 1,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "state": "expired",
+      "revision": 2,
+      "n": 1,
+      "generation": 0,
+      "serial": 2,
+      "agent": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "state": "expired",
+      "revision": 2,
+      "n": 1,
+      "generation": 0,
+      "serial": 3,
+      "agent": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 1,
+      "generation": 0,
+      "serial": 4,
+      "agent": {
+        "member": "@counting-two",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 2,
+      "generation": 0,
+      "serial": 5,
+      "agent": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 3,
+      "generation": 0,
+      "serial": 6,
+      "agent": {
+        "member": "@counting-two",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 4,
+      "generation": 0,
+      "serial": 7,
+      "agent": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 5,
+      "generation": 0,
+      "serial": 8,
+      "agent": {
+        "member": "@counting-two",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "state": "expired",
+      "revision": 2,
+      "n": 6,
+      "generation": 0,
+      "serial": 9,
+      "agent": {
+        "member": "@counting-three",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 6,
+      "generation": 0,
+      "serial": 10,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 48,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 7,
+      "generation": 0,
+      "serial": 11,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 52,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 8,
+      "generation": 0,
+      "serial": 12,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 54,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 9,
+      "generation": 0,
+      "serial": 13,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 56,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 10,
+      "generation": 0,
+      "serial": 14,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 60,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 1,
+      "generation": 1,
+      "serial": 1,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 62,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 2,
+      "generation": 1,
+      "serial": 2,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 64,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 3,
+      "generation": 1,
+      "serial": 3,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 66,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 4,
+      "generation": 1,
+      "serial": 4,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 68,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 5,
+      "generation": 1,
+      "serial": 5,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 70,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 6,
+      "generation": 1,
+      "serial": 6,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 72,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 7,
+      "generation": 1,
+      "serial": 7,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 74,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 8,
+      "generation": 1,
+      "serial": 8,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 76,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 9,
+      "generation": 1,
+      "serial": 9,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 78,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 10,
+      "generation": 1,
+      "serial": 10,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 82,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 1,
+      "generation": 2,
+      "serial": 1,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 84,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 2,
+      "generation": 2,
+      "serial": 2,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 86,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 3,
+      "generation": 2,
+      "serial": 3,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 88,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 4,
+      "generation": 2,
+      "serial": 4,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 90,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 5,
+      "generation": 2,
+      "serial": 5,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 92,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 6,
+      "generation": 2,
+      "serial": 6,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 94,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 7,
+      "generation": 2,
+      "serial": 7,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 96,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 8,
+      "generation": 2,
+      "serial": 8,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 98,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 9,
+      "generation": 2,
+      "serial": 9,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 100,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 10,
+      "generation": 2,
+      "serial": 10,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 104,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 1,
+      "generation": 3,
+      "serial": 1,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 106,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 2,
+      "generation": 3,
+      "serial": 2,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 108,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 3,
+      "generation": 3,
+      "serial": 3,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 110,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 4,
+      "generation": 3,
+      "serial": 4,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 112,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 5,
+      "generation": 3,
+      "serial": 5,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 114,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 6,
+      "generation": 3,
+      "serial": 6,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 116,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 7,
+      "generation": 3,
+      "serial": 7,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 118,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 8,
+      "generation": 3,
+      "serial": 8,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 120,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 9,
+      "generation": 3,
+      "serial": 9,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    },
+    {
+      "id": 122,
+      "state": "fulfilled",
+      "revision": 2,
+      "n": 10,
+      "generation": 3,
+      "serial": 10,
+      "agent": {
+        "member": "@counting-one",
+        "membership": {
+          "inc": "in_vdhtpyrw4pknhm7b27gxd4cn3i",
+          "kind": "membership",
+          "scope": "sc_2enkts3vuq64woelfhewjvplo5ya3emvp6mbosva7rh6ow6yyita"
+        }
+      }
+    }
+  ],
+  "readSessionIssuance": 1,
+  "mutationPosts": 0,
+  "qualification": "Signature/hash/address and retained native grant subject/key verified. Current grant authority not independently replayed. No act, speech, browser action, provider mutation or inferred HTTP refusal reason. Old head 16 not assumed; lost profiles leave old browser custody unavailable."
+}
