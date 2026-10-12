@@ -5,14 +5,14 @@ A programmable coordination fabric for people and agents.
 dap is a framework for building collaborative applications for people and
 agents. A scope is an actor that holds an ordered record and judges signed
 acts against its definition, and an application is a set of definitions.
-This page explains what the framework does, the actor model it is
-built on, and the three applications built with it.
+This page explains what the framework does, the actor model it is built
+on, and the three applications built with it.
 
 ## A framework for shared work with a record
 
-Collaborative work needs three things that ordinary application code
-mixes together: rules about who may do what, a record of what was done,
-and a way for someone else to check that record. dap separates them.
+Collaborative work needs three things: rules about who may do what, a
+record of what was done, and a way for someone else to check that record.
+dap keeps the three apart.
 
 An application states its rules as data, in **definitions**. dap supplies
 the rest: a runtime that judges each request against those definitions,
@@ -51,6 +51,8 @@ one of these:
 - The scope answers that it is unavailable. That answer confirms nothing,
   so the caller keeps the signed intent and checks the record before
   signing anything new.
+- The scope answers `mismatch` when the same key already used the
+  intent's idempotency key for a different intent.
 
 The current state is the fold of the entries. Nothing else is state. So a
 verifier that has the entries, the definition and the inputs the scope
@@ -87,7 +89,7 @@ pages are in [apps/room/docs](../apps/room/docs), starting with
 [Join a room and publish one text change](../apps/room/docs/first-change.md).
 
 **dap-counter** keeps a shared count. Participants join a board, commit
-to say the next number, and speak it. The scope checks every proposal:
+to say the next number, and speak it aloud. The scope checks every proposal:
 the full roster, the arithmetic and whose turn it is. The source is in
 [examples/counting](../examples/counting). The tutorial
 [Build a counter](build-a-counter.md) builds a smaller version of its
@@ -135,6 +137,6 @@ Written against main `d309b6b9`. Sources:
 [the judges](../packages/derive/src/index.ts),
 [the Counter definition](../examples/counting/definition.ts), and
 [the jam room design](../notes/2026-10-01-jam-room.md). This page claims
-no run. Independent review and acceptance of this
-version are owed. The [ledger](../apps/room/docs/ledger.md) keeps the
-review history of the earlier version.
+no run. Independent review and acceptance of this version are owed. The
+[ledger](../apps/room/docs/ledger.md) keeps the review history of the
+earlier version.

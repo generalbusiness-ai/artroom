@@ -34,8 +34,11 @@ A definition is a JSON value, not code. It declares:
 - named rules, which are restricted expressions that a guard evaluates.
 
 Because the definition is data, one runtime runs every application. The
-room's issue lane, the Counter's board and a membership scope differ only
-in the definitions they pin. A change to a definition makes a new
+room's issue lane and the Counter's board differ only in the definitions
+they pin. The platform's own definitions, such as membership and the
+destination, are data with marks whose rules are code in
+`packages/platform`. A verifier needs that code too, and its report
+lists it under what it trusts. A change to a definition makes a new
 definition with a new digest. Scopes created under the old one keep it.
 [Write an application](write-an-application.md) shows how to declare one.
 
@@ -86,10 +89,9 @@ gets. `applyEntry` is the only code that changes state.
 
 The runtime calls these functions inside the commit. The verifier calls
 the same functions on the stored history. That choice is the heart of the
-design. Because the runtime and the verifier share the code that judges,
-and nothing else, a replay that matches is evidence that each entry
-followed from its input under the pinned definition. It is not a second
-implementation that might disagree in small ways.
+design. The runtime and the verifier share `dap-derive` and nothing else,
+so a replay that matches shows that each entry followed from its input
+under the pinned definition, by the same code that judged it.
 
 ## Scopes compose by delivery
 
@@ -149,7 +151,8 @@ dap keeps the record in three places, each with a different job.
 **The scope's own storage.** Each scope is one Durable Object. Its
 entries, sends, retained inputs and folded items are written in one
 storage transaction per turn. This is the authority for the scope's
-order. It is also the only copy until something else reads it.
+order. Nothing outside the service holds the history until a reader
+copies it.
 
 **Publication to a Git host.** A dap-room destination publishes
 repository content to a Git host: GitHub, or Cloudflare Artifacts. For
@@ -157,9 +160,8 @@ the first head and for each publication it also writes a receipt
 commit with one file, `receipt.json`. The file names the destination's
 entry, the operation and the published commit. Its ref is
 `refs/artroom/receipts/<hash>`, named by the hash of the entry that
-opened the operation. The published
-repository and its receipts outlive the service, and anyone who can
-clone the repository can read them. This publication covers the
+opened the operation. The published repository and its receipts outlive
+the service, and anyone who can clone the repository can read them. This publication covers the
 repository's content and the receipts, not the full history of every
 scope.
 
@@ -235,6 +237,6 @@ Written against main `d309b6b9`. Sources:
 [destination objects](../packages/platform/src/destination-objects.ts),
 [replay](../packages/replay/README.md), and
 [platform versions](../packages/platform/src/index.ts). This page claims
-no run. Independent review and acceptance of this
-version are owed. The [ledger](../apps/room/docs/ledger.md) keeps the
-review history of the earlier version.
+no run. Independent review and acceptance of this version are owed. The
+[ledger](../apps/room/docs/ledger.md) keeps the review history of the
+earlier version.
