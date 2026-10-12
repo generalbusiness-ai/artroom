@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c6fd14756c547789f61895482422cda4602500c5"}
+{"kind":"artifact","text":"examples/counting/browser-build/counting.css at exact 6a1d7f876ad0ba930f7a72c01316e5dc3c7e4e0c on request/counter-demo-complete, under promise git:sha1…e944498 on request git:sha1…64bbeda","body":{"commit":"6a1d7f876ad0ba930f7a72c01316e5dc3c7e4e0c","path":"examples/counting/browser-build/counting.css"}}
