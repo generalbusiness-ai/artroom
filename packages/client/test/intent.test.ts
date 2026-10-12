@@ -1,7 +1,22 @@
 import { expect, test, vi } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { LATE, MAX_DEPTH, isFieldValue, publicKeyOf, takeBytes, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
+import { LATE, MAX_DEPTH, canonicalize, isFieldValue, newIncarnation, publicKeyOf, scopeIdOf, takeBytes, textDigest, verifySessionRequest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { ScopeHandle, TransportError, bindingTransport, found, httpTransport, signedIntent, signerSessionRequest, webCryptoSigner, type ServiceBinding, type Transport } from "../src/index.ts";
+
+test("an asynchronous session signer keeps the original membership request and its session domain while caller data changes", async () => {
+  const signer = await webCryptoSigner();
+  const to = { scope: scopeIdOf({ v: 1, kind: "membership", definition: "platform:membership@5", creator: null, cause: textDigest("TEST session signer"), ordinal: 0 }), kind: "membership" as const, inc: newIncarnation(new Uint8Array(16).fill(1)) };
+  const original = structuredClone(to);
+  let release!: () => void;
+  const waiting = new Promise<void>(resolve => { release = resolve; });
+  const result = signerSessionRequest(to, { key: signer.key, sign: async bytes => { await waiting; return signer.sign(bytes); } }, "2026-10-12T00:01:00Z", "TEST operation");
+  to.inc = newIncarnation(new Uint8Array(16).fill(2));
+  release();
+  const signed = await result;
+  expect(verifySessionRequest(signed)).toBe(true);
+  expect(canonicalize(signed.request.to)).toBe(canonicalize(original));
+  expect(signed.request.actor).toBe(signer.key);
+});
 
 test("an intent signed by a WebCrypto key that cannot be read is one the bytes package verifies; each intent has a fresh idempotency key and a notAfter within the lifetime bound", async () => {
   const signer = await webCryptoSigner();

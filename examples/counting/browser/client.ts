@@ -1,7 +1,7 @@
 /** Actual SDK adapter. Bootstrap/enrollment belongs to F1/C4, never this stage. */
 import type { Receipt, Summary } from "@generalbusiness/artroom-contract";
-import { b64url, canonicalize, intentDigest, keyIdOfSecret, isRecord, timeOf } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHeadStream, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, type Fetch, type HeadStreamFetch, type Observation, type ObservationState, type Session } from "@generalbusiness/artroom-client";
+import { b64url, canonicalize, intentDigest, isRecord, timeOf } from "@generalbusiness/artroom-bytes";
+import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHeadStream, requestSession, signerSessionRequest, shapeDeclaredAct, signedIntent, type Fetch, type HeadStreamFetch, type Observation, type ObservationState, type Session, type Signer } from "@generalbusiness/artroom-client";
 import { countingCommitments as counting } from "../commitments.ts";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { assignedTurn, countingView, ownedParticipant, proposal, same, type Control, type ProposalOptions, type CountingView } from "./model.ts";
@@ -23,12 +23,11 @@ export interface StageGateway extends Reporter {
   restoreCommand():Promise<void>;
   dispose():void;
 }
-export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options:{current():boolean;lock:CustodyLock;voiceStore:PendingStore;commandStore:CommandStore;fetch?:Fetch;headFetch?:HeadStreamFetch;actFetch?:TrustedActFetch}):StageGateway {
+export function nativeGateway(configured:ActorIdentity,signer:Signer,options:{current():boolean;lock:CustodyLock;voiceStore:PendingStore;commandStore:CommandStore;fetch?:Fetch;headFetch?:HeadStreamFetch;actFetch?:TrustedActFetch}):StageGateway {
   const identity=JSON.parse(JSON.stringify(configured)) as ActorIdentity;
   const origin=new URL(identity.origin);if(origin.origin!==identity.origin||origin.pathname!=="/"||origin.search||origin.hash||origin.username||origin.password||!["https:","http:"].includes(origin.protocol))throw new Error("The configured service must be an exact trusted origin.");
-  if(identity.definition!==COUNTING_DEFINITION||keyIdOfSecret(secret)!==identity.publicKey||!same(identity.member.membership,identity.membership))throw new Error("This enrolled device does not match the configured counting identity.");
-  // Copies stay in this device's closure; no key/token reaches a URL or view.
-  const ownSecret=Uint8Array.from(secret),signer=secretSigner(ownSecret);
+  if(identity.definition!==COUNTING_DEFINITION||signer.key!==identity.publicKey||!same(identity.member.membership,identity.membership))throw new Error("This enrolled device does not match the configured counting identity.");
+  // The signer holds a browser key capability; no seed or token reaches a URL or view.
   const lifetime=new AbortController();let alive=true;
   const transport=httpTransport(identity.origin,{fetch:options.fetch??((url,init)=>fetch(url,{...init,redirect:"error",signal:init?.signal?AbortSignal.any([init.signal,lifetime.signal]):lifetime.signal}))});
   let session:Session|null=null,view:CountingView|undefined,observer:Observation|undefined,pending:string|null=null,fresh=false,commandPrepared=false;
@@ -84,7 +83,7 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
   return{
     observe(emit){
       observer=observeScope<Summary>({context:{origin:identity.origin,deployment:identity.deployment,scope:identity.scope,definition:identity.definition,membership:identity.membership,member:identity.member.member,key:identity.publicKey},current:usable,
-        authenticate:async()=>{const answer=await requestSession(identity.origin,identity.membership.scope,sessionRequest(identity.membership,ownSecret,timeOf(Date.now()+60_000),b64url(crypto.getRandomValues(new Uint8Array(16)))),options.fetch?{fetch:options.fetch}:{});if(answer.ok)session=answer.session;return answer.ok?{ok:true,session:answer.session}:answer;},
+        authenticate:async()=>{current();const signed=await signerSessionRequest(identity.membership,signer,timeOf(Date.now()+60_000),b64url(crypto.getRandomValues(new Uint8Array(16))));current();const answer=await requestSession(identity.origin,identity.membership.scope,signed,options.fetch?{fetch:options.fetch}:{});current();if(answer.ok)session=answer.session;return answer.ok?{ok:true,session:answer.session}:answer;},
         snapshot:async next=>{session=next;return completeSummary(await handle().summary());},
         open:(next,signal)=>openHttpHeadStream(identity.origin,identity.scope,next,signal,options.headFetch?{fetch:options.headFetch}:{}),
         emit:state=>{if(!usable())return;fresh=state.status==="current";if(fresh&&state.status==="current"){try{view=countingView(state.snapshot.value,identity.scope);}catch{view=undefined;fresh=false;emit({status:"error",reason:"The counting snapshot is invalid."});return;}}emit(state,view);},
@@ -107,6 +106,6 @@ export function nativeGateway(configured:ActorIdentity,secret:Uint8Array,options
     commandResumeReady:()=>usable()&&fresh&&commandPrepared,
     pendingCommand:()=>pending,
     async restoreCommand(){const held=await options.commandStore.load();current();retainCommandPresence(held);},
-    dispose(){alive=false;lifetime.abort();observer?.cancel();session=null;view=undefined;ownSecret.fill(0);},
+    dispose(){alive=false;lifetime.abort();observer?.cancel();session=null;view=undefined;},
   };
 }

@@ -2,7 +2,7 @@
 import "./style.css";
 import type { Entry, Item, MemberRef, Receipt, ScopeRef, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
-import type { Fetch, HeadStreamFetch } from "@generalbusiness/artroom-client";
+import { secretSigner, type Fetch, type HeadStreamFetch } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { nativeGateway } from "./client.ts";
 import { mountCountingStage } from "./app.ts";
@@ -48,10 +48,10 @@ const fakeFetch:Fetch=async(url,init)=>{
 };
 const fakeHeads:HeadStreamFetch=async(url,init)=>{if(init.redirect!=="error")throw new Error("Fake metadata contract requires redirect refusal.");const body=new ReadableStream<Uint8Array>({start(controller){heads.add(controller);controller.enqueue(new TextEncoder().encode(JSON.stringify({at:head()})+"\n"));},cancel(){for(const c of heads)try{c.close();}catch{}heads.clear();}});return{status:200,body,headers:new Headers({"content-type":"application/x-ndjson"}),url,redirected:false};};
 let plays=0,cancels=0,callbacks:{end():void;error():void}|undefined;
-const speech:SpeechPort={voices:()=>[{id:"fake-1",name:"Voice 1"},{id:"fake-2",name:"Voice 2"},{id:"fake-3",name:"Voice 3"}],play:(_text,_id,events)=>{plays++;callbacks=events;return()=>{cancels++;};}};
+const speech:SpeechPort={voices:()=>[{id:"fake-1",name:"Fake voice 1 · en-US"},{id:"fake-2",name:"Fake voice 2 · en-US"},{id:"fake-3",name:"Fake voice 3 · en-US"}],play:(_text,_id,events)=>{plays++;callbacks=events;return()=>{cancels++;};}};
 const identity:ActorIdentity={origin:ORIGIN,deployment:DEPLOYMENT,scope:S,definition:COUNTING_DEFINITION,membership:M,member:members[0]!,publicKey:keyIdOfSecret(keys[0]!)};
-const store=privatePendingStore(identity),lock=browserLock(identity),commands=privateCommandStore(identity),gateway=nativeGateway(identity,keys[0]!,{current:()=>active,lock,voiceStore:store,commandStore:commands,fetch:fakeFetch,headFetch:fakeHeads,actFetch:async(url,init)=>{const response=await fakeFetch(url,{...init,signal:init.signal as never});return{status:response.status,body:response.body,headers:new Headers({"content-type":"application/json"}),url,redirected:false};}});
+const store=privatePendingStore(identity),lock=browserLock(identity),commands=privateCommandStore(identity),gateway=nativeGateway(identity,secretSigner(keys[0]!),{current:()=>active,lock,voiceStore:store,commandStore:commands,fetch:fakeFetch,headFetch:fakeHeads,actFetch:async(url,init)=>{const response=await fakeFetch(url,{...init,signal:init.signal as never});return{status:response.status,body:response.body,headers:new Headers({"content-type":"application/json"}),url,redirected:false};}});
 const app=mountCountingStage(document.querySelector<HTMLElement>("#counting")!,{speech,connect:()=>{},fake:true,now:()=>NOW});
-void app.attach({identity,speech,gateway,store,lock,current:()=>active,dispose:()=>{active=false;}});
+void app.attach({identity,name:"Ada",speech,gateway,store,lock,current:()=>active,dispose:()=>{active=false;}});
 // Public test hooks expose only events/counters, never credentials/envelopes.
 Object.assign(window,{countingPreview:{end(){callbacks?.end();},error(){callbacks?.error();},loseNextReply(){lost=true;},counters(){return{plays,cancels,posts,settles,number:board.values["lastNumber"]};},staleEnd(){callbacks?.end();}}});

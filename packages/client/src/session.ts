@@ -24,8 +24,10 @@
  * (I5), by the proof plan's key O12.
  */
 
+import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
+import type { Signer } from "./intent.ts";
 import type { ScopeId, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SessionRequest, SignedSessionRequest, Timestamp } from "@generalbusiness/artroom-contract";
-import { LATE, isKeyId, isMemberId, keyIdOfSecret, signSessionRequest, takeBytes, timeMs, within } from "@generalbusiness/artroom-bytes";
+import { canonicalBytes, parseStrictBytes, taggedBytes, LATE, isKeyId, isMemberId, keyIdOfSecret, signSessionRequest, takeBytes, timeMs, within } from "@generalbusiness/artroom-bytes";
 import { TransportError } from "./handle.ts";
 import { REPLY_SECONDS, type Fetch } from "./http.ts";
 
@@ -33,6 +35,12 @@ import { REPLY_SECONDS, type Fetch } from "./http.ts";
 export function sessionRequest(to: ScopeRef, secret: Uint8Array, notAfter: Timestamp, operation: string): SignedSessionRequest {
   const request: SessionRequest = { v: 1, to, actor: keyIdOfSecret(secret), action: "read-session", operation, notAfter };
   return signSessionRequest(request, secret);
+}
+
+/** Sign a detached read-session request through an asynchronous device signer. */
+export async function signerSessionRequest(to: ScopeRef, signer: Signer, notAfter: Timestamp, operation: string): Promise<SignedSessionRequest> {
+  const request = parseStrictBytes(canonicalBytes({ v: 1, to, actor: signer.key, action: "read-session", operation, notAfter } satisfies SessionRequest)) as SessionRequest;
+  return { request, sig: await signer.sign(taggedBytes(SESSION_DOMAINS.request, canonicalBytes(request))) };
 }
 
 /** A read session in memory. */
