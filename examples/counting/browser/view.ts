@@ -102,8 +102,9 @@ export function stageView(root:HTMLElement,actions:StageActions,speech:SpeechPor
     joinOwn.hidden=!!p.joined;joinOwn.disabled=blocked||!available;joinOwn.textContent=p.joinBusy?"Joining…":"Join room";leave.hidden=!p.joined;leave.disabled=!!p.joinBusy||!!p.commandBusy;
     changeIdentity.disabled=!!p.joinBusy||!!p.commandBusy;forget.disabled=!!p.joinBusy||!!p.commandBusy;
     record.textContent=b?`Last recorded: ${b.lastNumber}${b.lastSpeaker?` · ${b.lastSpeaker.member}`:""}. Generation ${b.generation}, turn ${b.serial}.`:p.fresh&&p.view?"Counting has not started.":"No current counting record is loaded.";
+    inspection.hidden=!p.identity;
     definition.textContent=p.identity?`counting-commitments · ${p.identity.definition}. The room records each promise and completion.`:"";
-    disconnect.hidden=!p.identity;forget.hidden=!actions.forget;fail.hidden=!p.view?.pledge||!same(p.view.pledge.member,p.identity?.member);fail.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
+    disconnect.hidden=!p.identity;forget.hidden=!p.identity||!actions.forget;fail.hidden=!p.view?.pledge||!same(p.view.pledge.member,p.identity?.member);fail.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
     cancel.hidden=!isController||!p.view?.pledge;cancel.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
     checkCommand.hidden=!p.commandUnknown;checkReport.hidden=!p.identity||!pending;checkReport.disabled=p.voice?.phase==="reporting";
     updateReport.hidden=!p.identity||pending!=="refused";updateReport.disabled=!p.fresh||!p.voice?.correctionReady;
