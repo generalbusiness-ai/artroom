@@ -1,6 +1,6 @@
 # Observability for dap: a design
 
-2026-10-12. Draft 5, for checker review. Hugh's direction, 2026-10-12 17:36
+2026-10-12. Draft 6, for checker review. Hugh's direction, 2026-10-12 17:36
 Eastern: draft a dated design in `notes/`, send it to the checker, and tell
 the planner that it is to be prioritized soon after the demo. Written
 against main `013fac7a5`. Draft 1 (`baa0e21e`) received changes requested
@@ -9,7 +9,9 @@ answered them, and section 9 maps them. Review `efc3882d` requested five
 more; Draft 3 (`c45ef0c2`) answered them, and section 10 maps them.
 Review `5f3673c6` requested three more; Draft 4 (`0ea94184`) answered
 them, and section 11 maps them. Review `435c67c9` requested two more;
-Draft 5 answers them, and section 12 maps them.
+Draft 5 (`27fbdfd2`) answered them, and section 12 maps them. Review
+`7c09200c` asked for two consistency repairs; Draft 6 makes them, and
+section 13 maps them.
 
 ## 1. What this note decides
 
@@ -117,18 +119,23 @@ a count of the things its kind names, never a rate.
 | blob 8 | trace ID | 32 lowercase hexadecimal characters from a validated `traceparent`; `mixed` for a merged row whose traces differed; `none` |
 | blob 9 | answer | for a `turn` whose end is `answer` and whose input was a public act, preparation or founding: the public answer, `accepted`, `refused`, `unavailable` or `mismatch`; for a `turn` whose end is `answer` but whose input was internal (a give-up diagnosis run through `turns.run` by `outbox.ts:179-197`, or any other turn with no public answer): `none`; `mixed` for a merged row whose answers differed; for a `route`: `turn` when a turn ran for the request, `pre-turn` when the route answered before any turn (section 4.7); otherwise `none` |
 | double 1 | multiplicity | how many underlying events this row stands for: 1 for an unmerged row, the merged count for an aggregated `turn` row (below); the platform's own `_sample_interval` is a separate column read at query time, and the two multiply |
-| double 2 | duration in milliseconds | the route's or the turn's wall time, or 0 |
+| double 2 | duration in milliseconds, or the loss bitmask | for every kind but `metric-dropped`: the route's or the turn's wall time, or 0; for the one `metric-dropped` summary row: the bitmask of loss reasons present, 0 to 31 |
 | double 3 | count a | per kind, below |
 | double 4 | count b | per kind, below |
 | double 5 | count c | per kind, below |
-| double 6 | flag count | how many of the row's underlying events had the flag: 0 or 1 for an unmerged row, 0 to the multiplicity for a merged one |
+| double 6 | flag count, or groups merged | for every kind but `metric-dropped`: how many of the row's underlying events had the flag, 0 or 1 for an unmerged row, 0 to the multiplicity for a merged one; for the summary row: the groups merged in the invocation, 0 to 2^31 minus 1, saturating with the `overflow` bit |
+
+The validator checks every double against the domain of the row's kind,
+so the summary row's bitmask and group count are accepted for that kind
+and refused, as tainted, for any other; a summary row is built from
+constants and bounded counts and can never fail its own validation.
 
 **The kinds, their places and their slots.** Each is emitted where the
 number already exists.
 
 | Kind | Where | blob 4 | blob 5 | blob 6 | double 2 | double 3 | double 4 | double 5 | double 6 |
 |---|---|---|---|---|---|---|---|---|---|
-| `turn` | `turn.ts` at `#close` | the operation (`acts`, `preparations`, `found`, `alarm`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer`, else `none` |
+| `turn` | `turn.ts` at the exit of `run` | the operation (`acts`, `preparations`, `found`, `alarm`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer` and the input was public, else `none` |
 | `route` | `worker.ts` `route` | the route name | `ok` for a `2xx` or `3xx`, `refused` for a `4xx`, `error` for a `5xx` | the status class | wall time | 0 | 0 | 0 | 0; blob 9 `turn` or `pre-turn` |
 | `session` | `sessions.ts` | `sessions` | `issued` or `refused` | the `SessionRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
 | `signed-read` | `signed-reads.ts` | the read name | `ok` or `refused` | the `ReadRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
@@ -146,17 +153,27 @@ that the dispatcher runs through `turns.run<boolean>`, ends with `answer`
 and has no public answer, so blob 9 is `none` and blob 4 is `dispatch`.
 An `idle`, `busy`, `clock-behind` or `unavailable` end has blob 9 `none`.
 Every turn, public or internal, is one `turn` row or part of a merged
-one, because the row is emitted at the turn's closure in `turn.ts`, the
-one place every turn passes. Timed
+one, because the row is emitted at the one exit every turn has: the
+return of `run` in `turn.ts`, wrapped so that whatever `End` it returns
+is counted. That covers the ends that pass through `#close`, the end
+`#section` returns directly when the scope has no definition
+(`turn.ts:209`, which `run:188` returns as it is), and the late-rules
+path. W1 includes a missing-definition turn beside public and internal
+ones. Timed
 attempts charged (double 4) and timed entries written (double 5) are
 different numbers and are both kept.
 
-**Where a `route` row learns `turn` or `pre-turn`.** `route` in
-`worker.ts` sets blob 9 to `turn` when it obtained a Durable Object and
-the object reports that a turn ran for the request, and to `pre-turn`
-when it answered from the Worker alone; the object passes the fact back
-beside its answer as an operational flag, with no change to the answer's
-bytes. W1 asserts both values at each of the three pre-turn sites.
+**Where a `route` row learns `turn` or `pre-turn`.** The flag comes from
+execution, not inference. The `run` wrapper of `turn.ts` sets a
+per-request operational mark when it is entered; the object returns that
+mark beside its answer (over the service binding as one more member of
+the tuple it already returns, over the internal fetch as a response
+header the Worker strips), so the answer's own bytes never change. `route`
+sets blob 9 to `turn` when the mark is present and true, and to `pre-turn`
+when the Worker answered without calling the object or the object
+answered without entering `run` (a routing refusal, a wrong incarnation).
+W1 asserts both values at each of the three Worker sites and at an
+object-side early answer.
 
 **Closure.** The allowlists above are exactly the values the kinds in the
 table need, and a test (W1) emits one legitimate row of every kind with
@@ -173,8 +190,10 @@ hosted endpoint of stage 2 writes those rows to the sink under that map.
 
 **No free text, anywhere.** Every blob is checked against its allowlist or
 its exact shape before the write. A value outside its allowlist is not
-written, is not truncated and is not redacted: the event is dropped and
-one `metric-dropped` with reason `tainted` is written instead. So a secret cannot
+written, is not truncated and is not redacted: the event is dropped, the
+invocation's one summary row gains the `tainted` bit, and the row is
+counted there, with its turn and critical status when it was a `turn`. So
+a secret cannot
 reach the sink through an allowlisted field; the request and trace IDs
 are structurally validated to an exact hex shape, which bounds their form
 and not their content (section 4.4). The diagnosis redactor stays where it is, for the
@@ -295,8 +314,8 @@ trace ID or null, time, seq or null, duty or null)`.
 *Isolation.* A sidecar write is best effort and outside every native
 decision: it runs after the sealing transaction has committed and after
 the outbox row is written, in its own statement, with any SQL error
-caught, counted as a `metric-dropped` row of reason `sidecar`, and
-otherwise ignored. A failed, slow, restarted or overflowing sidecar
+caught, counted in the invocation's one summary row (the `sidecar` bit
+and the lost rows' counts), and otherwise ignored. A failed, slow, restarted or overflowing sidecar
 never rolls back, resubmits, replaces or delays an accepted entry or a
 send, and the request's answer is already decided before the write
 begins. The correlation is passed to the turn and the dispatcher as an
@@ -507,18 +526,23 @@ One builder request, after the demo, in three heads:
    table names is written unchanged, and the fallback row validates; a
    throwing binding, a slow binding and an absent binding give
    byte-identical answer bodies and deliveries, with the slow one never
-   awaited; the `tainted` drops, including a tainted `busy` turn counted as
-   critical; an alarm with more due duties than the platform cap leaves
+   awaited; tainted rows counted in the summary, including a tainted
+   `busy` turn counted as critical; an alarm with more due duties than the platform cap leaves
    sends and entries equal to a run with no sink, with every turn's end
    recoverable from merged rows, multiplicity and flag counts right, every
-   double in its domain, and the `groups` row counting the second merge; a request with and without each
+   double in its domain, and the summary's group count and `groups` bit
+   recording the second merge; one invocation with mixed losses (budget,
+   tainted, groups and a sidecar fault) and more than one group merged
+   writes exactly one valid summary row with every bit and count set,
+   within the platform's cap; a missing-definition turn is counted like
+   any other; a request with and without each
    header gets a byte-identical answer body and only the two added
    headers differ; `traceparent` cases: valid, uppercase, zero trace ID,
    zero parent ID, wrong length, fifth field, each ignored without a log
    line, and the outgoing header carries only the sampled bit;
    `tracestate` appears nowhere; a SQL fault at the entry boundary and at
    the duty boundary leaves entries, sends and answers unchanged and
-   writes one `sidecar` drop row; the sidecar fills on a sealed entry and
+   sets the `sidecar` bit and its counts in the one summary row; the sidecar fills on a sealed entry and
    a duty, expires rows older than seven days on the next write, rings at
    4,096, and `requests` is refused to a member session, refuses a
    malformed ID before reading, pages at 100 and reports its window and
@@ -606,3 +630,10 @@ checker cited them.
 |---|---|
 | 1. The aggregation schema and bounded write protocol | Section 4.2: `summary` and `aggregated` in blob 6, `mixed` in blobs 4, 7, 8 and 9, `other` for a diagnosis step outside `STEPS`; exactly one terminal row per invocation carrying every loss signal as a bitmask and counts; the 65th group triggers coarsening in a fixed order (reason, answer, place) that never crosses an end; checked sums that saturate, set `overflow` and count as critical; the generic native `End.answer` kept with blob 9 `none` for internal turns such as give-up diagnoses; W1 extended with mixed losses, group 65, coarsened values, internal turns and overflow. |
 | 2. Coverage at native turn boundaries, with a defined sampled comparison | Section 4.7: `route` rows carry `turn` or `pre-turn`, set from the object's operational flag, with the three pre-turn sites named and witnessed; the comparison counts `turn`-flagged routes against public turn multiplicity; alarm and give-up turns and paired losses are declared undetectable; the estimators are `SUM(double1 * _sample_interval)` for events and `SUM(counter * _sample_interval)` for counters, multiplicity applied once; the comparison is exact only when `MAX(_sample_interval)` is 1 and otherwise coverage is `unknown`, since the platform gives no confidence bound; a `busy` observation fails regardless; the four possible result sentences are fixed. |
+
+## 13. Draft 6 against review `7c09200c`
+
+| Correction | Where answered |
+|---|---|
+| 1. Consistent per-kind domains and witnesses for the one summary row | Section 4.2: double 2 and double 6 are defined per kind, with the summary row's bitmask and saturating group count, and the validator checks doubles by kind; every loss, tainted and sidecar included, now updates the one summary row's bits and counts, and no prose emits a per-reason terminal row; W1's witnesses updated, including mixed losses with more than one group merged in one invocation writing exactly one valid summary row within the cap. |
+| 2. The native turn exit that bypasses `#close` | Section 4.2: the row is emitted at the return of `run`, wrapped, so the missing-definition end from `#section` and the late-rules path are counted with the rest; a missing-definition witness added; the route's `turn` or `pre-turn` flag comes from a mark the `run` wrapper sets and the object returns beside its answer, with the object-side early answers covered and no answer bytes changed. |
