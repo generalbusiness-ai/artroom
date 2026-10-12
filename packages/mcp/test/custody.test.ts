@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -7,7 +7,7 @@ import type { Answer, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { signedIntent } from "@generalbusiness/artroom-client";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
-import { fileStore, releaseLock, takeLock } from "../src/node.ts";
+import { blockedBy, fileStore, releaseLock, takeLock } from "../src/node.ts";
 import { T0, accepted, build, identity, lane, notAfter, receiptOf, refused, resource, signer } from "./support/custody.ts";
 
 // The scope's answers here are scripted: `deliver` and `settle` are STAND-INs for a scope's submit and settlement. What a real
@@ -347,6 +347,30 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     expect(existsSync(path), "another holding's release leaves this lock").toBe(true);
     releaseLock(mine);
     expect(existsSync(path)).toBe(false);
+  }, 60_000);
+
+  // Invariant: a reclaimer that died inside the reclaim section leaves recovery blocked, never raced: no process enters the lock,
+  // the refusal names the reclaim file, and once an operator removes it exactly one of several processes enters.
+  test("a reclaimer that died inside the reclaim section blocks recovery until an operator clears it", async () => {
+    const { dir, custody } = setup();
+    const deadPid = async () => { const p = spawn(process.execPath, ["-e", ""]); return new Promise<number>((resolve) => p.on("exit", () => resolve(p.pid!))); };
+    const path = join(dir, "contended.lease");
+    writeFileSync(path, JSON.stringify({ pid: await deadPid(), token: "dead-owner" }));
+    writeFileSync(`${path}.reclaim`, JSON.stringify({ pid: await deadPid(), token: "dead-reclaimer" }));
+    const blocked = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));
+    expect(blocked.map((r) => r.out.trim()), blocked.map((r) => r.out).join("\n")).toEqual(["refused", "refused", "refused", "refused"]);
+    expect([takeLock(path, {}), blockedBy(path)]).toEqual([null, `${path}.reclaim`]);
+    // The same through custody: an identity whose lock is blocked so is refused as locked, naming the reclaim file.
+    mkdirSync(join(dir, "locks"), { recursive: true });
+    const lock = join(dir, "locks", `${identityId(identity("blocked"))}.lock`);
+    writeFileSync(lock, JSON.stringify({ pid: await deadPid(), token: "dead-owner" }));
+    writeFileSync(`${lock}.reclaim`, JSON.stringify({ pid: await deadPid(), token: "dead-reclaimer" }));
+    const refusal = await custody.keep(identity("blocked"), meaningOf("b"), build("blocked"), notAfter).catch((e: unknown) => e);
+    expect((refusal as CustodyError).why).toEqual({ held: "locked", stale: `${lock}.reclaim` });
+    // An operator removes the dead reclaimer's file: recovery goes on, one process at a time.
+    unlinkSync(`${path}.reclaim`);
+    const cleared = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));
+    expect(cleared.map((r) => r.out.trim()).filter((o) => o === "entered")).toHaveLength(1);
   }, 60_000);
 
   // Invariant: archival re-reads each candidate under its lock: a refusal resubmitted between selection and lock is unresolved,

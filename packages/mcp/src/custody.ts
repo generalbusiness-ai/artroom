@@ -150,7 +150,7 @@ export type HeldBack =
   | { held: "conflicting"; recorded: string }
   | { held: "full"; reason: "count"; keys: string[] }
   | { held: "full"; reason: "bytes"; bytes: number }
-  | { held: "locked" }
+  | { held: "locked"; stale?: string }
   | { held: "unreadable" }
   | { held: "too-large" };
 

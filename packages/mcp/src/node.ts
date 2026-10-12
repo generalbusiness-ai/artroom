@@ -21,7 +21,7 @@
  *   process that took it is gone.
  */
 
-import { appendFileSync, chmodSync, closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
@@ -74,24 +74,18 @@ export function releaseLock(held: Holding): void {
 }
 
 /**
- * The reclaim lock beside a lock file: whoever holds it may remove a dead owner's file. A reclaim lock left by a process that
- * died inside its short section is moved aside under a unique name, and removed only when the moved file is the dead one that
- * was read; a live one moved by mistake is put back.
+ * The reclaim lock beside a lock file: whoever holds it may remove a dead owner's file. It is taken only by exclusive creation.
+ * A reclaim lock left by a process that died inside its short section is never broken here: Node gives no way to replace a file
+ * only while it still holds the dead token that was read, and moving it aside could displace a live reclaimer. The lock it
+ * guards stays held, and `blockedBy` names the file, for an operator to remove once no process of this store runs.
  */
-function takeReclaim(path: string): Holding | null {
-  const held = create(path, {});
-  if (held) return held;
-  const seen = readHolding(path);
-  if (!seen || alive(seen.pid)) return null;
-  const aside = `${path}.${randomUUID()}.dead`;
-  try { renameSync(path, aside); } catch { return null; }
-  if (readHolding(aside)?.token !== seen.token) {
-    try { linkSync(aside, path); } catch { /* the place was taken again meanwhile */ }
-    try { unlinkSync(aside); } catch { /* gone */ }
-    return null;
-  }
-  try { unlinkSync(aside); } catch { /* gone */ }
-  return create(path, {});
+function takeReclaim(path: string): Holding | null { return create(path, {}); }
+
+/** The reclaim lock that a dead process left beside this lock file, if one blocks its recovery; null otherwise. */
+export function blockedBy(path: string): string | null {
+  const reclaim = `${path}.reclaim`;
+  const held = readHolding(reclaim);
+  return held && !alive(held.pid) ? reclaim : null;
 }
 
 /**
@@ -225,7 +219,10 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
       ensure();
       const path = lockPath(name);
       const held = takeLock(path, { time: new Date(now()).toISOString(), notAfter });
-      return held ? async () => { releaseLock(held); } : null;
+      if (held) return async () => { releaseLock(held); };
+      const stale = blockedBy(path);
+      if (stale) throw new CustodyError({ held: "locked", stale });
+      return null;
     },
     exclusive: async <T>(work: () => Promise<T>): Promise<T> => {
       ensure();
@@ -233,6 +230,8 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
       const until = Date.now() + LEASE_WAIT_MS;
       let held = takeLock(path, { time: new Date(now()).toISOString() });
       while (!held) {
+        const stale = blockedBy(path);
+        if (stale) throw new CustodyError({ held: "locked", stale });
         if (Date.now() > until) throw new CustodyError({ held: "locked" });
         await new Promise((resolve) => setTimeout(resolve, 5));
         held = takeLock(path, { time: new Date(now()).toISOString() });
