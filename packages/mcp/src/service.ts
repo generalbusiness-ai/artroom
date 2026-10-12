@@ -191,7 +191,9 @@ export class McpService {
     try {
       const generic = Object.hasOwn(this.#generic, name) ? this.#generic[name]! : null;
       if (generic && ((name !== "actions" && name !== "act") || this.mode !== "default")) return await generic.run(given);
-      const s = await this.#current();
+      // A name the list derived earlier does not hold: derive it again once, since the room may have changed since.
+      let s = await this.#current();
+      if (!s.bindings.some((b) => b.name === name)) s = await this.snapshot();
       const binding = this.mode === "generic" ? null : s.bindings.find((b) => b.name === name) ?? null;
       if (!binding) return failed({ error: "unknown-tool", name });
       return await this.#perform(binding, given, binding.kind);
