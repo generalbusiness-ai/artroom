@@ -345,3 +345,5 @@ made by the planner on the same branch:
   version (`packages/lanes/src/change.ts`).
 
 Link check rerun at this head: `node scripts/check-doc-links.mjs`.
+
+Filing note: the whole 33-path set is published once more at this head so that the review binds one head.
