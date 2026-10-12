@@ -133,7 +133,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     controls.push(input);
     const fieldLabel = field.name === "body" && act.kind === "comment" ? "Comment"
       : field.name === "body" && act.kind === "review-verdict" ? "Review comment" : labelOf(field.name);
-    const label = element("label", {}, fieldLabel, input);
+    const label = element("label", {}, field.type === "bool" && !fieldLabel.endsWith("?") ? `${fieldLabel}?` : fieldLabel, input);
     if (primary && technical.has(field.name) && !field.required) advanced.push(label);
     else form.append(label);
   }

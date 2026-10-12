@@ -281,7 +281,8 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     querySelectorAll<T=Node>(selector:string):T[]{return this.all().slice(1).filter(node=>selector.split(',').some(part=>node.selected(part))) as T[];}
     querySelector<T=Node>(selector:string):T|null{return this.querySelectorAll<T>(selector)[0]??null;}
     addEventListener(name:string,handler:(event:{preventDefault():void})=>void){this.handlers.set(name,[...this.handlers.get(name)??[],handler]);}
-    emit(name:string){for(const handler of this.handlers.get(name)??[])handler({preventDefault(){}});}
+    getBoundingClientRect(){return {left:10,top:10,right:110,bottom:110};}
+    emit(name:string, data: {target?:Node;clientX?:number;clientY?:number} = {}){for(const handler of this.handlers.get(name)??[])handler({preventDefault(){},...data});}
     focus(){focused=this;} setSelectionRange(start:number,end:number){this.selectionStart=start;this.selectionEnd=end;}
     getClientRects(){let at:Node|null=this;while(at){if(at.hasAttribute('hidden'))return[];at=at.parent;}return[{}];}
     showModal(){this.open=true;}close(){this.open=false;}
@@ -315,6 +316,9 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   const publish={kind:'publish',step:'transition',on:'rules',line:'Publish',fields:[]};
   const loadedRules={scope:'rules',head:{seq:2,hash:fixtureDigest},item:0,revision:1,approvals:1,ownerMayReview:false,singleControllerException:false,checks:[],labels:[],extents:[{name:'source',patterns:[],approvals:1,approver:'change.review',checks:[],class:'content'}],definitions:[],controllers:[]};
   const close={kind:'close-own',step:'transition',on:'intent',line:'Close',fields:[{name:'reason',type:'enum',required:false,choices:[{label:'Completed',value:'completed'},{label:'Not planned',value:'not-planned'}]}]};
+  let listedIssue=false;
+  const childRead=gate(), releaseChild=gate();
+  const createdChild=vi.fn(async(_room:unknown,_result:unknown)=>{childRead.resolve();await releaseChild.promise;listedIssue=true;return issue.ref;});
   const posts=vi.fn();const attempts:{args:unknown[];finish:(answer:'accepted'|'refused')=>void;lose:()=>void}[]=[];
   let attempted=gate();
   const act=vi.fn((...args:unknown[])=>{
@@ -326,7 +330,7 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   vi.doMock('@generalbusiness/artroom-bytes',async()=>({...await vi.importActual<typeof import('@generalbusiness/artroom-bytes')>('@generalbusiness/artroom-bytes'),b64url:()=> 'device',unb64url:()=>new Uint8Array(32),keyIdOfSecret:()=> 'key'}));
   // resetModules keeps cached manual mocks. Use this case's actual view.
   vi.doMock('../src/view.ts', async () => vi.importActual<typeof import('../src/view.ts')>('../src/view.ts'));
-  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,initializationStillCurrent:async()=>true,roomInitialization:async()=>({state:"configured"}),openRoom:async()=>room,listLanes:async()=>({issues:[{scope:issue.scope,number:1,title:'Native issue',state:'open'}],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope==='rules'?[publish,otherRule]:scope===change.scope?[comment,review]:[comment,close],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:async()=>loadedRules,siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
+  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,initializationStillCurrent:async()=>true,roomInitialization:async()=>({state:"configured"}),createdIssue:createdChild,openRoom:async()=>room,listLanes:async()=>({issues:listedIssue?[{scope:issue.scope,number:1,title:'Native issue',state:'open'}]:[],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope==='rules'?[publish,otherRule]:scope===change.scope?[comment,review]:[comment,close],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:async()=>loadedRules,siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
   vi.doMock('../src/retained-editor.ts',()=>({retainedEditor:()=>new Node('div')}));
   let redraw!:()=>void;const location={origin:'https://page.test',hash:'#/'};
   vi.stubGlobal('document',doc);vi.stubGlobal('location',location);vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify(settings)});vi.stubGlobal('window',{addEventListener:(_name:string,callback:()=>void)=>{redraw=callback;}});
@@ -362,17 +366,32 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     expect(root.textContent).toContain('Sending request');
     expect(root.querySelector<Node>('[data-task-act="open-issue"]')?.hasAttribute('disabled')).toBe(true);
     await done(0,'refused');
-    expect(dialog.textContent).toContain('Refused:');expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(false);
+    expect(dialog.open).toBe(false); // The real refusal popup replaces the creation popup; its draft stays owned.
+    expect(root.textContent).toContain('Refused:');
     let refusal=body.querySelector<Node>('[data-refusal-context]')!;
     expect(refusal.textContent).toContain('Guard: scripted-review-boundary');
     expect(root.querySelector<Node>('[data-request-context]')!.textContent).toContain('Refused: guard-failed');
-    refusal.querySelectorAll<Node>('button').find(node=>node.textContent==='Dismiss')!.emit('click');
+    refusal.emit('click',{target:refusal,clientX:20,clientY:20});
+    expect(body.querySelector('[data-refusal-context]')).toBe(refusal); // Dialog padding is inside the box.
+    refusal.emit('click',{target:refusal,clientX:5,clientY:20});
     expect(body.querySelector('[data-refusal-context]')).toBeNull();
     await refresh();
     expect(root.querySelector<Node>('[data-request-context]')!.textContent).toContain('Refused: guard-failed');
     expect(body.querySelector('[data-refusal-context]')).toBeNull();
-    attempted=gate();form.emit('submit');await attempted.promise;await done(1,'accepted');
+    root.querySelector<Node>('[data-task-act="open-issue"]')!.emit('click');
+    dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="open-issue"]')!;
+    expect(form.querySelector<Node>('[name="field:title"]')!.value).toBe('Original creation draft');
+    expect(body.querySelectorAll<Node>('dialog').filter(node=>node.open)).toHaveLength(1);
+    attempted=gate();form.emit('submit');await attempted.promise;
+    rendered=gate();attempts[1]!.finish('accepted');await childRead.promise;
+    expect(location.hash).toBe('#/'); // A known acceptance alone does not supply a child address.
+    releaseChild.resolve();await rendered.promise;
     expect(dialog.open).toBe(false);expect(root.textContent).toContain('Native issue');
+    expect(createdChild).toHaveBeenCalledTimes(1);
+    expect(createdChild.mock.calls[0]?.[0]).toBe(room);
+    expect(location.hash).toBe(`#/issue/${issue.scope}`);
+    location.hash='#/';await refresh();
+    expect(root.textContent).toContain('Native issue');
     expect(root.querySelector<Node>('[data-request-context]')!.textContent).not.toContain('Refused:');
 
     location.hash=`#/issue/${issue.scope}`;await refresh();
@@ -443,6 +462,12 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     form.emit('submit');expect(act).toHaveBeenCalledTimes(before);expect(dialog.textContent).toContain('no longer open');
     change.state='open';await refresh();
     attempted=gate();form.emit('submit');await attempted.promise;expect((attempts[6]!.args[3]as{fields:Record<string,string>}).fields['request']).toBe('6');await done(6,'refused');
+    expect(dialog.open).toBe(false);
+    body.querySelector<Node>('[data-refusal-context]')!.querySelectorAll<Node>('button').find(node=>node.textContent==='Dismiss')!.emit('click');
+    root.querySelector<Node>('[data-task-act="review-verdict"]')!.emit('click');
+    dialog=body.querySelector<Node>('dialog')!;form=dialog.querySelector<Node>('form[data-act="review-verdict"]')!;
+    expect(form.querySelector<Node>('[name="field:body"]')!.value).toBe('Keep this selected review');
+    expect(form.querySelector<Node>('[name="field:request"]')!.value).toBe('6');
     expect(form.querySelector<Node>('button[type=submit]')!.hasAttribute('disabled')).toBe(false);
     // A role/controller loss between the last draw and submit is caught BEFORE data.act.
     change.reviewMembersByExtent={rules:[]};rendered=gate();form.emit('submit');await rendered.promise;

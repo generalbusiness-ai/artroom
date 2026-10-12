@@ -34,7 +34,7 @@
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
@@ -347,7 +347,25 @@ export interface IssueView {
   intent?: number;
   scope: ScopeId; ref: ScopeRef; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
+  createdAt: string | null; modifiedAt: string | null;
   requesterRef: MemberRef | null; requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
+}
+
+/** Times are native genesis/latest-entry times at this full authenticated read frontier. */
+async function issueTimes(handle: ScopeHandle, summary: Summary, at: Head): Promise<{ createdAt: string | null; modifiedAt: string | null }> {
+  const unavailable = { createdAt: null, modifiedAt: null };
+  try {
+    const first = await handle.entry(0), last = at.seq === 0 ? first : await handle.entry(at.seq);
+    if (!first.ok || !last.ok || !first.complete || !last.complete || first.next !== undefined || last.next !== undefined) return unavailable;
+    const genesis = first.value.entry, latest = last.value.entry;
+    if (genesis.seq !== 0 || genesis.prev !== null || latest.seq !== at.seq
+      || canonicalize(genesis.at) !== canonicalize(summary.scope) || canonicalize(latest.at) !== canonicalize(summary.scope)
+      || entryHash(genesis) !== first.value.hash || entryHash(latest) !== last.value.hash || last.value.hash !== at.hash
+      || timeMs(genesis.time) === null || timeMs(latest.time) === null) return unavailable;
+    const final = await summaryOf(handle);
+    if (canonicalize(final.summary.scope) !== canonicalize(summary.scope) || canonicalize(final.at) !== canonicalize(at)) return unavailable;
+    return { createdAt: genesis.time, modifiedAt: latest.time };
+  } catch { return unavailable; } // A denied or changed read supplies no substitute clock.
 }
 
 /** An issue lane: its intent item, its comments, and the head it was read at. */
@@ -361,6 +379,7 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
     scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, intent: intent.id,
+    ...await issueTimes(handle, summary, at),
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
     state: intent.state, closeReason: text(intent.values["closeReason"]), requesterRef: isMemberRef(intent.parties["requester"]) ? structuredClone(intent.parties["requester"]) : null, requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
     conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
@@ -880,6 +899,34 @@ export interface Acted {
   service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
   answer: Answer; before: Head; after: Head | null; observation: string | null;
 }
+/** Resolve only the native directory row opened by this exact accepted request. */
+export async function createdIssue(room: Room, result: Acted): Promise<ScopeRef | null> {
+  if (result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
+    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return null;
+  try {
+    await fresh(room);
+    const receipt = result.answer.receipt, handle = handleOf(room, room.directory);
+    const source = await handle.entry(receipt.fact.seq);
+    if (!source.ok || !source.complete || source.next !== undefined) return null;
+    const entry = source.value.entry;
+    if (entry.seq !== receipt.fact.seq || canonicalize(entry.at) !== canonicalize(receipt.fact.at) || entryHash(entry) !== receipt.fact.hash || source.value.hash !== receipt.fact.hash
+      || entry.input.type !== "act" || entry.input.signed.intent.kind !== "open-issue" || !verifySignedIntent(entry.input.signed)
+      || canonicalize(entry.input.signed.intent.to) !== canonicalize(receipt.fact.at) || entry.input.signed.intent.actor !== room.key || intentDigest(entry.input.signed.intent) !== receipt.intent) return null;
+    const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
+    if (creates.length !== 1) return null;
+    const seed = creates[0]!.to;
+    if (!isSeed(seed) || seed.kind !== "lane" || canonicalize(seed.creator) !== canonicalize(receipt.fact.at) || seed.cause !== receipt.intent) return null;
+    const { summary } = await summaryOf(handle);
+    if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return null;
+    const row = summary.items.find(item => item.id === receipt.fact.seq && item.type === "lane" && item.values["kind"] === "issue");
+    const child = row?.refs["scope"];
+    if (!row || row.state !== "listed" || !fullScopeRef(child) || child.kind !== "lane" || child.scope !== scopeIdOf(seed)) return null;
+    const read = await summaryOf(handleOf(room, child.scope));
+    if (read.summary.status !== "active" || canonicalize(read.summary.scope) !== canonicalize(child) || !read.summary.items.some(item => item.type === "intent")) return null;
+    return structuredClone(child);
+  } catch { return null; }
+}
+
 /** Memory-only association; contains no signing key or current permission. */
 export function actAssociation(room: Pick<Room, "session" | "directory" | "membership">, scope: ScopeId): string {
   return JSON.stringify([room.session.service.replace(/\/+$/, ""), room.directory, room.membership, keyIdOfSecret(room.session.secret), scope]);

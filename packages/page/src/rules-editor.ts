@@ -42,10 +42,10 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
     return input;
   });
   form.prepend(h("h2", {}, "Review requirements"));
-  form.append(h("label", {}, "Default approvals", approvals), h("label", {}, "Agent controllers can review their own agents", owner));
+  form.append(h("label", {}, "Default approvals", approvals), h("label", {}, "Agent controllers can review their own agents?", owner));
   const checks = h("textarea", { name: "checks", rows: "5" }, value("checks", baseline["checks"]!)) as HTMLTextAreaElement;
   const labels = h("textarea", { name: "labels", rows: "2" }, value("labels", baseline["labels"]!)) as HTMLTextAreaElement;
-  form.append(h("details", {}, h("summary", {}, "Advanced rules"), h("label", {}, "Checks", checks), h("label", {}, "Labels", labels), h("label", {}, "Single controller exception", exception)));
+  form.append(h("details", {}, h("summary", {}, "Advanced rules"), h("label", {}, "Checks", checks), h("label", {}, "Labels", labels), h("label", {}, "Single controller exception?", exception)));
   const save = h("button", { type: "submit", class: "primary" }, "Save changes");
   const message = h("p", { role: "status", hidden: "" });
   const confirmation = h("div", { class: "rules-confirmation", hidden: "" });
@@ -102,7 +102,7 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
     pending = next;
     const confirm = h("button", { type: "button", class: "primary" }, "Confirm changes");
     const cancel = h("button", { type: "button" }, "Cancel");
-    const names: Record<string, string> = { approvals: "Default approvals", ownerMayReview: "Agent controllers can review their own agents", singleControllerException: "Single controller exception", checks: "Checks", labels: "Labels", extents: "Review requirements" };
+    const names: Record<string, string> = { approvals: "Default approvals", ownerMayReview: "Agent controllers can review their own agents?", singleControllerException: "Single controller exception?", checks: "Checks", labels: "Labels", extents: "Review requirements" };
     confirmation.replaceChildren(h("h3", {}, "Confirm rule changes"), ...changed.map((key) => h("div", {}, h("strong", {}, names[key]!), h("pre", {}, `${baseline[key]}\n→ ${next[key]}`))), confirm, cancel);
     confirmation.removeAttribute("hidden");
     cancel.addEventListener("click", hideConfirmation);

@@ -49,6 +49,8 @@ const button = (form: Element, label: string) => form.all().find((node) => node.
 test("unchanged rules and canceled confirmation sign nothing; malformed advanced values remain editable", () => {
   const sent: unknown[] = [];
   const form = asElement(rulesEditor(rules(), (...args) => sent.push(args)));
+  const labelFor = (name: string) => form.all().find(node => node.tag === "label" && node.all().some(control => control.name === name))!.children[0];
+  expect([labelFor("ownerMayReview"), labelFor("singleControllerException"), labelFor("approvals")]).toEqual(["Agent controllers can review their own agents?", "Single controller exception?", "Default approvals"]);
   const save = button(form, "Save changes");
   expect(save.hasAttribute("disabled")).toBe(true);
   form.all().find((node) => node.name === "approvals")!.value = "01";
@@ -73,11 +75,15 @@ test("unchanged rules and canceled confirmation sign nothing; malformed advanced
   form.event("change");
   expect(save.hasAttribute("disabled")).toBe(true);
   form.all().find((node) => node.name === "ownerMayReview")!.value = "true";
+  form.all().find((node) => node.name === "singleControllerException")!.value = "false";
   form.event("change");
   expect(save.hasAttribute("disabled")).toBe(false);
   form.event("submit");
-  expect(form.all().find((node) => node.attrs.get("class") === "rules-confirmation")!.textContent).toContain("Agent controllers can review their own agents");
+  const confirmation = form.all().find((node) => node.attrs.get("class") === "rules-confirmation")!;
+  expect(confirmation.textContent).toContain("Agent controllers can review their own agents?");
+  expect(confirmation.all().filter(node => node.tag === "strong").map(node => node.textContent)).toEqual(["Agent controllers can review their own agents?", "Single controller exception?"]);
   form.all().find((node) => node.name === "ownerMayReview")!.value = "false";
+  form.all().find((node) => node.name === "singleControllerException")!.value = "true";
   form.event("change");
   expect(save.hasAttribute("disabled")).toBe(true);
   expect(button(form, "Confirm changes")).toBeUndefined();

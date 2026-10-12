@@ -20,7 +20,8 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, createdIssue, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { bindDisclosures, openDialog, releaseDialog } from "./popups.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
@@ -151,7 +152,7 @@ function closeWorkbench(restore = true): void {
   const current = workbenchDialog;
   if (!current) return;
   workbenchDialog = null;
-  current.dialog.close(); current.dialog.remove();
+  releaseDialog(current.dialog); current.dialog.close(); current.dialog.remove();
   if (restore && location.hash === current.route && current.binding === settingsContext(settings() ?? { place: null, secret: "" })) returnToControl(current.opener);
 }
 function openWorkbench(title: string, body: HTMLElement, context: string, opener: string, kind: WorkbenchDialog["kind"], subject?: { manifest: number; action: string }): void {
@@ -162,7 +163,7 @@ function openWorkbench(title: string, body: HTMLElement, context: string, opener
   workbenchDialog = { dialog, body, message, context, route: location.hash, kind, opener, binding: settingsContext(settings() ?? { place: null, secret: "" }), ...subject };
   close.addEventListener("click", () => closeWorkbench());
   dialog.addEventListener("cancel", event => { event.preventDefault(); closeWorkbench(); });
-  document.body.append(dialog); dialog.showModal();
+  document.body.append(dialog); openDialog(dialog, restore => closeWorkbench(restore));
   (body.querySelector<HTMLElement>("input:not([type=hidden]), textarea, select, button, summary") ?? close).focus();
 }
 
@@ -171,7 +172,7 @@ function closeRefusal(): void {
   const current = refusalDialog;
   if (!current) return;
   refusalDialog = null;
-  current.dialog.close(); current.dialog.remove();
+  releaseDialog(current.dialog); current.dialog.close(); current.dialog.remove();
 }
 function showRefusal(known: Acted, context: string): void {
   if (known.answer.answer !== "refused") return;
@@ -185,16 +186,16 @@ function showRefusal(known: Acted, context: string): void {
     h("p", {}, known.answer.name ? `Guard: ${known.answer.name}` : "The scope did not supply a guard name."),
     h("div", { class: "form-footer" }, dismiss)) as HTMLDialogElement;
   refusalDialog = { dialog, context, route, binding };
-  const close = () => {
+  const close = (restore = true) => {
     if (refusalDialog?.dialog !== dialog) return;
     closeRefusal();
-    if (route === location.hash && binding === settingsContext(settings() ?? { place: null, secret: "" })) {
+    if (restore && route === location.hash && binding === settingsContext(settings() ?? { place: null, secret: "" })) {
       if (!restoreFocus(document.body, focus)) document.getElementById("page-main")?.focus();
     }
   };
-  dismiss.addEventListener("click", close);
+  dismiss.addEventListener("click", () => close());
   dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
-  document.body.append(dialog); dialog.showModal(); dismiss.focus();
+  document.body.append(dialog); openDialog(dialog, close); dismiss.focus();
 }
 
 /** All deep records share one entry; status recovery remains a visible task. */
@@ -399,15 +400,18 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
   skip.addEventListener("click", event => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
   const create = () => { const button = h("button", { class: "nav-item", type: "button", "data-focus-key": controlKey(shellContext, "create-room") }, "Create room"); button.addEventListener("click", () => { if (offer) claimDialog(room, offer.kept, offer.configured, button); }); return button; };
-  return [skip,
+  const surfaces = [skip,
     h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(), offer ? create() : null, h("div", { class: "rail-bottom" }, accountControl())),
     h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, wordmark(), roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
+  bindDisclosures(surfaces.flatMap(surface => [...surface.querySelectorAll<HTMLElement>("details.shell-disclosure")]), surfaces);
+  return surfaces;
 }
 
 function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, opener: HTMLElement): void {
   const binding = settingsContext(kept);
   if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+  if (roomDialog) releaseDialog(roomDialog);
   roomDialog?.close(); roomDialog?.remove();
   let status: ReturnType<typeof claimStatus>;
   try { status = claimStatus(sessionOf(kept), configured, localStorage); }
@@ -424,7 +428,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
   roomDialog = dialog;
   roomDialogBinding = { settings: binding, route: location.hash };
   const openerKey = opener.getAttribute("data-focus-key");
-  const close = (preserveDraft = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); dialog.close(); dialog.remove(); if (roomDialog === dialog) { roomDialog = null; roomDialogBinding = null; } if (openerKey) returnToControl(openerKey); };
+  const close = (preserveDraft = true, restore = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); releaseDialog(dialog); dialog.close(); dialog.remove(); if (roomDialog === dialog) { roomDialog = null; roomDialogBinding = null; } if (restore && openerKey) returnToControl(openerKey); };
   cancel.addEventListener("click", () => { close(); });
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   name.addEventListener("input", () => { claimDrafts.set(binding, name.value); });
@@ -465,7 +469,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
       finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
     })();
   });
-  document.body.append(dialog); dialog.showModal(); name.focus();
+  document.body.append(dialog); openDialog(dialog, restore => close(true, restore)); name.focus();
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
@@ -473,6 +477,7 @@ interface PanelOptions {
   offered?: Awaited<ReturnType<typeof actsOn>>;
   represented?: readonly string[];
   beforeSign?: (kind: string, on: string) => Promise<void>;
+  settled?: (result: Acted, current: () => boolean) => Promise<void>;
   customForm?: (send: (kind: string, on: string, typed: Record<string, string>) => void, blocked: boolean, draftKey: string) => HTMLElement;
   tasks?: (offered: Awaited<ReturnType<typeof actsOn>>, send: Send, context: ActionContext) => readonly string[];
 }
@@ -522,6 +527,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
           sending.submitting(association);
         });
         lastActs.set(association, result);
+        if (result.answer.answer === "accepted" && result.observation === null && activeView()) await options.settled?.(result, activeView);
         if (result.answer.answer === "refused" && result.observation === null) issueDialogOutcome(association, "editable", nonacceptedAnswerText(result.answer));
         else if (result.answer.answer !== "accepted" || result.observation !== null) issueDialogOutcome(association, "unknown", "The original request remains unresolved. Check status without sending a replacement.");
       } catch (error) {
@@ -648,7 +654,7 @@ async function draw(focus = false): Promise<void> {
   reconcileIssueDialogs();
   if (refusalDialog && (refusalDialog.route !== location.hash || refusalDialog.binding !== settingsContext(settings() ?? { place: null, secret: "" }))) closeRefusal();
   if (roomDialog && (roomDialogBinding?.settings !== settingsContext(settings() ?? { place: null, secret: "" }) || roomDialogBinding?.route !== location.hash)) {
-    roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
+    releaseDialog(roomDialog); roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
   }
   if (workbenchDialog && (workbenchDialog.route !== location.hash || workbenchDialog.binding !== settingsContext(settings() ?? { place: null, secret: "" }))) closeWorkbench(false);
   const route = routeOf(location.hash);
@@ -819,7 +825,13 @@ async function draw(focus = false): Promise<void> {
     const offered = await actsOn(room, room.directory);
     if (!await presentationCurrent()) return;
     const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
-    const panel = await panelFor(loaded, loaded.directory, {}, { offered, tasks: (acts, send, context) => {
+    const panel = await panelFor(loaded, loaded.directory, {}, { offered, settled: async (result, current) => {
+      if (result.kind !== "open-issue") return;
+      const child = await createdIssue(loaded, result);
+      if (!child || !current()) return; // Accepted but not yet confirmed: refresh the list; never guess a child.
+      location.hash = `#/issue/${child.scope}`;
+      await draw();
+    }, tasks: (acts, send, context) => {
       if (destination === "changes") {
         const open = acts.acts.find(act => act.kind === "open-pr");
         if (open) screen.querySelector('[data-action-slot="create"]')?.append(proposeFromRecordedSource(loaded, lanes.changes, context));

@@ -66,11 +66,14 @@ const review: Offered = { kind: "review-verdict", step: "open", on: "review", li
 
 test("review submits the exact observed version and typed controls once; unsupported acts remain inspectable", () => {
   const sent: unknown[] = [];
-  const panel = asElement(actsPanel({ acts: [review, { kind: "custom-act", step: "open", on: "record", line: "Custom", fields: [] }], hidden: 2 }, (...args) => sent.push(args), null, {
+  // An additional scripted bool declaration checks generic labels, not native review authority.
+  const withBoolean: Offered = { ...review, fields: [...review.fields, { name: "notify", type: "bool", required: false }] };
+  const panel = asElement(actsPanel({ acts: [withBoolean, { kind: "custom-act", step: "open", on: "record", line: "Custom", fields: [] }], hidden: 2 }, (...args) => sent.push(args), null, {
     primary: ["review-verdict", "merge"], defaults: { "review-verdict": { fields: { manifest: "17" } } },
     choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "changes" }] } },
   }));
   const nodes = panel.all();
+  expect(nodes.filter(node => node.tag === "label").map(node => node.children[0])).toEqual(["Decision", "Review comment", "notify?"]);
   expect(nodes.filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Review change", "Advanced", "custom-act"]);
   expect(nodes.find((node) => node.name === "field:manifest")?.attrs.get("type")).toBe("hidden");
   nodes.find((node) => node.name === "field:verdict")!.value = "changes";
