@@ -43,3 +43,37 @@ union. Only the normal Page generator, after Source review, can replace it.
 Affected compilers, witnesses, asset build and the new gate are UNRUN. The older
 1,040-pass gate and component evidence above remain bound to their original heads.
 No new review, landing or hosted acceptance is claimed.
+
+## Configured-room completion after Source review
+
+At `69ee0fa33f2d915dd590dedf60583e881d48dd0a`, original run `54569` passed
+Page SOURCE and TEST compilers and five cases from the whole initialization,
+Sending, joined-shell and Claim UI files. No case was skipped or repeated.
+The body took 1.06 seconds elapsed and 2.02 seconds CPU. These are scripted
+read and DOM boundaries, not new native or hosted acceptance.
+
+The one shortcut-removal control `67587` reused that passing initialization
+case without a baseline or compiler repeat. Its body and pipeline exited 1.
+The structured record identifies the intended toBe assertion at line 56:
+expected configured, observed unknown when definition history was denied.
+There were no module or unhandled errors. The isolated copy was restored to
+exact `69ee0fa`, including Source, witness, private pool and all pinned inputs.
+Later assertions after the failing state comparison are not claimed as executed.
+
+Normal Page build `26280` exited 0 once and replaced the stale placeholder from
+the composed authored Source. The generated module is 617,886 bytes, SHA256
+`c8b25451ac0ff20f58661e2f778dcff5e79bf4e17caaf1a54a703c24d7dc0617`.
+Other tracked Source, cached tools and the private pool remained unchanged.
+This checkpoint changes only the generated asset and this outcome note after
+the checked head. It does not repeat the focused cases, control or build.
+
+The closed component proof is
+`/Users/hughpyle/play/artroom-diagnostics/empty-room-configured-status-checks/public-proof.json`,
+SHA256 `853394111ec0d879c3715cc8ce8acba9b3787f61c063ebcf332bd1232f1cab66`.
+The closed control proof is the same directory's `control-public.json`, SHA256
+`d7b0169a1047cbfb43c8b38365d07604a012c5e5cd8c544d86734b30282c816a`.
+Raw diagnostics and generated program bodies remain private.
+
+The new ordinary gate remains UNRUN pending the recorded result review. The
+older 1,040-pass gate remains historical. New review, landing, deployed Pages,
+fresh human walkthrough and broader Start obligations remain separate.
