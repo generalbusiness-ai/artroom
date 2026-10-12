@@ -21,7 +21,7 @@ vi.mock("@generalbusiness/artroom-client", async importOriginal => ({
 
 const OLD = "a".repeat(40), NEW = "b".repeat(40), TIME = "2026-10-11T20:00:00Z";
 const secret = new Uint8Array(32).fill(7);
-function ref(label: string, kind: string, definition: Seed["definition"]): ScopeRef {
+function ref(label: string, kind: ScopeRef["kind"], definition: Seed["definition"]): ScopeRef {
   return { scope: scopeIdOf({ v: 1, kind, definition, creator: null, cause: textDigest(label), ordinal: 0 }), kind, inc: newIncarnation(new Uint8Array(16).fill(5)) };
 }
 const D = ref("scripted directory", "directory", "platform:directory@3");
