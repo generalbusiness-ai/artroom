@@ -41,3 +41,22 @@ landing is incorporated. All old wordmark, Counter and empty-room results retain
 their original heads. This new composition has run no compiler, test, asset build,
 browser, gate, provider command or workroom write. Its final checks, one new gate,
 review and managed deployments remain outstanding.
+
+## Actual receiving empty-room landing incorporated: Source only
+
+The approved empty-room Source was normally landed in receiving main
+`b419f806736f406b02ff4465eab7ed85a4b32272`, tree
+`7f348b53c49832c0652349816bddb7fb71ee6583`, with receipt
+`772d3467bca34c4634a8afeee2e02cbd1de2bdcc`. This continuation normally merges that
+actual receiving head. Its authored code and witnesses remain identical to the
+prepared `6056a3b9cf5a7fa31e158bdfef18bac36197d533` union. Receiving Counter and MCP
+changes are preserved. The original Core wordmark and separate Jam heads remain.
+
+The three generated Counting and Page files now explicitly retain receiving
+`b419f806` bytes as stale placeholders for this wordmark composition. The Page
+placeholder is the receiving empty-room asset, not a new wordmark bundle. Normal
+builders remain UNRUN and must produce both applications from this authored union.
+The three affected compiler roots, three Page cases and one owning Counter view
+case remain UNRUN. The new composition gate, independent wordmark review and
+managed deployments remain outstanding. Earlier gates and browser proofs retain
+their original subjects; no result is transferred to these stale files.
