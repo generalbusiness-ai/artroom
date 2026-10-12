@@ -168,14 +168,42 @@ guard, the guard's sentence, and a next step.
 
 The server keeps each signed envelope before it sends it, under the
 caller's `idempotencyKey`, in the config directory's
-`private/mcp-custody/`. A lost reply leaves the record unknown; the same
-call with the same key, or `settle`, sends the same bytes again or reads
-the scope's settlement, and never signs a second intent. A key used for
-another meaning is refused before anything is signed. A refusal is kept;
-`resubmit: true` sends the same envelope again. At most 256 records may be
-unresolved at once. A record keeps its last 64 outcomes inline and the rest
-in a segment file beside it; every outcome stays readable. Terminal records
-move to append-only archive files of at most 64 MiB, with an index.
+`private/mcp-custody/`, readable only by its owner.
+
+- **A lost reply** leaves the record unknown. The same call with the same
+  key sends the same bytes again; `settle` reads the scope's settlement.
+  Neither signs a second intent.
+- **Another meaning under a used key** is refused before anything is
+  signed.
+- **The outcome** given is always the newest decisive one of the current
+  attempt: an answer other than unavailable, or a receipt that settlement
+  found. A record that was lost, then unavailable, then settled answers
+  accepted.
+- **Terminal records.** Accepted and mismatch are never sent again, even
+  with `resubmit: true`. A refusal is kept; `resubmit: true` first keeps a
+  new attempt, unresolved, with the refusal as history, and then sends the
+  same envelope. A lost reply to it leaves the record unresolved, and
+  `settle` asks the scope.
+- **Capacity.** At most 256 records may be unresolved at once, admitted
+  under a lease that every process sharing the directory takes, so two
+  processes cannot both admit the 256th. Nothing unresolved is evicted.
+- **Size.** A record is at most 2 MiB. An act whose fields, texts,
+  presented facts and values would not fit with room for its outcomes is
+  refused as full, for bytes, before it is signed. A record keeps up to 64
+  outcomes inline; older ones, or ones that would push it past 2 MiB, move
+  to a segment file beside it, which keeps every one and is read in bounded
+  slices.
+- **Preparation steps** are kept apart from the act. A step keeps its first
+  answer and its latest 63; the answers between them are not kept. The act's
+  outcomes are never dropped.
+- **Archives.** Terminal records move to archive files of at most 64 MiB,
+  with an index, in one transaction under an archive lease: the archive file
+  is written whole and renamed into place, then the index, and only then are
+  the live records removed. A record whose lock another process holds is
+  skipped. A crash at any point loses no record.
+- **Locks.** A lock or lease is broken only when the process that took it
+  is gone, whatever its time; the passing of an intent's deadline is never
+  an outcome.
 
 ## Tool reference
 
@@ -187,7 +215,7 @@ annotations. In the default mode, `actions` and `act` are not listed.
 
 ### `room`
 
-Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists (50 a page), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold. Start here.
+Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.
 
 ```json
 {
@@ -1249,16 +1277,38 @@ run. The recipe test runs the recipe to that refusal and asserts it.
 Each figure below is labelled by how it was taken: an observed run of a
 named test, or a sum of a recipe's steps.
 
+### Whole responses
+
+A tool's bound is for the whole response as the client receives it: the
+structured content and the text together (plan 031, section 8: 4 KiB for an
+act, `wait`, `settle` and `prepare`; 8 KiB for `room` and a page of
+`inspect`; 64 KiB for `items`, `steps`, `step`, `record`, `sends`, `text`,
+`actions` and the declaration or complete text of `inspect`; 2 KiB for
+`credential`). The text repeats the structured content's JSON only when
+the whole response still fits; otherwise the text says where the result
+is. Pages are sized for the whole response, and a text slice is measured
+after JSON escaping. The one result larger than its bound is a single live
+item larger than a page, which is served whole, alone on its page.
+
+`room` pages every collection it returns (lanes, standalone scopes,
+standing, active definitions, the act tools not held, the scopes not read)
+together, by bytes, with a cursor bound to the list's generation.
+
+The searches of `wait` and `credential` keep their position between polls
+and calls and read at most 16 entries, or 4 pages of final items, each
+time, with no fixed window.
+
 ### Per tool, end to end
 
 Observed run of `packages/mcp/test/budget.test.ts`, on the stand-in scope
 service of the Node tests, which counts every request the server makes. A
 warm call holds a read session; a cold call adds one session request. The
-bound is plan 031, section 8.
+plan's bound is plan 031, section 8. Response bytes are the whole response
+of the warm call; the test asserts both calls' sizes against the bound.
 
 | Tool | Reads, warm | Posts | Cold | Response bytes | Plan's bound, warm |
 |---|---|---|---|---|---|
-| `room` | 3 | 0 | +1 session | 3810 | 3, + roots and memberships |
+| `room` | 3 | 0 | +1 session | 3836 | 3, + roots and memberships |
 | `inspect` | 1 | 0 | +1 | 990 | 1 |
 | `inspect` with `describe` | 1 | 0 | +1 | 1471 | 2 |
 | `inspect` with `declaration` | 2 | 0 | +1 | 64536 | 2 |
@@ -1269,18 +1319,17 @@ bound is plan 031, section 8.
 | `sends` | 1 | 0 | +1 | 442 | 1 |
 | `text` | 1 | 0 | +1 | 474 | 1 |
 | `wait`, one poll | 1 | 0 | +1 | 476 | 1 |
-| `settle` | 1 | 0 | +1 | 1964 | 1 |
+| `settle` | 1 | 0 | +1 | 1990 | 1 |
 | `actions` | 1 | 0 | +1 | 20056 | 3 |
 | `issue.comment`, on a lane | 1 | 1 | +1 | 1184 | 2 |
 | `issue.create`, with the definition's bytes read | 2 | 1 | +1 | 1204 | 2 |
 | `create` | 0 | 1 | | | 0 |
-| `credential` | 3 | 0 | +1 | 641 | 1 |
+| `credential`, a second token after the first was read | 3 | 0 | +1 | 362 | 1 |
 | `tools/list` | 3 | 0 | +1 | | 3, + roots and memberships |
 
-Response bytes count the whole response: the structured content and the
-same JSON as text. `credential` reads the act's entry, then the entries
-after it until the operation's outcome names the token, then the
-credential route: 3 reads where plan 031 counts 1.
+`credential` reads the act's entry, then the entries after it until the
+operation's outcome names the token (two here), then the credential route:
+3 reads where plan 031 counts 1.
 
 Other observed figures from the same run:
 
@@ -1292,13 +1341,18 @@ Other observed figures from the same run:
 - A room with two standalone roots, one under a second membership: `room`
   warm reads 6 (3, + 2 roots, + 1 for standing on the second membership);
   cold, 2 session requests.
+- A room of 60 lanes and 40 roots: `room` in 5 pages, each within 8 KiB.
+- A mint's outcome 100 entries after its act: found in 7 `credential`
+  calls; a creation completed 100 entries after its act: found in 7 polls
+  of one `wait`; a final item on the fifth page of final items: found in 2
+  polls. No entry was read twice.
 - A 64 KiB live item is served alone and whole on its own `inspect` page.
   A continuation after the head moved restarts at the new head and says so.
 - A 200 KiB retained text is read whole in 4 calls of `text` by offset.
 - With a 2 KiB list page, each descriptor larger than the page is alone on
-  its page, and all 70 tools are reachable.
-- 70 resubmissions of one refused envelope: all 70 outcomes readable; each
-  resubmission 1 read and 1 post.
+  its page (35 of them), and all 71 tools are reachable.
+- 70 resubmissions of one refused envelope: each of the 70 made 1 read and
+  1 post, and all 70 outcomes are readable.
 - A subscribed client is told 2 times for an activation and a role change,
   and 0 times for an ordinary head advance. Each watch run reads 3
   summaries.
@@ -1306,18 +1360,19 @@ Other observed figures from the same run:
 ### The list, per role
 
 Observed run of `packages/mcp/test/budget.test.ts`. Bytes are the
-canonical JSON of each `tools/list` result as sent. Tokens are counted by
-gpt-tokenizer 3.4.0 with the `o200k_base` encoding, a proxy: an agent
-host's own tokenizer gives other counts.
+canonical JSON of each `tools/list` result as sent; every page is asserted
+to be at most 256 KiB. Tokens are counted by gpt-tokenizer 3.4.0 with the
+`o200k_base` encoding, a proxy: an agent host's own tokenizer gives other
+counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 70 | 1 | 143892 | 37127 |
-| Demo room, maintainer | 56 | 1 | 111976 | 28989 |
-| Demo room, member | 53 | 1 | 105401 | 27241 |
-| Demo room, agent | 51 | 1 | 99635 | 25804 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 157 | 2 | 336518 | 88391 |
-| Demo room, admin, `--generic` | 15 | 1 | 13075 | 3073 |
+| Demo room, admin | 71 | 1 | 145949 | 37612 |
+| Demo room, maintainer | 57 | 1 | 114033 | 29484 |
+| Demo room, member | 54 | 1 | 107458 | 27727 |
+| Demo room, agent | 52 | 1 | 101692 | 26288 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 338575 | 88861 |
+| Demo room, admin, `--generic` | 16 | 1 | 14654 | 3448 |
 
 No cap applies to the whole list. `--tools` shortens it for an agent with
 one job; `--generic` replaces the act tools with the pair.

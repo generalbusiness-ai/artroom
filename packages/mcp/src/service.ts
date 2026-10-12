@@ -413,7 +413,7 @@ export class McpService {
     const tool = (name: string, description: string, properties: Record<string, unknown>, required: string[], annotations: Record<string, unknown>, run: Run, output?: Record<string, unknown>): [string, { tool: Tool; run: Run }] =>
       [name, { tool: { name, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, ...(output ? { outputSchema: output } : {}), annotations }, run }];
     return Object.fromEntries([
-      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists (50 a page), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold. Start here.",
+      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
         { cursor: { type: "string" } }, [], READ, (a) => this.#room(a)),
       tool("inspect", "One scope: its definition and digest, status, head, counts by item type and state, and its live items, paged by bytes at its head. With declaration: true, the definition's bytes, paged. With describe: <kind>, the complete derived text of one act, for an act whose tool description points here.",
         { scope: scopeArg, declaration: { type: "boolean" }, describe: { type: "string" }, cursor: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope"], READ, (a) => this.#inspect(a)),
