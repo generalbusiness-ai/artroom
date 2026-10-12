@@ -36,6 +36,8 @@ import {
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
 import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
+import { enrolAgentKey } from "./invitations.ts";
+import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
 const NEW_REGISTER = NEWEST["platform:register"]!;
 
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
@@ -868,6 +870,7 @@ export function linkOf(text: string): Link | null {
 
 /** `artroom join <link>` resumes the exact enrollment kept before delivery. */
 export function join(ctx: Context, text: string): Promise<Outcome> {
+  if (text.startsWith(AGENT_KEY_LINK)) return enrolAgentKey(ctx, text);
   return run(async () => {
     const link = linkOf(text) ?? stop(usage("That is not an invitation link from artroom invite."));
     if (typeof link.service !== "string" || typeof link.handle !== "string" || link.invitation < 1
@@ -875,6 +878,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
       || !isScopeRef(link.repository?.membership) || link.repository.membership.kind !== "membership"
       || !isScopeId(link.repository?.rules) || !isScopeId(link.repository?.destination)) return usage("That invitation link has invalid repository references.");
     const before = await ctx.store.config();
+    if (before?.join?.kind === "enrol") return failed("An original agent enrollment is retained; a person invitation cannot replace it.");
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
     if (before && !before.join) return usage("This config directory is set up already; use another config directory to join.");
     const linkDigest = textDigest(canonicalize(link));
