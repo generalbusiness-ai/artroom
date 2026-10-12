@@ -142,6 +142,19 @@ async function follow(M: ScopeHandle, signed: SignedIntent, receipt: Receipt): P
   const read = await M.followReceipt(receipt);
   return read.ok && read.entry.input.type === "act" && same(read.entry.input.signed, signed) ? read.entry : null;
 }
+/** M2 records an inbox create send, not member.refs.inbox (EM9). */
+async function inboxOfOpening(ctx: Context, service: string, reader: string, opening: Entry, membership: ScopeRef, owner: MemberRef): Promise<ScopeRef | null> {
+  const births = opening.sends.filter(send => "creator" in send.to && send.to.kind === "inbox");
+  const birth = births.length === 1 ? births[0] : undefined;
+  if (!birth || !("creator" in birth.to) || birth.to.definition !== "platform:inbox@1" || !same(birth.to.creator, membership)) return null;
+  const scope = scopeIdOf(birth.to), I = handle(ctx, service, scope, reader);
+  const [summaryRead, birthRead] = await Promise.all([I.summary(), I.entry(0)]);
+  if (!summaryRead.ok || !summaryRead.complete || summaryRead.next !== undefined || summaryRead.value.status !== "active" || summaryRead.value.definition !== "platform:inbox@1" || summaryRead.value.scope.kind !== "inbox" || summaryRead.value.scope.scope !== scope || !birthRead.ok || !birthRead.complete || birthRead.next !== undefined) return null;
+  const entry = birthRead.value.entry;
+  if (entry.seq !== 0 || entry.input.type !== "genesis" || entry.input.decision !== "applied" || entry.input.kind !== "establish" || entry.input.inc !== summaryRead.value.scope.inc || !same(entry.at, summaryRead.value.scope) || !same(entry.input.seed, birth.to) || !same(entry.input.source, factRefOf(opening)) || entry.input.n !== birth.n || entryHash(entry) !== birthRead.value.hash) return null;
+  const inbox = summaryRead.value.items.find(item => item.type === "inbox" && item.state === "open");
+  return inbox && same(inbox.parties["owner"], owner) && same(inbox.refs["membership"], membership) ? summaryRead.value.scope : null;
+}
 /** No output exposes a signing key. The optional link is a private invitation. */
 export async function issueInvitation(ctx: Context, input: InvitationIssueInput, options: InvitationIssueOptions): Promise<InvitationIssueResult> {
   check(options);
@@ -250,7 +263,10 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
     } else {
       const member = s.items.find(i => i.type === "member" && i.id === row.member!.receipt!.fact.seq), roster = s.items.find(i => i.type === "roster" && i.state === "open");
       const controller = s.items.find(item => item.type === "member" && item.state === "active" && item.values["kind"] === "person" && same(item.parties["member"], row.input.controller));
-      if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || member.values["handle"] !== row.input.handle || !same(member.parties["controller"], row.input.controller) || invited.values["kind"] !== "agent" || invited.refs["member"] !== member.id || !isScopeRef(member.refs["inbox"]) || member.refs["inbox"].kind !== "inbox" || !roster) return status("unknown");
+      if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || member.values["handle"] !== row.input.handle || !same(member.parties["controller"], row.input.controller) || invited.values["kind"] !== "agent" || invited.refs["member"] !== member.id || !isMemberRef(member.parties["member"]) || !roster) return status("unknown");
+      const owner = member.parties["member"];
+      const opening = await wait(options, async () => follow(await membershipHandle(), row.member!.signed, row.member!.receipt!));
+      if (!opening || !await wait(options, () => inboxOfOpening(ctx, row.service, reader!, opening, row.repository.membership, owner))) return status("unknown", "The native agent inbox creation could not be verified.");
       link = encodeAgentKeyInvitation({ v: 1, kind: "agent-key", service: row.service, repository, definition: "platform:membership@2", handle: row.input.handle, controller: row.input.controller!, member: row.member!.receipt!.fact, invitation: receipt.fact, secret: row.secret, expected: { on: roster.revision, member: member.revision } });
     }
     if (!row.link) { row.link = link; await persist(); }
@@ -356,16 +372,12 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
       if (opened.kind !== "add-member" || !same(opened.fields, { handle: link.handle, kind: "agent", controller: link.controller }) || invited.kind !== "invite-key" || !same(invited.fields, { member: link.member.seq, kind: "agent", inviteHash: textDigest(link.secret), inviteEnds: invited.fields["inviteEnds"] })) return bad();
       const member = s.items.find(i => i.type === "member" && i.id === link.member.seq), activeKey = s.items.find(i => i.type === "key" && i.id === link.invitation.seq);
       const controller = s.items.find(item => item.type === "member" && item.state === "active" && item.values["kind"] === "person" && same(item.parties["member"], link.controller));
-      if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["handle"] !== link.handle || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || !same(member.parties["controller"], link.controller) || !activeKey || activeKey.state !== "active" || activeKey.values["kind"] !== "agent" || activeKey.values["id"] !== keyIdOfSecret(key) || activeKey.refs["member"] !== member.id || !isScopeRef(member.refs["inbox"]) || member.refs["inbox"].kind !== "inbox") return bad();
-      const inbox = member.refs["inbox"];
-      const birth = memberEntry.sends.find(send => "creator" in send.to && send.to.kind === "inbox");
-      if (!birth || !("creator" in birth.to) || scopeIdOf(birth.to) !== inbox.scope) return bad();
+      if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["handle"] !== link.handle || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || !same(member.parties["controller"], link.controller) || !activeKey || activeKey.state !== "active" || activeKey.values["kind"] !== "agent" || activeKey.values["id"] !== keyIdOfSecret(key) || activeKey.refs["member"] !== member.id || !isMemberRef(member.parties["member"])) return bad();
       const observed = await boundDirectory(ctx, link.service, reader, link.repository, s);
       if (!observed) return bad();
-      const I = handle(ctx, link.service, inbox.scope, reader);
-      const [inboxRead, inboxBirth] = await Promise.all([I.summary(), I.entry(0)]);
-      if (!inboxRead.ok || !inboxRead.complete || inboxRead.next !== undefined || inboxRead.value.status !== "active" || inboxRead.value.definition !== "platform:inbox@1" || !same(inboxRead.value.scope, inbox) || !inboxBirth.ok || !inboxBirth.complete || inboxBirth.next !== undefined || inboxBirth.value.entry.input.type !== "genesis" || !same(inboxBirth.value.entry.input.seed, birth.to) || !same(inboxBirth.value.entry.at, inbox) || entryHash(inboxBirth.value.entry) !== inboxBirth.value.hash) return bad();
-      config = { ...config!, repository: { ...observed, inbox: inboxRead.value.scope.scope }, handle: link.handle };
+      const inbox = await inboxOfOpening(ctx, link.service, reader, memberEntry, link.repository.membership, member.parties["member"]);
+      if (!inbox) return bad();
+      config = { ...config!, repository: { ...observed, inbox: inbox.scope }, handle: link.handle };
       await save(config);
       if (!same(await ctx.store.config(), config)) return bad();
       return { code: 0, lines: [`Enrolled independent agent ${link.handle}. Native agent and controller bindings verified.`] };

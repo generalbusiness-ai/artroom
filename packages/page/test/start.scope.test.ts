@@ -168,7 +168,8 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     const savedRecovery = await lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready));
     expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native founder backup, not the internal CLI recovery key.
     await expect(lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
-    const creatorSent: SignedIntent[] = [];
+    const creatorSent: SignedIntent[] = [], creatorReplies: { kind: string; answer: string; reason: string | null; name: string | null }[] = [];
+    let creatorSessions = 0;
     let loseCreator: "add-member" | "invite-key" | null = "add-member", creatorCheck = false;
     const creatorFetch: Fetch = async (url, init) => {
       const path = new URL(url).pathname;
@@ -181,8 +182,20 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
         expect([readbacks.get(name) === bytes, pointer.actor === status.key, stage.attempted, canonicalize(stage.signed) === canonicalize(signed), signed.intent.actor === status.key]).toEqual([true, true, true, true, true]);
         creatorSent.push(structuredClone(signed));
       }
-      const response = await native(url, init);
-      if (path.endsWith("/acts") && signed?.intent.kind === loseCreator) { loseCreator = null; await response.body?.getReader().cancel(); throw new Error("STAND-IN lost accepted connection reply"); }
+      if (path.endsWith("/sessions")) creatorSessions++;
+      // This is the same native producer, kept as its actual Response type so
+      // a closed reply-category projection can inspect a clone, never a payload.
+      const response = await lifetime.wait(() => worker.fetch(new Request(url, init), bindings));
+      let category: string | undefined;
+      if (path.endsWith("/acts") && signed) {
+        const reply = await response.clone().json() as { answer?: unknown; reason?: unknown; name?: unknown };
+        category = typeof reply.answer === "string" && ["accepted", "refused", "unavailable", "mismatch", "due"].includes(reply.answer) ? reply.answer : "invalid";
+        const safe = (value: unknown) => typeof value === "string" && /^[a-z0-9-]{1,64}$/.test(value) ? value : null;
+        creatorReplies.push({ kind: signed.intent.kind, answer: category, reason: safe(reply.reason), name: safe(reply.name) });
+      }
+      // Loss is only an actually accepted reply. Other native judgments return
+      // unchanged to the shared helper and remain visible in the closed tuple.
+      if (path.endsWith("/acts") && signed?.intent.kind === loseCreator && category === "accepted") { loseCreator = null; await response.body?.getReader().cancel(); throw new Error("STAND-IN lost accepted connection reply"); }
       if (creatorCheck && path.endsWith("/settle") && signed && ["add-member", "invite-key"].includes(signed.intent.kind)) { await response.body?.getReader().cancel(); throw new Error("STAND-IN lost original connection settlement reply"); }
       return response;
     };
@@ -209,7 +222,7 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     expect([keyChecked.state, creatorSent.length, connectionPauses]).toEqual(["unknown", beforeKeyCheck, 0]);
     creatorCheck = false;
     const issued = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "continue" }));
-    expect([issued.state, issued.operation, originalConnection(origin, reload, binding)?.kind]).toEqual(["verified", begun.operation, "agent-key"]);
+    expect([issued.state, issued.reason ?? null, issued.operation === begun.operation, originalConnection(origin, reload, binding)?.kind, creatorReplies, creatorSessions < 64]).toEqual(["verified", null, true, "agent-key", ["add-member", "add-member", "invite-key", "invite-key"].map(kind => ({ kind, answer: "accepted", reason: null, name: null })), true]);
     expect(creatorSent.filter(s => s.intent.kind === "invite-key").every(s => canonicalize(s) === canonicalize(invitationEnvelope))).toBe(true);
     const agentLink = issued.link!, tagged = agentKeyInvitationOf(agentLink)!;
     expect([tagged.controller.member, canonicalize(tagged.controller.membership) === canonicalize(binding.membership), linkOf(agentLink)]).toEqual(["@founder", true, null]);

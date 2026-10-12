@@ -24,11 +24,7 @@ test("retained native agent opening and key invitation survive loss; independent
   let lose: "add-member" | "enrol" | null = "add-member", loseSettle = false;
   const liveItems = (): Item[] => Object.entries(m.definition.declared.items).flatMap(([type, item]) => m.state.page(type, Object.keys(item.states).filter(s => !item.states[s]!.final), null, 100).items).map((item): Item => {
     if (item.type === "roster") return { ...item, refs: { ...item.refs, directory } }; // SCRIPTED directory creator projection.
-    if (item.type !== "member" || item.values["kind"] !== "agent") return item;
-    const entry = m.entries[item.id]!.entry, send = entry.sends.find(s => "creator" in s.to && s.to.kind === "inbox");
-    if (!send || !("creator" in send.to)) return item;
-    // Explicit stand-in for native inbox result/confirmation in this cheap test.
-    return { ...item, refs: { ...item.refs, inbox: { scope: scopeIdOf(send.to), inc: newIncarnation(new Uint8Array(16).fill(33)), kind: "inbox" } } };
+    return item; // M2 never writes member.refs.inbox (EM9).
   });
   const reply = (value: unknown) => Response.json(value);
   const fetch: Fetch = async (url, init) => {
@@ -71,7 +67,7 @@ test("retained native agent opening and key invitation survive loss; independent
         const entry: Entry = { v: 1, at, seq: 0, prev: null, time: m.now, clamped: false, epoch: 0, input: { type: "genesis", seed: birth.to, inc: at.inc, kind: "establish", founding: null, source: m.fact(agent!.id), n: birth.n, message: birth.message.class === "request" ? birth.message : null, decision: "applied" }, uses: [], prepared: [], effects: [], sends: [] };
         return reply({ ok: true, at: { seq: 0, hash: entryHash(entry) }, value: { entry, hash: entryHash(entry) }, complete: true });
       }
-      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED inbox head") }, value: { scope: at, status: "active", definition: "platform:inbox@1", time: m.now, items: [], counts: [] }, complete: true });
+      return reply({ ok: true, at: { seq: 0, hash: textDigest("SCRIPTED inbox head") }, value: { scope: at, status: "active", definition: "platform:inbox@1", time: m.now, items: [{ id: 0, type: "inbox", state: "open", revision: 1, opened: textDigest("SCRIPTED inbox opening"), attributed: [], values: {}, parties: { owner: agent!.parties["member"] }, refs: { membership: m.at } }], counts: [["inbox", "open", 1]] }, complete: true });
     }
     if (url.includes(directory.scope)) {
       expect(init?.headers?.["authorization"]?.startsWith("Session ")).toBe(true); crossReads++;
