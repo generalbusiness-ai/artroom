@@ -21,7 +21,7 @@
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
-import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
@@ -345,8 +345,12 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const name = room.name;
   const account = room.me.handle;
   const shellContext = JSON.stringify([location.origin, directory, room.membership, room.key]);
-  const roomSwitch = () => name ? h("a", { class: "room-switch", href: "#/join", title: directory, "aria-label": `Change room: ${name}`, "data-focus-key": controlKey(shellContext, "room-connection") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄")) : null;
-  const accountControl = () => h("a", { class: "account", href: "#/join", "aria-label": `Change connection for ${account}`, "data-focus-key": controlKey(shellContext, "account-connection") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
+  const roomSwitch = () => name ? h("details", { class: "shell-disclosure room-disclosure" },
+    h("summary", { class: "room-switch", title: directory, "aria-label": `Room: ${name}`, "data-focus-key": controlKey(shellContext, "room-connection") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄")),
+    h("div", { class: "shell-disclosure-content" }, h("p", { title: directory }, name), h("a", { href: "#/join" }, "Join another room"))) : null;
+  const accountControl = () => h("details", { class: "shell-disclosure account-disclosure" },
+    h("summary", { class: "account", "aria-label": `Account: ${account}`, "data-focus-key": controlKey(shellContext, "account-connection") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.replace(/^@+/, "").slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account)),
+    h("div", { class: "shell-disclosure-content" }, whoLine(room), h("a", { href: "#/join" }, "Change connection")));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
     ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) => h("a", { class: "nav-item", href, "data-focus-key": controlKey(shellContext, `nav:${kind}`), ...(destination === kind ? { "aria-current": "page" } : {}) }, label)), h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages"));
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
@@ -503,11 +507,13 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   return panel;
 }
 
-function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
+function connectionScreen(path: "join" | "invitation" | "config", connected: Room | null = null): HTMLElement {
   const capturedDraw = drawing, capturedRoute = location.hash, capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
   const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
   const back = () => h("a", { class: "entry-back", href: "#/join" }, h("span", { "aria-hidden": "true" }, "‹"), "Back");
-  if (path === "join") return h("main", { class: "screen entry-screen" }, h("h1", {}, "Join a room"), h("p", { class: "entry-intro" }, "How would you like to join?"),
+  if (path === "join") return h("main", { class: "screen entry-screen" },
+    connected ? h("a", { class: "entry-back", href: "#/" }, h("span", { "aria-hidden": "true" }, "‹"), `Back to ${connected.name}`) : null,
+    h("h1", {}, connected ? "Join another room" : "Join a room"), h("p", { class: "entry-intro" }, connected ? `You are in ${connected.name} as ${connected.me!.handle}` : "How would you like to join?"),
     ignoredSavedAddress ? h("p", { class: "entry-answer" }, "The saved connection address is ignored. Your room and key are kept. Use a connection below; this page reads only its own service.") : null,
     h("div", { class: "entry-choices" },
       h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
@@ -611,7 +617,15 @@ async function draw(focus = false): Promise<void> {
   };
   if (["join", "invitation", "config"].includes(route.destination) || !kept || !kept.place || ignoredSavedAddress) {
     const path = route.destination === "invitation" || route.destination === "config" ? route.destination : "join";
-    return show(...entryShell(connectionScreen(path)));
+    show(...entryShell(connectionScreen(path)));
+    if (path === "join" && kept?.place && !ignoredSavedAddress) {
+      try {
+        const connected = await roomOf(kept, kept.place);
+        if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== originalContext) return;
+        if (verifiedRoom(connected)) { selectedRoom = connected; show(...entryShell(connectionScreen(path, connected))); }
+      } catch { /* An unreadable saved connection cannot identify a current room. Joining remains available. */ }
+    }
+    return;
   }
   if (originalContext !== lastVerifiedContext) show(...entryShell(h("main", { class: "screen entry-screen" }, h("h1", {}, "Opening your room"), h("p", { class: "entry-answer", role: "status" }, "Working on reading the room"))));
   let room: Room | null = null;

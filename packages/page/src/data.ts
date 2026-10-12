@@ -725,11 +725,14 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
     if (rules.length !== 1) return unavailable;
     const current = rules[0]!;
     if (current.id !== 0 || current.state !== "current" || !Number.isSafeInteger(current.revision) || current.revision < 1) return unavailable;
-    // itemsOf merges current and retained pages at `at`: a retired definition
-    // is evidence that this room has been configured, never empty activation.
-    const definitions = await itemsOf(handle, summary, "definition", at);
+    // Complete summary evidence already proves configured. A historical read
+    // cannot discard that positive result or delay ordinary navigation.
     const published = current.refs["published"];
-    if (definitions.length > 0 || published !== undefined && published !== null || current.revision !== 1) return { state: "configured" };
+    if (published !== undefined && published !== null || current.revision > 1 || summary.items.some(item => item.type === "definition")) return { state: "configured" };
+    // Proving absence still needs complete coherent current/retained pages:
+    // a retired definition also proves that this room has been configured.
+    const definitions = await itemsOf(handle, summary, "definition", at);
+    if (definitions.length > 0) return { state: "configured" };
     // Known rules1–3 initial item, not merely a missing/failed policy read.
     if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
       || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"

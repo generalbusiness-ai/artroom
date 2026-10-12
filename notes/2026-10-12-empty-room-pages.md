@@ -21,3 +21,25 @@ The gate ran on the local macOS arm64 host with existing cached dependencies. Ot
 The public gate proof is `/tmp/artroom-empty-room229c-final-gate-one/public-proof.json`, SHA-256 `10919f8669cec90a24c34075993c26ec8492ce3c56e23e534d774c44c2f25c5e`. It retains the actual private phase paths and raw log hashes; generated files remain opaque. This note update changes only documentation after the tested head; source, tests and assets remain identical, so it does not repeat the gate.
 
 Earlier component results retain their named heads and failed wrappers. Site publication proof and Git responses in the focused witness are scripted boundaries, not live provider evidence. Full review, landing, hosted acceptance and a fresh human walkthrough remain separate obligations.
+
+## Configured-room repair and shell composition: prebuild Source
+
+The repair of checker `c29a5cdbd37795d4d2aca6426cfc18715e6e4bfb` returns configured
+from a complete summary's published reference, revised rules item or definition
+before requesting definition history. Complete coherent pagination still proves
+absence. The existing initialization witness now denies definition history for
+configured summaries and checks that no definition-page request occurs. Its
+retired-definition, denied-read, changed-head and changed-context assertions remain.
+
+This successor normally composes landed shell main
+`565a39159bf0f0a138014689cec0363e618c2418` with the empty-room Source at
+`795f60bd613aae311be70e15a9ad89c248d3d25d`. Both initialization fixture exports and
+shell identity exports remain. The retained-dialog witness restores the real view.
+The joined-shell witness explicitly scripts its new initialization read boundary.
+
+The receiving 795 generated Page asset is a temporarily stale prebuild placeholder.
+It does not represent the composed authored Source and is not approved for this
+union. Only the normal Page generator, after Source review, can replace it.
+Affected compilers, witnesses, asset build and the new gate are UNRUN. The older
+1,040-pass gate and component evidence above remain bound to their original heads.
+No new review, landing or hosted acceptance is claimed.

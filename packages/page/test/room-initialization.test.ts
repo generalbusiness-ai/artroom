@@ -16,7 +16,7 @@ test("initialization guidance needs complete initial rules and no live or retire
   const rule = item({ refs: { directory: { ...D } }, values: { branch: "main", membership: M.scope, approvals: 1, ownerMayReview: false, singleControllerException: false } });
   const repository = item({ type: "repository", refs: { membership: { ...M }, rules: { ...Q }, destination: { ...G } } });
   const summary = (at: ScopeRef, items: Item[]): Summary => ({ scope: at, status: "active", definition: at.kind === "rules" ? "platform:rules@3" : "platform:directory@3", time: "2026-10-12T00:00:00Z", items, counts: [] });
-  let mode: "empty" | "live" | "retired" | "forbidden" | "incomplete" | "missing" | "moved" | "context" = "empty", reads = 0, mutations = 0;
+  let mode: "empty" | "live" | "published" | "revised" | "retired" | "forbidden" | "incomplete" | "missing" | "moved" | "context" = "empty", reads = 0, mutations = 0, definitionReads = 0, denyDefinitionReads = false;
   let pageEntered!: () => void, resumePage!: () => void;
   const fetch = async (url: string, init?: { method?: string }): Promise<Response> => {
     reads++;
@@ -27,9 +27,12 @@ test("initialization guidance needs complete initial rules and no live or retire
     if (path === `/v1/scopes/${Q.scope}`) {
       if (mode === "forbidden") return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
       const definitions = mode === "live" ? [item({ id: 2, type: "definition", state: "active", values: { name: "issue", digest } })] : [];
-      return Response.json({ ok: true, complete: mode !== "incomplete", at: frontier, value: summary(Q, mode === "missing" ? [] : [rule, ...definitions]) });
+      const current = mode === "published" ? { ...rule, refs: { ...rule.refs, published: 1 } } : mode === "revised" ? { ...rule, revision: 2 } : rule;
+      return Response.json({ ok: true, complete: mode !== "incomplete", at: frontier, value: summary(Q, mode === "missing" ? [] : [current, ...definitions]) });
     }
     if (path === `/v1/scopes/${Q.scope}/items/definition`) {
+      definitionReads++;
+      if (denyDefinitionReads) return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
       const cursor = new URL(url).searchParams.get("cursor");
       if (mode === "context") { pageEntered(); await new Promise<void>(resolve => { resumePage = resolve; }); }
       if (mode === "retired" && cursor === null) return Response.json({ ok: true, complete: false, next: "retained-page-two", at: frontier, value: [] });
@@ -47,7 +50,14 @@ test("initialization guidance needs complete initial rules and no live or retire
   expect(initializationMessage(initial.state)).toBe("This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.");
   mode = "live";
   expect(await initializationStillCurrent(room, initial)).toBe(false); // Initialization observed after H0 and before display.
+  // These complete summaries prove configured even when history is denied.
+  // The actual HTTP boundary must receive no definition-page request.
+  denyDefinitionReads = true; const beforeConfigured = definitionReads;
   expect((await roomInitialization(room)).state).toBe("configured");
+  mode = "published"; expect((await roomInitialization(room)).state).toBe("configured");
+  mode = "revised"; expect((await roomInitialization(room)).state).toBe("configured");
+  expect(definitionReads).toBe(beforeConfigured);
+  denyDefinitionReads = false;
   mode = "retired"; expect((await roomInitialization(room)).state).toBe("configured");
   for (const failure of ["forbidden", "incomplete", "missing", "moved"] as const) {
     mode = failure; const unknown = await roomInitialization(room);
