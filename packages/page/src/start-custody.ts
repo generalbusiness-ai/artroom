@@ -19,7 +19,8 @@ const keyOf = (origin: string) => `artroom-page-start:${origin}`;
 const unavailable = () => new Error("The original private Start key or claim is unavailable. Nothing was replaced or submitted.");
 function originOf(origin: string): void {
   const url = new URL(origin);
-  if (url.origin !== origin || !["https:", "http:"].includes(url.protocol) || typeof location !== "undefined" && location.origin !== origin) throw unavailable();
+  const browser = globalThis as { location?: { origin: string } };
+  if (url.origin !== origin || !["https:", "http:"].includes(url.protocol) || browser.location && browser.location.origin !== origin) throw unavailable();
 }
 function read(origin: string, storage: ClaimStorage): KeptStart | null {
   originOf(origin);
@@ -65,7 +66,8 @@ export function originalStart(origin: string, storage: ClaimStorage): StartStatu
 }
 export async function startRoom(origin: string, storage: ClaimStorage, options: StartOptions): Promise<StartedRoom> {
   originOf(origin);
-  const locks = options.locks ?? (typeof navigator === "undefined" ? undefined : navigator.locks);
+  const browser = globalThis as { navigator?: { locks?: import("./claim.ts").ClaimLocks } };
+  const locks = options.locks ?? browser.navigator?.locks;
   if (!locks) throw new Error("Private Start locking is unavailable. Nothing was submitted.");
   return locks.request(`artroom-page-start:${origin}`, async () => {
     current(options);
