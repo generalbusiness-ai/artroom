@@ -57,6 +57,12 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   vi.stubGlobal("window", { addEventListener: (_key: string, callback: () => void) => { redraw = callback; } });
   try {
     await import("../src/main.ts"); await rendered.promise;
+    const verifiedWordmarks = root.all().filter(element => element.tag === "a" && element.attrs["aria-label"] === "dap homepage");
+    expect(verifiedWordmarks).toHaveLength(2); // Rail and mobile header.
+    for (const wordmark of verifiedWordmarks) {
+      expect(wordmark.attrs["href"]).toBe("https://dap.generalbusiness.ai/");
+      expect(wordmark.children).toHaveLength(2);
+    }
     root.find((element) => element.tag === "button" && element.textContent === "Create room")!.fire("click");
     let dialog = body.find((element) => element.tag === "dialog")!;
     let input = dialog.find((element) => element.tag === "input")!; input.value = "Local intent";
