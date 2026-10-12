@@ -175,9 +175,9 @@ is 2.43.0, which refuses the runner's
 `fatal: only one reference expected, 2 given.` The runner reads that exit
 code as `checkout-failed`. The failures are the same with the global Git
 configuration set aside (`GIT_CONFIG_GLOBAL=/dev/null`), so the container's
-signing and proxy settings are not the cause. A Git that accepts
-`--end-of-options` before a revision in `checkout` passes them; the fix,
-in the runner or in the cloud image's Git, is not this delivery's.
+signing and proxy settings are not the cause. No newer Git was tried here.
+The fix, in the runner or in the cloud image's Git, is not this
+delivery's.
 
 ## What is owed
 
