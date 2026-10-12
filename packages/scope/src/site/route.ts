@@ -87,7 +87,7 @@ export function refused(reason: SiteRefusal, sentence: string, step?: SiteStep, 
   };
   const body = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pages</title>
-<style>body{margin:0;font:16px/1.6 system-ui,sans-serif;color:#1f2328;background:#fff}header,main{max-width:42rem;margin:0 auto;padding:1.5rem 1rem}header img{width:72px;height:42px}.wordmark-dark{display:none}a{color:#0969da}h1{font-size:1.5rem}@media(prefers-color-scheme:dark){body{color:#f0f6fc;background:#0d1117}a{color:#4493f8}.wordmark-light{display:none}.wordmark-dark{display:inline}}</style></head>
+<style>body{margin:0;font:16px/1.6 system-ui,sans-serif;color:#16180F;background:#F3F1EA}header,main{max-width:42rem;margin:0 auto;padding:1.5rem 1rem}header img{width:72px;height:42px}.wordmark-dark{display:none}a{color:#123F2B}h1{font-size:1.5rem}@media(prefers-color-scheme:dark){body{color:#ECEAE2;background:#121410}a{color:#5FA880}.wordmark-light{display:none}.wordmark-dark{display:inline}}</style></head>
 <body><header><a href="${ROOM_PAGE}"><img class="wordmark-light" src="/brand/dap-wordmark.svg" alt="dap" width="72" height="42"><img class="wordmark-dark" src="/brand/dap-wordmark-white.svg" alt="dap" width="72" height="42"></a></header><main><h1>Pages</h1>
 <p>The room publishes a change's pages at this address once the host reads its repository.</p>
 <p>${escapeHtml(explanations[reason])}</p><p><a href="${ROOM_PAGE}">Back to the room</a></p></main></body></html>\n`;

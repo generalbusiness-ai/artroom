@@ -20,9 +20,9 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
-import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
+import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
@@ -630,6 +630,9 @@ async function draw(focus = false): Promise<void> {
     if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     const { destination, scope } = route;
     const loaded = room;
+    const initialization = await roomInitialization(room);
+    let notice = initializationMessage(initialization.state);
+    const showRoom = (...content: HTMLElement[]) => show(...shell(destination, room, ...(notice ? [h("p", { class: "answer room-initialization", role: "status" }, notice)] : []), ...content));
     const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
     if (destination === "issues" && scope) {
       const issue = await loadIssue(room, scope as ScopeId);
@@ -654,7 +657,7 @@ async function draw(focus = false): Promise<void> {
         }
         return represented;
       } });
-      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Issue record")));
+      return showRoom(inspectedScreen(screen, panel, association, "Issue record"));
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
@@ -709,16 +712,22 @@ async function draw(focus = false): Promise<void> {
         }
         return represented;
       } });
-      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Change record")));
+      return showRoom(inspectedScreen(screen, panel, association, "Change record"));
     }
     if (destination === "rules") {
-      const rules = await loadRules(room);
+      let rules: Awaited<ReturnType<typeof loadRules>>;
+      try { rules = await loadRules(room); }
+      catch {
+        notice = null; // A later failed read cannot keep an earlier initialization claim current.
+        const known = lastActs.get(actAssociation(room, room.rules));
+        return showRoom(h("main", { class: "screen" }, h("h1", {}, "Rules"), h("p", { class: "answer", role: "status" }, "The complete rules could not be read. Check status before editing."), ...(known ? [answerLine({ ...known, observation: known.observation ?? "The subsequent view could not be read." })] : [])));
+      }
       const offered = await actsOn(room, room.rules);
       const editable = rules.item !== undefined && offered.acts.some((act) => act.kind === "publish");
       const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
       const screen = rulesScreen(room, rules, editable);
       const panel = await panelFor(room, room.rules, {}, options);
-      return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record")));
+      return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record"));
     }
     const kind = destination === "changes" ? "change" : "issue";
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
@@ -731,14 +740,14 @@ async function draw(focus = false): Promise<void> {
         return []; // Generic custom declarations remain available in Advanced.
       }
       const open = destination === "issues" ? acts.acts.find((act) => act.kind === "open-issue") : undefined;
-      if (!open) return [];
+      if (!open || initialization.state === "not-initialized") return [];
       const control = createIssue(open, send, context);
       screen.querySelector('[data-action-slot="create"]')?.append(control);
       // An unavailable task paragraph must not remove the usable native
       // declaration from Inspect (for example a custom required field).
       return control.hasAttribute("data-task-act") ? [open.kind] : [];
     } });
-    return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record")));
+    return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record"));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];

@@ -687,6 +687,54 @@ export async function loadSite(room: Pick<Room, "session" | "directory">, path: 
 
 // ---------------------------------------------------------------- the rules
 
+/** Conservative presentation evidence; failed reads never imply an uninitialized room. */
+export type RoomInitialization =
+  | { state: "not-initialized"; scope: ScopeRef; head: Head; rulesItem: number }
+  | { state: "configured" }
+  | { state: "unknown"; reason: string };
+
+export async function roomInitialization(room: Room): Promise<RoomInitialization> {
+  const unavailable: RoomInitialization = { state: "unknown", reason: "The complete rules could not be read. Check status before editing." };
+  const context = () => canonicalize({ service: room.session.service, directory: room.directory, membership: room.membership, key: room.key, rules: room.rules });
+  const captured = context();
+  try {
+    await fresh(room);
+    const directory = await summaryOf(handleOf(room, room.directory));
+    const repository = directory.summary.items.find(item => item.type === "repository");
+    const named = repository?.refs["rules"];
+    if (directory.summary.status !== "active" || directory.summary.scope.scope !== room.directory || directory.summary.scope.kind !== "directory"
+      || !fullScopeRef(named) || named.kind !== "rules" || named.scope !== room.rules
+      || canonicalize(repository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    const handle = handleOf(room, room.rules), { summary, at } = await summaryOf(handle);
+    if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(named)
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return unavailable;
+    const rules = summary.items.filter(item => item.type === "rules");
+    if (rules.length !== 1) return unavailable;
+    const current = rules[0]!;
+    if (current.id !== 0 || current.state !== "current" || !Number.isSafeInteger(current.revision) || current.revision < 1) return unavailable;
+    // itemsOf merges current and retained pages at `at`: a retired definition
+    // is evidence that this room has been configured, never empty activation.
+    const definitions = await itemsOf(handle, summary, "definition", at);
+    const published = current.refs["published"];
+    if (definitions.length > 0 || published !== undefined && published !== null || current.revision !== 1) return { state: "configured" };
+    // Known rules1–3 initial item, not merely a missing/failed policy read.
+    if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
+      || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"
+      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== false || current.values["singleControllerException"] !== false
+      || ["checks", "labels", "extents"].some(name => current.values[name] !== undefined && current.values[name] !== null)) return unavailable;
+    const after = await summaryOf(handle);
+    const latestDirectory = await summaryOf(handleOf(room, room.directory));
+    const latestRepository = latestDirectory.summary.items.find(item => item.type === "repository");
+    if (context() !== captured || canonicalize(after.at) !== canonicalize(at) || canonicalize(after.summary.scope) !== canonicalize(summary.scope)
+      || latestDirectory.summary.status !== "active" || canonicalize(latestDirectory.summary.scope) !== canonicalize(directory.summary.scope)
+      || canonicalize(latestRepository?.refs["rules"]) !== canonicalize(named)
+      || canonicalize(latestRepository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    return { state: "not-initialized", scope: summary.scope, head: at, rulesItem: current.id };
+  } catch {
+    return unavailable;
+  }
+}
+
 export interface RulesView {
   /** The actual rules item, used by publish transitions. */
   item?: number;

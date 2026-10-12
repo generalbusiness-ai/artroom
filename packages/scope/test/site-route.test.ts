@@ -435,8 +435,8 @@ test("a relative image: the address a page writes answers the image's bytes with
 });
 
 // Invariant: a missing page, a missing ref, a file over the bound, a scope that is no room and a host that is not configured
-// each answer a plain refusal with its reason and status, and no HTML.
-test("refusals: a missing page, a bad ref, a file over the size bound at the real bound, no room, a bad path and no host each answer plain text with a reason and a status (STAND-IN host)", async () => {
+// each keeps its machine refusal; browsers get a safe Pages document with the same status.
+test("refusals preserve machine reasons and statuses while browsers get safe Pages documents for the same failures (STAND-IN host)", async () => {
   const cases: [string, number, string, SiteEnv?][] = [
     [`/site/${D.name}/HEAD/docs/missing.md`, 404, "not-found"],
     [`/site/${D.name}/HEAD/docs/guide.md/`, 404, "not-found"],

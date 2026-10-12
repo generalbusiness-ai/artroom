@@ -1,0 +1,56 @@
+import { expect, test } from "vitest";
+import type { Head, Item, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import { digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { Session as ReadSession } from "@generalbusiness/artroom-client";
+import { roomInitialization, type Room } from "../src/data.ts";
+import { initializationMessage } from "../src/shell.ts";
+
+// Scripted authenticated read answers, not native founding or permission evidence.
+// Real client HTTP reads and complete current/retained pagination are exercised.
+test("initialization guidance needs complete initial rules and no live or retired definitions; read failures and changed context stay unknown", async () => {
+  const digest = digestBytes(new Uint8Array([1]));
+  const scope = (kind: ScopeRef["kind"], n: number): ScopeRef => ({ scope: scopeIdOf({ v: 1, kind, definition: digest, creator: null, cause: digest, ordinal: n }), inc: newIncarnation(new Uint8Array(16).fill(n)), kind });
+  const D = scope("directory", 1), M = scope("membership", 2), Q = scope("rules", 3), G = scope("destination", 4);
+  const head: Head = { seq: 1, hash: digest };
+  const item = (over: Partial<Item>): Item => ({ id: 0, type: "rules", state: "current", revision: 1, opened: digest, parties: {}, refs: {}, values: {}, attributed: [], ...over });
+  const rule = item({ refs: { directory: { ...D } }, values: { branch: "main", membership: M.scope, approvals: 1, ownerMayReview: false, singleControllerException: false } });
+  const repository = item({ type: "repository", refs: { membership: { ...M }, rules: { ...Q }, destination: { ...G } } });
+  const summary = (at: ScopeRef, items: Item[]): Summary => ({ scope: at, status: "active", definition: at.kind === "rules" ? "platform:rules@3" : "platform:directory@3", time: "2026-10-12T00:00:00Z", items, counts: [] });
+  let mode: "empty" | "live" | "retired" | "forbidden" | "incomplete" | "missing" | "moved" | "context" = "empty", reads = 0, mutations = 0;
+  let pageEntered!: () => void, resumePage!: () => void;
+  const fetch = async (url: string, init?: { method?: string }): Promise<Response> => {
+    reads++;
+    if ((init?.method ?? "GET") !== "GET") { mutations++; throw new Error("No mutation is permitted by this fixture"); }
+    const path = new URL(url).pathname;
+    if (path === `/v1/scopes/${D.scope}`) return Response.json({ ok: true, complete: true, at: head, value: summary(D, [repository]) });
+    if (path === `/v1/scopes/${Q.scope}`) {
+      if (mode === "forbidden") return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
+      const definitions = mode === "live" ? [item({ id: 2, type: "definition", state: "active", values: { name: "issue", digest } })] : [];
+      return Response.json({ ok: true, complete: mode !== "incomplete", at: head, value: summary(Q, mode === "missing" ? [] : [rule, ...definitions]) });
+    }
+    if (path === `/v1/scopes/${Q.scope}/items/definition`) {
+      const cursor = new URL(url).searchParams.get("cursor");
+      if (mode === "context") { pageEntered(); await new Promise<void>(resolve => { resumePage = resolve; }); }
+      if (mode === "retired" && cursor === null) return Response.json({ ok: true, complete: false, next: "retained-page-two", at: head, value: [] });
+      const values = mode === "retired" ? [item({ id: 2, type: "definition", state: "retired", values: { name: "issue", digest } })] : [];
+      return Response.json({ ok: true, complete: true, at: mode === "moved" ? { ...head, seq: 2 } : head, value: values });
+    }
+    throw new Error("Unexpected scripted read");
+  };
+  const secret = new Uint8Array(32), key = keyIdOfSecret(secret);
+  const room: Room = { session: { service: "https://room.test", secret, fetch, now: () => Date.parse("2026-10-12T00:00:00Z") }, directory: D.scope, membership: M, rules: Q.scope, destination: G.scope, key, me: null, reader: new ReadSession("SCRIPTED-private-session", { v: 1, deployment: "SCRIPTED", membership: M, member: "@reader", key, reads: ["summary", "items"], ends: "2026-10-12T00:10:00Z" }), unsessioned: null, definitions: new Map() };
+  const initial = await roomInitialization(room);
+  expect(initial).toEqual({ state: "not-initialized", scope: Q, head, rulesItem: 0 });
+  expect(initializationMessage(initial.state)).toBe("This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.");
+  mode = "live"; expect((await roomInitialization(room)).state).toBe("configured");
+  mode = "retired"; expect((await roomInitialization(room)).state).toBe("configured");
+  for (const failure of ["forbidden", "incomplete", "missing", "moved"] as const) {
+    mode = failure; const unknown = await roomInitialization(room);
+    expect(unknown.state).toBe("unknown"); expect(initializationMessage(unknown.state)).toBeNull();
+  }
+  mode = "context"; const entered = new Promise<void>(resolve => { pageEntered = resolve; });
+  const old = roomInitialization(room); await entered;
+  room.membership = { ...M, inc: newIncarnation(new Uint8Array(16).fill(5)) }; resumePage();
+  expect((await old).state).toBe("unknown");
+  expect(reads).toBeGreaterThan(0); expect(mutations).toBe(0);
+});
