@@ -49,10 +49,21 @@ const button = (form: Element, label: string) => form.all().find((node) => node.
 test("unchanged rules and canceled confirmation sign nothing; malformed advanced values remain editable", () => {
   const sent: unknown[] = [];
   const form = asElement(rulesEditor(rules(), (...args) => sent.push(args)));
+  const labelFor = (name: string) => form.all().find(node => node.tag === "label" && node.all().some(control => control.name === name))!.children[0];
+  expect([labelFor("ownerMayReview"), labelFor("singleControllerException"), labelFor("approvals")]).toEqual(["Agent controllers can review their own agents?", "Single controller exception?", "Default approvals"]);
+  const save = button(form, "Save changes");
+  expect(save.hasAttribute("disabled")).toBe(true);
+  form.all().find((node) => node.name === "approvals")!.value = "01";
+  form.all().find((node) => node.name === "checks")!.value = JSON.stringify(rules().checks, null, 2);
+  form.all().find((node) => node.name === "labels")!.value = '[ "ready" ]';
+  form.event("input");
+  expect(save.hasAttribute("disabled")).toBe(true);
   form.event("submit");
   expect(form.textContent).toContain("No changes to save.");
   expect(sent).toEqual([]);
   form.all().find((node) => node.name === "extent:0")!.value = "2";
+  form.event("input");
+  expect(save.hasAttribute("disabled")).toBe(false);
   form.event("submit");
   expect(form.textContent).toContain("Confirm rule changes");
   expect(form.textContent).toContain('"approvals":1');
@@ -60,7 +71,26 @@ test("unchanged rules and canceled confirmation sign nothing; malformed advanced
   button(form, "Cancel").event("click");
   expect(sent).toEqual([]);
   expect(button(form, "Confirm changes")).toBeUndefined();
+  form.all().find((node) => node.name === "extent:0")!.value = "1";
+  form.event("change");
+  expect(save.hasAttribute("disabled")).toBe(true);
+  form.all().find((node) => node.name === "ownerMayReview")!.value = "true";
+  form.all().find((node) => node.name === "singleControllerException")!.value = "false";
+  form.event("change");
+  expect(save.hasAttribute("disabled")).toBe(false);
+  form.event("submit");
+  const confirmation = form.all().find((node) => node.attrs.get("class") === "rules-confirmation")!;
+  expect(confirmation.textContent).toContain("Agent controllers can review their own agents?");
+  expect(confirmation.all().filter(node => node.tag === "strong").map(node => node.textContent)).toEqual(["Agent controllers can review their own agents?", "Single controller exception?"]);
+  form.all().find((node) => node.name === "ownerMayReview")!.value = "false";
+  form.all().find((node) => node.name === "singleControllerException")!.value = "true";
+  form.event("change");
+  expect(save.hasAttribute("disabled")).toBe(true);
+  expect(button(form, "Confirm changes")).toBeUndefined();
   form.all().find((node) => node.name === "checks")!.value = "not JSON";
+  form.event("input");
+  expect(save.hasAttribute("disabled")).toBe(false);
+  expect(form.all().find((node) => node.name === "checks")!.hasAttribute("disabled")).toBe(false);
   form.event("submit");
   expect(sent).toEqual([]);
   expect(button(form, "Confirm changes")).toBeUndefined();
@@ -80,6 +110,11 @@ test("confirmed rules publish the exact observed item and preserve the complete 
   expect(JSON.parse(typed["checks"]!)).toEqual(original.checks);
   expect(JSON.parse(typed["extents"]!)).toEqual([{ ...original.extents![0], approvals: 3 }]);
   expect(original.extents![0]!.approvals).toBe(1);
+  form.all().find((node) => node.name === "extent:0")!.value = "4";
+  form.event("input");
+  expect(button(form, "Save changes").hasAttribute("disabled")).toBe(true);
+  form.event("submit");
+  expect(sent).toHaveLength(1);
 });
 
 test("missing exact rules identity, incomplete values and pending custody offer no save mutation", () => {
@@ -90,6 +125,9 @@ test("missing exact rules identity, incomplete values and pending custody offer 
     expect(form.textContent).toContain("complete rules could not be read");
   }
   const pending = asElement(rulesEditor(rules(), () => expect.fail("must not send"), { blocked: true }));
+  expect(button(pending, "Save changes").hasAttribute("disabled")).toBe(true);
+  pending.all().find((node) => node.name === "extent:0")!.value = "2";
+  pending.event("input");
   expect(button(pending, "Save changes").hasAttribute("disabled")).toBe(true);
   pending.event("submit");
   expect(button(pending, "Confirm changes")).toBeUndefined();
@@ -105,9 +143,17 @@ test("unsent rules edits survive navigation only in the same room, member and ob
   expect(value(original, "other-room/member/rules")).toBe("1");
   expect(value(original, "room/other-member/rules")).toBe("1");
   expect(value({ ...original, head: { ...original.head, seq: original.head.seq + 1 } }, "room/member/rules")).toBe("1");
+  const restored = asElement(rulesEditor(original, () => {}, { draftKey: "room/member/rules" }));
+  expect(button(restored, "Save changes").hasAttribute("disabled")).toBe(false);
+  const fresh = asElement(rulesEditor(original, () => {}, { draftKey: "other-room/member/rules" }));
+  expect(button(fresh, "Save changes").hasAttribute("disabled")).toBe(true);
   form.event("submit");
   expect(button(form, "Confirm changes")).toBeDefined();
   form.all().find((node) => node.name === "extent:0")!.value = "5";
   form.event("input");
   expect(button(form, "Confirm changes")).toBeUndefined();
+  form.all().find((node) => node.name === "extent:0")!.value = "1";
+  form.event("input");
+  const reverted = asElement(rulesEditor(original, () => {}, { draftKey: "room/member/rules" }));
+  expect(button(reverted, "Save changes").hasAttribute("disabled")).toBe(true);
 });
