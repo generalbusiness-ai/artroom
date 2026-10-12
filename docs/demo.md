@@ -9,9 +9,10 @@ evening before a recording, and again on the morning of it.
 
 ## What the runner does
 
-`scripts/demo-run.ts` runs 26 shots in order by default. Each shot is one command
-line, called as the command line's own function with that person's config
-directory, or one read of `git log` or of a page. The people are the
+`scripts/demo-run.ts` runs 27 shots in order by default. Each ordinary shot
+is one command line, called through the CLI with that person's config
+directory, or one read of `git log` or a page. The concurrency shot records
+each of its commands and exits. The people are the
 founder `@hugh`, a member `@una` and a maintainer `@paul`, each with a
 fresh config directory.
 
@@ -23,13 +24,40 @@ fresh config directory.
 | 11, 12 | The member clones with a read token from the room, and reads `git log --oneline` | 6 |
 | 13 to 15 | The member opens issue #1, the maintainer comments, the founder assigns it to the maintainer | 8 |
 | 16 | The maintainer edits `guide/start.md` with `--closes 1`: published, and the issue closes | 8 |
-| 17 to 19 | The maintainer edits `AGENTS.md`: refused `rules-not-met:rules`; the founder approves for the rules extent; the maintainer's merge publishes | 10, 11 |
-| 20 | The maintainer edits `../outside.md`: refused `path-invalid` | 10 |
-| 21, 22 | `artroom issues` shows #1 closed; `artroom verify --all` reports twelve scopes consistent | 8, 12 |
-| 23 to 26 | The site's front page, the two published pages, and the room's page at `/page/` | 7, 9, 11 |
+| 17 to 19 | The maintainer proposes `AGENTS.md`: refused `rules-not-met:rules`; the founder approves. Before merging it, the maintainer admits the second file on the same published base, then publishes `AGENTS.md`. Each command and exit is recorded. | 10, 11, concurrency |
+| 20 | The maintainer merges the already-admitted second file: refused `out-of-date`; the same maintainer re-proposes it as a new change on the new head and publishes it. The refused lane remains in the record. | concurrency |
+| 21 | The maintainer edits `../outside.md`: refused `path-invalid` | 10 |
+| 22, 23 | `artroom issues` shows #1 closed; `artroom verify --all` reports fourteen scopes consistent | 8, 12 |
+| 24 to 27 | The site's front page, the two published pages, and the room's page at `/page/` | 7, 9, 11 |
 
-Each shot states the exit code and the lines it expects, taken from the
-observed run of the 23:00 sprint report. An expected line is a template:
+Each shot states the exit code and the lines it expects. The isolated
+GitHub rehearsal `github27-freeze-two`, run on 12 October 2026 UTC,
+observed the new stale-base row at source `c8cb6c538`. All 27 shots ran;
+25 matched, including fourteen consistent scopes. The front-page and
+`AGENTS.md` reads returned HTTP 502. One later anonymous read of each
+returned the expected HTTP 200, content type, title and page text. Those
+later reads are separate evidence; the original run remains failed.
+The controlled change and the
+stale change name the same earlier published base. Both proposals are
+admitted before the controlled publication; the second merge follows it. The result's
+`staleRefusal` field and transcript report runner-local elapsed milliseconds
+from invoking that merge command to its expected `out-of-date` return,
+using `performance.now()`. They label the date, service and Git host. This
+includes CLI work and round-trip waiting, excludes the fresh proposal and
+publication, and is not server-only latency or a native history fact.
+Injected test clocks are labelled separately. The freeze route uses a
+new change lane; same-lane manifest replacement remains separate work
+under plan 029.
+
+Observed run, runner timer: **2,586.628125 ms**, measured with
+`performance.now()` at `2026-10-12T01:40:23.340Z`, against
+`https://artroom-rehearsal.inguz.workers.dev`, with Git host `github.com`.
+Subsequent signed native reads confirm the shared old base, retained
+out-of-date refusal, same proposer, distinct fresh lane and publication
+on the winner's commit. Native timestamps corroborate the recorded CLI
+sequence; they do not define a global order across scopes.
+
+An expected line is a template:
 `<name>` is any text without a space, `<...>` is any text, and `{name}` is
 a value that an earlier line printed, such as the change's scope ID. A
 later shot types those values, so the runner needs no help from the
@@ -77,7 +105,7 @@ node --import tsx --no-warnings scripts/demo-run.ts \
 
 Arrange the pin step with the deployment operator before starting. The
 App installation must cover the new repository; the creation credential
-must be current. The GitHub adapter supports all 26 shots, including
+must be current. The run asks the GitHub adapter for all 27 shots, including
 the member's one-hour read token, clone, publications and site reads, so
 none is skipped for this host. A missing setting, expired credential or
 unexpected provider answer is a mismatch to investigate, not an
@@ -115,8 +143,8 @@ and a second text file. The maintainer's proposal must be refused
 scenes use the manifest-list definition; the explicit later merge prints
 its publication line without the legacy convenience page line.
 
-The optional run has 31 shots and verifies 14 scopes; the default run
-keeps its 26 shots and 12 scopes. Both flags can be used together:
+The optional run has 32 shots and verifies 16 scopes; the default run
+keeps its 27 shots and 14 scopes. Both flags can be used together:
 `--manifest --pace` waits before the preparation steps too.
 
 The Node runner uses actual local Git in the member's `site` clone.
