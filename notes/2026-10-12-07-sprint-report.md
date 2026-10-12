@@ -104,3 +104,13 @@ was carried over each time, so no review work was repeated.
 Times are Eastern. Event times come from workroom act times and Git
 history. Deployment versions come from the Cloudflare deployment list
 read by the planner. Review verdicts are the checker's.
+
+## Addendum, 07:35
+
+The builder returned at 07:08 and finished the landing the report
+called unlanded: the join flow composite is on main at `459ccf92`, the
+room host runs it as version `c4ab4c3f` (07:19) and the rehearsal host
+as `98fddc61` (07:23), with the served page bytes and the "dap -
+workroom" title read back by the builder. The counting host stays at
+`bfaa66a9`. The builder is now composing the Start a room head in its
+own worktree. Item 2 of "For Hugh" is no longer needed.
