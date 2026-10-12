@@ -213,8 +213,21 @@ export class Custody {
   /** The decisive outcome of a record's current attempt, reading the segment only when the inline outcomes do not reach back far enough. */
   async decided(id: string, record: CustodyRecord): Promise<{ at: string; answer: Answer } | null> {
     const inline = decisive(record.outcomes, record.attempt);
-    if (inline || record.outcomes.length === record.count || record.outcomes[0]?.attempt !== record.attempt) return inline;
-    return decisive(await this.outcomes(id, record), record.attempt);
+    // Found inline, or the inline outcomes already reach back past the attempt's start, or there is nothing in the segment.
+    const inSegment = record.count - record.outcomes.length;
+    if (inline || inSegment === 0 || (record.outcomes.length > 0 && record.outcomes[0]!.attempt !== record.attempt)) return inline;
+    // Every outcome of this attempt that is inline is undecided, or none is inline at all (each spilled to meet the byte bound):
+    // read the segment's tail backwards, a bounded slice at a time, until the decisive one or the attempt's start.
+    const SLICE = 64;
+    let tail: Outcome[] = [...record.outcomes];
+    for (let end = inSegment; end > 0; end -= SLICE) {
+      const from = Math.max(0, end - SLICE);
+      const slice = await this.store.segmented(id, from, end - from);
+      tail = [...slice, ...tail];
+      const found = decisive(tail, record.attempt);
+      if (found || slice.some((o) => o.attempt !== record.attempt)) return found;
+    }
+    return decisive(tail, record.attempt);
   }
 
   /** The record under an identity, or null. */
@@ -270,12 +283,21 @@ export class Custody {
           if (!last) throw new CustodyError({ held: "unreadable" });
           return { record, answer: last.answer, retained: true };
         }
-        // A deliberate resubmission of a refusal: a new attempt, kept unresolved before anything is sent.
-        record.attempt++;
+        // A deliberate resubmission of a refusal makes the record unresolved again: it is admitted against the capacity under the
+        // shared lease, and the new attempt is kept there, before anything is sent. A store that is full keeps the refusal as it was.
+        await this.store.exclusive(async () => {
+          const open = await this.store.unresolved();
+          if (open.length >= UNRESOLVED_MOST) throw new CustodyError({ held: "full", reason: "count", keys: open.slice(0, 8).map((o) => o.key) });
+          record.attempt++;
+          record.phase = "sent";
+          record.updated = this.now();
+          await this.#write(id, record);
+        });
+      } else {
+        record.phase = "sent";
+        record.updated = this.now();
+        await this.#write(id, record);
       }
-      record.phase = "sent";
-      record.updated = this.now();
-      await this.#write(id, record);
       let answer: Answer;
       try {
         answer = await deliver(record.envelope);

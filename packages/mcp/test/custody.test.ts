@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import type { Answer, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
-import { fileStore } from "../src/node.ts";
+import { fileStore, releaseLock, takeLock } from "../src/node.ts";
 import { T0, accepted, build, identity, notAfter, receiptOf, refused, resource } from "./support/custody.ts";
 
 // The scope's answers here are scripted: `deliver` and `settle` are STAND-INs for a scope's submit and settlement. What a real
@@ -292,4 +292,79 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     const settled = await make().settle(identity("dies"), async (e) => receiptOf(e.signed, 6));
     expect([settled!.record.phase, settled!.decided?.answer.answer]).toEqual(["accepted", "accepted"]);
   }, 60_000);
+
+  // Invariant: a resubmitted refusal is admitted against the capacity like a new record: two processes resubmitting distinct
+  // refusals at 255 unresolved admit one; the other is held back as full, and its refusal stays as it was.
+  test("capacity: two processes resubmitting refusals at the bound admit one", async () => {
+    const { dir, custody, clock } = setup();
+    for (const key of ["left", "right"]) await custody.send(identity(key), meaningOf(key), build(key), async () => refused, { notAfter });
+    const first = await custody.keep(identity("seed"), meaningOf("seed"), build("seed"), notAfter);
+    for (let i = 1; i < UNRESOLVED_MOST - 1; i++) {
+      clock.advance(1);
+      const record: CustodyRecord = { ...first, identity: identity(`seed-${i}`), created: timeOf(clock.at()) };
+      writeFileSync(join(dir, "records", `${identityId(record.identity)}.json`), canonicalize(record));
+    }
+    expect((await custody.store.unresolved()).length).toBe(UNRESOLVED_MOST - 1);
+    const results = await Promise.all([child({ op: "resubmit", dir, key: "left" }).done, child({ op: "resubmit", dir, key: "right" }).done]);
+    expect(results.map((r) => r.out.trim()).sort(), results.map((r) => r.out).join("\n")).toEqual(["admitted", "full"]);
+    expect((await custody.store.unresolved()).length).toBe(UNRESOLVED_MOST);
+    const held = (await Promise.all(["left", "right"].map((k) => custody.find(identity(k))))).find((r) => r!.phase === "refused")!;
+    expect([held.attempt, held.outcomes.map((o) => "answer" in o && o.answer.answer)]).toEqual([1, ["refused"]]);
+  }, 60_000);
+
+  // Invariant: when every outcome moved to the segment to keep a record within 2 MiB, the decisive outcome is still found: a
+  // later send returns it with no delivery and no new signature, and settle reads it.
+  test("an accepted outcome found in the segment when none is inline", async () => {
+    const { custody } = setup();
+    const body = "y".repeat(2_000_000);
+    let delivered = 0;
+    const big = (signed: SignedIntent): Answer => ({ answer: "accepted", receipt: { ...receiptOf(signed, 9), effects: Array.from({ length: 400 }, (_, i) => ({ effect: "value", item: i, slot: "s", value: "v".repeat(400) })) as never } });
+    const first = await custody.send(identity("spilled"), meaningOf("s"), build("spilled", body), async (e) => { delivered++; return big(e.signed); }, { notAfter, bytes: body.length });
+    expect("answer" in first && first.answer.answer).toBe("accepted");
+    const record = (await custody.find(identity("spilled")))!;
+    expect([record.outcomes.length, record.count, record.phase]).toEqual([0, 1, "accepted"]);
+    const again = await custody.send(identity("spilled"), meaningOf("s"), async () => { throw new Error("must not sign"); }, async () => { throw new Error("must not send"); }, { notAfter, resubmit: true });
+    expect("answer" in again && [again.retained, again.answer.answer, again.answer.answer === "accepted" && again.answer.receipt.fact.seq]).toEqual([true, "accepted", 9]);
+    expect((await custody.settle(identity("spilled"), async () => { throw new Error("must not read"); }))!.decided?.answer.answer).toBe("accepted");
+    expect(delivered).toBe(1);
+  });
+
+  // Invariant: a dead owner's lock is reclaimed by exactly one of several processes trying at once, and a release removes only
+  // the releaser's own holding, never a newer owner's.
+  test("lock reclamation: simultaneous reclaimers, one enters; release is the owner's", async () => {
+    const { dir } = setup();
+    const dead = spawn(process.execPath, ["-e", ""]);
+    const pid = await new Promise<number>((resolve) => dead.on("exit", () => resolve(dead.pid!)));
+    const path = join(dir, "contended.lease");
+    writeFileSync(path, JSON.stringify({ pid, token: "dead-owner" }));
+    const results = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));
+    expect(results.map((r) => r.out.trim()).filter((o) => o === "entered"), results.map((r) => r.out).join("\n")).toHaveLength(1);
+    expect(results.map((r) => r.out.trim()).filter((o) => o === "refused")).toHaveLength(3);
+    const mine = takeLock(path, {})!;
+    expect(mine).not.toBeNull();
+    releaseLock({ path, token: "someone-else" });
+    expect(existsSync(path), "another holding's release leaves this lock").toBe(true);
+    releaseLock(mine);
+    expect(existsSync(path)).toBe(false);
+  }, 60_000);
+
+  // Invariant: archival re-reads each candidate under its lock: a refusal resubmitted between selection and lock is unresolved,
+  // stays live and counted, and is not archived.
+  test("archival skips a candidate resubmitted after it was selected", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mcp-custody-"));
+    let interleave: (() => void) | null = null;
+    const store = fileStore(dir, { terminalMost: 0, ageDays: 30, archiveBytes: 4096, fault: (point) => { if (point === "candidates-selected" && interleave) { const run = interleave; interleave = null; run(); } } }, () => T0);
+    const custody = new Custody(store, () => timeOf(T0));
+    await custody.keep(identity("refused-one"), meaningOf("r"), build("refused-one"), notAfter);
+    const id = identityId(identity("refused-one"));
+    const path = join(dir, "records", `${id}.json`);
+    // The record is refused; as archival selects it, another process resubmits it: its file now says sent.
+    const record = JSON.parse(readFileSync(path, "utf8")) as CustodyRecord;
+    interleave = () => writeFileSync(path, canonicalize({ ...record, phase: "sent", attempt: 2 }));
+    await store.write(id, { ...record, phase: "refused", count: 1, outcomes: [{ at: timeOf(T0), answer: refused, attempt: 1 }] });
+    expect(existsSync(path)).toBe(true);
+    expect((await store.read(id))!.phase).toBe("sent");
+    expect((await store.unresolved()).map((u) => u.key)).toEqual(["refused-one"]);
+    expect(store.archived()).toBe(0);
+  });
 });

@@ -21,7 +21,7 @@
  *   process that took it is gone.
  */
 
-import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
@@ -43,7 +43,7 @@ export interface FileStoreBounds {
   /** The most bytes of one archive file. */
   archiveBytes: number;
   /** A test's fault injection: called at each named point of an archival, where a crash may come. */
-  fault?: (point: "archive-written" | "index-published") => void;
+  fault?: (point: "candidates-selected" | "archive-written" | "index-published") => void;
 }
 export const FILE_STORE_BOUNDS: FileStoreBounds = { terminalMost: 1024, ageDays: 30, archiveBytes: 64 * 1024 * 1024 };
 
@@ -52,22 +52,66 @@ const LEASE_WAIT_MS = 10_000;
 
 const alive = (pid: number): boolean => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } };
 
+/** A lock file this process holds: its path, and the token written in it, which names this holding and no other. */
+export interface Holding { path: string; token: string }
+
+const readHolding = (path: string): { pid: number; token: string } | null => {
+  try {
+    const held = JSON.parse(readFileSync(path, "utf8")) as { pid?: unknown; token?: unknown };
+    return typeof held.pid === "number" && typeof held.token === "string" ? { pid: held.pid, token: held.token } : null;
+  } catch { return null; }
+};
+
+function create(path: string, body: Record<string, unknown>): Holding | null {
+  const token = randomUUID();
+  try { writeFileSync(path, JSON.stringify({ pid: process.pid, token, ...body }), { mode: 0o600, flag: "wx" }); return { path, token }; }
+  catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") return null; throw e; }
+}
+
+/** Remove a lock file only when it still holds this holding's token: a newer owner's file is never removed. */
+export function releaseLock(held: Holding): void {
+  if (readHolding(held.path)?.token === held.token) { try { unlinkSync(held.path); } catch { /* already gone */ } }
+}
+
 /**
- * Take a lock file: created exclusively, holding the process and the time. A file whose process is gone is broken and taken;
- * one whose process lives is not. Its time and any deadline it records decide nothing: expiry is never an outcome.
+ * The reclaim lock beside a lock file: whoever holds it may remove a dead owner's file. A reclaim lock left by a process that
+ * died inside its short section is moved aside under a unique name, and removed only when the moved file is the dead one that
+ * was read; a live one moved by mistake is put back.
  */
-function takeFile(path: string, body: Record<string, unknown>): boolean {
-  const take = (): boolean => {
-    try { writeFileSync(path, JSON.stringify({ pid: process.pid, ...body }), { mode: 0o600, flag: "wx" }); return true; }
-    catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") return false; throw e; }
-  };
-  if (take()) return true;
-  let held: { pid?: unknown } | null = null;
-  try { held = JSON.parse(readFileSync(path, "utf8")) as { pid?: unknown }; } catch { held = null; }
+function takeReclaim(path: string): Holding | null {
+  const held = create(path, {});
+  if (held) return held;
+  const seen = readHolding(path);
+  if (!seen || alive(seen.pid)) return null;
+  const aside = `${path}.${randomUUID()}.dead`;
+  try { renameSync(path, aside); } catch { return null; }
+  if (readHolding(aside)?.token !== seen.token) {
+    try { linkSync(aside, path); } catch { /* the place was taken again meanwhile */ }
+    try { unlinkSync(aside); } catch { /* gone */ }
+    return null;
+  }
+  try { unlinkSync(aside); } catch { /* gone */ }
+  return create(path, {});
+}
+
+/**
+ * Take a lock file: created exclusively, holding the process, a token and the time. A file whose process is gone is broken, one
+ * reclaimer at a time: under the reclaim lock, the file is read again, removed only if it is still the dead owner's, and taken.
+ * One whose process lives is not broken. Its time and any deadline it records decide nothing: expiry is never an outcome.
+ */
+export function takeLock(path: string, body: Record<string, unknown>): Holding | null {
+  const held = create(path, body);
+  if (held) return held;
+  const seen = readHolding(path);
   // A file being written has no body yet: its taker lives. Only a whole file naming a process that is gone is broken.
-  if (!held || typeof held.pid !== "number" || alive(held.pid)) return false;
-  try { unlinkSync(path); } catch { /* another broke it first */ }
-  return take();
+  if (!seen || alive(seen.pid)) return null;
+  const reclaim = takeReclaim(`${path}.reclaim`);
+  if (!reclaim) return null;
+  try {
+    const again = readHolding(path);
+    if (again && again.token === seen.token && !alive(again.pid)) { try { unlinkSync(path); } catch { /* gone */ } }
+    return create(path, body);
+  } finally { releaseLock(reclaim); }
 }
 
 /** The custody store under `dir` (`ARTROOM_HOME/private/mcp-custody`). `now` is the clock of a test. */
@@ -91,7 +135,6 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
   const index = (): Index => (existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) as Index : {});
   const live = (): { name: string; record: CustodyRecord }[] => readdirSync(records).filter((f) => /^[0-9a-f]{64}\.json$/.test(f))
     .flatMap((f) => { try { return [{ name: f.slice(0, 64), record: JSON.parse(readFileSync(join(records, f), "utf8")) as CustodyRecord }]; } catch { return []; } });
-  const release = (path: string) => () => { try { unlinkSync(path); } catch { /* already gone */ } };
 
   /**
    * Move the oldest terminal records into the archive, past the count or the age, as one transaction under the archive lease.
@@ -102,9 +145,9 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
    * read first, and the next archival removes it.
    */
   const archive = (owned: string) => {
-    const leasePath = join(archives, "archive.lease");
-    if (!takeFile(leasePath, { time: new Date(now()).toISOString() })) return;
-    const held: (() => void)[] = [];
+    const lease = takeLock(join(archives, "archive.lease"), { time: new Date(now()).toISOString() });
+    if (!lease) return;
+    const held: Holding[] = [];
     try {
       const table = index();
       const referenced = new Set(Object.values(table).map((e) => e.file));
@@ -114,13 +157,19 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
       const terminal = live().filter((r) => TERMINAL.has(r.record.phase)).sort((a, b) => (a.record.updated < b.record.updated ? -1 : 1));
       const old = now() - bounds.ageDays * 86_400_000;
       const due = terminal.filter((r, i) => i < terminal.length - bounds.terminalMost || (timeMs(r.record.updated) ?? now()) < old);
+      bounds.fault?.("candidates-selected");
       const moving: { name: string; text: string }[] = [];
       for (const { name } of due) {
         if (name !== owned) {
-          if (!takeFile(lockPath(name), { time: new Date(now()).toISOString(), archiving: true })) continue;
-          held.push(release(lockPath(name)));
+          const lock = takeLock(lockPath(name), { time: new Date(now()).toISOString(), archiving: true });
+          if (!lock) continue;
+          held.push(lock);
         }
-        moving.push({ name, text: readFileSync(recordPath(name), "utf8") });
+        // Read again under the lock: a record resubmitted since it was selected is unresolved now, and is not archived.
+        let text: string;
+        try { text = readFileSync(recordPath(name), "utf8"); } catch { continue; }
+        if (!TERMINAL.has((JSON.parse(text) as CustodyRecord).phase)) continue;
+        moving.push({ name, text });
       }
       if (moving.length === 0) return;
       let n = Math.max(-1, ...readdirSync(archives).map((f) => /^archive-(\d+)\.jsonl$/.exec(f)).filter((m) => m !== null).map((m) => Number(m![1]))) + 1;
@@ -152,8 +201,8 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
         if (existsSync(recordPath(name)) && readFileSync(recordPath(name), "utf8") === text) unlinkSync(recordPath(name));
       }
     } finally {
-      for (const r of held) r();
-      release(leasePath)();
+      for (const lock of held) releaseLock(lock);
+      releaseLock(lease);
     }
   };
 
@@ -175,17 +224,20 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
     lock: async (name, notAfter) => {
       ensure();
       const path = lockPath(name);
-      return takeFile(path, { time: new Date(now()).toISOString(), notAfter }) ? async () => { release(path)(); } : null;
+      const held = takeLock(path, { time: new Date(now()).toISOString(), notAfter });
+      return held ? async () => { releaseLock(held); } : null;
     },
     exclusive: async <T>(work: () => Promise<T>): Promise<T> => {
       ensure();
       const path = join(dir, "capacity.lease");
       const until = Date.now() + LEASE_WAIT_MS;
-      while (!takeFile(path, { time: new Date(now()).toISOString() })) {
+      let held = takeLock(path, { time: new Date(now()).toISOString() });
+      while (!held) {
         if (Date.now() > until) throw new CustodyError({ held: "locked" });
         await new Promise((resolve) => setTimeout(resolve, 5));
+        held = takeLock(path, { time: new Date(now()).toISOString() });
       }
-      try { return await work(); } finally { release(path)(); }
+      try { return await work(); } finally { releaseLock(held); }
     },
     read: async (name) => {
       ensure();
