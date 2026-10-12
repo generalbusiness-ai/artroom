@@ -64,6 +64,8 @@ const WATCH_MS = 30_000;
 const WAIT_MOST_SECONDS = 60;
 /** The most entries one poll or call reads when it searches a history, and the most pages of final items; it goes on from there next time. */
 const SEARCH_ENTRIES = 16;
+/** The most bytes of a capability's name or of a step's name that `prepare` takes. */
+const NAME_BYTES = 128;
 const SEARCH_PAGES = 4;
 const SINGLETON_PLACES = ["register", "directory", "membership", "rules", "destination", "inbox"] as const;
 
@@ -629,6 +631,11 @@ export class McpService {
 
   async #prepare(args: Args): Promise<CallResult> {
     if (typeof args["capability"] !== "string" || typeof args["step"] !== "string") return failed({ error: "shape", field: "capability or step", what: "is missing", declared: "text" });
+    // A capability's name and a step are short words of the contract: anything longer is refused before anything is signed or kept,
+    // so neither the record nor any result repeats it.
+    for (const field of ["capability", "step"] as const) {
+      if (utf8(args[field] as string).length > NAME_BYTES) return failed({ error: "shape", field, what: `is longer than ${NAME_BYTES} bytes`, declared: "a capability's name, such as hold@1, or one of its steps" });
+    }
     if (typeof args["kind"] !== "string") return this.#standalone(args, args["capability"], args["step"]);
     return this.#perform(null, args, args["kind"], { resource: args["resource"], capability: args["capability"], step: args["step"] });
   }

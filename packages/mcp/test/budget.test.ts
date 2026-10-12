@@ -289,6 +289,27 @@ describe("what a call costs, end to end", () => {
     await annotate(`a known name at a new root: ${called.requests.length} requests, the session of the second membership among them`);
   });
 
+  // Invariant: a capability or step name longer than 128 bytes is refused before anything is signed, kept or sent, and the
+  // refusal stays within its bound; it does not repeat the name.
+  test("an over-long capability or step name is refused whole, within the bound", async ({ annotate }) => {
+    const s = roomOf("admin", [issueDemo], { custody: memoryStore() });
+    await s.service.page();
+    const huge = "c".repeat(100 * 1024);
+    const sizes: number[] = [];
+    for (const args of [{ capability: huge, step: "instance" }, { capability: "hold@1", step: huge }]) {
+      for (const kind of [{}, { kind: "comment", target: 1 }]) {
+        const got = await counted(s, () => s.service.call("prepare", { resource: 1, fields: {}, idempotencyKey: "long-name", ...kind, ...args }));
+        expect([got.result.isError, got.result.structuredContent["error"]]).toEqual([true, "shape"]);
+        expect(got.bytes).toBeLessThanOrEqual(BOUNDS.act);
+        expect(JSON.stringify(got.result)).not.toContain("c".repeat(200));
+        expect(got.requests, "nothing read or sent").toEqual([]);
+        sizes.push(got.bytes);
+      }
+    }
+    expect(await s.service.custody.store.unresolved()).toEqual([]);
+    await annotate(`over-long names: refused with nothing kept or sent, results of at most ${Math.max(...sizes)} bytes`);
+  });
+
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation
   // across a head move restarts at the new head and says so, a retained input larger than a page is read whole by offset, and a
   // descriptor larger than a list page is served alone on its page with every tool reachable.
