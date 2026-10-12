@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/src/page-assets.ts","body":{"commit":"622c76fe42ab9ce5b917fb087323a06d940a6d37","path":"packages/scope/src/page-assets.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00e43324eadd40b654744c7e067048b690e0c612","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/storage.browser.test.ts."}
