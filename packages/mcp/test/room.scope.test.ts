@@ -23,6 +23,13 @@ export async function step(agent: Agent, mode: "default" | "generic", at: { tool
   return agent.ok("act", { target: at.scope, kind: at.kind, digest: acts["digest"], ...args });
 }
 
+/** Whether an act is offered: its tool listed in the default mode, its kind in actions in --generic mode. */
+async function offers(agent: Agent, mode: "default" | "generic", at: { tool: string; scope: string | number; kind: string }): Promise<boolean> {
+  if (mode === "default") return (await agent.names()).includes(at.tool);
+  const acts = await agent.call("actions", { scope: at.scope });
+  return !acts.isError && (acts.structuredContent["acts"] as { kind: string }[]).some((a) => a.kind === at.kind);
+}
+
 /** Create the register and claim a room through the tools: create, room.create, wait, room.seat, room.first-key, wait. */
 export async function founded(room: Room, rita: Agent, mode: "default" | "generic" = "default"): Promise<{ register: ScopeId }> {
   const installed = await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
@@ -84,20 +91,22 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
     const invitation = (invited["fact"] as { seq: number }).seq;
     const paul = room.agent("paul", { subscribe: true, mode, config: { service: rita.config.service, repository: { ...rita.config.repository!, inbox: undefined as never }, pins: { [rita.config.repository!.membership.scope]: "platform:membership@2" } } });
     delete paul.config.repository!.inbox;
-    expect(await paul.names()).not.toContain("issue.create");
+    const issueCreate = { tool: "issue.create", scope: "directory", kind: "open-issue" };
+    expect(await offers(paul, mode, issueCreate)).toBe(false);
     await paul.tick(); seen.set(paul, paul.told);
     expect(paul.told).toBe(0);
     await settled(paul, 0, "paul's first list, before he joins");
     const joined = await step(paul, mode, { tool: "room.join", scope: "membership", kind: "join" }, { fields: { invitation, secret }, idempotencyKey: "join" });
     expect(joined["answer"], JSON.stringify(joined)).toBe("accepted");
     await settled(paul, 1, "joining gives paul a role");
-    expect(await paul.names()).toContain("issue.create");
+    expect(await offers(paul, mode, issueCreate)).toBe(true);
     await step(rita, mode, { tool: "member.role", scope: "membership", kind: "set-role" }, { on: invitation, fields: { role: "maintainer" }, idempotencyKey: "paul-maintainer" });
     await settled(paul, 1, "a role change changes paul's list");
     await settled(rita, 0, "rita's list does not change with paul's role");
     // The same platform tools, now described for his role.
-    const described = (await room.wait(() => paul.service.page())).tools.find((t) => t.name === "issue.create")!.description;
-    if (mode === "default") expect(described).toContain("which your role (maintainer) holds");
+    const described = mode === "default" ? (await room.wait(() => paul.service.page())).tools.find((t) => t.name === "issue.create")!.description
+      : ((await paul.ok("actions", { scope: "directory" }))["acts"] as { kind: string; description: string }[]).find((a) => a.kind === "open-issue")!.description;
+    expect(described).toContain("which your role (maintainer) holds");
 
     // paul opens an issue with the definition's bytes and a detached body; the first lane of the issue declaration is a change.
     exercises("platform:directory", "open-issue", "values");
@@ -106,7 +115,7 @@ async function story(mode: "default" | "generic"): Promise<{ told: Record<string
     expect(lane["timedOut"]).toBe(false);
     await settled(paul, 1, "the first issue lane brings the issue declaration's tools");
     await settled(rita, 1, "and rita's");
-    expect(await paul.names()).toEqual(expect.arrayContaining(["issue.comment", "issue.close-own"]));
+    expect([await offers(paul, mode, { tool: "issue.comment", scope: 1, kind: "comment" }), await offers(paul, mode, { tool: "issue.close-own", scope: 1, kind: "close-own" })]).toEqual([true, true]);
     const commented = await step(paul, mode, { tool: "issue.comment", scope: 1, kind: "comment" }, { fields: { body: "I will write it." }, idempotencyKey: "comment-1" });
     expect(commented["answer"]).toBe("accepted");
     await settled(paul, 0, "a comment advances a head and changes no declaration");

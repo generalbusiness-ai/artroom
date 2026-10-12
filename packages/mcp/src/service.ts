@@ -798,7 +798,7 @@ export class McpService {
   async #actions(args: Args): Promise<CallResult> {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
-    const { summary } = await this.#summary(scope, membership);
+    const summary = await this.#target(scope, membership);
     const definition = await this.#definition(s, summary.definition, scope, membership);
     const held = s.read.inventory.scopes.find((h) => h.scope === scope);
     const inventory: Inventory = held ? s.read.inventory : { ...s.read.inventory, scopes: [...s.read.inventory.scopes, { scope, ref: summary.scope, place: "root", pinned: summary.definition, definition, membership: membership?.scope ?? null }] };
