@@ -486,7 +486,7 @@ Joins a room with an invitation link from artroom invite (artroom-invite:...), a
 
 ### `prepare`
 
-Asks the scope that owns a resource for one step of a capability, for the intent an act will submit later under the same idempotencyKey. resource: the scope asked, which may differ from target; capability, step; then the act's own target, kind, on, fields, texts, presented and values. Returns the resource's answer for that step, never the act's receipt.
+Asks the scope that owns a resource for one step of a capability. With kind: for the intent an act will submit later under the same idempotencyKey; resource: the scope asked, which may differ from target; then the act's own target, kind, on, fields, texts, presented and values. Without kind: a step with no act, such as hold@1's instance, whose own intent (kind capability:step, with fields) goes to the resource. Returns the resource's answer for that step, never an act's receipt.
 
 ```json
 {
@@ -549,8 +549,6 @@ Asks the scope that owns a resource for one step of a capability, for the intent
       "resource",
       "capability",
       "step",
-      "target",
-      "kind",
       "idempotencyKey"
     ],
     "additionalProperties": false
@@ -892,6 +890,9 @@ What is known about the envelope under idempotencyKey on target (or the creation
         "minLength": 1,
         "maxLength": 128,
         "description": "Your key for this one meaning, 1 to 128 bytes. Keep it."
+      },
+      "cursor": {
+        "type": "string"
       }
     },
     "required": [

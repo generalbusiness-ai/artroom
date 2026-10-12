@@ -7,6 +7,7 @@
  * | The server, its tools, custody and reads | Real: `McpService` of this package, called in the test's isolate, as a transport would call it. |
  * | The scopes, the routes and the readers | Real: the namespace `PLATFORM`, the Worker's HTTP routes (`routed`), and the read sessions of `sessions.ts` under a TEST SECRET that this file generates. |
  * | The Git host | A STAND-IN: `OwnGit` of `packages/scope/test/hosts.ts`, under the production wiring of the hosting own Git service's ports, as `packages/page/test/support/demo.ts` wires it. |
+ * | hold@1's outside | A STAND-IN: the lanes' `Host` (`packages/lanes/test/support/graph.ts`) answers each attempt hold@1's code opens: a mint, a revocation, a staged ref and the ancestry read. No repository is staged and no commit is walked. |
  * | The scheduler | A STAND-IN: the service's `pause`, between two polls of `wait`, runs the operations drivers and dispatchers of the scopes waited on, and of the register and the destination, as a deployment's alarms would. |
  * | The watch's timer | A STAND-IN: the test fires it (`tick`), in place of 30 seconds passing. |
  * | The clock | The scripted clock of the namespaces. |
@@ -19,6 +20,7 @@ import { ownHost } from "../../../scope/test/hosts.ts";
 import { type Platform, routed } from "../../../scope/test/repository.ts";
 import { beginSessionFixture } from "../../../scope/test/session-settings.ts";
 import { driveFixture, nativeFixtureLifetime } from "../../../scope/test/support/native-fixture-lifetime.ts";
+import { Host } from "../../../lanes/test/support/graph.ts";
 import { McpService, memoryStore, type CallResult, type McpConfig, type Mode, type Root } from "../../src/index.ts";
 
 export const SERVICE = "https://scopes.test";
@@ -76,7 +78,17 @@ export function mcpRoom(): Room {
   let register: ScopeId | null = null;
   const known: Platform[] = [];
   const bindings = () => at.bindings(register!);
-  const wire = (name: ScopeId) => lifetime.outside(name, (given, sql) => at.outside(given, sql, bindings()));
+  // hold@1's operations (mints, revocations, staged refs, the ancestry read) are answered by the lanes' Host STAND-IN; the
+  // register's and the destination's by the hosting's own Git service, as wired above.
+  const hold = new Host();
+  const wire = (name: ScopeId) => lifetime.outside(name, (given, sql) => {
+    const outside = at.outside(given, sql, bindings());
+    return {
+      ...outside,
+      accepts: (owner, kind) => hold.accepts(owner, kind) || outside.accepts(owner, kind),
+      send: (request) => (hold.accepts(request.owner, request.kind) ? Promise.resolve(hold.send(request)) : outside.send(request)),
+    };
+  });
   const pause = async (waiting: readonly string[] = []) => {
     active();
     const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => lifetime.platform(scope as ScopeId))];

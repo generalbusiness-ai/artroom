@@ -245,6 +245,31 @@ describe("what a call costs, end to end", () => {
     await annotate(`searches: a mint outcome 100 entries on, in ${calls.length} credential calls; a creation 100 entries on, in ${polls} polls of one wait; a final item on page 5, in 2 polls`);
   });
 
+  // Invariant: settle and prepare stay within their bound: each step is a projection of its latest answer, the steps are paged
+  // with a cursor, and every step of a record is reachable.
+  test("settlement and preparation results within their bound", async ({ annotate }) => {
+    const s = roomOf("admin", [issueDemo]);
+    await s.service.page();
+    const sizes: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const prepared = await counted(s, () => s.service.call("prepare", { target: 1, kind: "comment", fields: { body: "Steps." }, idempotencyKey: "many-steps", resource: 1, capability: "hold@1", step: `step-${i}` }));
+      expect(prepared.result.isError, JSON.stringify(prepared.result.structuredContent)).toBe(false);
+      sizes.push(prepared.bytes);
+    }
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(BOUNDS.act);
+    const seen: string[] = [];
+    let cursor: string | undefined, pages = 0;
+    do {
+      const got = await counted(s, () => s.service.call("settle", { target: 1, idempotencyKey: "many-steps", ...(cursor ? { cursor } : {}) }));
+      expect(got.bytes, `settle page ${pages + 1}`).toBeLessThanOrEqual(BOUNDS.act);
+      seen.push(...(got.result.structuredContent["steps"] as { step: string }[]).map((x) => x.step));
+      cursor = got.result.structuredContent["cursor"] as string | undefined;
+      pages++;
+    } while (cursor);
+    expect(seen.sort()).toEqual(Array.from({ length: 20 }, (_, i) => `step-${i}`).sort());
+    await annotate(`settle: 20 steps of one key in ${pages} pages, each within 4 KiB; each prepare result at most ${Math.max(...sizes)} bytes`);
+  });
+
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation
   // across a head move restarts at the new head and says so, a retained input larger than a page is read whole by offset, and a
   // descriptor larger than a list page is served alone on its page with every tool reachable.

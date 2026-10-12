@@ -97,6 +97,18 @@ const ok = (structured: Record<string, unknown>, bound: number = BOUNDS.act): Ca
 };
 const failed = (f: Finding): CallResult => { const said = finding(f); const structured = { error: said.error, message: said.sentence, next: said.next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
 
+/**
+ * A native answer, projected for a result: its kind, the fact and the duties of an acceptance, the reason, name and judged head
+ * of a refusal. The receipt's effects are counted, not repeated: `step` reads the entry whole.
+ */
+export function projectAnswer(answer: Answer): Record<string, unknown> {
+  switch (answer.answer) {
+    case "accepted": return { answer: "accepted", fact: answer.receipt.fact, duties: answer.receipt.sends, effects: answer.receipt.effects.length };
+    case "refused": return { answer: "refused", reason: answer.reason, ...(answer.name ? { name: answer.name } : {}), judgedAt: answer.judgedAt };
+    default: return { answer: answer.answer, reason: answer.reason };
+  }
+}
+
 class Stop extends Error { constructor(readonly result: CallResult) { super("stop"); } }
 const stop = (f: Finding): never => { throw new Stop(failed(f)); };
 
@@ -372,7 +384,7 @@ export class McpService {
       const said = stepped.answer === null
         ? { sentence: `The reply from ${resource.scope} to step ${preparing.step} of ${preparing.capability} was lost; this step's outcome is unknown. The act's phase is unchanged.`, next: "Call prepare again with the same arguments: the resource answers the same step with its first entry." }
         : { sentence: `${resource.scope} answered step ${preparing.step} of ${preparing.capability} for your intent: ${stepped.answer.answer}${stepped.answer.answer === "refused" ? ` (${stepped.answer.reason}${stepped.answer.name ? `, ${stepped.answer.name}` : ""})` : ""}. The act is not submitted by this; its phase is ${record.phase}.`, next: "Submit the act with the same idempotencyKey when the steps you need are answered; settle shows each step and the act apart." };
-      return ok({ step: { resource: resource.scope, capability: preparing.capability, step: preparing.step, phase: stepped.step.phase, answer: stepped.answer }, act: { phase: stepped.record.phase, intent: intentDigest(stepped.record.envelope.signed.intent) }, ...said });
+      return ok({ step: { resource: resource.scope, capability: preparing.capability, step: preparing.step, phase: stepped.step.phase, answer: stepped.answer === null ? null : projectAnswer(stepped.answer) }, act: { phase: stepped.record.phase, intent: intentDigest(stepped.record.envelope.signed.intent) }, ...said });
     }
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try { return await this.#reads.transport.submit(scope, envelope.signed, [], envelope.beside); }
@@ -422,9 +434,9 @@ export class McpService {
         ["definition", "kind", "idempotencyKey"], WRITE, (a) => this.#create(a), ACT_OUTPUT),
       tool("join", "Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret, which no result repeats.",
         { link: { type: "string", description: "The invitation link, artroom-invite:..." }, idempotencyKey: keyArg }, ["link", "idempotencyKey"], WRITE, (a) => this.#join(a), ACT_OUTPUT),
-      tool("prepare", "Asks the scope that owns a resource for one step of a capability, for the intent an act will submit later under the same idempotencyKey. resource: the scope asked, which may differ from target; capability, step; then the act's own target, kind, on, fields, texts, presented and values. Returns the resource's answer for that step, never the act's receipt.",
+      tool("prepare", "Asks the scope that owns a resource for one step of a capability. With kind: for the intent an act will submit later under the same idempotencyKey; resource: the scope asked, which may differ from target; then the act's own target, kind, on, fields, texts, presented and values. Without kind: a step with no act, such as hold@1's instance, whose own intent (kind capability:step, with fields) goes to the resource. Returns the resource's answer for that step, never an act's receipt.",
         { resource: scopeArg, capability: { type: "string" }, step: { type: "string" }, target: scopeArg, kind: { type: "string" }, on: { type: "integer", minimum: 0 }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, presented: { type: "object" }, values: { type: "array", items: { type: "string" } }, idempotencyKey: keyArg },
-        ["resource", "capability", "step", "target", "kind", "idempotencyKey"], WRITE, (a) => this.#prepare(a)),
+        ["resource", "capability", "step", "idempotencyKey"], WRITE, (a) => this.#prepare(a)),
       tool("items", "A page of one item type of a scope: live ones from the summary, then the retained final ones, with a cursor.",
         { scope: scopeArg, type: { type: "string" }, final: { type: "boolean", description: "true: the retained final items; the default is the live ones" }, cursor: { type: "string" } }, ["scope", "type"], READ, (a) => this.#items(a)),
       tool("steps", "A page of a scope's entries, oldest first, one line each: seq, time, kind, signer, effects and sends counts.",
@@ -440,7 +452,7 @@ export class McpService {
       tool("wait", "Waits at most 60 seconds until one of: a scope's head reaches seq; an item reaches one of states; the scopes an entry created (entry) and the scopes their genesis created exist and are active; a send (duty) has a result. Returns what it saw and whether it timed out. Never writes.",
         { scope: scopeArg, seq: { type: "integer", minimum: 0 }, item: { type: "integer", minimum: 0 }, type: { type: "string", description: "the item's type; with item, a final item is found among the retained ones" }, states: { type: "array", items: { type: "string" } }, entry: { type: "integer", minimum: 0 }, duty: { type: "string" }, seconds: { type: "integer", minimum: 1, maximum: WAIT_MOST_SECONDS } }, ["scope"], READ, (a) => this.#wait(a)),
       tool("settle", "What is known about the envelope under idempotencyKey on target (or the creation of definition): the act's phase and kept outcome, the scope's settlement for an act that is not final, and each preparation step apart. Signs nothing and sends no act.",
-        { target: scopeArg, definition: { type: ["string", "object"] }, idempotencyKey: keyArg }, ["idempotencyKey"], READ, (a) => this.#settle(a)),
+        { target: scopeArg, definition: { type: ["string", "object"] }, idempotencyKey: keyArg, cursor: { type: "string" } }, ["idempotencyKey"], READ, (a) => this.#settle(a)),
       tool("credential", "The one-time read credential for a read-token act your key signed (entry: its seq at the destination), read once from the destination's credential route with your session. Its result is a secret: the credential is in the structured field credential only, with the remote URL beside it. Use it with Git; it is not kept here.",
         { entry: { type: "integer", minimum: 1 }, target: scopeArg }, ["entry"], { ...READ, idempotentHint: false }, (a) => this.#credential(a)),
       tool("actions", "The acts of one scope, as act tools would describe them: each kind with its derived description, input schema, binding and the definition digest to give to act. For a host that lists few tools.",
@@ -606,8 +618,40 @@ export class McpService {
   }
 
   async #prepare(args: Args): Promise<CallResult> {
-    if (typeof args["kind"] !== "string" || typeof args["capability"] !== "string" || typeof args["step"] !== "string") return failed({ error: "shape", field: "kind, capability or step", what: "is missing", declared: "text" });
+    if (typeof args["capability"] !== "string" || typeof args["step"] !== "string") return failed({ error: "shape", field: "capability or step", what: "is missing", declared: "text" });
+    if (typeof args["kind"] !== "string") return this.#standalone(args, args["capability"], args["step"]);
     return this.#perform(null, args, args["kind"], { resource: args["resource"], capability: args["capability"], step: args["step"] });
+  }
+
+  /**
+   * A capability step with no act, such as `hold@1:instance`: the intent is the step's own, of kind `<capability>:<step>`, to the
+   * resource, with the step's fields and no expected revisions, signed by this server's key. It is kept under custody under the
+   * caller's key before it is sent, and its answers are kept as the step's, apart from any act: the record is never submitted.
+   */
+  async #standalone(args: Args, capability: string, step: string): Promise<CallResult> {
+    const key = args["idempotencyKey"];
+    if (!validKey(key)) return failed({ error: "shape", field: "idempotencyKey", what: "is missing, or not 1 to 128 bytes of UTF-8", declared: "a key you choose and keep" });
+    if (args["target"] !== undefined && args["target"] !== args["resource"]) return failed({ error: "shape", field: "target", what: "is not taken by a step with no act: the step's intent goes to the resource", declared: "resource only" });
+    const fields = isRecord(args["fields"]) ? args["fields"] as Record<string, FieldValue> : {};
+    const s = await this.#current();
+    const resource = await this.#scope(s, args["resource"]);
+    const { summary } = await this.#summary(resource.scope, resource.membership);
+    const identity: Identity = { service: this.#service, membership: resource.membership, signer: this.#port.signer.key, target: summary.scope, key: key as string };
+    const kind = `${capability}:${step}`;
+    const build = async () => ({
+      binding: { definition: capability, kind, declaration: null, pinned: summary.definition },
+      envelope: { signed: await signedIntent(this.#port.signer, { to: summary.scope, kind, on: null, fields, expected: {} }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
+    });
+    const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
+    await this.custody.keep(identity, meaningOf({ standalone: kind, fields }), build, notAfter, bytesOf(fields));
+    const stepped = await this.custody.step(identity, summary.scope, capability, step, async (signed) => {
+      try { return await this.#reads.transport.prepare(resource.scope, signed, [], capability, step); }
+      catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
+    });
+    const said = stepped.answer === null
+      ? { sentence: `The reply from ${resource.scope} to step ${step} of ${capability} was lost; this step's outcome is unknown.`, next: "Call prepare again with the same arguments: the same signed step is sent again, and the resource answers it with its first entry." }
+      : { sentence: `${resource.scope} answered step ${step} of ${capability}, a step with no act: ${stepped.answer.answer}${stepped.answer.answer === "refused" ? ` (${stepped.answer.reason}${stepped.answer.name ? `, ${stepped.answer.name}` : ""})` : ""}.`, next: "settle with the resource as target and the same key shows this step." };
+    return ok({ step: { resource: resource.scope, capability, step, phase: stepped.step.phase, answer: stepped.answer === null ? null : projectAnswer(stepped.answer) }, intent: intentDigest(stepped.record.envelope.signed.intent), ...said });
   }
 
   async #settle(args: Args): Promise<CallResult> {
@@ -646,13 +690,19 @@ export class McpService {
     const record = settled.record;
     const last = settled.decided;
     const receipt: Receipt | null = settled.receipt ?? (last?.answer.answer === "accepted" ? last.answer.receipt : null);
-    const steps = Object.values(record.steps).map((st) => ({ resource: st.resource.scope, capability: st.capability, step: st.step, phase: st.phase, answer: st.answers.at(-1)?.answer ?? "unknown" }));
+    // Each step by its latest answer, projected, and how many it has had; the steps paged by bytes with a cursor.
+    const allSteps = Object.entries(record.steps).sort(([a], [b]) => (a < b ? -1 : 1)).map(([, st]) => {
+      const latest = st.answers.at(-1)?.answer ?? null;
+      return { resource: st.resource.scope, capability: st.capability, step: st.step, phase: st.phase, answer: latest?.answer ?? "unknown", last: latest ? projectAnswer(latest) : null, answers: st.answers.length };
+    });
+    const fromStep = fromCursor<{ i: number }>(args["cursor"])?.i ?? 0;
+    const { page: steps, next: nextStep } = pageBy(allSteps, fromStep, pageOf(BOUNDS.act) - 1536);
     const answer = record.phase === "accepted" ? "accepted" : record.phase === "refused" ? "refused" : record.phase === "mismatch" ? "mismatch" : "unknown";
     const sentence = answer === "accepted" ? `The act under key ${String(key)} was accepted: entry ${receipt?.fact.seq}.`
       : answer === "refused" ? `The act under key ${String(key)} was refused; the refusal is kept.`
       : answer === "mismatch" ? `The key ${String(key)} is on another intent of your key at that scope.`
       : `The outcome under key ${String(key)} is unknown: the scope gave no receipt for the exact envelope. The record stays unknown.`;
-    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ?? null, steps });
+    return ok({ answer, phase: record.phase, sentence, next: answer === "unknown" ? "Call the same tool again with the same idempotencyKey: it resends the same envelope." : "Nothing more is needed.", ...(receipt ? { fact: receipt.fact, duties: receipt.sends } : {}), outcomes: record.count, attempt: record.attempt, last: last ? { at: last.at, ...projectAnswer(last.answer) } : null, steps, ...(nextStep !== null ? { cursor: cursorOf({ i: nextStep }), more: `Steps ${fromStep + 1} to ${nextStep} of ${allSteps.length}; call settle with cursor for the rest.` } : {}) });
   }
 
   async #membershipRef(given: unknown): Promise<ScopeRef | null> {

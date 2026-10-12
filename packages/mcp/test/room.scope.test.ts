@@ -97,7 +97,8 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     const filed = await paul.ok("step", { scope: 1, seq: 0 });
     const terms: FactRef = { at: (offer["fact"] as FactRef).at, seq: 0, hash: filed["hash"] as Digest };
     await step(paul, mode, { tool: "issue.take", scope: 1, kind: "accept" }, { on: commitment, fields: { terms }, idempotencyKey: "take-1" });
-    await step(paul, mode, { tool: "issue.work", scope: 1, kind: "take-hold" }, { fields: { commitment }, idempotencyKey: "work-1" });
+    const held = await step(paul, mode, { tool: "issue.work", scope: 1, kind: "take-hold" }, { fields: { commitment }, idempotencyKey: "work-1" });
+    const hold = (held["fact"] as FactRef).seq;
     const report = { target: 1, kind: "report", fields: { commitment, terms, commit: "c".repeat(40), tree: "d".repeat(40) }, idempotencyKey: "hand-in-1" };
     const stage = await paul.ok("prepare", { ...report, resource: 2, capability: "hold@1", step: "stage" });
     const check = await paul.ok("prepare", { ...report, resource: 2, capability: "hold@1", step: "check" });
@@ -129,6 +130,31 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     expect(steps.filter((s) => (s as unknown as { resource: string }).resource === foreign).map((s) => [s.step, s.phase]).sort()).toEqual([["check", "answered"], ["stage", "answered"]]);
     // A step's answer is never the act's receipt: the act's fact, if any, is the target's own entry.
     if (handIn["answer"] === "accepted") expect((handIn["fact"] as FactRef).at.scope).not.toBe((stage["step"] as { resource: string }).resource);
+
+    // The accepted workflow, under another key: the holder's instance, a step with no act; the report's stage and check; then
+    // the act itself, accepted, and its own settlement. hold@1's outside operations are answered by the Host STAND-IN.
+    const laneRef = (await paul.ok("inspect", { scope: 1 }))["ref"] as { scope: string; inc: string; kind: string };
+    const instance = await paul.ok("prepare", { resource: 1, capability: "hold@1", step: "instance", fields: { hold, task: { ...laneRef, kind: "task" }, instance: "i-1" }, idempotencyKey: "instance-1" });
+    expect((instance["step"] as { answer: { answer: string } }).answer.answer, JSON.stringify(instance)).toBe("accepted");
+    const staged = { ...report, idempotencyKey: "hand-in-2" };
+    const stageAccepted = await paul.ok("prepare", { ...staged, resource: 1, capability: "hold@1", step: "stage" });
+    const stagedAt = (stageAccepted["step"] as { answer: { answer: string; fact: FactRef } }).answer;
+    expect(stagedAt.answer, JSON.stringify(stageAccepted)).toBe("accepted");
+    // The stage opened a staging and two mints; the check is accepted once their outcomes are written. Each wait lets the
+    // scheduler run one entry further.
+    let checked: Record<string, unknown> = {};
+    for (let seq = stagedAt.fact.seq + 1, n = 0; n < 12; n++, seq++) {
+      await paul.ok("wait", { scope: 1, seq });
+      checked = await paul.ok("prepare", { ...staged, resource: 1, capability: "hold@1", step: "check" });
+      if ((checked["step"] as { answer: { answer: string } }).answer.answer === "accepted") break;
+    }
+    expect((checked["step"] as { answer: { answer: string } }).answer.answer, JSON.stringify(checked)).toBe("accepted");
+    const handedIn = await step(paul, mode, { tool: "issue.hand-in", scope: 1, kind: "report" }, { fields: report.fields, idempotencyKey: "hand-in-2" });
+    expect(handedIn["answer"], JSON.stringify(handedIn)).toBe("accepted");
+    const settledAccepted = await paul.ok("settle", { target: 1, idempotencyKey: "hand-in-2" });
+    expect([settledAccepted["answer"], (settledAccepted["fact"] as FactRef).seq]).toEqual(["accepted", (handedIn["fact"] as FactRef).seq]);
+    expect((settledAccepted["steps"] as { step: string; answer: string }[]).map((x) => [x.step, x.answer]).sort()).toEqual(expect.arrayContaining([["check", "accepted"], ["stage", "accepted"]]));
+    lines.push(`room story, ${mode}: the accepted workflow: instance, stage and check accepted; the hand-in accepted at entry ${(handedIn["fact"] as FactRef).seq}`);
 
     // A change: opened with the definition's bytes, its rules asked, one file proposed, merged and published by the room.
     exercises("platform:directory", "open-pr", "values");
