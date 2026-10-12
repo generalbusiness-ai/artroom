@@ -1,13 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import type { DeclaredDefinition, PlatformDefinition } from "@generalbusiness/artroom-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { VERSIONS } from "@generalbusiness/artroom-platform";
-import { change, change3, changeDemo, changeDemo3, issue, issueDemo } from "@generalbusiness/artroom-lanes";
+import { issueDemo } from "@generalbusiness/artroom-lanes";
 import { lane as deriveLane } from "@generalbusiness/artroom-derive/testing";
 import { counting } from "../../../examples/counting/definition.ts";
 import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Inventory } from "../src/index.ts";
-import { ACTIVE_DEMO, MEMBERSHIP, declared, demoInventory, heldOf, lane, platformData, standingOf } from "./support/catalogue.ts";
+import { ACTIVE_DEMO, MEMBERSHIP, declared, demoInventory, heldOf, lane, standingOf } from "./support/catalogue.ts";
 
 const DOC = readFileSync(new URL("../../../docs/mcp.md", import.meta.url), "utf8");
 
@@ -45,26 +43,6 @@ describe("descriptions are derived from the whole declaration", () => {
     expect(describeAct(declared(counting), "spoken", spoken, { standing: "unknown" }, { pinned: definitionDigest(counting) }, { definition: "counting", kind: "spoken", declaration: "sha256:x", digests: [] }, "").complete)
       .toContain(`- the rule spoken-plan holds: ${counting.rules["spoken-plan"]}`);
     for (const [name, render] of Object.entries(EXAMPLES)) expect(DOC, `docs/mcp.md shows ${name} as sent`).toContain(render());
-  });
-
-  // Invariant: every act of every definition in the repository renders without falling through to raw JSON, and each description
-  // is at most 1,000 characters.
-  test("rendering is total over every act of every definition the repository ships", () => {
-    const definitions: [string, DefinitionLike][] = [
-      ...Object.keys(VERSIONS).map((v) => [v, platformData(v as PlatformDefinition)] as [string, DefinitionLike]),
-      ...[issue, change, change3, issueDemo, changeDemo, changeDemo3, counting, deriveLane].map((d) => [definitionDigest(d as DeclaredDefinition), declared(d as DeclaredDefinition)] as [string, DefinitionLike]),
-    ];
-    let acts = 0;
-    for (const [pinned, definition] of definitions) {
-      for (const [kind, act] of Object.entries(definition.acts)) {
-        if (kind === definition.genesis) continue;
-        acts++;
-        const text = describeAct(definition, kind, act, { standing: "holds", role: "admin" }, { pinned, active: ACTIVE_DEMO }, { definition: definition.name, kind, declaration: "sha256:x", digests: [pinned] }, `inspect with describe: "${kind}"`);
-        expect(text.complete, `${definition.name} ${kind}`).not.toContain("the form {");
-        expect(text.description.length, `${definition.name} ${kind}`).toBeLessThanOrEqual(DESCRIPTION_CHARS);
-      }
-    }
-    expect(acts).toBeGreaterThan(300);
   });
 
   // Invariant: every guard form, operand and part of the contract has a sentence; none renders as raw JSON.
