@@ -66,7 +66,7 @@
   .skip:focus { transform: translateY(0); }
 
   .rail { background: var(--rail); padding: 18px; display: flex; flex-direction: column; min-width: 0; gap: 12px; }
-  .wordmark { line-height: 1.4; padding: 0 2px; }
+  .wordmark { display: block; line-height: 1.4; padding: 0 2px; }
   .wordmark img { display: block; width: 72px; height: auto; }
   .wordmark .wordmark-dark { display: none; }
   :root[data-theme="dark"] .wordmark-light { display: none; }
@@ -76,6 +76,14 @@
     :root:not([data-theme="light"]) .wordmark-dark { display: block; }
   }
   .room-switch { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: transparent; border-radius: 0; min-height: 44px; padding: 9px 10px; text-align: left; width: 100%; font-size: 14px; text-decoration: none; color: var(--ink); }
+  details.shell-disclosure { position: relative; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .shell-disclosure > summary { list-style: none; cursor: pointer; }
+  .shell-disclosure > summary::-webkit-details-marker { display: none; }
+  .shell-disclosure[open] > summary { margin-bottom: 0; }
+  .shell-disclosure-content { position: absolute; top: 100%; left: 0; z-index: 10; width: min(340px, calc(100vw - 32px)); padding: 12px; border: 1px solid var(--line); background: var(--paper); box-shadow: 0 4px 12px #0002; overflow-wrap: anywhere; }
+  .shell-disclosure-content p { margin: 0 0 8px; }
+  .shell-disclosure-content a { display: block; min-height: 44px; padding: 10px 0; }
+  .account-disclosure .shell-disclosure-content { bottom: 100%; top: auto; }
   .room-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .room-name > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .room-recorded-name { color: var(--muted-ink); font-size: 14px; font-weight: 400; }
@@ -239,6 +247,9 @@
     .rail { display: none; }
     .mobile-header { display: block; border-bottom: 1px solid var(--line); padding: 12px 16px 0; }
     .mobile-context { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+    .mobile-context .room-disclosure { flex: 1; }
+    .mobile-context .room-disclosure .shell-disclosure-content { width: min(340px, calc(100vw - 128px)); }
+    .mobile-context .account-disclosure .shell-disclosure-content { top: 100%; bottom: auto; left: auto; right: 0; }
     .mobile-context .room-switch { flex: 1; min-width: 0; border: 0; padding: 4px 0; font-size: 16px; width: auto; max-width: none; }
     .mobile-context .room-name { font-size: 14px; }
     .mobile-context .account { padding: 6px; min-width: 44px; justify-content: center; }

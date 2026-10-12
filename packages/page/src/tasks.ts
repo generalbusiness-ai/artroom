@@ -70,7 +70,9 @@ export function createIssue(act: Offered, send: Send, context: ActionContext): H
   const definitionChoices = context.choices?.[act.kind]?.["definition"] ?? act.fields.find(field => field.name === "definition")?.choices;
   const fields = ["title", "body", ...(definitionChoices && definitionChoices.length > 1 ? ["definition"] : [])];
   const missing = missingFields(taskAct, context, fields);
-  if (missing.length) return h("p", { class: "muted", role: "status" }, `Create issue is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from the room's active issue definition.`);
+  if (missing.length) return h("p", { class: "muted", role: "status" }, missing.length === 1 && missing[0] === "definition"
+    ? "Create issue is unavailable: the room's active issue definition could not be read."
+    : `Create issue is unavailable: ${missing.map(missingCondition).join(" and ")} could not be read from the room's active issue definition.`);
   const openerKey = context.draftKey ? controlKey(context.draftKey, "create-issue") : "create-issue";
   const button = h("button", { type: "button", class: "button primary", "data-task-act": act.kind, "data-focus-key": openerKey, "aria-label": "Create issue" }, h("span", { class: "full-label" }, "Create issue"), h("span", { class: "short-label" }, icon("plus"), "Create"));
   if (context.uncertain || context.pending) button.setAttribute("disabled", "");

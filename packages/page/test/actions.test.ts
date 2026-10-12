@@ -246,6 +246,10 @@ test("Create issue asks for title and description and intentionally uses the tit
   Object.defineProperty(globalThis, "document", { configurable: true, value: { createElementNS: (_namespace: string, tag: string) => new Element(tag), createElement: (tag: string) => new Element(tag), body } });
   const open: Offered = { kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "authenticated-definition" }] }, { name: "title", type: "text", required: true }, { name: "body", type: "text", required: false }, { name: "conditions", type: "list", required: true }] };
   const sent: unknown[] = [];
+  const unavailable = asElement(createIssue({ ...open, fields: open.fields.map(field => field.name === "definition" ? { ...field, choices: [] } : field) }, (...args) => sent.push(args), {}));
+  expect(unavailable.textContent).toBe("Create issue is unavailable: the room's active issue definition could not be read.");
+  expect(unavailable.hasAttribute("data-task-act")).toBe(false);
+  expect(sent).toEqual([]);
   const create = asElement(createIssue(open, (...args) => sent.push(args), {})); create.event("click");
   const form = body.all().find((node) => node.tag === "form")!;
   expect(form.all().filter((node) => node.tag === "label").map((node) => node.textContent)).toEqual(["Title", "Description"]);
