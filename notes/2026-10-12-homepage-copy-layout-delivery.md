@@ -1,7 +1,7 @@
 # Homepage copy and compact shared header
 
 The homepage now says “Durable action platform for people and agents.” The
-coordination sentence remains unchanged. The practice opening uses the same
+adopted coordination sentence sits below it. The practice opening uses the same
 adopted wording. The homepage utility row starts with the wordmark, followed by
 the GitHub and Documentation links. Room, Counter and Jam share that exact header.
 The logo is 170 pixels wide on desktop and 130 pixels at the compact breakpoint,
