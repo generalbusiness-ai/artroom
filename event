@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-12-homepage-copy-layout-delivery.md","body":{"commit":"8e4689b489fac9e29080b58d8b5c98f66f539d5a","path":"notes/2026-10-12-homepage-copy-layout-delivery.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:11344ef8c5174b497d242dcd93f985c6c744f5c2","text":"Merge retired a covered predecessor; the successor is at homepage/src/jam/index.html."}
