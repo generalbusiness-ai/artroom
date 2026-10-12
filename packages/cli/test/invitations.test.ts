@@ -97,7 +97,7 @@ test("retained native agent opening and key invitation survive loss; independent
     if (pointer) {
       const bytes = (await issuer.private(pointer.request))!, row = JSON.parse(new TextDecoder().decode(bytes));
       const phase = !row.member ? "initial" : !row.member.attempted && !row.invitation ? "member" : row.invitation && !row.invitation.attempted ? "invitation" : null;
-      if (phase === failPointer) { failPointer = null; orphanRequest = pointer.request; throw Error("SCRIPTED lost public pointer save"); }
+      if (failPointer !== null && phase === failPointer) { failPointer = null; orphanRequest = pointer.request; throw Error("SCRIPTED lost public pointer save"); }
     }
     await savedConfig(config);
   };
