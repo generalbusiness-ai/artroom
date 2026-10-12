@@ -1,4 +1,5 @@
 import "./style.css";
+document.title="dap - counting";
 import { nativeGateway } from "./client.ts";
 import { mountCountingStage } from "./app.ts";
 import { deviceSigner, importDemoBundle, importLegacyDevice, type SavedDevice } from "./device-key.ts";
