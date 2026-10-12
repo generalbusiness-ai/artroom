@@ -60,3 +60,23 @@ The three affected compiler roots, three Page cases and one owning Counter view
 case remain UNRUN. The new composition gate, independent wordmark review and
 managed deployments remain outstanding. Earlier gates and browser proofs retain
 their original subjects; no result is transferred to these stale files.
+
+## Actual homepage landing incorporated: Source only
+
+The homepage was normally landed in main
+`c4156177a201dc52229c9ddafb7871146d18dc51`, tree
+`2b251ca56b6ee1b0b046393ac16f2ca7e0c79403`, with receipt
+`592603baaaac240cbde1ec7cfd6ad6590d47417c`. This continuation normally merges that
+receiving head, including its thirteen homepage, producer, documentation and
+package-script paths. Root's landing manifest verified the pre-existing receiving
+application Source unchanged. Wordmark, Counter, empty-room and shell authored
+Source remain as in the reviewed `754df45` composition.
+
+The root test command now includes homepage/test/home.test.mjs in its existing
+Node chain, and build:home runs homepage/build.mjs. The lock and dependencies are
+unchanged. No homepage build or test is repeated here. The three application
+asset placeholders remain explicitly stale until the normal Page and Counter
+builders run after release. Three affected compiler contexts, the owning three
+Page cases, one Counter view case, new ordinary composition gate, wordmark review
+and managed deployments remain outstanding. This Source merge executes nothing
+and leaves the original donor and independent Jam branches untouched.
