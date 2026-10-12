@@ -149,7 +149,7 @@ export function finding(f: Finding): Said & { error: string } {
     }
     case "credential": return { error: f.error, sentence: `No read token of yours is readable at ${f.destination} (${f.why}); nothing was returned.`, next: "Call repository.read-token first (or act in --generic mode), then wait for its outcome, then credential." };
     case "target": return { error: f.error, sentence: `Before signing, the server could not resolve the target: ${f.what}. Nothing was sent.`, next: "Call room for the scopes and lanes of the room; give target as a scope ID or a number." };
-    case "unknown-tool": return { error: f.error, sentence: `No tool is named ${f.name} in this list.`, next: "Call tools/list." };
+    case "unknown-tool": return { error: f.error, sentence: `No tool is named ${f.name.length > 256 ? `${f.name.slice(0, 256)}...` : f.name} in this list.`, next: "Call tools/list." };
     case "read": { const said = readRefused(f.scope, f.reason); return { error: f.error, ...said }; }
   }
 }

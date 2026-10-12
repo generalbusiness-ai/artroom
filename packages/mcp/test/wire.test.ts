@@ -10,7 +10,7 @@ import { b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { McpService, MODERN, LEGACY, memoryStore, type McpConfig } from "../src/index.ts";
+import { McpService, MODERN, LEGACY, Wire, memoryStore, type McpConfig } from "../src/index.ts";
 import { serveHttp, serveStdio, type HttpServing } from "../src/node.ts";
 import { StandIn } from "./support/standin.ts";
 
@@ -273,5 +273,51 @@ describe("both MCP wire revisions, each by its own rules", () => {
     expect(lines.filter((l) => (l["error"] as { code?: number } | undefined)?.code === -32600)).toHaveLength(1);
     input.end();
     await done;
+  });
+
+  // Invariant: a listen whose stream closes while its first snapshot is being read leaves nothing behind: no watcher, no listen
+  // and no timer, and it is never acknowledged.
+  test("a listen that disconnects before its snapshot leaves no watcher", async () => {
+    let release!: () => void;
+    let subscribed = 0;
+    const deferred = new Promise<void>((resolve) => { release = resolve; });
+    const fake = { snapshot: async () => { await deferred; return { generation: "sha256:x" }; }, subscribe: () => { subscribed++; return () => {}; } } as unknown as McpService;
+    const wire = new Wire(fake);
+    const sent: unknown[] = [];
+    const owner = {};
+    const pending = wire.handle({ jsonrpc: "2.0", id: 0, method: "subscriptions/listen", params: { notifications: { toolsListChanged: true }, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }, null, (m) => { sent.push(m); }, owner);
+    expect(wire.listening).toBe(1);
+    wire.dropStream(owner);
+    release();
+    expect(await pending).toBeNull();
+    expect([subscribed, wire.listening, sent]).toEqual([0, 0, []]);
+  });
+
+  // Invariant: frames are told apart by JSON-RPC's rules, an invalid ID is never echoed, and nothing a client sends is repeated
+  // past 256 characters: large IDs, versions and methods get bounded errors, and a healthy call is served after each.
+  test("IDs, methods and versions: invalid frames rejected, reflections bounded", async () => {
+    const s = await http();
+    try {
+      const c = client("modern");
+      await c.connect(new StreamableHTTPClientTransport(new URL(s.url), bearer(s)));
+      const healthy = async () => expect((await c.callTool({ name: "room", arguments: {} })).structuredContent).toMatchObject({ key: signer.key });
+      const raw = (body: unknown) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify(body) });
+      const meta = (version: string) => ({ "io.modelcontextprotocol/protocolVersion": version, "io.modelcontextprotocol/clientCapabilities": {} });
+      const big = "x".repeat(20_000);
+      for (const id of [{ a: 1 }, [1], true, null, big]) {
+        const answer = await (await raw({ jsonrpc: "2.0", id, method: "tools/list", params: { _meta: meta(MODERN) } })).json() as { id: unknown; error: { code: number } };
+        expect([answer.id, answer.error.code], JSON.stringify(id).slice(0, 20)).toEqual([null, -32600]);
+        await healthy();
+      }
+      // A malformed request is not taken for a response: a method that is not a string, beside a result.
+      const malformed = await (await raw({ jsonrpc: "2.0", id: 3, method: 5, result: {} })).json() as { id: unknown; error: { code: number } };
+      expect([malformed.id, malformed.error.code]).toEqual([null, -32600]);
+      for (const body of [{ jsonrpc: "2.0", id: 4, method: "tools/list", params: { _meta: meta(big) } }, { jsonrpc: "2.0", id: 5, method: big, params: { _meta: meta(MODERN) } }, { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: big, arguments: {}, _meta: meta(MODERN) } }]) {
+        const text = await (await raw(body)).text();
+        expect(text.length, text.slice(0, 80)).toBeLessThan(1024);
+        await healthy();
+      }
+      await c.close();
+    } finally { await s.close(); }
   });
 });

@@ -59,10 +59,32 @@ export interface LegacySession {
  * The state of one 2026-07-28 listen subscription: its ID (the request's), the types it opted in to, and what it was last told.
  * It belongs to the client stream it was opened on (`owner`): two clients may use the same request ID.
  */
-export interface Listen { id: Id; owner: object; tools: boolean; told: Digest | null; send: Send; unsubscribe: () => void; end: () => void }
+export interface Listen { id: Id; owner: object; tools: boolean; told: Digest | null; send: Send; unsubscribe: () => void; end: () => void; closed: boolean }
 
-/** Whether a value is a JSON-RPC 2.0 frame this server reads: an object with `jsonrpc: "2.0"`. Null, scalars and arrays are not. */
-export const isFrame = (v: unknown): v is Message => isRecord(v) && v["jsonrpc"] === "2.0";
+/** The most characters of anything a client sent that an error repeats, and of an ID this server echoes. */
+export const REFLECTED_MOST = 256;
+const clip = (v: unknown): string => { const t = typeof v === "string" ? v : JSON.stringify(v) ?? String(v); return t.length > REFLECTED_MOST ? `${t.slice(0, REFLECTED_MOST)}...` : t; };
+
+/**
+ * What a frame is, by JSON-RPC 2.0's rules: a request (a method, and an ID that is a string or a number), a notification (a
+ * method and no ID), a response (an ID, and a result or an error, and no method), or invalid. An ID of another type, or one longer
+ * than 256 characters, is invalid: an error never echoes it.
+ */
+export function frameOf(v: unknown): "request" | "notification" | "response" | "invalid" {
+  if (!isRecord(v) || v["jsonrpc"] !== "2.0") return "invalid";
+  const hasId = Object.hasOwn(v, "id");
+  const id = v["id"];
+  if (hasId && !(typeof id === "number" && Number.isFinite(id)) && !(typeof id === "string" && id.length <= REFLECTED_MOST)) return "invalid";
+  if (Object.hasOwn(v, "method")) {
+    if (typeof v["method"] !== "string") return "invalid";
+    if (v["params"] !== undefined && !isRecord(v["params"]) && !Array.isArray(v["params"])) return "invalid";
+    return hasId ? "request" : "notification";
+  }
+  return hasId && (Object.hasOwn(v, "result") !== Object.hasOwn(v, "error")) ? "response" : "invalid";
+}
+
+/** Whether a value is a JSON-RPC 2.0 frame this server reads. Null, scalars, arrays and malformed objects are not. */
+export const isFrame = (v: unknown): v is Message => frameOf(v) !== "invalid";
 
 export function newSession(): LegacySession {
   return { version: null, initialized: false, capabilities: {}, told: null, stream: null, unsubscribe: null };
@@ -107,11 +129,12 @@ export class Wire {
    * stdio, the response stream of a `subscriptions/listen` over HTTP.
    */
   async handle(message: unknown, session: LegacySession | null, send: Send, owner: object = send): Promise<Message | null> {
-    if (!isFrame(message)) return error(null, -32600, "Invalid Request: a JSON-RPC 2.0 object is expected.");
-    const m = message as unknown as Message;
+    const kind = frameOf(message);
+    if (kind === "invalid") return error(null, -32600, "Invalid Request: a JSON-RPC 2.0 request, notification or response is expected.");
+    if (kind === "response") return null;   // a response to a request of ours: the server makes none
+    const m = message as Message;
     const id = m.id ?? null;
-    if (typeof m.method !== "string") return null;   // a response to a request of ours: the server makes none
-    const notification = id === null || id === undefined;
+    const notification = kind === "notification";
     const revision = revisionOf(m, session);
     try {
       if (revision === "modern") return await this.#modern(m, notification, send, owner);
@@ -150,7 +173,7 @@ export class Wire {
         const result = await this.service.call(String(params["name"]), params["arguments"]);
         return reply(id, result);
       }
-      default: return notification ? null : error(id, -32601, `Method not found: ${m.method}`);
+      default: return notification ? null : error(id, -32601, `Method not found: ${clip(m.method)}`);
     }
   }
 
@@ -159,7 +182,7 @@ export class Wire {
     const params = isRecord(m.params) ? m.params : {};
     const meta = isRecord(params["_meta"]) ? params["_meta"] : {};
     const version = meta[PROTOCOL_META];
-    if (version !== MODERN) return notification ? null : error(id, UNSUPPORTED_VERSION, `Unsupported protocol version: ${String(version)}`, { supported: [MODERN, LEGACY], requested: String(version) });
+    if (version !== MODERN) return notification ? null : error(id, UNSUPPORTED_VERSION, "Unsupported protocol version.", { supported: [MODERN, LEGACY], requested: clip(version) });
     if (m.method === "notifications/cancelled") {
       // Only a listen of the same client stream: another client's request with the same ID is not this one.
       this.listens.get(owner)?.get(JSON.stringify(params["requestId"]))?.end();
@@ -182,11 +205,12 @@ export class Wire {
         const key = JSON.stringify(id);
         let ended = false;
         const listen: Listen = {
-          id, owner, tools, told: null, send,
+          id, owner, tools, told: null, send, closed: false,
           unsubscribe: () => {},
           end: () => {
             if (ended) return;
             ended = true;
+            listen.closed = true;
             listen.unsubscribe();
             this.#forget(owner, key);
             send(reply(id, { resultType: "complete", _meta: { [SUBSCRIPTION_META]: id, [SERVER_INFO_META]: SERVER_INFO } }));
@@ -200,19 +224,25 @@ export class Wire {
           // The baseline is the list as it is now; only a later change is told. The watch runs before the acknowledgement, so no
           // change between the two is lost.
           try { listen.told = (await this.service.snapshot()).generation; } catch { listen.told = null; }
+          // The stream may have closed, or the listen ended, while the snapshot was read: then no watcher is installed at all.
+          if (!this.#owns(owner, key, listen)) return null;
           listen.unsubscribe = this.service.subscribe((generation) => {
             if (ended || listen.told === generation) return;
             listen.told = generation;
             send({ jsonrpc: "2.0", method: "notifications/tools/list_changed", params: { _meta: { [SUBSCRIPTION_META]: id } } });
           });
         }
+        if (!this.#owns(owner, key, listen)) return null;
         // The acknowledgement names the types the server will send: only tool list changes.
         send({ jsonrpc: "2.0", method: "notifications/subscriptions/acknowledged", params: { _meta: { [SUBSCRIPTION_META]: id }, notifications: tools ? { toolsListChanged: true } : {} } });
         return null;
       }
-      default: return error(id, -32601, `Method not found: ${m.method}`);
+      default: return error(id, -32601, `Method not found: ${clip(m.method)}`);
     }
   }
+
+  /** Whether this listen is still open and still the one its stream holds under its ID. */
+  #owns(owner: object, key: string, listen: Listen): boolean { return !listen.closed && this.listens.get(owner)?.get(key) === listen; }
 
   #forget(owner: object, key: string): void {
     const of = this.listens.get(owner);
@@ -222,12 +252,12 @@ export class Wire {
 
   /** End every listen of a client stream that closed: no result is sent, as for an abrupt close; its watchers are removed. */
   dropStream(owner: object): void {
-    for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) listen.unsubscribe();
+    for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) { listen.closed = true; listen.unsubscribe(); }
     this.listens.delete(owner);
   }
 
   closeAll(): void {
-    for (const of of this.listens.values()) for (const listen of of.values()) listen.unsubscribe();
+    for (const of of this.listens.values()) for (const listen of of.values()) { listen.closed = true; listen.unsubscribe(); }
     this.listens.clear();
   }
 }

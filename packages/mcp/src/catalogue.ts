@@ -178,18 +178,25 @@ export function bindingsOf(inventory: Inventory, words: Words): Binding[] {
   return bindings.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-/** Who may sign a binding's act, for this caller, over the scopes it serves. */
+/**
+ * Who may sign a binding's act, for this caller, over the scopes it serves. The memberships are taken in the order of their scope
+ * IDs, so the text does not depend on the order the scopes were read in. Where they give different roles, the role is a
+ * per-membership account: "admin on sc_a..., member on sc_b...".
+ */
 export function whoOf(binding: Binding, inventory: Inventory): Who {
   const action = grantAction(binding.act);
-  const standings = [...new Set(binding.scopes.map((s) => s.membership))].map((m) => (m === null ? undefined : inventory.standing[m]));
+  const memberships = [...new Set(binding.scopes.map((s) => s.membership))].sort((a, b) => (a === b ? 0 : a === null ? -1 : b === null ? 1 : a < b ? -1 : 1));
+  const standings = memberships.map((m) => (m === null ? undefined : inventory.standing[m]));
   if (standings.some((s) => s === undefined || !s.known)) {
     return standings.every((s) => s === undefined || !s.known) ? { standing: "unknown" } : { standing: "partly-unknown" };
   }
   const known = standings as Extract<Standing, { known: true }>[];
+  const roles = [...new Set(known.map((s) => s.role ?? "none"))];
+  const role = roles.length === 1 ? roles[0]! : known.map((s, i) => `${s.role ?? "none"} on ${memberships[i]}`).join(", ");
   const holds = known.map((s) => action !== null && s.actions.includes(action));
-  if (holds.every(Boolean)) return { standing: "holds", role: known[0]!.role ?? "none" };
+  if (holds.every(Boolean)) return { standing: "holds", role };
   if (holds.some(Boolean)) return { standing: "mixed" };
-  return { standing: "lacks", role: known[0]!.role };
+  return { standing: "lacks", role: roles.length === 1 ? known[0]!.role : role };
 }
 
 /** Whether a binding is listed for this caller: a rule decides who may sign, its standing is unknown, or the role holds the action somewhere. */

@@ -4,7 +4,8 @@ import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { change, issueDemo } from "@generalbusiness/artroom-lanes";
 import { lane as deriveLane } from "@generalbusiness/artroom-derive/testing";
 import { counting } from "../../../examples/counting/definition.ts";
-import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, describedOf, generationOf, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Inventory } from "../src/index.ts";
+import type { ScopeId } from "@generalbusiness/artroom-contract";
+import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, describedOf, generationOf, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Held, type Inventory } from "../src/index.ts";
 import { ACTIVE_DEMO, MEMBERSHIP, declared, demoInventory, heldOf, lane, standingOf } from "./support/catalogue.ts";
 
 const DOC = readFileSync(new URL("../../../docs/mcp.md", import.meta.url), "utf8");
@@ -151,5 +152,21 @@ describe("descriptions are derived from the whole declaration", () => {
     const range = { type: "t", states: ["a"], except: ["also.x"] };
     const act: ActLike = { step: "transition", on: "t", grant: "g", also: { x: { item: "t", by: "f" } }, fields: { f: { type: "text", max: 9, required: true } }, guards: [{ capability: { name: "hold", guard: "staged", with: { c: { items: range, slot: "s" } } } }], effects: [] };
     expect(inline(guardSentences({ name: "x", genesis: "g0", items: { t: {} }, acts: { a: act } }, act, { pinned: "sha256:x" })[0]!)).toMatch(/the s of each t that is a, except /);
+  });
+
+  // Invariant: a tool served across memberships with different roles names each membership's role in the order of the
+  // memberships' scope IDs, so reordering the scopes changes neither the text nor the generation.
+  test("two memberships with different roles, reordered: the same text and generation", () => {
+    const base = demoInventory("admin");
+    const m2 = "sc_aaaamembershipsecond" as ScopeId;
+    const roots: Held[] = [heldOf("sc_r1", "root", definitionDigest(counting), declared(counting)), heldOf("sc_r2", "root", definitionDigest(counting), declared(counting), m2)];
+    const standing = { [MEMBERSHIP]: { ...(standingOf("admin") as object), actions: ["counting.join"] }, [m2]: { ...(standingOf("member") as object), actions: ["counting.join"] } } as Inventory["standing"];
+    const inv = (order: Held[]): Inventory => ({ ...base, scopes: [...base.scopes, ...order], standing });
+    const text = (i: Inventory) => actTool(bindingsOf(i, WORDS).find((b) => b.definition === "counting" && b.kind === "join")!, i, "default").description;
+    const options = { mode: "default" as const, tools: null, words: WORDS };
+    const [forward, backward] = [inv(roots), inv([...roots].reverse())];
+    expect(text(forward)).toBe(text(backward));
+    expect(text(forward)).toContain(`which your role (member on ${m2}, admin on ${MEMBERSHIP}) holds`);
+    expect(generationOf(bindingsOf(backward, WORDS), backward, options)).toBe(generationOf(bindingsOf(forward, WORDS), forward, options));
   });
 });
