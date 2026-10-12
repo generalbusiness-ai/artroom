@@ -20,7 +20,7 @@ import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, genera
 import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
 import { describeAct, grantAction, onOf, schemaOf, type DefinitionLike } from "./describe.ts";
 import { answered, finding, type Finding } from "./errors.ts";
-import { Kept, definitionOf, readInventory, type ConfigPort, type Read_, type Root } from "./inventory.ts";
+import { Kept, definitionOf, readInventory, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
 import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.ts";
 import { Reads } from "./reads.ts";
 import { Unshaped, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
@@ -74,6 +74,8 @@ interface Snapshot {
   generation: Digest;
   hidden: string[];
   memberships: Map<string, ScopeRef>;
+  /** The digest of the configuration the snapshot was derived from. */
+  configured: Digest;
 }
 
 type Args = Record<string, unknown>;
@@ -108,6 +110,8 @@ export function projectAnswer(answer: Answer): Record<string, unknown> {
     default: return { answer: answer.answer, reason: answer.reason };
   }
 }
+
+const configDigest = (config: McpConfig): Digest => digestBytes(utf8(canonicalize(config as never)));
 
 class Stop extends Error { constructor(readonly result: CallResult) { super("stop"); } }
 const stop = (f: Finding): never => { throw new Stop(failed(f)); };
@@ -172,7 +176,7 @@ export class McpService {
     const hidden = shown.filter((b) => !listed(b, read.inventory)).map((b) => b.name);
     const acts = this.mode === "generic" ? [] : shown.filter((b) => listed(b, read.inventory)).map((b) => actTool(b, read.inventory, this.mode));
     const generic = Object.entries(this.#generic).filter(([name]) => (name === "actions" || name === "act" ? this.mode !== "default" : true)).map(([, g]) => g.tool);
-    const snapshot: Snapshot = { read, bindings, tools: [...generic, ...acts], generation, hidden, memberships };
+    const snapshot: Snapshot = { read, bindings, tools: [...generic, ...acts], generation, hidden, memberships, configured: configDigest(config) };
     this.#stale = false;
     const previous = this.#snapshot?.generation ?? null;
     this.#snapshot = snapshot;
@@ -181,7 +185,13 @@ export class McpService {
   }
 
   /** The snapshot the last list or call derived; derived again when none is held, or when this service changed the configuration since. */
-  async #current(): Promise<Snapshot> { return this.#snapshot && !this.#stale ? this.#snapshot : this.snapshot(); }
+  async #current(): Promise<Snapshot> {
+    if (!this.#snapshot || this.#stale) return this.snapshot();
+    // The configuration is read on every call: another process (another connection of the same ARTROOM_HOME, or the command line)
+    // may have added a root or a room since, and a call by a name already known must see the scopes and memberships it names now.
+    if (configDigest(await this.#port.config.read()) !== this.#snapshot.configured) return this.snapshot();
+    return this.#snapshot;
+  }
 
   /**
    * After this service wrote the configuration (a created scope, a claimed or joined room, an inbox): the next call derives the

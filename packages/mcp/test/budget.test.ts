@@ -270,6 +270,25 @@ describe("what a call costs, end to end", () => {
     await annotate(`settle: 20 steps of one key in ${pages} pages, each within 4 KiB; each prepare result at most ${Math.max(...sizes)} bytes`);
   });
 
+  // Invariant: a call by a tool name already known, at a root that another process added to the configuration under a second
+  // membership, is served under that membership, with no list or room call first.
+  test("a known name at a root added under a second membership", async ({ annotate }) => {
+    const s = roomOf("admin", [issueDemo]);
+    const item = (id: number, type: string, values: Record<string, unknown>, refs: Record<string, unknown> = {}) => ({ id, type, state: "active", revision: 0, opened: null, parties: {}, refs, values, attributed: [] }) as unknown as Item;
+    const other = s.stand.add("membership", "platform:membership@2", [item(0, "roster", { adminActions: [], maintainerActions: [], memberActions: ["issue.comment"], agentActions: [], checkerActions: [] }), item(1, "member", { handle: "@agent", role: "member", kind: "person" }), item(2, "key", { id: s.stand.key }, { member: 1 })]);
+    const first = s.stand.add("lane", issueDemo);
+    s.config.roots = [{ scope: first.scope, membership: s.config.repository!.membership }];
+    expect(await s.service.call("issue.comment", { target: first.scope, fields: { body: "First root." }, idempotencyKey: "root-1" })).toMatchObject({ isError: false });
+    // Another process records a second root, under the second membership.
+    const second = s.stand.add("lane", issueDemo);
+    s.config.roots = [...s.config.roots, { scope: second.scope, membership: other }];
+    const called = await counted(s, () => s.service.call("issue.comment", { target: second.scope, fields: { body: "Second root." }, idempotencyKey: "root-2" }));
+    expect(called.result.isError, JSON.stringify(called.result.structuredContent)).toBe(false);
+    expect(called.requests).toContain(`POST /v1/scopes/${other.scope}/sessions`);
+    expect(called.requests.some((r) => r.startsWith("GET /") && r.includes(second.scope))).toBe(true);
+    await annotate(`a known name at a new root: ${called.requests.length} requests, the session of the second membership among them`);
+  });
+
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation
   // across a head move restarts at the new head and says so, a retained input larger than a page is read whole by offset, and a
   // descriptor larger than a list page is served alone on its page with every tool reachable.
