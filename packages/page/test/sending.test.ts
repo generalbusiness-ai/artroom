@@ -52,7 +52,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   };
   const root = new Element("div"), body = new Element("body"); body.append(root);
   const membershipDigest = digestBytes(new Uint8Array([5, 4, 3, 6]));
-  const membership = { scope: scopeIdOf({ v: 1, kind: "membership", definition: membershipDigest, creator: null, cause: membershipDigest, ordinal: 0 }), kind: "membership", inc: newIncarnation() };
+  const membership = { scope: scopeIdOf({ v: 1, kind: "membership", definition: membershipDigest, creator: null, cause: membershipDigest, ordinal: 0 }), kind: "membership", inc: newIncarnation(new Uint8Array(16).fill(54)) };
   type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership }, secret: "device" };
   const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: [], ref: { membership: context.place.membership, member: "@reader" } } };
@@ -157,7 +157,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(panels.at(-1)?.uncertain).toBe(false);
     expect(posts).toHaveBeenCalledTimes(1);
     const reading = gate(), releaseRead = gate();
-    issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0 }; });
+    issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0, requesterRef: room.me.ref }; });
     location.hash = "#/issue/delayed";
     redraw(); await reading.promise;
     context = { ...context, place: { ...context.place, directory: "newest-room" } };
