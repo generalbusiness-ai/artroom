@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Planner writes the observability design note and files it for checker review; builder heads follow after the demo.","body":{"branch":"planner/observability-design"}}
+{"kind":"promise","text":"Planner writes the global --json design specification as a dated design note, specification only before the demo, and files it to the checker for review behind the demo heads; implementation requests follow the review and the demo constraint.","body":{"branch":"planner/cli-json-spec"}}
