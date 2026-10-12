@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"notes/2026-10-12-counter-repair-delivery.md at exact 59d042c8aab27a572b84c1d6d784b0b015b0ffed on request/counter-demo-repair, under promise git:sha1…e944498 on request git:sha1…64bbeda","body":{"commit":"59d042c8aab27a572b84c1d6d784b0b015b0ffed","path":"notes/2026-10-12-counter-repair-delivery.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e2fa9d89a0bdc1af214e6fbbf507133a09e59d20","text":"Republished at 59d042c8aab27a572b84c1d6d784b0b015b0ffed; the successor stands at examples/counting/browser-build/counting.css."}
