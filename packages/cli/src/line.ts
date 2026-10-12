@@ -36,7 +36,7 @@ export const USAGE = [
 ].join("\n");
 
 /** The flags that take no value. */
-const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned"]);
+const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned", "check"]);
 
 /** The words of a command line: the positional ones, each `--name value`, and each switch; `--set` may be given more than once. */
 export function parse(argv: readonly string[]): { words: string[]; flags: Map<string, string[]> } | null {
