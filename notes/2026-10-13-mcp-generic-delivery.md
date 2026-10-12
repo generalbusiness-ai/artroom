@@ -194,7 +194,8 @@ In this session, after the last change to what each covers:
 | `npm run typecheck` in `packages/mcp` | no errors |
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
 | `npm run gate`, once in the second round, at `3efb954d` | FAILED at the test step: `Tests  4 failed \| 1095 passed \| 2 skipped (1101)`. The four failures are the checkers failure below, and no other. |
-| `npm run gate`, once in this round | GATE_RESULT |
+| `npm run gate` in this round, first at `350dfb9c` | FAILED at the typecheck: a cast in the role-text witness of `describe.test.ts` (TS2352). Fixed in the next commit, which changes only that cast. |
+| `npm run gate` at `9feae202` (a second attempt was cut off when the cloud worker restarted, and was run again) | FAILED at the test step: `Tests  4 failed \| 1104 passed \| 2 skipped (1110)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone: `# pass 7`, `# fail 0`. |
 
 ## The planner's amendment after the second cloud gate
 
