@@ -11,10 +11,10 @@ const HOME = "https://dap.generalbusiness.ai/", DOCS = "https://github.com/gener
 const words = html => html.replace(/<br\s*\/?\s*>/g, " ").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const anchors = html => [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map(match => ({ attributes: Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(part => [part[1], part[2]])), content: match[2] }));
 const expected = {
-  "index.html": { title: "dap", copy: "Durable action platform for people and agents Rooms where people and agents act under shared rules. Every action signed, every rule enforced, every record kept. Room Shared work, governed by your rules. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [GITHUB, DOCS, HOME, "/room/", "/counter/", "/jam/", DOCS] },
-  "room/index.html": { title: "dap - room", copy: "A room for shared work. Raise issues, propose changes and publish when the room’s rules are met. Open room Raise an issue Propose a change Publish under the rules The room records who did what, and why.", targets: [HOME, "https://artroom-scope.inguz.workers.dev/page/"] },
-  "counter/index.html": { title: "dap - counter", copy: "Agents that count. Three agents take turns counting aloud, with each completed turn added to the record. Open counter A Ada → B Beau → C Cleo One turn at a time. Choose an identity and join. The turns follow automatically.", targets: [HOME, "https://artroom-counting.inguz.workers.dev/counting/"] },
-  "jam/index.html": { title: "dap - jam", copy: "A little music. Explore a procedural music demo. Open jam Synth Percussion Lead Sound starts when you press Play.", targets: [HOME, "https://artroom-jam.inguz.workers.dev/"] },
+  "index.html": { title: "dap", copy: "Durable action platform for people and agents. Rooms where people and agents act under shared rules. Every action signed, every rule enforced, every record kept. Room Shared work, governed by your rules. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [HOME, GITHUB, DOCS, "/room/", "/counter/", "/jam/", DOCS] },
+  "room/index.html": { title: "dap - room", copy: "A room for shared work. Raise issues, propose changes and publish when the room’s rules are met. Open room Raise an issue Propose a change Publish under the rules The room records who did what, and why.", targets: [HOME, GITHUB, DOCS, "https://artroom-scope.inguz.workers.dev/page/"] },
+  "counter/index.html": { title: "dap - counter", copy: "Agents that count. Three agents take turns counting aloud, with each completed turn added to the record. Open counter A Ada → B Beau → C Cleo One turn at a time. Choose an identity and join. The turns follow automatically.", targets: [HOME, GITHUB, DOCS, "https://artroom-counting.inguz.workers.dev/counting/"] },
+  "jam/index.html": { title: "dap - jam", copy: "A little music. Explore a procedural music demo. Open jam Synth Percussion Lead Sound starts when you press Play.", targets: [HOME, GITHUB, DOCS, "https://artroom-jam.inguz.workers.dev/"] },
 };
 test("four built homepages preserve the approved copy, every link, child headers and shared supporting rule", async () => {
   const temporary = await mkdtemp(resolve(tmpdir(), "dap-home-test-"));
@@ -30,10 +30,13 @@ test("four built homepages preserve the approved copy, every link, child headers
       assert.deepEqual([logos[0].attributes.href, logos[0].attributes["aria-label"]], [HOME, "dap homepage"]);
       assert.match(logos[0].content, /<img src="\/brand\/dap\.svg"/);
       if (file !== "index.html") {
-        const header = html.match(/<header>([\s\S]*?)<\/header>/)?.[1]; assert.ok(header);
-        assert.equal(anchors(header).length, 1); assert.ok(!/<nav\b|role="tab|class=".*tabs/.test(header), "children have only their home wordmark in the header");
+        const header = html.match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1]; assert.ok(header);
+        assert.deepEqual(anchors(header).map(link => link.attributes.href), [HOME, GITHUB, DOCS]); assert.ok(!/<nav\b|role="tab|class=".*tabs/.test(header), "children share the utility header without navigation tabs");
       }
     }
+    const utility = pages["index.html"].match(/<div class="utility">([\s\S]*?)<\/div>/)?.[1]; assert.ok(utility);
+    assert.match(utility, /^<a class="brand-link" data-home /, "the homepage wordmark is the utility row’s first child");
+    for (const file of ["room/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], utility, "all four pages share exact header links and labels");
     const rows = anchors(pages["index.html"]).filter(link => link.attributes.class === "destination");
     assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Counter", "Jam", "Documentation"]);
     const icons = anchors(pages["index.html"]).filter(link => link.attributes.class === "icon-link");
