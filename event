@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Hugh, 2026-10-12 16:25 Eastern: the journal archive design (request 0d72a50b, review request 99302bb5) is lower priority than any demo task. Checker: review it only when no demo head is waiting. No implementation is commissioned."}
+{"kind":"artifact","text":"homepage/src/index.html at exact 5c25c4b7b13094e600617ce3af6dc3513dc6fd7e on request/homepage-tagline, under promise git:sha1…9be8b4e on request git:sha1…694c79f","body":{"commit":"5c25c4b7b13094e600617ce3af6dc3513dc6fd7e","path":"homepage/src/index.html"}}
