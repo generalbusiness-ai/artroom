@@ -14,7 +14,8 @@ the seven current correctness repairs and their coordinated gate ahead of
 runtime expansion. The original full volatile brief and all 14 sections remain.
 Amended again on 12 October 2026 under request
 `0d72a50b28c683046f6ea127d0ebe5b484f87822`: section 15 designs a journal
-archive in Git. It adds a section and one pointer, and changes no other text.
+archive in Git and the declaration of a durability level for each region. It
+adds a section and two pointers, and changes no other text.
 
 ## 1. Guarantees, goals and current foundations
 
@@ -114,7 +115,8 @@ The proposed DO-journal adapter preserves that barrier; it never opts out with
 
 **Choice proposed for adoption:** execution belongs to a declared **state
 region**, not each invocation, transport, individual field or caller flag.
-All types/acts/timers in a region share its execution contract. Initially the
+All types/acts/timers in a region share its execution contract. Section 15.2
+names the three levels a region may declare. Initially the
 only new region profile is `artroom-live@1`; ordinary recorded definitions keep
 their existing pinned format, profile and entry semantics unchanged.
 
@@ -1347,7 +1349,9 @@ No claim of a full source audit, current deployed support or measured speedup.
 `fae322e0901ae73e961b1434c6fe55ec6d842b73`, resting on the durability
 request `578edf653772749b5fa9b47f6782f6db4d0ab720`. Read against main
 `cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`. Sections 1 to 14 are unchanged
-except for one pointer after the establishment table in section 1.
+except for two pointers: one after the establishment table in section 1,
+and one at the start of section 2. Draft 2 of this section adds 15.2, the
+declaration, and renumbers what follows.
 
 ### 15.1 The decision
 
@@ -1367,16 +1371,19 @@ through N**: every entry of the scope through position N is in the
 archive ref. A client that wants the stronger guarantee for one act waits
 until its receipt's position is at or below N.
 
-Hugh decided four points on 12 October 2026:
+Hugh decided five points on 12 October 2026:
 
 1. Build the archive, not the barrier.
 2. Archive pushes use a deployment-level credential. Archive progress is
    bookkeeping outside history. Archiving writes no entry.
-3. The first archived kinds are `lane`, `membership`, `rules` and
-   `destination`. Inboxes are left out. The register is shared across
+3. The first archived scopes are lanes and the room's membership, rules
+   and destination. Inboxes are left out. The register is shared across
    rooms and is not archived to a room's repository.
 4. A detached text is not archived. The archive holds its digest only,
    inside the entry that names it.
+5. The definition drives the application, and it declares the durability
+   level of each region. The archive is one of those levels, declared in
+   the definition. It is not a setting of a deployment or of a scope kind.
 
 The earlier protocol published a room's log to `refs/artroom/log`
 ([protocol.md](../docs/protocol.md), R-LOG-8 to R-LOG-10 and section 30).
@@ -1386,9 +1393,69 @@ property for scopes. It reuses that protocol's measured object bound and
 its rule for a lost push reply. It restores no room key, no signed
 checkpoint and no earlier format.
 
-### 15.2 What is archived
+### 15.2 The declaration
 
-For each archived scope, the archive holds:
+A region declares one of three levels. The level is part of the
+definition's bytes, so it is pinned by digest at genesis and never
+changes for that scope. No caller, transport or deployment setting
+selects it.
+
+| Level | Declared as | What survives | Confirmation | Support |
+|---|---|---|---|---|
+| Live | A region of the application envelope with `execution: { name: "artroom-live", version: 1 }` (section 2) | Nothing | Applied | Designed in sections 2 to 14; not built |
+| Recorded | A recorded definition with no `archive` member | The journal in the Durable Object | Recorded, with a receipt | Built; every definition today |
+| Recorded and archived | A recorded definition with `archive: { name: "git-journal", version: 1 }` | The journal, and a copy in the room's repository that a clone can verify | Recorded, with a receipt; then Archived through N | Designed in this section; not built |
+
+**Where it is written.** `DeclaredDefinition` gains one optional member:
+
+```ts
+archive?: { name: "git-journal"; version: 1 };
+```
+
+An absent member means Recorded. So the bytes and digest of every
+existing definition are unchanged, and no pinned scope changes level. A
+runtime or replay that does not know the member answers
+`unsupported-definition` for a definition that has it, which is the
+existing answer for a definition it has no code for. Whether today's
+validator already refuses an unknown member is owed a check in slice A0.
+
+The application envelope of section 2 does not restate the level of its
+recorded region. Its `host.recordedDefinition` names the recorded
+definition, and that definition's `archive` member is the declaration.
+Discovery reports the level of every region from those two places: a
+live region from its `execution`, the recorded region from the recorded
+definition.
+
+**One level for a recorded region.** A scope has one history, so the
+level covers every item type, act, handler and timed rule of the
+definition. A definition cannot archive some acts and not others.
+
+**The declaration is a requirement; the room gives permission.** A room
+states at its claim whether its repository may hold an archive. The
+directory keeps that in its genesis.
+
+| Definition declares the archive | Room permits it | Result |
+|---|---|---|
+| Yes | Yes | The scope is created and archives. |
+| Yes | No, or the room has no destination | The creation is refused, with the reason `archive-unavailable`. Nothing is created unarchived. |
+| No | Either | The scope is created and is Recorded only. |
+
+The room's own membership, rules and destination scopes run platform
+definitions. They archive when the room permits it, because a lane's
+replay reads their histories (15.7). Inboxes and the register do not.
+
+**Relation to publication.** A definition may also declare acts whose
+result is written to the repository, as the `change` lane does. That is
+publication: the application's own outside effect, opened by an entry
+and receipted under `refs/artroom/receipts/`. The archive is the
+platform's copy of the history under `refs/artroom/journal/`. They share
+the repository and nothing else. Declaring one neither needs nor implies
+the other.
+
+### 15.3 What is archived
+
+A scope is archived when its definition declares it and its room
+permits it (15.2). For each archived scope, the archive holds:
 
 - every entry, as the canonical bytes that the `log` read returns;
 - every retained input of the kinds `definition`, `entry`, `rule`,
@@ -1412,9 +1479,9 @@ today.
 The archive is in the room's own repository at its destination's host.
 Whoever can fetch that repository's refs can read the archive. Reads of
 the service stay gated by sessions as they are now; the archive is a
-second, coarser door, and section 15.9 lists it as a point for review.
+second, coarser door, and section 15.10 lists it as a point for review.
 
-### 15.3 Layout
+### 15.4 Layout
 
 One ref for each archived scope:
 
@@ -1444,7 +1511,7 @@ Rules:
   section 30). A retained input is at most 1 MiB by the contract
   (`RETAINED_INPUT_BYTES`). An entry line over B is not archived: the
   archiver stops and reports `object-too-large`. Whether the contract
-  already bounds an entry below B is an open point (15.9).
+  already bounds an entry below B is an open point (15.10).
 - **Fan-out.** A directory lists at most 4,096 names; above that it splits
   by the rule of protocol.md R-LOG-19.
 - **The commit.** Its parent is the previous archive commit, or none. Its
@@ -1457,7 +1524,7 @@ Rules:
 `head.json` is a statement, not a proof. It has no signature, because a
 scope holds no signing key (scope contract, D1-6).
 
-### 15.4 The writer
+### 15.5 The writer
 
 The archiver runs in the archived scope's own Durable Object, after a
 commit, from the object's alarm. It never runs inside a turn and never
@@ -1465,11 +1532,12 @@ delays an answer.
 
 1. **Target.** The scope finds its room's repository once: from its seed's
    creator to the directory, then the destination that the directory's
-   `repository` item names. It keeps the answer as bookkeeping. A scope
-   with no such destination has no archive.
+   `repository` item names. It keeps the answer as bookkeeping. An
+   archiving scope always has one, because its creation was refused
+   otherwise (15.2).
 2. **Plan.** It reads its own entries from `archivedThrough + 1` to its
    head, bounded by a count and a byte limit for one pass, and builds the
-   commit of 15.3 on the last confirmed commit.
+   commit of 15.4 on the last confirmed commit.
 3. **Mark.** It writes one bookkeeping row before any request leaves: the
    parent, `through`, the commit ID and the time. At most one commit is
    outstanding for a scope.
@@ -1503,7 +1571,7 @@ archiver is trusted code in the same way as the destination's driver.
 that is busy with turns archives later; it never refuses a turn in order
 to archive.
 
-### 15.5 What a read states
+### 15.6 What a read states
 
 `Summary` gains an optional member:
 
@@ -1517,12 +1585,12 @@ archive?: {
 }
 ```
 
-A scope of a kind that is not archived has no `archive` member. The
+A scope that is Recorded only has no `archive` member. The
 client gains `followArchived(receipt)`: it reads the summary until
 `through` is at or past the receipt's position and the hashes agree, or
 it reports the state that prevents that. It derives no judgment.
 
-### 15.6 The verifier
+### 15.7 The verifier
 
 `@generalbusiness/artroom-replay` gains a second source,
 `gitSource(directory)`, which implements `HistorySource`
@@ -1548,7 +1616,7 @@ artroom-replay --git <clone> <scope ID> [--mode integrity|replay]
 Everything read from a clone is untrusted, with the same limits on bytes,
 entries and scopes as the HTTP source.
 
-### 15.7 What a clone shows, and what it does not
+### 15.8 What a clone shows, and what it does not
 
 A clone shows, with no call to the service:
 
@@ -1571,14 +1639,15 @@ The Git host is a second holder of the bytes, apart from the service. The
 archive makes verification independent of the service's availability and
 of its answers. It does not make the service unable to equivocate.
 
-### 15.8 Slices and witnesses
+### 15.9 Slices and witnesses
 
 Each slice is reviewable alone. No slice changes an entry's bytes, a
 judgment, a receipt or a publication.
 
 | Slice | Work | Witness |
 |---|---|---|
-| A1. Layout | A pure function from entries and retained inputs to the objects and commit of 15.3, for both object formats. | The same input gives the same commit ID. Segment and fan-out boundaries at their limits. A text is never written. Real local Git reads the tree back byte for byte. |
+| A0. Declaration | The `archive` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
+| A1. Layout | A pure function from entries and retained inputs to the objects and commit of 15.4, for both object formats. | The same input gives the same commit ID. Segment and fan-out boundaries at their limits. A text is never written. Real local Git reads the tree back byte for byte. |
 | A2. Git source | `gitSource` and the `--git` and `--texts` options. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. |
 | A3. Archiver | Target resolution, the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
 | A4. Read and client | `Summary.archive` and `followArchived`. | Each state is reported. A receipt past `through` waits; a hash that differs is reported, not waited on. |
@@ -1587,19 +1656,21 @@ judgment, a receipt or a publication.
 Run the tests of each slice while it is built, and the gate once before
 review ([docs/testing.md](../docs/testing.md)).
 
-### 15.9 Open points
+### 15.10 Open points
 
 | Point | Question | Proposed |
 |---|---|---|
 | J1 | Is an entry's canonical line bounded below B by the contract? | Confirm in A1. If not, adopt protocol.md R-LOG-18's chunk rule before A3. |
 | J2 | A `value` or a retained `entry` may hold bytes that a session would not show to every member. | List the byte domains and foreign kinds in A1. Any that is narrower than "every member of the room" is left out as a text is, and reported the same way. |
-| J3 | The archive is readable by whoever can fetch the repository's refs. | For a public repository this publishes the lanes' histories. Make the archive opt-in for each room until a person-facing statement of that exists. |
+| J3 | The archive is readable by whoever can fetch the repository's refs. | For a public repository this publishes the lanes' histories and the room's membership history. The room's permission (15.2) is the consent. The claim must say so in plain words before a person gives it. |
 | J4 | The archive token is a write that no entry opened. | Review the adapter's prefix check as a security boundary in A3. |
 | J5 | A `conflict` has no automatic repair. | An operator reads the ref and decides. A later design may add a recorded repair act. |
+| J7 | How a creation learns the room's permission, and how an existing room gains it. | The directory holds the permission in its genesis and refuses a `create` of a declaring definition without it. This needs new versions of the register, directory and the three platform definitions. A room founded earlier cannot gain it; migration of a live scope is not designed. |
+| J8 | The acknowledgement barrier, if it is ever built. | It would be a fourth level, declared the same way, with a new `archive` name. Nothing here reserves its meaning. |
 | J6 | Histories that reach the scope's entry budget. | Unchanged: the archive follows the history that exists. Archival that frees service storage is not designed. |
 
 This amendment ran no product tests, gate, provider or deployment probes.
 The provider's `send`, the `log` and `retained` reads, the `HistorySource`
 interface and the directory's `repository` item were read in source at
 the head above. The path from a lane's seed to its room's destination
-(15.4, step 1) was read as declarations only and is owed a witness in A3.
+(15.5, step 1) was read as declarations only and is owed a witness in A3.
