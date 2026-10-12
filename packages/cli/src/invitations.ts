@@ -267,34 +267,54 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
     if (pending?.refused) return { code: 1, lines: [`The original agent enrollment was refused: ${pending.refused.reason}. Nothing was replaced.`] };
     if (options.mode === "check" && !pending) return bad();
     let own: Uint8Array | null = null;
+    const tag = digest.slice("sha256:".length, "sha256:".length + 30), keyName = "k-" + tag, requestName = "a-" + tag;
+    let originalBytes: Uint8Array | null = null, freshKey = false;
     if (pending) own = await ctx.store.secret(config!.key);
     else {
-      own = crypto.getRandomValues(new Uint8Array(32));
-      config = { v: 1, service: link.service, key: privateName("k") };
-      await ctx.store.keep(config.key, own);
-      const readback = await ctx.store.secret(config.key);
-      if (!readback || !same([...readback], [...own])) { own.fill(0); return bad(); }
+      own = await ctx.store.secret(keyName);
+      originalBytes = await ctx.store.private(requestName);
+      // A surviving key without its original envelope is not proof of no
+      // dispatch. Never manufacture a replacement signature from absence.
+      if (own && !originalBytes || originalBytes && !own) return bad();
+      if (!own) {
+        own = crypto.getRandomValues(new Uint8Array(32)); freshKey = true;
+        await ctx.store.keep(keyName, own);
+        const readback = await ctx.store.secret(keyName);
+        if (!readback || !same([...readback], [...own])) { own.fill(0); return bad(); }
+      }
+      config = { v: 1, service: link.service, key: keyName };
     }
     if (!own || own.length !== 32) return bad();
     const key = own.slice();
     // Fresh raw key is no longer needed after its owned snapshot/store readback.
-    if (!pending) own.fill(0);
+    if (freshKey) own.fill(0);
     try {
       let signed: SignedIntent;
+      const readEnvelope = (bytes: Uint8Array, legacy: boolean): SignedIntent | null => {
+        if (bytes.length > 32 * 1024) return null;
+        const value = parseStrict(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes));
+        if (closed(value, ["v", "link", "signed"]) && value["v"] === 1 && value["link"] === digest && isSignedIntentShape(value["signed"])) return value["signed"];
+        return legacy && isSignedIntentShape(value) ? value : null;
+      };
       if (pending) {
         const bytes = await ctx.store.private(pending.request);
-        if (!bytes || bytes.length > 32 * 1024) return bad();
-        const kept = parseStrict(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes));
-        if (!isSignedIntentShape(kept)) return bad(); signed = kept;
+        const kept = bytes && readEnvelope(bytes, true);
+        if (!kept) return bad(); signed = kept;
       } else {
-        signed = await signedIntent(secretSigner(key), { to: link.repository.membership, kind: "enrol", on: 0, fields: { invitation: link.invitation.seq, secret: link.secret }, expected: link.expected }, { now: now(ctx) });
-        const request = privateName("a"), raw = canonicalize(signed);
-        await ctx.store.keepPrivate(request, utf8(raw));
-        const readback = await ctx.store.private(request);
-        if (!readback || new TextDecoder().decode(readback) !== raw) return bad();
-        config = { ...config!, join: { kind: "enrol", request, intent: intentDigest(signed.intent), link: digest, repository: link.repository, handle: link.handle } };
+        if (originalBytes) {
+          const kept = readEnvelope(originalBytes, false);
+          if (!kept) return bad(); signed = kept;
+        } else {
+          signed = await signedIntent(secretSigner(key), { to: link.repository.membership, kind: "enrol", on: 0, fields: { invitation: link.invitation.seq, secret: link.secret }, expected: link.expected }, { now: now(ctx) });
+          const raw = canonicalize({ v: 1, link: digest, signed });
+          await ctx.store.keepPrivate(requestName, utf8(raw));
+          const readback = await ctx.store.private(requestName);
+          if (!readback || new TextDecoder().decode(readback) !== raw) return bad();
+        }
+        config = { ...config!, join: { kind: "enrol", request: requestName, intent: intentDigest(signed.intent), link: digest, repository: link.repository, handle: link.handle } };
+        // Validate the original before restoring its public pointer.
+        if (!verifySignedIntent(signed) || signed.intent.actor !== keyIdOfSecret(key) || signed.intent.kind !== "enrol" || signed.intent.on !== 0 || !same(signed.intent.to, link.repository.membership) || !same(signed.intent.fields, { invitation: link.invitation.seq, secret: link.secret }) || !same(signed.intent.expected, link.expected)) return bad();
         await save(config);
-        if (!same(await ctx.store.config(), config)) return bad();
       }
       if (!verifySignedIntent(signed) || signed.intent.actor !== keyIdOfSecret(key) || signed.intent.kind !== "enrol" || signed.intent.on !== 0 || !same(signed.intent.to, link.repository.membership) || !same(signed.intent.fields, { invitation: link.invitation.seq, secret: link.secret }) || !same(signed.intent.expected, link.expected) || intentDigest(signed.intent) !== config!.join!.intent) return bad();
       const M = new ScopeHandle(signedReads(httpTransport(link.service, ctx.fetch ? { fetch: ctx.fetch } : {}), secretSigner(key), { now: () => now(ctx) }), link.repository.membership.scope);

@@ -125,13 +125,25 @@ test("retained native agent opening and key invitation survive loss; independent
     if (new URL(url).pathname.endsWith("/acts")) {
       const cfg = (await receiver.config())!, originalBytes = await receiver.private(cfg.join!.request);
       expect(!!originalBytes && cfg.join!.kind === "enrol").toBe(true);
-      expect(canonicalize(JSON.parse(new TextDecoder().decode(originalBytes!))) === canonicalize(JSON.parse(init!.body!).signed)).toBe(true);
+      expect(canonicalize(JSON.parse(new TextDecoder().decode(originalBytes!)).signed) === canonicalize(JSON.parse(init!.body!).signed)).toBe(true);
       submittedWithCustody = true;
     }
     return fetch(url, init);
   } };
+  const receiverSave = receiver.save;
+  let dropReceiverPointer = true;
+  receiver.save = async config => { if (dropReceiverPointer && config.join) { dropReceiverPointer = false; return; } await receiverSave(config); };
+  const beforeReceiver = sent.length;
+  expect((await command(receiving, ["join", link])).code).toBe(1);
+  expect([sent.length, await receiver.config()]).toEqual([beforeReceiver, null]);
+  const originalNames = await readdir(pathJoin(home, "agent", "private"));
+  expect([originalNames.length, (await readdir(pathJoin(home, "agent", "keys"))).length]).toEqual([1, 1]);
+  const initialEnvelope = JSON.parse(new TextDecoder().decode((await receiver.private(originalNames[0]!.replace(/\.data$/, "")))!));
+  expect((await command(receiving, ["join", link, "--check"])).code).toBe(1);
+  expect([sent.length, await receiver.config()]).toEqual([beforeReceiver, null]);
   lose = "enrol";
   expect((await command(receiving, ["join", link])).code).toBe(1);
+  expect(canonicalize(sent.at(-1)) === canonicalize(initialEnvelope.signed)).toBe(true);
   const kept = (await receiver.config())!, raw = await receiver.private(kept.join!.request);
   expect([submittedWithCustody, kept.join!.kind, sent.at(-1)!.intent.actor === rita.key]).toEqual([true, "enrol", false]);
   const before = sent.length; loseSettle = true;
