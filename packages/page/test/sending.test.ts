@@ -16,7 +16,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     setAttribute(name: string, value: string) { this.attrs[name] = value; }
     append(...children: (Element | string)[]) { for (const child of children) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.push(child); } }
     prepend(...children: (Element | string)[]) { for (const child of [...children].reverse()) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.unshift(child); } }
-    replaceChildren(...children: (Element | string)[]) { for (const child of this.children) if (child instanceof Element) child.parent = null; this.children = []; this.append(...children); if (this === root) rendered.resolve(); }
+    replaceChildren(...children: (Element | string)[]) { for (const child of this.children) if (child instanceof Element) child.parent = null; this.children = []; this.append(...children); if (this === root && this.all().some(node => node.attrs["class"] === "rail")) rendered.resolve(); }
     remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; }
     addEventListener(name: string, handler: (event: { preventDefault(): void }) => void) { this.handlers.set(name, handler); }
     focus() {}
@@ -50,7 +50,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   const root = new Element("div");
   type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
-  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: null };
+  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: [], ref: { membership: context.place.membership, member: "@reader" } } };
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>, accepted?: () => void) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
@@ -70,7 +70,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key", isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value }));
   vi.doMock("../src/data.ts", () => ({
     act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: ["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own"].map((kind) => ({ kind, fields: [] })), hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
-    openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
+    openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership, name: `Recorded ${context.place.directory}` }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
     joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: vi.fn(),
   }));
   vi.doMock("../src/view.ts", () => ({
@@ -159,8 +159,8 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     context.label = { text: "Newest local label", place: context.place };
     rendered = gate(); releaseRead.resolve(); await rendered.promise;
     expect(root.textContent).toContain("Newest local label");
-    expect(root.textContent).toContain("Room est-room");
-    expect(root.textContent).not.toContain("Room ther-roo");
+    expect(root.textContent).toContain("Recorded newest-room");
+    expect(root.textContent).not.toContain("Recorded another-room");
     context = { ...context, secret: "device" };
     rendered = gate(); redraw(); await rendered.promise;
     const retired = vi.fn();

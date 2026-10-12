@@ -106,6 +106,7 @@ const shot = async (tab, name, height = null) => {
   const viewport = tab.viewportSize();
   const check = await tab.evaluate(() => ({
     title: document.title,
+    recordedRoomName: document.querySelector(".room-switch .room-name > span")?.textContent ?? null,
     origin: location.origin,
     pathname: location.pathname,
     meaningful: document.querySelector("main")?.textContent?.trim().length > 0,
@@ -119,7 +120,7 @@ const shot = async (tab, name, height = null) => {
       .map((element) => ({ name: element.getAttribute("name"), fontSize: parseFloat(getComputedStyle(element).fontSize) })),
   }));
   if (check.origin !== new URL(record.service).origin || !(check.pathname === "/page/" || check.pathname.startsWith("/site/"))) throw new Error(`${name}: document left the recorded service routes.`);
-  if (check.pathname === "/page/" && check.title !== "Artroom") throw new Error(`${name}: unexpected page title ${check.title}.`);
+  if (check.pathname === "/page/" && check.title !== (check.recordedRoomName ? `dap - workroom ${check.recordedRoomName}` : "dap - workroom")) throw new Error(`${name}: unexpected page title ${check.title}.`);
   if (!check.meaningful || check.overlay || check.horizontalOverflow) throw new Error(`${name}: invalid rendered layout ${JSON.stringify(check)}`);
   if (viewport.width <= 390 && check.touchTargets.some(control => control.height < 43)) throw new Error(`${name}: a core task target is below 44px effective height.`);
   if (viewport.width <= 390 && check.controls.some((control) => control.fontSize < 16)) throw new Error(`${name}: editable phone text is smaller than 16px.`);

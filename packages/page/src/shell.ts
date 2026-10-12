@@ -1,5 +1,5 @@
 /** Navigation and room identity shared by the browser shell and its tests. */
-export type Destination = "issues" | "changes" | "rules" | "settings";
+export type Destination = "issues" | "changes" | "rules" | "join" | "invitation" | "config";
 export interface Route { destination: Destination; scope: string | null }
 
 /** State-sensitive presentation only; the scope still judges each offered act. */
@@ -18,7 +18,8 @@ export function changeActions(state: string, invalidPath: boolean): { primary: s
 export function routeOf(hash: string): Route {
   const [path, query] = hash.replace(/^#/, "").split("?");
   const [, kind, scope] = (path || "/").split("/");
-  if (kind === "settings" || kind === "rules") return { destination: kind, scope: null };
+  if (kind === "settings" || kind === "join") return { destination: "join", scope: null };
+  if (kind === "invitation" || kind === "config" || kind === "rules") return { destination: kind, scope: null };
   if (kind === "issue" && scope) return { destination: "issues", scope };
   if (kind === "change" && scope) return { destination: "changes", scope };
   return { destination: new URLSearchParams(query).get("kind") === "change" ? "changes" : "issues", scope: null };

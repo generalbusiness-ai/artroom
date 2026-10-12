@@ -18,7 +18,12 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
     removeAttribute(key: string) { delete this.attrs[key]; }
     append(...children: (Element | string)[]) { this.children.push(...children); }
     prepend(...children: (Element | string)[]) { this.children.unshift(...children); }
-    replaceChildren(...children: (Element | string)[]) { this.children = children; rendered.resolve(); }
+    replaceChildren(...children: (Element | string)[]) {
+      this.children = children;
+      // Opening now renders an entry shell before native room verification.
+      // Wait for the actual verified workbench, including eligibility reads.
+      if (this.all().some(element => element.attrs["class"] === "rail")) rendered.resolve();
+    }
     addEventListener(key: string, callback: (event: { preventDefault(): void }) => void) { this.handlers.set(key, callback); }
     fire(key: string) { this.handlers.get(key)?.({ preventDefault() {} }); }
     focus() {} showModal() {} close() {} remove() {}
@@ -40,7 +45,7 @@ test("only an eligible configured founder sees creation; an in-flight or stale c
   vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value, keyIdOfSecret: () => "key" }));
   vi.doMock("../src/claim.ts", () => ({ allowedClaim: async () => { if (!eligible) throw new Error("Not founder"); return { register, definition: "platform:register@2" }; }, claimRoom: claim, claimStatus: () => journal }));
   vi.doMock("../src/data.ts", () => ({
-    openRoom: async () => ({ session: { service: "https://page.test", secret: new Uint8Array(32) }, ...settings.place, rules: "rules", name: "Recorded repository", me: { handle: "@founder" } }),
+    openRoom: async () => ({ session: { service: "https://page.test", secret: new Uint8Array(32) }, ...settings.place, key: "key", rules: "rules", destination: "destination", name: "Recorded repository", me: { handle: "@founder", role: "admin", actions: [], ref: { membership: settings.place.membership, member: "@founder" } }, definitions: new Map(), reader: null, unsessioned: null }),
     actsOn: async () => ({ acts: [], hidden: 0 }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", actAssociation: () => "association", act: vi.fn(), fieldValue: vi.fn(), joinRoom: vi.fn(), loadChange: vi.fn(), loadIssue: vi.fn(), loadRules: vi.fn(), placeOf: vi.fn(),
   }));
   vi.doMock("../src/view.ts", () => ({ icon: () => new Element("svg"), h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); element.children = children.flat().filter((child) => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; }, roomScreen: () => new Element("main"), actsPanel: () => new Element("section"), failureScreen: () => new Element("main"), changeScreen: vi.fn(), issueScreen: vi.fn(), rulesScreen: vi.fn(), answerLine: vi.fn(), nonacceptedAnswerText: vi.fn() }));

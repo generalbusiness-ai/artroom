@@ -12,9 +12,9 @@ submission does not retain.
 
 The source is `packages/page`. The scope Worker serves it at `/page/`, on
 the same origin as the routes it reads, so no second deployment and no
-cross-origin header is needed. It has run only against the test Worker:
-its story test, and screenshots in Chromium answered with the test
-Worker's recorded answers.
+cross-origin header is needed. The story test and earlier screenshots use
+the test Worker's recorded answers. They do not establish live enrollment;
+current delivery evidence is reported separately.
 
 ## Build it
 
@@ -42,35 +42,49 @@ page with it.
 
 Each answer carries a content security policy that runs this origin's
 scripts only and lets the page read only this origin. The page keeps its
-key in the browser's local storage for the origin, which any script of the
-origin can read. The site route's pages, on the same origin, run no script
-(their policy is `default-src 'none'`).
+raw Ed25519 key in the browser's local storage for the origin, which any
+script of that origin can read. The private enrollment record also contains
+the key and the exact signed Join request, including the invitation secret.
+Neither belongs in a URL, log, screenshot or exported diagnostic. Read-session
+tokens stay in memory. This is the Page's existing raw-key policy, not the
+Counter demo's non-extractable CryptoKey policy. The site route's pages, on
+the same origin, run no script (their policy is `default-src 'none'`).
 
 ## Open it against a room
 
-Open `<base URL>/page/` and go to Settings (`#/settings`). Give it:
+Open `<base URL>/page/`. The existing-room chooser offers two paths:
 
-- **The room**: an invitation link from `artroom invite`, or the content of
-  the command line's `config.json`. The page keeps only the room it names:
-  the directory's scope ID, and membership's scope ID with its
-  incarnation, which a session request names. A key that is not yet a
-  member cannot read the directory to learn membership, so the page is told
-  both.
-- **A key**: the 32-byte Ed25519 secret, as unpadded base64url. The page
-  keeps it in local storage under `artroom-page`, and shows only its key ID
-  (`key_...`).
+1. **Invitation link.** Choose this path and paste the complete link from
+   `artroom invite`. The page prepares a browser key and joins automatically.
+   There is no key input or manual Join button. Before dispatch, it retains
+   and reads back the key and exact signed enrollment request under the
+   origin's Web Lock. After verification, it checks the loaded membership
+   handle against the invitation before selecting the room.
+2. **Config and key.** Paste `config.json` and its matching 32-byte Ed25519
+   key as unpadded base64url. The key comes from `keys/device.key`, or
+   `keys/operator.key` for the founder, in the command line's config directory.
+   Choose **Join room** once. The page verifies the key's actual membership
+   before saving the connection and navigating. The connection still uses
+   the service that serves this page, regardless of an address in the config.
 
-There are two ways to sign in:
+The saved connection names the directory and the complete membership
+reference, including its incarnation. It keeps the selected key under
+`artroom-page`. An invitation's complete URL is not saved, but its secret
+remains in the private signed enrollment record. The chooser replaces
+Settings, Save settings and manual key creation. The old `#/settings`
+address opens the chooser.
 
-1. **Join on the page.** Paste the invitation link, press "Create key",
-   then "Join room". The page signs membership's
-   `join` with the new key and the link's secret. Membership enrols the key
-   as the invited member. The link is not kept. A link joins once; a
-   second join with it is refused.
-2. **Use a key of the command line.** Paste `config.json` as the room and
-   the content of `keys/device.key` (or `keys/operator.key` for the
-   founder) as the key, from the command line's config directory.
+An unknown enrollment survives redraw and reload. **Check status** reads
+its original result and verifies the matching receipt and signed entry;
+it sends no replacement enrollment. A newer head does not settle the request.
+Do not replace its key or try another invitation while it remains unknown.
 
+After a verified first-attempt refusal, the same invitation remains refused
+and sends no new enrollment. Pasting an explicit different invitation reuses
+the retained key. The record keeps the original envelope and refusal intact
+before dispatching the new request. It holds at most eight prior refusals
+within a 64 KiB record; full, malformed or unavailable custody blocks dispatch.
+**Check status** remains read-only for refused requests.
 The page then asks membership for a read session signed by the key, and
 presents it to every read. A session lasts 600 seconds; the page asks for
 a new one before a read when the last one has ended. If membership gives
@@ -92,9 +106,13 @@ membership.
 | The site | Pages and **Open latest page** navigate to `/site/<directory>/HEAD/`. These show the latest branch, not an immutable rendered preview. Exact source preview verifies the selected retained signed proposal's subject, digest and size; rendered same-version links and assets remain separate work. |
 | `#/rules` | The rules of this room, as the rules scope holds them: the revision, the approvals the lanes count, the extents with their classes, approvals, approvers, checks and paths, whether the single-controller exception is declared, required checks, labels and the active definitions. It says who may change them: the members whose role holds `rules.publish`. |
 
-The account control identifies the member. Record inspection retains the
-role, key and read-session evidence. The room switcher uses the recorded
-repository name; it does not invent a retained claim display name.
+Room navigation, the room switcher and the account control appear only
+with verified room context. The account identifies the actual member, and
+record inspection retains the role, public key ID and read-method evidence.
+The room switcher uses the recorded repository name; it does not invent a
+retained claim display name. The document title is `dap - workroom <name>`
+for that verified name, and `dap - workroom` while entering or when the room
+context cannot be verified.
 
 **Actions.** Create issue opens a dialog with Title and Description. The title
 also states the completion condition, matching the CLI's issue command.
@@ -134,14 +152,13 @@ it does not review or merge it. Each signed step is kept before POST and a
 lost reply stops further steps. Drafts, requests and answers survive only
 while this Page remains loaded. Reload recovery remains separately owed.
 
-Join also blocks duplicate requests and checks captured settings before
-submission and before selecting an accepted reply. A late accepted answer
-is kept in memory for its original context; Use joined room selects that
-known result with the original signing key and makes no new Join. Unknown
-Join outcomes remain read-only, with the same reload-recovery limitation.
-Enrollment custody follows the actual membership incarnation and signing key.
-Saving that room or changing the invitation does not release an unknown Join
-under the same identity.
+Invitation enrollment differs from generic forms: its exact key, signed
+request and outcome remain in bounded origin-private storage across reload.
+The page checks the captured route and connection before dispatch and before
+selecting a verified result. A late reply cannot select another context.
+Unknown enrollment remains fenced; changing the selected room does not
+resolve it. Checking the original request verifies its receipt and exact
+signed entry without rekeying or reenrolling.
 
 The Rules editor changes approval counts and preserves complete checks,
 extents, labels and exception values. Only an actually offered `publish`

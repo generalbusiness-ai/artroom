@@ -5,7 +5,7 @@ import * as bytes from "@generalbusiness/artroom-bytes";
 import { b64url, definitionDigest, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { changeDemo } from "@generalbusiness/artroom-lanes";
 import { Session as ReadSession, type Fetch } from "@generalbusiness/artroom-client";
-import { joinAssociation, joinRoom, placeOf, type Session } from "../src/index.ts";
+import { invitationTarget, prepareJoin, joinAssociation, joinRoom, placeOf, type Session } from "../src/index.ts";
 
 // One client boundary, with a SCRIPTED service acknowledgment. No scope,
 // membership judgment, provider or durable enrollment/recovery runs.
@@ -51,6 +51,11 @@ test("page join refuses mismatched encoding before submission and accepts script
     await expect(joinRoom(session, encode(changed))).rejects.toThrow("The invitation does not match this configured service");
   }
   expect(submissions).toEqual([]);
+  const target = invitationTarget(session.service, encode(original));
+  const prepared = await prepareJoin(session, encode(original));
+  expect([prepared.place, prepared.definition, prepared.handle, prepared.link]).toEqual([target.place, target.definition, target.handle, target.link]);
+  expect(verifySignedIntent(prepared.signed)).toBe(true);
+  expect(submissions).toEqual([]); // Preparation alone must not dispatch.
   await expect(joinRoom(session, encode(original), () => { throw new Error("Page context changed before join submission"); })).rejects.toThrow("Page context changed before join submission");
   expect(submissions).toEqual([]);
   for (const definition of ["platform:membership@1", "platform:membership@2"]) {

@@ -20,6 +20,10 @@ test("navigation keeps lane identity and separates the room's Issues and Changes
   expect(routeOf("#/change/sc_exact?kind=issue")).toEqual({ destination: "changes", scope: "sc_exact" });
   expect(routeOf("#/issue/sc_other")).toEqual({ destination: "issues", scope: "sc_other" });
   expect(routeOf("#/rules")).toEqual({ destination: "rules", scope: null });
+  expect(routeOf("#/join")).toEqual({ destination: "join", scope: null });
+  expect(routeOf("#/invitation")).toEqual({ destination: "invitation", scope: null });
+  expect(routeOf("#/config")).toEqual({ destination: "config", scope: null });
+  expect(routeOf("#/settings")).toEqual({ destination: "join", scope: null });
 });
 
 test("a scope fence permits pre-submit correction but never a fresh signature after an attempted request loses its reply", async () => {
