@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Planner writes plan 031 (one MCP service for every dap application) and files it for checker review; implementation is a separate request.","body":{"branch":"planner/mcp-generic-design"}}
+{"kind":"artifact","text":"plans/README.md at exact ab74034699b01adceb570e2ed96a4786f9cc51a9 on planner/mcp-generic-design, under promise git:sha1…da45ac5 on request git:sha1…c268fd9","body":{"commit":"ab74034699b01adceb570e2ed96a4786f9cc51a9","path":"plans/README.md"}}
