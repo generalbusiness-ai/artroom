@@ -1,14 +1,15 @@
 # Observability for dap: a design
 
-2026-10-12. Draft 4, for checker review. Hugh's direction, 2026-10-12 17:36
+2026-10-12. Draft 5, for checker review. Hugh's direction, 2026-10-12 17:36
 Eastern: draft a dated design in `notes/`, send it to the checker, and tell
 the planner that it is to be prioritized soon after the demo. Written
 against main `013fac7a5`. Draft 1 (`baa0e21e`) received changes requested
 in review `12fc5d1a`, with five corrections; Draft 2 (`4f0057ac`)
 answered them, and section 9 maps them. Review `efc3882d` requested five
 more; Draft 3 (`c45ef0c2`) answered them, and section 10 maps them.
-Review `5f3673c6` requested three more; Draft 4 answers them, and section
-11 maps them.
+Review `5f3673c6` requested three more; Draft 4 (`0ea94184`) answered
+them, and section 11 maps them. Review `435c67c9` requested two more;
+Draft 5 answers them, and section 12 maps them.
 
 ## 1. What this note decides
 
@@ -109,12 +110,12 @@ a count of the things its kind names, never a rate.
 | blob 1 | kind | the ten kinds below |
 | blob 2 | deployment | the `DEPLOYMENT` setting, already bounded at 128 bytes |
 | blob 3 | version | the Worker version ID from the platform's version metadata binding, or `unknown` |
-| blob 4 | place | the union of: the fixed route names of `worker.ts`'s table (`found`, `acts`, `preparations`, `settle`, `summary`, `items`, `history`, `entries`, `outbox`, `duty`, `log`, `retained`, `sessions`, `stream`, `incidents`, `waiting`, `credential`, `site`, `page`, `health`, `requests`); the operations `alarm`, `dispatch`, `metrics`; and the diagnosis steps, which are the fixed words the source emits at its diagnosis sites, enumerated in `metrics.ts` as `STEPS` with a test that every `diagnose(` call site's literal is in it; any other value is `other` |
+| blob 4 | place | the union of: the fixed route names of `worker.ts`'s table (`found`, `acts`, `preparations`, `settle`, `summary`, `items`, `history`, `entries`, `outbox`, `duty`, `log`, `retained`, `sessions`, `stream`, `incidents`, `waiting`, `credential`, `site`, `page`, `health`, `requests`); the operations `alarm`, `dispatch`, `metrics`; the diagnosis steps, which are the fixed words the source emits at its diagnosis sites, enumerated in `metrics.ts` as `STEPS` with a test that every `diagnose(` call site's literal is in it; `mixed` for a merged row whose places differed; and `other` for a step outside `STEPS` |
 | blob 5 | end | for `turn`: the native `End` kinds of `turn.ts:94`, `answer`, `idle`, `busy`, `clock-behind`, `unavailable`; for every other kind: `ok`, `error`, `issued`, `refused`, `served`, `unavailable`, `dropped` |
-| blob 6 | reason | the union of `RefusalReason`, `UnavailableReason`, `MismatchReason`, `ReadRefusal`, `SessionRefusal`, the diagnosis events (`outside-call-failed`, `outside-replies-failed`, `outside-recovery-failed`, enumerated as `EVENTS` with the same call-site test), the operator record kinds, the status classes `2xx`, `3xx`, `4xx`, `5xx`, the drop reasons `budget`, `tainted`, `aggregated`, `sidecar`, and `none` |
-| blob 7 | request ID | 16 lowercase hexadecimal characters, server-minted (section 4.4) |
-| blob 8 | trace ID | 32 lowercase hexadecimal characters from a validated `traceparent`, or `none` |
-| blob 9 | answer | for a `turn` whose end is `answer`: the public answer the native `End` carries, `accepted`, `refused`, `unavailable` or `mismatch`; for every other end and kind: `none`. So blob 5 says how the turn ended and blob 9 says what the input was answered, and the two are never substituted for each other |
+| blob 6 | reason | the union of `RefusalReason`, `UnavailableReason`, `MismatchReason`, `ReadRefusal`, `SessionRefusal`, the diagnosis events (`outside-call-failed`, `outside-replies-failed`, `outside-recovery-failed`, enumerated as `EVENTS` with the same call-site test), the operator record kinds, the status classes `2xx`, `3xx`, `4xx`, `5xx`, `aggregated` for a merged row whose reasons differed, `summary` for the one terminal row, and `none` |
+| blob 7 | request ID | 16 lowercase hexadecimal characters, server-minted (section 4.4); `mixed` for a merged row whose requests differed; `none` for an alarm |
+| blob 8 | trace ID | 32 lowercase hexadecimal characters from a validated `traceparent`; `mixed` for a merged row whose traces differed; `none` |
+| blob 9 | answer | for a `turn` whose end is `answer` and whose input was a public act, preparation or founding: the public answer, `accepted`, `refused`, `unavailable` or `mismatch`; for a `turn` whose end is `answer` but whose input was internal (a give-up diagnosis run through `turns.run` by `outbox.ts:179-197`, or any other turn with no public answer): `none`; `mixed` for a merged row whose answers differed; for a `route`: `turn` when a turn ran for the request, `pre-turn` when the route answered before any turn (section 4.7); otherwise `none` |
 | double 1 | multiplicity | how many underlying events this row stands for: 1 for an unmerged row, the merged count for an aggregated `turn` row (below); the platform's own `_sample_interval` is a separate column read at query time, and the two multiply |
 | double 2 | duration in milliseconds | the route's or the turn's wall time, or 0 |
 | double 3 | count a | per kind, below |
@@ -128,23 +129,34 @@ number already exists.
 | Kind | Where | blob 4 | blob 5 | blob 6 | double 2 | double 3 | double 4 | double 5 | double 6 |
 |---|---|---|---|---|---|---|---|---|---|
 | `turn` | `turn.ts` at `#close` | the operation (`acts`, `preparations`, `found`, `alarm`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer`, else `none` |
-| `route` | `worker.ts` `route` | the route name | `ok` for a `2xx` or `3xx`, `refused` for a `4xx`, `error` for a `5xx` | the status class | wall time | 0 | 0 | 0 | 0 |
+| `route` | `worker.ts` `route` | the route name | `ok` for a `2xx` or `3xx`, `refused` for a `4xx`, `error` for a `5xx` | the status class | wall time | 0 | 0 | 0 | 0; blob 9 `turn` or `pre-turn` |
 | `session` | `sessions.ts` | `sessions` | `issued` or `refused` | the `SessionRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
 | `signed-read` | `signed-reads.ts` | the read name | `ok` or `refused` | the `ReadRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
 | `join` | `limits.ts` `serve` | `acts` | `served`, `refused` or `unavailable` | `rate-limited`, `busy` or `none` | 0 | windows open | waiting | 0 | 0 |
 | `dispatch` | `outbox.ts` `Dispatcher.run` | `dispatch` | `ok` | `none` | 0 | attempts made | acknowledged | given up (diagnosed) | 0 |
-| `diagnosis` | `diag.ts` `toConsole` | the diagnosis `step` when it is a fixed word of the source, else `none` | `error` | the diagnosis `event` | 0 | 0 | 0 | 0 | 0 |
+| `diagnosis` | `diag.ts` `toConsole` | the diagnosis `step` when it is in `STEPS`, else `other` | `error` | the diagnosis `event` | 0 | 0 | 0 | 0 | 0 |
 | `incident` | `operator.ts` `record` | `incidents` | `error` | the record kind | 0 | 1 | 0 | 0 | 0 |
 | `stream` | `object.ts` `serving` | `stream` | `ok` | `none` | 0 | open | released | 0 | 0 |
-| `metric-dropped` | `metrics.ts` | `metrics` | `dropped` | `budget`, `tainted`, `aggregated`, `groups` or `sidecar` | 0 | rows lost or merged | of them `turn` rows | of them critical `turn` rows (end `busy`, `clock-behind` or `unavailable`, or an end that failed validation) | 0 |
+| `metric-dropped` | `metrics.ts`, one per invocation | `metrics` | `dropped` | `summary` | a bitmask of the loss reasons present: 1 budget, 2 tainted, 4 groups, 8 sidecar, 16 overflow | rows lost or merged, all reasons | of them `turn` rows | of them critical `turn` rows (end `busy`, `clock-behind` or `unavailable`, or an end that failed validation, or a saturated counter) | groups merged |
 
-A `turn` row carries the native end in blob 5 and, only when that end is
-`answer`, the public answer in blob 9; an `idle`, `busy`, `clock-behind` or
-`unavailable` end has blob 9 `none`, and an `answer` end always has a
-public answer. The native `End` and the public answer are therefore both
-kept, with their relationship explicit. Timed
+A `turn` row carries the native end in blob 5. The native `End.answer` is
+generic: a public act, preparation or founding carries a public answer,
+which goes in blob 9; an internal turn, such as the give-up diagnosis
+that the dispatcher runs through `turns.run<boolean>`, ends with `answer`
+and has no public answer, so blob 9 is `none` and blob 4 is `dispatch`.
+An `idle`, `busy`, `clock-behind` or `unavailable` end has blob 9 `none`.
+Every turn, public or internal, is one `turn` row or part of a merged
+one, because the row is emitted at the turn's closure in `turn.ts`, the
+one place every turn passes. Timed
 attempts charged (double 4) and timed entries written (double 5) are
 different numbers and are both kept.
+
+**Where a `route` row learns `turn` or `pre-turn`.** `route` in
+`worker.ts` sets blob 9 to `turn` when it obtained a Durable Object and
+the object reports that a turn ran for the request, and to `pre-turn`
+when it answered from the Worker alone; the object passes the fact back
+beside its answer as an operational flag, with no change to the answer's
+bytes. W1 asserts both values at each of the three pre-turn sites.
 
 **Closure.** The allowlists above are exactly the values the kinds in the
 table need, and a test (W1) emits one legitimate row of every kind with
@@ -173,52 +185,55 @@ and asserts that nothing but `metric-dropped` is written.
 
 **Write budget, with coverage.** The platform caps data points per
 invocation. The sink's budget is that cap less one, the one being
-reserved for the terminal `metric-dropped` row, which is therefore always
-writable when the sink can write at all. Within an invocation the sink
-buffers rows and writes them at the end: `turn` rows first, then `route`,
-then the rest in order of emission.
+reserved for the single terminal row, the `metric-dropped` row of reason
+`summary`, of which there is exactly one per invocation and which
+carries every loss signal: a bitmask of the loss reasons present, the
+rows lost or merged, the turn rows among them, the critical turns among
+them, and the groups merged. Within an invocation the sink buffers rows
+and writes them at the end: `turn` rows first, then `route`, then the
+rest in order of emission.
 
-*Typed aggregation of turns.* When the buffered `turn` rows would exceed
-the budget, as an alarm that drains many due duties and their give-up
-turns can, they are merged by group, never dropped. A group is a place,
-end, answer and reason; the accumulator holds at most 64 groups in
-memory. Merging is typed per slot: double 1 is the multiplicity, the
-number of turns merged; doubles 2 to 5 are sums over those turns; double 6
-is the count of turns with the flag; blobs are the group's. A query reads
-a merged row as `multiplicity` turns with those sums, and multiplies by
-`_sample_interval` as for any row, so the platform's sampling and the
-sink's merging compose without double counting. When the groups
-themselves exceed the budget, groups are merged in a fixed order that
-never crosses an end: first across reason within a place and end, then
-across answer, then across place, so at most one row per end remains,
-five rows, which every platform cap exceeds. The resolution lost in that
-second merge is counted in a terminal row of reason `groups` (double 3
-the groups merged, double 4 of them turn groups, double 5 of them
-critical). Rows of other kinds beyond the budget are dropped and counted
-in a terminal row of reason `budget`. Nothing the sink does changes a
-native effect: the buffer is written after the native answer is decided.
+*The accumulator and its transitions.* `turn` rows accumulate by group,
+a group being a place, end, answer and reason, in a map of at most 64
+groups. At the 65th distinct group the map is coarsened in a fixed
+order, each step applied only if the previous did not bring the count
+under 64: first reasons merge within a place, end and answer (blob 6
+becomes `aggregated`); then answers merge within a place and end (blob 9
+becomes `mixed`); then places merge within an end (blob 4 becomes
+`mixed`). No step crosses an end, so after the third step at most five
+groups remain, one per native end kind. The same three steps apply at
+write time when the groups exceed the write budget. Merging is typed per
+slot: double 1 is the multiplicity, the turns merged; doubles 2 to 5 are
+sums; double 6 is the count of turns with the flag; request and trace
+IDs become `mixed` when they differ; blobs otherwise are the group's.
+Every sum is checked: a counter that would pass 2^31 minus 1 saturates
+there, sets the `overflow` bit in the summary row and counts its turns
+as critical, so saturation can never hide a `busy` end. Each coarsening
+step counts the groups it merged in the summary row's double 6.
 
 *What coverage means.* A critical turn is one whose end is `busy`,
-`clock-behind` or `unavailable`, or whose end failed validation. The
-terminal row of each reason counts, in double 5, the critical turns it
-stands for: merged across groups, dropped for budget, dropped as tainted
-(a tainted `turn` row is counted by its end before validation, and an
-invalid end counts as critical), or lost because the sidecar failed. A
-window whose terminal rows show any critical loss is incomplete for the
-"no busy" question (section 4.7). What the terminal row cannot prove is
-its own absence: if the sink failed to write the terminal row, or the
-process ended before it, the loss is uncounted in that invocation, and a
-deferred count on the next invocation is best effort and may never come.
-Section 4.7 therefore does not rely on terminal rows alone to claim
-completeness.
+`clock-behind` or `unavailable`, whose end failed validation, or whose
+counters saturated. The summary row's double 5 counts the critical turns
+lost or merged away by any reason: dropped for budget, dropped as
+tainted (a tainted `turn` row is counted by its end before validation,
+and an invalid end counts as critical), merged across groups, or lost
+with the sidecar. A window whose summary rows count any critical loss is
+incomplete for the "no busy" question (section 4.7). What the summary
+row cannot prove is its own absence: if the sink failed to write it, or
+the process ended before it, the loss is uncounted in that invocation,
+and a deferred count on the next invocation is best effort and may never
+come. Section 4.7 says what it does with that.
 
 W1 drives an alarm with more due duties than the cap and asserts that the
 sends and entries equal those of a run with no sink; that every turn's end
 is recoverable from the written rows; that merging two `wrote` turns gives
 multiplicity 2 and flag count 2 and every double stays in its domain; that
-distinct end and reason groups are preserved up to the budget; and that
-exceeding the group budget merges across reason and place but never
-across end, with the `groups` row counting what was merged.
+the 65th group triggers the reason merge and that the answer and place
+merges follow when needed, each with the right coarse values and summary
+counts; that a give-up diagnosis turn appears with place `dispatch`, end
+`answer` and answer `none`; that a saturating counter sets `overflow` and
+counts its turns as critical; and that mixed losses in one invocation
+produce exactly one summary row with every signal set.
 
 **Boundaries of what the sink can tell.** Retention is the platform's
 (ninety days of the dataset). Access is the deployment's analytics token,
@@ -389,10 +404,14 @@ not involved.
 Engine SQL API and polls `/health`. It is truthful about sampling and
 coverage:
 
-- every count is a sum of `_sample_interval`, never a count of rows, and
-  every counter value is a sum of the double times `_sample_interval`, so
-  the platform's write-time and read-time sampling are weighted back; the
-  p95 of `route` wall time is a weighted quantile over `_sample_interval`;
+- the estimators are spelled out and used nowhere else: an event count
+  is `SUM(double1 * _sample_interval)`, since double 1 already carries the
+  sink's multiplicity and `_sample_interval` the platform's weight, and
+  the two multiply once; an additive counter is
+  `SUM(counter * _sample_interval)`, since a merged row's counter is
+  already the sum over its turns and multiplicity is not applied again;
+  the p95 of `route` wall time is the weighted quantile over
+  `_sample_interval` of unmerged rows (`route` rows are never merged);
 - the error taxonomy is fixed: an error is a `route` row with end
   `error` (a `5xx`), the denominator is every `route` row of the version
   in the window, both weighted; `refused` rows (`4xx`) are reported
@@ -410,19 +429,37 @@ coverage:
   one observed run on the demo room and recorded in the note that
   delivers it, labelled as observed, as woo's envelope was calibrated
   from a bake; nothing in this note is a measured figure;
-- coverage is a gate of its own, in two parts. First, any `metric-dropped`
-  row in the window, of any reason, whose critical-turn count (double 5)
-  is above zero fails `coverage`: a lost `busy` row, whether dropped for
-  budget, tainted, merged away or lost with the sidecar, forbids a "no
-  busy" pass. Second, because a terminal row cannot prove its own absence,
-  the check cross-counts: every `acts`, `preparations` and `found` route
-  that answered produced one turn, so the weighted count of those `route`
-  rows is compared with the weighted multiplicity of `turn` rows at those
-  places, and a shortfall beyond the sampling uncertainty the platform
-  reports fails `coverage` too. With both parts clean the result is stated
-  as "no busy observed, with N turns and no recorded or inferred loss";
-  it is never stated as proof of absence, and the sampling uncertainty is
-  printed beside it;
+- coverage is a gate of its own, with three outcomes, `complete`,
+  `incomplete` and `unknown`, and a `busy` observation fails the check
+  whatever the coverage. First, any summary row in the window whose
+  critical-turn count is above zero makes coverage `incomplete`: a lost
+  `busy` row, whether dropped for budget, tainted, merged away, saturated
+  or lost with the sidecar, forbids a "no busy" pass. Second, because a
+  summary row cannot prove its own absence, the check cross-counts at the
+  turn boundary: a `route` row with blob 9 `turn` means the request ran a
+  turn, a `pre-turn` row means the Worker answered before any turn (an
+  invalid scope ID answered `unavailable` without a Durable Object,
+  `worker.ts:146, 168-169`; a non-canonical founding refused before one,
+  `156-164`; a malformed body answered `400`, `244-280`), so the estimated
+  count of `turn`-flagged `route` rows at `acts`, `preparations` and
+  `found` is compared with the estimated multiplicity of public `turn`
+  rows at those places. Alarm and give-up turns have no incoming route and
+  are not in the comparison; a loss that takes both a `route` row and its
+  `turn` row, or a summary row, is not detectable by counts; both gaps are
+  declared in the output. Third, the comparison is exact only when every
+  row in the window has `_sample_interval` equal to 1, which the query
+  checks with `MAX(_sample_interval)`; the platform documents that its
+  weights make estimates whose accuracy depends on the sample
+  distribution and gives no confidence bound, so when any row is sampled
+  the comparison is not made and coverage is `unknown`, and the output
+  says so and names the remedy (less write volume, or a larger dataset
+  quota). With no sampling, a shortfall of one or more fails the
+  comparison. The result is stated as one of: "busy observed" (fail);
+  "no busy observed, coverage complete: N turns, no recorded loss, counts
+  balanced, undetectable paired loss and alarm turns declared"; "no busy
+  observed, coverage incomplete: <the loss>" (fail); or "no busy
+  observed, coverage unknown: sampled window" (fail). It is never stated
+  as proof of absence;
 - the health check compares the body's `deployment` and `version` with
   the ones just deployed, not only the status code;
 - the output states the weighted event count, the coverage (sum of
@@ -500,12 +537,16 @@ One builder request, after the demo, in three heads:
    run on the demo room, and the MCP server's console kinds. Witnesses,
    W3: against recorded SQL answers the script fails on each threshold,
    on `no-data`, on `stale`, on a wrong version, on a query failure, on a
-   failing or mismatched health answer, on `coverage` when any terminal
-   row in the window counts a critical turn, and on `coverage` when the
-   route-to-turn cross-count falls short, passes on the observed figures
-   with its qualified "no busy observed" wording, and its weighted counts
-   and counter sums equal the sums over `_sample_interval` and
-   multiplicity in the recording.
+   failing or mismatched health answer, on `coverage incomplete` when any
+   summary row in the window counts a critical turn, on `coverage
+   incomplete` when the `turn`-flagged route count exceeds the public
+   turn multiplicity in an unsampled window, on `coverage unknown` when
+   any row has `_sample_interval` above 1, and on a `busy` observation
+   whatever the coverage; passes on the observed unsampled figures with
+   the complete-coverage wording and its declared gaps; and its event
+   counts equal `SUM(double1 * _sample_interval)` and its counters
+   `SUM(counter * _sample_interval)` over the recording, with
+   `pre-turn` rows excluded from the comparison.
 
 Size, judged against woo's equivalents: head 1 a few hundred lines and
 two days; head 2 a day; head 3 a day. Woo's sink and admin panel took two
@@ -558,3 +599,10 @@ checker cited them.
 | 2. Every lost critical turn invalidates coverage | Section 4.2 defines critical turns and counts them in every terminal row, tainted and sidecar included; section 4.7's coverage gate fails on any counted critical loss and, because a terminal row cannot prove its own absence, cross-counts answering routes against turn multiplicity, and words "no busy" as observed with its uncertainty, never as proof. |
 | 3. Expiry agrees with the algorithm | Section 4.4 separates query exclusion (every read filters by age), byte deletion (a complete indexed delete of expired rows before each write, bounded by the 4,096-row table) and capacity eviction, says what remains when writes stop, and W1 tests a backlog above 256 with one write and then none. |
 | Also | The absolute hex-shape privacy sentence replaced by the structural-validation claim; the timeout stated as the route's own limit with no claim of a physical drain. |
+
+## 12. Draft 5 against review `435c67c9`
+
+| Correction | Where answered |
+|---|---|
+| 1. The aggregation schema and bounded write protocol | Section 4.2: `summary` and `aggregated` in blob 6, `mixed` in blobs 4, 7, 8 and 9, `other` for a diagnosis step outside `STEPS`; exactly one terminal row per invocation carrying every loss signal as a bitmask and counts; the 65th group triggers coarsening in a fixed order (reason, answer, place) that never crosses an end; checked sums that saturate, set `overflow` and count as critical; the generic native `End.answer` kept with blob 9 `none` for internal turns such as give-up diagnoses; W1 extended with mixed losses, group 65, coarsened values, internal turns and overflow. |
+| 2. Coverage at native turn boundaries, with a defined sampled comparison | Section 4.7: `route` rows carry `turn` or `pre-turn`, set from the object's operational flag, with the three pre-turn sites named and witnessed; the comparison counts `turn`-flagged routes against public turn multiplicity; alarm and give-up turns and paired losses are declared undetectable; the estimators are `SUM(double1 * _sample_interval)` for events and `SUM(counter * _sample_interval)` for counters, multiplicity applied once; the comparison is exact only when `MAX(_sample_interval)` is 1 and otherwise coverage is `unknown`, since the platform gives no confidence bound; a `busy` observation fails regardless; the four possible result sentences are fixed. |
