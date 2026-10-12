@@ -1,12 +1,14 @@
 # Observability for dap: a design
 
-2026-10-12. Draft 3, for checker review. Hugh's direction, 2026-10-12 17:36
+2026-10-12. Draft 4, for checker review. Hugh's direction, 2026-10-12 17:36
 Eastern: draft a dated design in `notes/`, send it to the checker, and tell
 the planner that it is to be prioritized soon after the demo. Written
 against main `013fac7a5`. Draft 1 (`baa0e21e`) received changes requested
 in review `12fc5d1a`, with five corrections; Draft 2 (`4f0057ac`)
 answered them, and section 9 maps them. Review `efc3882d` requested five
-more; Draft 3 answers them, and section 10 maps them.
+more; Draft 3 (`c45ef0c2`) answered them, and section 10 maps them.
+Review `5f3673c6` requested three more; Draft 4 answers them, and section
+11 maps them.
 
 ## 1. What this note decides
 
@@ -108,24 +110,24 @@ a count of the things its kind names, never a rate.
 | blob 2 | deployment | the `DEPLOYMENT` setting, already bounded at 128 bytes |
 | blob 3 | version | the Worker version ID from the platform's version metadata binding, or `unknown` |
 | blob 4 | place | the union of: the fixed route names of `worker.ts`'s table (`found`, `acts`, `preparations`, `settle`, `summary`, `items`, `history`, `entries`, `outbox`, `duty`, `log`, `retained`, `sessions`, `stream`, `incidents`, `waiting`, `credential`, `site`, `page`, `health`, `requests`); the operations `alarm`, `dispatch`, `metrics`; and the diagnosis steps, which are the fixed words the source emits at its diagnosis sites, enumerated in `metrics.ts` as `STEPS` with a test that every `diagnose(` call site's literal is in it; any other value is `other` |
-| blob 5 | end | for `turn`: `idle`, `busy`, `clock-behind`, `unavailable`; for every other kind: `ok`, `error`, `issued`, `refused`, `served`, `unavailable`, `dropped` |
+| blob 5 | end | for `turn`: the native `End` kinds of `turn.ts:94`, `answer`, `idle`, `busy`, `clock-behind`, `unavailable`; for every other kind: `ok`, `error`, `issued`, `refused`, `served`, `unavailable`, `dropped` |
 | blob 6 | reason | the union of `RefusalReason`, `UnavailableReason`, `MismatchReason`, `ReadRefusal`, `SessionRefusal`, the diagnosis events (`outside-call-failed`, `outside-replies-failed`, `outside-recovery-failed`, enumerated as `EVENTS` with the same call-site test), the operator record kinds, the status classes `2xx`, `3xx`, `4xx`, `5xx`, the drop reasons `budget`, `tainted`, `aggregated`, `sidecar`, and `none` |
 | blob 7 | request ID | 16 lowercase hexadecimal characters, server-minted (section 4.4) |
 | blob 8 | trace ID | 32 lowercase hexadecimal characters from a validated `traceparent`, or `none` |
-| blob 9 | answer | for `turn` on an act, preparation or founding: `accepted`, `refused`, `unavailable`, `mismatch`; otherwise `none` |
-| double 1 | sample interval | always 1 as written; the platform's own `_sample_interval` is read at query time |
+| blob 9 | answer | for a `turn` whose end is `answer`: the public answer the native `End` carries, `accepted`, `refused`, `unavailable` or `mismatch`; for every other end and kind: `none`. So blob 5 says how the turn ended and blob 9 says what the input was answered, and the two are never substituted for each other |
+| double 1 | multiplicity | how many underlying events this row stands for: 1 for an unmerged row, the merged count for an aggregated `turn` row (below); the platform's own `_sample_interval` is a separate column read at query time, and the two multiply |
 | double 2 | duration in milliseconds | the route's or the turn's wall time, or 0 |
 | double 3 | count a | per kind, below |
 | double 4 | count b | per kind, below |
 | double 5 | count c | per kind, below |
-| double 6 | flag | 0 or 1, per kind |
+| double 6 | flag count | how many of the row's underlying events had the flag: 0 or 1 for an unmerged row, 0 to the multiplicity for a merged one |
 
 **The kinds, their places and their slots.** Each is emitted where the
 number already exists.
 
 | Kind | Where | blob 4 | blob 5 | blob 6 | double 2 | double 3 | double 4 | double 5 | double 6 |
 |---|---|---|---|---|---|---|---|---|---|
-| `turn` | `turn.ts` at `#close` | the operation (`acts`, `preparations`, `found`, `alarm`) | the turn's end, always | the answer's reason, or the end's reason, or `none` | wall time | restarts | timed attempts charged | timed entries written | wrote; blob 9 carries the answer, `none` for an alarm |
+| `turn` | `turn.ts` at `#close` | the operation (`acts`, `preparations`, `found`, `alarm`) | the native end, always | the answer's reason, or the end's reason, or `none` | wall time (a sum for a merged row) | restarts (sum) | timed attempts charged (sum) | timed entries written (sum) | wrote count; blob 9 carries the public answer when the end is `answer`, else `none` |
 | `route` | `worker.ts` `route` | the route name | `ok` for a `2xx` or `3xx`, `refused` for a `4xx`, `error` for a `5xx` | the status class | wall time | 0 | 0 | 0 | 0 |
 | `session` | `sessions.ts` | `sessions` | `issued` or `refused` | the `SessionRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
 | `signed-read` | `signed-reads.ts` | the read name | `ok` or `refused` | the `ReadRefusal` or `none` | 0 | 0 | 0 | 0 | 0 |
@@ -134,11 +136,13 @@ number already exists.
 | `diagnosis` | `diag.ts` `toConsole` | the diagnosis `step` when it is a fixed word of the source, else `none` | `error` | the diagnosis `event` | 0 | 0 | 0 | 0 | 0 |
 | `incident` | `operator.ts` `record` | `incidents` | `error` | the record kind | 0 | 1 | 0 | 0 | 0 |
 | `stream` | `object.ts` `serving` | `stream` | `ok` | `none` | 0 | open | released | 0 | 0 |
-| `metric-dropped` | `metrics.ts` | `metrics` | `dropped` | `budget`, `tainted`, `aggregated` or `sidecar` | 0 | rows dropped or merged | of them `turn` rows | of them `route` rows | 0 |
+| `metric-dropped` | `metrics.ts` | `metrics` | `dropped` | `budget`, `tainted`, `aggregated`, `groups` or `sidecar` | 0 | rows lost or merged | of them `turn` rows | of them critical `turn` rows (end `busy`, `clock-behind` or `unavailable`, or an end that failed validation) | 0 |
 
-A `turn` row always carries the turn's end in blob 5 and, when the turn
-judged an input, the input's answer in blob 9, so `idle` with `refused`
-and `busy` with `none` are both expressible and never confused. Timed
+A `turn` row carries the native end in blob 5 and, only when that end is
+`answer`, the public answer in blob 9; an `idle`, `busy`, `clock-behind` or
+`unavailable` end has blob 9 `none`, and an `answer` end always has a
+public answer. The native `End` and the public answer are therefore both
+kept, with their relationship explicit. Timed
 attempts charged (double 4) and timed entries written (double 5) are
 different numbers and are both kept.
 
@@ -158,10 +162,10 @@ hosted endpoint of stage 2 writes those rows to the sink under that map.
 **No free text, anywhere.** Every blob is checked against its allowlist or
 its exact shape before the write. A value outside its allowlist is not
 written, is not truncated and is not redacted: the event is dropped and
-one `metric-dropped` with reason `tainted` is written instead. So a secret
-can never reach the sink by being placed in a field the sink accepts; the
-only field with free shape is the request or trace ID, which must be hex
-of exact length. The diagnosis redactor stays where it is, for the
+one `metric-dropped` with reason `tainted` is written instead. So a secret cannot
+reach the sink through an allowlisted field; the request and trace IDs
+are structurally validated to an exact hex shape, which bounds their form
+and not their content (section 4.4). The diagnosis redactor stays where it is, for the
 console; the sink never receives a diagnosis's text, only its two fixed
 words. The `tainted` witness (W1) passes a token-shaped string, a URL
 with userinfo and a PEM header as the reason, the route and the trace ID
@@ -170,22 +174,51 @@ and asserts that nothing but `metric-dropped` is written.
 **Write budget, with coverage.** The platform caps data points per
 invocation. The sink's budget is that cap less one, the one being
 reserved for the terminal `metric-dropped` row, which is therefore always
-writable. Within an invocation the sink buffers rows and writes them at
-the end: `turn` and `route` rows first, then the rest in order of
-emission. When the buffered `turn` rows alone would exceed the budget, as
-an alarm that drains many due duties and their give-up turns can, they
-are aggregated, not dropped: rows with the same place, end, answer and
-reason merge into one row whose doubles are sums, with the merged count
-in a `metric-dropped` row of reason `aggregated`, so every turn is still
-counted and every `busy` end still appears. Rows of other kinds beyond
-the budget are dropped and counted by kind in the terminal row. Nothing
-the sink does changes a native effect: the buffer is written after the
-native answer is decided, and a failure to write is itself only counted
-on the next invocation's terminal row. W1 drives an alarm with more due
-duties than the cap and asserts that every turn's end is recoverable from
-the written rows, that the sends and entries equal those of a run with no
-sink, and that the `metric-dropped` rows name what was merged or
-dropped.
+writable when the sink can write at all. Within an invocation the sink
+buffers rows and writes them at the end: `turn` rows first, then `route`,
+then the rest in order of emission.
+
+*Typed aggregation of turns.* When the buffered `turn` rows would exceed
+the budget, as an alarm that drains many due duties and their give-up
+turns can, they are merged by group, never dropped. A group is a place,
+end, answer and reason; the accumulator holds at most 64 groups in
+memory. Merging is typed per slot: double 1 is the multiplicity, the
+number of turns merged; doubles 2 to 5 are sums over those turns; double 6
+is the count of turns with the flag; blobs are the group's. A query reads
+a merged row as `multiplicity` turns with those sums, and multiplies by
+`_sample_interval` as for any row, so the platform's sampling and the
+sink's merging compose without double counting. When the groups
+themselves exceed the budget, groups are merged in a fixed order that
+never crosses an end: first across reason within a place and end, then
+across answer, then across place, so at most one row per end remains,
+five rows, which every platform cap exceeds. The resolution lost in that
+second merge is counted in a terminal row of reason `groups` (double 3
+the groups merged, double 4 of them turn groups, double 5 of them
+critical). Rows of other kinds beyond the budget are dropped and counted
+in a terminal row of reason `budget`. Nothing the sink does changes a
+native effect: the buffer is written after the native answer is decided.
+
+*What coverage means.* A critical turn is one whose end is `busy`,
+`clock-behind` or `unavailable`, or whose end failed validation. The
+terminal row of each reason counts, in double 5, the critical turns it
+stands for: merged across groups, dropped for budget, dropped as tainted
+(a tainted `turn` row is counted by its end before validation, and an
+invalid end counts as critical), or lost because the sidecar failed. A
+window whose terminal rows show any critical loss is incomplete for the
+"no busy" question (section 4.7). What the terminal row cannot prove is
+its own absence: if the sink failed to write the terminal row, or the
+process ended before it, the loss is uncounted in that invocation, and a
+deferred count on the next invocation is best effort and may never come.
+Section 4.7 therefore does not rely on terminal rows alone to claim
+completeness.
+
+W1 drives an alarm with more due duties than the cap and asserts that the
+sends and entries equal those of a run with no sink; that every turn's end
+is recoverable from the written rows; that merging two `wrote` turns gives
+multiplicity 2 and flag count 2 and every double stays in its domain; that
+distinct end and reason groups are preserved up to the budget; and that
+exceeding the group budget merges across reason and place but never
+across end, with the `groups` row counting what was merged.
 
 **Boundaries of what the sink can tell.** Retention is the platform's
 (ninety days of the dataset). Access is the deployment's analytics token,
@@ -228,9 +261,9 @@ collide or be chosen. `tracestate` is opaque vendor text: it is not
 stored anywhere, not written to the sink, and not echoed.
 
 **What a trace ID is, and is not.** It is untrusted correlation chosen by
-the caller. Its hex shape proves only its shape: 128 bits can encode
-anything, so the ID is never treated as a secret, as an identity, or as
-evidence that two requests came from one caller, and two callers may
+the caller. Structural validation bounds its form, not its content: 128
+bits can encode anything, so the ID is never treated as a secret, as an
+identity, or as evidence that two requests came from one caller, and two callers may
 choose the same one or link their requests on purpose. Its boundary is
 the sidecar's: admin-only reads, the retained window of section 4.4, and
 the sink's retention. Neither identity reaches a grant, an idempotency
@@ -257,14 +290,22 @@ type or envelope changes. W1 injects a SQL fault at the entry boundary
 and at the duty boundary and asserts the entries, the sends and the
 answers equal those of a run with no sidecar.
 
-*Retention.* Two bounds, both enforced on write: a row older than seven
-days is deleted by a sweep that runs before each write and removes at
-most 256 rows, so idle old rows do expire within seven days of the next
-write; and the table holds at most 4,096 rows, the oldest replaced when
-it is full. The read says what it covers: the retained window is the
-oldest and newest row times, and `complete` means the read exhausted the
-retained window, never that a request outside it did not happen or that
-anything settled.
+*Retention, in three distinct operations.* Query exclusion: every read of
+the table filters on `time >= now - 7 days`, so an expired row is never
+returned whether or not it has been deleted. Byte deletion: before each
+write, one indexed `DELETE ... WHERE time < now - 7 days` removes every
+expired row; the table is at most 4,096 rows with an index on `time`, so
+the delete is bounded by the table size and is complete, not partial. If
+writes stop, expired rows remain as bytes until the next write and are
+excluded from every read meanwhile. Capacity eviction: when the table
+holds 4,096 rows at a write, the oldest row is replaced; this is the only
+eviction of an unexpired row. The read reports the retained window as the
+oldest and newest unexpired row times and `complete` as having exhausted
+that window, never as proof that a request outside it did not happen or
+that anything settled. W1 fills the table with more than 256 expired rows,
+makes one write, and asserts that none remain; then with no further
+writes, backdates rows and asserts the read excludes them and reports the
+window truthfully.
 
 *The read.* `requests`, for an admin session only (`ADMIN_READS`), takes
 either a request ID or a trace ID, validated to its exact shape before
@@ -326,8 +367,10 @@ reads no data:
    scope that is not a register, and `unavailable` on any error, with no
    head, no seq and no data. The probe needs no reader and is served by no
    public route. The route waits at most 2 seconds for it; a timeout is
-   answered `unavailable` and is an observational limit only, since the
-   underlying call may still complete and its result is then discarded.
+   answered `unavailable`; it is the route's own limit on waiting and says
+   nothing about the probe, which the runtime may still be running and
+   whose late result is discarded. The design claims no physical drain of
+   that call.
 3. **Answer.** `200 {deployment, version, sessions: ok, register: ready}`
    when both hold; `503 {deployment, version, sessions, register}` naming
    the first failing word otherwise, with those words only.
@@ -367,11 +410,19 @@ coverage:
   one observed run on the demo room and recorded in the note that
   delivers it, labelled as observed, as woo's envelope was calibrated
   from a bake; nothing in this note is a measured figure;
-- coverage is a gate of its own: any `metric-dropped` row of reason
-  `budget` or `sidecar` in the window whose `turn` count is above zero
-  fails `coverage`, because a "no busy" pass cannot be claimed when turn
-  rows were lost; `aggregated` rows do not fail it, since aggregation
-  keeps every end;
+- coverage is a gate of its own, in two parts. First, any `metric-dropped`
+  row in the window, of any reason, whose critical-turn count (double 5)
+  is above zero fails `coverage`: a lost `busy` row, whether dropped for
+  budget, tainted, merged away or lost with the sidecar, forbids a "no
+  busy" pass. Second, because a terminal row cannot prove its own absence,
+  the check cross-counts: every `acts`, `preparations` and `found` route
+  that answered produced one turn, so the weighted count of those `route`
+  rows is compared with the weighted multiplicity of `turn` rows at those
+  places, and a shortfall beyond the sampling uncertainty the platform
+  reports fails `coverage` too. With both parts clean the result is stated
+  as "no busy observed, with N turns and no recorded or inferred loss";
+  it is never stated as proof of absence, and the sampling uncertainty is
+  printed beside it;
 - the health check compares the body's `deployment` and `version` with
   the ones just deployed, not only the status code;
 - the output states the weighted event count, the coverage (sum of
@@ -419,10 +470,11 @@ One builder request, after the demo, in three heads:
    table names is written unchanged, and the fallback row validates; a
    throwing binding, a slow binding and an absent binding give
    byte-identical answer bodies and deliveries, with the slow one never
-   awaited; the `tainted` drops; an alarm with more due duties than the
-   platform cap leaves sends and entries equal to a run with no sink,
-   with every turn's end recoverable from aggregated rows and the
-   terminal row naming what was merged; a request with and without each
+   awaited; the `tainted` drops, including a tainted `busy` turn counted as
+   critical; an alarm with more due duties than the platform cap leaves
+   sends and entries equal to a run with no sink, with every turn's end
+   recoverable from merged rows, multiplicity and flag counts right, every
+   double in its domain, and the `groups` row counting the second merge; a request with and without each
    header gets a byte-identical answer body and only the two added
    headers differ; `traceparent` cases: valid, uppercase, zero trace ID,
    zero parent ID, wrong length, fifth field, each ignored without a log
@@ -448,10 +500,12 @@ One builder request, after the demo, in three heads:
    run on the demo room, and the MCP server's console kinds. Witnesses,
    W3: against recorded SQL answers the script fails on each threshold,
    on `no-data`, on `stale`, on a wrong version, on a query failure, on a
-   failing or mismatched health answer and on `coverage` when a `budget`
-   or `sidecar` drop row with turns is in the window, passes on the
-   observed figures, and its weighted counts and counter sums equal the
-   sums over `_sample_interval` in the recording.
+   failing or mismatched health answer, on `coverage` when any terminal
+   row in the window counts a critical turn, and on `coverage` when the
+   route-to-turn cross-count falls short, passes on the observed figures
+   with its qualified "no busy observed" wording, and its weighted counts
+   and counter sums equal the sums over `_sample_interval` and
+   multiplicity in the recording.
 
 Size, judged against woo's equivalents: head 1 a few hundred lines and
 two days; head 2 a day; head 3 a day. Woo's sink and admin panel took two
@@ -495,3 +549,12 @@ checker cited them.
 | 3. Readiness means an active register | Section 4.6: `ready` only for native status `active`; `not-ready` for provisional, refused or a non-register; a deterministic selector with `unconfigured` and `ambiguous`; a shared in-flight probe per isolate with a 5 second result, tested under concurrent polling; the timeout stated as an observational limit. |
 | 4. Sidecar isolation and retention | Section 4.4: best-effort writes after the sealing transaction and the outbox write, errors caught and counted, no rollback or resubmission, correlation passed as an operational argument with native messages untouched; a seven-day sweep on write plus the ring; a validated, paged `requests` read with its window, head and `complete` meaning the window; section 4.5 reports per-column heads and partial counts. W1 injects SQL faults at both boundaries. |
 | 5. Trace validation and privacy | Section 4.4: exact lowercase version `00` framing with four fields, non-zero trace and parent IDs, the sampled bit only on the way out, invalid context ignored without logging, the witnesses named; a trace ID stated as untrusted correlation with its collision and linking limits and its boundary, never a secret or an identity; answer-body equality distinguished from the two added headers. |
+
+## 11. Draft 4 against review `5f3673c6`
+
+| Correction | Where answered |
+|---|---|
+| 1. The schema and aggregation over native turns | Section 4.2: blob 5 is the native `End` kind including `answer`, and blob 9 the public answer only for that end; double 1 is multiplicity and double 6 a flag count; merging is typed per slot with sums and counts; a bounded accumulator of 64 groups; groups merge across reason, answer and place but never across end, so at most one row per end remains, and the `groups` terminal row counts the resolution lost. W1 merges two written turns, checks every domain, and exceeds the group budget. |
+| 2. Every lost critical turn invalidates coverage | Section 4.2 defines critical turns and counts them in every terminal row, tainted and sidecar included; section 4.7's coverage gate fails on any counted critical loss and, because a terminal row cannot prove its own absence, cross-counts answering routes against turn multiplicity, and words "no busy" as observed with its uncertainty, never as proof. |
+| 3. Expiry agrees with the algorithm | Section 4.4 separates query exclusion (every read filters by age), byte deletion (a complete indexed delete of expired rows before each write, bounded by the 4,096-row table) and capacity eviction, says what remains when writes stop, and W1 tests a backlog above 256 with one write and then none. |
+| Also | The absolute hex-shape privacy sentence replaced by the structural-validation claim; the timeout stated as the route's own limit with no claim of a physical drain. |
