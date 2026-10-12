@@ -190,13 +190,16 @@ caller's `idempotencyKey`, in the config directory's
   `settle` asks the scope.
 - **Capacity.** At most 256 records may be unresolved at once, admitted
   under a lease that every process sharing the directory takes, so two
-  processes cannot both admit the 256th. Nothing unresolved is evicted.
+  processes cannot both admit the 256th. A resubmitted refusal is admitted
+  the same way: it becomes unresolved under the lease, and a full store
+  keeps the refusal as it was. Nothing unresolved is evicted.
 - **Size.** A record is at most 2 MiB. An act whose fields, texts,
   presented facts and values would not fit with room for its outcomes is
   refused as full, for bytes, before it is signed. A record keeps up to 64
   outcomes inline; older ones, or ones that would push it past 2 MiB, move
   to a segment file beside it, which keeps every one and is read in bounded
-  slices.
+  slices; when every outcome has moved there, the decisive one is read from
+  the segment's end.
 - **Preparation steps** are kept apart from the act. A step keeps its first
   answer and its latest 63; the answers between them are not kept. The act's
   outcomes are never dropped.
@@ -207,7 +210,13 @@ caller's `idempotencyKey`, in the config directory's
   skipped. A crash at any point loses no record.
 - **Locks.** A lock or lease is broken only when the process that took it
   is gone, whatever its time; the passing of an intent's deadline is never
-  an outcome.
+  an outcome. One process at a time breaks it, under a reclaim lock, after
+  reading it again; a release removes only the releaser's own holding.
+  Archival reads each record again under its lock and skips one that is
+  no longer terminal.
+- **Steps with no act.** `prepare` without `kind` sends a capability step
+  that has no act, such as hold@1's instance: the step's own intent, kept
+  under custody under the caller's key, with its answers kept as the step's.
 
 ## Tool reference
 
@@ -1326,7 +1335,7 @@ of the warm call; the test asserts both calls' sizes against the bound.
 | `sends` | 1 | 0 | +1 | 442 | 1 |
 | `text` | 1 | 0 | +1 | 474 | 1 |
 | `wait`, one poll | 1 | 0 | +1 | 476 | 1 |
-| `settle` | 1 | 0 | +1 | 1990 | 1 |
+| `settle` | 1 | 0 | +1 | 1570 | 1 |
 | `actions` | 1 | 0 | +1 | 20056 | 3 |
 | `issue.comment`, on a lane | 1 | 1 | +1 | 1184 | 2 |
 | `issue.create`, with the definition's bytes read | 2 | 1 | +1 | 1204 | 2 |
@@ -1349,6 +1358,10 @@ Other observed figures from the same run:
   warm reads 6 (3, + 2 roots, + 1 for standing on the second membership);
   cold, 2 session requests.
 - A room of 60 lanes and 40 roots: `room` in 5 pages, each within 8 KiB.
+- 20 prepared steps under one key: `settle` in 4 pages, each within 4 KiB;
+  each `prepare` result at most 1692 bytes.
+- A known tool name called at a root another process added under a second
+  membership: served under that membership, with no list call first.
 - A mint's outcome 100 entries after its act: found in 7 `credential`
   calls; a creation completed 100 entries after its act: found in 7 polls
   of one `wait`; a final item on the fifth page of final items: found in 2
@@ -1374,12 +1387,12 @@ counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 145949 | 37612 |
-| Demo room, maintainer | 57 | 1 | 114033 | 29484 |
-| Demo room, member | 54 | 1 | 107458 | 27727 |
-| Demo room, agent | 52 | 1 | 101692 | 26288 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 338575 | 88861 |
-| Demo room, admin, `--generic` | 16 | 1 | 14654 | 3448 |
+| Demo room, admin | 71 | 1 | 146418 | 37722 |
+| Demo room, maintainer | 57 | 1 | 114502 | 29594 |
+| Demo room, member | 54 | 1 | 107927 | 27837 |
+| Demo room, agent | 52 | 1 | 102161 | 26398 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339044 | 88971 |
+| Demo room, admin, `--generic` | 16 | 1 | 15123 | 3558 |
 
 No cap applies to the whole list. `--tools` shortens it for an agent with
 one job; `--generic` replaces the act tools with the pair.

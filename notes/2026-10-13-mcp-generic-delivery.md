@@ -3,9 +3,12 @@
 This note reports the build of plan 031, "One MCP service for every dap
 application" (approved at `a8c6222f`, review `5eb60654`), on branch
 `request/mcp-generic`, and the corrections that review `de37ae90` of head
-`2db9160b` asked for. The branch started from `planner/mcp-generic-design`,
-and `main` was merged in twice, the second time with main's Empty-room,
-wordmark, Home and forms heads in `packages/page`, whose bytes stay main's.
+`2db9160b` and review `95c749bb` of head `fbf80dea` asked for. The branch
+started from `planner/mcp-generic-design`, and `main` was merged in three
+times: the second time with main's Empty-room, wordmark, Home and forms
+heads in `packages/page`, whose bytes stay main's; the third time at
+`6198b199` or later, with main's documentation, homepage copy and layout,
+and `notes/2026-10-12-observability-design.md`, each taken as main has it.
 Every figure below is labelled by how it was taken: an observed run, a sum
 of steps, or a proxy.
 
@@ -63,8 +66,11 @@ of steps, or a proxy.
   acceptance it reads the admitted entry, checks that it holds the request
   kept, finds the inbox the join created, and records the service, the
   repository's scopes with the inbox, and the handle in `config.json`; the
-  next call lists the room's tools. No result repeats the invitation's
-  secret. The server reads the link with
+  next call lists the room's tools. `join`'s own result never repeats the
+  invitation's secret. The admitted join holds it, as its signed input, so a
+  history read of membership (`step`, `record`) returns it to whoever may
+  read that history, as the native record does for any member's session;
+  the server does not mask the exact record. The server reads the link with
   `packages/client/src/invitation.ts`, since it may not import the command
   line. The command line keeps its own `linkOf`, unchanged, because the
   page's built module bundles the command line and its bytes stay main's;
@@ -78,7 +84,11 @@ of steps, or a proxy.
   `errors`, `budget`, `custody` and `wire` in Node; `room`, `binding`,
   `discovery`, `unfamiliar`, `counter` and `recipes` as stories on the real
   test Worker. Each states its invariant in its first comment. `recipes`
-  is new in this round: it runs every row of the W1 inventory.
+  runs every row of the W1 inventory.
+- **Capability steps with no act.** `prepare` without `kind` sends a step
+  that has no act, such as `hold@1`'s instance: the step's own intent
+  (kind `<capability>:<step>`), to the resource, signed by the server's key
+  and kept under custody, its answers kept as the step's.
 - **`docs/mcp.md`**, with `docs/mcp-tools.json`, the whole list as sent to
   an admin of the demo room, which a test derives again and compares.
 - **`scripts/active-source.test.mjs`** refuses an import in the server's
@@ -103,6 +113,36 @@ of steps, or a proxy.
 | 11. HTTP bytes and frames | One decode, frame validation first, bounded errors, contained failures | `wire.test.ts`, with a real client's call after each case |
 | 12. Subscriptions and bounds | Listens by client stream; SSE lifetime from the response; pruned stdio tasks; bounded lines | `wire.test.ts`: equal IDs, a disconnect and a reconnect, cleanup, sustained stdio traffic |
 | 13. Evidence and docs | The W1 recipes executed; a review and exact refusals in the room story; budget witnesses; `propose-file`'s text stated as inline; the SDK rationale corrected | `recipes.scope.test.ts`, `room.scope.test.ts`, `budget.test.ts`; this note |
+
+## Corrections of review 95c749bb
+
+| Item | What changed | Witness |
+|---|---|---|
+| 1. Steps with no act | `prepare` without `kind` sends a capability step with no act under custody | the room story: `hold@1`'s instance, the report's stage and check, then the hand-in, accepted at entry 17, and its settlement, in both modes; the not-staged refusals stay their own witness |
+| 2. The full proposal | The `propose` recipe runs in a room of its own under `change-demo3` and its version 3 destination | `recipes.scope.test.ts`: two files, a version naming both, accepted, a merge published; 10 calls in the default mode and 12 in `--generic`; the demo change's `source-shape` refusal is its own check |
+| 3. Resubmissions at the bound | A resubmitted refusal becomes unresolved under the capacity lease, persisted there before delivery | `custody.test.ts`: two processes resubmitting refusals at 255 unresolved admit one; the other's refusal stays as it was |
+| 4. Every outcome spilled | The decisive outcome is read from the segment's end in bounded slices | `custody.test.ts`: an accepted outcome found with nothing inline, by send and settle, with no signature and no delivery |
+| 5. Lease reclamation | A dead owner's lock is broken under a reclaim lock after reading it again; release removes only the releaser's holding | `custody.test.ts`: four processes reclaim one dead lease, one enters; a release with another token leaves the lock |
+| 6. Archival under the lock | Each candidate is read again under its lock and skipped when no longer terminal | `custody.test.ts`: a resubmission between selection and lock stays live and counted |
+| 7. A root added elsewhere | The configuration is read on each call and the list derived again when it changed | `budget.test.ts`: a known name at a root added under a second membership is served under it; the witness fails without the check |
+| 8. Bounded settlement | settle projects each step's latest answer and pages the steps; prepare returns a projection | `budget.test.ts`: 20 steps of one key in 4 pages within 4 KiB |
+| 9. Role text across memberships | Roles named per membership, in the order of their scope IDs | `describe.test.ts`: two memberships with different roles, reordered, give one text and one generation |
+| 10. A listen closed early | A listen whose stream closes during its first snapshot installs no watcher | `wire.test.ts`, with a deferred snapshot |
+| 11. Frames and reflections | Requests, notifications and responses told apart; invalid or long IDs rejected with id null; reflections capped at 256 characters | `wire.test.ts`, with a real client's call after each case |
+| 12. The invitation's secret | The guarantee narrowed to `join`'s own result; the record is not masked | the tool's description, `docs/mcp.md` and this note |
+| 13. Prose | `items` says its two traversals; the wire's opening comment no longer claims the SDK serves only the older revision | `docs/mcp.md`, `wire.ts`, the stand-in |
+
+**Paths that differ from main.** After the third merge,
+`git diff --stat origin/main...HEAD` lists 58 files, all this branch's own:
+the 42 files of `packages/mcp`; `packages/cli/package.json`,
+`packages/cli/src/line.ts`, `packages/cli/src/main.ts`,
+`packages/cli/src/mcp.ts`, `packages/cli/src/store.ts` and
+`packages/cli/test/invitation-link.test.ts`;
+`packages/client/src/index.ts` and `packages/client/src/invitation.ts`;
+`docs/mcp.md`, `docs/mcp-tools.json`, `scripts/active-source.test.mjs`,
+`parked/README.md`, `plans/README.md`, this note, `package-lock.json` (the
+new package and its pinned development dependencies) and
+`vitest.config.ts` (the mcp project and the mcp stories).
 
 ## The SDK choice
 
@@ -146,13 +186,15 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
-| `npx vitest run --project mcp` | `Tests  49 passed (49)` |
+| `npx vitest run --project mcp` | `Tests  58 passed (58)` |
 | `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Test Files  6 passed (6)`, `Tests  8 passed (8)` |
-| `npx vitest run --project cli --project mcp --project page --project client` (after the join change) | `Tests  175 passed (175)` |
-| `npx vitest run --project scope packages/mcp/test packages/cli/test/join packages/cli/test/story` (after the join change) | `Tests  8 passed (8)` |
+| `npx vitest run --project mcp packages/mcp/test/custody`, three more times after the lease change | `Tests  23 passed (23)` each time |
+| `npx vitest run --project cli --project mcp --project page --project client` (after the join change of the second round) | `Tests  175 passed (175)` |
+| `npx vitest run --project scope packages/mcp/test packages/cli/test/join packages/cli/test/story` (after the join change of the second round) | `Tests  8 passed (8)` |
 | `npm run typecheck` in `packages/mcp` | no errors |
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
-| `npm run gate`, once, at `3efb954d` | FAILED at the test step: `Tests  4 failed \| 1095 passed \| 2 skipped (1101)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install, whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone, above. |
+| `npm run gate`, once in the second round, at `3efb954d` | FAILED at the test step: `Tests  4 failed \| 1095 passed \| 2 skipped (1101)`. The four failures are the checkers failure below, and no other. |
+| `npm run gate`, once in this round | GATE_RESULT |
 
 ## The planner's amendment after the second cloud gate
 
@@ -178,16 +220,18 @@ tokenizer gives other counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 145949 | 37612 |
-| Demo room, maintainer | 57 | 1 | 114033 | 29484 |
-| Demo room, member | 54 | 1 | 107458 | 27727 |
-| Demo room, agent | 52 | 1 | 101692 | 26288 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 338575 | 88861 |
-| Demo room, admin, `--generic` | 16 | 1 | 14654 | 3448 |
+| Demo room, admin | 71 | 1 | 146418 | 37722 |
+| Demo room, maintainer | 57 | 1 | 114502 | 29594 |
+| Demo room, member | 54 | 1 | 107927 | 27837 |
+| Demo room, agent | 52 | 1 | 102161 | 26398 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339044 | 88971 |
+| Demo room, admin, `--generic` | 16 | 1 | 15123 | 3558 |
 
 The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
+The bytes grew in this round with the longer descriptions of `prepare`,
+`settle`, `join` and `items`.
 
 ### Reads per tool
 
@@ -228,26 +272,34 @@ Worker:
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 263 |
-| `--generic` | 7 | 3 | 4 | 241 | 259 |
+| Default | 7 | 3 | 4 | 229 | 288 |
+| `--generic` | 7 | 3 | 4 | 241 | 281 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,
 approving it, before the merge.
 
-**Capability steps.** No act of any definition in this repository has a
-capability whose resource is another scope, and `hold@1`'s steps are
-judged by the lane that holds the hold. The story asks for `hold@1`'s
-stage and check at another issue lane, and stage at the lane itself, and
-asserts the exact answer each time: `refused`, `capability-refused`,
-`not-staged`; the hand-in is refused for the same reason. At the other
-lane, no hold under the commitment exists. At the lane itself, `hold@1`
-stages a report only after the holder's `hold@1:instance` step, which is a
-capability step with no act (`packages/lanes/test/hold.scope.test.ts`
-shows it accepted), and no tool of this server sends such a step. An
-accepted step, and a retry answered with its first entry, are shown only
-against scripted answers, in `custody.test.ts`: that shows what the server
-keeps, and nothing about `hold@1`'s judgment.
+**Capability steps.** `hold@1`'s steps are judged by the lane that holds
+the hold. The story first asks for stage and check at another issue lane,
+and stage at the lane itself, under one key, and asserts the exact answer
+each time: `refused`, `capability-refused`, `not-staged`; the hand-in under
+that key is refused for the same reason. At the other lane, no hold under
+the commitment exists; at the lane itself, nothing was staged.
+
+Then the accepted workflow, under another key, in both modes: the holder's
+`hold@1:instance`, a step with no act, sent by `prepare` without `kind`;
+the report's stage, accepted; the operations the stage opened (a staging
+and two token mints) run by the scheduler while `wait` polls; the check,
+accepted; the hand-in, accepted at entry 17; and its settlement, which
+shows both steps accepted, apart from the act. `hold@1`'s outside
+operations are answered by the lanes' `Host` STAND-IN
+(`packages/lanes/test/support/graph.ts`), wired into the story's room
+beside the hosting's own Git service: it answers each attempt `hold@1`'s
+code opens, and stages no repository and walks no commit.
+
+No act of any definition in this repository has a capability whose
+resource is another scope, so no accepted step at a foreign resource
+exists to witness.
 
 ### Call counts per activity
 
@@ -259,15 +311,18 @@ Opening an issue is 2 calls in the default mode (`issue.create`, `wait`)
 and 3 in `--generic` (`actions`, `act`, `wait`); a clone is 3 calls and
 Git; `artroom edit` with `--closes` is 10 calls and 12 in `--generic`.
 One row shares another row's calls, as the table says: Create room shares
-`artroom claim`'s. `artroom propose` runs to the demo change's refusal of
-its version, `source-shape`, which the test asserts: the demo change
-definition's `propose-manifest` is the hold workflow's, and holds one
-version only, and `artroom propose` needs `change3` or `change-demo3` under
-a destination at version 3, which the demo room does not run.
+`artroom claim`'s. `artroom propose` runs in a room of its own under
+`change-demo3` and its version 3 destination: two files, a version naming
+both, accepted at entry 7, and a merge the room publishes, in 10 calls in
+the default mode and 12 in `--generic`. The destination builds the tree;
+the agent sends none. Under the demo change definition, whose
+`propose-manifest` is the hold workflow's and which holds one version
+only, the same steps end in the lane's refusal of the version as
+`source-shape`, which the test asserts as a check of its own.
 
 ## The T36 checkers failure in the cloud
 
-It recurred, in both rounds. In each gate run, the same four tests of
+It recurred, in all three rounds. In each gate run, the same four tests of
 `packages/checkers` failed with `checkout-failed`: T36 in
 `test/runner.test.ts`, the two other checkout tests there, and the staging
 test in `test/reservation-record.test.ts`. This branch changes nothing in
@@ -293,12 +348,13 @@ delivery's.
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
 - **`credential`'s reads**: 3 where plan 031 counts 1, as reported above.
-- **A capability step with no act**, such as `hold@1:instance`: no tool
-  sends one, so an accepted `hold@1` stage is not reached through the
-  server.
-- **`artroom propose` in full**: a room under `change3` with a destination
-  at version 3, and Git trees built for it, so the recipe's version is
-  accepted and merged.
+- **A narrow window in breaking a dead reclaim lock.** A dead owner's lock is
+  broken one process at a time, under a reclaim lock. A reclaim lock left by
+  a process that died inside that short section is moved aside and removed
+  only when it is the dead one that was read; a live one moved by mistake
+  is put back, but another process may take the place in the moment
+  between. The witness covers the lock itself, with four reclaimers; it
+  does not cover a reclaimer dying inside the reclaim section.
 - **No gitseq request** was recorded from this session: no gitseq tool was
   available in the cloud container. The requester records one for this
   head.
