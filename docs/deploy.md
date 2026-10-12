@@ -151,6 +151,14 @@ The scope Worker serves the room's page at `/page/` from
 page package's build writes (`docs/page.md`). Deploying the Worker
 deploys the page; it needs no binding, setting or secret of its own.
 
+## The homepage
+
+The static-assets Worker `dap-home` serves the four pages from `homepage/`.
+Run `npm run build:home` to copy its source and the repository brand masters
+into `homepage/assets/`. Its Wrangler configuration attaches
+`dap.generalbusiness.ai` as a custom domain. The room, Counter and Jam
+applications keep their own addresses; the homepage links to those origins.
+
 ## What is never written down
 
 The values of `SESSION_SECRET`, `GITHUB_APP_PRIVATE_KEY`,
