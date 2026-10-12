@@ -1,5 +1,6 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
+import { createServer, request, type Server } from "node:http";
+import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +11,7 @@ import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { McpService, MODERN, LEGACY, memoryStore, type McpConfig } from "../src/index.ts";
-import { serveHttp, type HttpServing } from "../src/node.ts";
+import { serveHttp, serveStdio, type HttpServing } from "../src/node.ts";
 import { StandIn } from "./support/standin.ts";
 
 // The scope service here is the STAND-IN of test/support/standin.ts, served over HTTP on loopback. The clients are real: the MCP
@@ -178,4 +179,99 @@ describe("both MCP wire revisions, each by its own rules", () => {
     expect(signed.structuredContent).toMatchObject({ answer: "accepted", tool: "act" });
     await generic.c.close();
   }, 120_000);
+
+  // Invariant: the HTTP transport decodes a body once, as UTF-8, so a character split across chunks arrives whole; answers null,
+  // scalars, arrays, objects without jsonrpc and unparsable bodies with a bounded JSON-RPC error; survives an aborted upload; and
+  // after each of these a real client's call is served.
+  test("HTTP bytes and invalid frames, each followed by a healthy call", async () => {
+    const s = await http();
+    try {
+      const c = client("modern");
+      await c.connect(new StreamableHTTPClientTransport(new URL(s.url), bearer(s)));
+      const healthy = async () => expect((await c.callTool({ name: "room", arguments: {} })).structuredContent).toMatchObject({ key: signer.key });
+      const raw = (body: string) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body });
+      for (const [body, code] of [["null", -32600], ["3", -32600], ['"x"', -32600], ["[]", -32600], ['{"id":1,"method":"tools/list"}', -32600], ["{", -32700]] as const) {
+        const answer = await raw(body);
+        const parsed = await answer.json() as { jsonrpc: string; id: null; error: { code: number; message: string } };
+        expect([answer.status, parsed.jsonrpc, parsed.id, parsed.error.code], body).toEqual([400, "2.0", null, code]);
+        expect(JSON.stringify(parsed).length).toBeLessThan(256);
+        await healthy();
+      }
+      // A two-byte character split across two chunks of the body.
+      const name = "café-tool";
+      const bytes = Buffer.from(JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name, arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }), "utf8");
+      const split = bytes.indexOf(Buffer.from("é", "utf8")) + 1;
+      const reply = await new Promise<string>((resolve, reject) => {
+        const req = request(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", "content-length": bytes.length } }, (res) => { let out = ""; res.setEncoding("utf8"); res.on("data", (d: string) => { out += d; }); res.on("end", () => resolve(out)); });
+        req.on("error", reject);
+        req.write(bytes.subarray(0, split));
+        setTimeout(() => { req.end(bytes.subarray(split)); }, 30);
+      });
+      expect((JSON.parse(reply) as { result: { structuredContent: { message: string } } }).result.structuredContent.message).toBe(`No tool is named ${name} in this list.`);
+      await healthy();
+      // An upload aborted halfway: nothing hangs or rejects, and the next call is served.
+      await new Promise<void>((resolve) => {
+        const req = request(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", "content-length": 1000 } });
+        req.on("error", () => resolve());
+        req.write("{\"jsonrpc\":\"2.0\",");
+        setTimeout(() => { req.destroy(); resolve(); }, 30);
+      });
+      await healthy();
+      await c.close();
+    } finally { await s.close(); }
+  });
+
+  // Invariant: a listen subscription belongs to its client stream: two clients that both use request ID 0 each keep their own;
+  // an abrupt disconnect removes that stream's subscription and its watcher, and only that one; a reconnect subscribes again; and
+  // when the last stream closes no watcher is left.
+  test("listen subscriptions by client stream: equal IDs, abrupt disconnect, reconnect, cleanup", async () => {
+    const s = await http();
+    try {
+      const listen = () => {
+        const abort = new AbortController();
+        const seen: string[] = [];
+        const opened = fetch(s.url, { method: "POST", signal: abort.signal, headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "subscriptions/listen", params: { notifications: { toolsListChanged: true }, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }) })
+          .then(async (res) => { const reader = res.body!.getReader(); for (;;) { const r = await reader.read(); if (r.done) break; seen.push(Buffer.from(r.value).toString("utf8")); } }).catch(() => {});
+        return { seen, abort, opened, text: () => seen.join("") };
+      };
+      const a = listen(), b = listen();
+      expect(await until(() => a.text().includes("acknowledged") && b.text().includes("acknowledged"))).toBe(true);
+      expect(s.wire.listening).toBe(2);
+      a.abort.abort();
+      expect(await until(() => s.wire.listening === 1)).toBe(true);
+      standIn.activate(later("equal-ids"));
+      await s.tick();
+      expect(await until(() => b.text().includes("notifications/tools/list_changed"))).toBe(true);
+      expect(a.text()).not.toContain("notifications/tools/list_changed");
+      const again = listen();
+      expect(await until(() => again.text().includes("acknowledged") && s.wire.listening === 2)).toBe(true);
+      b.abort.abort(); again.abort.abort();
+      expect(await until(() => s.wire.listening === 0 && !s.mcp.watching)).toBe(true);
+    } finally { await s.close(); }
+  });
+
+  // Invariant: stdio serves sustained traffic, one answer per request; a frame split across chunks inside a character arrives
+  // whole; a line over the bound is answered once and skipped to its end without swallowing the next frame.
+  test("stdio: sustained traffic, split characters, an oversized line", async () => {
+    const mcp = new McpService({ service, signer, config: { read: async () => configOf(), addRoot: async () => {} }, custody: memoryStore() });
+    const input = new PassThrough(), output = new PassThrough();
+    const lines: Record<string, unknown>[] = [];
+    let rest = "";
+    output.on("data", (d: Buffer) => { rest += d.toString("utf8"); for (let i = rest.indexOf("\n"); i >= 0; i = rest.indexOf("\n")) { lines.push(JSON.parse(rest.slice(0, i)) as Record<string, unknown>); rest = rest.slice(i + 1); } });
+    const done = serveStdio(mcp, input, output);
+    const meta = { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} };
+    for (let i = 0; i < 300; i++) input.write(`${JSON.stringify({ jsonrpc: "2.0", id: i, method: "server/discover", params: { _meta: meta } })}\n`);
+    const call = Buffer.from(`${JSON.stringify({ jsonrpc: "2.0", id: "split", method: "tools/call", params: { name: "naïve", arguments: {}, _meta: meta } })}\n`, "utf8");
+    const at = call.indexOf(Buffer.from("ï", "utf8")) + 1;
+    input.write(call.subarray(0, at)); input.write(call.subarray(at));
+    input.write(`${"x".repeat(5 * 1024 * 1024)}\n`);
+    input.write(`${JSON.stringify({ jsonrpc: "2.0", id: "after", method: "server/discover", params: { _meta: meta } })}\n`);
+    expect(await until(() => lines.some((l) => l["id"] === "after"), 10_000)).toBe(true);
+    expect(lines.filter((l) => typeof l["id"] === "number" && l["result"] !== undefined)).toHaveLength(300);
+    expect((lines.find((l) => l["id"] === "split")!["result"] as { structuredContent: { message: string } }).structuredContent.message).toBe("No tool is named naïve in this list.");
+    expect(lines.filter((l) => (l["error"] as { code?: number } | undefined)?.code === -32600)).toHaveLength(1);
+    input.end();
+    await done;
+  });
 });

@@ -55,8 +55,14 @@ export interface LegacySession {
   unsubscribe: (() => void) | null;
 }
 
-/** The state of one 2026-07-28 listen subscription: its ID (the request's), the types it opted in to, and what it was last told. */
-export interface Listen { id: Id; tools: boolean; told: Digest | null; send: Send; unsubscribe: () => void; end: () => void }
+/**
+ * The state of one 2026-07-28 listen subscription: its ID (the request's), the types it opted in to, and what it was last told.
+ * It belongs to the client stream it was opened on (`owner`): two clients may use the same request ID.
+ */
+export interface Listen { id: Id; owner: object; tools: boolean; told: Digest | null; send: Send; unsubscribe: () => void; end: () => void }
+
+/** Whether a value is a JSON-RPC 2.0 frame this server reads: an object with `jsonrpc: "2.0"`. Null, scalars and arrays are not. */
+export const isFrame = (v: unknown): v is Message => isRecord(v) && v["jsonrpc"] === "2.0";
 
 export function newSession(): LegacySession {
   return { version: null, initialized: false, capabilities: {}, told: null, stream: null, unsubscribe: null };
@@ -71,7 +77,8 @@ export function revisionOf(message: Message, session: LegacySession | null): "mo
 }
 
 export class Wire {
-  readonly listens = new Map<string, Listen>();
+  /** Open listen subscriptions, by the client stream they belong to, then by request ID. */
+  readonly listens = new Map<object, Map<string, Listen>>();
   constructor(readonly service: McpService) {}
 
   /** Watch the service's list for one 2025-11-25 session, while it has a stream. */
@@ -90,19 +97,24 @@ export class Wire {
     session.stream = null;
   }
 
+  /** How many listen subscriptions are open, across every client stream. */
+  get listening(): number { let n = 0; for (const of of this.listens.values()) n += of.size; return n; }
+
   /**
    * One message. Returns the response to send, or null for a notification or
    * for a `subscriptions/listen` request, whose stream `send` carries.
+   * `owner` is the client stream the message came on: the connection on
+   * stdio, the response stream of a `subscriptions/listen` over HTTP.
    */
-  async handle(message: unknown, session: LegacySession | null, send: Send): Promise<Message | null> {
-    if (!isRecord(message) || message["jsonrpc"] !== "2.0") return error(null, -32600, "Invalid Request");
+  async handle(message: unknown, session: LegacySession | null, send: Send, owner: object = send): Promise<Message | null> {
+    if (!isFrame(message)) return error(null, -32600, "Invalid Request: a JSON-RPC 2.0 object is expected.");
     const m = message as unknown as Message;
     const id = m.id ?? null;
     if (typeof m.method !== "string") return null;   // a response to a request of ours: the server makes none
     const notification = id === null || id === undefined;
     const revision = revisionOf(m, session);
     try {
-      if (revision === "modern") return await this.#modern(m, notification, send);
+      if (revision === "modern") return await this.#modern(m, notification, send, owner);
       if (revision === "legacy") return session ? await this.#legacy(m, session, notification) : error(id, -32600, "This transport has no session for 2025-11-25.");
       if (notification) return null;
       return error(id, -32600, `Not initialized: send initialize (${LEGACY}), or name the protocol version in _meta (${MODERN}).`);
@@ -142,15 +154,15 @@ export class Wire {
     }
   }
 
-  async #modern(m: Message, notification: boolean, send: Send): Promise<Message | null> {
+  async #modern(m: Message, notification: boolean, send: Send, owner: object): Promise<Message | null> {
     const id = m.id as Id;
     const params = isRecord(m.params) ? m.params : {};
     const meta = isRecord(params["_meta"]) ? params["_meta"] : {};
     const version = meta[PROTOCOL_META];
     if (version !== MODERN) return notification ? null : error(id, UNSUPPORTED_VERSION, `Unsupported protocol version: ${String(version)}`, { supported: [MODERN, LEGACY], requested: String(version) });
     if (m.method === "notifications/cancelled") {
-      const listen = this.listens.get(JSON.stringify(params["requestId"]));
-      listen?.end();
+      // Only a listen of the same client stream: another client's request with the same ID is not this one.
+      this.listens.get(owner)?.get(JSON.stringify(params["requestId"]))?.end();
       return null;
     }
     if (notification) return null;
@@ -170,17 +182,20 @@ export class Wire {
         const key = JSON.stringify(id);
         let ended = false;
         const listen: Listen = {
-          id, tools, told: null, send,
+          id, owner, tools, told: null, send,
           unsubscribe: () => {},
           end: () => {
             if (ended) return;
             ended = true;
             listen.unsubscribe();
-            this.listens.delete(key);
+            this.#forget(owner, key);
             send(reply(id, { resultType: "complete", _meta: { [SUBSCRIPTION_META]: id, [SERVER_INFO_META]: SERVER_INFO } }));
           },
         };
-        this.listens.set(key, listen);
+        // A second listen with the same ID on the same stream replaces the first, which ends.
+        this.listens.get(owner)?.get(key)?.end();
+        if (!this.listens.has(owner)) this.listens.set(owner, new Map());
+        this.listens.get(owner)!.set(key, listen);
         if (tools) {
           // The baseline is the list as it is now; only a later change is told. The watch runs before the acknowledgement, so no
           // change between the two is lost.
@@ -199,16 +214,20 @@ export class Wire {
     }
   }
 
-  /** End a listen subscription whose stream closed: no result is sent, as for an abrupt close. */
-  dropListen(id: Id): void {
-    const listen = this.listens.get(JSON.stringify(id));
-    if (!listen) return;
-    listen.unsubscribe();
-    this.listens.delete(JSON.stringify(id));
+  #forget(owner: object, key: string): void {
+    const of = this.listens.get(owner);
+    of?.delete(key);
+    if (of && of.size === 0) this.listens.delete(owner);
+  }
+
+  /** End every listen of a client stream that closed: no result is sent, as for an abrupt close; its watchers are removed. */
+  dropStream(owner: object): void {
+    for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) listen.unsubscribe();
+    this.listens.delete(owner);
   }
 
   closeAll(): void {
-    for (const listen of [...this.listens.values()]) { listen.unsubscribe(); }
+    for (const of of this.listens.values()) for (const listen of of.values()) listen.unsubscribe();
     this.listens.clear();
   }
 }

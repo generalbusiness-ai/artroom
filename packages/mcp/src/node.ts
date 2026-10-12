@@ -31,7 +31,7 @@ import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Out
 import type { ConfigPort } from "./inventory.ts";
 import { McpService } from "./service.ts";
 import type { Mode } from "./catalogue.ts";
-import { Wire, newSession, revisionOf, type LegacySession, type Message } from "./wire.ts";
+import { Wire, isFrame, newSession, revisionOf, type LegacySession, type Message } from "./wire.ts";
 
 // ---------------------------------------------------------------- custody on files
 
@@ -237,37 +237,60 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
 
 // ---------------------------------------------------------------- stdio
 
-/** Serve over standard input and output. Resolves when the input ends. */
+/** The most bytes of one line on stdio, and of one HTTP body: a whole envelope of the largest act fits with room to spare. */
+const FRAME_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Serve over standard input and output. Resolves when the input ends. Each line is one frame, read as bytes and decoded once as
+ * UTF-8. A line longer than the bound is answered with one error and skipped to its end, never truncated into another frame. Each
+ * request runs as its own task, removed when it settles; a failure in one is answered and contained.
+ */
 export function serveStdio(service: McpService, input: NodeJS.ReadableStream = process.stdin, output: NodeJS.WritableStream = process.stdout): Promise<void> {
   const wire = new Wire(service);
   const session: LegacySession = newSession();
-  const write = (message: Message) => { output.write(`${JSON.stringify(message)}\n`); };
+  const owner = {};
+  const write = (message: Message) => { try { output.write(`${JSON.stringify(message)}\n`); } catch { /* the output is gone */ } };
   session.stream = write;
-  let buffer = "";
-  const pending: Promise<void>[] = [];
+  let parts: Buffer[] = [];
+  let held = 0;
+  let skipping = false;
+  const pending = new Set<Promise<void>>();
+  const frame = (bytes: Buffer) => {
+    let message: unknown;
+    try { message = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
+    catch { write({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }); return; }
+    const task: Promise<void> = wire.handle(message, session, write, owner)
+      .then((response) => { if (response) write(response); }, () => { write({ jsonrpc: "2.0", id: isFrame(message) ? message.id ?? null : null, error: { code: -32603, message: "Internal error" } }); })
+      .finally(() => { pending.delete(task); });
+    pending.add(task);
+  };
+  const tooLong = () => write({ jsonrpc: "2.0", id: null, error: { code: -32600, message: `A frame longer than ${FRAME_BYTES} bytes is not read.` } });
   return new Promise((resolve) => {
-    input.setEncoding?.("utf8");
     input.on("data", (chunk: string | Buffer) => {
-      buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
-      for (let at = buffer.indexOf("\n"); at >= 0; at = buffer.indexOf("\n")) {
-        const line = buffer.slice(0, at).trim();
-        buffer = buffer.slice(at + 1);
-        if (line.length === 0) continue;
-        let message: unknown;
-        try { message = JSON.parse(line); } catch { write({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }); continue; }
-        pending.push(wire.handle(message, session, write).then((response) => { if (response) write(response); }));
+      let data = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+      for (let at = data.indexOf(10); at >= 0; at = data.indexOf(10)) {
+        const tail = data.subarray(0, at);
+        data = data.subarray(at + 1);
+        if (skipping) { skipping = false; parts = []; held = 0; continue; }
+        if (held + tail.length > FRAME_BYTES) { parts = []; held = 0; tooLong(); continue; }
+        const line = Buffer.concat([...parts, tail]);
+        parts = []; held = 0;
+        if (line.toString("latin1").trim().length > 0) frame(line);
       }
+      if (data.length === 0 || skipping) return;
+      held += data.length;
+      if (held > FRAME_BYTES) { skipping = true; parts = []; held = 0; tooLong(); return; }
+      parts.push(Buffer.from(data));
     });
-    input.on("end", () => { void Promise.allSettled(pending).then(() => { wire.endLegacy(session); wire.closeAll(); resolve(); }); });
+    input.on("end", () => { void Promise.allSettled([...pending]).then(() => { wire.endLegacy(session); wire.closeAll(); resolve(); }); });
   });
 }
 
 // ---------------------------------------------------------------- loopback HTTP
 
 const LOOPBACK = /^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|::1|\[::1\])$/;
-const BODY_BYTES = 4 * 1024 * 1024;
 
-export interface HttpServing { server: Server; url: string; bearer: string; close(): Promise<void> }
+export interface HttpServing { server: Server; url: string; bearer: string; wire: Wire; close(): Promise<void> }
 
 /** Whether an address is loopback: 127.0.0.0/8 or ::1. A name such as `localhost` is not taken: it may resolve elsewhere. */
 export function isLoopback(host: string): boolean { return LOOPBACK.test(host); }
@@ -285,7 +308,16 @@ export async function serveHttp(service: McpService, host: string, port: number,
   const sessions = new Map<string, LegacySession>();
   const bare = (res: ServerResponse, status: number) => { res.writeHead(status); res.end(); };
 
-  const server = createServer((req, res) => { void handle(req, res); });
+  const json = (res: ServerResponse, status: number, message: Message) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(message)); };
+  // Every failure of one request is contained here: an aborted body, a parser or a handler that throws, a write to a closed
+  // socket. Nothing rejects unhandled and no other request waits on it.
+  const server = createServer((req, res) => {
+    req.on("error", () => { /* an aborted upload: the handler sees the end of the body */ });
+    res.on("error", () => { /* the client is gone */ });
+    handle(req, res).catch(() => {
+      try { if (!res.headersSent) json(res, 500, { jsonrpc: "2.0", id: null, error: { code: -32603, message: "Internal error" } }); else res.end(); } catch { /* the socket is gone */ }
+    });
+  });
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // Origin: no browser origin is a client of a signing server.
     if (req.headers["origin"] !== undefined) return bare(res, 403);
@@ -307,34 +339,49 @@ export async function serveHttp(service: McpService, host: string, port: number,
       if (!session) return bare(res, 404);
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
       res.write(": stream\n\n");
-      session.stream = (message) => { res.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`); };
+      const stream = (message: Message) => { if (!res.writableEnded) res.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`); };
+      session.stream = stream;
       wire.watchLegacy(session);
-      req.on("close", () => { if (sessions.get(sessionId) === session) wire.endLegacy(session); });
+      // The stream lives as long as the response: its close, from either side, ends the watch.
+      res.on("close", () => { if (session.stream === stream) wire.endLegacy(session); });
       return;
     }
     if (req.method !== "POST") return bare(res, 405);
-    let body = "";
+    // The body is read whole, within the bound, and decoded once: a character split across chunks is not corrupted.
+    const chunks: Buffer[] = [];
     let size = 0;
-    for await (const chunk of req) { size += (chunk as Buffer).length; if (size > BODY_BYTES) return bare(res, 413); body += (chunk as Buffer).toString("utf8"); }
+    for await (const chunk of req) {
+      size += (chunk as Buffer).length;
+      if (size > FRAME_BYTES) return bare(res, 413);
+      chunks.push(chunk as Buffer);
+    }
+    if (!req.complete) return;   // aborted: nobody is listening for an answer
     let message: unknown;
-    try { message = JSON.parse(body); } catch { res.writeHead(400, { "content-type": "application/json" }); res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })); return; }
-    if (Array.isArray(message)) { res.writeHead(400, { "content-type": "application/json" }); res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Batches are not served." } })); return; }
-    const m = message as Message;
+    try { message = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); }
+    catch { return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }); }
+    if (Array.isArray(message)) return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Batches are not served." } });
+    // The frame is checked before its revision is read: null, a scalar or an object without jsonrpc is an invalid request.
+    if (!isFrame(message)) return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request: a JSON-RPC 2.0 object is expected." } });
+    const m = message;
     const revision = revisionOf(m, sessionId ? sessions.get(sessionId) ?? null : null);
     if (revision === "modern" || (revision === "none" && !sessionId && m.method !== "initialize")) {
       if (m.method === "subscriptions/listen") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-        const send = (out: Message) => { res.write(`event: message\ndata: ${JSON.stringify(out)}\n\n`); if (out.id !== undefined && (out.result !== undefined || out.error !== undefined)) res.end(); };
-        req.on("close", () => { if (m.id !== undefined && m.id !== null) wire.dropListen(m.id); });
-        const response = await wire.handle(m, null, send);
+        const owner = {};
+        const send = (out: Message) => {
+          if (res.writableEnded) return;
+          res.write(`event: message\ndata: ${JSON.stringify(out)}\n\n`);
+          if (out.id !== undefined && (out.result !== undefined || out.error !== undefined)) res.end();
+        };
+        // The subscription lives as long as its response stream: a close from either side removes its watchers.
+        res.on("close", () => { wire.dropStream(owner); });
+        const response = await wire.handle(m, null, send, owner);
         if (response) send(response);
         return;
       }
       const response = await wire.handle(m, null, () => {});
       if (!response) return bare(res, 202);
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(response));
-      return;
+      return json(res, 200, response);
     }
     // 2025-11-25: initialize issues the session; every later request names it, and an unknown one is answered 404.
     let session: LegacySession | undefined;
@@ -360,7 +407,7 @@ export async function serveHttp(service: McpService, host: string, port: number,
   const url = `http://${host.includes(":") && !host.startsWith("[") ? `[${host}]` : host}:${actual}/mcp`;
   announce(`artroom mcp: serving ${url}; bearer (shown once): ${bearer}`);
   return {
-    server, url, bearer,
+    server, url, bearer, wire,
     close: () => new Promise<void>((resolve) => {
       for (const session of sessions.values()) wire.endLegacy(session);
       wire.closeAll();
