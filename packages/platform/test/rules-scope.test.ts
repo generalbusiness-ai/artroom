@@ -96,6 +96,18 @@ test("the genesis opens the rules with the branch, the directory and membership'
   expect(pinned.map(book => book.item(0).values["ownerMayReview"])).toEqual([false, false, false, true]);
   expect(pinned.map(book => book.state.scope()?.status)).toEqual(["active", "active", "active", "active"]);
   expect(pinned.map(book => book.entries[0]!.entry.input.type === "genesis" ? book.entries[0]!.entry.input.seed.definition : null)).toEqual(named);
+  // Each catalog reader answers from this confirmed scope's actual folded head.
+  const observed = pinned.map((book, index) => platform(named[index]!)!.observed!(book.state, { of: book.at, asked: "rules" }));
+  expect(observed).toMatchObject(pinned.map((book, index) => ({
+    subject: "rules", of: book.at, head: book.head, definition: named[index], revision: 0,
+    content: { asked: "rules", ownerMayReview: [false, false, false, true][index] },
+  })));
+  // Rules4's observation names the bytes served beside it at that same head.
+  const prospective = pinned[3]!;
+  const values = platform(named[3])!.observedValues!(prospective.state, { of: prospective.at, asked: "rules" });
+  expect(values).toHaveLength(1);
+  expect(values[0]!.domain).toBe(RULES_EXTENTS_VALUE.domain);
+  expect(observed[3]).toMatchObject({ content: { extents: valueDigest(values[0]!.domain, JSON.parse(values[0]!.bytes)) } });
   const provisional = new Rulebook(false);
   expect([provisional.state.scope()?.status, said(keep(provisional, unit))[0] === "write"]).toEqual(["provisional", false]);
 });
