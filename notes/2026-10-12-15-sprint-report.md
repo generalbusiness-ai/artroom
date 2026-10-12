@@ -114,3 +114,31 @@ Times are Eastern. Event times come from workroom act times (UTC, converted)
 and Git history. Deployment versions come from the builder's delivery
 asserts; served titles were read by the planner at 14:10. Review verdicts
 are the checker's.
+
+## Addendum, 14:55
+
+Since the report was written at 14:20:
+
+- Hugh decided at 14:55: the stale-base rehearsal shot is dropped (the
+  request is retired; the concurrent-edit story is told in words), and the
+  six public packages publish as `@generalbusiness/dap-*`. The minimal
+  rename (`2e8c191d`) and the practice script amendment (`cc50622b`) were
+  refiled and the builder promised both at 14:50, with about two hours and
+  half an hour of work, in that order after the room heads and Start.
+- Hugh's second round of room page findings (dialogs that do not close on
+  an outside click, two narrative sentences, boolean labels, the issues
+  list not refreshing after create, no timestamps on an issue) is filed as
+  `84f45948` and promised at 14:24 on the forms source.
+- The documentation head's second review (14:21) asked for one change in
+  the room glossary; the planner made it (`956814f6`) and is refiling the
+  exact-head invitation. The checker also asked for changes on the two
+  design notes: the CLI JSON design (five points, 14:38) and the
+  observability design (14:43). Neither is demo-critical.
+- Of the 120 stale workroom requests Hugh authorized for retirement, 60
+  planner-owned ones are retired and ten frozen drafts ratified. Retiring a
+  request makes live requests that rested on it read stale; two live ones
+  were caught and refiled, and the rest of the wave was checked for
+  dependents before it ran. The builder's and checker's own stale requests
+  wait for them after the submission.
+- Nothing stalled. Next sprint commitments are unchanged, with the two
+  refiled requests in place of the originals.
