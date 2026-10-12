@@ -92,6 +92,52 @@ They establish no native authority, provider behavior, or hosted latency.
 Original failures and their completion remain separate. No old control,
 whole suite, or gate was repeated for the successor or this note.
 
+## Remaining guard and outer-stop evidence
+
+Commit `3d7162aae` extends the same two scripted Node journeys. Returned
+opening provenance, proposal and rules readiness, command results, manifest
+source, and fresh edit results now have bounded failure ledgers. Trusted
+preflight cases cover initial base and scope, saved room and key, and
+session refusal. Those cases establish local stopping behavior, not remote
+evidence or membership authority.
+
+One new artifacts-only native case runs two fresh rooms. It injects a valid
+unavailable `open-pr` answer before admission, first during stale preparation
+and then during fresh reproposal. The actual runner, CLI, planned install,
+and read codecs run. Both failed composites leave every later shot unrun,
+with no later mutation submission or runnable callback. Git hosting and
+scheduling remain stand-ins. Earlier acts remain recorded, without rollback.
+The four existing native happy-path stories were not repeated.
+
+Both owning compiler closures passed. The two Node cases and new native
+case passed at `3d7162aae`. Baseline proof SHA256:
+`acf2907b4d1c37a93498cecf730dd58b448717abb583bf417214b395adc51561`.
+Production code is unchanged from the previously reviewed successor.
+
+Four additional guard groups distinguish intended faults. Opening
+provenance passed both mutant compilers and failed the intended mutation
+prefix assertion at line 102. The next readiness recipe failed compilation:
+`TS6133` reported an unused predicate, and unconditional return made the
+remaining pause and config code unreachable for narrowing. That original
+failure remains preserved, without credit for the unrun readiness body:
+`37a72342341311001cea149271aa8005c223d66518fbcd2f766adc46431129ef`.
+
+The corrected recipe preserves conditional flow while bypassing the
+readiness decision. Its continuation runs only that corrected group and
+the two previously unrun command-result and outer-stop groups. All six
+mutant compiler stages passed. Readiness and command-result bodies failed
+the intended prefix assertions at line 102. The outer-stop body failed the
+later-shots-unrun assertion at line 83. Isolated source was restored exactly.
+Completion proof SHA256:
+`d7668a9025144e5bee03adbfca780c780b5f778c2d48842c13ea8e0bd4cd60ff`.
+The earlier two successful controls retain credit and were not repeated.
+
+These grouped controls do not prove independent necessity for every
+predicate or output field. The Node ledgers establish runner decisions
+from scripted answers. The native outer case establishes the outer stop
+through its stated fixture boundaries. No proof establishes hosted results
+or latency. No test, control, gate, or provider action ran for this note.
+
 Local evidence remains outside the repository:
 
 - `artroom-diagnostics/stale-base-source/public-result.json`
