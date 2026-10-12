@@ -120,7 +120,7 @@ export interface Room {
 export interface Rehearsal { shots: Taken[]; room: Room; ok: boolean }
 
 /** The values a shot's lines named, by the name of their place in the expected lines; a later shot types them. */
-type Found = Record<string, string>;
+export type Found = Record<string, string>;
 
 class Missing extends Error {}
 
@@ -480,7 +480,7 @@ export async function plannedOperator(ctx: Context, stage: Pick<Stage, "service"
 /** The freeze route uses existing generic acts and a normal fresh-head edit.
  * Each command is recorded with its actual exit. A mismatch stops this
  * composite before another mutation; no unknown request is retried. */
-async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controlled: string, expected: { code: number; lines: string[] }, v: Found, manifest: boolean): Promise<Outcome> {
+export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controlled: string, expected: { code: number; lines: string[] }, v: Found, manifest: boolean): Promise<Outcome> {
   const lines = [`Proposal base: ${oldBase}.`];
   const failure = (reason = "required result did not match"): Outcome => ({ code: 1, lines: [...lines, `Composite stopped: ${reason}. No mutation was retried.`] });
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !isScopeId(controlled)) return failure();
@@ -530,7 +530,7 @@ async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, controll
 }
 
 /** Merge the already-admitted loser, then open a distinct fresh-head change. */
-async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found, monotonic: () => number, now: () => number, measured: (milliseconds: number, at: string) => void): Promise<Outcome> {
+export async function staleReproposal(ctx: Context, oldBase: string, newBase: string, expected: { code: number; lines: string[] }, v: Found, monotonic: () => number, now: () => number, measured: (milliseconds: number, at: string) => void): Promise<Outcome> {
   const lines = [`Old base: ${oldBase}; new base: ${newBase}.`];
   const failure = (): Outcome => ({ code: 1, lines: [...lines, "Composite stopped: required result did not match. No mutation was retried."] });
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
