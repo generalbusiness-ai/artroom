@@ -19,6 +19,8 @@ import type { ObservationRequest, PlatformData, PlatformDefinition } from "@gene
 import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
+import { DEMO_REGISTER, demoRegister, demoRegisterRules } from "./demo-register.ts";
+export { DEMO_REGISTER, DEMO_PURPOSE, demoRegister, demoRegisterRules } from "./demo-register.ts";
 import { register, registerRules } from "./register.ts";
 import { directory, directory2, directory3, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
@@ -114,6 +116,7 @@ export interface Platform {
  * cannot run.
  */
 export const VERSIONS: Readonly<Record<string, Platform>> = {
+  [DEMO_REGISTER]: { data: demoRegister, rules: demoRegisterRules },
   "platform:inbox@1": { data: inbox, rules: inboxRules },
   [APPLICATION_COHORT.register]: { data: register, rules: registerRules },
   [APPLICATION_COHORT.directory]: { data: directory5, rules: directoryRules5, membership: directoryMembership, rulesScope: directoryRulesScope },
