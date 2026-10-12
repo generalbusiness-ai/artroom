@@ -33,7 +33,7 @@ If the reply is lost or the inbox is still being created, rerun `join` with
 that original link. It uses the same key, request and deadline. A different
 invitation cannot replace a pending Join. Missing private records or keys
 stop recovery; they do not authorize a new enrollment as the same member.
-See [the command reference](../cli.md) for custody and refusal details.
+See [the command reference](../../../docs/cli.md) for custody and refusal details.
 
 `acts` lists the actions your current role holds. An offered action can
 still be refused by the room's rules or state. A member can propose and
@@ -63,7 +63,7 @@ and version shown in that output for review and later merge.
 This source has no `dap propose <branch>`, application preset or ordinary
 browser editor. The branch/manifest-list workflow is separate unlanded work;
 it is not an alternative command in this guide. A clone is optional for this
-one-file path. [Clone and host credentials](../hosts.md) explain the separate
+one-file path. [Clone and host credentials](../../../docs/hosts.md) explain the separate
 read-token path and its limits.
 
 ## Review the exact version and extent
@@ -87,7 +87,7 @@ dap act review-verdict --on <change-scope> \
 ```
 
 Replace each placeholder with the exact recorded value. Inspect the room's
-Rules view and [lane reference](../lanes-reference.md) before choosing an
+Rules view and [lane reference](../../../docs/lanes-reference.md) before choosing an
 extent. One verdict names one extent; mixed changes need each touched
 extent's required verdicts. Authors cannot supply an independent review of
 their own version. Current rules also judge controller relationships and
@@ -139,12 +139,12 @@ that all external effects are finished or that unobserved history is complete.
 
 ## Evidence and remaining acceptance
 
-Commands match current [CLI help](../../packages/cli/src/line.ts).
-[CLI story](../../packages/cli/test/story.scope.test.ts) covers native
+Commands match current [CLI help](../../../packages/cli/src/line.ts).
+[CLI story](../../../packages/cli/test/story.scope.test.ts) covers native
 creation, enrollment, authority refusals and history reads with labelled
 Git host, scheduler and clock stand-ins. The existing
-[one-file scenario](../../packages/lanes/test/edit.scope.test.ts) and
-[demo rehearsal](../../scripts/demo/rehearse.ts) supply contribution,
+[one-file scenario](../../../packages/lanes/test/edit.scope.test.ts) and
+[demo rehearsal](../../../scripts/demo/rehearse.ts) supply contribution,
 extent-review and publication examples. This documentation change runs no
 new tests or hosted commands and claims no new fixture result.
 

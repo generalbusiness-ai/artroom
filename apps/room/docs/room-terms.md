@@ -2,7 +2,7 @@
 
 These terms belong to dap-room, the application that keeps a repository's
 work. The framework's own terms, such as scope, act, entry and
-destination, are in [The ten terms](../../docs/manual/ten-terms.md).
+destination, are in [The ten terms](../../../docs/manual/ten-terms.md).
 
 ## Room
 
@@ -22,7 +22,7 @@ is allowed to do.
 
 A **lane** is a scope of the kind `lane`. Its pinned definition decides
 what it holds. The room has two lane definitions, `issue` and `change`,
-in [packages/lanes](../../packages/lanes). [Lanes](lanes.md) describes
+in [packages/lanes](../../../packages/lanes). [Lanes](lanes.md) describes
 them.
 
 ## Issue
@@ -74,9 +74,9 @@ has:
 ## Sources
 
 Written against main `d309b6b9`. Sources:
-[membership](../../packages/platform/src/membership.ts),
-[the inbox](../../packages/platform/src/inbox.ts),
-[the issue definition](../../packages/lanes/src/issue.ts),
-[the change definition](../../packages/lanes/src/change.ts), and
-[the command line's help](../../packages/cli/src/line.ts). This page
+[membership](../../../packages/platform/src/membership.ts),
+[the inbox](../../../packages/platform/src/inbox.ts),
+[the issue definition](../../../packages/lanes/src/issue.ts),
+[the change definition](../../../packages/lanes/src/change.ts), and
+[the command line's help](../../../packages/cli/src/line.ts). This page
 claims no run.

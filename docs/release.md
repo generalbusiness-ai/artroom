@@ -38,7 +38,7 @@ release script writes the tarball's manifest itself:
    directory outside the repository. For the CLI it also writes
    `THIRD-PARTY-NOTICES.txt` there (see "Third-party code in the command").
 3. It writes the staged `package.json` from the workspace manifest
-   (`publishManifest` in [scripts/release-lib.mjs](../scripts/release-lib.mjs)).
+   (`publishManifest` in [scripts/release-lib.mjs](../parked/release/release-lib.mjs)).
    Each `./src/x.ts` export becomes `{ "types": "./dist/x.d.ts", "default":
    "./dist/x.js" }`, each `./src/x.ts` bin becomes `./dist/x.js`, and
    `scripts` and `devDependencies` are left out. The subpaths, version,
@@ -73,7 +73,7 @@ its name, version, declared licence and the complete text of the licence
 file it ships. That text holds the package's copyright and permission
 notices.
 
-The record is [release/third-party](../release/third-party):
+The record is [release/third-party](../parked/release/third-party):
 `packages.json` lists each package with the SHA-256 of its licence file,
 and `licenses/` holds the files, copied unchanged from the published
 packages. Two kinds of package are listed:
@@ -111,7 +111,7 @@ npm run release:pack -- <output directory>
 npm run release:check -- <output directory>
 ```
 
-`release:pack` ([scripts/pack-release.mjs](../scripts/pack-release.mjs))
+`release:pack` ([scripts/pack-release.mjs](../parked/release/pack-release.mjs))
 builds and packs the six packages and writes
 `<output directory>/release-manifest.json`: the source commit and tree,
 whether the working tree was clean, and each tarball's package name,
@@ -119,7 +119,7 @@ version, file name, byte length and SHA-256. Packing the same source again
 gives the same bytes. If the tree was not clean the manifest says so, and
 the tarballs do not identify a commit.
 
-`release:check` ([scripts/check-release.mjs](../scripts/check-release.mjs))
+`release:check` ([scripts/check-release.mjs](../parked/release/check-release.mjs))
 checks that release from outside the repository:
 
 - each tarball has the bytes and SHA-256 the manifest records;
@@ -131,7 +131,7 @@ checks that release from outside the repository:
   content against `release/third-party` and the installed packages, so run
   the check in a checkout of the release's commit, after `npm ci`;
 - all six tarballs install together into a copy of
-  [release/consumer](../release/consumer) in a fresh temporary directory.
+  [release/consumer](../parked/release/consumer) in a fresh temporary directory.
   The lock file is saved as `<output directory>/consumer-package-lock.json`.
   It names each tarball by file and integrity, with no link;
 - plain Node imports every export subpath of every library, and runs the
@@ -168,7 +168,7 @@ A TypeScript application needs `Disposable` and `Symbol.dispose` in its
 library types, because the contract's subscriptions are disposable. Node's
 types (`@types/node` 22) supply them. Without Node's types, add
 `"ESNext.Disposable"` to `lib`, as
-[release/consumer/tsconfig.bundler.json](../release/consumer/tsconfig.bundler.json)
+[release/consumer/tsconfig.bundler.json](../parked/release/consumer/tsconfig.bundler.json)
 does.
 
 ## Where each entry point runs

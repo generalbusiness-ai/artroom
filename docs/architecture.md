@@ -223,7 +223,7 @@ The checker package supplies runner and signer interfaces. An interface
 is not a deployed sandbox. `platform:task@1` is not supplied at this base.
 Real lane hold and Git-read host adapters are not built.
 
-## Sources
+## Source and acceptance
 
 Written against main `d309b6b9`. Sources:
 [Worker routes](../packages/scope/src/worker.ts),
@@ -235,4 +235,6 @@ Written against main `d309b6b9`. Sources:
 [destination objects](../packages/platform/src/destination-objects.ts),
 [replay](../packages/replay/README.md), and
 [platform versions](../packages/platform/src/index.ts). This page claims
-no run.
+no run. Independent review and acceptance of this
+version are owed. The [ledger](../apps/room/docs/ledger.md) keeps the
+review history of the earlier version.

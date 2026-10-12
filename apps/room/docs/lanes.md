@@ -5,8 +5,8 @@ are in `packages/lanes`. It is for a technical reader who has not read the
 design notes. It says what the two definitions are, how to read one row,
 how the definitions are pinned, how a client uses one, and what runs today.
 
-Read [scopes.md](scopes.md) first. It says what a scope, an entry, an act
-and a definition are. [lanes-reference.md](lanes-reference.md) lists every
+Read [scopes.md](../../../docs/scopes.md) first. It says what a scope, an entry, an act
+and a definition are. [lanes-reference.md](../../../docs/lanes-reference.md) lists every
 row of both definitions in tables. That file is generated from the data.
 
 The design note "Lane forms and browser flow", revision 14, at `4b3bf5da`,
@@ -436,7 +436,7 @@ Worker entry do not import it.
 | Deployed lane indexing and notices | The authority and publication delivery. The room fixture already runs lane index sends to the real directory; it establishes no live journey. |
 | Live evidence of lane grants under `issue.promise`, `change.merge` and the other actions | The same. The room fixture already reads these grants from real membership. |
 | Capacity in items, records, bytes and pending requests | The proof plan and a later delivery. Today the count is of entries only. |
-| Browser pages and tools for agents; a complete application journey | The application delivery. The command line is source in `packages/cli`; its fixture boundaries are in [cli.md](cli.md). |
+| Browser pages and tools for agents; a complete application journey | The application delivery. The command line is source in `packages/cli`; its fixture boundaries are in [cli.md](../../../docs/cli.md). |
 
 No row was changed to make it pass. A row that an owner still has to
 decide is in the data as the lane forms state it.
@@ -445,8 +445,8 @@ decide is in the data as the lane forms state it.
 
 | Need | Read |
 |---|---|
-| Every row, in tables | [lanes-reference.md](lanes-reference.md) |
+| Every row, in tables | [lanes-reference.md](../../../docs/lanes-reference.md) |
 | The rows themselves | `packages/lanes/src` |
 | The package's exports and scripts | `packages/lanes/README.md` |
-| What each form means | [scopes.md](scopes.md), "Definitions are data" and "Composition" |
+| What each form means | [scopes.md](../../../docs/scopes.md), "Definitions are data" and "Composition" |
 | The source choices behind the forms | `notes/2026-10-05-i2-contract-deltas.md` |

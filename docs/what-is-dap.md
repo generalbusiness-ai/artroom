@@ -127,7 +127,7 @@ in the room's browser page.
 - Treat a lost reply as unresolved. Check the record with the original
   signed intent before you sign another.
 
-## Sources
+## Source and acceptance
 
 Written against main `d309b6b9`. Sources:
 [the entry and its inputs](../packages/contract/src/entry.ts),
@@ -135,4 +135,6 @@ Written against main `d309b6b9`. Sources:
 [the judges](../packages/derive/src/index.ts),
 [the Counter definition](../examples/counting/definition.ts), and
 [the jam room design](../notes/2026-10-01-jam-room.md). This page claims
-no run.
+no run. Independent review and acceptance of this
+version are owed. The [ledger](../apps/room/docs/ledger.md) keeps the
+review history of the earlier version.

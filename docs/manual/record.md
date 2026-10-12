@@ -62,7 +62,7 @@ retroactively.
 
 The current HTTP service provides authenticated history, entries, stored log
 bytes and retained-input reads. The command line provides log and verify
-commands. [The first-change guide](first-change.md) shows their contribution
+commands. [The first-change guide](../../apps/room/docs/first-change.md) shows their contribution
 context; [the scope guide](../scopes.md) describes the interfaces. Do not
 assume the older `refs/artroom/log` publishing scheme is a current route or
 that an operator has exported the whole history offline.
@@ -102,4 +102,4 @@ established. Sources: [entries and receipts](../../packages/contract/src/entry.t
 [change publication handler](../../packages/lanes/src/change.ts).
 Existing [scope replay witnesses](../../packages/scope/test/replay.test.ts)
 are reusable evidence with their stated stand-ins; this page claims no new
-run, offline export or release acceptance. See [the ledger](ledger.md).
+run, offline export or release acceptance. See [the ledger](../../apps/room/docs/ledger.md).
