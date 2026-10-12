@@ -85,7 +85,7 @@ In this session, each after its last change:
 | `npx vitest run --project scope packages/mcp/test/counter` (after its last change) | `Tests  1 passed (1)` |
 | `npm run typecheck` in `packages/mcp` | no errors |
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
-| `npm run gate` | GATE_RESULT |
+| `npm run gate`, once, at `1aebbeee` | FAILED at the test step: `Tests  4 failed \| 1075 passed \| 2 skipped (1081)`, `Test Files  2 failed \| 193 passed \| 1 skipped (196)`. Install, whitespace and typecheck passed. The four failures are the checkers failure below. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone, above. |
 
 ## Observed figures
 
@@ -163,7 +163,21 @@ calls in the default mode (`issue.create`, `wait`) and 3 in `--generic`
 
 ## The T36 checkers failure in the cloud
 
-T36_RESULT
+It recurred. In the gate's run, four tests of `packages/checkers` failed
+with `checkout-failed`: T36 in `test/runner.test.ts`, the two other
+checkout tests there, and the staging test in
+`test/reservation-record.test.ts`. This branch changes nothing in
+`packages/checkers` or `packages/git`.
+
+The cause, reproduced by hand in a scratch directory: the container's Git
+is 2.43.0, which refuses the runner's
+`git checkout -q --detach --end-of-options <commit> --` with
+`fatal: only one reference expected, 2 given.` The runner reads that exit
+code as `checkout-failed`. The failures are the same with the global Git
+configuration set aside (`GIT_CONFIG_GLOBAL=/dev/null`), so the container's
+signing and proxy settings are not the cause. A Git that accepts
+`--end-of-options` before a revision in `checkout` passes them; the fix,
+in the runner or in the cloud image's Git, is not this delivery's.
 
 ## What is owed
 
