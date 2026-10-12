@@ -1,9 +1,13 @@
 # One MCP service for every dap application
 
-2026-10-12. Draft 2, for checker review before implementation.
+2026-10-12. Draft 3, for checker review before implementation.
 Planned against main `d309b6b9baca9e6a51a1dfb2c7979145463b229c`.
 Draft 1 (`ab740346`) received changes requested in review `ca8a00f6`, with
-eight corrections. Draft 2 answers each; section 14 maps them.
+eight corrections; Draft 2 (`41ed9eff`) answered each, and section 14 maps
+them. Draft 3 follows Hugh's direction of 2026-10-12 14:37 Eastern: the
+tool list is dynamic, one tool per act kind of each definition the room
+holds, so an agent picks a verb directly instead of calling a generic
+`acts` then `act`. The generic pair stays as a fallback behind a flag.
 
 Hugh's direction, 2026-10-12 13:50 Eastern: the MCP plan
 (`notes/2026-10-01-mcp-plan.md`, revision 4, and plan 009) is reasonable,
@@ -45,14 +49,14 @@ by this note; Hugh confirms them by adopting the note.
 | Adopted or owed outcome | Here |
 |---|---|
 | MCP is a transport, never an authority; every write is one signed intent judged by the scope | Kept. `act` and `found` sign one intent each; the server derives no judgment (section 3). |
-| Tools are complete; resources, prompts, elicitation, Tasks and Apps are enhancements | Kept. Eleven tools; nothing else is required (section 3). |
+| Tools are complete; resources, prompts, elicitation, Tasks and Apps are enhancements | Kept. Ten generic tools plus one tool per act kind the room holds; nothing else is required (section 3). |
 | `idempotencyKey` required on act tools | Kept, and required before dispatch: a caller-known key; the server generates none (section 7). |
 | Titles, annotations, advertised `outputSchema` on every tool | Kept, with truthful annotations for a generic write (section 3). |
 | `waitMs` on long operations | Replaced by the `wait` tool, since the scope model has no `RoomApi` operation handle; a child scope, a timed entry or an outcome is observed by reading (section 3). |
 | Stateless server; state with its owners, reached by handles | Kept. Scope IDs, item IDs, cursors and idempotency keys are the handles (section 7). |
 | Retries repeat the same prepared meaning | Kept, as exact signed envelopes under exclusive custody (section 7). |
-| Context budget, measured in CI | Kept. The token gate of the plan stays, measured by a pinned counter; a byte gate is added beside it (section 9). |
-| Fourteen named code-review tools, lanes and leases, the `/v1/rooms/:room/mcp` endpoint, bearer signing by the room, role toolsets | Replaced. They name things that no longer exist. The generic `acts` and `act` route of the plan's section 4 is the whole surface. Role-dependent lists survive as the `hidden` count and the per-act "your role holds / does not hold" sentence. |
+| Context budget, measured in CI | Replaced, by Hugh's direction of 2026-10-12: the list is as long as the acts the room holds and the role may sign, measured per role and reported, with gates on each description and on the whole list in bytes (section 9). The fixed 3,000-token gate of the plan is retired. |
+| Fourteen named code-review tools, lanes and leases, the `/v1/rooms/:room/mcp` endpoint, bearer signing by the room, role toolsets | Replaced. They name things that no longer exist. The act tools are generated from the definitions the room holds (section 3). Role toolsets survive as role filtering of that list and an optional selection by definition name. The generic `acts` and `act` route of the plan's section 4 is kept as the fallback. |
 | Application packs in `.artroom/mcp/` (item 6) | Replaced. Under the scope model the definition is the pack: an application's acts, fields and guards are data the scope retains, and the server reads them. What a pack would add is authored text, which section 11 proposes as an optional `doc` member of the definition. |
 | Application servers composed from a library (L4) | Owed, later. The server package exports its derivation and transports so an application can embed them; no application needs to. |
 | New reads `room`, `diff`, `file`, `policy` (item 5); reviewer without a checkout | `room` and `policy` are here (`room`, `scope` of the rules scope). `diff` and `file` at a pinned commit are owed to stage 2: the site route serves HEAD only, and pinned reads need the destination's Git read capability. |
@@ -96,31 +100,35 @@ sequences of reads, intents and Git (`packages/cli/src/commands.ts`,
 same functions (`packages/page/src/data.ts` imports `heldActs`, `describe`,
 `expectedOf` and `valueOf` from the CLI package).
 
-So a server that offers founding, reads, the derived list of acts a caller
-may sign, one signing submit that carries every native beside input, and the
-helpers every composition needs (wait for a created scope, settle a lost
-reply, read a text, fetch a credential once) is complete for every
-application, present and future, without naming any act. Section 10's
-inventory (W1) lists every CLI command and page action against the tools
-that perform it, so completeness is checked, not asserted.
+So a server that offers founding, reads, one signing tool for each act a
+definition in the room declares, generated from the declaration and
+carrying every native beside input, and the helpers every composition
+needs (wait for a created scope, settle a lost reply, read a text, fetch a
+credential once) is complete for every application, present and future,
+without a line of code that names an act. Section 10's inventory (W1) lists
+every CLI command and page action against the tools that perform it, so
+completeness is checked, not asserted.
 
 ## 3. The tools
 
-Eleven tools. Names are short; the host namespaces them. Every input and
-output schema has an object root. A refusal is a normal result
-(`isError: false`) with the scope's `Answer` as structured content; a
-failure before or beside the scope's judgment (transport, shape, custody,
-credential) is a tool error (`isError: true`) with a structured
-`{ error, message, next }` (R-API-1 of `docs/protocol.md`, section 21,
-kept).
+The surface has two parts: ten generic tools that read, wait, settle,
+found and fetch a credential, which never change; and one tool per act
+kind of each definition the room holds, generated from the declarations
+and listed for the caller's role, which change when the room changes.
+Names are short; the host namespaces them. Every input and output schema
+has an object root. A refusal is a normal result (`isError: false`) with
+the scope's `Answer` as structured content; a failure before or beside the
+scope's judgment (transport, shape, custody, credential) is a tool error
+(`isError: true`) with a structured `{ error, message, next }` (R-API-1 of
+`docs/protocol.md`, section 21, kept).
+
+### The generic tools
 
 | Tool | Does | Reads | Annotations |
 |---|---|---|---|
 | `room` | Orientation: the service, the repository's scopes with their names (directory, membership, rules, destination, inbox), who I am (handle, role, key ID) or that standing is unknown, the active definitions (name, digest), and the lanes the directory lists with number, kind, title and state, bounded at 50 with a cursor. | membership summary, directory summary, rules summary | read-only |
 | `scope` | One scope: its definition name and digest, status, head, counts by item type and state, and its live items, bounded; with `declaration: true` the retained definition's bytes, paged by `offset` and `limit` (section 9). | summary; retained for the declaration | read-only |
-| `acts` | The acts I may sign on a scope now, each with its sentence, its fields as a JSON Schema, its presented facts, its guards as sentences with their refusal names, and what it opens or moves; the act's full declaration as JSON beside the prose. States how many acts my role cannot sign, and lists them by name. For a field that names a definition by digest, lists the active definitions as choices. | summary, definition, membership summary; rules summary when a definition field is present | read-only |
-| `act` | Signs and submits one act: `scope`, `kind`, `on`, `fields`, `idempotencyKey` (required), and the native beside inputs: `texts` (a detached text per detached field, given inline; the server computes the digest into the field), `presented` (fact references by the names the act declares), `values` (bytes for a digest field with a byte domain, given inline; the server computes the digest and checks it against the field, or, for the definition domain, fetches the active definition's bytes from the rules scope when the field holds a digest and no bytes are given). Checks each field against its declared type before signing. Sets `expected` revisions from the summary. Keeps the exact envelope under custody before sending (section 7). Returns the scope's answer; on `accepted`, the fact (scope, seq, hash) and the receipt's duty IDs. Child scopes are read with `wait`. | summary, definition; rules retained when a definition is fetched; one POST | not read-only, destructive, idempotent under the required key |
-| `found` | Founds a scope with no existing target: `definition` (a platform name, or a declared definition's JSON or digest), `kind` (the definition's genesis act), `fields`, `idempotencyKey`, and the beside inputs `texts` and `definitions` (the declarations the definition names in its creates). Same custody as `act`. Returns the founding answer and the new scope's reference. | none before; one POST | not read-only, destructive, idempotent under the required key |
+| `found` | Founds a scope with no existing target: `definition` (a platform name, or a declared definition's JSON or digest), `kind` (the definition's genesis act), `fields`, `idempotencyKey`, and the beside inputs `texts` and `definitions` (the declarations the definition names in its creates). Same custody as an act tool (section 7). Returns the founding answer and the new scope's reference. After an accepted founding the list gains that definition's act tools. | none before; one POST | not read-only, destructive, idempotent under the required key |
 | `items` | A page of a scope's items of one type: live or final, with a cursor. | items | read-only |
 | `history` | A page of a scope's entries, oldest first, each as one line: seq, time, kind, signer, effects and sends counts; `entry` for one in full. | history | read-only |
 | `entry` | One entry in full: its input, fields, effects, sends and hash, paged by bytes when it is large (section 9); a detached text's digest resolves with `text`. | entry | read-only |
@@ -129,42 +137,111 @@ kept).
 | `settle` | Was the intent under `idempotencyKey` accepted? Reads the custody record and asks the scope; resends nothing. Returns the receipt, `not-found`, `refused` with the recorded refusal, or `unknown` when the record exists and the scope has no receipt yet. | settle | read-only |
 | `credential` | The one-time read credential for a `read-token` act the caller signed, from the destination's credential route, with the caller's session. This is the only tool whose output may contain a credential. It returns the credential in one structured field, `credential`, and the remote URL beside it, so a generic local Git helper or the agent's own Git can use it. The server keeps no copy. | credential route | read-only, but its result is secret: the description says so |
 
-**Server instructions**, at most 512 characters: start with `room`; call
-`acts` on a scope before `act` on it; an act's answer is the scope's
-decision, and a refusal that names a guard points at the sentence that
-explains it; after `accepted`, use `wait` to see what the entry created;
-after a lost reply, `settle` with the same `idempotencyKey` instead of
-signing again; `credential` is the only tool that returns a secret, and
-only for a read token you signed; nothing here grants authority; what you
-may sign is what your role holds.
+### The act tools
 
-**Annotations are truthful, not reassuring.** `act` and `found` are
-advertised as not read-only and destructive, because a generic act can
-close, remove or redact declared state. They are advertised as idempotent
-only because the key is required and a repeat under the same key resends
-the same envelope (section 7). Every other tool is read-only.
+**One tool per act kind per definition name.** The tool for the act
+`comment` of the definition named `issue` is `issue.comment`; the tool for
+`invite-member` of `platform:membership@2` is `membership.invite-member`;
+the Counter's `join` is `counting.join`. The name is the definition's
+`name` and the act's kind, joined by a dot; a platform definition uses its
+short name. A room with thirty issue lanes has one `issue.comment`. Two
+definitions with the same name, such as `issue` and its demo profile, share
+their tools; the server checks that the target lane's own definition
+declares the kind, and refuses readably when it does not.
+
+**Parameters.** The act's fields, each with the JSON Schema that section 4
+derives, and only the beside inputs the act declares: `texts` for its
+detached text fields, `presented` for its presented facts, `values` for a
+digest field with a byte domain. `idempotencyKey` is required (section 7).
+`on` is required for a transition, as the item's local ID. A target
+parameter names the scope when the definition can have several scopes in
+the room: for a lane definition, `issue` or `change` takes the number the
+directory assigned or the lane's scope ID; for any other declared
+definition, `scope` takes the scope ID. A platform definition that is a
+singleton in the room (directory, membership, rules, destination, inbox)
+has no target parameter. The server resolves a number to a lane through
+the directory's items, reads the target's summary for `expected`
+revisions, checks each field against its declared type, keeps the exact
+envelope under custody, and submits. The result is the scope's answer; on
+`accepted`, the fact (scope, seq, hash) and the receipt's duty IDs. Child
+scopes are read with `wait`.
+
+**Description.** The sentence, fields, presented facts and guards that
+section 4 derives, so the agent reads what the act does and what would
+refuse it before choosing, and the host validates the input from the
+schema. The act's full declaration is not in the description; `scope` with
+`declaration: true` returns it when an agent needs the exact form.
+
+**What is listed.** For the caller's current standing, read at each
+`tools/list`: every act of every platform definition in the room that the
+role holds, or that a rule decides; every act of every definition the
+rules scope holds active; and every act of the definition of each existing
+lane, where that definition is no longer active, so that old lanes stay
+workable. Acts the role does not hold are not listed; the generic `acts`
+fallback names them with their actions, and a hidden act called anyway is
+judged by the scope, since hiding is never authorization. The genesis act
+of a definition is never a tool; `found` is. An agent that wants fewer
+tools passes `--tools <definition names>` at launch and sees only those
+definitions' acts beside the generic tools.
+
+**When the list changes.** The server declares `listChanged` on its tools
+capability. It re-derives the list when a read it makes for any call shows
+a change in the inputs that the list depends on: the caller's role, the
+roster's actions for that role, the rules scope's active definitions, the
+set of definitions that lanes in the directory run under, or a scope the
+caller founded. It then sends `notifications/tools/list_changed`, and the
+host re-fetches. The list depends on authorization and on what the room
+holds, never on the history of the connection; two connections of the same
+key to the same room at the same moment list the same tools. Changes are
+rare in practice (a role change, an activation, a new kind of lane), which
+is why a per-connection notification is cheap. The server keeps the last
+derived list in memory only to know whether it changed.
+
+**Counts, from the definitions in the repository.** An admin in the demo
+room: about 25 platform acts, 12 of the demo issue profile, 19 of the demo
+change profile, and the 10 generic tools, about 66 tools. With the full
+lane definitions, about 140. A member sees fewer. These are estimates from
+counting declarations; the delivery measures the real lists (section 9).
+
+**The generic fallback.** `acts` and `act`, as Draft 2 described them, stay
+in the server behind the launch flag `--generic`: `acts` lists the acts of
+one scope with the same derived text, including the acts the role does not
+hold, and `act` signs one by kind. They are for a host with a tool-count
+limit, and for a scope under a definition the list does not show. They are
+not listed by default, so an agent never sees two ways to do one thing.
+
+**Server instructions**, at most 512 characters: start with `room`; each
+act tool's description says what it does, who may sign it and what would
+refuse it; an answer is the scope's decision, and a refusal that names a
+guard points at the sentence that explains it; after `accepted`, use `wait`
+to see what the entry created; after a lost reply, `settle` with the same
+`idempotencyKey` instead of signing again; `credential` is the only tool
+that returns a secret, and only for a read token you signed; nothing here
+grants authority; what you may sign is what your role holds, and the list
+changes when that changes.
+
+**Annotations are truthful, not reassuring.** Every act tool and `found`
+are advertised as not read-only and destructive, because an act can close,
+remove or redact declared state. They are advertised as idempotent only
+because the key is required and a repeat under the same key resends the
+same envelope (section 7). Every generic read is read-only.
 `credential`'s description says its result is a secret.
 
-**Not in the list, on purpose.** No per-act tools. One tool per act gives
-the best per-tool description but puts every act of every scope of the room
-into `tools/list` on every call (a room with the full change definition has
-54 acts on each change lane), and it cannot be stable for a stateless hosted
-server. `acts` gives the same descriptions and schemas, for one scope, when
-the agent is about to act there, and the agent pays for only those (section
-9). A host that prefers code mode can generate code from `acts` output.
-
-No `verify`, no `clone`, no `propose` as tools. `verify` is a verifier over
-reads that an agent runs as a command. `clone` and `propose` are Git work
-that the agent does with Git, after `act` of the destination's `read-token`
-and `credential`. Section 10's inventory names each step.
+**Not in the list, on purpose.** No `verify`, no `clone`, no `propose` as
+tools. `verify` is a verifier over reads that an agent runs as a command.
+`clone` and `propose` are Git work that the agent does with Git, after
+`destination.read-token` and `credential`. Section 10's inventory names
+each step.
 
 ## 4. Readable descriptions, derived from the whole declaration
 
 A definition has no description text (`docs/cli.md`, "An act definition has
 no description text"). The command line's one-line `describe` is made from
 the act's step, item and grant. The MCP server derives more, from the same
-declaration, in sentences an agent can act on, and attaches the declaration
-itself so nothing is lost in prose. The derivation is a total function over
+declaration, in sentences an agent can act on. The derived text is each act
+tool's description and its fields are the tool's input schema; the same
+derivation serves the generic `acts` fallback, and the full declaration is
+reachable through `scope` so nothing is lost in prose. The derivation is a total function over
 the contract's forms (`packages/contract/src/definition.ts`): every guard,
 operand, part and field type has a rendering, and an unknown form, which
 the validator would have refused, renders as its JSON. It is the same for
@@ -232,26 +309,29 @@ it.
 | platform mark (`code`) | the platform's own one-line text for that mark, from a table in the server keyed by `platform:<name>@<version>` and the mark's code; the table is part of the platform's documentation, not of any application. A mark with no text renders as `the platform rule <code> (row <row>) holds`. |
 
 A `where` clause renders as its guard. Sentences are never cut: a long
-guard renders whole, and the act's declaration is attached as JSON beside
-the prose in every `acts` result, so an agent that needs the exact form has
-it (section 9 bounds the result by paging, not by dropping).
+guard renders whole. A description that would pass 1,000 characters ends
+its guard list with `and <n> more guards; read the declaration with scope`,
+and names the guards it left out by their reason names, so a refusal still
+points at a name (section 9 bounds the list by paging where a host
+supports it, not by dropping acts).
 
-**Worked examples.** The delivery renders these in `docs/mcp.md` exactly as
-the server produces them, and snapshot-tests them. The first three are
+**Worked examples.** These are tool descriptions as `tools/list` sends them.
+The delivery renders them in `docs/mcp.md` exactly as the server produces
+them, and snapshot-tests them. The first three are
 written here by the rules above; the Counter's `join` is written here from
 its declaration, and its `spoken` is given to show the limit of derivation.
 
-- `comment` of `issue-demo`: `comment: opens a comment; needs issue.comment,
+- `issue.comment` under `issue-demo`: `comment: opens a comment; needs issue.comment,
   which your role (member) holds. Fields: body (required): text up to 65536
   bytes, kept apart from the entry; give it in texts. mentions: list of up
   to 16 members as @handle. replyTo: the ID of a comment item on this
   scope. No guards.`
-- `take-hold` of the derive fixture: `take-hold: opens a hold; needs hold,
+- `lane.take-hold` of the derive fixture: `take-hold: opens a hold; needs hold,
   which your role (member) holds. Fields: commitment (required): the ID of
   a commitment item on this scope. Guards: the commitment is accepted; you
   are the commitment's performer; no hold is held where the hold's under
   equals the act's commitment.`
-- `open-issue` of `platform:directory@2`: `open-issue: opens a lane; needs
+- `directory.open-issue` of `platform:directory@2`: `open-issue: opens a lane; needs
   issue.open, which your role (admin) holds. Fields: definition (required):
   the digest of a value in the definition domain, up to 262144 bytes;
   choices from the rules scope: issue sha256:82a9…. title (required): text
@@ -259,11 +339,11 @@ its declaration, and its `spoken` is given to show the limit of derivation.
   give it in texts. conditions (required): list of up to 16 texts up to
   4096 bytes. Guards: the definition is active in the rules scope
   (not-activated).`
-- `join` of `counting`: `join: opens a participant; needs counting.join,
+- `counting.join`: `join: opens a participant; needs counting.join,
   which your role holds. Fields: none. Guards: between 0 and 7
   participants are joined; no participant is joined where the
   participant's agent equals you.`
-- `spoken` of `counting` renders its `rule` guard as `the rule spoken-plan
+- `counting.spoken` renders its `rule` guard as `the rule spoken-plan
   holds:` followed by the JSONata expression verbatim. That is exact and
   complete, and it is not easy reading. It is the honest limit of
   derivation for rule guards, and the reason section 11 proposes the
@@ -299,7 +379,8 @@ attributed to the server in the sentence.
 | `refused` `guard-failed` with name | `<scope> refused <kind>: <the guard sentence keyed by name> does not hold (<name>), judged at head <seq>.` | Read the subject with `scope` or `items`; change the field or the state the sentence names; sign again with a new key. |
 | `refused` `guard-failed` without name | `<scope> refused <kind>: one of its guards does not hold, judged at head <seq>; the scope does not say which. The act's guards are: <all guard sentences>.` | Read the subjects the sentences name and compare; sign again with a new key. |
 | `refused` `unauthorized` | `<scope> refused <kind>: your key holds no current grant for <action>.` | `room` to see your role; ask an admin. |
-| `refused` `unknown-act`, `bad-field`, `no-item`, `required-unset` | `<scope> refused <kind>: <reason as the contract defines it>. The scope does not name the field or item. The act declares: <fields and subjects>.` | `acts` on this scope; correct the fields; sign again. |
+| `refused` `unknown-act`, `bad-field`, `no-item`, `required-unset` | `<scope> refused <kind>: <reason as the contract defines it>. The scope does not name the field or item. The act declares: <fields and subjects>.` | Read the tool's description again; correct the fields; sign again. |
+| the target's definition does not declare the kind (a lane under another definition) | `before signing, the server found that <scope> runs <definition>, which has no act <kind>. Nothing was sent.` | `room` to see the lane's kind; use the tool of that definition. |
 | `refused` `revision-moved` | `<scope> refused <kind>: an item this act names changed after it was read, judged at head <seq>.` | Read again, sign again with a new key. |
 | `refused` `expired`, `scope-full`, `final`, `slot-full`, `type-full`, `entry-too-large`, `fact-mismatch`, `capability-refused` and the rest of `RefusalReason` | one sentence each from a table in the server, naming the bound or the name the answer carries | stated per reason |
 | `unavailable` any reason | `<scope> did not judge <kind> (<reason>). Nothing is known to have been accepted; timed entries may have been written.` | `settle` with the same `idempotencyKey`; do not sign again first. |
@@ -328,7 +409,9 @@ platform's six definitions are part of every room, not an application.
 
 The claim is stronger than an import rule. The server's inputs are the
 contract's forms, all of them (section 4), and its only knowledge of an
-application is what the scope retains. So the witness for (c) is an
+application is what the scope retains; the act tools are generated from
+those forms, so a definition the server has never seen gets its tools the
+moment the room holds it. So the witness for (c) is an
 application the server has never seen: W2 founds a scope under a definition
 written inside the test (three acts, two item types, a `distinct` guard, a
 presented fact and a detached text), lists its acts, signs them, and reads
@@ -383,12 +466,14 @@ That custody is a change to the Worker and its secrets and is not built in
 the cloud session. The server module is the same; only the signer, the
 reader and the custody store differ.
 
-**Stateless.** No state between calls except the process's in-memory
-session token and the custody store below. A call rebuilds what it needs
-from the configuration and reads. Cursors, item IDs, scope IDs and
+**Stateless, except what the transport needs.** No state between calls
+except the process's in-memory session token, the last derived tool list
+(kept only to know whether to send `list_changed`), and the custody store
+below. Neither the token nor the list is authority: a call rebuilds what it
+needs from the configuration and reads. Cursors, item IDs, scope IDs and
 idempotency keys are the handles.
 
-**Custody: the required key and what it binds.** `act` and `found` require
+**Custody: the required key and what it binds.** Every act tool and `found` require
 `idempotencyKey` from the caller, any unique string the caller will
 remember, and refuse without one. The server generates none, because a key
 the caller does not know cannot be used to settle after the first MCP reply
@@ -467,8 +552,11 @@ that would exceed its budget is paged, and the page says how to continue.
 |---|---|---|---|
 | `room` | 3 | 4 (one session request) | 8 KiB; lanes paged at 50 |
 | `scope` | 1; 2 with `declaration` | +1 | 8 KiB; the declaration paged at 64 KiB |
-| `acts` | 3; 4 with a definition field | +1 | 64 KiB per page; the full change definition (54 acts) fits in two pages, the demo profile in one |
-| `act` / `found` | 2 reads and 1 POST; 3 reads when a definition is fetched | +1 | 4 KiB |
+| `tools/list` | 3 (membership, directory, rules summaries) plus one retained read per distinct definition digest not yet read in this process | +1 | the whole list; see section 9 |
+| an act tool on a singleton platform scope | 1 read and 1 POST; 2 reads when a definition value is fetched from the rules scope | +1 | 4 KiB |
+| an act tool on a lane or a declared scope | 2 reads (the directory's items to resolve a number, the target's summary) and 1 POST | +1 | 4 KiB |
+| `found` | 0 reads and 1 POST | +1 | 4 KiB |
+| `acts` (fallback) | 3; 4 with a definition field | +1 | 64 KiB per page |
 | `items`, `history` | 1 | +1 | 64 KiB per page |
 | `entry`, `text` | 1 | +1 | 64 KiB per page; an entry up to 256 KiB and a retained input up to 1 MiB are paged by `offset` and `limit` |
 | `wait` | 1 per poll for a head or a state; 2 plus one per child for created scopes | +1 | 4 KiB |
@@ -483,30 +571,33 @@ note reports the counts for the stories as observed figures.
 
 | What | Budget | How measured |
 |---|---|---|
-| `tools/list` as sent, all eleven tools with schemas | 3,000 tokens, the plan's gate, by a pinned token counter named in the note; and 8 KiB of UTF-8 JSON as a second gate; each description at most 1,000 characters; instructions at most 512 | the canonical JSON the server sends |
+| Each tool as sent | description at most 1,000 characters; schema at most 4 KiB; instructions at most 512 characters | the canonical JSON the server sends |
+| `tools/list` as sent, per role | measured and reported, not gated by a fixed number: the bytes and the token count (by a pinned counter named in the note) for an admin, a maintainer, a member and an agent in the demo room, and for an admin with the full lane definitions; the whole list at most 256 KiB | the canonical JSON the server sends, for each role in W2's room |
+| List changes | one `list_changed` per real change of role, roster actions, active definitions or lane definitions, and none otherwise | counted by the test's client over the W2 story |
 | Each tool result | the response bound of section 8, with paging | bytes of the whole response |
 | Canonical activities | open an issue and learn its number: `acts`, `act`, `wait` (3 calls); comment on it: `act` (1 call, after `acts` once per scope); read an issue with its comments: `scope`, `text` per comment; clone: `act` `read-token`, `wait`, `credential`, then Git (3 calls) | counted from the story tests; reported as a sum of steps |
 | `wait` | polls at 1 second, at most 60 seconds | the test's gate and clock, no sleeps |
 
-`acts` costs what it costs because it is the one place that carries
-descriptions and declarations. An agent calls it once per scope it works
-on, not once per act. The sentences are derived at call time from the
-definition the scope retains, which the server reads once per call; a
-definition's bytes never change for a digest, so a hosted server may cache
-them by digest.
+The list costs what it costs because it is the one place that carries
+descriptions, and a host fetches it once and again only after a change,
+which is rare: a role change, an activation, a new kind of lane. The
+sentences are derived from the definitions the room retains, which the
+server reads once per distinct digest per process; a definition's bytes
+never change for a digest, so a hosted server may cache them by digest.
+`--tools <definition names>` shortens the list for an agent with one job.
 
 ## 10. What proves each claim
 
 | Claim | Witness | Where |
 |---|---|---|
 | (a) complete | **W1 inventory.** `docs/mcp.md` lists every command of `docs/cli.md` and every page action of `docs/page.md` with the tool calls that perform it, including `install` and `claim` through `found` and `act`, `issue open` with its definition value, `edit` and `propose` with their detached texts and presented facts, and `clone` with `credential`. A test asserts that rendering is total over every act of every definition in the repository (the six platform definitions, `issue`, `change`, `issue-demo`, `change-demo`, `counting` and the unfamiliar test definition), over every guard form and operand of the contract, and that every act that declares `presents` or a byte domain is exercised with that input somewhere in W2. | `packages/mcp/test/inventory.test.ts`; `docs/mcp.md` |
-| (a) driven by available acts | **W2 story, room.** Against the real test Worker: `found` the register and the room, publish rules, activate the demo definitions, `set-role` a member, open an issue with its definition value and body text, comment, assign, close, open a change by `propose-file` with its presented facts, review, merge; all through the tools over an in-process client. `acts` before each `act`, and the test asserts that every kind it signs was listed, and that `acts` and `room` change after the role and activation changes. | `packages/mcp/test/room.scope.test.ts` |
+| (a) driven by available acts | **W2 story, room.** Against the real test Worker: `found` the register and the room, publish rules, activate the demo definitions, `set-role` a member, open an issue with its definition value and body text, comment, assign, close, open a change by `propose-file` with its presented facts, review, merge; all through the act tools over an in-process client. The test fetches `tools/list` before each step and asserts that every tool it calls was listed for the caller's role at that moment, that a `list_changed` notification arrived after the activation, the role change and the first lane of a new kind, and that none arrived otherwise. | `packages/mcp/test/room.scope.test.ts` |
 | (c) one service | **W2 story, unfamiliar.** A definition written in the test (three acts, two item types, a `distinct` guard, a presented fact, a detached text) is founded and driven through the same server. **W2 story, Counter.** A Counter scope under its cohort: `join`, `start`, `spoken`, `leave`. No counting import in the server; the import boundary test refuses one. | `packages/mcp/test/unfamiliar.scope.test.ts`; `counter.scope.test.ts`; `scripts/active-source.test.mjs` |
-| (b) descriptions | **W3.** The five worked examples of section 4 are snapshot tests whose expected text is in `docs/mcp.md`, so the checker reads what an agent reads. A test renders every guard form and operand of the contract once and asserts no form falls through to raw JSON. | `packages/mcp/test/describe.test.ts` |
+| (b) descriptions | **W3.** The five worked examples of section 4 are snapshot tests of the tool descriptions as `tools/list` sends them, with the expected text in `docs/mcp.md`, so the checker reads what an agent reads. A test renders every guard form and operand of the contract once and asserts no form falls through to raw JSON, and that a description over 1,000 characters names what it left out. | `packages/mcp/test/describe.test.ts` |
 | (b) errors | **W4.** Table-driven over every reason of `RefusalReason`, `UnavailableReason`, `MismatchReason` and `ReadRefusal`, plus shape, transport, custody and credential errors: the sentence names the scope, the kind, the head when the answer carries one, the source of the finding, and a next step. Two cases use a definition with two unnamed guards and assert the sentence attributes neither. One case moves an item's state after the judgment and asserts the sentence reports the judged head, not the new state. One story drives a session token, a key, an invitation secret and a read credential through every tool and asserts the credential appears only in `credential`'s structured field and the others nowhere. | `packages/mcp/test/errors.test.ts` |
-| (d) efficient | **W5.** The budget tests of section 9 and the read counts of section 8 over the instrumented transport, cold and warm, with an expired and a refused session, created children, pagination of a 54-act definition and of a large retained input, and standing and activation refresh. The delivery note reports the observed figures. | `packages/mcp/test/budget.test.ts` |
+| (d) efficient | **W5.** The budget tests of section 9 and the read counts of section 8 over the instrumented transport, cold and warm, with an expired and a refused session, created children, pagination of a large retained input, the list for each role with the demo and the full lane definitions, the count of `list_changed` notifications over the story, and standing and activation refresh. The delivery note reports the observed figures. | `packages/mcp/test/budget.test.ts` |
 | retries | **W6.** First MCP reply lost (the client never sees the result) and `settle` with the caller's key finds the receipt; two processes preparing the same identity at once, one locked out; the same key with a different meaning refused without sending; a restart between prepare and send resends the same bytes; a full store refuses a new preparation and names the unresolved keys; archive rotation keeps a resolved record findable for replay. | `packages/mcp/test/custody.test.ts` |
-| transports | **W7.** A real MCP client over stdio and over loopback HTTP lists tools and calls `room`; the HTTP server refuses a request with an `Origin` header, a request without the per-launch bearer, and a bind address that is not loopback. | `packages/mcp/test/wire.test.ts` |
+| transports | **W7.** A real MCP client over stdio and over loopback HTTP lists tools, calls `room` and an act tool, and receives a `list_changed` notification after an activation; the HTTP server refuses a request with an `Origin` header, a request without the per-launch bearer, and a bind address that is not loopback; `--generic` lists `acts` and `act` and the default does not. | `packages/mcp/test/wire.test.ts` |
 
 Each test states its invariant in one sentence first (`docs/testing.md`).
 The scope tests use the test Worker pool of `packages/scope`, as the CLI's
@@ -540,6 +631,7 @@ the planner's scratchpad (`cloud-mcp-prompt.txt`). It delivers:
 - `packages/mcp`: the server, the derivation, the custody store, the two
   transports with the loopback guards; `artroom mcp` in the CLI;
 - the nine test files of section 10;
+- the `--tools` and `--generic` launch flags;
 - `docs/mcp.md`: how to connect an agent host, the tool reference as sent,
   the five worked examples, the W1 inventory, the budgets and the observed
   figures;
@@ -556,9 +648,14 @@ says so if it recurs.
 
 ## 13. Decisions recorded here
 
-1. Generic tools only; no per-act tools (section 3).
-2. Descriptions derived from the whole declaration, with the declaration
-   attached; authored `doc` text is a later, optional amendment (sections 4
+1. A dynamic tool list: one tool per act kind of each definition the room
+   holds, listed for the caller's role, with `list_changed` on a real
+   change; ten generic tools beside them; the generic `acts` and `act`
+   pair kept as a fallback behind `--generic` (section 3). Hugh's
+   direction, 2026-10-12 14:37 Eastern.
+2. Descriptions derived from the whole declaration into each tool's
+   description and schema, with the declaration reachable through
+   `scope`; authored `doc` text is a later, optional amendment (sections 4
    and 11).
 3. The server signs with the agent's own key beside the agent, behind an
    origin check and a per-launch bearer on loopback HTTP; the hosted
@@ -570,8 +667,9 @@ says so if it recurs.
    carries it (section 7).
 6. The server renders only what the judge returned; unattributed fallbacks
    say so (section 5).
-7. The token gate of the plan stays; a byte gate is added; nothing is
-   dropped to meet either (section 9).
+7. The plan's fixed token gate is replaced by a measured, reported list
+   size per role with gates on each tool and on the whole list; nothing is
+   dropped to meet them (section 9).
 8. Packs and the application-server topology of the plan are replaced as
    section 1 states; Hugh's adoption of this note confirms the replacement.
 
@@ -594,7 +692,22 @@ its optional `doc`.
 | 7. Truthful annotations and the loopback boundary | Section 3's annotations; section 7's origin rejection, per-launch bearer and loopback bind; W7. |
 | 8. The retained, replaced and outstanding matrix | Section 1's table, including packs, application servers, the four reads, OAuth's steps, resources and prompts, Tasks and Apps, acceptance outcomes, and the token gate kept beside the byte gate; "ten" corrected to the current count throughout. |
 
-## 15. Sources read for this note
+## 15. Draft 3 after Draft 2
+
+Hugh, 2026-10-12 14:31 and 14:37 Eastern, asked how a generic surface finds
+and invokes acts, said the indirection concerned him, and asked whether a
+dynamic tool list that reflects the acts in the connection is viable; on
+the planner's answer (viable, one tool per act kind per definition name,
+role filtered, changing rarely, with the generic pair as a fallback) he
+decided for it and noted that the rare list changes make the cost to a
+host's cache acceptable. Draft 3 rewrites section 3, adjusts sections 1, 2,
+4, 5, 6, 7, 8, 9, 10 and 13, and keeps everything Draft 2 answered for
+review `ca8a00f6`: the corrections about founding, beside inputs, the
+credential channel, judge-only diagnostics, custody, total rendering,
+end-to-end bounds, the loopback boundary and the retained matrix apply to
+the act tools exactly as they applied to `act`.
+
+## 16. Sources read for this note
 
 `notes/2026-10-01-mcp-plan.md` (sections 1, 4, 5, 6, 10, 11, 12, 13, 14);
 `plans/009-2026-10-03-mcp-clarification.md`; decision `775acdd3`; review
