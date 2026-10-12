@@ -8,7 +8,7 @@ test("Main mounts a new corrected-proposal control for verified invalid-path tex
   const done = new Promise<void>(resolve => { rendered = resolve; });
   class Element {
     attrs: Record<string,string> = {}; children:(Element|string)[]=[]; handlers=new Map<string,()=>void>();
-    constructor(readonly tag:string){} setAttribute(n:string,v:string){this.attrs[n]=v;} hasAttribute(n:string){return Object.hasOwn(this.attrs,n);}
+    constructor(readonly tag:string){} setAttribute(n:string,v:string){this.attrs[n]=v;} getAttribute(n:string){return this.attrs[n]??null;} removeAttribute(n:string){delete this.attrs[n];} hasAttribute(n:string){return Object.hasOwn(this.attrs,n);}
     append(...c:(Element|string)[]){this.children.push(...c);} prepend(...c:(Element|string)[]){this.children.unshift(...c);} replaceChildren(...c:(Element|string)[]){this.children=c;if(this===root)rendered();}
     addEventListener(n:string,f:()=>void){this.handlers.set(n,f);} focus(){}
     all():Element[]{return[this,...this.children.flatMap(c=>typeof c==='string'?[]:c.all())];}

@@ -31,7 +31,23 @@ fidelity ledger is `d6d24594`. Browser DOM, storage, locks, cryptography and
 Page/SDK code are real; service replies are scripted. Native enrollment and
 hosted acceptance are not established by these checks.
 
-Gate: UNRUN. Isolated-host screenshots/deployment, checker full review, landing
+The gate ran once at `45e46dbb55aa6c4f18c69eebe0c8d880bf395133`,
+tree `1b0cdd9210d236f13c0cdd64972f335f0f04c437`, and failed in test-fixture
+type checking before tests. Two fixture typing corrections passed their
+owning compiler. Four originally unrun compiler checks passed. The unrun
+Vitest phase then passed 1,033 tests with two existing skips and three
+fixture failures. Each failed case passed alone after realistic verified
+room/render fixtures and DOM methods were supplied; production guards
+were unchanged. The updated fixture compiler and originally unrun Node
+suites passed (eight tooling tests, 47 Counter browser tests). Original
+failures, including a wrong-directory fixture-edit attempt, remain retained.
+No whole Vitest suite or gate was repeated.
+
+Public gate and bounded-completion proofs are in `page-join-gate-one/`;
+completion SHA256 `045653b62790aede67c637e285238fa78fa1930dd3f02e3d08ad227698d3ac50`. After browser code head `5f54`,
+only documentation and test fixtures changed.
+
+Isolated-host screenshots/deployment, checker full review, landing
 and production redeployment remain owed. Full title request `936` stays open.
 The Start-a-room amendment `010` is blocked on the service capability and a
 separate child request; this existing-room delivery does not close it.
