@@ -419,7 +419,7 @@ async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed
   };
   const [winnerProposal, staleProposal, newProposal] = await Promise.all([proposals(controlled), proposals(stale), proposals(replacement)]);
   const fields = (entry: typeof winnerProposal[number]) => entry.input.type === "act" ? entry.input.signed.intent.fields : {};
-  expect(fields(staleProposal[0]!).base).toBe(fields(winnerProposal[0]!).base);
+  expect(fields(staleProposal[0]!)["base"]).toBe(fields(winnerProposal[0]!)["base"]);
   const beforeWinner = rehearsal.shots.find(shot => shot.title === "Merge: it publishes")!.lines;
   const loserAdmission = beforeWinner.findIndex(line => line.includes(`entry ${stale.scope}:`) && line.includes(`:${staleProposal[0]!.seq},`));
   const winnerPublication = beforeWinner.findIndex(line => line.startsWith("Published:"));
@@ -427,8 +427,8 @@ async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed
   expect(winnerPublication).toBeGreaterThan(loserAdmission);
   expect(beforeWinner.slice(loserAdmission + 1, winnerPublication)).toContain(`$ artroom merge ${controlled.scope}`);
 
-  expect(fields(newProposal[0]!).base).toBe(pushed.at(-2));
-  expect(fields(newProposal[0]!).base).not.toBe(fields(staleProposal[0]!).base);
+  expect(fields(newProposal[0]!)["base"]).toBe(pushed.at(-2));
+  expect(fields(newProposal[0]!)["base"]).not.toBe(fields(staleProposal[0]!)["base"]);
   expect(newProposal[0]!.input.type === "act" && staleProposal[0]!.input.type === "act" && newProposal[0]!.input.signed.intent.actor === staleProposal[0]!.input.signed.intent.actor).toBe(true);
   expect(stale.scope).not.toBe(replacement.scope);
   const [oldState, newState] = await Promise.all([stale.items("merge"), replacement.items("merge")]);
