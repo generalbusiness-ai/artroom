@@ -181,10 +181,9 @@ export class Wire {
           },
         };
         this.listens.set(key, listen);
-        // The acknowledgement names the types the server will send: only tool list changes.
-        send({ jsonrpc: "2.0", method: "notifications/subscriptions/acknowledged", params: { _meta: { [SUBSCRIPTION_META]: id }, notifications: tools ? { toolsListChanged: true } : {} } });
         if (tools) {
-          // The baseline is the list as it is now; only a later change is told.
+          // The baseline is the list as it is now; only a later change is told. The watch runs before the acknowledgement, so no
+          // change between the two is lost.
           try { listen.told = (await this.service.snapshot()).generation; } catch { listen.told = null; }
           listen.unsubscribe = this.service.subscribe((generation) => {
             if (ended || listen.told === generation) return;
@@ -192,6 +191,8 @@ export class Wire {
             send({ jsonrpc: "2.0", method: "notifications/tools/list_changed", params: { _meta: { [SUBSCRIPTION_META]: id } } });
           });
         }
+        // The acknowledgement names the types the server will send: only tool list changes.
+        send({ jsonrpc: "2.0", method: "notifications/subscriptions/acknowledged", params: { _meta: { [SUBSCRIPTION_META]: id }, notifications: tools ? { toolsListChanged: true } : {} } });
         return null;
       }
       default: return error(id, -32601, `Method not found: ${m.method}`);
