@@ -34,7 +34,20 @@ to distinguish the refusal duration from the whole shot duration.
 These runs use real native scopes, with Git hosting, local Git, and the
 scheduler as labelled stand-ins. Both used the exact Page asset composition
 and restored the original bytes afterward. They do not prove a hosted run.
-The composed head has not yet run its gate.
+The original gate at `932b1a01` skipped installation and passed whitespace,
+then failed typecheck on five index-signature accesses in the native witness.
+Its test phase did not run. That original failed result remains unchanged:
+`stale-composed-gate-one/public-result.json`, SHA256
+`534676eef808e46d7330537161f47d64874e38cfc42f82977fb339cc9d9219b9`.
+
+Commit `dbf88cfb` changed only those five accesses to bracket notation.
+One full compiler run then passed. The previously unrun test phase passed:
+1,028 Vitest cases, with two skips, followed by eight repository Node checks
+and 39 browser Node checks. No focused cases or gate were repeated.
+Completion evidence: `stale-composed-gate-completion-one/public-result.json`,
+SHA256 `b7fa1b91059171dd614088746e135ccaef0d9c7c653ce32f8b18c9087b9c6687`.
+This completes the failed and unrun phases. It does not make the original
+gate green.
 
 The earlier control changed only the stale proposal's base to the fresh
 head and failed by assertion. That proof predates the chronology correction
@@ -50,7 +63,8 @@ Local evidence remains outside the repository:
 
 ## Remaining work
 
-One gate on the composed candidate, full review, and an isolated hosted
-rehearsal remain owed. Actual counts and elapsed time must come from that
+Checker review, explicit acceptance of the original failed gate with its
+phase completion, and an isolated hosted rehearsal remain owed. Actual
+counts and elapsed time must come from that
 recorded run. The full same-lane manifest successor remains separate work
 under Plan 029 and is not satisfied by this fresh-lane freeze route.
