@@ -468,19 +468,22 @@ source/tests-unchanged statement. It does not repeat the full gate for
 documents alone. Any further source repair keeps its relevant checks.
 
 [031: One MCP service for every dap application](031-2026-10-12-generic-mcp-service.md)
-is Draft 3, dated 2026-10-12, under Hugh's direction of that day. The
-tool list is dynamic: one tool per act kind of each definition the room
-holds, generated from the declarations, listed for the caller's role and
-changed by notification when the role, the active definitions or the
-lanes' definitions change; ten generic tools for founding, reads, waiting,
-settling and the read credential stand beside them; the generic `acts` and
-`act` pair stays as a fallback behind a flag. The note states what proves
-each of Hugh's four claims (complete, readable, one service for every
-application, efficient), maps every adopted decision of `775acdd3` to what
-it becomes under the scope model, answers the eight corrections of review
-`ca8a00f6`, and records Hugh's decision for the dynamic list. It is to be
-built in a cloud session on a branch with checker review of the head.
-Status: DRAFT 3, filed for checker review.
+is Draft 4, dated 2026-10-12, under Hugh's direction of that day. The
+tool list is dynamic: one tool per act declaration of each definition the
+room holds, bound to exact definition digests with variants where same-name
+definitions differ, generated from the declarations, listed for the
+caller's role on each membership, and told to subscribed clients when the
+role, the active definitions, the lanes' definitions or the configured
+roots change; thirteen generic tools for founding, reads, capability
+preparation, waiting, settling and the read credential stand beside them;
+the generic `acts` and `act` pair is a launch mode for hosts with a
+tool-count limit. Both MCP wire revisions are served by their own rules.
+The note states what proves each of Hugh's four claims (complete,
+readable, one service for every application, efficient), maps every
+adopted decision of `775acdd3` to what it becomes under the scope model,
+and answers the corrections of reviews `ca8a00f6` and `85c4e1b0`. It is
+to be built in a cloud session on a branch with checker review of the
+head. Status: DRAFT 4, filed for checker review.
 
 ## Other original planning reports
 
