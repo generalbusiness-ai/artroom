@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "source": "plan 030, The words; plan 031, section 3",
+  "nouns": {
+    "platform:register": "room",
+    "platform:directory": "issue",
+    "platform:membership": "room",
+    "platform:rules": "rules",
+    "platform:destination": "repository",
+    "platform:inbox": "inbox"
+  },
+  "acts": {
+    "platform:register": { "found": "room.create" },
+    "platform:directory": {
+      "open-issue": "issue.create",
+      "open-pr": "change.create",
+      "open-task": "task.create",
+      "retry-import": "repository.retry-import",
+      "establish-application": "application.create"
+    },
+    "platform:membership": {
+      "join": "room.join",
+      "enrol": "room.enrol",
+      "seat": "room.seat",
+      "first-key": "room.first-key",
+      "rotate-recovery": "room.rotate-recovery",
+      "invite-member": "member.invite",
+      "add-member": "member.add",
+      "set-role": "member.role",
+      "set-actions": "member.actions",
+      "remove-member": "member.remove",
+      "invite-key": "key.invite",
+      "revoke-key": "key.revoke"
+    },
+    "platform:rules": {
+      "publish": "rules.publish",
+      "activate": "rules.activate",
+      "retire-definition": "rules.retire",
+      "keep-configuration": "rules.keep-configuration"
+    },
+    "platform:destination": { "read-token": "repository.read-token" },
+    "issue": {
+      "accept": "issue.take",
+      "take-hold": "issue.work",
+      "release-hold": "issue.release",
+      "renew-hold": "issue.renew",
+      "report": "issue.hand-in",
+      "accept-report": "issue.accept"
+    },
+    "change": {
+      "accept": "change.take",
+      "take-hold": "change.work",
+      "release-hold": "change.release",
+      "renew-hold": "change.renew",
+      "propose-manifest": "change.propose-version",
+      "request-review-own": "change.request-review",
+      "review-verdict": "change.review"
+    }
+  }
+}

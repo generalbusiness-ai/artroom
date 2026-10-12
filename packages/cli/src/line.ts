@@ -29,6 +29,7 @@ export const USAGE = [
   "  artroom issue assign <issue> <@member>",
   "  artroom issue close <issue>",
   "  artroom issues",
+  "  artroom mcp [--generic | --generic=add] [--tools <definition>,...] [--http 127.0.0.1:<port>] [--scope <scope> --membership <scope>]",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
   "An issue is its number, as artroom issues lists it, or its lane's scope ID.",
 ].join("\n");

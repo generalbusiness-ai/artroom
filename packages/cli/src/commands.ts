@@ -1817,3 +1817,50 @@ async function linking(ctx: Context, config: Config, lane: ScopeId, reader: stri
   if (answer.answer !== "accepted") return answered(lane, answer, "Linked");
   return done(`Linked: when it is published, the change ${lane} closes issue #${issue.number ?? "?"} (${issue.lane}).`);
 }
+
+// ---------------------------------------------------------------- the MCP server's standalone scopes
+
+/**
+ * `artroom mcp --scope <scope> --membership <scope>`: append one standalone scope to the config, for the MCP server to list its
+ * acts. The membership is the scope that standing for it is read from; its incarnation is read from its summary. The scope
+ * itself is not read here: the server reads it when it lists.
+ */
+export function mcpRoot(ctx: Context, scope: string, membership: string | undefined): Promise<Outcome> {
+  return run(async () => {
+    const config = await configOf(ctx);
+    if (!isScopeId(scope)) return usage(`--scope takes a scope ID, not ${scope}.`);
+    let ref: ScopeRef | null = null;
+    if (membership !== undefined) {
+      const named = scopeNamed(config, membership);
+      ref = config.repository?.membership.scope === named ? config.repository.membership : (await summaryOf(await handleOf(ctx, config, named))).scope;
+      if (ref.kind !== "membership") return usage(`${named} is no membership scope.`);
+    }
+    const roots = (config.roots ?? []).filter((root) => root.scope !== scope);
+    await ctx.store.save({ ...config, roots: [...roots, { scope, membership: ref }] });
+    return done(`Standalone scope ${scope}${ref ? `, standing read from ${ref.scope}` : ", standing unknown"}: recorded for the MCP server.`);
+  });
+}
+
+/** The options of `artroom mcp`, read from its command line; a usage outcome when they cannot be read. */
+export interface McpOptions { mode: "default" | "generic" | "add"; tools: string[] | null; http: { host: string; port: number } | null; scope: string | null; membership: string | null }
+export function mcpOptions(argv: readonly string[]): McpOptions | Outcome {
+  const options: McpOptions = { mode: "default", tools: null, http: null, scope: null, membership: null };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    const value = (): string | null => argv[++i] ?? null;
+    if (arg === "--generic") options.mode = "generic";
+    else if (arg === "--generic=add") options.mode = "add";
+    else if (arg === "--tools") { const v = value(); if (!v) return usage("--tools takes definition names, separated by commas."); options.tools = v.split(",").map((t) => t.trim()).filter((t) => t.length > 0); }
+    else if (arg === "--http") {
+      const v = value();
+      const match = v ? /^(.+):(\d{1,5})$/.exec(v) : null;
+      if (!match) return usage("--http takes <loopback address>:<port>, such as 127.0.0.1:8765.");
+      options.http = { host: match[1]!, port: Number(match[2]) };
+    }
+    else if (arg === "--scope") { const v = value(); if (!v) return usage("--scope takes a scope ID."); options.scope = v; }
+    else if (arg === "--membership") { const v = value(); if (!v) return usage("--membership takes a scope."); options.membership = v; }
+    else return usage(`mcp takes no ${arg}.`);
+  }
+  if (options.membership !== null && options.scope === null) return usage("--membership goes with --scope.");
+  return options;
+}
