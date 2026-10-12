@@ -486,6 +486,8 @@ and answers the corrections of reviews `ca8a00f6`, `85c4e1b0` and
 glossary through a words table, with names resolved across the whole
 catalogue. It is to be built in a cloud session on a branch with checker
 review of the head. Status: DRAFT 7, filed for checker review.
+A build head exists on branch `request/mcp-generic`; its delivery note is
+`notes/2026-10-13-mcp-generic-delivery.md`.
 
 ## Other original planning reports
 
