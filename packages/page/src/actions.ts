@@ -96,15 +96,17 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   // Review request choices can grow without changing the selected version.
   // Keep their selection in the draft, rather than in its version identity.
   const defaultFields = defaults?.fields;
-  const draftDefaults = act.kind === "review-verdict" && defaultFields && own(defaultFields, "manifest") !== undefined
+  const requestChoices = own(choicesFor, "request");
+  const taskReview = act.kind === "review-verdict" && act.fields.some(field => field.name === "request" && field.type === "item")
+    && defaultFields !== undefined && own(defaultFields, "manifest") !== undefined && requestChoices !== undefined;
+  const draftDefaults = taskReview && defaultFields
     ? { ...defaults, fields: Object.fromEntries(Object.entries(defaultFields).filter(([name]) => name !== "request")) } : defaults;
   const draftKey = context.draftKey ? JSON.stringify([context.draftKey, act.kind, draftDefaults ?? null]) : null;
   const draft = draftKey ? drafts.get(draftKey) ?? {} : {};
-  const requestChoices = own(choicesFor, "request") ?? act.fields.find(field => field.name === "request")?.choices;
   const originalRequest = own(draft, "request");
   const fixedRequest = own(defaultFields, "request");
-  const correctRequest = act.kind === "review-verdict" && originalRequest !== undefined
-    && (!requestChoices || !requestChoices.some(choice => choice.value === originalRequest) || fixedRequest !== undefined && fixedRequest !== originalRequest);
+  const correctRequest = taskReview && requestChoices !== undefined && originalRequest !== undefined
+    && (!requestChoices.some(choice => choice.value === originalRequest) || fixedRequest !== undefined && fixedRequest !== originalRequest);
   const chooseRequest = "__choose_review_request__";
   const controls: (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[] = [];
   const form = element("form", { "data-act": act.kind });
@@ -153,7 +155,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   if (blocked || act.fields.some((field) => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined)) button.setAttribute("disabled", "");
   if (blocked) for (const control of controls) control.setAttribute("disabled", "");
   form.append(button);
-  if (correctRequest) form.append(element("p", { role: "status" }, "The original review request is no longer offered. Choose a current request to continue; your review text is kept."));
+  if (correctRequest) form.append(element("p", { role: "status" }, "Choose a current review request before continuing; your review text is kept."));
   const read = (): { on: string; typed: Record<string, string> } => {
     let on = "";
     const typed: Record<string, string> = Object.create(null) as Record<string, string>;
@@ -173,7 +175,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     else button.removeAttribute("disabled");
   };
   const draftValues = (on: string, typed: Record<string, string>): Record<string, string> => {
-    const request = act.kind === "review-verdict" ? controls.find(control => control.name === "field:request") : undefined;
+    const request = taskReview ? controls.find(control => control.name === "field:request") : undefined;
     return { ...typed, on, ...(request ? { request: request.value } : {}) }; // Keep explicit voluntary selection, without adding an empty native field.
   };
   const edited = () => {

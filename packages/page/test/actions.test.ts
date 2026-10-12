@@ -171,6 +171,18 @@ test("ordinary declared inherited names remain own fields with their exact text,
   expect(Object.keys(fields)).toEqual(names);
   for (const name of names) expect([Object.hasOwn(fields, name), fields[name]]).toEqual([true, `text for ${name}`]);
   expect(Object.getPrototypeOf(fields)).toBeNull();
+  // A custom declaration may use this kind/name for ordinary text. No task choices are asserted.
+  const custom: Offered = { kind: "review-verdict", step: "open", on: "record", line: "Custom review", fields: [{ name: "manifest", type: "item", required: true }, { name: "request", type: "text", required: true }] };
+  const ordinary = { acts: [custom], hidden: 0 };
+  const customContext = { draftKey: "ordinary-custom-review", defaults: { "review-verdict": { fields: { manifest: "17" } } } };
+  const customSent: unknown[] = [];
+  const show = () => asElement(actsPanel(ordinary, (...args) => customSent.push(args), null, customContext)).all().find(node => node.tag === "form")!;
+  const unsent = show();unsent.all().find(node => node.name === "field:request")!.value = "An ordinary request value";unsent.event("input");
+  const reopened = show(), request = reopened.all().find(node => node.name === "field:request")!;
+  expect(request.tag).toBe("input");expect(request.value).toBe("An ordinary request value");
+  expect(reopened.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  request.value = "An edited ordinary value";reopened.event("input");reopened.event("submit");
+  expect(customSent).toEqual([["review-verdict", "", { manifest: "17", request: "An edited ordinary value" }]]);
 });
 
 test("a final subject can retain its declared action for inspection without offering another merge", () => {
