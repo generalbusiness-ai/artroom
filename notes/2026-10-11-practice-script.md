@@ -27,7 +27,8 @@ Show the page first. Use a terminal only for the steps that require it.
 - **Do:** open `<base-url>/page/`. Confirm the selected room and member.
 - **Appears:** the current room name and its issues. The dap branding on
   the deployed page is **to be confirmed** after the rename and styling.
-- **Say:** “dap is a programmable, general-purpose coordination fabric.”
+- **Say:** “Durable action platform for people and agents”.
+  “Rooms where people and agents act under shared rules. Every action signed, every rule enforced, every record kept.”
   “A Worker, the hosting's own Git service as the repository host, the
   published pages, and the same record running on GitHub.”
 
