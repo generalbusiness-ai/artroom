@@ -44,6 +44,7 @@ test("joined room/account clicks disclose identity without leaving the room, and
   const setItem = vi.fn();
   vi.doMock("../src/data.ts", async () => ({
     ...await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts"),
+    roomInitialization: async () => ({ state: "configured" }), initializationStillCurrent: async () => true,
     openRoom: async () => room, actsOn: async () => ({ acts: [], hidden: 0 }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/HEAD/",
   }));
   vi.stubGlobal("document", { title: "", activeElement: null, getElementById: () => root, createElement: (tag: string) => new Element(tag), createElementNS: (_ns: string, tag: string) => new Element(tag) });

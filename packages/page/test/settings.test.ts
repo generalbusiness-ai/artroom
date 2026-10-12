@@ -160,6 +160,8 @@ test("Config and key select a room only after matching standing and exact storag
     await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts");
   vi.doMock("../src/data.ts", () => ({
     ...data,
+    initializationStillCurrent: async () => true,
+    roomInitialization: async () => ({ state: "configured" }),
     openRoom: open,
     listLanes: async () => {
       if (viewUnavailable) throw new Error("Scripted later view unavailable");
