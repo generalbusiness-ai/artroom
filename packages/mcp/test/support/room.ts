@@ -44,6 +44,8 @@ export interface Agent {
   tick(): Promise<void>;
   /** Requests this agent's service made to the scope service, by method and path. */
   requests: string[];
+  /** Every tool this agent called, in order, by name. */
+  calls: string[];
 }
 
 export interface Room {
@@ -119,9 +121,10 @@ export function mcpRoom(): Room {
         },
       });
       const agent: Agent = {
-        name, key: keyIdOfSecret(key), secret: key, config, service, told: 0, requests,
-        call: (tool, args = {}) => wait(() => service.call(tool, args)),
+        name, key: keyIdOfSecret(key), secret: key, config, service, told: 0, requests, calls: [],
+        call: (tool, args = {}) => { agent.calls.push(tool); return wait(() => service.call(tool, args)); },
         ok: async (tool, args = {}) => {
+          agent.calls.push(tool);
           const result = await wait(() => service.call(tool, args));
           expect(result.isError, `${name} ${tool}: ${JSON.stringify(result.structuredContent)}`).toBe(false);
           return result.structuredContent;

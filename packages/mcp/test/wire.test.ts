@@ -267,7 +267,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
     input.write(call.subarray(0, at)); input.write(call.subarray(at));
     input.write(`${"x".repeat(5 * 1024 * 1024)}\n`);
     input.write(`${JSON.stringify({ jsonrpc: "2.0", id: "after", method: "server/discover", params: { _meta: meta } })}\n`);
-    expect(await until(() => lines.some((l) => l["id"] === "after"), 10_000)).toBe(true);
+    expect(await until(() => lines.some((l) => l["id"] === "after") && lines.some((l) => l["id"] === "split"), 10_000)).toBe(true);
     expect(lines.filter((l) => typeof l["id"] === "number" && l["result"] !== undefined)).toHaveLength(300);
     expect((lines.find((l) => l["id"] === "split")!["result"] as { structuredContent: { message: string } }).structuredContent.message).toBe("No tool is named naïve in this list.");
     expect(lines.filter((l) => (l["error"] as { code?: number } | undefined)?.code === -32600)).toHaveLength(1);

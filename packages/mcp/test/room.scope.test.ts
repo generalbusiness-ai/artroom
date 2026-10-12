@@ -109,11 +109,18 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     expect([lost["sentence"], (lost["act"] as { phase: string }).phase]).toEqual([expect.stringMatching(/was lost; this step's outcome is unknown\. The act's phase is unchanged\./), "prepared"]);
     const recovered = await paul.ok("prepare", { ...report, resource: 2, capability: "hold@1", step: "check" });
     expect((recovered["step"] as { phase: string }).phase).toBe("answered");
-    // On this Worker the resource refuses both steps (capability-refused, not-staged): no hold of the change lane stages the
-    // issue's report. A refused step writes no entry, so the retry is answered with the same refusal; that a retry of an accepted
-    // step is answered with its first entry is custody.test.ts's case, with a scripted resource.
+    // The exact answer: refused, capability-refused, not-staged, at the foreign resource (lane 2), which holds no hold under this
+    // commitment, and also at the lane itself (lane 1): hold@1 stages a report only after the holder's hold@1:instance step,
+    // which is a capability step with no act, and no tool of this server sends one. A refused step writes no entry, so the retry
+    // is answered with the same refusal. An accepted step, and its retry answered with its first entry, are custody.test.ts's
+    // cases, against scripted answers: they show what the server keeps, and nothing about hold@1's judgment.
+    for (const s of [stage, check, again, recovered]) expect((s["step"] as { answer: { answer: string; reason: string; name: string } }).answer).toMatchObject({ answer: "refused", reason: "capability-refused", name: "not-staged" });
+    const own = await paul.ok("prepare", { ...report, idempotencyKey: "hand-in-own", resource: 1, capability: "hold@1", step: "stage" });
+    expect((own["step"] as { answer: unknown }).answer).toMatchObject({ answer: "refused", reason: "capability-refused", name: "not-staged" });
     lines.push(`room story, ${mode}: steps at a foreign resource: ${[stage, check, again, lost, recovered].map((x) => String(x["sentence"]).replace(/^sc_\w+ /, "")).join(" | ")}`);
     const handIn = await step(paul, mode, { tool: "issue.hand-in", scope: 1, kind: "report" }, { fields: report.fields, idempotencyKey: report.idempotencyKey });
+    // The act itself is refused for the same reason: nothing staged its report.
+    expect([handIn["answer"], handIn["reason"], handIn["name"]]).toEqual(["refused", "capability-refused", "not-staged"]);
     lines.push(`room story, ${mode}: hand-in answered ${String(handIn["answer"])} ${String(handIn["reason"] ?? "")} ${String(handIn["name"] ?? "")}`);
     const settledHandIn = await paul.ok("settle", { target: 1, idempotencyKey: report.idempotencyKey });
     expect(settledHandIn["answer"]).toBe(handIn["answer"]);
@@ -137,6 +144,9 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     const proposed = await step(paul, mode, { tool: "change.propose-file", scope: number, kind: "propose-file" }, { fields: { base: head, path: "README.md", digest: digestBytes(utf8(content)), size: utf8(content).length, content }, idempotencyKey: "propose-1" });
     expect(proposed["answer"], JSON.stringify(proposed)).toBe("accepted");
     const manifest = (proposed["fact"] as FactRef).seq;
+    // A review: rita, who is not an author, approves the version.
+    const reviewed = await step(rita, mode, { tool: "change.review", scope: number, kind: "review-verdict" }, { fields: { manifest, verdict: "approve" }, idempotencyKey: "review-1" });
+    expect(reviewed["answer"], JSON.stringify(reviewed)).toBe("accepted");
     const merged = await step(rita, mode, { tool: "change.merge", scope: number, kind: "merge" }, { fields: { manifest, reports: [] }, idempotencyKey: "merge-1" });
     expect(merged["answer"], JSON.stringify(merged)).toBe("accepted");
     const published = await rita.ok("wait", { scope: number, item: (merged["fact"] as FactRef).seq, type: "merge", states: ["published", "refused", "aborted"] });

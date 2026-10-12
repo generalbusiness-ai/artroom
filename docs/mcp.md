@@ -1190,49 +1190,59 @@ refused when the server starts.
 
 Every command of the command line and every action of the page, with the
 tool calls that perform it in each launch mode and the count of calls.
-Counts are sums of the recipe's steps. In `--generic` mode, `actions` is
-called once per scope, and its result serves every later `act` on that
-scope. `--generic=add` lists both, so either recipe works; the count given
-is the default recipe's.
+`packages/mcp/test/recipes.scope.test.ts` runs every row through the server
+on the real test Worker, with complete arguments, in the default and
+`--generic` modes, and checks that the tools called are the ones the row
+names, in order, as many times as it counts. In `--generic` mode, `actions`
+is called once per scope within one activity, and its result serves every
+later `act` on that scope. `--generic=add` lists both, so either recipe
+works; the count given is the default recipe's.
 
 | Activity | Default | --generic | --generic=add |
 |---|---|---|---|
-| `artroom install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register) and kind install: 1. The signed intent is kept before it is sent, which is what `--plan` keeps; after a lost reply, `settle`: +1 | `create`: 1 | 1 |
-| `artroom claim <name>` | `room.create` on the register, `wait` for the created directory and its children, `room.seat`, `room.first-key` within the founder's window, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
-| `artroom invite <@member>` | `member.invite` with the handle, role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the number and secret to the member: 1 | `actions`, `act`: 2 | 1 |
-| `artroom join <link>` | `join` with the link, then `wait` for the inbox: 2. It works from an empty configuration: the server records the room, the service and the handle when the join is accepted | `join`, `wait`: 2 | 2 |
-| `artroom acts [<scope>]` | `room`, whose `notHeld` names the act tools the role does not hold; the list holds the rest: 1 | `actions`: 1 | 1 |
-| `artroom act <kind> --on <scope>` | The act tool of that kind: 1 | `actions`, `act`: 2 | 1 |
-| `artroom log <scope>` | `steps`: 1 per page | `steps`: 1 | 1 |
-| `artroom show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
-| `artroom verify <scope>` | `record`, 1 per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as `artroom verify` | `record`: 1 | 1 |
-| `artroom verify --all` | `room`, then `record` for each scope: 1 + n | the same: 1 + n | 1 + n |
-| `artroom remote` | `inspect` on the destination, whose branch item names the host, namespace and name: 1 | `inspect`: 1 | 1 |
-| `artroom clone [<directory>]` | `repository.read-token`, `wait` for its outcome, `credential`, then Git: `git clone` with the credential as the header: 3 and Git | `actions` on the destination, `act`, `wait`, `credential`, then Git: 4 and Git | 3 and Git |
-| `artroom edit <path> --file <file>` | `change.create` (the definition's bytes are read from the rules scope), `wait`, `change.ask-rules`, `wait`, `change.propose-file` with the text detached, `change.merge` with the selected reports presented, `wait`: 7; with `--closes`, `change.link-own` first: 8 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act` ask-rules, `wait`, `act` propose-file, `act` merge, `wait`: 9; with `--closes`: 10 | 7 |
-| `artroom propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then `change.create`, `wait`, `change.ask-rules`, `wait`, `change.propose-file` once per path, `change.propose-version` naming every path, `change.merge`, `wait`: 7 + n | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act` ask-rules, `wait`, `act` per path, `act` propose-manifest, `act` merge, `wait`: 9 + n | 7 + n |
-| `artroom merge <change>` | `inspect` for the current version and the reports to select, `change.merge`, `wait`: 3; with `--closes`, `change.link-own` first: 4 | `inspect`, `actions`, `act`, `wait`: 4; with `--closes`: 5 | 3 |
-| `artroom issue open` | `issue.create`, `wait` for the issue's lane: 2 | `actions` on the directory, `act`, `wait`: 3 | 2 |
-| `artroom issue comment <issue> <text>` | `issue.comment`: 1 | `actions`, `act`: 2 | 1 |
-| `artroom issue assign <issue> <@member>` | `issue.assign`: 1 | `actions`, `act`: 2 | 1 |
-| `artroom issue close <issue>` | `issue.close-own` when the caller opened it, else `issue.close-any`: 1 | `actions`, `act`: 2 | 1 |
-| `artroom issues` | `room` for the lanes (50 a page), then `inspect` per issue for its own state: 1 + n | the same: 1 + n | 1 + n |
+| `artroom install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and founder keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
+| `artroom claim <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
+| Page: Create room | the same calls as `artroom claim`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `artroom claim`: 7 | 5 |
+| `artroom invite <@member> --role <role>` | `member.invite` with the handle, the role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the link with the number and secret to the member: 1 | `actions` on membership, `act`: 2 | 1 |
+| `artroom join <link>` | `join` with the link, from an empty configuration, then `wait` for the inbox: 2 | `join`, `wait`: 2 | 2 |
 | Page: Join with an invitation link | `join`, `wait`: 2 | `join`, `wait`: 2 | 2 |
+| Page: Rules editor | `inspect` on the rules scope, `rules.publish` with the changed counts and the rest kept: 2 | `inspect`, `actions` on the rules scope, `act`: 3 | 2 |
+| `artroom act <kind> --on <scope>` | The act tool of that kind, such as `rules.activate` with the definition's digest, name and bytes: 1 | `actions`, `act`: 2 | 1 |
+| `artroom acts [<scope>]` | `room`, whose notHeld names the act tools the role does not hold; the list holds the rest: 1 | `actions` on the scope: 1 | 1 |
+| `artroom issue open --title <text>` | `issue.create` with the issue definition's digest (its bytes are read from the rules scope), the title, the body and the title as its condition, then `wait` for the issue's lane: 2 | `actions` on the directory, `act`, `wait`: 3 | 2 |
 | Page: Create issue | `issue.create`, `wait`: 2 | `actions`, `act`, `wait`: 3 | 2 |
-| Page: Comment | `issue.comment`, or `change.comment` on a change: 1 | `actions`, `act`: 2 | 1 |
-| Page: Review | `inspect` for the version and extents, `change.review`: 2 | `inspect`, `actions`, `act`: 3 | 2 |
-| Page: Merge | `inspect`, `change.merge`, `wait`: 3 | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
-| Page: Propose an edit | `change.create`, `wait`, `change.ask-rules`, `wait`, `change.propose-file`: 5 | `actions`, `act`, `wait`, `actions`, `act`, `wait`, `act`: 7 | 5 |
-| Page: Rules editor | `inspect` on the rules scope, `rules.publish` with the changed counts and the rest kept: 2 | `inspect`, `actions`, `act`: 3 | 2 |
-| Page: Create room | `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | `actions`, `act`, `wait`, `actions`, `act`, `act`, `wait`: 7 | 5 |
-| Page: Check status | `settle` with the key: 1 | `settle`: 1 | 1 |
-| Page: Record inspection | `room` for the role and key, `record`: 2 | the same: 2 | 2 |
-| A capability step | `prepare` at the resource, then the act tool under the same key: 2 | `prepare`, `actions`, `act`: 3 | 2 |
-| A send's outcome | `sends`, then `wait` with the duty: 2 | the same: 2 | 2 |
+| `artroom issue comment <issue> <text>` | `issue.comment` with the issue's number and the body: 1 | `actions` on the lane, `act`: 2 | 1 |
+| `artroom issue assign <issue> <@member>` | `issue.assign` on the issue's intent item with the assignees: 1 | `actions`, `act`: 2 | 1 |
+| `artroom issue close <issue>` | `issue.close-own` when the caller opened it (issue.close-any otherwise), with the reason: 1 | `actions`, `act`: 2 | 1 |
+| `artroom issues` | `room` for the lanes (paged by bytes), then `inspect` for each issue's own state: 1 + n | `room`, then `inspect` for each issue: 1 + n | 1 + n |
+| `artroom log <scope>` | `steps`, one per page: 1 | `steps`: 1 | 1 |
+| `artroom show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
+| `artroom verify <scope>` | `record`, one per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as artroom verify itself: 1 | `record`: 1 | 1 |
+| `artroom verify --all` | `room`, then `record` for each scope it names: 1 + n | `room`, then `record` for each scope: 1 + n | 1 + n |
+| `artroom remote` | `inspect` on the destination, whose branch item names the host, namespace and name: 1 | `inspect`: 1 | 1 |
+| `artroom clone [<directory>]` | `repository.read-token` with the hours, `wait` for the outcome entry, `credential` with the act's entry, then Git: git clone with the credential as the header: 3 and Git | `actions` on the destination, `act`, `wait`, `credential`, then Git: 4 and Git | 3 and Git |
+| Page: Propose an edit | `change.create` with the change definition's digest and a title, `wait` for the lane, `change.ask-rules`, `wait` for the rules item, `inspect` on the destination for the head, `change.propose-file` with the base, path, digest, size and the text inline: 6 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`: 8 | 6 |
+| Page: Review | `inspect` on the change for its current version, `change.review` with the version and the verdict: 2 | `inspect`, `actions`, `act`: 3 | 2 |
+| Page: Comment | `change.comment` on a change (issue.comment on an issue), with the body: 1 | `actions`, `act`: 2 | 1 |
+| Page: Merge | `inspect` on the change for its current version, `change.merge` with the version and the reports it selects, `wait` for the merge to be published, refused or aborted: 3 | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
+| `artroom edit <path> --file <file>` | `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` with the text inline, then as artroom merge: `inspect` on the change, `change.link-own` with the issue for --closes, `change.merge`, `wait`; 9 without --closes: 10 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`, `inspect`, `act` link-own, `act` merge, `wait`: 12 | 10 |
+| `artroom merge <change>` | `inspect` on the change for its current version, `change.merge`, `wait`: 3; with --closes, change.link-own first | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
+| `artroom propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` once per path, `change.propose-version` naming every path: 6 + n; then as artroom merge once the lane accepts the version. In the demo room the lane refuses that version (source-shape): see the note below | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act` per path, `act` propose-manifest: 8 + n | 6 + n |
+| Page: Check status | `settle` with the target and the key: 1 | `settle`: 1 | 1 |
+| Page: Record inspection | `room` for the role and key, `record` on membership: 2 | `room`, `record`: 2 | 2 |
+| A capability step | `prepare` at the resource, with the act's own target, kind and fields, then the act tool under the same key, such as `issue.hand-in`: 2 | `prepare`, `actions`, `act`: 3 | 2 |
+| A send's outcome | `sends` on the scope, then `wait` with the duty a receipt named: 2 | `sends`, `wait`: 2 | 2 |
 
 Git steps: `clone` and `propose` use Git outside the server. The server
 returns the remote URL and a one-time credential; the agent's own Git, or
 a generic credential helper, uses them. The server runs no Git.
+
+`propose` in the demo room: the demo change definition's `propose-manifest`
+is the hold workflow's version, which takes a held hold, or a foreign hold
+with its presented pin, and the lane refuses a version with neither as
+`source-shape`. `artroom propose` needs `change3` or `change-demo3` under a
+destination at version 3 (see `docs/cli.md`), which the demo room does not
+run. The recipe test runs the recipe to that refusal and asserts it.
 
 ## Budgets and observed figures
 
