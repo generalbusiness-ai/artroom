@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2edd91e402bf5c650f5cf7819dfa968c689c5601","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-counter-empty-controls-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:38baaa064012f0d4c198959b7ebf5e565f9be430","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/counting-assets.ts."}
