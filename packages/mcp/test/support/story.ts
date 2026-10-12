@@ -49,4 +49,3 @@ export async function founded(room: Room, rita: Agent, mode: "default" | "generi
   expect([inbox["timedOut"], rita.config.repository?.inbox]).toEqual([false, expect.stringMatching(/^sc_/)]);
   return { register };
 }
-
