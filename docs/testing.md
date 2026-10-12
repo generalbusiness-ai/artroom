@@ -1,4 +1,4 @@
-# Testing Artroom
+# Test dap
 
 This page says what a test in this repository is for, where it belongs, how
 to run tests while you work, and what to run before a review. It replaces
@@ -52,7 +52,7 @@ Put each test at the cheapest boundary that can show its property.
 A stand-in proves only the boundary it exposes. A retry, an ordering or a
 restart is shown against the thing that really retries, orders or restarts.
 
-The scripted capability of `@generalbusiness/artroom-scope/testing` is a
+The scripted capability of `@generalbusiness/dap-scope/testing` is a
 stand-in for the code of `hold@1` and `git-read@1`. The derive package
 has that code, and the production ports hold it. A test that uses the stand-in says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
@@ -80,7 +80,7 @@ it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
 Membership has two stand-ins of its own, in
-`@generalbusiness/artroom-platform/testing`. `office` is a made-up
+`@generalbusiness/dap-room/testing`. `office` is a made-up
 directory that creates one membership scope: it stands for the real
 directory and the register. `Roster` is a membership scope in memory
 below such an office. A test that uses one says so. It shows
@@ -185,19 +185,19 @@ counts. The platform data and rules remain made up. The replay witness in
 `packages/replay/test/decisions.test.ts` runs the real verifier on a judged
 receiver history, with the sender's entries written by hand and anchored.
 It checks that the taking entry fits its decision reservation. These tests
-show no behavior of an Artroom platform definition. The marker-duty tests
+show no behavior of a dap platform definition. The marker-duty tests
 in `forms-settles.test.ts` also use made-up platform data and rules.
 
 The rows of `observes` have a made-up definition and two scripted scopes.
 `weigher`, in `packages/derive/test/fixtures-observes.ts`, is made-up
 platform data whose acts, one kind of `outcomes` and one clause of a
 result state rows, with a stand-in rule for each of its marks. It is no
-definition of Artroom. The destination, membership and task platform data
+definition of dap. The destination, membership and task platform data
 now state their own rows, separately from these fixtures. Each
 observation of that file is written by hand. A test that uses it says so.
 It shows where a subject comes from, what the judges retain and what a verifier derives,
 and nothing about a rule of a destination or of a rules scope.
-`Controls.rulebook`, of `@generalbusiness/artroom-scope/testing`, is a
+`Controls.rulebook`, of `@generalbusiness/dap-scope/testing`, is a
 scripted rules scope, beside the scripted membership: the test writes
 each answer and the bytes that are said to come beside it, and where the
 scope is said to record that reference. The platform rules scope has its
@@ -268,7 +268,7 @@ host. What a real change lane does with the service's signed results is
 one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
-`packages/lanes/test/edit.scope.test.ts` runs `artroom edit` as the
+`packages/lanes/test/edit.scope.test.ts` runs `dap edit` as the
 command-line story runs its commands, on each host through the production
 wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
 labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
@@ -297,7 +297,7 @@ current-job read finished first. Other cases preserve an unresolved push
 when its retry is refused, cancel a pre-push reservation, drain its recorded
 deadline, and refuse a final membership read that exceeded its window.
 
-`packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+`packages/lanes/test/issues.scope.test.ts` runs `dap issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
 `packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
@@ -329,7 +329,7 @@ answers, and nothing about a real host, a real tree or a runner.
   parameter, and at the real limit once.
 - Tests that only read may share one scope or one fixture per file. Tests
   that write get their own. The packages share one fixture set, exported by
-  `@generalbusiness/artroom-derive/testing`.
+  `@generalbusiness/dap-derive/testing`.
 
 ## While you work
 
@@ -348,7 +348,7 @@ Run the tests of what you changed, not the repository.
 npm run test:changed                 # what you changed and have not committed
 npm run test:changed -- origin/main  # everything that differs from origin/main
 npx vitest run --project scope turn   # one project, files whose name matches
-npm test --workspace @generalbusiness/artroom-derive   # one package
+npm test --workspace @generalbusiness/dap-derive   # one package
 ```
 
 `npm run test:changed` runs the root vitest run
@@ -495,7 +495,7 @@ copy of a fixture or change to the native Worker classes. The lanes package keep
 files alone, in a Worker of its own with the same classes: for `npm test`
 in the package, for `scripts/control.mjs` and for
 `scripts/measure-tests.sh`. A scenario's client calls the scope service's
-own operations, `api` of `@generalbusiness/artroom-scope/worker`, in the
+own operations, `api` of `@generalbusiness/dap-scope/worker`, in the
 test's isolate. A few acts go over the Worker's HTTP routes, where the
 scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has

@@ -7,14 +7,14 @@ For a room admin and a person joining that room, this page explains the source C
 In the admin's existing room context:
 
 ```sh
-artroom invite @rita --role member --hours 24
+dap invite @rita --role member --hours 24
 ```
 
 Pass the printed invitation only to its intended recipient. In the recipient's fresh CLI context:
 
 ```sh
-artroom join '<original invitation link>'
-artroom acts membership
+dap join '<original invitation link>'
+dap acts membership
 ```
 
 The invitation carries a one-time secret, not the member's private signing key. Keep it out of shared notes, screenshots and logs. The CLI makes and privately keeps the device key. Do not paste a private signing key into the invitation or documentation. [Invitation and Join source](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L691)
@@ -44,7 +44,7 @@ Join saves its exact signed request privately before sending. After a lost reply
 For an active key item you have identified in the actual membership record, an actor holding `membership.manage` can deliberately retire it through the declared generic act:
 
 ```sh
-artroom act revoke-key --on membership \
+dap act revoke-key --on membership \
   --target <key-item> --set as=retired
 ```
 

@@ -17,15 +17,15 @@ why. Nothing in either note is adopted by being built.
 
 | Package | Holds | Imports |
 |---|---|---|
-| `@generalbusiness/artroom-contract` | Types and constant tables. No logic. | Nothing |
-| `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, SHA-1 for Git object names, encodings, Ed25519, the eight byte domains, and the guard of each identifier. | contract |
-| `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
-| `@generalbusiness/artroom-platform` | Six platform definitions, each with its whole data and every rule: register, directory, membership, rules, destination and inbox. The destination includes the exact first-head and receipt commit rules, its reservation reader, and the held operations and observation rows of the adopted authority revision 28 and scope contract revision 23. A missing version or a version with any missing rule is still `unsupported-definition`; `platform:task@1` is not supplied. | contract, bytes, derive |
-| `@generalbusiness/artroom-git` | The Git object reader, commands, push evidence, token gateway and snapshot builder, with separate Web API modules for smart HTTP and GitHub App requests. It runs outside a scope's commit. Scope and checkers import it. | contract, bytes |
-| `@generalbusiness/artroom-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
-| `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, the Worker's routes and opt-in wiring for two Git hosts, GitHub and the hosting's own Git service ([hosts.md](hosts.md)). | contract, bytes, derive, platform, git |
-| `@generalbusiness/artroom-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
-| `@generalbusiness/artroom-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
+| `@generalbusiness/dap-contract` | Types and constant tables. No logic. | Nothing |
+| `@generalbusiness/dap-bytes` | Canonical JSON, SHA-256, SHA-1 for Git object names, encodings, Ed25519, the eight byte domains, and the guard of each identifier. | contract |
+| `@generalbusiness/dap-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
+| `@generalbusiness/dap-room` | Six platform definitions, each with its whole data and every rule: register, directory, membership, rules, destination and inbox. The destination includes the exact first-head and receipt commit rules, its reservation reader, and the held operations and observation rows of the adopted authority revision 28 and scope contract revision 23. A missing version or a version with any missing rule is still `unsupported-definition`; `platform:task@1` is not supplied. | contract, bytes, derive |
+| `@generalbusiness/dap-git` | The Git object reader, commands, push evidence, token gateway and snapshot builder, with separate Web API modules for smart HTTP and GitHub App requests. It runs outside a scope's commit. Scope and checkers import it. | contract, bytes |
+| `@generalbusiness/dap-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
+| `@generalbusiness/dap-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, the Worker's routes and opt-in wiring for two Git hosts, GitHub and the hosting's own Git service ([hosts.md](hosts.md)). | contract, bytes, derive, platform, git |
+| `@generalbusiness/dap-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
+| `@generalbusiness/dap-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
 
 The packages' guides and exported modules describe their parts. The
 runtime and the verifier share `derive` and nothing else. The client
@@ -88,8 +88,8 @@ operation that it opens or the definition of a scope that it creates,
 reads it from the scope's genesis. So a room's versions follow from its
 register: version 1 of the register creates version 1 of the directory,
 which creates membership, the rules scope and the destination at version
-1, and version 2 does the same at version 2. `artroom install` founds a
-register at the newest version, and `artroom claim` founds the room at the
+1, and version 2 does the same at version 2. `dap install` founds a
+register at the newest version, and `dap claim` founds the room at the
 version that the register creates; both print the versions. A register
 founded before version 2 keeps creating rooms at version 1.
 
@@ -137,7 +137,7 @@ canonical JSON of one value. The eight tags are in `DOMAINS`, including
 Sessions have their separate `SESSION_DOMAINS` tags. No value
 contains its own digest: an entry has no field for its own hash.
 
-`@generalbusiness/artroom-bytes` has the one implementation of each:
+`@generalbusiness/dap-bytes` has the one implementation of each:
 `canonicalize` and `parseStrict`; `scopeIdOf`, `entryHash`, `intentDigest`,
 `definitionDigest`, `textDigest` and the other digests; `signIntent` and `verifySignedIntent`; and the
 guards `isDigest`, `isScopeId`, `isIncarnation`, `isKeyId`, `isMemberId`,
@@ -508,7 +508,7 @@ no scope under a definition that uses it,
 and answers `unsupported-definition`. A verifier with no such code answers the same. The
 item form of `hold@1`, with its `hold` effect, needs no such code and
 runs. A test may use `scriptedCapability`, from
-`@generalbusiness/artroom-scope/testing`. It is a stand-in: it answers
+`@generalbusiness/dap-scope/testing`. It is a stand-in: it answers
 from a table that the test supplies, and shows nothing about a real hold
 or a Git read. The same module has `net.peers`, for scripted peers: entries
 that a test writes by hand in place of a platform scope that is not
@@ -713,7 +713,7 @@ One credential route answers a read token once to the authorized session of the 
 
 ## Replay, and what a report means
 
-`@generalbusiness/artroom-replay` checks a history without running the
+`@generalbusiness/dap-replay` checks a history without running the
 runtime. `verify(source, options)` reads a scope's stored bytes through a
 `HistorySource` and returns a report. There are two modes.
 
@@ -767,10 +767,10 @@ was not understood or the target could not be read.
 
 ## The client handle
 
-`@generalbusiness/artroom-client` is what an application or an agent uses.
+`@generalbusiness/dap-client` is what an application or an agent uses.
 
 ```ts
-import { ScopeHandle, httpTransport, signedIntent, webCryptoSigner } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, signedIntent, webCryptoSigner } from "@generalbusiness/dap-client";
 
 const signer = await webCryptoSigner();
 const scope = new ScopeHandle(httpTransport("https://scopes.example"), scopeId, reader);

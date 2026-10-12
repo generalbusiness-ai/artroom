@@ -14,12 +14,12 @@ operator permission or new-room bootstrap.
 
 ## Join with your invitation
 
-In a terminal with a fresh Artroom user context, run:
+In a terminal with a fresh dap user context, run:
 
 ```sh
-artroom join '<your invitation link>'
-artroom acts
-artroom issues
+dap join '<your invitation link>'
+dap acts
+dap issues
 ```
 
 The admin chooses your room role when inviting you. The CLI creates and
@@ -45,7 +45,7 @@ admin with `change.merge` performs publication.
 Create a local UTF-8 file, then use its path as the input:
 
 ```sh
-artroom edit README.md --file ./readme.md --title 'Explain the room'
+dap edit README.md --file ./readme.md --title 'Explain the room'
 ```
 
 `README.md` is the target path in the room's repository. `./readme.md` is
@@ -60,7 +60,7 @@ version. It does not mean published. A missing approval, unauthorized merger
 or invalid path can leave a recorded proposal unpublished. Keep the change
 and version shown in that output for review and later merge.
 
-This source has no `artroom propose <branch>`, application preset or ordinary
+This source has no `dap propose <branch>`, application preset or ordinary
 browser editor. The branch/manifest-list workflow is separate unlanded work;
 it is not an alternative command in this guide. A clone is optional for this
 one-file path. [Clone and host credentials](../hosts.md) explain the separate
@@ -74,7 +74,7 @@ review requirements. For a source extent named `source`, an eligible reviewer
 uses the actual change and version printed earlier:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<version> --set verdict=approve --set extent=source
 ```
 
@@ -82,7 +82,7 @@ For an authority file such as `AGENTS.md`, the default rules extent requires
 an eligible controller holding `rules.publish`:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<version> --set verdict=approve --set extent=rules
 ```
 
@@ -105,9 +105,9 @@ could not obtain or verify.
 An authorized merger runs:
 
 ```sh
-artroom merge <change-scope>
-artroom log <change-scope>
-artroom verify --all
+dap merge <change-scope>
+dap log <change-scope>
+dap verify --all
 ```
 
 A `Published: commit ...` result names the room destination's confirmed

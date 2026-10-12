@@ -1,7 +1,7 @@
 # The record
 
-For a participant checking what happened, this page explains what an
-Artroom receipt proves, where to find the underlying evidence and what a
+For a participant checking what happened, this page explains what a
+dap receipt proves, where to find the underlying evidence and what a
 consistency report leaves open.
 
 Every scope has its own numbered history. The first entry records its

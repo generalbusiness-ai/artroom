@@ -1,6 +1,6 @@
 > **Inactive.** This page describes the release of the earlier model's six packages. Its scripts and files are parked, unedited, in `parked/release/`; none of them runs. Releasing the new packages is a later delivery (I6). See [`parked/README.md`](../parked/README.md).
 
-# Releasing the installable packages
+# Release the packages
 
 Six packages can be installed outside this repository:
 
@@ -58,12 +58,12 @@ together, and in `packages/ui/package.json`, then run
 `npm install --package-lock-only`. The gate fails if the six disagree.
 
 The CLI's bundle holds everything it runs, so its manifest lists no runtime
-dependency. Its Artroom packages are development dependencies.
+dependency. Its dap packages are development dependencies.
 
 ## Third-party code in the command
 
 The five libraries are compiled, not bundled. Their tarballs hold only
-Artroom code, and npm installs what they depend on as separate packages
+dap code, and npm installs what they depend on as separate packages
 with their own licence files.
 
 The command is different. `dist/artroom.js` is one bundled file that
@@ -158,7 +158,7 @@ npm install --save-exact ./vendor/artroom/generalbusiness-artroom-contract-0.1.0
   ./vendor/artroom/generalbusiness-artroom-client-0.1.0-dev.1.tgz
 ```
 
-Name every Artroom package that the chosen ones depend on, because no
+Name every dap package that the chosen ones depend on, because no
 registry holds them: `policy` needs `contract`; `client` needs `contract`
 and `policy`; `log` needs `contract` and `policy`; `mcp` needs `client`,
 `contract` and `policy`. The CLI needs none. Commit the tarballs and the

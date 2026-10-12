@@ -1,16 +1,16 @@
 # Review an exact change version
 
-For a reviewer using an already configured Artroom source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
+For a reviewer using an already configured dap source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
 
 **Source guide — cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
 
 First read the change and the actual entries that hold its content:
 
 ```sh
-artroom acts <change-scope>
-artroom log <change-scope>
-artroom show <change-scope>:<manifest-entry>
-artroom show <change-scope>:<source-entry>
+dap acts <change-scope>
+dap log <change-scope>
+dap show <change-scope>:<manifest-entry>
+dap show <change-scope>:<source-entry>
 ```
 
 Replace placeholders with recorded identities. A manifest is a recorded version of the proposed change. A manifest list names its frozen source entries and digests; read every relevant source entry. Reading only a title, a task transcript or the latest published page is not reviewing that version. General immutable diff/interdiff access and cold-review acceptance remain separate work.
@@ -22,7 +22,7 @@ An extent is a named part of the repository with its own reviews and checks. Rea
 For an extent actually named `source`, an eligible independent reviewer can record:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<manifest-item> --set verdict=approve --set extent=source
 ```
 
@@ -43,7 +43,7 @@ A job label such as reviewer grants no authority. The default native `agent` rol
 This declaration allows one submitted verdict per reviewer for a manifest. To replace your own submitted verdict for that same manifest, supply its exact review item:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<same-manifest-item> --set earlier=<your-review-item> \
   --set verdict=request-changes --set extent=source
 ```

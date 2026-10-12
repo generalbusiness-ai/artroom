@@ -1,4 +1,4 @@
-# Rehearsing the demo
+# Rehearse the demo
 
 The demo runner plays the middle of the demo script
 (`notes/2026-10-07-demo-script-draft.md`) against a deployment, as three
@@ -27,7 +27,7 @@ fresh config directory.
 | 17 to 19 | The maintainer proposes `AGENTS.md`: refused `rules-not-met:rules`; the founder approves. Before merging it, the maintainer admits the second file on the same published base, then publishes `AGENTS.md`. Each command and exit is recorded. | 10, 11, concurrency |
 | 20 | The maintainer merges the already-admitted second file: refused `out-of-date`; the same maintainer re-proposes it as a new change on the new head and publishes it. The refused lane remains in the record. | concurrency |
 | 21 | The maintainer edits `../outside.md`: refused `path-invalid` | 10 |
-| 22, 23 | `artroom issues` shows #1 closed; `artroom verify --all` reports fourteen scopes consistent | 8, 12 |
+| 22, 23 | `dap issues` shows #1 closed; `dap verify --all` reports fourteen scopes consistent | 8, 12 |
 | 24 to 27 | The site's front page, the two published pages, and the room's page at `/page/` | 7, 9, 11 |
 
 Each shot states the exit code and the lines it expects. The isolated
@@ -121,7 +121,7 @@ the coordinated GitHub run.
 `--name <room>` names the room; the default is `rehearsal-` and the month,
 day, hour and minute. The runner prints no secret: an invitation link is
 cut to its first eight letters on screen and in the transcript, the read
-token is never printed by `artroom clone`, and keys are shown by their
+token is never printed by `dap clone`, and keys are shown by their
 key IDs only. The keys stay in the config directories, readable only by
 their owner.
 
@@ -132,9 +132,9 @@ founder activates the current manifest-list demo definition. In the
 member's clone, the runner pulls the room's head, creates `two-pages`,
 writes two UTF-8 Markdown files and commits them with Git. It records
 these local Git commands and their outputs explicitly. The maintainer
-runs `artroom propose two-pages` in the same local clone and proposes both
-committed files as one change, expecting publication. Artroom writes its own integration commit; the local commit
-is source preparation, not a commit made by an Artroom command.
+runs `dap propose two-pages` in the same local clone and proposes both
+committed files as one change, expecting publication. dap writes its own integration commit; the local commit
+is source preparation, not a commit made by a dap command.
 
 The next preparation checks out `main` and pulls again, observing the
 room's integration commit, then creates `two-controlled` with `AGENTS.md`
@@ -223,7 +223,7 @@ answers the browser with the Worker's recorded answers, as
 3. Each take: fresh config directories (`ARTROOM_HOME`) on both screens,
    and a new room. The takes type the commands of the transcript in the
    same order; the runner's room is not used on camera.
-4. After the take: `artroom verify --all` on the take's room. The current
+4. After the take: `dap verify --all` on the take's room. The current
    deployment capture form supports homes with the runner's bound native
    observations; a manually created take home without them is unsupported.
 

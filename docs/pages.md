@@ -15,10 +15,10 @@ A page's address is:
 ```
 
 - `<base-url>` is the scope Worker's address, the one given to
-  `artroom install`.
+  `dap install`.
 - `<directory>` is the room's directory scope identifier (`sc_...`),
   not a human name.
-  `artroom claim` prints it ("Claimed demo: directory sc_..."), and the
+  `dap claim` prints it ("Claimed demo: directory sc_..."), and the
   command line keeps it under the name `directory`.
 - `<ref>` is `HEAD` or a published branch name. `HEAD` names the room's
   branch at the exact head its destination records. The Worker does not
@@ -204,7 +204,7 @@ authorization value and URL query replaced by `[redacted]`.
 
 ## Editing a page
 
-`artroom edit <path> --file <local file>` changes one page (docs/cli.md).
+`dap edit <path> --file <local file>` changes one page (docs/cli.md).
 The command opens a change on the room's change lane with a one-file
 version: the path, the digest and size of the bytes, and the bytes. The
 room judges it by its rules, as any change: a page in an extent that asks

@@ -7,13 +7,13 @@ For a maintainer or admin using an already configured source CLI, this page help
 Read the intended version, content and required evidence before the mutation:
 
 ```sh
-artroom log <change-scope>
-artroom show <change-scope>:<manifest-entry>
-artroom show <change-scope>:<source-entry>
+dap log <change-scope>
+dap show <change-scope>:<manifest-entry>
+dap show <change-scope>:<source-entry>
 # Read every referenced file and the required review/check evidence.
-artroom merge <change-scope>
-artroom log <change-scope>
-artroom verify --all
+dap merge <change-scope>
+dap log <change-scope>
+dap verify --all
 ```
 
 Use exact recorded references. For a manifest list, the frozen manifest points to source entries; read each relevant entry. The CLI selects the current manifest and the reports it records when signing `merge`. It does not bind your memory of an earlier version as approval of the new one. [Merge selection](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L1523)

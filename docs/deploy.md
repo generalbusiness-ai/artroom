@@ -1,4 +1,4 @@
-# Deploying the scope Worker
+# Deploy the scope Worker
 
 This page says which settings and secrets the scope Worker takes, and in
 what order to set them so that a claim creates its repository on GitHub,
@@ -49,7 +49,7 @@ install's signed intent, so the command line computes it before the
 register exists. Plan first, then set the setting, then install:
 
 1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`.
-2. **Plan.** Run `artroom install --plan <base-url> --host github.com
+2. **Plan.** Run `dap install --plan <base-url> --host github.com
    --namespace <login>`, where `<login>` is the account's `login`. It
    founds nothing. It prints `Planned: register sc_...` and the seed's
    time, and keeps the plan in the config. The plan can be founded until
@@ -57,7 +57,7 @@ register exists. Plan first, then set the setting, then install:
 3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that register
    ID, and the GitHub secrets. A register whose host or namespace differs
    from the setting sends nothing.
-4. **Install.** Run `artroom install --planned`. It checks that the plan
+4. **Install.** Run `dap install --planned`. It checks that the plan
    still makes that ID, founds the register, and prints
    `Installed: register sc_..., ..., as planned.` A plan whose time is
    over and was never attempted is refused as `plan-expired`. For a
@@ -67,7 +67,7 @@ register exists. Plan first, then set the setting, then install:
    subsequent commands ([cli.md](cli.md)). An attempted or acknowledged
    original needs reconciliation from its original directory; expiry
    cannot authorize a replacement.
-5. **Claim.** Run `artroom claim <name> --handle @you`. The register
+5. **Claim.** Run `dap claim <name> --handle @you`. The register
    sends its creation at once. If the claim still gives up waiting, run
    the same command again: it goes on from the pending claim and signs
    nothing new. `--again` signs a second claim, which creates a second
@@ -79,7 +79,7 @@ artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
 
 ### The earlier order, and its wait
 
-`artroom install <base-url> --host ... --namespace ...` with no plan
+`dap install <base-url> --host ... --namespace ...` with no plan
 still works: it founds at once and prints the register ID, and the
 setting is set after it. Then the register's object may have started
 before the setting took effect. A claim's creation is then recorded and
