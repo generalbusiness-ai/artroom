@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"homepage/src/_headers at exact 314577da3179c411ec6a2d92b7abe81df60be53c on request/homepage-06fc, under promise git:sha1…eb6d463 on request git:sha1…0a6d6ab","body":{"commit":"314577da3179c411ec6a2d92b7abe81df60be53c","path":"homepage/src/_headers"}}
+{"kind":"artifact","text":"homepage/src/counter/index.html at exact 314577da3179c411ec6a2d92b7abe81df60be53c on request/homepage-06fc, under promise git:sha1…eb6d463 on request git:sha1…0a6d6ab","body":{"commit":"314577da3179c411ec6a2d92b7abe81df60be53c","path":"homepage/src/counter/index.html"}}
