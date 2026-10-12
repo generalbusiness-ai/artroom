@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:18800abd7b07ebc1deb374fbdc697e39c8cbfb17","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/speech.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1cd6a48657f289d68d0bd917fdbbe7f49f7e2360","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/voice-controller.ts."}
