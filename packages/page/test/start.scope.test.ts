@@ -57,7 +57,11 @@ test("fresh Page Start discovers native demo register@7, retains before dispatch
     let offerStatus: number | null = null, offerTransportError: string | null = null;
     const offerFetch: FoundingOfferFetch = async (url, init) => {
       let response: Awaited<ReturnType<Fetch>>;
-      try { response = await native(url, init); }
+      // workerd Request accepts only follow/manual; the SDK requests browser
+      // redirect:error. Direct Worker.fetch has no network redirect to follow.
+      // Manual preserves no-follow; SDK still checks exact URL/status/bounds.
+      expect(init.redirect).toBe("error");
+      try { response = await native(url, { ...init, redirect: "manual" }); }
       catch (error) { offerTransportError = error instanceof Error ? error.name : "non-error"; throw error; }
       offerStatus = response.status;
       // In-process Worker responses have no network URL; only this metadata is
