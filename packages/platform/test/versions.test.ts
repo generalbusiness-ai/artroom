@@ -16,7 +16,13 @@ import { rita } from "./support-founding.ts";
 // Rules4 was generated and validated from the actual catalog at 15a922de916a28c3062775acef4ba8673708f458; its tests remained held.
 // Evidence: /tmp/artroom-rules4-generation-one/result.json
 // SHA-256: 41f71c59e0b534042ccfc5b9bed61f4bb4cfc753809db6fabfec4acc4ebe3761.
+// Demo register versions 7 and 8 and directory version 7 were generated and validated at a1153d28b3e8f5b73af0440b894b217f351709d0.
+// Evidence: /tmp/artroom-cohort25-generation-one/result.json
+// SHA-256: e2a2052d23705690ec4b884786f453718875f6505d515fdda88a20191eb64269.
 const DIGESTS: Readonly<Record<string, string>> = {
+  "platform:register@7": "sha256:1363aa547f314eb9c598c33415a1e9e3c90b4e5afce351233abf9b3f757069b5",
+  "platform:register@8": "sha256:1363aa547f314eb9c598c33415a1e9e3c90b4e5afce351233abf9b3f757069b5",
+  "platform:directory@7": "sha256:053ec528406d1de077992d80f405f846940fb3c2c44f9206263e18329e1d58f6",
   "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
   "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155",
   "platform:register@6": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
