@@ -110,7 +110,7 @@ let lastVerifiedContext: string | null = null;
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
-interface CreationFollow { result: Acted; timer?: ReturnType<typeof setTimeout>; active: boolean }
+interface CreationFollow { result: Acted; timer?: ReturnType<typeof setTimeout>; active: boolean; current(): boolean }
 let creationFollow: CreationFollow | null = null;
 function cancelCreationFollow(): void {
   if (!creationFollow) return;
@@ -120,11 +120,12 @@ function cancelCreationFollow(): void {
 }
 /** One bounded read at a time while native creation is positively pending; no new submission. */
 async function followCreatedIssue(room: Room, result: Acted, current: () => boolean): Promise<void> {
+  if (creationFollow?.result === result && creationFollow.active && creationFollow.current() && current()) return;
   cancelCreationFollow();
-  const owned: CreationFollow = { result, active: true };
+  const owned: CreationFollow = { result, active: true, current };
   creationFollow = owned;
   let reads = 0;
-  const active = () => owned.active && creationFollow === owned && lastActs.get(actAssociation(room, room.directory)) === result && current();
+  const active = () => owned.active && creationFollow === owned && lastActs.get(actAssociation(room, room.directory)) === result && owned.current();
   const check = async (): Promise<void> => {
     if (!active()) { if (creationFollow === owned) cancelCreationFollow(); return; }
     const read = await issueCreation(room, result, active); reads++;

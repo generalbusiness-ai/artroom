@@ -387,7 +387,11 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     vi.useFakeTimers();
     rendered=gate();attempts[1]!.finish('accepted');await childRead.promise;
     expect(location.hash).toBe('#/'); // A known acceptance alone does not supply a child address.
-    releaseChild.resolve();await rendered.promise;
+    await refresh(); // A same-context redraw can expose the manual original check while its first lookup is held.
+    root.querySelectorAll<Node>('button').find(node=>node.textContent==='Check created issue')!.emit('click');
+    expect(createdChild).toHaveBeenCalledTimes(1);
+    expect(act.mock.calls.filter(call=>call[2]==='open-issue')).toHaveLength(2); // Original refused request, then accepted request; no replacement.
+    rendered=gate();releaseChild.resolve();await rendered.promise;
     expect(location.hash).toBe('#/');expect(root.textContent).not.toContain('Native issue');
     expect(createdChild).toHaveBeenCalledTimes(1);
     const nativePosts = posts.mock.calls.length, nativeActs = act.mock.calls.length;
