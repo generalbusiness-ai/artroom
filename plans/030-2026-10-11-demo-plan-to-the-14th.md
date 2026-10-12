@@ -134,19 +134,31 @@ says so.
 
 1. Land the brand kit; deploy the Counter host from main `2614a82a`.
 2. The practice script (`f77085ed`), tonight.
-3. Step 3, the stale-base rehearsal shot, with its observed run.
-4. The component rename head (plan 028 step 2).
-5. The documentation head (plan 028 step 3), carrying the positioning.
-6. Step 1, the concern path guard: live in the video only if its
-   estimate fits before the freeze; built in full either way, after the
-   docs head.
-7. Redeploy every host, rehearse the 26 (now 27) shots, publish the six
+3. Step 3, the stale-base rehearsal shot, with its observed run (the
+   distinct-lane child for the freeze; the same-lane form after the
+   submission).
+4. The Counter demo head (Hugh, 11 October 21:15: the Counter is the
+   first demo he records, and the demo may persist the signing key): one
+   identity bundle remembered in the browser as a non-extractable key,
+   one Join in place of Participate, Activate and Arm, automatic turns,
+   and the three presentation fixes from the design review of request
+   `e04c3b81`. Candidate on the isolated host Monday afternoon for the
+   rehearsal; landed and redeployed before the freeze.
+5. The component rename head (plan 028 step 2).
+6. The documentation head (plan 028 step 3), carrying the positioning.
+7. Step 1, the concern path guard: the builder's estimate (eight hours
+   after the docs head) does not fit before the freeze, so the video
+   takes the narrated line; the guard is built in full after the docs
+   head and the submission.
+8. Redeploy every host, rehearse the 26 (now 27) shots, publish the six
    packages as `dap-*`.
-8. The fork cost measurement (plan 029 item 0) only in an idle hour.
+9. The fork cost measurement (plan 029 item 0) only in an idle hour.
 
-The checker's order stays as set: the rename head, then the docs head,
-then the guard head if filed. The stale-base shot is an evidence review,
-not a full one.
+The checker's order follows: the stale-base child, the Counter head
+(full), the rename head, the docs head.
+
+The stale-base shot is an evidence review, not a full one; the others
+are full reviews.
 
 ## Gates, re-cut
 
