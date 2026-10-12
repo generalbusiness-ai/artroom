@@ -244,6 +244,18 @@ export class McpService {
     return { summary: read.value, at: read };
   }
 
+  /**
+   * The target of an act as its summary has it; or, where the caller may not read it yet and the configuration records its pin,
+   * that pin with no items: the act is signed with no expected revisions, as `artroom join` signs one, and the scope judges.
+   */
+  async #target(scope: ScopeId, membership: ScopeRef | null): Promise<Pick<Summary, "scope" | "definition" | "items">> {
+    const read = await this.reads.read(membership, (t, r) => t.summary(scope, r));
+    if (read.ok) return read.value;
+    const pin = this.kept.pins.get(scope);
+    if (pin && read.reason === "forbidden") return { scope: pin.ref, definition: pin.pinned, items: [] };
+    return stop({ error: "read", scope, reason: read.reason });
+  }
+
   async #definition(s: Snapshot, pinned: Digest | PlatformDefinition, scope: ScopeId, membership: ScopeRef | null): Promise<DefinitionLike> {
     const rules = s.read.room?.rules;
     const found = await definitionOf(this.reads, this.kept, pinned, [{ scope, membership }, ...(rules ? [{ scope: rules.scope, membership: s.read.room!.membership }] : [])]);
@@ -261,7 +273,7 @@ export class McpService {
     if (named === undefined && binding?.singleton) named = binding.scopes[0]!.scope;
     if (named === undefined) return failed({ error: "target", what: "no target was given" });
     const { scope, membership } = await this.#scope(s, named);
-    const { summary } = await this.#summary(scope, membership);
+    const summary = await this.#target(scope, membership);
     const definition = await this.#definition(s, summary.definition, scope, membership);
     const act = definition.acts[kind];
     // The binding check, before anything is signed: the target's pinned definition and declaration are the ones this tool serves.
@@ -331,7 +343,11 @@ export class McpService {
     const tool = binding?.name ?? "act";
     if ("lost" in kept) return failed({ error: "transport", scope, submitted: true });
     const said = answered(kept.answer, asked, guards);
-    if (kept.answer.answer === "accepted" && !kept.retained) void this.check();
+    if (kept.answer.answer === "accepted" && !kept.retained) {
+      // An accepted act on a membership can change whether it gives this key a session: ask again on the next read.
+      if (summary.scope.kind === "membership") this.reads.forget(summary.scope.scope);
+      void this.check();
+    }
     return ok(this.#answerOf(kept.answer, { scope, kind, tool, retained: kept.retained, said, phase: kept.record.phase }));
   }
 

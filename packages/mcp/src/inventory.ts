@@ -29,6 +29,11 @@ export interface McpConfig {
   register?: ScopeRef;
   repository?: { directory: ScopeRef; membership: ScopeRef; rules: ScopeId; destination: ScopeId; inbox?: ScopeId };
   roots?: readonly Root[];
+  /**
+   * The pinned definitions of scopes the caller cannot read yet, by scope ID, as an invitation link records membership's
+   * version: a key that is no member's reads nothing before it joins, and its list still offers `room.join`.
+   */
+  pins?: Readonly<Record<string, Digest | PlatformDefinition>>;
 }
 export interface Root { scope: ScopeId; membership: ScopeRef | null }
 
@@ -141,6 +146,8 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
   const repository = config.repository;
   if (repository) {
     const M = repository.membership;
+    const pinned = config.pins?.[M.scope];
+    if (pinned && !kept.pins.has(M.scope)) kept.pins.set(M.scope, { ref: M, pinned });
     const [membershipRead, directoryRead, rulesRead] = [await summaryOf(M.scope, M), await summaryOf(repository.directory.scope, M), await summaryOf(repository.rules, M)];
     if (membershipRead.ok) {
       heads[M.scope] = headText(membershipRead.at);
@@ -185,7 +192,12 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
         room.inbox = kept.pins.get(repository.inbox)?.ref ?? null;
       }
       for (const lane of lanes) await hold("lane", lane.ref.scope, M, undefined, { number: lane.number, kind: lane.kind, title: lane.title, state: lane.state });
-    } else unread.push({ scope: repository.directory.scope, reason: directoryRead.reason });
+    } else {
+      unread.push({ scope: repository.directory.scope, reason: directoryRead.reason });
+      // Nothing of the room is readable yet: membership is held by the pin the configuration records, so its acts that a rule
+      // decides, such as join, are listed.
+      if (kept.pins.has(M.scope)) await hold("membership", M.scope, M);
+    }
   } else if (config.register) {
     await hold("register", config.register.scope, null);
   }

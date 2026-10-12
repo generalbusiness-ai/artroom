@@ -53,6 +53,9 @@ export interface Room {
   /** Wire the outside port of the register a story created, as the deployment's host setting would. */
   wireRegister(register: ScopeId): Promise<void>;
   advance(ms: number): void;
+  now(): number;
+  /** The next request whose path ends with `suffix` reaches the Worker, and its reply is lost: a STAND-IN for a dropped reply. */
+  loseNextReply(suffix: string): void;
   fetch: Fetch;
   done(): void;
 }
@@ -72,8 +75,15 @@ export function mcpRoom(): Room {
     const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => lifetime.platform(scope as ScopeId))];
     await driveFixture(nodes, wait);
   };
-  const fetch: Fetch = ((url: string, init?: RequestInit) => lifetime.waitFor(sessionOwner, () => routed(url, init))) as unknown as Fetch;
+  let lose: string | null = null;
+  const fetch: Fetch = (async (url: string, init?: RequestInit) => {
+    const response = await lifetime.waitFor(sessionOwner, () => routed(url, init));
+    if (lose !== null && new URL(url).pathname.endsWith(lose)) { lose = null; await response.body?.cancel(); throw new Error("scripted loss of the reply"); }
+    return response;
+  }) as unknown as Fetch;
   return {
+    now: () => lifetime.now(),
+    loseNextReply: (suffix) => { lose = suffix; },
     pause, wait, active, fetch, done,
     platform: (scope) => lifetime.platform(scope),
     advance: (ms) => lifetime.advance(ms),
