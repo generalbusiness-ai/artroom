@@ -18,6 +18,8 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
+import { foundingOffer } from "@generalbusiness/artroom-client";
+import { originalStart, startRoom, type StartedRoom } from "./start-custody.ts";
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
@@ -38,6 +40,7 @@ const KEPT = "artroom-page";
 /** The room text survives a key-generation redraw in memory only. It can hold an invitation secret. */
 let invitationDraft = "";
 let configDraft = "";
+let startDraft = "";
 let connectionBusy = false;
 /** What this browser keeps: the room (no secret of it) and the key. */
 interface LocalLabel { text: string; place: Place; register?: ScopeRef }
@@ -504,6 +507,95 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   return panel;
 }
 
+/** Start shares the adopted entry layout. Reads never trigger Start/Continue. */
+function startScreen(): HTMLElement {
+  const capturedDraw = drawing, capturedRoute = location.hash;
+  const capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
+  const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
+  const message = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
+  const tell = (text: string, bad = false) => { if (current()) { message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; } };
+  const name = h("input", { name: "room", required: "", maxlength: "256", autocomplete: "off", value: startDraft }) as HTMLInputElement;
+  const submit = h("button", { type: "submit", class: "primary" }, "Start room");
+  const check = h("button", { type: "button", class: "link-button", hidden: "" }, "Check status");
+  const form = h("form", { class: "entry-form" }, h("label", {}, "Room name", name), submit);
+  const ready = h("div", { hidden: "" });
+  const heading = h("h1", {}, "Start a room");
+  const intro = h("p", { class: "entry-intro" }, "Choose a personal room name.");
+  let original: ReturnType<typeof originalStart> = null;
+  let blocked = false;
+  const restore = () => {
+    try {
+      original = originalStart(location.origin, localStorage);
+      if (original) { name.value = original.label; name.setAttribute("disabled", ""); submit.textContent = "Continue creation"; if (ready.hasAttribute("hidden")) check.removeAttribute("hidden"); }
+    } catch { blocked = true; name.setAttribute("disabled", ""); submit.setAttribute("disabled", ""); check.setAttribute("disabled", ""); tell("Original Start custody is unavailable. Nothing will be replaced.", true); }
+  };
+  restore();
+  if (original) tell("Your original Start and founder key are retained. Check status only reads; Continue creation explicitly resumes its original requests.");
+  name.addEventListener("input", () => { startDraft = name.value; });
+  const download = (filename: string, text: string, type: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    try { const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); }
+    finally { URL.revokeObjectURL(url); }
+  };
+  const showResult = async (result: StartedRoom) => {
+    if (!current()) { result.secret?.fill(0); return; }
+    if (!result.repository || !result.secret) { result.secret?.fill(0); tell(result.outcome.lines.join(" ") || "The original creation remains unresolved. Check status before continuing.", true); return; }
+    const secret = result.secret;
+    try {
+      const place: Place = { directory: result.repository.directory.scope, membership: result.repository.membership };
+      const room = await openRoom({ service: location.origin, secret }, place);
+      if (!current()) return;
+      if (!verifiedRoom(room) || room.key !== result.key || room.me.handle !== result.handle) { tell("The created room has not verified this original founder key. Check status before opening it.", true); return; }
+      // This is the actual enrolled founder seed; the journal's internal
+      // recovery key is never exposed as a usable member/device key.
+      const encoded = b64url(secret);
+      const next: Settings = { place, secret: encoded, register: result.configured.register,
+        label: { text: result.label, place, register: result.configured.register },
+        claimSelection: { operation: result.operation, place, register: result.configured.register, origin: location.origin, key: result.key } };
+      const open = h("button", { type: "button", class: "primary" }, "Open room");
+      open.addEventListener("click", () => {
+        if (!current()) return;
+        if (!keep(next)) { tell("The room is verified, but connection storage could not be read back. Check the saved original before another request.", true); return; }
+        opened.clear(); startDraft = ""; location.hash = "#/"; void draw(true);
+      });
+      const recovery = h("button", { type: "button", class: "link-button" }, "Download recovery files");
+      recovery.addEventListener("click", () => {
+        if (!current()) return;
+        download("device.key", encoded + "\n", "text/plain");
+        download("config.json", JSON.stringify({ v: 1, service: location.origin, key: "device.key", register: result.configured.register, repository: result.repository, handle: result.handle }, null, 2) + "\n", "application/json");
+      });
+      form.setAttribute("hidden", ""); check.setAttribute("hidden", "");
+      heading.textContent = "Your room is ready"; intro.textContent = "Your founding membership is verified.";
+      ready.replaceChildren(h("p", {}, room.name ?? "Your verified room"),
+        h("p", { class: "muted small" }, `Personal label: ${result.label}`), open, recovery);
+      ready.removeAttribute("hidden"); document.title = room.name ? `dap - workroom ${room.name}` : "dap - workroom";
+      tell("The room and its founding membership are verified. Keep the recovery files private.");
+    } finally { secret.fill(0); }
+  };
+  const run = async (mode: "new" | "continue" | "check") => {
+    if (!current() || connectionBusy || blocked) return;
+    connectionBusy = true; submit.setAttribute("disabled", ""); check.setAttribute("disabled", "");
+    tell(mode === "check" ? "Reading the original creation status" : "Working on your room");
+    try {
+      // A retained invitation with uncertain dispatch cannot be bypassed by
+      // choosing another first-run task. Read-only Start Check remains safe.
+      const enrollment = originalJoin(location.origin, localStorage);
+      if (mode !== "check" && enrollment && ["prepared", "unknown"].includes(enrollment.status)) throw new Error("An original invitation enrollment remains unresolved. Check that original join before starting another room.");
+      const offer = mode === "new" ? await foundingOffer(location.origin) : undefined;
+      if (!current()) return;
+      const result = await startRoom(location.origin, localStorage, { mode, ...(offer ? { offer } : {}), label: name.value,
+        foundingOffer: async register => { const offered = await foundingOffer(location.origin); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
+      await showResult(result);
+    } catch (error) { tell(error instanceof Error ? error.message : "The original creation remains unresolved. Check status without replacing its key.", true); }
+    finally { connectionBusy = false; if (current()) { restore(); if (!blocked) { submit.removeAttribute("disabled"); check.removeAttribute("disabled"); } } }
+  };
+  form.addEventListener("submit", event => { event.preventDefault(); void run(original ? "continue" : "new"); });
+  check.addEventListener("click", () => { void run("check"); });
+  return h("main", { class: "screen entry-screen" }, h("a", { class: "entry-back", href: "#/join" }, "‹", "Back"),
+    heading, intro, form, message, check, ready,
+    h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your founder key when you explicitly start. Keep the recovery files to reconnect to the same room.")));
+}
+
 function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
   const capturedDraw = drawing, capturedRoute = location.hash, capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
   const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
@@ -512,7 +604,8 @@ function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
     ignoredSavedAddress ? h("p", { class: "entry-answer" }, "The saved connection address is ignored. Your room and key are kept. Use a connection below; this page reads only its own service.") : null,
     h("div", { class: "entry-choices" },
       h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
-      h("a", { class: "entry-choice", href: "#/config" }, h("div", {}, h("h2", {}, "Config and key"), h("p", {}, "Use config.json and its matching device key.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›"))));
+      h("a", { class: "entry-choice", href: "#/config" }, h("div", {}, h("h2", {}, "Config and key"), h("p", {}, "Use config.json and its matching device key.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›"))),
+    h("a", { class: "link-button", href: "#/start" }, "Start a room"));
   const message = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
   const tell = (text: string, bad = false) => { if (!current()) return; message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; };
   const selectRoom = async (next: Settings, expectedHandle?: string): Promise<boolean> => {
@@ -610,6 +703,7 @@ async function draw(focus = false): Promise<void> {
     document.title = verifiedRoom(selectedRoom) && selectedRoom.name ? `dap - workroom ${selectedRoom.name}` : "dap - workroom";
     publish(...children);
   };
+  if (route.destination === "start") return show(...entryShell(startScreen()));
   if (["join", "invitation", "config"].includes(route.destination) || !kept || !kept.place || ignoredSavedAddress) {
     const path = route.destination === "invitation" || route.destination === "config" ? route.destination : "join";
     return show(...entryShell(connectionScreen(path)));
