@@ -18,7 +18,8 @@ import { defineConfig } from "vitest/config";
  * `packages/lanes/vitest.scope.config.ts` runs them alone, in a Worker of
  * the lanes package's own, with the same classes. The command line's story,
  * `packages/cli/test/*.scope.test.ts`, and the page's story,
- * `packages/page/test/*.scope.test.ts`, run here the same way, and have no
+ * `packages/page/test/*.scope.test.ts`, and the MCP server's stories,
+ * `packages/mcp/test/*.scope.test.ts`, run here the same way, and have no
  * Worker of their own.
  *
  * The post-sent local-denial witness has its own `scope-denial` Worker
@@ -38,7 +39,7 @@ export default defineConfig({
       project("checkers", "checkers", "vitest.config.ts", 0),
       project("replay", "replay", "vitest.config.ts", 0),
       project("client", "client", "vitest.config.ts", 0),
-      project("scope", "scope", "vitest.worker.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts"], {
+      project("scope", "scope", "vitest.worker.config.ts", 1, ["../lanes/test/**/*.scope.test.ts", "../cli/test/**/*.scope.test.ts", "../page/test/**/*.scope.test.ts", "../mcp/test/**/*.scope.test.ts"], {
         // The page's recorder for its screenshots runs only when asked: `PAGE_RECORD=1` (packages/page/test/screens.mjs). So does
         // the demo runner's recorder for its captures: `DEMO_RECORD=1` (scripts/demo-captures.ts --recorded).
         provide: { pageRecord: process.env["PAGE_RECORD"] === "1", demoRecord: process.env["DEMO_RECORD"] === "1" },
@@ -47,6 +48,7 @@ export default defineConfig({
       project("lanes", "lanes", "vitest.config.ts", 0),
       project("cli", "cli", "vitest.config.ts", 0),
       project("page", "page", "vitest.config.ts", 0),
+      project("mcp", "mcp", "vitest.config.ts", 0),
       {
         extends: "./examples/counting/vitest.config.ts",
         test: { name: "counting", root: "./examples/counting", sequence: { groupOrder: 0 } },

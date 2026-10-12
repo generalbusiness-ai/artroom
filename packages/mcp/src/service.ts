@@ -697,7 +697,7 @@ export class McpService {
       }
     }
     if (seeds.length === 0) return null;
-    const children: { scope: ScopeId; kind: string; definition: string; status: string | null; by: string }[] = [];
+    const children: { scope: ScopeId; ref: ScopeRef | null; kind: string; definition: string; status: string | null; by: string }[] = [];
     const queue = seeds.map((s) => ({ ...s, by: `${scope}:${s.from}.${s.n}`, depth: 0 }));
     while (queue.length > 0) {
       const next = queue.shift()!;
@@ -705,14 +705,34 @@ export class McpService {
       // A child's own reads go with the same membership; a signed read is the fallback where the cause chain allows it.
       const child = await this.reads.read(membership, (t, r) => t.summary(id, r));
       const status = child.ok ? child.value.status : null;
-      children.push({ scope: id, kind: next.seed.kind, definition: String(next.seed.definition), status, by: next.by });
+      children.push({ scope: id, ref: child.ok ? child.value.scope : null, kind: next.seed.kind, definition: String(next.seed.definition), status, by: next.by });
       if (status === "active" && next.depth === 0) {
         const genesis = await this.reads.read(membership, (t, r) => t.entry(id, r, 0));
         if (genesis.ok) for (const send of genesis.value.entry.sends) if ("creator" in send.to) queue.push({ n: send.n, seed: send.to as Seed, from: 0, by: `${id}:0.${send.n}`, depth: 1 });
       }
     }
     waiting(children.map((c) => c.scope));
-    return children.every((c) => c.status === "active") ? { created: children } : null;
+    if (!children.every((c) => c.status === "active")) return null;
+    await this.#remember(entry, children);
+    return { created: children.map(({ ref: _ref, ...c }) => c) };
+  }
+
+  /**
+   * A room the caller's own claim created, or the caller's own inbox, is recorded in the configuration, as `artroom claim` and
+   * `join` record them, so the next list holds the room's scopes. Only an entry the caller's key signed is followed.
+   */
+  async #remember(entry: Entry, children: readonly { ref: ScopeRef | null; kind: string }[]): Promise<void> {
+    const set = this.#port.config.setRepository;
+    if (!set || entry.input.type !== "act" || entry.input.signed.intent.actor !== this.#port.signer.key) return;
+    const of = (kind: string) => children.find((c) => c.kind === kind)?.ref ?? null;
+    const config = await this.#port.config.read();
+    const [directory, membership, rules, destination, inbox] = ["directory", "membership", "rules", "destination", "inbox"].map(of);
+    if (!config.repository && directory && membership && rules && destination) {
+      await set({ directory, membership, rules: rules.scope, destination: destination.scope });
+      this.reads.forget(membership.scope);
+    } else if (config.repository && inbox && !config.repository.inbox && entry.at.scope === config.repository.membership.scope) {
+      await set({ ...config.repository, inbox: inbox.scope });
+    }
   }
 
   async #credential(args: Args): Promise<CallResult> {

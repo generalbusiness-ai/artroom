@@ -36,6 +36,8 @@ export interface Root { scope: ScopeId; membership: ScopeRef | null }
 export interface ConfigPort {
   read(): Promise<McpConfig>;
   addRoot(root: Root): Promise<void>;
+  /** Record the repository that the caller's own claim created, or the caller's inbox, as `artroom claim` and `join` record them. */
+  setRepository?(repository: NonNullable<McpConfig["repository"]>): Promise<void>;
 }
 
 /** What the process keeps, none of it authority: pins by scope and definitions by digest, which never change. */
