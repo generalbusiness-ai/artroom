@@ -7,6 +7,7 @@ import type { Summary } from "@generalbusiness/artroom-contract";
 import type { ObservationState } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { mountCountingStage } from "./app.ts";
+import { browserSpeech } from "./speech.ts";
 import { stageView, type StagePresentation } from "./view.ts";
 import { nativeGateway, type CommandStore, type StageGateway } from "./client.ts";
 import type { CountingView } from "./model.ts";
@@ -20,6 +21,22 @@ class Element {
   querySelector(){return null;}focus(){}remove(){}
 }
 const elements=(root:Element):Element[]=>[root,...root.children.flatMap(elements)];
+// Browser speech inventory and utterances are stand-ins; no physical audio.
+test("Counter demo offers and plays only en-US voices, including after inventory changes",()=>{
+  const oldSynth=globalThis.speechSynthesis,oldUtterance=globalThis.SpeechSynthesisUtterance;
+  const us={voiceURI:"us",name:"American",lang:"en-US"},british={voiceURI:"gb",name:"British",lang:"en-GB"},french={voiceURI:"fr",name:"French",lang:"fr-FR"};
+  let inventory=[british,us,french];const played:SpeechSynthesisUtterance[]=[];
+  class FakeUtterance {constructor(public text:string){}voice?:SpeechSynthesisVoice;lang="";onend?:()=>void;onerror?:()=>void;}
+  Object.assign(globalThis,{speechSynthesis:{getVoices:()=>inventory,speak:(utterance:SpeechSynthesisUtterance)=>{played.push(utterance);},cancel(){}},SpeechSynthesisUtterance:FakeUtterance});
+  try{
+    const speech=browserSpeech(),callbacks={end(){},error(){}};
+    assert.deepEqual(speech.voices(),[{id:"us",name:"American · en-US"}]);
+    assert.throws(()=>speech.play("1","gb",callbacks),/English \(US\).*unavailable/);assert.equal(played.length,0);
+    speech.play("1","us",callbacks);assert.equal(played[0]?.voice,us);assert.equal(played[0]?.lang,"en-US");assert.equal(played[0]?.text,"1");
+    played.length=0;inventory=[british,french];assert.deepEqual(speech.voices(),[]);
+    assert.throws(()=>speech.play("2","us",callbacks),/unavailable/);assert.equal(played.length,0);
+  }finally{Object.assign(globalThis,{speechSynthesis:oldSynth,SpeechSynthesisUtterance:oldUtterance});}
+});
 test("Roster removal leaves the identity-owned original Check report reachable without signing, POST or speech",async()=>{
   const oldDocument=globalThis.document,oldHTMLElement=globalThis.HTMLElement,oldButton=globalThis.HTMLButtonElement;
   Object.assign(globalThis,{document:{createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null},HTMLElement:Element,HTMLButtonElement:Element});
