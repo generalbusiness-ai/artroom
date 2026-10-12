@@ -85,7 +85,7 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   let original: StartStatus | null = null, verified = false, complete = false, redraw!: () => void;
   let finishOffer!: (value: FoundingOffer) => void;
   const offerRead = vi.fn(() => new Promise<FoundingOffer>(resolve => { finishOffer = resolve; }));
-  const start = vi.fn(async (_origin: string, _storage: unknown, options: StartOptions): Promise<StartedRoom> => {
+  const start = vi.fn(async (_origin: string, _storage: unknown, _options: StartOptions): Promise<StartedRoom> => {
     original = { key, configured: { register, definition: "platform:register@7" }, handle: "@founder", label: "Personal intent", operation: "original", state: complete ? "complete" : "pending" };
     return { key, configured: original.configured, handle: "@founder", operation: "original", label: "Personal intent", pending: !complete, repository: complete ? { directory, membership, rules: directory.scope, destination: membership.scope } : null, outcome: { code: complete ? 0 : 1, lines: ["SCRIPTED original pending"] }, ...(complete ? { secret: seed.slice() } : {}) };
   });

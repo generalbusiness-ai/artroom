@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import type { SignedIntent } from "@generalbusiness/artroom-contract";
-import { b64url, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent, textDigest, unb64url } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent, textDigest, unb64url } from "@generalbusiness/artroom-bytes";
 import type { FoundingOffer } from "@generalbusiness/artroom-client";
 import type { Context, PendingClaim, Repository } from "@generalbusiness/artroom-cli";
 
@@ -41,7 +41,7 @@ test("scripted Start retains its actual founder key before the CLI boundary; rel
       const pending: PendingClaim = { register: register.scope, intent: intentDigest(intent), handle: "@founder", found: { signed: original } };
       await ctx.store.save({ ...config, claim: pending });
     } else {
-      expect(JSON.stringify(config.claim.found?.signed) === JSON.stringify(original)).toBe(true);
+      expect(canonicalize(config.claim.found?.signed) === canonicalize(original)).toBe(true);
       expect(descriptor.secret === founder).toBe(true);
     }
     secret?.fill(0); posts++;
@@ -49,7 +49,7 @@ test("scripted Start retains its actual founder key before the CLI boundary; rel
   });
   cli.checkClaim.mockImplementation(async (ctx: Context) => {
     const config = (await ctx.store.config())!;
-    expect(JSON.stringify(config.claim?.found?.signed) === JSON.stringify(original)).toBe(true);
+    expect(canonicalize(config.claim?.found?.signed) === canonicalize(original)).toBe(true);
     return { code: 1, lines: ["SCRIPTED original remains pending"] };
   });
   const first = await startRoom(origin, f.storage, { mode: "new", label: "Personal intent", offer, foundingOffer: offerRead, locks });
@@ -78,7 +78,9 @@ test("scripted Start retains its actual founder key before the CLI boundary; rel
     await expect(startRoom(origin, reload, { mode: "continue", foundingOffer: unavailableOffer, locks })).rejects.toThrow("private Start");
     await expect(startRoom(origin, reload, { mode: "check", locks })).rejects.toThrow("private Start");
     expect(cli.claim).toHaveBeenCalledTimes(2); expect(cli.checkClaim).toHaveBeenCalledTimes(1);
-    expect(posts).toBe(2); expect(uuid).not.toHaveBeenCalled(); expect(randomness).not.toHaveBeenCalled();
+    expect(posts).toBe(2); expect(uuid).not.toHaveBeenCalled(); // Public-key derivation uses 16-byte scalar blinding in the pinned
+    // curve implementation; a new founder seed would require 32 bytes.
+    expect(randomness.mock.calls.some(([array]) => array?.byteLength === 32)).toBe(false);
     expect(f.values.get(`artroom-page-start:${origin}`) === descriptorBeforeLoss).toBe(true);
   } finally { uuid.mockRestore(); randomness.mockRestore(); }
 });
