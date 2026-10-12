@@ -47,7 +47,17 @@ Public gate and bounded-completion proofs are in `page-join-gate-one/`;
 completion SHA256 `045653b62790aede67c637e285238fa78fa1930dd3f02e3d08ad227698d3ac50`. After browser code head `5f54`,
 only documentation and test fixtures changed.
 
-Isolated-host screenshots/deployment, checker full review, landing
-and production redeployment remain owed. Full title request `936` stays open.
+The isolated candidate deployed at code head `ba4c3a01d7ea20dba39110a4ce2b2812599b8bdd`,
+version `d7e7baca-451e-4223-8dfb-a327f7f30877`. All 22 actual static readbacks
+matched expected bytes, types and security headers; Counter and brand assets
+remained unchanged, as did protected bindings and runtime metadata. Deployment
+proof SHA256 `5aa242b8ed7bd2b0faef0e78c2ab240959fcd23111095b8bcf3dde7affc61771`.
+Twelve hosted empty-entry captures passed at 1280/390 in both themes, with
+exact served HTML/JS correspondence and no page errors, warnings or blocked
+requests. Hosted capture proof SHA256 `8cc3f519ce717f8192ddce6ee9b35d4d8de87be9b71edfb86339818b6842d7e2`.
+These anonymous static checks do not prove native enrollment or Start capability.
+This result update changes only the note after the deployed code head.
+
+Checker full review, landing and production redeployment remain owed. Full title request `936` stays open.
 The Start-a-room amendment `010` is blocked on the service capability and a
 separate child request; this existing-room delivery does not close it.
