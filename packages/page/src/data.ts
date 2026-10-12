@@ -345,9 +345,9 @@ const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Prom
 export interface IssueView {
   /** The actual intent item used by transitions. */
   intent?: number;
-  scope: ScopeId; definition: string; head: Head;
+  scope: ScopeId; ref: ScopeRef; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
-  requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
+  requesterRef: MemberRef | null; requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
 }
 
 /** An issue lane: its intent item, its comments, and the head it was read at. */
@@ -360,9 +360,9 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
-    scope, definition: summary.definition, head: at, intent: intent.id,
+    scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, intent: intent.id,
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
-    state: intent.state, closeReason: text(intent.values["closeReason"]), requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
+    state: intent.state, closeReason: text(intent.values["closeReason"]), requesterRef: isMemberRef(intent.parties["requester"]) ? structuredClone(intent.parties["requester"]) : null, requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
     conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
   };
 }

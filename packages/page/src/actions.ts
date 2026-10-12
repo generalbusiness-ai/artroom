@@ -92,6 +92,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
   const defaults = own(context.defaults, act.kind);
   const choicesFor = own(context.choices, act.kind);
   const blocked = context.uncertain || context.pending || context.blockedKinds?.includes(act.kind);
+  const closeReason = ["close-own", "close-any"].includes(act.kind) ? act.fields.find(field => field.name === "reason" && field.type === "enum") : undefined;
   // Exact-version defaults are part of the key: a version change never reuses a stale review draft.
   const draftKey = context.draftKey ? JSON.stringify([context.draftKey, act.kind, defaults ?? null]) : null;
   const draft = draftKey ? drafts.get(draftKey) ?? {} : {};
@@ -109,7 +110,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     const choices = own(choicesFor, field.name) ?? field.choices;
     const attrs: Record<string, string> = { name: `field:${field.name}`, "data-type": field.type };
     if (draftKey) attrs["data-focus-key"] = controlKey(draftKey, `field:${field.name}`);
-    if (field.required) attrs["required"] = "";
+    if (field.required || field === closeReason) attrs["required"] = "";
     const value = fixed ?? own(draft, field.name) ?? "";
     let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     if (fixed !== undefined || choices?.length === 1) {
@@ -150,17 +151,30 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
     }
     return { on, typed };
   };
-  form.addEventListener("input", () => {
+  let submitted = false;
+  const reasonChosen = () => !closeReason || closeReason.choices?.some(choice => choice.value === controls.find(control => control.name === "field:reason")?.value) === true;
+  const requiredChoiceUnavailable = act.fields.some(field => field.required && (own(choicesFor, field.name) ?? field.choices)?.length === 0 && own(defaults?.fields, field.name) === undefined);
+  const updateSubmit = () => {
+    if (!closeReason) return;
+    if (blocked || submitted || requiredChoiceUnavailable || !reasonChosen()) button.setAttribute("disabled", "");
+    else button.removeAttribute("disabled");
+  };
+  const edited = () => {
     if (draftKey) { const { on, typed } = read(); drafts.set(draftKey, { ...typed, on }); draftVersions.set(draftKey, (draftVersions.get(draftKey) ?? 0) + 1); }
-  });
+    updateSubmit();
+  };
+  form.addEventListener("input", edited);
+  form.addEventListener("change", edited);
+  updateSubmit();
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (blocked || button.hasAttribute("disabled")) return;
+    if (blocked || button.hasAttribute("disabled") || closeReason && (submitted || !reasonChosen())) return;
     const { on, typed } = read();
     const submittedDraft = { ...typed, on };
     if (draftKey) drafts.set(draftKey, submittedDraft);
     const submittedVersion = draftKey ? draftVersions.get(draftKey) ?? 0 : null;
     // Block repeated clicks while the shell's signed operation is awaiting its answer.
+    if (closeReason) submitted = true;
     button.setAttribute("disabled", "");
     const accepted = act.kind === "comment" && draftKey ? () => {
       const current = drafts.get(draftKey);
@@ -179,6 +193,7 @@ export function actionForm(act: Offered, send: Send, context: ActionContext, pri
       const value = own(current, name) ?? "";
       control.value = choices && !choices.some(choice => choice.value === value) ? "" : value;
     }
+    updateSubmit();
   });
   return form;
 }

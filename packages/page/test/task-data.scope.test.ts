@@ -10,7 +10,7 @@ import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.t
 import { Platform } from "../../scope/test/repository.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
 import { nextChangeAction, requestedReviewCandidates, taskReviewExtents } from "../src/task-values.ts";
-import { changeActions } from "../src/shell.ts";
+import { changeActions, issueActions } from "../src/shell.ts";
 const oid = (c: string) => c.repeat(40);
 
 /** Scheduler provenance uses the same authenticated room transport; no inspector. */
@@ -173,7 +173,11 @@ test("native task data supplies active issue choices, detached Description, exac
     const issue = (await listLanes(room)).issues.find((row) => row.title === "Clear task")!;
     expect(issue, "Confirmed native issue must appear in the Page projection").toBeDefined();
     expect(issue.scope).toBe(child);
-    expect((await loadIssue(room, issue.scope)).body).toBe("A literal Description.");
+    const loadedIssue = await loadIssue(room, issue.scope);
+    expect(loadedIssue.body).toBe("A literal Description.");
+    expect(loadedIssue.ref.scope).toBe(child);
+    expect(loadedIssue.requesterRef).toEqual(room.me?.ref);
+    expect(issueActions(loadedIssue.state, ["close-own", "close-any"], loadedIssue.requesterRef, room.me?.ref).primary).toEqual(["comment", "close-own"]);
     console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "issue-description");
     console.info("native-stage", "task-data", "started", performance.now() - stageOrigin, lastStarted = "publication-and-review-choices", lastCompleted);
     expect((await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Task data")).code).toBe(0);

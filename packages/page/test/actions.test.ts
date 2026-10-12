@@ -12,16 +12,19 @@ class Element {
   attrs = new Map<string, string>();
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
   closed = false;
+  parent: Element | null = null;
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
   getAttribute(name: string) { return this.attrs.get(name) ?? null; }
   removeAttribute(name: string) { this.attrs.delete(name); }
-  showModal() { this.closed = false; } close() { this.closed = true; } remove() {} focus() {}
+  showModal() { this.closed = false; } close() { this.closed = true; }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; }
+  focus() {}
   querySelectorAll(selector: string): Element[] {
     return this.all().filter(node => selector.split(",").some(part => {
       const simple = part.trim(), attribute = /^\[([^=\]]+)\]$/.exec(simple)?.[1];
       if (attribute) return node.hasAttribute(attribute);
-      if (simple === 'button[type=submit]') return node.tag === "button" && node.attrs.get("type") === "submit";
+      if (simple === 'button[type=submit]' || simple === 'button[type="submit"]') return node.tag === "button" && node.attrs.get("type") === "submit";
       return node.tag === simple;
     }));
   }
@@ -30,7 +33,8 @@ class Element {
     return (name ? this.all().find((node) => node.name === name) : this.querySelectorAll(selector)[0]) as T ?? null;
   }
   hasAttribute(name: string) { return this.attrs.has(name); }
-  append(...children: (Element | string)[]) { this.children.push(...children); }
+  append(...children: (Element | string)[]) { for (const child of children) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.push(child); } }
+  prepend(...children: (Element | string)[]) { for (const child of [...children].reverse()) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.unshift(child); } }
   addEventListener(name: string, listener: (event: { preventDefault(): void }) => void) {
     this.listeners.set(name, [...this.listeners.get(name) ?? [], listener]);
   }
@@ -141,6 +145,24 @@ test("ordinary declared inherited names remain own fields with their exact text,
 
 test("a final subject can retain its declared action for inspection without offering another merge", () => {
   let sends = 0;
+  const close: Offered = { kind: "close-own", step: "transition", on: "intent", line: "Close", fields: [{ name: "reason", type: "enum", required: false, choices: [{ label: "Completed", value: "completed" }, { label: "Not planned", value: "not-planned" }] }] };
+  const values: unknown[] = [];
+  const closeContext = { primary: ["close-own"], draftKey: "close/reason/original", defaults: { "close-own": { on: 0 } } };
+  const closing = () => asElement(actsPanel({ acts: [close], hidden: 0 }, (...args) => values.push(args), null, closeContext)).all().find(node => node.tag === "form")!;
+  const held = closing(), reason = held.all().find(node => node.name === "field:reason")!, submit = held.all().find(node => node.tag === "button")!;
+  expect(reason.hasAttribute("required")).toBe(true);
+  expect(submit.hasAttribute("disabled")).toBe(true);
+  held.event("submit"); expect(values).toEqual([]);
+  reason.value = "completed"; held.event("change"); expect(submit.hasAttribute("disabled")).toBe(false);
+  reason.value = ""; held.event("input"); expect(submit.hasAttribute("disabled")).toBe(true);
+  reason.value = "not-a-declared-choice"; held.event("change"); held.event("submit"); expect(values).toEqual([]);
+  reason.value = "completed"; held.event("change");
+  const restored = closing(); expect(restored.all().find(node => node.name === "field:reason")!.value).toBe("completed");
+  expect(restored.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  restored.event("submit"); restored.event("change"); restored.event("submit");
+  expect(values).toEqual([["close-own", "0", { reason: "completed" }]]);
+  const blockedClose = asElement(actsPanel({ acts: [close], hidden: 0 }, () => expect.fail("unknown close must not send"), null, { ...closeContext, uncertain: true }));
+  expect(blockedClose.all().find(node => node.tag === "button" && node.attrs.get("type") === "submit")!.hasAttribute("disabled")).toBe(true);
   const merge: Offered = { kind: "merge", step: "open", on: "merge", line: "Merge", fields: [] };
   const panel = asElement(actsPanel({ acts: [merge], hidden: 0 }, () => sends++, null, { blockedKinds: ["merge"] }));
   const form = panel.all().find((node) => node.tag === "form")!;
@@ -314,6 +336,9 @@ test("a refused creation keeps its draft editable; unknown creation offers a rea
   creator.event("click");
   const dialog = body.all().find(node => node.tag === "dialog")!;
   const form = dialog.all().find(node => node.tag === "form")!;
+  const footer = form.all().find(node => node.attrs.get("class") === "form-footer dialog-controls")!;
+  expect(footer.children.map(node => typeof node === "string" ? node : node.textContent)).toEqual(["Create issue", "Cancel"]);
+  expect(form.all().filter(node => node.tag === "button" && node.attrs.get("type") === "submit")).toHaveLength(1);
   form.all().find(node => node.name === "field:title")!.value = "Keep these words";
   form.event("input"); form.event("submit");
   issueDialogOutcome("creation-original-context", "editable", "The native request was refused.");

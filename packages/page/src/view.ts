@@ -69,7 +69,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   }
   query.addEventListener("input", () => { context?.changed({ query: query.value, filter }); render(); });
   render();
-  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { "data-action-slot": "create" })), content,
+  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { class: "toolbar-actions", "data-action-slot": "create" })), content,
     inspect("Inspect room record", whoLine(room), h("dl", {}, field("Directory", h("code", {}, room.directory)))),
   );
 }
@@ -82,7 +82,7 @@ const discussion = (body: string | null, comments: IssueView["comments"]): HTMLE
 
 export function issueScreen(room: Room, issue: IssueView): HTMLElement {
   return h("main", { class: "screen" }, back("issue"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null)), h("div", { "data-action-slot": "next" })),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null)), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
     issue.assignees.length ? h("p", { class: "record-meta" }, `Assigned to ${list(issue.assignees)}`) : null,
     issue.conditions.length ? section("Conditions", h("ul", {}, issue.conditions.map((c) => h("li", {}, c)))) : null,
     discussion(issue.body, issue.comments),
@@ -134,7 +134,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     typeof current.file.content === "string" ? h("div", { "data-action-slot": "edit" }) : null,
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { "data-action-slot": "next" })),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
     version,
     !published && requiredReviews.length ? section("Review requirements", requiredReviews.map((extent) => {
       const approving = change.reviews.filter((review) => review.manifest === current?.id && review.state === "submitted" && review.verdict === "approve" && review.extent === extent.name);
@@ -170,20 +170,20 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
 }
 
 export function rulesScreen(room: Room, rules: RulesView, editable = false): HTMLElement {
-  return h("main", { class: "screen form-layout" }, h("h1", { class: "rules-title" }, "Rules"),
+  return h("main", { class: "screen form-layout" }, h("div", { class: "detail-top" }, h("h1", { class: "rules-title" }, "Rules"), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
     !editable ? rules.extents?.length ? section("Review requirements", rules.extents.map((e) => h("div", { class: "rule-row" },
-      h("div", {}, h("strong", { class: "rule-label" }, e.name), h("span", { class: "rule-path" }, list(e.patterns ?? [], "Paths unmatched by another extent"))),
+      h("div", {}, h("strong", { class: "rule-label" }, e.name), h("span", { class: "rule-path" }, list(e.patterns ?? [], "Any other file paths"))),
       h("span", {}, `${e.approvals} approval${e.approvals === 1 ? "" : "s"}`),
       e.checks.length ? h("p", { class: "muted" }, `Required checks: ${list(e.checks)}`) : null,
     ))) : h("p", { class: "muted" }, "No review requirements published yet.") : null,
     !editable && rules.checks.some((c) => c.required) ? section("Required checks", h("ul", {}, rules.checks.filter((c) => c.required).map((c) => h("li", {}, c.name)))) : null,
     inspect("Inspect rules record", whoLine(room), h("dl", {},
       field("Rules scope", h("code", {}, rules.scope)), field("Read at", `${rules.head.seq}, ${rules.head.hash}`), field("Revision", rules.revision === null ? "No rules published yet" : String(rules.revision)),
-      field("Lanes' approval count", or(rules.approvals)), field("Author's agent controller may review", rules.ownerMayReview === null ? "Not stated" : rules.ownerMayReview ? "Yes" : "No"),
+      field("Lanes' approval count", or(rules.approvals)), field("Agent controllers can review their own agents", rules.ownerMayReview === null ? "Not stated" : rules.ownerMayReview ? "Yes" : "No"),
       field("Single-controller exception", rules.singleControllerException ? "Declared" : "Not declared"), field("Controllers", list(rules.controllers, "No eligible controller")),
       rules.labels.length ? field("Labels", list(rules.labels)) : null,
     ),
-      rules.extents?.length ? section("Extent authority", table(["Extent", "Class", "Role", "Approvals", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, e.approver, String(e.approvals), list(e.checks, "No required checks"), list(e.patterns ?? [], "Paths unmatched by another extent")]))) : null,
+      rules.extents?.length ? section("Extent authority", table(["Extent", "Class", "Role", "Approvals", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, e.approver, String(e.approvals), list(e.checks, "No required checks"), list(e.patterns ?? [], "Any other file paths")]))) : null,
       rules.checks.length ? section("Check configuration", table(["Name", "Required", "Checker"], rules.checks.map((check) => [check.name, check.required ? "Yes" : "No", check.checker === undefined ? "Not configured" : JSON.stringify(check.checker)]))) : null,
       rules.definitions.length ? section("Active definitions", table(["Name", "Digest", "State"], rules.definitions.map((d) => [d.name, h("code", {}, d.digest), d.state]))) : null,
     ),

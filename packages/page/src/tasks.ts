@@ -85,7 +85,10 @@ export function createIssue(act: Offered, send: Send, context: ActionContext): H
     const form = taskForm(taskAct, submit, context, fields, "Create issue");
     const close = h("button", { type: "button" }, "Cancel");
     const message = h("p", { role: "status", "aria-live": "polite", hidden: "" });
-    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, message, close) as HTMLDialogElement;
+    const submitButton = form.querySelector<HTMLElement>('button[type="submit"]');
+    const footer = h("div", { class: "form-footer dialog-controls" }, close);
+    if (submitButton) { submitButton.remove(); footer.prepend(submitButton); form.append(footer); }
+    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, message, ...(submitButton ? [] : [footer])) as HTMLDialogElement;
     const returnFocus = () => { [...document.querySelectorAll<HTMLElement>("[data-focus-key]")].find(node => node.getAttribute("data-focus-key") === openerKey)?.focus(); };
     const closeDialog = (restore = true) => { dialog.close(); dialog.remove(); if (context.draftKey && issueDialogs.get(context.draftKey)?.dialog === dialog) issueDialogs.delete(context.draftKey); if (restore && context.current?.() !== false) returnFocus(); };
     close.addEventListener("click", () => closeDialog());

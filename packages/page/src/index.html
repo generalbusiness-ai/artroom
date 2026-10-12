@@ -92,6 +92,10 @@
 
   .toolbar { display: flex; gap: 24px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
   .toolbar > .button { margin-left: auto; }
+  .toolbar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-left: auto; }
+  .toolbar-actions form { display: flex; align-items: flex-end; gap: 10px; margin: 0; }
+  .toolbar-actions form > label { margin: 0; }
+  .toolbar-actions .inspect-actions { margin: 0; }
   .toolbar > [data-action-slot="create"] { margin-left: auto; display: flex; align-items: center; gap: 8px; }
   [data-action-slot="next"] { display: flex; align-items: center; gap: 8px; }
   [data-action-slot="next"] form { margin: 0; }

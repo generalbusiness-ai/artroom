@@ -1,12 +1,16 @@
 /** Navigation and room identity shared by the browser shell and its tests. */
+import type { MemberRef } from "@generalbusiness/artroom-contract";
+import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
 export type Destination = "issues" | "changes" | "rules" | "join" | "invitation" | "config";
 export interface Route { destination: Destination; scope: string | null }
 
 /** State-sensitive presentation only; the scope still judges each offered act. */
-export function issueActions(state: string, offered: readonly string[]): { primary: string[]; blockedKinds: string[] } {
+export function issueActions(state: string, offered: readonly string[], requester?: MemberRef | null, current?: MemberRef | null): { primary: string[]; blockedKinds: string[] } {
   const closes = ["close-own", "close-any"], reopens = ["reopen-own", "reopen-any"];
-  const transition = (state === "closed" ? reopens : state === "open" ? closes : []).find((kind) => offered.includes(kind));
-  return { primary: ["comment", ...(transition ? [transition] : [])], blockedKinds: state === "closed" ? closes : state === "open" ? reopens : [...closes, ...reopens] };
+  const own = isMemberRef(requester) && isMemberRef(current) && canonicalize(requester) === canonicalize(current);
+  const blockedKinds = [...new Set([...(state === "closed" ? closes : state === "open" ? reopens : [...closes, ...reopens]), ...(!own ? ["close-own", "reopen-own"] : [])])];
+  const transition = (state === "closed" ? reopens : state === "open" ? closes : []).find((kind) => offered.includes(kind) && !blockedKinds.includes(kind));
+  return { primary: ["comment", ...(transition ? [transition] : [])], blockedKinds };
 }
 
 export function changeActions(state: string, invalidPath: boolean): { primary: string[]; blockedKinds: string[] } {

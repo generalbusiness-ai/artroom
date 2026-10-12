@@ -84,6 +84,13 @@ test("issue and rules keep their subject once and move authority detail into ins
   const rules = rulesScreen(room, { scope: "sc_rules", head, revision: 3, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: [{ name: "protected", class: "rules", approvals: 1, approver: "rules.publish", checks: [], patterns: ["AGENTS.md"] }], definitions: [], controllers: ["@controller"] } as never) as unknown as Element;
   expect(rules.children.filter((child) => typeof child === "string" || child.tagName !== "details").map((child) => typeof child === "string" ? child : child.textContent).join("").match(/AGENTS.md/g)).toHaveLength(1);
   expect(rules.all("details")[0]!.textContent).toContain("rules.publish");
+  const roomList = roomScreen(room, { issues: [], changes: [] }, "issue") as unknown as Element;
+  const change = render(view());
+  for (const screen of [roomList, issue, change, rules]) {
+    const row = screen.all("div").filter(node => node.attributes["class"] === "toolbar-actions");
+    expect(row).toHaveLength(1);
+    expect(row[0]!.attributes["data-action-slot"]).toBe(screen === roomList ? "create" : "next");
+  }
 });
 
 // A refused or unsettled comment is request evidence, not the lifecycle of a merge.
