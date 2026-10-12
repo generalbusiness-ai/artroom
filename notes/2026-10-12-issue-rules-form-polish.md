@@ -32,7 +32,11 @@ Public evidence:
 A deliberate composition with the empty-room changes, the normal Page asset build, an ordinary final-head gate, full review, landing and redeployment of Core and rehearsal still remain. Rendered browser observation, Hugh's hosted diagnosis, prospective native defaults and the rest of the parent demo duties remain separate obligations. No fresh human acceptance is claimed.
 
 
-## Current Source composition and item 8 disposition
+## Historical Source preparation at 1cd5; item 8 remains nrep
+
+The following section records the 1cd5 Source preparation. Its producer and
+check duties were pending then and are superseded by the current results below.
+Item 8 remains nrep. Original failures and proofs keep their original heads.
 
 The Forms and Round 2 Source is normally composed onto published main
 `6198b199e220e6ec2d7ee389937e4e2601f124ab`. Page Source is retained from
@@ -77,3 +81,119 @@ affected checks and the normal Page producer. The one final gate, full reviews,
 normal landing, Core and rehearsal deployment and remaining full request duties
 stay open. The earlier component failures remain historical, and the user queue
 remains Forms, then the homepage change, then Start. All Jam work stays deferred.
+
+
+## Completed local checks and current final gate
+
+At `1cd5a5f3bb5dc5016654ab43bb26ee9aa14d4e1e`, original run 89987 passed Page
+Source, Page Test and Page Scope compilers and the whole one-case initialization
+witness. The normal Page producer then passed once. That command made two
+internal pageFiles calls and emitted no metafile. Its focused guards covered
+1,430 Source files, 24 physical package files and actual API tool inputs, with
+12 workspace links. They were not a full dependency inventory. Proof:
+`/tmp/artroom-forms-final-focused-one/public-proof.json`, SHA-256
+`55a2033dce9108859670260a9f14a796d460092cf2c4cb6ff37863ad7cb30454`.
+The resulting asset-only head was `9389e70da1eef71a0257fffd065dc2bcbef07f55`.
+Its ordinary gate 80917 passed 1,042 Vitest cases, two original skips and Node
+chains of 9 and 55. That historical gate verified 1,430 Source files and 3,881
+resolved dependency files across 91 roots; it is not the final CSS-head proof.
+
+The local browser work found a visible Issue toolbar defect. The first CSS step
+changed the class rule at line 103 to end, but the later next-action rule at line
+108 still selected center. Equal specificity and later order overrode the first
+step. Producer 23287 passed and generated `0ec87f52d8c85a1c92dfe0c1ec6930c342023058`,
+but browser 81675 still failed the same alignment check. The second CSS step
+changed that binding rule at line 108 to end. Producer 74329 passed once and
+created current generated head `d6a70a5edec32f8c8cd45027cafbed8b2c00e1fc`, tree
+`a7cd3b8c7cd0bc035277319306d76a51f47fdebe`. Its Page module is 628,944 bytes,
+SHA-256 `8d70222fe7aa518ac4520d4056ff269d9ee93356b5839a539283ff8f94462ecf`.
+JavaScript remains byte-identical to the first producer. No unaffected compiler
+or completed browser case was repeated for these CSS steps. Producer proof:
+`/Users/hughpyle/play/artroom-diagnostics/forms-toolbar-page-build-preparation-r2/build-one/result.json`,
+SHA-256 `6c96d6c63c07e5b597c8c686ecd5f9f001a643dfe9ad76629c30355e575592cd`.
+
+The ordinary gate wrapper at the historical 0ec87 head, original session 23738,
+exited 1 after the gate reported a pass with all phases zero. Its artifact parser
+wrongly required macOS mktemp output below the requested TMP directory. The
+original subprocess return code was not retained. Read-only completion verified
+the unchanged Source and dependencies and copied the existing phase files; it
+ran no gate again. Its exit zero is distinct from the failed original wrapper.
+Gate exit zero there is an explicitly qualified inference from the pinned exit
+policy, not a directly retained value. Recovery proof:
+`/Users/hughpyle/play/artroom-diagnostics/forms-round2-css-gate-completion-source/output-one/public-proof.json`,
+SHA-256 `88ececcc2ec0877a4fb5de8cdbcde5bbafb4ee65fd7e142aaf2c7e7a8a89ad50`.
+
+After the remaining browser check passed, the one final ordinary gate, original
+session 68995, passed at the current d6 head. Its command exit zero was retained
+before artifact parsing. Whitespace, every workspace typecheck and tests exited
+zero. Vitest passed 1,042 cases and retained two original skips; 186 files passed
+and one was skipped. The Node chains passed 9 and 55 cases. Installation was
+skipped against the exact lock stamp. Before and after guards checked 1,430
+Source files, 3,882 resolved dependency files and 12 workspace links, with the
+checkout clean. Measured npm wall time was 103.9834365 seconds. These are local
+observations, not a speed comparison or physical drain claim. Final proof:
+`/Users/hughpyle/play/artroom-diagnostics/forms-round2-final-gate-d6-source/gate-one/public-proof.json`,
+SHA-256 `24909fbff4fce3a43506843ee66008ac259cb1179a07f29e1ede1d2331977452`.
+
+## Qualified rendered completion and retained browser history
+
+The browser checks used the actual built Page with scripted transport and
+synthetic answers. They do not complete the original authenticated hosted browser
+gestures or native accepted-Create journey. The Browser plugin was unavailable;
+the released fallback used pinned Playwright and Chromium. Original failures
+remain failed, and completed cases were excluded from each continuation:
+
+- At 9389, the first harness failed fixture compilation before Chromium or
+  captures: the resolver omitted derive/rule's RULE_PROFILES. Run 11366 then
+  compiled but timed out at ConfigJoin, with no captures. Noncanonical fixture
+  time and obsolete routes were corrected. A third prevalidation failed on
+  wrong-kind references. Run 95659 passed 17 answer prevalidations and captured
+  Issues, Changes and empty docs before an omitted destination summary left a
+  change view unknown.
+- Still at 9389, run 58389 captured change detail and both Rules states before
+  finding the real Issue alignment defect. At 0ec87, run 81675 captured nothing
+  and confirmed the first CSS step was insufficient.
+- At d6, run 24909 captured the corrected Issue toolbar with local times and
+  desktop Account, then a harness selector looked for body instead of field:body.
+  Run 47179 captured refusal, retained answer and draft, Create footer spacing,
+  mobile toolbar and mobile Account, then its outside-click target was covered
+  by the popup. These were harness failures, not additional product defects.
+  A wrong release-hash argument was also refused before imports, output or
+  Chromium; it remains separate pre-runtime evidence.
+
+Final session 70854 passed only the remaining mobile outside dismissal. The
+point (1,843) was verified inside the room root and outside the popup. All 13
+prior positive states were retained without repetition. Root directly viewed
+those captures and the final dismissal. The final screenshot did not recollect
+seven computed measures: it is byte-identical to the earlier measured current
+d6 mobile image. Root's seven qualitative comparisons apply; the generic proof
+field is not a new measurement census. Closed completion proof:
+`/Users/hughpyle/play/artroom-diagnostics/forms-round2-browser-mobile-outside-source/output-one/public-result.json`,
+SHA-256 `100cb98a6cb70cd41b8014fd047ebdd56897d0de566503177637ac4436f0c2e2`.
+Root's qualified fidelity is
+`/Users/hughpyle/play/artroom-diagnostics/forms-round2-browser-mobile-outside-source/root-fidelity-final.public.json`,
+SHA-256 `f2d4269edafd6ec3c2a9830cb0e0378feec2cbc436b62d10eab2f885d8028f34`.
+This is completion across qualified local attempts, not a same-run aggregate.
+
+## Review and parent duties
+
+Item 8 remains nrep under effective assertion
+`104832109c87e075fac6831eef683c2ba79e9076`. No hosted cause is invented and no
+further reproduction is sought. The reason control, actual returned guard name
+when present, dismissable refusal and retained answer remain required. Rules 4
+starts with controller review enabled and approvals 1. Old pins and actual
+recorded room policies remain unchanged. The factory 8 component proof uses real
+judges and folds in memory with a scripted Git answer. It does not prove deployed
+native factory admission or the later Start offer, installation or configuration.
+Earlier authenticated native component witnesses remain at their real heads
+with their declared Git, clock and transport stand-ins.
+
+The joint normal Source child is `932a112d58907e5f5c25c2fa25e44916012cce75`, under
+promise `3a379ced40e696ad333a360ce9bc251793a67c76`. Exact-head Source review and
+normal landing remain owed. The full Forms request
+`543616a28fce8c3594ebf2aec88ed72dcd0113df` and Round 2 request
+`84f45948c29607677c7e78c5317798ceb1949af7` retain the actual hosted browser,
+native accepted-Create, deployment, readback and human acceptance duties.
+A Source child receipt closes only that child. No hosted or Hugh acceptance is
+claimed. The reporting successor changes this note only. Every other Source and asset byte
+remains at the gated d6 head. No gate was repeated for this document-only change.
