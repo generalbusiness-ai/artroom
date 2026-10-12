@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/lanes/test/rehearsal-stops.test.ts at exact c8cb6c5387efdde17cce732f0dcaf1af01abbd4e on request/stale-base-rehearsal, under promise git:sha1…1b4fb9d on request git:sha1…5199080","body":{"commit":"c8cb6c5387efdde17cce732f0dcaf1af01abbd4e","path":"packages/lanes/test/rehearsal-stops.test.ts"}}
+{"kind":"promise","text":"I will implement and verify only the en-US Counter voice restriction in an isolated worktree, refresh the generated assets and run the ordinary gate once at the candidate head.","body":{"branch":"request/counter-en-us-demo"}}
