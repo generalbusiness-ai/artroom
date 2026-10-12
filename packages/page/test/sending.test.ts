@@ -182,12 +182,14 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(panels.at(-1)?.uncertain).toBe(false);
     expect(posts).toHaveBeenCalledTimes(1);
     const reading = gate(), releaseRead = gate();
+    const sourceReadsBefore = issueRead.mock.calls.length;
     issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0 }; });
     location.hash = "#/issue/delayed";
     redraw(); await reading.promise;
     context = { ...context, place: { ...context.place, directory: "newest-room" } };
     context.label = { text: "Newest local label", place: context.place };
     rendered = gate(); releaseRead.resolve(); await rendered.promise;
+    expect(issueRead).toHaveBeenCalledTimes(sourceReadsBefore + 2); // Old read retires; the existing draw opens the actual current room once.
     expect(root.textContent).toContain("Newest local label");
     expect(root.textContent).toContain("Recorded newest-room");
     expect(root.textContent).not.toContain("Recorded another-room");

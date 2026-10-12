@@ -630,15 +630,20 @@ async function draw(focus = false): Promise<void> {
     if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     const { destination, scope } = route;
     const loaded = room;
+    const viewCurrent = (): boolean => {
+      if (currentDraw !== drawing) return false;
+      if (settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) { void draw(focus); return false; }
+      return true;
+    };
     let initialization = await roomInitialization(room);
-    if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
+    if (!viewCurrent()) return;
     let notice = initializationMessage(initialization.state);
     const showRoom = (...content: HTMLElement[]) => show(...shell(destination, room, ...(notice ? [h("p", { class: "answer room-initialization", role: "status" }, notice)] : []), ...content));
     const presentationCurrent = async (): Promise<boolean> => {
       if (initialization.state === "not-initialized" && !await initializationStillCurrent(loaded, initialization)) {
         initialization = { state: "unknown", reason: "The room changed or could not be read before showing this view." }; notice = null;
       }
-      return currentDraw === drawing && settingsContext(settings() ?? { place: null, secret: "" }) === settingsContext(kept);
+      return viewCurrent();
     };
     const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
     if (destination === "issues" && scope) {
