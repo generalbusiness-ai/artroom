@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import type { Answer, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
+import { signedIntent } from "@generalbusiness/artroom-client";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
 import { fileStore, releaseLock, takeLock } from "../src/node.ts";
-import { T0, accepted, build, identity, notAfter, receiptOf, refused, resource } from "./support/custody.ts";
+import { T0, accepted, build, identity, lane, notAfter, receiptOf, refused, resource, signer } from "./support/custody.ts";
 
 // The scope's answers here are scripted: `deliver` and `settle` are STAND-INs for a scope's submit and settlement. What a real
 // scope answers to a replay is shown in room.scope.test.ts; these cases show what the server keeps and sends.
@@ -366,5 +367,65 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     expect((await store.read(id))!.phase).toBe("sent");
     expect((await store.unresolved()).map((u) => u.key)).toEqual(["refused-one"]);
     expect(store.archived()).toBe(0);
+  });
+
+  // Invariant: a standalone capability step (a step with no act) has its own lifecycle: a decisive answer makes it terminal and
+  // replayable with nothing sent, and its record settled, never accepted; a lost answer keeps it unresolved and counted, and a
+  // retry, also after a restart between sending and the answer, sends the exact signed step again.
+  describe("standalone steps", () => {
+    const standalone = (key: string) => async () => ({
+      binding: { definition: "hold@1", kind: "hold@1:instance", declaration: null, pinned: "platform:inbox@1" as const },
+      envelope: { signed: await signedIntent(signer, { to: lane, kind: "hold@1:instance", on: null, fields: { hold: 3, instance: key }, expected: {} }, { idempotencyKey: key, now: T0 }), beside: {} },
+    });
+    const keepStep = (custody: Custody, key: string) => custody.keep(identity(key), meaningOf({ standalone: key }), standalone(key), notAfter, 0, { standalone: true });
+
+    test("a decisive step is terminal, replayed with nothing sent, and its record settled", async () => {
+      const { custody } = setup();
+      await keepStep(custody, "s1");
+      const first = await custody.step(identity("s1"), lane, "hold@1", "instance", async (signed) => accepted(signed, 4));
+      expect([first.step.phase, first.record.phase, first.retained]).toEqual(["answered", "settled", false]);
+      expect((await custody.store.unresolved()).length).toBe(0);
+      const again = await custody.step(identity("s1"), lane, "hold@1", "instance", async () => { throw new Error("must not send"); });
+      expect([again.retained, again.answer?.answer, again.answer?.answer === "accepted" && again.answer.receipt.fact.seq]).toEqual([true, "accepted", 4]);
+      expect(again.record.phase).not.toBe("accepted");
+      expect(again.record.outcomes).toEqual([]);
+    });
+
+    test("a restart between sending a step and its answer resends the exact step", async () => {
+      const { make } = setup();
+      const kept = await keepStep(make(), "s2");
+      await expect(make().step(identity("s2"), lane, "hold@1", "instance", async () => { throw new Error("the process ends here"); })).rejects.toThrow("the process ends here");
+      const after = (await make().find(identity("s2")))!;
+      expect([Object.values(after.steps)[0]!.phase, after.phase]).toEqual(["sent", "sent"]);
+      let resent: SignedIntent | null = null;
+      const retried = await make().step(identity("s2"), lane, "hold@1", "instance", async (signed) => { resent = signed; return refused; });
+      expect(canonicalize(resent)).toBe(canonicalize(kept.envelope.signed));
+      expect([retried.step.phase, retried.record.phase, retried.answer?.answer]).toEqual(["answered", "settled", "refused"]);
+    });
+
+    test("a lost step stays unresolved and counted, and its retry sends the same signed step", async () => {
+      const { custody } = setup();
+      const kept = await keepStep(custody, "s3");
+      const lost = await custody.step(identity("s3"), lane, "hold@1", "instance", async () => { throw new Lost(); });
+      expect([lost.step.phase, lost.record.phase, lost.answer]).toEqual(["unknown", "unknown", null]);
+      expect((await custody.store.unresolved()).map((u) => u.key)).toEqual(["s3"]);
+      const unavailable = await custody.step(identity("s3"), lane, "hold@1", "instance", async () => ({ answer: "unavailable", reason: "busy" }));
+      expect([unavailable.step.phase, unavailable.record.phase]).toEqual(["unknown", "unknown"]);
+      const sent: SignedIntent[] = [];
+      const done = await custody.step(identity("s3"), lane, "hold@1", "instance", async (signed) => { sent.push(signed); return accepted(signed, 5); });
+      expect(canonicalize(sent[0])).toBe(canonicalize(kept.envelope.signed));
+      expect([done.record.phase, (await custody.store.unresolved()).length]).toEqual(["settled", 0]);
+    });
+
+    test("new work is admitted after more than 256 completed standalone steps", async () => {
+      const { custody } = setup();
+      for (let i = 0; i < UNRESOLVED_MOST + 4; i++) {
+        await keepStep(custody, `done-${i}`);
+        await custody.step(identity(`done-${i}`), lane, "hold@1", "instance", async (signed) => accepted(signed, i));
+      }
+      expect((await custody.store.unresolved()).length).toBe(0);
+      const admitted = await custody.keep(identity("after"), meaningOf("after"), build("after"), notAfter);
+      expect(admitted.phase).toBe("prepared");
+    }, 120_000);
   });
 });

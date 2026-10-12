@@ -36,6 +36,15 @@
  *   answer is never the act's receipt. A step keeps its first answer and its
  *   latest 63; answers between them are not kept. The act's outcomes are
  *   never dropped: that rule is for steps only.
+ * - **Standalone steps** (a capability step with no act, such as
+ *   `hold@1:instance`): the record's envelope is the step's own intent, and
+ *   it is never submitted as an act. A decisive answer from the resource
+ *   (accepted or refused) makes the step terminal: a later call returns
+ *   that answer and sends nothing. When every step the record holds is
+ *   decisive, the record is `settled`, which is terminal and archived like
+ *   any other, and never an act's acceptance. A lost or unavailable answer
+ *   leaves the step and the record unresolved, and a retry sends the exact
+ *   signed step again.
  * - **Capacity**: at most 256 unresolved records, never evicted, counted and
  *   admitted under the store's exclusive section, so two processes cannot
  *   both admit the 256th. A record is at most 2 MiB: an act whose envelope
@@ -73,8 +82,12 @@ export interface Envelope {
   creation?: { definition: DeclaredDefinition | Digest | PlatformDefinition; definitions: readonly DeclaredDefinition[] };
 }
 
-export type Phase = "prepared" | "sent" | "unknown" | "accepted" | "refused" | "mismatch";
-export const TERMINAL: ReadonlySet<Phase> = new Set(["accepted", "refused", "mismatch"]);
+/**
+ * `settled` is the terminal phase of a record that holds only standalone capability steps (steps with no act): every step it
+ * holds has a decisive answer from its resource. It is never an act's acceptance: no act is kept under such a record.
+ */
+export type Phase = "prepared" | "sent" | "unknown" | "accepted" | "refused" | "mismatch" | "settled";
+export const TERMINAL: ReadonlySet<Phase> = new Set(["accepted", "refused", "mismatch", "settled"]);
 
 /** One outcome of one sending, in its attempt. `lost`: no answer could be read. */
 export type Outcome = ({ at: string; answer: Answer } | { at: string; lost: true } | { at: string; settled: Receipt }) & { attempt: number };
@@ -100,6 +113,8 @@ export interface CustodyRecord {
   count: number;
   /** The attempt now current: 1, and one more for each deliberate resubmission of a refusal. */
   attempt: number;
+  /** True for a record whose envelope is a standalone capability step's own intent, which is never submitted as an act. */
+  standalone?: true;
   steps: Record<string, Step>;
   created: string;
   updated: string;
@@ -240,12 +255,12 @@ export class Custody {
    * account of what the envelope will carry (fields, texts, presented facts
    * and values); it is checked against the record's bound before signing.
    */
-  async keep(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, notAfter: string, bytes = 0): Promise<CustodyRecord> {
+  async keep(identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, notAfter: string, bytes = 0, options: { standalone?: boolean } = {}): Promise<CustodyRecord> {
     const id = identityId(identity);
-    return this.#locked(id, notAfter, async () => this.#kept(id, identity, meaning, build, bytes));
+    return this.#locked(id, notAfter, async () => this.#kept(id, identity, meaning, build, bytes, options.standalone === true));
   }
 
-  async #kept(id: string, identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, bytes: number): Promise<CustodyRecord> {
+  async #kept(id: string, identity: Identity, meaning: Digest, build: () => Promise<{ binding: BindingRecord; envelope: Envelope }>, bytes: number, standalone = false): Promise<CustodyRecord> {
     const found = await this.#read(id);
     if (found) {
       if (found.meaning !== meaning) throw new CustodyError({ held: "conflicting", recorded: `${found.envelope.signed.intent.kind} on ${found.identity.target && "scope" in found.identity.target ? found.identity.target.scope : "a creation"}` });
@@ -258,7 +273,7 @@ export class Custody {
       if (open.length >= UNRESOLVED_MOST) throw new CustodyError({ held: "full", reason: "count", keys: open.slice(0, 8).map((o) => o.key) });
       const { binding, envelope } = await build();
       const at = this.now();
-      const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at };
+      const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at, ...(standalone ? { standalone: true as const } : {}) };
       const size = bytesOf(record);
       if (size + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes: size });
       await this.#write(id, record);
@@ -350,7 +365,7 @@ export class Custody {
    * not move. A step that has an answer is asked again only when the caller
    * asks again: the resource answers the same step with its first entry.
    */
-  async step(identity: Identity, resource: ScopeRef, capability: string, step: string, deliver: (signed: SignedIntent) => Promise<Answer>): Promise<{ record: CustodyRecord; step: Step; answer: Answer | null }> {
+  async step(identity: Identity, resource: ScopeRef, capability: string, step: string, deliver: (signed: SignedIntent) => Promise<Answer>): Promise<{ record: CustodyRecord; step: Step; answer: Answer | null; retained: boolean }> {
     const id = identityId(identity);
     const record = await this.#read(id);
     if (!record) throw new CustodyError({ held: "unreadable" });
@@ -359,8 +374,16 @@ export class Custody {
       const intent = intentDigest(fresh.envelope.signed.intent);
       const sid = stepId({ intent, resource, capability, step });
       const entry: Step = fresh.steps[sid] ?? { intent, resource, capability, step, phase: "prepared", answers: [] };
+      // A standalone step with a decisive answer is terminal: its answer is returned again, and nothing is sent.
+      if (fresh.standalone && entry.phase === "answered") {
+        const kept = [...entry.answers].reverse().find((a) => a.answer !== null && a.answer.answer !== "unavailable")?.answer ?? null;
+        return { record: fresh, step: entry, answer: kept, retained: true };
+      }
+      // Kept as sent before anything is sent: a restart between here and the answer finds the step sent, and a retry sends the
+      // same signed intent again.
       entry.phase = "sent";
       fresh.steps[sid] = entry;
+      if (fresh.standalone) fresh.phase = "sent";
       await this.#write(id, fresh);
       let answer: Answer | null = null;
       try { answer = await deliver(fresh.envelope.signed); } catch (error) { if (!(error instanceof Lost)) throw error; }
@@ -368,9 +391,11 @@ export class Custody {
       entry.answers.push({ at: this.now(), answer });
       // A step keeps its first answer and its latest 63 (see the header): the first is what the resource repeats for the same step.
       if (entry.answers.length > OUTCOMES_INLINE) entry.answers.splice(1, entry.answers.length - OUTCOMES_INLINE);
+      // A standalone record is settled, and terminal, when every step it holds is decided; until then it stays unresolved.
+      if (fresh.standalone) fresh.phase = Object.values(fresh.steps).every((st) => st.phase === "answered") ? "settled" : "unknown";
       fresh.updated = this.now();
       await this.#write(id, fresh);
-      return { record: fresh, step: entry, answer };
+      return { record: fresh, step: entry, answer, retained: false };
     });
   }
 }

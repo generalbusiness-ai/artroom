@@ -653,14 +653,14 @@ export class McpService {
       envelope: { signed: await signedIntent(this.#port.signer, { to: summary.scope, kind, on: null, fields, expected: {} }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
     });
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
-    await this.custody.keep(identity, meaningOf({ standalone: kind, fields }), build, notAfter, bytesOf(fields));
+    await this.custody.keep(identity, meaningOf({ standalone: kind, fields }), build, notAfter, bytesOf(fields), { standalone: true });
     const stepped = await this.custody.step(identity, summary.scope, capability, step, async (signed) => {
       try { return await this.#reads.transport.prepare(resource.scope, signed, [], capability, step); }
       catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     });
     const said = stepped.answer === null
       ? { sentence: `The reply from ${resource.scope} to step ${step} of ${capability} was lost; this step's outcome is unknown.`, next: "Call prepare again with the same arguments: the same signed step is sent again, and the resource answers it with its first entry." }
-      : { sentence: `${resource.scope} answered step ${step} of ${capability}, a step with no act: ${stepped.answer.answer}${stepped.answer.answer === "refused" ? ` (${stepped.answer.reason}${stepped.answer.name ? `, ${stepped.answer.name}` : ""})` : ""}.`, next: "settle with the resource as target and the same key shows this step." };
+      : { sentence: `${resource.scope} answered step ${step} of ${capability}, a step with no act: ${stepped.answer.answer}${stepped.answer.answer === "refused" ? ` (${stepped.answer.reason}${stepped.answer.name ? `, ${stepped.answer.name}` : ""})` : ""}.${stepped.retained ? " This answer was kept from before; nothing was sent." : ""}`, next: "settle with the resource as target and the same key shows this step." };
     return ok({ step: { resource: resource.scope, capability, step, phase: stepped.step.phase, answer: stepped.answer === null ? null : projectAnswer(stepped.answer) }, intent: intentDigest(stepped.record.envelope.signed.intent), ...said });
   }
 
@@ -707,8 +707,9 @@ export class McpService {
     });
     const fromStep = fromCursor<{ i: number }>(args["cursor"])?.i ?? 0;
     const { page: steps, next: nextStep } = pageBy(allSteps, fromStep, pageOf(BOUNDS.act) - 1536);
-    const answer = record.phase === "accepted" ? "accepted" : record.phase === "refused" ? "refused" : record.phase === "mismatch" ? "mismatch" : "unknown";
-    const sentence = answer === "accepted" ? `The act under key ${String(key)} was accepted: entry ${receipt?.fact.seq}.`
+    const answer = record.phase === "accepted" ? "accepted" : record.phase === "refused" ? "refused" : record.phase === "mismatch" ? "mismatch" : record.phase === "settled" ? "settled" : "unknown";
+    const sentence = answer === "settled" ? `Under key ${String(key)}, every capability step is decided; no act is kept under this key.`
+      : answer === "accepted" ? `The act under key ${String(key)} was accepted: entry ${receipt?.fact.seq}.`
       : answer === "refused" ? `The act under key ${String(key)} was refused; the refusal is kept.`
       : answer === "mismatch" ? `The key ${String(key)} is on another intent of your key at that scope.`
       : `The outcome under key ${String(key)} is unknown: the scope gave no receipt for the exact envelope. The record stays unknown.`;
