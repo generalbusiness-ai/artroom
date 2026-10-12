@@ -22,6 +22,8 @@ import { driveFixture, nativeFixtureLifetime } from "../../../scope/test/support
 import { McpService, memoryStore, type CallResult, type McpConfig, type Mode, type Root } from "../../src/index.ts";
 
 export const SERVICE = "https://scopes.test";
+/** The generic tools in --generic=add mode, in the order the list sends them. */
+export const GENERIC = ["room", "inspect", "create", "join", "prepare", "items", "steps", "step", "record", "sends", "text", "wait", "settle", "credential", "actions", "act"];
 
 /** What a story calls a person: their key, their configuration, and their MCP service. */
 export interface Agent {
@@ -105,7 +107,7 @@ export function mcpRoom(): Room {
       const requests: string[] = [];
       const counted: Fetch = (url, init) => { requests.push(`${init?.method ?? "GET"} ${new URL(url).pathname}`); return fetch(url, init); };
       const service = new McpService({
-        service: SERVICE, fetch: counted, signer: secretSigner(key), custody: memoryStore(), mode: options.mode ?? "default", ...(options.tools ? { tools: options.tools } : {}),
+        service: config.service, fetch: counted, signer: secretSigner(key), custody: memoryStore(), mode: options.mode ?? "default", ...(options.tools ? { tools: options.tools } : {}),
         ...(options.listPageBytes ? { listPageBytes: options.listPageBytes } : {}),
         now: lifetime.now, pause: (waiting) => pause(waiting),
         every: () => () => {},
@@ -113,6 +115,7 @@ export function mcpRoom(): Room {
           read: async () => structuredClone(config),
           addRoot: async (root: Root) => { config.roots = [...(config.roots ?? []).filter((r) => r.scope !== root.scope), root]; },
           setRepository: async (repository) => { config.repository = repository; },
+          joined: async (joined) => { config.service = joined.service; config.repository = joined.repository; config.handle = joined.handle; },
         },
       });
       const agent: Agent = {

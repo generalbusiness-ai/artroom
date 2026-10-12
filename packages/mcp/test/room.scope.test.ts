@@ -3,7 +3,8 @@ import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, digestBytes, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { firstExtents } from "@generalbusiness/artroom-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
-import { mcpRoom, type Agent } from "./support/room.ts";
+import { INVITATION_LINK } from "@generalbusiness/artroom-client";
+import { GENERIC, mcpRoom, type Agent } from "./support/room.ts";
 import { exercises, founded, offers, step } from "./support/story.ts";
 
 /**
@@ -44,15 +45,24 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const invited = await step(rita, mode, { tool: "member.invite", scope: "membership", kind: "invite-member" }, { fields: { handle: "@paul", role: "member", inviteHash: textDigest(secret), inviteEnds: timeOf(room.now() + 3_600_000) }, idempotencyKey: "invite-paul" });
     const invitation = (invited["fact"] as { seq: number }).seq;
-    const paul = room.agent("paul", { subscribe: true, mode, config: { service: rita.config.service, repository: { ...rita.config.repository!, inbox: undefined as never }, pins: { [rita.config.repository!.membership.scope]: "platform:membership@2" } } });
-    delete paul.config.repository!.inbox;
+    // paul starts from an empty configuration: no service, no room, no pins. The link is the one artroom invite prints.
+    const link = `${INVITATION_LINK}${b64url(utf8(JSON.stringify({ v: 1, service: rita.config.service, repository: (({ inbox: _inbox, ...shared }) => shared)(rita.config.repository!), invitation, secret, handle: "@paul", definition: "platform:membership@2" })))}`;
+    const paul = room.agent("paul", { subscribe: true, mode, config: { service: "" } });
     const issueCreate = { tool: "issue.create", scope: "directory", kind: "open-issue" };
-    expect(await offers(paul, mode, issueCreate)).toBe(false);
+    expect((await paul.names()).filter((n) => !["actions", "act"].includes(n)).sort()).toEqual(GENERIC.filter((n) => !["actions", "act"].includes(n)).sort());
     await paul.tick(); seen.set(paul, paul.told);
     expect(paul.told).toBe(0);
     await settled(paul, 0, "paul's first list, before he joins");
-    const joined = await step(paul, mode, { tool: "room.join", scope: "membership", kind: "join" }, { fields: { invitation, secret }, idempotencyKey: "join" });
-    expect(joined["answer"], JSON.stringify(joined)).toBe("accepted");
+    // A reply lost on the way back: the same link and key send the same request again, and the join is not signed twice.
+    room.loseNextReply(`/${rita.config.repository!.membership.scope}/acts`);
+    const lostJoin = await paul.call("join", { link, idempotencyKey: "join" });
+    expect([lostJoin.isError, lostJoin.structuredContent["error"]]).toEqual([true, "transport"]);
+    const joined = await paul.ok("join", { link, idempotencyKey: "join" });
+    expect([joined["answer"], joined["handle"]], JSON.stringify(joined)).toEqual(["accepted", "@paul"]);
+    expect(JSON.stringify(joined)).not.toContain(secret);
+    expect(paul.config).toMatchObject({ service: rita.config.service, handle: "@paul", repository: { ...rita.config.repository, inbox: expect.stringMatching(/^sc_/) } });
+    expect(paul.config.repository!.inbox).not.toBe(rita.config.repository!.inbox);
+    expect((await paul.ok("wait", { scope: "inbox", seq: 0 }))["timedOut"]).toBe(false);
     await settled(paul, 1, "joining gives paul a role");
     expect(await offers(paul, mode, issueCreate)).toBe(true);
     await step(rita, mode, { tool: "member.role", scope: "membership", kind: "set-role" }, { on: invitation, fields: { role: "maintainer" }, idempotencyKey: "paul-maintainer" });

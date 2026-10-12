@@ -15,8 +15,10 @@ and what ran.
 ## Connect an agent host
 
 The server runs where the command line runs, with the same config
-directory (`ARTROOM_HOME`). Set the room up first, with `artroom install`
-and `artroom claim`, or `artroom join`.
+directory (`ARTROOM_HOME`). Set the room up first with `artroom install`
+and `artroom claim`; or start the server with an empty config directory
+and call its `join` tool with an invitation link, which records the room
+there as `artroom join` does.
 
 ### Over stdio
 
@@ -83,7 +85,7 @@ A request with a version the server does not serve is answered with error
 The list has two parts.
 
 - **The generic tools**, the same for every room: `room`, `inspect`,
-  `create`, `prepare`, `items`, `steps`, `step`, `record`, `sends`, `text`,
+  `create`, `join`, `prepare`, `items`, `steps`, `step`, `record`, `sends`, `text`,
   `wait`, `settle` and `credential`, and in `--generic` and
   `--generic=add` modes `actions` and `act`.
 - **The act tools**, one for each act declaration of the definitions the
@@ -304,6 +306,92 @@ Creates a scope with no existing target, and records it in your configuration so
     "required": [
       "definition",
       "kind",
+      "idempotencyKey"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "answer": {
+        "type": "string",
+        "description": "accepted, refused, unavailable, mismatch, or unknown when the reply was lost"
+      },
+      "sentence": {
+        "type": "string"
+      },
+      "next": {
+        "type": "string"
+      },
+      "scope": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "tool": {
+        "type": "string"
+      },
+      "fact": {
+        "type": "object"
+      },
+      "duties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "reason": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "judgedAt": {
+        "type": "object"
+      },
+      "retained": {
+        "type": "boolean",
+        "description": "true when this is a terminal outcome kept under custody, and nothing was sent"
+      }
+    },
+    "required": [
+      "answer",
+      "sentence",
+      "next"
+    ]
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false
+  }
+}
+```
+
+### `join`
+
+Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret, which no result repeats.
+
+```json
+{
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "link": {
+        "type": "string",
+        "description": "The invitation link, artroom-invite:..."
+      },
+      "idempotencyKey": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "Your key for this one meaning, 1 to 128 bytes. Keep it."
+      }
+    },
+    "required": [
+      "link",
       "idempotencyKey"
     ],
     "additionalProperties": false
@@ -1112,7 +1200,7 @@ is the default recipe's.
 | `artroom install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register) and kind install: 1. The signed intent is kept before it is sent, which is what `--plan` keeps; after a lost reply, `settle`: +1 | `create`: 1 | 1 |
 | `artroom claim <name>` | `room.create` on the register, `wait` for the created directory and its children, `room.seat`, `room.first-key` within the founder's window, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
 | `artroom invite <@member>` | `member.invite` with the handle, role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the number and secret to the member: 1 | `actions`, `act`: 2 | 1 |
-| `artroom join <link>` | `room.join` with the invitation's number and secret, then `wait` for the inbox: 2 | `actions` on membership, `act`, `wait`: 3 | 2 |
+| `artroom join <link>` | `join` with the link, then `wait` for the inbox: 2. It works from an empty configuration: the server records the room, the service and the handle when the join is accepted | `join`, `wait`: 2 | 2 |
 | `artroom acts [<scope>]` | `room`, whose `notHeld` names the act tools the role does not hold; the list holds the rest: 1 | `actions`: 1 | 1 |
 | `artroom act <kind> --on <scope>` | The act tool of that kind: 1 | `actions`, `act`: 2 | 1 |
 | `artroom log <scope>` | `steps`: 1 per page | `steps`: 1 | 1 |
@@ -1129,7 +1217,7 @@ is the default recipe's.
 | `artroom issue assign <issue> <@member>` | `issue.assign`: 1 | `actions`, `act`: 2 | 1 |
 | `artroom issue close <issue>` | `issue.close-own` when the caller opened it, else `issue.close-any`: 1 | `actions`, `act`: 2 | 1 |
 | `artroom issues` | `room` for the lanes (50 a page), then `inspect` per issue for its own state: 1 + n | the same: 1 + n | 1 + n |
-| Page: Join with an invitation link | `room.join`, `wait`: 2 | `actions`, `act`, `wait`: 3 | 2 |
+| Page: Join with an invitation link | `join`, `wait`: 2 | `join`, `wait`: 2 | 2 |
 | Page: Create issue | `issue.create`, `wait`: 2 | `actions`, `act`, `wait`: 3 | 2 |
 | Page: Comment | `issue.comment`, or `change.comment` on a change: 1 | `actions`, `act`: 2 | 1 |
 | Page: Review | `inspect` for the version and extents, `change.review`: 2 | `inspect`, `actions`, `act`: 3 | 2 |

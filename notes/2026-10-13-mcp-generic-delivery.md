@@ -12,8 +12,8 @@ an observed run, a sum of steps, or a proxy.
   definitions as data and derives one act tool for each act declaration,
   bound to the definition name, the native kind and the digest of the
   declaration. Same-name declarations that differ get variant tools named
-  `<name>@<8 hex>`. Thirteen generic tools stand beside them: `room`,
-  `inspect`, `create`, `prepare`, `items`, `steps`, `step`, `record`,
+  `<name>@<8 hex>`. Fourteen generic tools stand beside them: `room`,
+  `inspect`, `create`, `join`, `prepare`, `items`, `steps`, `step`, `record`,
   `sends`, `text`, `wait`, `settle` and `credential`; `actions` and `act`
   are listed in the `--generic` and `--generic=add` modes. Descriptions and
   input schemas are derived from the whole declaration, at most 1,000
@@ -30,6 +30,23 @@ an observed run, a sum of steps, or a proxy.
 - **The wire**: JSON-RPC for the 2025-11-25 and 2026-07-28 revisions, over
   stdio and loopback HTTP, with the per-launch bearer, the `Origin` refusal
   and the loopback bind.
+- **Joining through the server alone.** The generic tool `join` takes the
+  link `artroom invite` prints. It works from an empty config directory:
+  `artroom mcp` makes and keeps the key as `artroom join` does, and serves
+  with no service until the first join names one. `join` signs
+  membership's `join` with the server's key, keeps the exact request under
+  custody (in the config directory's private custody store) before sending
+  it, and after a lost reply the same link and key send the same request
+  again; it never signs a new one or makes a new key. On acceptance it reads
+  the admitted entry, checks that it holds the request kept, finds the
+  inbox the join created, and records the service, the repository's scopes
+  with the inbox, and the handle in `config.json`; the next call lists the
+  room's tools. No result repeats the invitation's secret. The server reads
+  the link with `packages/client/src/invitation.ts`, since it may not
+  import the command line. The command line keeps its own `linkOf`
+  unchanged, because the page's built module bundles it and its bytes stay
+  main's; `packages/cli/test/invitation-link.test.ts` shows that the two
+  parsers read and refuse the same links.
 - **`artroom mcp`** in the command line, with `--generic`,
   `--generic=add`, `--tools`, `--http`, and `--scope` with `--membership`.
 - **Eleven test files** in `packages/mcp/test`: `inventory`, `describe`,
@@ -188,10 +205,6 @@ delivery's.
 - **The optional amendment of `docs/cli.md`**, naming `artroom mcp` in its
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
-- **A joiner's configuration.** `room.join` through the server needs a
-  configuration that names the room and pins its membership. `artroom mcp`
-  reads no pins from the config directory, and no command writes them
-  without joining, so a member joins with `artroom join` before serving.
 - **`credential`'s reads**: 3 where plan 031 counts 1, as reported above.
 - **No gitseq request** was recorded from this session: no gitseq tool was
   available in the cloud container. The requester records one for this

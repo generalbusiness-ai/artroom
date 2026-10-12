@@ -25,7 +25,9 @@ import type { Reads } from "./reads.ts";
 
 /** What the server reads of the configuration. The command line's `config.json` holds these members, and more. */
 export interface McpConfig {
+  /** The scope service; empty for a configuration that has joined nothing yet. */
   service: string;
+  handle?: string;
   register?: ScopeRef;
   repository?: { directory: ScopeRef; membership: ScopeRef; rules: ScopeId; destination: ScopeId; inbox?: ScopeId };
   roots?: readonly Root[];
@@ -43,6 +45,8 @@ export interface ConfigPort {
   addRoot(root: Root): Promise<void>;
   /** Record the repository that the caller's own claim created, or the caller's inbox, as `artroom claim` and `join` record them. */
   setRepository?(repository: NonNullable<McpConfig["repository"]>): Promise<void>;
+  /** Record a room the caller joined, as `artroom join` records it: the service, the repository's scopes with the inbox, and the handle. */
+  joined?(room: { service: string; repository: NonNullable<McpConfig["repository"]>; handle: string }): Promise<void>;
 }
 
 /** What the process keeps, none of it authority: pins by scope and definitions by digest, which never change. */

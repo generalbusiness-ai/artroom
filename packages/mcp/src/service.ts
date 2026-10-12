@@ -1,5 +1,5 @@
 /**
- * One MCP service for every dap application (plan 031). It lists thirteen
+ * One MCP service for every dap application (plan 031). It lists fourteen
  * generic tools that never change, and one act tool per act declaration of
  * each definition the inventory holds, listed for the caller's standing.
  * In `--generic` mode the act tools are replaced by `actions` and `act`;
@@ -14,7 +14,7 @@
 import type { Answer, Beside, DeclaredDefinition, Digest, Entry, FieldValue, Item, PlatformDefinition, Read, Receipt, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/artroom-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isPlatformDefinition, isScopeId, isScopeRef, parseStrict, scopeIdOf, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
-import { TransportError, readCredential, signedIntent, type Fetch, type Signer } from "@generalbusiness/artroom-client";
+import { TransportError, invitationOf, readCredential, signedIntent, wellFormedInvitation, type Fetch, type Signer } from "@generalbusiness/artroom-client";
 import { platform } from "@generalbusiness/artroom-platform";
 import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, generationOf, listed, selected, type Binding, type Held, type Inventory, type Mode, type Tool } from "./catalogue.ts";
 import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
@@ -90,7 +90,9 @@ const scopeArg = { type: ["string", "integer"], description: "A scope ID; one of
 const keyArg = { type: "string", minLength: 1, maxLength: 128, description: "Your key for this one meaning, 1 to 128 bytes. Keep it." };
 
 export class McpService {
-  readonly reads: Reads;
+  #reads: Reads;
+  /** The scope service: the configuration's, or, for a process that has joined nothing yet, the one its first join names. */
+  #service: string;
   readonly kept = new Kept();
   readonly custody: Custody;
   readonly mode: Mode;
@@ -98,6 +100,7 @@ export class McpService {
   readonly #port: ServerPort;
   readonly #tools: readonly string[] | null;
   #snapshot: Snapshot | null = null;
+  #stale = false;
   readonly #listeners = new Set<(generation: Digest) => void>();
   #stopWatch: (() => void) | null = null;
   #told: Digest | null = null;
@@ -111,12 +114,16 @@ export class McpService {
     this.words = port.words ?? WORDS;
     this.#tools = port.tools ?? null;
     const now = port.now ?? Date.now;
-    this.reads = new Reads({ service: port.service, ...(port.fetch ? { fetch: port.fetch } : {}), signer: port.signer, now });
+    this.#service = port.service;
+    this.#reads = this.#readsOf(port.service);
     this.custody = new Custody(port.custody, () => timeOf(now()));
     this.#generic = this.#genericTools();
   }
 
   get key(): string { return this.#port.signer.key; }
+  get reads(): Reads { return this.#reads; }
+  get service(): string { return this.#service; }
+  #readsOf(service: string): Reads { return new Reads({ service, ...(this.#port.fetch ? { fetch: this.#port.fetch } : {}), signer: this.#port.signer, now: this.#port.now ?? Date.now }); }
   #now(): number { return (this.#port.now ?? Date.now)(); }
 
   // ---------------------------------------------------------------- the list
@@ -135,13 +142,21 @@ export class McpService {
     const acts = this.mode === "generic" ? [] : shown.filter((b) => listed(b, read.inventory)).map((b) => actTool(b, read.inventory, this.mode));
     const generic = Object.entries(this.#generic).filter(([name]) => (name === "actions" || name === "act" ? this.mode !== "default" : true)).map(([, g]) => g.tool);
     const snapshot: Snapshot = { read, bindings, tools: [...generic, ...acts], generation, hidden, memberships };
+    this.#stale = false;
     const previous = this.#snapshot?.generation ?? null;
     this.#snapshot = snapshot;
     if (previous !== null && previous !== generation) this.#raise(generation);
     return snapshot;
   }
 
-  async #current(): Promise<Snapshot> { return this.#snapshot ?? this.snapshot(); }
+  /** The snapshot the last list or call derived; derived again when none is held, or when this service changed the configuration since. */
+  async #current(): Promise<Snapshot> { return this.#snapshot && !this.#stale ? this.#snapshot : this.snapshot(); }
+
+  /**
+   * After this service wrote the configuration (a created scope, a claimed or joined room, an inbox): the next call derives the
+   * list again, and a subscribed client is told of the change at once, with no list or room call first.
+   */
+  #invalidate(): void { this.#stale = true; void this.check(); }
 
   /** One page of `tools/list`: at most 256 KiB, a cursor bound to the generation, and a restart for a cursor of another one. */
   async page(cursor?: unknown): Promise<{ tools: Tool[]; nextCursor?: string; generation: Digest }> {
@@ -229,7 +244,7 @@ export class McpService {
       let lane = room.lanes.find((l) => l.number === number);
       if (!lane) {
         // A lane opened since the list was read: the directory's rows, read once.
-        const read = await this.reads.read(room.membership, (t, r) => t.summary(room.directory.scope, r));
+        const read = await this.#reads.read(room.membership, (t, r) => t.summary(room.directory.scope, r));
         if (read.ok) {
           const row = read.value.items.find((item) => item.type === "lane" && item.values["number"] === number && isScopeRef(item.refs["scope"]));
           if (row) return at((row.refs["scope"] as ScopeRef).scope);
@@ -241,7 +256,7 @@ export class McpService {
   }
 
   async #summary(scope: ScopeId, membership: ScopeRef | null): Promise<{ summary: Summary; at: Read<Summary> & { ok: true } }> {
-    const read = await this.reads.read(membership, (t, r) => t.summary(scope, r));
+    const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));
     if (!read.ok) return stop({ error: "read", scope, reason: read.reason });
     return { summary: read.value, at: read };
   }
@@ -251,7 +266,7 @@ export class McpService {
    * that pin with no items: the act is signed with no expected revisions, as `artroom join` signs one, and the scope judges.
    */
   async #target(scope: ScopeId, membership: ScopeRef | null): Promise<Pick<Summary, "scope" | "definition" | "items">> {
-    const read = await this.reads.read(membership, (t, r) => t.summary(scope, r));
+    const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));
     if (read.ok) return read.value;
     const pin = this.kept.pins.get(scope);
     if (pin && read.reason === "forbidden") return { scope: pin.ref, definition: pin.pinned, items: [] };
@@ -300,7 +315,7 @@ export class McpService {
     const valuesGiven = Array.isArray(args["values"]) ? args["values"].filter((v): v is string => typeof v === "string") : [];
     const presentedGiven = isRecord(args["presented"]) ? args["presented"] : undefined;
     const meaning = meaningOf({ kind, on, fields: fieldsGiven, texts: textsGiven.map(textDigest).sort(), values: valuesGiven.map((v) => digestBytes(utf8(v))).sort(), presented: presentedGiven ?? {} });
-    const identity: Identity = { service: this.#port.service, membership, signer: this.#port.signer.key, target: summary.scope, key: key as string };
+    const identity: Identity = { service: this.#service, membership, signer: this.#port.signer.key, target: summary.scope, key: key as string };
     const items = summary.items;
     const build = async (): Promise<{ binding: CustodyRecord["binding"]; envelope: Envelope }> => {
       let shaped: { fields: Record<string, FieldValue>; texts: string[] };
@@ -332,7 +347,7 @@ export class McpService {
       const resource = await this.#scope(s, preparing.resource);
       const { summary: resourceSummary } = await this.#summary(resource.scope, resource.membership);
       const stepped = await this.custody.step(identity, resourceSummary.scope, preparing.capability, preparing.step, async (signed) => {
-        try { return await this.reads.transport.prepare(resource.scope, signed, [], preparing.capability, preparing.step); }
+        try { return await this.#reads.transport.prepare(resource.scope, signed, [], preparing.capability, preparing.step); }
         catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
       });
       const said = stepped.answer === null
@@ -341,7 +356,7 @@ export class McpService {
       return ok({ step: { resource: resource.scope, capability: preparing.capability, step: preparing.step, phase: stepped.step.phase, answer: stepped.answer }, act: { phase: stepped.record.phase, intent: intentDigest(stepped.record.envelope.signed.intent) }, ...said });
     }
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
-      try { return await this.reads.transport.submit(scope, envelope.signed, [], envelope.beside); }
+      try { return await this.#reads.transport.submit(scope, envelope.signed, [], envelope.beside); }
       catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     }, { ...(args["resubmit"] === true ? { resubmit: true } : {}), notAfter, bytes: carried });
     const tool = binding?.name ?? "act";
@@ -349,7 +364,7 @@ export class McpService {
     const said = answered(kept.answer, asked, guards);
     if (kept.answer.answer === "accepted" && !kept.retained) {
       // An accepted act on a membership can change whether it gives this key a session: ask again on the next read.
-      if (summary.scope.kind === "membership") this.reads.forget(summary.scope.scope);
+      if (summary.scope.kind === "membership") this.#reads.forget(summary.scope.scope);
       void this.check();
     }
     return ok(this.#answerOf(kept.answer, { scope, kind, tool, retained: kept.retained, said, phase: kept.record.phase }));
@@ -368,7 +383,7 @@ export class McpService {
   async #valueBytes(s: Snapshot, place: { name: string; domain: string; digest: string }): Promise<string> {
     const room = s.read.room;
     if (place.domain !== "artroom-definition-1" || !room?.rules) return stop({ error: "shape", field: `fields.${place.name}`, what: `names a value in ${place.domain} that is not in values`, declared: "a digest of a value given in values" });
-    const read = await this.reads.read(room.membership, (t, r) => t.retained(room.rules!.scope, r, "definition", place.digest as Digest));
+    const read = await this.#reads.read(room.membership, (t, r) => t.retained(room.rules!.scope, r, "definition", place.digest as Digest));
     if (!read.ok) return stop({ error: "shape", field: `fields.${place.name}`, what: `names a definition the rules scope does not hold (${read.reason}); give its bytes in values`, declared: "the digest of a definition" });
     return read.value.bytes;
   }
@@ -386,6 +401,8 @@ export class McpService {
       tool("create", "Creates a scope with no existing target, and records it in your configuration so later connections list its tools. definition: a platform name such as platform:register@3, a definition's JSON, or its digest; kind: the definition's genesis act; fields; texts and definitions beside it; membership: the membership scope standing for the new scope is read from. Kept under custody like an act: the idempotencyKey is required.",
         { definition: { type: ["string", "object"] }, kind: { type: "string" }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, definitions: { type: "array", items: { type: "object" } }, membership: { type: ["string", "object"] }, idempotencyKey: keyArg, resubmit: { type: "boolean" } },
         ["definition", "kind", "idempotencyKey"], WRITE, (a) => this.#create(a), ACT_OUTPUT),
+      tool("join", "Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret, which no result repeats.",
+        { link: { type: "string", description: "The invitation link, artroom-invite:..." }, idempotencyKey: keyArg }, ["link", "idempotencyKey"], WRITE, (a) => this.#join(a), ACT_OUTPUT),
       tool("prepare", "Asks the scope that owns a resource for one step of a capability, for the intent an act will submit later under the same idempotencyKey. resource: the scope asked, which may differ from target; capability, step; then the act's own target, kind, on, fields, texts, presented and values. Returns the resource's answer for that step, never the act's receipt.",
         { resource: scopeArg, capability: { type: "string" }, step: { type: "string" }, target: scopeArg, kind: { type: "string" }, on: { type: "integer", minimum: 0 }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, presented: { type: "object" }, values: { type: "array", items: { type: "string" } }, idempotencyKey: keyArg },
         ["resource", "capability", "step", "target", "kind", "idempotencyKey"], WRITE, (a) => this.#prepare(a)),
@@ -427,7 +444,7 @@ export class McpService {
     const places = Object.fromEntries(SINGLETON_PLACES.map((p) => [p, s.read.inventory.scopes.find((h) => h.place === p) ?? null]).filter(([, h]) => h !== null).map(([p, h]) => [p, { scope: (h as Held).scope, definition: (h as Held).pinned }]));
     const standing = Object.entries(s.read.inventory.standing).map(([membership, st]) => (st.known ? { membership, handle: st.handle, role: st.role, key: st.key } : { membership, standing: "your standing here is unknown", why: st.reason }));
     return ok({
-      service: this.#port.service, key: this.#port.signer.key, mode: this.mode, generation: s.generation,
+      service: this.#service, key: this.#port.signer.key, mode: this.mode, generation: s.generation,
       scopes: places,
       lanes: page, ...(start + 50 < lanes.length ? { cursor: cursorOf({ i: start + 50 }) } : {}),
       roots: s.read.inventory.scopes.filter((h) => h.place === "root").map((h) => ({ scope: h.scope, definition: h.definition.name, digest: h.pinned, membership: h.membership })),
@@ -459,7 +476,7 @@ export class McpService {
         const part = sliceText(data, Number(args["offset"] ?? 0), 64 * KIB);
         return ok({ scope, definition: summary.definition, platform: true, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total });
       }
-      const read = await this.reads.read(membership, (t, r) => t.retained(scope, r, "definition", summary.definition as Digest));
+      const read = await this.#reads.read(membership, (t, r) => t.retained(scope, r, "definition", summary.definition as Digest));
       if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
       const part = sliceText(read.value.bytes, Number(args["offset"] ?? 0), 64 * KIB);
       return ok({ scope, definition: summary.definition, bytes: part.text, ...(part.next !== null ? { offset: part.next } : {}), total: part.total });
@@ -490,7 +507,7 @@ export class McpService {
       return ok({ scope, type, live: true, head: at.at, items: page, ...(next !== null ? { cursor: cursorOf({ h: head, i: next }) } : {}) });
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
-    const read = await this.reads.read(membership, (t, r) => t.items(scope, r, type, cursor?.c));
+    const read = await this.#reads.read(membership, (t, r) => t.items(scope, r, type, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const { page, next } = pageBy(read.value, cursor?.i ?? 0, 60 * KIB);
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
@@ -501,7 +518,7 @@ export class McpService {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
-    const read = await this.reads.read(membership, (t, r) => t.history(scope, r, cursor?.c));
+    const read = await this.#reads.read(membership, (t, r) => t.history(scope, r, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const lines = read.value.map(({ entry }) => lineOf(entry));
     const { page, next } = pageBy(lines, cursor?.i ?? 0, 60 * KIB);
@@ -513,7 +530,7 @@ export class McpService {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
     const seq = Number(args["seq"]);
-    const read = await this.reads.read(membership, (t, r) => t.entry(scope, r, seq));
+    const read = await this.#reads.read(membership, (t, r) => t.entry(scope, r, seq));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const whole = canonicalize(read.value);
     const part = sliceText(whole, Number(args["offset"] ?? 0), 60 * KIB);
@@ -525,7 +542,7 @@ export class McpService {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
-    const read = await this.reads.read(membership, (t, r) => t.log(scope, r, cursor?.c));
+    const read = await this.#reads.read(membership, (t, r) => t.log(scope, r, cursor?.c));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const { page, next } = pageBy(read.value.entries, cursor?.i ?? 0, 60 * KIB);
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
@@ -535,13 +552,13 @@ export class McpService {
   async #sends(args: Args): Promise<CallResult> {
     const s = await this.#current();
     const { scope, membership } = await this.#scope(s, args["scope"]);
-    const reader = await this.reads.reader(membership);
+    const reader = await this.#reads.reader(membership);
     if (typeof args["duty"] === "string") {
-      const read = await this.reads.transport.duty(scope, reader, args["duty"] as `${number}.${number}`);
+      const read = await this.#reads.transport.duty(scope, reader, args["duty"] as `${number}.${number}`);
       return read.ok ? ok({ scope, duty: read.value, head: read.at }) : failed({ error: "read", scope, reason: read.reason });
     }
     const cursor = fromCursor<{ c?: string; i: number }>(args["cursor"]);
-    const read = await this.reads.transport.outbox(scope, reader, cursor?.c);
+    const read = await this.#reads.transport.outbox(scope, reader, cursor?.c);
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     const { page, next } = pageBy(read.value, cursor?.i ?? 0, 60 * KIB);
     const cont = next !== null ? cursorOf({ ...(cursor?.c ? { c: cursor.c } : {}), i: next }) : read.next ? cursorOf({ c: read.next, i: 0 }) : null;
@@ -554,7 +571,7 @@ export class McpService {
     const kind = String(args["kind"]) as "definition" | "entry" | "rule" | "text" | "snapshot" | "value";
     const digest = String(args["digest"]) as Digest;
     const domain = typeof args["domain"] === "string" ? args["domain"] : undefined;
-    const read = await this.reads.read(membership, (t, r) => t.retained(scope, r, kind, digest, domain));
+    const read = await this.#reads.read(membership, (t, r) => t.retained(scope, r, kind, digest, domain));
     if (!read.ok) return failed({ error: "read", scope, reason: read.reason });
     let value = read.value.bytes;
     if (kind === "text") { try { const t = parseStrict(value); if (typeof t === "string") value = t; } catch { /* kept as bytes */ } }
@@ -577,11 +594,11 @@ export class McpService {
       const at = await this.#scope(s, args["target"]);
       scope = at.scope;
       const { summary } = await this.#summary(at.scope, at.membership);
-      identity = { service: this.#port.service, membership: at.membership, signer: this.#port.signer.key, target: summary.scope, key: key as string };
+      identity = { service: this.#service, membership: at.membership, signer: this.#port.signer.key, target: summary.scope, key: key as string };
     } else if (args["definition"] !== undefined) {
       const named = creationName(args["definition"]);
       if (!named) return failed({ error: "shape", field: "definition", what: "is not a platform name, a digest or a definition", declared: "the definition the creation named" });
-      identity = { service: this.#port.service, membership: await this.#membershipRef(args["membership"]), signer: this.#port.signer.key, target: { create: named }, key: key as string };
+      identity = { service: this.#service, membership: await this.#membershipRef(args["membership"]), signer: this.#port.signer.key, target: { create: named }, key: key as string };
     } else return failed({ error: "target", what: "give target, or definition for a creation" });
     const settled = await this.custody.settle(identity, async (envelope) => {
       if (envelope.creation) {
@@ -590,12 +607,12 @@ export class McpService {
         const definition = typeof envelope.creation.definition === "string" ? envelope.creation.definition : definitionDigest(envelope.creation.definition);
         const founded = scopeIdOf({ v: 1, kind, definition, creator: null, cause: intentDigest(envelope.signed.intent), ordinal: 0 } as Seed);
         try {
-          const read = await this.reads.transport.settle(founded, envelope.signed);
+          const read = await this.#reads.transport.settle(founded, envelope.signed);
           return read.ok ? read.value : null;
         } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
       }
       try {
-        const read = await this.reads.transport.settle(scope!, envelope.signed);
+        const read = await this.#reads.transport.settle(scope!, envelope.signed);
         return read.ok ? read.value : null;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
     });
@@ -616,7 +633,7 @@ export class McpService {
     if (given === undefined || given === null) return null;
     if (isScopeRef(given)) return given;
     if (typeof given === "string" && isScopeId(given)) {
-      const read = await this.reads.read(null, (t, r) => t.summary(given, r));
+      const read = await this.#reads.read(null, (t, r) => t.summary(given, r));
       if (read.ok) return read.value.scope;
       return stop({ error: "read", scope: given, reason: read.reason });
     }
@@ -642,7 +659,7 @@ export class McpService {
     const fieldsGiven = isRecord(args["fields"]) ? args["fields"] : {};
     const textsGiven = Array.isArray(args["texts"]) ? args["texts"].filter((t): t is string => typeof t === "string") : [];
     const definitions = Array.isArray(args["definitions"]) ? args["definitions"].filter(isRecord) as unknown as DeclaredDefinition[] : [];
-    const identity: Identity = { service: this.#port.service, membership, signer: this.#port.signer.key, target: { create: named }, key: key as string };
+    const identity: Identity = { service: this.#service, membership, signer: this.#port.signer.key, target: { create: named }, key: key as string };
     const meaning = meaningOf({ kind, definition: named, fields: fieldsGiven, texts: textsGiven.map(textDigest).sort(), definitions: definitions.map((d) => definitionDigest(d)).sort() });
     const build = async () => {
       let shaped: { fields: Record<string, FieldValue>; texts: string[] };
@@ -657,7 +674,7 @@ export class McpService {
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
       try {
-        const founded = await this.reads.transport.found(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
+        const founded = await this.#reads.transport.found(envelope.signed, envelope.creation!.definition, envelope.creation!.definitions, envelope.beside);
         // A founding has no mismatch and its refusal names no head: give it the shape of an act's answer.
         return founded.answer === "refused" ? { answer: "refused", reason: founded.reason as never, judgedAt: { seq: 0, hash: "sha256:" + "0".repeat(64) } as never } : founded as Answer;
       } catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
@@ -667,12 +684,67 @@ export class McpService {
       const scope = kept.answer.receipt.fact.at.scope;
       const config = await this.#port.config.read();
       if (!(config.roots ?? []).some((r) => r.scope === scope)) await this.#port.config.addRoot({ scope, membership } satisfies Root);
-      void this.check();
+      this.#invalidate();
     }
     const said = kept.answer.answer === "accepted"
       ? { sentence: `Created ${kept.answer.receipt.fact.at.kind} ${kept.answer.receipt.fact.at.scope} under ${data.name}; it is recorded in your configuration's standalone scopes.`, next: "Call wait with the scope and entry 0 to see what its genesis created; tools/list now lists its acts." }
       : answered(kept.answer, { scope: "the creation", kind }, null);
     return ok(this.#answerOf(kept.answer, { scope: kept.answer.answer === "accepted" ? kept.answer.receipt.fact.at.scope : "the creation", kind, tool: "create", retained: kept.retained, said, phase: kept.record.phase }));
+  }
+
+  /**
+   * `join`: membership's `join` for an invitation link, under custody, with no pre-join reads: the link names membership's
+   * version and its scope. On acceptance, the entry is read and checked against the request kept, its inbox found, and the
+   * room recorded in the configuration; the list is derived again on the next call.
+   */
+  async #join(args: Args): Promise<CallResult> {
+    const key = args["idempotencyKey"];
+    if (!validKey(key)) return failed({ error: "shape", field: "idempotencyKey", what: "is missing, or not 1 to 128 bytes of UTF-8", declared: "a key you choose and keep" });
+    const link = typeof args["link"] === "string" ? invitationOf(args["link"].trim()) : null;
+    if (!link || !wellFormedInvitation(link)) return failed({ error: "shape", field: "link", what: "is no invitation link from artroom invite, or its repository references are not well formed", declared: "artroom-invite:..." });
+    const config = await this.#port.config.read();
+    if (config.repository && config.repository.membership.scope !== link.repository.membership.scope) return failed({ error: "target", what: `this configuration has a room already (directory ${config.repository.directory.scope}); use another ARTROOM_HOME to join another` });
+    if (this.#service !== "" && this.#service !== link.service) return failed({ error: "target", what: `the link names the service ${link.service}, and this server serves ${this.#service}` });
+    if (this.#service === "") { this.#service = link.service; this.#reads = this.#readsOf(link.service); }
+    const named = (link.definition ?? "platform:membership@1") as PlatformDefinition;
+    const membershipData = platform(named)?.data as unknown as DefinitionLike | undefined;
+    const act = membershipData?.name === "platform:membership" ? membershipData.acts["join"] : undefined;
+    if (!act) return failed({ error: "target", what: `the invitation is in ${named}, which this server does not know as membership` });
+    const M = link.repository.membership;
+    const fields = { invitation: link.invitation, secret: link.secret };
+    const identity: Identity = { service: this.#service, membership: M, signer: this.#port.signer.key, target: M, key: key as string };
+    const meaning = meaningOf({ join: textDigest(canonicalize(link as never)) });
+    const build = async () => ({
+      binding: { definition: "platform:membership", kind: "join", declaration: declarationDigest(membershipData!, "join"), pinned: named },
+      envelope: { signed: await signedIntent(this.#port.signer, { to: M, kind: "join", fields, expected: expectedOf(act, [], null, fields) }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
+    });
+    const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
+    const kept = await this.custody.send(identity, meaning, build, async (envelope) => {
+      try { return await this.#reads.transport.submit(M.scope, envelope.signed, [], envelope.beside); }
+      catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
+    }, { notAfter, bytes: bytesOf(fields) });
+    if ("lost" in kept) return failed({ error: "transport", scope: M.scope, submitted: true });
+    const asked = { scope: M.scope, kind: "join", on: null, action: null };
+    if (kept.answer.answer !== "accepted") return ok(this.#answerOf(kept.answer, { scope: M.scope, kind: "join", tool: "join", retained: kept.retained, said: answered(kept.answer, asked, []), phase: kept.record.phase }));
+    // The admitted entry, read as the member the join made: it must hold the exact request kept, and it names the inbox.
+    this.#reads.forget(M.scope);
+    const fact = kept.answer.receipt.fact;
+    const entry = await this.#reads.read(M, (t, r) => t.entry(M.scope, r, fact.seq));
+    if (!entry.ok) return failed({ error: "read", scope: M.scope, reason: entry.reason });
+    const input = entry.value.entry.input;
+    if (entry.value.hash !== fact.hash || input.type !== "act" || canonicalize(input.signed) !== canonicalize(kept.record.envelope.signed)) {
+      return failed({ error: "target", what: `entry ${M.scope}:${fact.seq} does not hold the join kept under this key` });
+    }
+    const inbox = entry.value.entry.sends.flatMap((send) => ("creator" in send.to && send.to.kind === "inbox" ? [scopeIdOf(send.to as Seed)] : []))[0];
+    if (!inbox) return failed({ error: "target", what: `entry ${M.scope}:${fact.seq} creates no inbox` });
+    const repository = { ...link.repository, inbox };
+    if (this.#port.config.joined) await this.#port.config.joined({ service: link.service, repository, handle: link.handle });
+    else if (this.#port.config.setRepository) await this.#port.config.setRepository(repository);
+    this.#invalidate();
+    return ok({
+      ...this.#answerOf(kept.answer, { scope: M.scope, kind: "join", tool: "join", retained: kept.retained, said: { sentence: `Joined as ${link.handle} on key ${this.#port.signer.key}: entry ${M.scope}:${fact.seq}. The room is recorded in your configuration.`, next: "Call wait with scope inbox and seq 0 until your inbox exists; then room. tools/list now lists the room's acts for your role." }, phase: kept.record.phase }),
+      handle: link.handle, repository,
+    });
   }
 
   async #wait(args: Args): Promise<CallResult> {
@@ -683,11 +755,11 @@ export class McpService {
     let waiting: ScopeId[] = [scope];
     const poll = async (): Promise<Record<string, unknown> | null> => {
       if (typeof args["duty"] === "string") {
-        const read = await this.reads.transport.duty(scope, await this.reads.reader(membership), args["duty"] as `${number}.${number}`);
+        const read = await this.#reads.transport.duty(scope, await this.#reads.reader(membership), args["duty"] as `${number}.${number}`);
         return read.ok && (read.value.result !== null || read.value.diagnosis !== null) ? { duty: read.value } : null;
       }
       if (typeof args["entry"] === "number") return this.#created(scope, membership, args["entry"], (w) => { waiting = [scope, ...w]; });
-      const read = await this.reads.read(membership, (t, r) => t.summary(scope, r));
+      const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));
       if (!read.ok) return null;
       if (typeof args["seq"] === "number") return read.at.seq >= args["seq"] ? { head: read.at } : null;
       const states = Array.isArray(args["states"]) ? args["states"] as string[] : [];
@@ -697,7 +769,7 @@ export class McpService {
         if (item) return { item, head: read.at };
         // An item in a final state is no longer live: with its type, the retained final items are read too, one page.
         if (typeof args["item"] === "number" && typeof args["type"] === "string" && !read.value.items.some((i) => i.id === args["item"])) {
-          const final = await this.reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string));
+          const final = await this.#reads.read(membership, (t, r) => t.items(scope, r, args["type"] as string));
           const found = final.ok ? final.value.find(match) : undefined;
           if (found) return { item: found, head: read.at, final: true };
         }
@@ -715,7 +787,7 @@ export class McpService {
 
   /** The scopes entry `seq` created, read by its sends and, for an entry whose creation an outside answer completes, by the later entries whose sends the entry's intent caused; then what their genesis created. */
   async #created(scope: ScopeId, membership: ScopeRef | null, seq: number, waiting: (scopes: ScopeId[]) => void): Promise<Record<string, unknown> | null> {
-    const read = await this.reads.read(membership, (t, r) => t.entry(scope, r, seq));
+    const read = await this.#reads.read(membership, (t, r) => t.entry(scope, r, seq));
     if (!read.ok) return null;
     const entry = read.value.entry;
     const seeds: { n: number; seed: Seed; from: number }[] = entry.sends.flatMap((send) => ("creator" in send.to ? [{ n: send.n, seed: send.to as Seed, from: seq }] : []));
@@ -723,7 +795,7 @@ export class McpService {
       // A creation that an outside answer completes, as the register's `found`: a later entry sends the create, caused by this intent.
       const cause = intentDigest(entry.input.signed.intent);
       for (let next = seq + 1; next < seq + 64; next++) {
-        const later = await this.reads.read(membership, (t, r) => t.entry(scope, r, next));
+        const later = await this.#reads.read(membership, (t, r) => t.entry(scope, r, next));
         if (!later.ok) break;
         for (const send of later.value.entry.sends) if ("creator" in send.to && (send.to as Seed).cause === cause) seeds.push({ n: send.n, seed: send.to as Seed, from: next });
       }
@@ -735,11 +807,11 @@ export class McpService {
       const next = queue.shift()!;
       const id = scopeIdOf(next.seed);
       // A child's own reads go with the same membership; a signed read is the fallback where the cause chain allows it.
-      const child = await this.reads.read(membership, (t, r) => t.summary(id, r));
+      const child = await this.#reads.read(membership, (t, r) => t.summary(id, r));
       const status = child.ok ? child.value.status : null;
       children.push({ scope: id, ref: child.ok ? child.value.scope : null, kind: next.seed.kind, definition: String(next.seed.definition), status, by: next.by });
       if (status === "active" && next.depth === 0) {
-        const genesis = await this.reads.read(membership, (t, r) => t.entry(id, r, 0));
+        const genesis = await this.#reads.read(membership, (t, r) => t.entry(id, r, 0));
         if (genesis.ok) for (const send of genesis.value.entry.sends) if ("creator" in send.to) queue.push({ n: send.n, seed: send.to as Seed, from: 0, by: `${id}:0.${send.n}`, depth: 1 });
       }
     }
@@ -761,9 +833,11 @@ export class McpService {
     const [directory, membership, rules, destination, inbox] = ["directory", "membership", "rules", "destination", "inbox"].map(of);
     if (!config.repository && directory && membership && rules && destination) {
       await set({ directory, membership, rules: rules.scope, destination: destination.scope });
-      this.reads.forget(membership.scope);
+      this.#reads.forget(membership.scope);
+      this.#invalidate();
     } else if (config.repository && inbox && !config.repository.inbox && entry.at.scope === config.repository.membership.scope) {
       await set({ ...config.repository, inbox: inbox.scope });
+      this.#invalidate();
     }
   }
 
@@ -772,9 +846,9 @@ export class McpService {
     const target = args["target"] ?? "destination";
     const { scope, membership } = await this.#scope(s, target);
     const seq = Number(args["entry"]);
-    const reader = await this.reads.reader(membership);
+    const reader = await this.#reads.reader(membership);
     if (reader === null) return failed({ error: "credential", destination: scope, why: "no read session is given here, and only a session reads a credential" });
-    const opening = await this.reads.read(membership, (t, r) => t.entry(scope, r, seq));
+    const opening = await this.#reads.read(membership, (t, r) => t.entry(scope, r, seq));
     if (!opening.ok) return failed({ error: "credential", destination: scope, why: `entry ${seq}: ${opening.reason}` });
     const input = opening.value.entry.input;
     if (input.type !== "act" || input.signed.intent.kind !== "read-token" || input.signed.intent.actor !== this.#port.signer.key) return failed({ error: "credential", destination: scope, why: `entry ${seq} is no read-token act your key signed` });
@@ -782,7 +856,7 @@ export class McpService {
     let handle: string | null = null;
     let ended: string | null = null;
     for (let next = seq + 1; next < seq + 64 && handle === null && ended === null; next++) {
-      const got = await this.reads.read(membership, (t, r) => t.entry(scope, r, next));
+      const got = await this.#reads.read(membership, (t, r) => t.entry(scope, r, next));
       if (!got.ok) break;
       const i = got.value.entry.input;
       if (i.type === "outcome" && i.operation === operation) {
@@ -793,7 +867,7 @@ export class McpService {
     if (ended) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} is ${ended}` });
     if (handle === null) return failed({ error: "credential", destination: scope, why: `the mint of entry ${seq} has no outcome yet; call wait` });
     let answer: Read<{ token: string; ends: string; remote: string }>;
-    try { answer = await readCredential(this.#port.service, scope, reader, handle, this.#port.fetch ? { fetch: this.#port.fetch } : {}); }
+    try { answer = await readCredential(this.#service, scope, reader, handle, this.#port.fetch ? { fetch: this.#port.fetch } : {}); }
     catch { return failed({ error: "credential", destination: scope, why: "the credential reply was unavailable or invalid; the one-time credential may have been consumed" }); }
     if (!answer.ok) return failed({ error: "credential", destination: scope, why: answer.reason });
     const structured = { credential: answer.value.token, remote: answer.value.remote, ends: answer.value.ends, entry: seq };
