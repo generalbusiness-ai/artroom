@@ -3,7 +3,8 @@
 Bounded child `c151104fdedd8d2e3a3777908825fc4a95199080`, promised by
 `c40356ac6fcc3d0f821f5b41ec2e4dd771b4fb9d`, delivers the freeze route below.
 Parent request `3f08557547c4df666e44f150fe8d0209d43c8af9` and its original
-promise remain open. The parent amendment is `b861b235`. Source composition: `8aa545de532e4454578b96e38e3b5f2baa6ca9cb`,
+promise remain open. Runner timing also supports practice-script request
+`b861b235`. Source composition: `8aa545de532e4454578b96e38e3b5f2baa6ca9cb`,
 including landed Page branding from main `3d400d49`.
 
 The rehearsal admits two changes on the same published base before the
