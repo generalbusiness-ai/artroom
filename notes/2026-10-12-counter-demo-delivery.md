@@ -100,6 +100,16 @@ Public evidence: `counter-demo-gate-one/public-result.json` and
 `9fb4efd15aae3bc61429d2612f4fe568478c48d05a1469906afa30d3329b36aa`. The final candidate adds only that generated
 asset repair and this result note after the gate head; independent review
 must retain the original-failure and bounded-completion distinction.
-The isolated rehearsal deployment, Hugh's three-browser rehearsal,
-checker full review, sealed landing, and Counter redeployment remain
-owed. No new hosting, native count, or audio outcome is claimed.
+The isolated rehearsal deployment subsequently completed at code head
+`3fda79e271f9b5145fde4b956fb7d249a459ab24`, version
+`93afe58f-a4ab-46e8-974f-5b71af7e168a`. All 22 served Counter, Page and
+brand assets matched their expected bytes, MIME and security headers;
+Counter title `dap - counting` matched. All binding fields and protected
+runtime settings remained unchanged from version `a06502bd`. Public proof
+`counter-candidate-rehearsal/deploy-one/public-result.json`, SHA256
+`2fbd2a9e16e74185e65a5558738387297afe0005e37fecd102e7e4106a7f49c4`.
+This result update changes only the note after that deployed code head.
+
+Hugh's three-browser rehearsal, checker full review, sealed landing and
+Counter production redeployment remain owed. Static hosting evidence
+claims no native count, human audibility or physical-device outcome.
