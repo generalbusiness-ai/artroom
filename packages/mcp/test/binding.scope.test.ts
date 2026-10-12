@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, FactRef } from "@generalbusiness/artroom-contract";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
 import { firstExtents, platform } from "@generalbusiness/artroom-platform";
 import { change, change3 } from "@generalbusiness/artroom-lanes";
@@ -63,7 +63,7 @@ test("binding: variants, stale descriptors, retirement, collisions and controls"
     const names = list.map((t) => t.name);
     const v1 = toolFor(list, "change", "propose-manifest", definitionDigest(change));
     const v2 = toolFor(list, "change", "propose-manifest", definitionDigest(change3));
-    const expected = (d: typeof change) => `change.propose-version@${variantOf({ definition: "change", kind: "propose-manifest", declaration: declarationDigest(d as unknown as DefinitionLike, "propose-manifest") }, 8)}`;
+    const expected = (d: DeclaredDefinition) => `change.propose-version@${variantOf({ definition: "change", kind: "propose-manifest", declaration: declarationDigest(d as unknown as DefinitionLike, "propose-manifest") }, 8)}`;
     expect([v1.name, v2.name]).toEqual([expected(change), expected(change3)]);
     expect(names).not.toContain("change.propose-version");
     // A row both definitions hold byte for byte is one tool serving both digests.
