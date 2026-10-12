@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:68b5f63e3c7baa5520f0027a26d1efe779114665","text":"Republished at fbf80dea3ec8994dc9ee3deb0bda664d8446b2ee, which no longer changes packages/page/test/claim-ui.test.ts: the pointer is withdrawn with no successor."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d749492a8b7ffc09add2bd3dd7a4c4efd103e1a0","text":"Republished at fbf80dea3ec8994dc9ee3deb0bda664d8446b2ee, which no longer changes packages/page/test/joined-shell.test.ts: the pointer is withdrawn with no successor."}
