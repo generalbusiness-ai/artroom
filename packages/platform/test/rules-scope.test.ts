@@ -75,8 +75,8 @@ test("the rules definition validates whole with the platform option; its marks a
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
   const supplied = platform(RULES_SCOPE)!;
-  // F1 explicitly supports rules@3; the next unshipped version remains unsupported.
-  expect([supplied.data, supplied.rules, platform("platform:rules@4")]).toEqual([rulesScope2, rulesScopeRules, null]);
+  // Prospective Rules4 is explicitly supported; the next unshipped version remains unsupported.
+  expect([supplied.data, supplied.rules, platform("platform:rules@5")]).toEqual([rulesScope2, rulesScopeRules, null]);
   expect([runnable(checked.definition, supplied.rules), ...Object.keys(rulesScopeRules).map((lost) => runnable(checked.definition, { ...supplied.rules, [lost]: undefined as never })), runnable(checked.definition, { ...supplied.rules, checkers: { place: "send", run: () => null } })])
     .toEqual([true, ...Object.keys(rulesScopeRules).map(() => false), false]);
 });
@@ -89,6 +89,13 @@ test("the genesis opens the rules with the branch, the directory and membership'
   expect([membershipId(r.state), membershipId(r.registrar.state)]).toEqual([membership.scope, null]);
   // The creation's fields hold the ID as a text, which fits the slot: a scope ID is at most 64 bytes.
   expect(membership.scope.length).toBeLessThanOrEqual(64);
+  // The native memory judge derives the new default only for the explicitly pinned version4.
+  // Registrar, membership authority and clock remain the labelled fixture stand-ins above.
+  const named = ["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"] as const;
+  const pinned = named.map(version => new Rulebook(true, membership.scope, version));
+  expect(pinned.map(book => book.item(0).values["ownerMayReview"])).toEqual([false, false, false, true]);
+  expect(pinned.map(book => book.state.scope()?.status)).toEqual(["active", "active", "active", "active"]);
+  expect(pinned.map(book => book.entries[0]!.entry.input.type === "genesis" ? book.entries[0]!.entry.input.seed.definition : null)).toEqual(named);
   const provisional = new Rulebook(false);
   expect([provisional.state.scope()?.status, said(keep(provisional, unit))[0] === "write"]).toEqual(["provisional", false]);
 });

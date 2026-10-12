@@ -38,11 +38,19 @@ const DIGESTS: Readonly<Record<string, string>> = {
 };
 
 test("every shipped version resolves to its own data, pinned by digest, and version 1 of each is the data that main shipped; no other version resolves; default founding keeps the existing cohort", () => {
-  expect(Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]))).toEqual(DIGESTS);
+  const digests = Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]));
+  const { ["platform:rules@4"]: prospective, ...shipped } = digests;
+  expect(shipped).toEqual(DIGESTS); // Every existing golden literal stays exact.
+  const next = platform("platform:rules@4")!;
+  expect(next).toBe(VERSIONS["platform:rules@4"]);
+  expect(next.data.items["rules"]!.values["ownerMayReview"]!.default).toBe(true);
+  expect(next.rules).toBe(platform("platform:rules@3")!.rules);
+  expect(prospective).not.toBe(DIGESTS["platform:rules@3"]);
+  expect(["platform:rules@1", "platform:rules@2", "platform:rules@3"].map(named => platform(named)!.data.items["rules"]!.values["ownerMayReview"]!.default)).toEqual([false, false, false]);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
   expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
-  // The explicit application pins do not replace the existing default cohort.
-  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership]);
+  // Explicit application and prospective Rules4 pins do not replace the existing default cohort.
+  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4"]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.
