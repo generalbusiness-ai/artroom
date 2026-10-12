@@ -160,7 +160,7 @@ describe("descriptions are derived from the whole declaration", () => {
     const base = demoInventory("admin");
     const m2 = "sc_aaaamembershipsecond" as ScopeId;
     const roots: Held[] = [heldOf("sc_r1", "root", definitionDigest(counting), declared(counting)), heldOf("sc_r2", "root", definitionDigest(counting), declared(counting), m2)];
-    const standing = { [MEMBERSHIP]: { ...(standingOf("admin") as object), actions: ["counting.join"] }, [m2]: { ...(standingOf("member") as object), actions: ["counting.join"] } } as Inventory["standing"];
+    const standing = { [MEMBERSHIP]: { ...(standingOf("admin") as object), actions: ["counting.join"] }, [m2]: { ...(standingOf("member") as object), actions: ["counting.join"] } } as unknown as Inventory["standing"];
     const inv = (order: Held[]): Inventory => ({ ...base, scopes: [...base.scopes, ...order], standing });
     const text = (i: Inventory) => actTool(bindingsOf(i, WORDS).find((b) => b.definition === "counting" && b.kind === "join")!, i, "default").description;
     const options = { mode: "default" as const, tools: null, words: WORDS };
