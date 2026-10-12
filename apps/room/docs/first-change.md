@@ -6,7 +6,7 @@ require, and follow the room's confirmed publication.
 
 This draft describes capabilities in main
 `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`, inspected on 2026-10-09.
-The current CLI founds rooms under the native `@2` cohort. Workspace packages
+The current CLI creates rooms under the native `@2` cohort. Workspace packages
 are `0.1.0-dev.1`; no current public registry release or cold-reader result
 is established. Use an already supplied, supported CLI and an invitation
 from the room admin. This guide supplies no npm installation command,
@@ -14,12 +14,15 @@ operator permission or new-room bootstrap.
 
 ## Join with your invitation
 
-In a terminal with a fresh Artroom user context, run:
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](../../../docs/README.md#names-in-transition).
+
+In a terminal with a fresh dap user context, run:
 
 ```sh
-artroom join '<your invitation link>'
-artroom acts
-artroom issues
+dap join '<your invitation link>'
+dap acts
+dap issues
 ```
 
 The admin chooses your room role when inviting you. The CLI creates and
@@ -33,7 +36,7 @@ If the reply is lost or the inbox is still being created, rerun `join` with
 that original link. It uses the same key, request and deadline. A different
 invitation cannot replace a pending Join. Missing private records or keys
 stop recovery; they do not authorize a new enrollment as the same member.
-See [the command reference](../cli.md) for custody and refusal details.
+See [the command reference](../../../docs/cli.md) for custody and refusal details.
 
 `acts` lists the actions your current role holds. An offered action can
 still be refused by the room's rules or state. A member can propose and
@@ -45,7 +48,7 @@ admin with `change.merge` performs publication.
 Create a local UTF-8 file, then use its path as the input:
 
 ```sh
-artroom edit README.md --file ./readme.md --title 'Explain the room'
+dap edit README.md --file ./readme.md --title 'Explain the room'
 ```
 
 `README.md` is the target path in the room's repository. `./readme.md` is
@@ -60,10 +63,10 @@ version. It does not mean published. A missing approval, unauthorized merger
 or invalid path can leave a recorded proposal unpublished. Keep the change
 and version shown in that output for review and later merge.
 
-This source has no `artroom propose <branch>`, application preset or ordinary
+This source has no `dap propose <branch>`, application preset or ordinary
 browser editor. The branch/manifest-list workflow is separate unlanded work;
 it is not an alternative command in this guide. A clone is optional for this
-one-file path. [Clone and host credentials](../hosts.md) explain the separate
+one-file path. [Clone and host credentials](../../../docs/hosts.md) explain the separate
 read-token path and its limits.
 
 ## Review the exact version and extent
@@ -74,7 +77,7 @@ review requirements. For a source extent named `source`, an eligible reviewer
 uses the actual change and version printed earlier:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<version> --set verdict=approve --set extent=source
 ```
 
@@ -82,12 +85,12 @@ For an authority file such as `AGENTS.md`, the default rules extent requires
 an eligible controller holding `rules.publish`:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<version> --set verdict=approve --set extent=rules
 ```
 
 Replace each placeholder with the exact recorded value. Inspect the room's
-Rules view and [lane reference](../lanes-reference.md) before choosing an
+Rules view and [lane reference](../../../docs/lanes-reference.md) before choosing an
 extent. One verdict names one extent; mixed changes need each touched
 extent's required verdicts. Authors cannot supply an independent review of
 their own version. Current rules also judge controller relationships and
@@ -105,9 +108,9 @@ could not obtain or verify.
 An authorized merger runs:
 
 ```sh
-artroom merge <change-scope>
-artroom log <change-scope>
-artroom verify --all
+dap merge <change-scope>
+dap log <change-scope>
+dap verify --all
 ```
 
 A `Published: commit ...` result names the room destination's confirmed
@@ -139,12 +142,12 @@ that all external effects are finished or that unobserved history is complete.
 
 ## Evidence and remaining acceptance
 
-Commands match current [CLI help](../../packages/cli/src/line.ts).
-[CLI story](../../packages/cli/test/story.scope.test.ts) covers native
-founding, enrollment, authority refusals and history reads with labelled
+Commands match current [CLI help](../../../packages/cli/src/line.ts).
+[CLI story](../../../packages/cli/test/story.scope.test.ts) covers native
+creation, enrollment, authority refusals and history reads with labelled
 Git host, scheduler and clock stand-ins. The existing
-[one-file scenario](../../packages/lanes/test/edit.scope.test.ts) and
-[demo rehearsal](../../scripts/demo/rehearse.ts) supply contribution,
+[one-file scenario](../../../packages/lanes/test/edit.scope.test.ts) and
+[demo rehearsal](../../../scripts/demo/rehearse.ts) supply contribution,
 extent-review and publication examples. This documentation change runs no
 new tests or hosted commands and claims no new fixture result.
 

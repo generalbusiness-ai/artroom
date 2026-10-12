@@ -1,16 +1,19 @@
 # Review an exact change version
 
-For a reviewer using an already configured Artroom source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
+For a reviewer using an already configured dap source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
 
-**Source guide — cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
+**Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
+
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](../../../docs/README.md#names-in-transition).
 
 First read the change and the actual entries that hold its content:
 
 ```sh
-artroom acts <change-scope>
-artroom log <change-scope>
-artroom show <change-scope>:<manifest-entry>
-artroom show <change-scope>:<source-entry>
+dap acts <change-scope>
+dap log <change-scope>
+dap show <change-scope>:<manifest-entry>
+dap show <change-scope>:<source-entry>
 ```
 
 Replace placeholders with recorded identities. A manifest is a recorded version of the proposed change. A manifest list names its frozen source entries and digests; read every relevant source entry. Reading only a title, a task transcript or the latest published page is not reviewing that version. General immutable diff/interdiff access and cold-review acceptance remain separate work.
@@ -22,7 +25,7 @@ An extent is a named part of the repository with its own reviews and checks. Rea
 For an extent actually named `source`, an eligible independent reviewer can record:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<manifest-item> --set verdict=approve --set extent=source
 ```
 
@@ -32,7 +35,7 @@ The current declaration needs `change.review` to record the act. The destination
 
 ## Keep the subject and reviewer independent
 
-The manifest must still be current when the verdict is admitted. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. By default an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
+The manifest must still be current when the verdict takes effect. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. By default an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
 
 A declared single-controller exception is a separate merge rule. It applies only when the actual observed rules, controller count and author/controller relationship meet all its conditions. It does not turn an author's verdict into independent review or remove checks. Missing relationship/count evidence cannot justify assuming the exception. [Independence and exception](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L436)
 
@@ -43,7 +46,7 @@ A job label such as reviewer grants no authority. The default native `agent` rol
 This declaration allows one submitted verdict per reviewer for a manifest. To replace your own submitted verdict for that same manifest, supply its exact review item:
 
 ```sh
-artroom act review-verdict --on <change-scope> \
+dap act review-verdict --on <change-scope> \
   --set manifest=<same-manifest-item> --set earlier=<your-review-item> \
   --set verdict=request-changes --set extent=source
 ```

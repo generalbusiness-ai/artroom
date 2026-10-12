@@ -2,18 +2,21 @@
 
 For a maintainer or admin using an already configured source CLI, this page helps you tell a recorded proposal or reservation from the destination's confirmed publication.
 
-**Source guide — cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package release, hosted tutorial or rendered acceptance is established. Your room keeps its original definition pins; activating new declarations alone does not upgrade an older native destination.
+**Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package release, hosted tutorial or rendered acceptance is established. Your room keeps its original definition pins; activating new declarations alone does not upgrade an older native destination.
+
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](../../../docs/README.md#names-in-transition).
 
 Read the intended version, content and required evidence before the mutation:
 
 ```sh
-artroom log <change-scope>
-artroom show <change-scope>:<manifest-entry>
-artroom show <change-scope>:<source-entry>
+dap log <change-scope>
+dap show <change-scope>:<manifest-entry>
+dap show <change-scope>:<source-entry>
 # Read every referenced file and the required review/check evidence.
-artroom merge <change-scope>
-artroom log <change-scope>
-artroom verify --all
+dap merge <change-scope>
+dap log <change-scope>
+dap verify --all
 ```
 
 Use exact recorded references. For a manifest list, the frozen manifest points to source entries; read each relevant entry. The CLI selects the current manifest and the reports it records when signing `merge`. It does not bind your memory of an earlier version as approval of the new one. [Merge selection](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L1523)
@@ -23,7 +26,7 @@ Use exact recorded references. For a manifest list, the frozen manifest points t
 | Result | What it establishes | What remains |
 |---|---|---|
 | Proposed | A recorded change/version | Required review, checks and destination publication |
-| Accepted merge | The merge act was admitted | Observe its actual publication result |
+| Accepted merge | The merge act took effect | Observe its actual publication result |
 | Reserved tree | The destination recorded an integration for checks | Authentic required check results and publication |
 | Published commit | The destination confirmed publication of that commit | Inspect any separately recorded cleanup duties |
 | Refused, aborted or observation unknown | Publication is not confirmed by this result | Follow the recorded reason or original operation's reconciliation |
@@ -36,9 +39,9 @@ A `Published: commit ...` result names the destination's confirmed commit. Keep 
 
 ## Follow an unknown result without signing a replacement
 
-An accepted merge followed by `Observation unknown` has already been admitted. Read the stated merge fact and change history; do not submit another merge to recover only its observation. A lost transport reply likewise does not prove absence. Generic `act`, `edit`, `propose` and `merge` have no universal retained-envelope recovery journal. Rerunning one may sign another request or open another lane.
+An accepted merge followed by `Observation unknown` has already taken effect. Read the stated merge fact and change history; do not submit another merge to recover only its observation. A lost transport reply likewise does not prove absence. Generic `act`, `edit`, `propose` and `merge` have no universal retained-envelope recovery journal. Rerunning one may sign another request or open another lane.
 
-Exact recovery needs the original signed request and its existing owning mechanism. Read-only inspection does not authorize a replacement or erase outside duties. Join and saved founding recovery are narrower flows, not a promise about every command. [Unknown observation](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L1540)
+Exact recovery needs the original signed request and its existing owning mechanism. Read-only inspection does not authorize a replacement or erase outside duties. Join and saved creation recovery are narrower flows, not a promise about every command. [Unknown observation](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L1540)
 
 `verify --all` uses the caller's session and signed-read fallback and reports actual coverage and trusts. The source also inspects destination cleanup against the verified target; an unread or inconsistent history cannot supply that snapshot. A consistency result is not a general proof that every external operation is finished. [Verifier source](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L971)
 
