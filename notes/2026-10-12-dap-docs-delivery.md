@@ -256,3 +256,75 @@ resolve once this head lands.
    the architecture page. Those pages are now rewritten, and each says
    that review of the new version is owed. The ledger itself changed only
    in names and links.
+
+## Revision 1, 12 October 2026
+
+The checker reviewed the branch at `52180d64` and asked for five changes.
+They are on the same branch, on top of `52180d64`, with no rebase. The
+gate was not run again.
+
+1. **Names in transition.** `docs/README.md` has a new section, "Names in
+   transition". It says that the pages use the final names, that at this
+   commit the command is `artroom` and the packages are
+   `@generalbusiness/artroom-*`, with a table read from each
+   `packages/*/package.json`, and that the rename lands as its own change.
+   It also names what keeps its current form: `artroom-replay`, the
+   `@generalbusiness/artroom-lanes` import and the source values. Each page
+   with runnable commands or imports in the new names links that section
+   once, just before its first command: `docs/cli.md`, `docs/demo.md`,
+   `docs/deploy.md`, `docs/hosts.md`, `docs/pages.md`, `docs/scopes.md`,
+   `docs/testing.md`, `docs/write-an-application.md`, and in
+   `apps/room/docs/` `first-change.md`, `landing.md`, `lanes.md`,
+   `page.md`, `reviewing.md` and `roles-and-membership.md`. No code was
+   renamed.
+2. **Activation file path.** The command in `docs/write-an-application.md`
+   now reads `--value packages/lanes/definitions/change-demo.json`, run
+   from the repository root, because the command line reads the file at
+   the path given. Not run: it needs a deployed room. The page already
+   labels both creation paths as not run.
+3. **Heading anchors.** `scripts/check-doc-links.mjs` now blanks fenced
+   code for both jobs, but strips inline code only where it reads links.
+   Headings keep their inline-code text without the backticks before the
+   slug, so "The hosting's own Git service (host `artifacts`)" gives
+   `#the-hostings-own-git-service-host-artifacts`, and the lane reference's
+   "`issue`" gives `#issue`. The witness is a self-test mode:
+
+   ```sh
+   node scripts/check-doc-links.mjs --self-test
+   ```
+
+   It checks a fixture with a heading that holds inline code, three
+   repeated headings, a heading inside a fence and a heading with a
+   command in code. It reads no other file. Result: `self-test passed:
+   host-artifacts, notes, notes-1, notes-2, use-dap-verify---all`, exit 0,
+   0.05 seconds.
+4. **The derivation boundary.** `docs/architecture.md` no longer says "and
+   nothing else". It says that replay does not call the runtime, that
+   both use the same derivation code, `dap-derive`, on the types of
+   `dap-contract`, and that replay also depends on the stored entries and
+   retained inputs it reads.
+5. **Two repairs.** `docs/deploy.md` now links
+   [The page](../apps/room/docs/page.md) where it named `docs/page.md`.
+   `docs/cli.md` spells the merge command `dap merge`, as the rest of the
+   page does, and the page links the transition section.
+
+Also: the caution that deleting a token's plaintext does not prove that
+the provider revoked the token is back. It is in `docs/hosts.md`, in the
+paragraph on how the hosting's own Git service keeps creation tokens, and
+in the deployment section of `docs/architecture.md`, which links there.
+One more "founding" in `docs/scopes.md` now reads "first commit".
+
+Link check, rerun at the revision head:
+
+```sh
+node scripts/check-doc-links.mjs
+```
+
+Result: `256 relative links checked, 0 broken.` Exit 0.
+
+The search for the forbidden words on the pages this revision changed
+finds no "admission", "admit", "ordering", em-dash, "software scale",
+"Start a room" or "pull request". "found" appears only as `not-found`,
+as "not found" in an exit-code list, in test file names such as
+`founding-real.test.ts`, and in the quoted README sentence that the
+destination writes ("Founded by <handle> through the room ...").

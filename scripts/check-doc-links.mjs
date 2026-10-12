@@ -10,14 +10,21 @@
 // files are fixtures. notes/, plans/ and parked/ are history and keep their
 // links as written; --history adds plans/ and parked/ to the check.
 //
+// A heading's anchor keeps the text of its inline code, with the backticks
+// removed, as GitHub's does: "Host `artifacts`" is #host-artifacts.
+//
 // Usage: node scripts/check-doc-links.mjs [--history] [root]
 // Exits 0 when every link resolves, 1 otherwise.
+//
+// node scripts/check-doc-links.mjs --self-test checks the anchor rules on a
+// small fixture in this file, reads no other file, and exits 0 when they hold.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const history = args.includes("--history");
+const selfTest = args.includes("--self-test");
 const root = resolve(args.find((arg) => !arg.startsWith("--")) ?? new URL("..", import.meta.url).pathname);
 const skipAtRoot = new Set(history ? ["notes"] : ["notes", "plans", "parked"]);
 const skipAnywhere = new Set(["node_modules", ".git", "test"]);
@@ -32,11 +39,10 @@ function* markdown(dir) {
 	}
 }
 
-// Remove fenced code blocks and inline code, keeping line count.
-function prose(text) {
-	const lines = text.split("\n");
+// Blank the lines of fenced code blocks, keeping line count.
+function outsideFences(text) {
 	let fence = null;
-	return lines.map((line) => {
+	return text.split("\n").map((line) => {
 		const open = line.match(/^\s*(`{3,}|~{3,})/);
 		if (fence) {
 			if (open && open[1][0] === fence[0] && open[1].length >= fence.length) fence = null;
@@ -46,19 +52,26 @@ function prose(text) {
 			fence = open[1];
 			return "";
 		}
-		return line.replace(/(`+)[\s\S]*?\1/g, "");
-	}).join("\n");
+		return line;
+	});
 }
 
-// GitHub's heading anchors: lower case, punctuation removed, spaces to hyphens,
-// a repeated anchor numbered from -1.
-function anchors(path) {
+// The lines where links are read: no fenced code and no inline code.
+function prose(text) {
+	return outsideFences(text).map((line) => line.replace(/(`+)[\s\S]*?\1/g, "")).join("\n");
+}
+
+// GitHub's heading anchors: inline code keeps its text without backticks,
+// then lower case, punctuation removed, spaces to hyphens, and a repeated
+// anchor numbered from -1.
+function anchorsOfText(text) {
 	const found = new Set();
 	const seen = new Map();
-	for (const line of prose(readFileSync(path, "utf8")).split("\n")) {
+	for (const line of outsideFences(text)) {
 		const heading = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
 		if (heading) {
 			const base = heading[1]
+				.replace(/(`+)([\s\S]*?)\1/g, "$2")
 				.replace(/<[^>]*>/g, "")
 				.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
 				.toLowerCase()
@@ -68,9 +81,30 @@ function anchors(path) {
 			seen.set(base, n + 1);
 			found.add(n === 0 ? base : `${base}-${n}`);
 		}
-		for (const html of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) found.add(html[1]);
+		const html = line.replace(/(`+)[\s\S]*?\1/g, "");
+		for (const anchor of html.matchAll(/<a\s+(?:id|name)="([^"]+)"/g)) found.add(anchor[1]);
 	}
 	return found;
+}
+
+const anchors = (path) => anchorsOfText(readFileSync(path, "utf8"));
+
+if (selfTest) {
+	const fixture = [
+		"# Host `artifacts`",
+		"## Notes",
+		"## Notes",
+		"## Notes",
+		"```",
+		"## Not a heading",
+		"```",
+		"## Use `dap verify --all`",
+	].join("\n");
+	const expected = ["host-artifacts", "notes", "notes-1", "notes-2", "use-dap-verify---all"];
+	const actual = [...anchorsOfText(fixture)];
+	const ok = JSON.stringify(actual) === JSON.stringify(expected);
+	console.log(`self-test ${ok ? "passed" : "failed"}: ${actual.join(", ")}`);
+	process.exit(ok ? 0 : 1);
 }
 
 const cache = new Map();

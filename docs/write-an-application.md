@@ -103,6 +103,9 @@ declares named rules, pass `RULE_PROFILES` from
 the validator calls for the room's lane definitions and their demo
 profiles, which declare no named rules.
 
+The package names and commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](README.md#names-in-transition).
+
 From the repository root, with its workspace dependencies installed, this
 command validates both demo profiles:
 
@@ -209,11 +212,13 @@ exist today. Neither was run for this page.
 active definitions. A member who holds `rules.activate`, an admin by
 default, signs `activate` with the definition's digest and its canonical
 bytes.
-The room's directory then creates new lanes under it. For the demo
-profile of the change lane, that command is:
+The room's directory then creates new lanes under it. The command reads
+the `--value` file at the path you give. For the demo profile of the
+change lane, run this from the repository root, where the pin script
+wrote `packages/lanes/definitions/change-demo.json`:
 
 ```sh
-dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2 --set name=change --value change-demo.json
+dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2 --set name=change --value packages/lanes/definitions/change-demo.json
 ```
 
 Lanes that already exist keep the digest they pinned.

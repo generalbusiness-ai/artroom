@@ -89,9 +89,11 @@ gets. `applyEntry` is the only code that changes state.
 
 The runtime calls these functions inside the commit. The verifier calls
 the same functions on the stored history. That choice is the heart of the
-design. The runtime and the verifier share `dap-derive` and nothing else,
-so a replay that matches shows that each entry followed from its input
-under the pinned definition, by the same code that judged it.
+design. Replay does not call the runtime. Both use the same derivation
+code, `dap-derive`, on the types of `dap-contract`. Replay also depends on
+the stored bytes it reads: the entries and the inputs the scope retained.
+So a replay that matches shows that each stored entry followed from its
+input under the pinned definition, by the same code that judged it.
 
 ## Scopes compose by delivery
 
@@ -217,7 +219,10 @@ checked inputs to a judgment, not shared storage.
 The outside-operation driver marks each attempt before it sends a
 mutation. A missing reply leaves the outcome unknown and a cleanup duty
 open. The driver does not send the same mutation again. Private
-credentials are kept apart from the public history. A Git commit does not
+credentials are kept apart from the public history. Deleting a token's
+plaintext does not prove that the provider revoked the token.
+[Configure a Git host](hosts.md#the-hostings-own-git-service-host-artifacts)
+says how each host keeps and revokes its tokens. A Git commit does not
 itself become a dap act, and a recorded act does not itself prove that a
 Git write finished.
 

@@ -15,6 +15,9 @@ why. Nothing in either note is adopted by being built.
 
 ## The packages
 
+The package names and commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](README.md#names-in-transition).
+
 | Package | Holds | Imports |
 |---|---|---|
 | `@generalbusiness/dap-contract` | Types and constant tables. No logic. | Nothing |
@@ -104,7 +107,7 @@ histories; that historical correspondence remains owed.
 | `platform:directory` | Main's definition-byte places on `open-issue` and `open-pr`; missing bytes are `bad-field`. | Preserves those places and creates its three scopes at version 2, carrying the founder handle for the README. |
 | `platform:membership` | Main's declaration and version 1 standing. | The same declaration, with version 2 standing. |
 | `platform:rules` | Main's definition-byte place on `activate.digest`. | The same declaration, with version 2 cohort and observation identity. |
-| `platform:destination` | Main's declaration: no `read-token`, and a first commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the founding commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
+| `platform:destination` | Main's declaration: no `read-token`, and a first commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the first commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
 | `platform:inbox` | Main's declaration. | None. |
 
 ## Identity and incarnation

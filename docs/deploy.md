@@ -43,6 +43,9 @@ or in the command line's config.
 
 ## The order
 
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](README.md#names-in-transition).
+
 The host setting pins the register's scope ID, so the setting must name
 the register before its first claim. A register's ID is a function of its
 install's signed intent, so the command line computes it before the
@@ -148,7 +151,7 @@ No additional setting or token is required. See [pages.md](pages.md).
 
 The scope Worker serves the room's page at `/page/` from
 `packages/scope/src/page-assets.ts`, which is committed and which the
-page package's build writes (`docs/page.md`). Deploying the Worker
+page package's build writes ([The page](../apps/room/docs/page.md)). Deploying the Worker
 deploys the page; it needs no binding, setting or secret of its own.
 
 ## What is never written down

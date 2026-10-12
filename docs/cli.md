@@ -1,5 +1,8 @@
 # The dap command
 
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](README.md#names-in-transition).
+
 `dap` is a command-line client for the new model. Each command is a
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
@@ -498,7 +501,7 @@ naming the reports it selects, and waits until the merge is published,
 refused or aborted. It needs `change.merge`, which admins and maintainers
 hold. Published: it prints the commit, and for a one-file version the
 page's address. Refused by the lane, it prints the refusal; refused by the
-destination, the reason. Either way the change stays open, and `artroom
+destination, the reason. Either way the change stays open, and `dap
 merge` may be run again.
 
 With **`--closes <issue>`**, `merge` first signs the change lane's

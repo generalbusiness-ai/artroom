@@ -6,6 +6,9 @@ the repository's remote, and what is not built yet.
 
 ## How a register chooses its host
 
+The commands on this page use the final dap names. To run them at this commit, read
+[Names in transition](README.md#names-in-transition).
+
 The operator names the host when installing the register:
 
 ```
@@ -64,7 +67,8 @@ What it does:
   operation. The token's plaintext is kept privately in the register's
   storage until that revocation is confirmed. It is never in a history.
   A cleanup handle is reported only when that exact plaintext is durably
-  held. If custody and immediate revocation both fail, the result is unknown.
+  held. Deleting a token's plaintext does not prove that the provider
+  revoked the token. Only a confirmed revocation shows that. If custody and immediate revocation both fail, the result is unknown.
   The creation's reported remote must match the configured host, namespace
   and name before any creation metadata is confirmed.
 - **Refusals.** A taken name is a refusal with `nameExists: true`. Other
