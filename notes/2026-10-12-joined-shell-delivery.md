@@ -1,0 +1,9 @@
+# Joined room controls and connection identity
+
+The room name and account now open disclosures. Each disclosure has an explicit link to the Join screen. The account avatar shows the first letter after the leading `@`, while its label keeps the full handle. A verified saved connection gives the Join screen its current room, handle and named Back link.
+
+The owning Page checks cover these behaviors and the existing join and scope fences. The original test compiler failure is preserved; its test-only correction passed the failed compiler and seven previously unrun Node cases. Evidence: `/Users/hughpyle/play/artroom-diagnostics/joined-shell-source/combined-public-result.json` (SHA-256 `727c2f11ece91e076532d27d273fec7056d7ed49e7a7892d9366bf61dcb59f03`).
+
+Real Chromium checks at 1280 and 390 pixels cover mouse and keyboard disclosure actions, focus, explicit links, connected Join and Back, popup bounds and saved connection preservation. Their room and standing are scripted data. They prove browser behavior and layout, with no native membership or deployment claim. The original button-role locator timeout is retained. The completion uses native summary selectors and the original frontend bytes, with no repeated build. Browser evidence: `/Users/hughpyle/play/artroom-diagnostics/joined-shell-browser-source/summary-completion-one/public-result.json` (SHA-256 `f4ec1f8fbb3e4775941f810366b02f79398f734ba86a4a0592db725b951f6ef6`).
+
+The normal Page generator updates only the committed Page asset module; its HTML equals the current source. Build evidence: `/Users/hughpyle/play/artroom-diagnostics/joined-shell-source/assets-one-public.json` (SHA-256 `9decaf528dbd984c36be6a8eb7e808805e96db0eddfea927ba6585fad11e2078`). The final gate, checker review and Scope and rehearsal deployment are separate delivery steps.
