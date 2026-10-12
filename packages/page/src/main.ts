@@ -20,9 +20,9 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
-import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
-import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
+import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
+import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
@@ -317,7 +317,6 @@ function proposeFromRecordedSource(room: Room, rows: Awaited<ReturnType<typeof l
   const permitted = !!room.me?.actions.includes("change.propose");
   if (context.pending || context.uncertain || rows.length === 0 || !permitted) button.setAttribute("disabled", "");
   if (!permitted) host.append(h("p", { class: "muted small" }, "Your current member cannot propose a text change."));
-  else if (rows.length === 0) host.append(h("p", { class: "muted small" }, "No recorded change is available here as a text source."));
   button.addEventListener("click", () => {
     if (button.hasAttribute("disabled")) return;
     const binding = settingsContext(settings() ?? { place: null, secret: "" });
@@ -375,7 +374,7 @@ async function roomOf(kept: Settings, place: Place): Promise<Room> {
 function verifiedRoom(room: Room | null): room is Room & { me: NonNullable<Room["me"]> } {
   return !!room?.me?.handle && room.key === keyIdOfSecret(room.session.secret);
 }
-const wordmark = () => h("div", { class: "wordmark" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
+const wordmark = () => h("a", { class: "wordmark", href: "https://dap.generalbusiness.ai/", "aria-label": "dap homepage" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
 function entryShell(...content: HTMLElement[]): HTMLElement[] {
   return [h("header", { class: "entry-header" }, wordmark()), h("div", { class: "content entry-content", id: "page-main", tabindex: "-1" }, ...content)];
 }
@@ -389,8 +388,12 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const name = room.name;
   const account = room.me.handle;
   const shellContext = JSON.stringify([location.origin, directory, room.membership, room.key]);
-  const roomSwitch = () => name ? h("a", { class: "room-switch", href: "#/join", title: directory, "aria-label": `Change room: ${name}`, "data-focus-key": controlKey(shellContext, "room-connection") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄")) : null;
-  const accountControl = () => h("a", { class: "account", href: "#/join", "aria-label": `Change connection for ${account}`, "data-focus-key": controlKey(shellContext, "account-connection") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account));
+  const roomSwitch = () => name ? h("details", { class: "shell-disclosure room-disclosure" },
+    h("summary", { class: "room-switch", title: directory, "aria-label": `Room: ${name}`, "data-focus-key": controlKey(shellContext, "room-connection") }, h("span", { class: "room-name" }, h("span", {}, name), local ? h("span", { class: "room-recorded-name", title: "Personal label in this browser" }, `Personal label: ${local}`) : null), h("span", { "aria-hidden": "true" }, "⌄")),
+    h("div", { class: "shell-disclosure-content" }, h("p", { title: directory }, name), h("a", { href: "#/join" }, "Join another room"))) : null;
+  const accountControl = () => h("details", { class: "shell-disclosure account-disclosure" },
+    h("summary", { class: "account", "aria-label": `Account: ${account}`, "data-focus-key": controlKey(shellContext, "account-connection") }, h("span", { class: "avatar", "aria-hidden": "true" }, account.replace(/^@+/, "").slice(0, 1).toUpperCase()), h("span", { class: "account-label" }, account)),
+    h("div", { class: "shell-disclosure-content" }, whoLine(room), h("a", { href: "#/join" }, "Change connection")));
   const navigation = (mobile = false) => h("nav", { class: mobile ? "navigation mobile-nav" : "navigation", "aria-label": "Room" },
     ([ ["issues", "Issues", "#/"], ["changes", "Changes", "#/?kind=change"], ["rules", "Rules", "#/rules"] ] as const).map(([kind, label, href]) => h("a", { class: "nav-item", href, "data-focus-key": controlKey(shellContext, `nav:${kind}`), ...(destination === kind ? { "aria-current": "page" } : {}) }, label)), h("a", { class: "nav-item", href: siteAddress(room, ""), title: "Latest published pages" }, "Pages"));
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
@@ -552,11 +555,13 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   return panel;
 }
 
-function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
+function connectionScreen(path: "join" | "invitation" | "config", connected: Room | null = null): HTMLElement {
   const capturedDraw = drawing, capturedRoute = location.hash, capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
   const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
   const back = () => h("a", { class: "entry-back", href: "#/join" }, h("span", { "aria-hidden": "true" }, "‹"), "Back");
-  if (path === "join") return h("main", { class: "screen entry-screen" }, h("h1", {}, "Join a room"), h("p", { class: "entry-intro" }, "How would you like to join?"),
+  if (path === "join") return h("main", { class: "screen entry-screen" },
+    connected ? h("a", { class: "entry-back", href: "#/" }, h("span", { "aria-hidden": "true" }, "‹"), `Back to ${connected.name}`) : null,
+    h("h1", {}, connected ? "Join another room" : "Join a room"), h("p", { class: "entry-intro" }, connected ? `You are in ${connected.name} as ${connected.me!.handle}` : "How would you like to join?"),
     ignoredSavedAddress ? h("p", { class: "entry-answer" }, "The saved connection address is ignored. Your room and key are kept. Use a connection below; this page reads only its own service.") : null,
     h("div", { class: "entry-choices" },
       h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
@@ -661,7 +666,15 @@ async function draw(focus = false): Promise<void> {
   };
   if (["join", "invitation", "config"].includes(route.destination) || !kept || !kept.place || ignoredSavedAddress) {
     const path = route.destination === "invitation" || route.destination === "config" ? route.destination : "join";
-    return show(...entryShell(connectionScreen(path)));
+    show(...entryShell(connectionScreen(path)));
+    if (path === "join" && kept?.place && !ignoredSavedAddress) {
+      try {
+        const connected = await roomOf(kept, kept.place);
+        if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== originalContext) return;
+        if (verifiedRoom(connected)) { selectedRoom = connected; show(...entryShell(connectionScreen(path, connected))); }
+      } catch { /* An unreadable saved connection cannot identify a current room. Joining remains available. */ }
+    }
+    return;
   }
   if (originalContext !== lastVerifiedContext) show(...entryShell(h("main", { class: "screen entry-screen" }, h("h1", {}, "Opening your room"), h("p", { class: "entry-answer", role: "status" }, "Working on reading the room"))));
   let room: Room | null = null;
@@ -680,11 +693,27 @@ async function draw(focus = false): Promise<void> {
     if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     const { destination, scope } = route;
     const loaded = room;
+    const viewCurrent = (): boolean => {
+      if (currentDraw !== drawing) return false;
+      if (settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) { void draw(focus); return false; }
+      return true;
+    };
+    let initialization = await roomInitialization(room);
+    if (!viewCurrent()) return;
+    let notice = initializationMessage(initialization.state);
+    const showRoom = (...content: HTMLElement[]) => show(...shell(destination, room, ...(notice ? [h("p", { class: "answer room-initialization", role: "status" }, notice)] : []), ...content));
+    const presentationCurrent = async (): Promise<boolean> => {
+      if (initialization.state === "not-initialized" && !await initializationStillCurrent(loaded, initialization)) {
+        initialization = { state: "unknown", reason: "The room changed or could not be read before showing this view." }; notice = null;
+      }
+      return viewCurrent();
+    };
     const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
     if (destination === "issues" && scope) {
       const issue = await loadIssue(room, scope as ScopeId);
       const defaults = issue.intent === undefined ? undefined : Object.fromEntries(["edit-own", "edit-any", "close-own", "close-any", "reopen-own", "reopen-any"].map((kind) => [kind, { on: issue.intent! }]));
       const offered = await actsOn(room, scope as ScopeId);
+      if (!await presentationCurrent()) return;
       const screen = issueScreen(room, issue);
       const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind), issue.requesterRef, room.me?.ref) };
       const association = actAssociation(room, scope as ScopeId);
@@ -709,10 +738,12 @@ async function draw(focus = false): Promise<void> {
         }
         return represented;
       } });
-      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Issue record")));
+      return showRoom(inspectedScreen(screen, panel, association, "Issue record"));
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
+      const offered = await actsOn(room, scope as ScopeId);
+      if (!await presentationCurrent()) return;
       const current = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
       const defaults = {
         ...(current ? Object.fromEntries(["review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
@@ -745,7 +776,7 @@ async function draw(focus = false): Promise<void> {
         }));
       }
       const association = actAssociation(room, scope as ScopeId);
-      const panel = await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
+      const panel = await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { offered, tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
         if (comment) {
@@ -764,36 +795,45 @@ async function draw(focus = false): Promise<void> {
         }
         return represented;
       } });
-      return show(...shell(destination, room, inspectedScreen(screen, panel, association, "Change record")));
+      return showRoom(inspectedScreen(screen, panel, association, "Change record"));
     }
     if (destination === "rules") {
-      const rules = await loadRules(room);
+      let rules: Awaited<ReturnType<typeof loadRules>>;
+      try { rules = await loadRules(room); }
+      catch {
+        notice = null; // A later failed read cannot keep an earlier initialization claim current.
+        const known = lastActs.get(actAssociation(room, room.rules));
+        return showRoom(h("main", { class: "screen" }, h("h1", {}, "Rules"), h("p", { class: "answer", role: "status" }, "The complete rules could not be read. Check status before editing."), ...(known ? [answerLine({ ...known, observation: known.observation ?? "The subsequent view could not be read." })] : [])));
+      }
       const offered = await actsOn(room, room.rules);
+      if (!await presentationCurrent()) return;
       const editable = rules.item !== undefined && offered.acts.some((act) => act.kind === "publish");
       const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
       const screen = rulesScreen(room, rules, editable);
       const panel = await panelFor(room, room.rules, {}, options);
-      return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record")));
+      return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record"));
     }
     const kind = destination === "changes" ? "change" : "issue";
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
     const lanes = await listLanes(room);
+    const offered = await actsOn(room, room.directory);
+    if (!await presentationCurrent()) return;
     const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
-    const panel = await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
+    const panel = await panelFor(loaded, loaded.directory, {}, { offered, tasks: (acts, send, context) => {
       if (destination === "changes") {
         const open = acts.acts.find(act => act.kind === "open-pr");
         if (open) screen.querySelector('[data-action-slot="create"]')?.append(proposeFromRecordedSource(loaded, lanes.changes, context));
         return []; // Generic custom declarations remain available in Advanced.
       }
       const open = destination === "issues" ? acts.acts.find((act) => act.kind === "open-issue") : undefined;
-      if (!open) return [];
+      if (!open || initialization.state === "not-initialized") return [];
       const control = createIssue(open, send, context);
       screen.querySelector('[data-action-slot="create"]')?.append(control);
       // An unavailable task paragraph must not remove the usable native
       // declaration from Inspect (for example a custom required field).
       return control.hasAttribute("data-task-act") ? [open.kind] : [];
     } });
-    return show(...shell(destination, room, inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record")));
+    return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record"));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
     let known: Acted[] = [];

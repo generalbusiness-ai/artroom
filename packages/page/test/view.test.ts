@@ -192,3 +192,17 @@ test("dap acknowledgement requires an accepted receipt and a known observation",
     { ...acted, answer: { answer: "mismatch", reason: "different-intent" } },
   ]) expect((answerLine(changed as never) as unknown as Element).all("p").some((p) => p.textContent === "dap.")).toBe(false);
 });
+
+// Empty source is a complete-list fact; a search result never becomes first-room guidance.
+test("an empty change list explains the first recorded source once in its list column while filtering keeps No matches", () => {
+  vi.stubGlobal("document", document);
+  try {
+    const empty = roomScreen(room, { issues: [], changes: [] }, "change") as unknown as Element;
+    const text = "No changes yet. The page proposes a text change from a change already recorded here; the first change in a room comes from a connected device or agent.";
+    expect(empty.all("div").find(node => node.attributes["data-list"] !== undefined)?.textContent).toBe(text);
+    expect(empty.textContent.split(text)).toHaveLength(2);
+    const changed = roomScreen(room, { issues: [], changes: [{ scope: "sc_change", number: 1, kind: "pr", title: "Recorded source", state: "merged", draft: false }] } as never, "change", { state: { filter: "open", query: "" }, changed: () => {} }) as unknown as Element;
+    expect(changed.textContent).toContain("No matches.");
+    expect(changed.textContent).not.toContain("first change in a room");
+  } finally { vi.unstubAllGlobals(); }
+});

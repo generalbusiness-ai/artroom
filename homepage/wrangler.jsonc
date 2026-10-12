@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "dap-home",
+  "compatibility_date": "2026-10-12",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "dap.generalbusiness.ai", "custom_domain": true, "zone_id": "2b1718d350466b2c5818f7797584568d" }
+  ],
+  "assets": { "directory": "./assets", "html_handling": "auto-trailing-slash", "not_found_handling": "404-page" }
+}
