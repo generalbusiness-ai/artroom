@@ -211,6 +211,7 @@ In this session, after the last change to what each covers:
 | `npm run gate`, once in the second round, at `3efb954d` | FAILED at the test step: `Tests  4 failed \| 1095 passed \| 2 skipped (1101)`. The four failures are the checkers failure below, and no other. |
 | `npm run gate` in this round, first at `350dfb9c` | FAILED at the typecheck: a cast in the role-text witness of `describe.test.ts` (TS2352). Fixed in the next commit, which changes only that cast. |
 | `npm run gate` at `9feae202` (a second attempt was cut off when the cloud worker restarted, and was run again) | FAILED at the test step: `Tests  4 failed \| 1104 passed \| 2 skipped (1110)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone: `# pass 7`, `# fail 0`. |
+| `npm run gate` in the round of review b04a53c8, once, at `296166a7` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1112 passed \| 2 skipped (1118)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
 ## The planner's amendment after the second cloud gate
 
@@ -338,7 +339,7 @@ only, the same steps end in the lane's refusal of the version as
 
 ## The T36 checkers failure in the cloud
 
-It recurred, in all three rounds. In each gate run, the same four tests of
+It recurred, in all four rounds. In each gate run, the same four tests of
 `packages/checkers` failed with `checkout-failed`: T36 in
 `test/runner.test.ts`, the two other checkout tests there, and the staging
 test in `test/reservation-record.test.ts`. This branch changes nothing in
