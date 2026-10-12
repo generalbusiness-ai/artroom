@@ -514,7 +514,7 @@ function startScreen(): HTMLElement {
   const capturedContext = settingsContext(settings() ?? { place: null, secret: "" });
   const current = () => drawing === capturedDraw && location.hash === capturedRoute && settingsContext(settings() ?? { place: null, secret: "" }) === capturedContext;
   const message = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
-  const tell = (text: string, bad = false) => { if (current()) { message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; } };
+  const tell = (text: string, bad = false) => { if (current()) { message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; message.removeAttribute("hidden"); } };
   const name = h("input", { name: "room", required: "", maxlength: "256", autocomplete: "off", value: startDraft }) as HTMLInputElement;
   const submit = h("button", { type: "submit", class: "primary" }, "Start room");
   const check = h("button", { type: "button", class: "link-button", hidden: "" }, "Check status");
@@ -645,7 +645,7 @@ function startScreen(): HTMLElement {
           row("Connect command line", "Use this room from your computer.", "Get connection files", files),
           row("Connect an agent", "Give an agent its own access.", "Create agent invitation", () => showConnection("agent-key"))), connectionPanel, recovery);
       ready.removeAttribute("hidden"); about.setAttribute("hidden", ""); document.title = room.name ? `dap - workroom ${room.name}` : "dap - workroom";
-      message.textContent = "";
+      message.textContent = ""; message.setAttribute("hidden", "");
     } finally { secret.fill(0); }
   };
   const run = async (mode: "new" | "continue" | "check") => {
