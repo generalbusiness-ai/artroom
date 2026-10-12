@@ -169,12 +169,12 @@ When an explicitly supplied command-line config contains a full register
 reference, the page can read whether its current key may claim there.
 Create room appears only for an eligible key with a known member handle,
 Web Locks and dialog support. It never installs a register. Its private
-claim record retains exact founding and enrollment envelopes plus a separate
+claim record retains exact creation and enrollment envelopes plus a separate
 recovery key before sending; Resume creation follows those same requests.
 Each logical creation has a separate retained operation. Another Create
 requires verified completion of the previous active operation; unresolved
 work is not replaced. Old operations remain resumable by their exact identity.
-The private journal admits at most 64 operations and evicts none to make room.
+The private journal holds at most 64 operations and evicts none to make room.
 Context is checked again after a queued lock and before each mutation POST.
 The typed name is a local intent label, saved with the exact room context
 and shown beside the native generated repository name. It does not replace
@@ -223,7 +223,7 @@ that the room's records show, with the record it comes from:
 ## Tests
 
 `packages/page/test/story.scope.test.ts` runs the page's data functions
-against the Worker's routes on a room that the command line founds, with
+against the Worker's routes on a room that the command line creates, with
 the real read sessions, the edit command and the site route; the Git host
 and the scheduler are labelled stand-ins. `assets.test.ts` checks the
 Worker's page module, `states.test.ts` the states of a change, and

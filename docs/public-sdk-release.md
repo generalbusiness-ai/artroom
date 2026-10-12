@@ -261,7 +261,7 @@ passed the reader case and all four packages' resolution, emission and
 offline packing, and sealed its producer manifest. The checker passed its
 archive and emitted fixture ABI guards, then the compiled journey failed:
 the clone witness narrowed the text slot to 39 while write/edit fields
-still admitted 200. The actual validator refused both assignments. The
+still answered 200. The actual validator refused both assignments. The
 journey failed before any of the three strict consumer contexts were
 dispatched.
 
@@ -290,7 +290,7 @@ the second refused mismatched temporary config metadata before any phase;
 the third reached consistent native replay, then failed the retained input's
 mistaken bare definition-name assertion without exporting a capture. The
 corrected capture's handle 93455 passed the affected compiler and whole native
-founding case. Its public canonical capture is 96,949 bytes, SHA-256
+creation case. Its public canonical capture is 96,949 bytes, SHA-256
 `f01d6a82fb57f72bceb8160b9f0bf6f3a8b32a443bbf87a112b044efbd190833`:
 five complete prefixes, 18 entries, 12 retained inputs and 11 verified foreign
 facts, with no anchors, missing dependencies or redactions. The complete

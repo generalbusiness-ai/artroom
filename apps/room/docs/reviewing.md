@@ -2,7 +2,7 @@
 
 For a reviewer using an already configured dap source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
 
-**Source guide — cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
+**Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
 
 First read the change and the actual entries that hold its content:
 
@@ -32,7 +32,7 @@ The current declaration needs `change.review` to record the act. The destination
 
 ## Keep the subject and reviewer independent
 
-The manifest must still be current when the verdict is admitted. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. By default an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
+The manifest must still be current when the verdict takes effect. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. By default an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
 
 A declared single-controller exception is a separate merge rule. It applies only when the actual observed rules, controller count and author/controller relationship meet all its conditions. It does not turn an author's verdict into independent review or remove checks. Missing relationship/count evidence cannot justify assuming the exception. [Independence and exception](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L436)
 

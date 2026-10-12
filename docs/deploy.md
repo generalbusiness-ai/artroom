@@ -51,14 +51,14 @@ register exists. Plan first, then set the setting, then install:
 1. **Deploy** the Worker with `DEPLOYMENT` and `SESSION_SECRET`.
 2. **Plan.** Run `dap install --plan <base-url> --host github.com
    --namespace <login>`, where `<login>` is the account's `login`. It
-   founds nothing. It prints `Planned: register sc_...` and the seed's
-   time, and keeps the plan in the config. The plan can be founded until
+   creates nothing. It prints `Planned: register sc_...` and the seed's
+   time, and keeps the plan in the config. The plan can be created until
    that time, 14 minutes after the plan.
 3. **Set `GITHUB_APP_CONFIG`**, with `registerScope` set to that register
    ID, and the GitHub secrets. A register whose host or namespace differs
    from the setting sends nothing.
 4. **Install.** Run `dap install --planned`. It checks that the plan
-   still makes that ID, founds the register, and prints
+   still makes that ID, creates the register, and prints
    `Installed: register sc_..., ..., as planned.` A plan whose time is
    over and was never attempted is refused as `plan-expired`. For a
    definitely unsent legacy plan, plan again and set the new ID. A selected
@@ -80,7 +80,7 @@ artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
 ### The earlier order, and its wait
 
 `dap install <base-url> --host ... --namespace ...` with no plan
-still works: it founds at once and prints the register ID, and the
+still works: it creates the register at once and prints the register ID, and the
 setting is set after it. Then the register's object may have started
 before the setting took effect. A claim's creation is then recorded and
 not sent until the object sees the setting. Observed on 2026-10-07, that

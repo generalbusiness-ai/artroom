@@ -27,7 +27,7 @@ Read the package's current interface and the exact governing contract for the be
 
 ## Show the behavior at the cheapest useful boundary
 
-Name the invariant before adding a test. Reuse or strengthen a witness that already shows it. Pure decisions belong in Node; storage, admission, ordering and cross-scope behavior require their actual runtime boundary. A labelled stand-in proves only the side it exposes, not a host, deployment or native authority it does not run.
+Name the invariant before adding a test. Reuse or strengthen a witness that already shows it. Pure decisions belong in Node; storage, whether an act takes effect, the order of entries and cross-scope behavior require their actual runtime boundary. A labelled stand-in proves only the side it exposes, not a host, deployment or native authority it does not run.
 
 Use focused changed tests while editing. Import-based selection does not catch a document/fixture merely read as a file; name that affected check explicitly when needed. Root configuration changes may select the whole suite. Do not create one test per field or rerun whole suites to meet a count.
 

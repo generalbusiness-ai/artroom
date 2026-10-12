@@ -27,8 +27,8 @@ A definition is a JSON value, not code. It declares:
 
 - item types, with their states, initial state and slots for members,
   references and values;
-- acts, each with its fields, the grant it needs, its guards, its effects
-  and its sends;
+- acts, each with its fields, the action a signer must be allowed to
+  take, its guards, its effects and its sends;
 - handlers for messages from other scopes;
 - timed rules, which apply when a deadline held in an item passes;
 - named rules, which are restricted expressions that a guard evaluates.
@@ -36,7 +36,7 @@ A definition is a JSON value, not code. It declares:
 Because the definition is data, one runtime runs every application. The
 room's issue lane, the Counter's board and a membership scope differ only
 in the definitions they pin. A change to a definition makes a new
-definition with a new digest. Scopes founded under the old one keep it.
+definition with a new digest. Scopes created under the old one keep it.
 [Write an application](write-an-application.md) shows how to declare one.
 
 ## An act is a signed request, judged in one turn
@@ -114,7 +114,7 @@ twice gets the entry that recorded it the first time.
 A scope creates another with a `create` send. The child's ID is the
 digest of its seed, so it is known before the child exists. The child
 writes its genesis, sends a result, and becomes active when its creator
-confirms. A room is built this way: the register founds a directory, and
+confirms. A room is built this way: the register creates a directory, and
 the directory creates membership, the rules scope and the destination.
 
 The price of this design is that a result in one scope can arrive after
@@ -126,15 +126,17 @@ no scope can change another's record.
 
 ## Authority is an observation, not shared state
 
-An act names the action its grant must carry, such as `issue.promise` or
-`change.merge`. Membership is a scope like any other. It records
-members, their enrolled keys and their roles.
+An act names the action that its signer must be allowed to take, such as
+`issue.promise` or `change.merge`. Membership is a scope like any other.
+It records members, their enrolled keys and their roles, and so what each
+key is allowed to do.
 
 A scope that judges an act does not share membership's storage. It reads
-membership before the turn and decides in the commit whether the grant
-it read is current. The entry retains the observation it used. A verifier
-derives the grant again from that observation and from the membership
-scope's history. A grant with no such observation is no grant.
+membership before the turn and decides in the commit whether what it read
+still allows the signer to act. The entry retains the observation it
+used. A verifier works out again what the signer was allowed to do, from
+that observation and from the membership scope's history. Without such
+an observation, the signer is not allowed to act.
 
 Rules work the same way. The room's destination observes the rules scope
 and records the revision and digest of the rules it judged against. A
@@ -151,7 +153,7 @@ order. It is also the only copy until something else reads it.
 
 **Publication to a Git host.** A dap-room destination publishes
 repository content to a Git host: GitHub, or Cloudflare Artifacts. For
-the founding head and for each publication it also writes a receipt
+the first head and for each publication it also writes a receipt
 commit with one file, `receipt.json`. The file names the destination's
 entry, the operation and the published commit. Its ref is
 `refs/artroom/receipts/<hash>`, named by the hash of the entry that
@@ -202,7 +204,7 @@ checked inputs to a judgment, not shared storage.
 
 | Part | Owns |
 |---|---|
-| Register and directory | Founding a repository, and the room's child scopes |
+| Register and directory | Creating a repository, and the room's child scopes |
 | Membership | Members, enrolled keys, roles and the authority a scope may observe |
 | Rules | The room's published configuration and review requirements |
 | Lane | The application's work items, versions, reviews and declared messages |

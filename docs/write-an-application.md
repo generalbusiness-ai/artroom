@@ -1,7 +1,7 @@
 # Write an application
 
 To write a dap application, declare its definitions as data, validate
-them, pin their bytes, and found scopes under them. This page shows each
+them, pin their bytes, and create scopes under them. This page shows each
 step. [Build a counter](build-a-counter.md) walks through a small
 definition first, and [The architecture of a dap application](architecture.md)
 explains what the runtime does with one.
@@ -46,7 +46,8 @@ application needs and remove the others.
 
 Write the acts in `acts`. Each act says whether it opens an item,
 changes an item or comments. It declares the fields the signer supplies,
-the grant they need, the guards that must hold, the effects it writes and
+the action in `grant` that the signer must be allowed to take, the guards
+that must hold, the effects it writes and
 the messages and notices it sends.
 
 The issue's `accept` act changes a commitment. Its signer supplies a
@@ -69,7 +70,7 @@ Write each invariant as a plain sentence before choosing its form.
 | A person accepts the terms that were offered. | The fixed `commitment.termsAt` reference and the `accept` guard that compares it with the supplied `terms`. |
 | Only the named offeree accepts an offer that names one. | The `accept` guard, in the definition. |
 | A fulfilled commitment has ended. | `fulfilled` is a final state of the commitment item. Holds under a commitment end in the entry that makes it final. |
-| A person may promise work only with authority to do so. | The act names `issue.promise` as its grant; membership supplies current authority. A grant does not replace the act's guards. |
+| A person may promise work only when allowed to. | The act names `issue.promise` in its `grant` field, and membership says who is allowed to take it. Being allowed does not replace the act's guards. |
 | Each recorded attempt at an outside effect is sent at most once, including across restarts. | The platform's operation ledger and driver. The application inherits this rule. |
 | Publishing a change to the rules extent needs the controller's approval. | The room's published rules configuration, which its controller may change. The destination judges the change against that configuration. |
 
@@ -199,7 +200,7 @@ hosted application or a checker runner. A live run is separate evidence.
 [Test dap](testing.md) explains how to choose and run the witnesses for a
 change.
 
-## Found a scope under the definition
+## Create a scope under the definition
 
 A definition takes effect when a scope pins it at genesis. Two paths
 exist today. Neither was run for this page.
@@ -217,7 +218,7 @@ dap act activate --on rules --set digest=sha256:d86c64ae0a570165660a6eb4d75153b8
 
 Lanes that already exist keep the digest they pinned.
 
-**A new application scope.** A room founded with
+**A new application scope.** A room created with
 `dap install --cohort application` has a directory at version 5. Its act
 `establish-application` creates one scope under a definition that the
 rules scope has already activated. The act takes the definition's
@@ -225,11 +226,11 @@ digest, the other genesis fields as canonical JSON in `values`, and
 `execution=recorded-do`. The directory supplies the signer as the
 genesis `opener`. The definition and every definition it creates must
 use no capabilities, and the genesis fields may not be facts, items or
-detached texts. Membership must then grant the definition's own actions,
-such as `counting.control`, to the intended members. Enrollment alone
-grants none. [The dap command](cli.md#an-explicitly-selected-application-room)
+detached texts. Membership must then allow the intended members to take the
+definition's own actions, such as `counting.control`. Enrollment alone
+allows none. [The dap command](cli.md#an-explicitly-selected-application-room)
 lists the install and claim commands and the custody each one needs.
 
-Validation, pins and founding check the declaration and its record. They
+Validation, pins and creation check the declaration and its record. They
 do not establish that a host, an outside adapter or a whole application
 journey works. A live run is separate evidence.

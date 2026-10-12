@@ -306,7 +306,7 @@ const answer = await opened.handle.submit(signed, grants, beside);
 - The handle checks no guard, no grant and no state. The scope judges.
 
 The package also exports `definitions`, the two declarations as a list. A
-founder passes it as the `definitions` of a founding, so that a directory
+founder passes it as the `definitions` of a `found` intent, so that a directory
 which names the two digests in `create` sends retains their bytes for its
 children.
 
@@ -358,18 +358,18 @@ type:
 |---|---|---|
 | Both definitions pass the real validator whole, and are exactly their pinned bytes | `packages/lanes/test/definitions.test.ts` | Real: plain functions, no stand-in |
 | For each family of forms: what the validator accepts and refuses, and what the judges derive | The `forms-*.test.ts` files of `packages/derive/test` | Real derivation, on small made-up definitions and not on the lane rows |
-| The production wiring founds a scope under a definition that needs a capability record, and that scope admits no act and no step and sends nothing; a runtime that lacks the code founds none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
+| The production wiring creates a scope under a definition that needs a capability record, and in that scope no act and no step takes effect and nothing is sent; a runtime that lacks the code creates none | `packages/scope/test/founding.test.ts` | Real: the object as deployed |
 | What a definition does once a capability has answered | The same test, with `scriptedCapability` of `@generalbusiness/dap-scope/testing` | A stand-in |
-| What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, founded and created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
+| What the two pinned definitions do on real scopes: eleven scenarios, T1 to T9 and T34 | `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts` | Real scopes, storage, turn and dispatchers, created by the two pinned digests. T3, T4 and T5b run on the capability's code, as the production ports hold it. Stand-ins, each named in the test: the test authority, a Git host (`Host`), the scripted capability where a scenario still uses it, scripted peers for the rules scope and the destination, and a made-up directory |
 | What a change lane does with the real rules scope and the real destination: W1 to W5, and plan 019's story on the demo profile | `packages/lanes/test/wiring.scope.test.ts` and `story.scope.test.ts`, on `test/support/room.ts` | Real platform scopes under the deployed class and the production authority; lanes created by the real directory under activated digests, on the capability's code; grants read from the real membership scope. Stand-ins: a Git host for the destination and for each lane; the changed set of a publication is scripted. W5 signs the checker's answer in the test; no runner runs. These fixtures show no real host, tree or deployment |
 
-The eleven scenarios found and create scopes under both definitions. A
+The eleven scenarios create scopes under both definitions. A
 scenario chooses the capability code of its namespace. `onCode`, of the
 fixture, runs every scope on the code of `hold@1` and `git-read@1` as the
 production ports hold it, with `Host` for the outside: a stand-in that
 answers each attempt that the code opened, in place of a Git host and of a
-walk of commits. T3, T4 and T5b run so. Their reports and manifests are
-admitted on the lane's own records: an instance, a root that was sealed
+walk of commits. T3, T4 and T5b run so. Their reports and manifests
+take effect on the lane's own records: an instance, a root that was sealed
 before its ref, a check entry with a retained snapshot, and a pin for the
 one intent. The other scenarios keep the scripted capability, which
 refuses every guard unless a scenario says otherwise. T8 keeps it because

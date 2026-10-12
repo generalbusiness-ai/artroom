@@ -6,7 +6,7 @@ require, and follow the room's confirmed publication.
 
 This draft describes capabilities in main
 `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`, inspected on 2026-10-09.
-The current CLI founds rooms under the native `@2` cohort. Workspace packages
+The current CLI creates rooms under the native `@2` cohort. Workspace packages
 are `0.1.0-dev.1`; no current public registry release or cold-reader result
 is established. Use an already supplied, supported CLI and an invitation
 from the room admin. This guide supplies no npm installation command,
@@ -141,7 +141,7 @@ that all external effects are finished or that unobserved history is complete.
 
 Commands match current [CLI help](../../packages/cli/src/line.ts).
 [CLI story](../../packages/cli/test/story.scope.test.ts) covers native
-founding, enrollment, authority refusals and history reads with labelled
+creation, enrollment, authority refusals and history reads with labelled
 Git host, scheduler and clock stand-ins. The existing
 [one-file scenario](../../packages/lanes/test/edit.scope.test.ts) and
 [demo rehearsal](../../scripts/demo/rehearse.ts) supply contribution,

@@ -1,7 +1,11 @@
 # What is dap?
 
+A programmable coordination fabric for people and agents.
+
 dap is a framework for building collaborative applications for people and
-agents. This page explains what the framework does, the actor model it is
+agents. A scope is an actor that holds an ordered record and judges signed
+acts against its definition, and an application is a set of definitions.
+This page explains what the framework does, the actor model it is
 built on, and the three applications built with it.
 
 ## A framework for shared work with a record

@@ -28,10 +28,10 @@ The tutorial imports the framework packages by their paths in this
 checkout, so it needs no package install of its own. It also uses the
 in-memory scope from `packages/derive/test/fixtures.ts`. That fixture
 judges, seals and folds entries the way the runtime's commit does, and it
-gives every test key every grant. So every refusal you see in this
-tutorial comes from the definition's own guards.
+allows every test key to take every action. So every refusal you see in
+this tutorial comes from the definition's own guards.
 
-## Step 1: declare the configuration and found the scope
+## Step 1: declare the configuration and create the scope
 
 Every scope starts with a genesis act. Ours is `establish`. It opens the
 one `configuration` item, which holds the controller and the target.
@@ -84,7 +84,7 @@ party: it holds a member. The `fixed: true` flags mean that nothing can
 change those slots after the item opens. The act's two effects copy the
 signed fields into those slots.
 
-Now create `my-counter/run.ts`. It validates the definition, founds a
+Now create `my-counter/run.ts`. It validates the definition, creates a
 scope with `@rita` as the controller and a target of 3, and prints the
 configuration item:
 

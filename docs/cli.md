@@ -18,7 +18,7 @@ it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is
 published to a registry. A scope Worker is deployed at
 <https://artroom-scope.inguz.workers.dev>; its routes start at `/v1/scopes`.
 The root URL returns 404 because it has no application page. This endpoint
-does not establish a completed live founding, publication, clone or
+does not establish a completed live creation, publication, clone or
 authenticated replay.
 
 ## What it needs
@@ -48,7 +48,7 @@ The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
 **`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
-founds the register with an `install` intent, signed by a new operator
+creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
 service, use `--host artifacts --namespace artroom-demo`;
@@ -60,11 +60,11 @@ The operator key key_baqzbaDy... is kept in the config directory, readable only 
 ```
 
 **`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
-signs the same `install` intent and founds nothing. A register's ID is a
+signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
-version alone, so the command prints the ID that the install will found,
+version alone, so the command prints the ID that the install will create,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
-which it can be founded. It keeps the signed intent, the version and the
+which it can be created. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
 register's genesis records both. Only a definitely unsent legacy plan may
 be replaced. A selected application or Counting plan always retains its
@@ -76,7 +76,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`dap install --planned [--cohort application|counting-commitments]`** founds the planned register, with the kept
+**`dap install --planned [--cohort application|counting-commitments]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -100,7 +100,7 @@ does not renew or replace the expired original.
 An attempted or acknowledged original must instead be reconciled from its
 original directory with `install --planned`. Expiry does not prove that a
 request was never accepted and does not authorize a replacement. After
-founding, the receipt must match the original planned register, definition
+creation, the receipt must match the original planned register, definition
 and intent. Its acceptance is a service acknowledgement; independent
 history verification remains separate.
 
@@ -189,7 +189,7 @@ which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
-Before each founding step, the command saves its exact signed envelope:
+Before each creation step, the command saves its exact signed envelope:
 `found`, then `seat`, then `first-key`. It saves accepted fact references
 as each step completes. These records contain no private signing key.
 A refusal, unavailable reply or lost answer leaves the request pending;
@@ -205,7 +205,7 @@ reads or retries the exact saved steps, then waits for their confirmed
 scopes. It checks child identities against the actual directory seed and
 full reference. It does not extend a saved deadline or invent a replacement
 request. `--handle` is ignored on resume: the handle is the one already
-signed. Older digest-only state resumes only when the retained founding
+signed. Older digest-only state resumes only when the retained creation
 and enrollment records prove the exact signed steps; otherwise it stops
 without a new submission.
 
@@ -305,7 +305,7 @@ Mode: replay. Within the coverage stated below, the history was folded from its 
 **`dap verify --all`** runs the same replay for every scope of the
 room: the register, the directory, and every scope that the directory
 created and each of those created (membership, the rules scope, the
-destination, each lane, each inbox), found by the creations in their
+destination, each lane, each inbox), reached by the creations in their
 histories. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
 scopes.`, or the first finding, and then the command exits 1. A history
@@ -580,7 +580,7 @@ no session secret, or a key that is no active member's), the command
 reads by signed reads of its key, and the scope decides. Under a real
 session a member can read the scopes that record their membership, and,
 at the register, its genesis and the entries that come from the claim
-that founded the repository. A signed read reads the entries that the
+that created the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
 it (the intent window), and the retained inputs those entries carry. History and log pages can
 be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-history trust.

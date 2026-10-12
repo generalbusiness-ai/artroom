@@ -5,7 +5,7 @@ dap receipt proves, where to find the underlying evidence and what a
 consistency report leaves open.
 
 Every scope has its own numbered history. The first entry records its
-founding; each later entry names the hash of the previous entry. An entry
+creation; each later entry names the hash of the previous entry. An entry
 records one input, the facts used to judge it, prepared rule results, derived
 item changes and messages to send. **Folding** means applying the recorded
 entries in order to derive the scope's current state. Views and summaries
