@@ -96,6 +96,22 @@ Eastern); the plans carry the corrected times.
    the rules refusal stands in. The guard is built in full after the
    submission.
 
+## Addendum, 22:55
+
+Between the report and the boundary, the second planner session delivered
+with Hugh a design-first preview of the page's entry: "Start a room" as
+the first run (email and room name, a key prepared in the browser, email
+verification before the claim under the hosted service register), then
+the invitation, CLI and agent connections; and for an existing room a
+chooser with two paths, a pasted invitation that creates a key and joins,
+or a config file with its matching key and one Join action. No source
+changed; the gate ran once at the unchanged main. The planner's reading
+for the freeze: the join flow head implements the chooser and its two
+paths, removes the settings vocabulary and hides the room navigation
+before a room is loaded; "Start a room" with email verification is the
+hosted service's work after the submission, under the hosted design
+request. Hugh may correct this.
+
 Times are Eastern. Event times come from workroom act times and Git
 history. Deployment versions come from the Cloudflare deployment list
 read by the planner. Review verdicts are the checker's; the observed
