@@ -27,10 +27,18 @@ test("discovery: shared configuration, idle watch, heads against generations, cu
     // A standalone scope founded through one connection. The configuration records it; a second connection of the same
     // configuration, and a restarted one, list its acts.
     const second = room.agent("rita, second connection", { secret: rita.secret, config: rita.config, share: true });
+    // The second connection has derived its list once, before the scope exists.
+    await second.ok("room", {});
     const founding = await rita.ok("create", { definition: garden, kind: "start", fields: { opener: "@rita", title: "A garden", conditions: ["it grows"] }, membership: rita.config.repository!.membership, idempotencyKey: "garden" });
     expect(founding["answer"], JSON.stringify(founding)).toBe("accepted");
     const root = founding["scope"] as ScopeId;
     expect(rita.config.roots).toContainEqual({ scope: root, membership: rita.config.repository!.membership });
+    // Changed by another connection: the second's next call by a tool name it has not listed finds the new root's act, with no
+    // list or room call first.
+    const planted = await second.ok("garden.plant", { target: root, fields: { crop: "beans", rows: ["north"] }, idempotencyKey: "external-root" });
+    // The scope's own answer may be unavailable until its authority is observed; what this shows is that the call was bound,
+    // signed and judged under the new root's tool.
+    expect([planted["tool"], ["accepted", "unavailable"].includes(planted["answer"] as string)], JSON.stringify(planted)).toEqual(["garden.plant", true]);
     expect(await second.names()).toEqual(expect.arrayContaining(["garden.plant", "garden.tend", "garden.harvest"]));
     const restarted = room.agent("rita, restarted", { secret: rita.secret, config: rita.config, share: true });
     expect(await restarted.names()).toEqual(await second.names());
