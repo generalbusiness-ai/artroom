@@ -77,3 +77,34 @@ Raw diagnostics and generated program bodies remain private.
 The new ordinary gate remains UNRUN pending the recorded result review. The
 older 1,040-pass gate remains historical. New review, landing, deployed Pages,
 fresh human walkthrough and broader Start obligations remain separate.
+
+## Completed ordinary gate on the repaired composition
+
+Original gate `55557` completed once with exit 0 at
+`9546e7244159674f7a8ebbe9b36cf67c5abe4d27`, tree
+`643e90a6dadbc5e9e95aa870d427728a3e43a08a`. The pending gate in the previous
+checkpoint is now complete. Whitespace, typecheck and tests all exited 0.
+Installation was skipped against the unchanged lock stamp. Vitest reported
+1,041 passes and the two original optional skips across 186 files, with one
+file skipped. The chained Node commands passed 8 and 55 cases, with no failures,
+cancellations, skips or todo cases.
+
+The outer wrapper took 115.44 seconds elapsed and 179.04 seconds CPU.
+Typecheck took 5.88 seconds elapsed and 19.14 seconds CPU. The test phase took
+108.18 seconds elapsed and 158.88 seconds CPU. The Counter owner confirmed its
+separate gate was terminal before this gate began. Source, dependencies, cached
+tools and the private pool stayed unchanged. The checkout stayed clean.
+Fault and RefcountedCanceler diagnostics remain in the private logs. This does
+not claim an error-free log, physical drain, a timing factor or a complete cause.
+
+The closed public gate proof is
+`/Users/hughpyle/play/artroom-diagnostics/empty-room-configured-status-gate/gate-one/public-proof.json`,
+SHA256 `4050cbaf6cc3818820baa7b41e29bd1da5b88515c014fa6dd35de74eeb5a69aa`.
+Its whitelist contains metadata only. Raw logs, private bodies, generated program
+content and keys are not declassified.
+
+This final update changes only this note. All executable Source, tests,
+configuration and assets remain byte-identical to the tested head, so it does
+not repeat the gate. The shell composition and old component/gate failures remain
+preserved. Replacement review under 229c, landing, hosted acceptance, a fresh
+human walkthrough and broader Start obligations remain open.
