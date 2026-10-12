@@ -83,6 +83,15 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   const seed = new Uint8Array(32).fill(63), key = keyIdOfSecret(seed);
   const values = new Map<string, string>(), blobs: Blob[] = [];
   let original: StartStatus | null = null, verified = false, complete = false, redraw!: () => void;
+  let connection: { operation: string; kind: "person" | "agent-key"; handle: string; state: "unknown" | "verified" } | null = null;
+  let invitationVerified = false;
+  const issue = vi.fn(async (_origin: string, _storage: unknown, _expected: unknown, input: { kind: "person" | "agent-key"; handle: string }, options: { mode: string }) => {
+    if (options.mode === "new") connection = { operation: "SCRIPTED connection", kind: input.kind, handle: input.handle, state: "unknown" };
+    if (connection && invitationVerified) connection.state = "verified";
+    return { ...connection!, ...(invitationVerified ? { link: "artroom-agent-key:SCRIPTED-private-link" } : { reason: "SCRIPTED original invitation reply lost" }) };
+  });
+  const files = vi.fn(async () => ({ config: JSON.stringify({ repository: { directory, membership }, handle: "@founder" }), key: b64url(seed) + "\n" }));
+  const recovery = vi.fn(async () => { if (original) original = { ...original, recoverySaved: true }; return b64url(seed) + "\n"; });
   let finishOffer!: (value: FoundingOffer) => void;
   const offerRead = vi.fn(() => new Promise<FoundingOffer>(resolve => { finishOffer = resolve; }));
   const start = vi.fn(async (_origin: string, _storage: unknown, _options: StartOptions): Promise<StartedRoom> => {
@@ -91,6 +100,7 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   });
   const save = vi.fn((name: string, text: string) => { values.set(name, text); });
   vi.doMock("@generalbusiness/artroom-client", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-client")>("@generalbusiness/artroom-client"), foundingOffer: offerRead }));
+  vi.doMock("../src/connection-custody.ts", () => ({ connectInvitation: issue, originalConnection: () => connection, founderConnectionFiles: files, saveFounderRecoveryOnce: recovery }));
   vi.doMock("../src/start-custody.ts", () => ({ originalStart: () => original, startRoom: start }));
   vi.doMock("../src/data.ts", async () => ({ ...await vi.importActual<typeof import("../src/data.ts")>("../src/data.ts"), openRoom: async (session: { service: string; secret: Uint8Array }) => ({ session, directory: directory.scope, membership, key, name: "Recorded host name", me: verified ? { handle: "@founder", role: "admin", actions: [], ref: { membership, member: "@founder" } } : null }) }));
   vi.doMock("../src/view.ts", async () => ({ ...await vi.importActual<typeof import("../src/view.ts")>("../src/view.ts"), h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const element = new Element(tag); for (const [k, v] of Object.entries(attrs)) element.setAttribute(k, v); element.children = children.flat().filter(child => child !== null && child !== undefined && child !== false) as (Element | string)[]; return element; } }));
@@ -119,15 +129,40 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
     expect(save).not.toHaveBeenCalled(); expect(root.textContent).toContain("has not verified"); expect(document.title).toBe("dap - workroom");
     verified = true; find("button", "Check status").fire("click"); await flush();
     expect(root.textContent).toContain("Your room is ready"); expect(document.title).toBe("dap - workroom Recorded host name");
-    find("button", "Download recovery files").fire("click");
-    expect(blobs).toHaveLength(2); expect((await blobs[0]!.text()).trim() === b64url(seed)).toBe(true);
-    const config = JSON.parse(await blobs[1]!.text()); expect(config.repository.membership).toEqual(membership); expect(config.handle).toBe("@founder");
-    expect(save).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("Invite people"); expect(root.textContent).toContain("Connect command line"); expect(root.textContent).toContain("Connect an agent");
+    root.all().find(e => e.tag === "button" && e.textContent.startsWith("Get connection files"))!.fire("click"); await flush();
+    expect(files).toHaveBeenCalledTimes(1); expect(blobs).toHaveLength(2);
+    expect((await blobs[1]!.text()).trim() === b64url(seed)).toBe(true);
+    const config = JSON.parse(await blobs[0]!.text()); expect(config.repository.membership).toEqual(membership); expect(config.handle).toBe("@founder");
+    find("button", "Save a recovery file").fire("click"); await flush();
+    find("button", "Save a recovery file").fire("click"); await flush();
+    expect(recovery).toHaveBeenCalledTimes(1); expect(blobs).toHaveLength(3); expect((await blobs[2]!.text()).trim() === b64url(seed)).toBe(true);
+    root.all().find(e => e.tag === "button" && e.textContent.startsWith("Create invitation"))!.fire("click");
+    const connectionForm = root.all().filter(e => e.tag === "form").at(-1)!;
+    root.all().find(e => e.attrs["name"] === "handle")!.value = "@guest";
+    connectionForm.fire("submit"); await flush(); connectionForm.fire("submit"); await flush();
+    expect(issue).toHaveBeenCalledTimes(1); expect(issue.mock.calls[0]![4].mode).toBe("new");
+    root.all().filter(e => e.tag === "button" && e.textContent === "Check status").at(-1)!.fire("click"); await flush();
+    expect(issue.mock.calls.at(-1)![4].mode).toBe("check");
+    find("button", "Continue original connection").fire("click"); await flush();
+    expect(issue.mock.calls.at(-1)![4].mode).toBe("continue"); expect(save).not.toHaveBeenCalled();
+    root.all().find(e => e.tag === "button" && e.textContent.startsWith("Create agent invitation"))!.fire("click");
+    expect(root.textContent).toContain("Original person invitation for @guest");
+    expect(root.textContent).toContain("Another connection is already in progress");
+    invitationVerified = true;
+    find("button", "Continue original connection").fire("click"); await flush();
+    root.all().find(e => e.tag === "button" && e.textContent.startsWith("Create agent invitation"))!.fire("click");
+    root.all().find(e => e.attrs["name"] === "handle")!.value = "@agent";
+    root.all().filter(e => e.tag === "form").at(-1)!.fire("submit"); await flush();
+    expect(issue.mock.calls.at(-1)![3].kind).toBe("agent-key");
+    expect(root.textContent).toContain("artroom join <private invitation link>");
+    expect(root.textContent).toContain("artroom join <same-private-link> --check");
+    expect(root.textContent).toContain("new owner-only ARTROOM_HOME directory");
     // A late ready-screen action cannot replace a newly selected connection.
     values.set("artroom-page", JSON.stringify({ place: null, secret: b64url(new Uint8Array(32).fill(64)) }));
     find("button", "Open room").fire("click"); expect(save).not.toHaveBeenCalled();
   } finally {
     createUrl.mockRestore(); revokeUrl.mockRestore(); vi.unstubAllGlobals();
-    for (const path of ["@generalbusiness/artroom-client", "../src/start-custody.ts", "../src/data.ts", "../src/view.ts"]) vi.doUnmock(path);
+    for (const path of ["@generalbusiness/artroom-client", "../src/start-custody.ts", "../src/connection-custody.ts", "../src/data.ts", "../src/view.ts"]) vi.doUnmock(path);
   }
 });
