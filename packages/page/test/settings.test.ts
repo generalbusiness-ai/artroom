@@ -94,8 +94,7 @@ test("Config and key select a room only after matching standing and exact storag
     location = { origin: "https://page.test", hash: "#/settings" };
   let redraw!: () => void;
   const seed = new Uint8Array(32).fill(82),
-    secret = b64url(seed),
-    key = keyIdOfSecret(seed);
+    secret = b64url(seed);
   const membership = {
     kind: "membership" as const,
     scope: scopeIdOf({

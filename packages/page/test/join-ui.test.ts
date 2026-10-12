@@ -120,7 +120,7 @@ test("Invitation paste joins automatically once; Back and reload keep unknown en
   });
   const original = () =>
     values.has("SCRIPTED-original") ? publicOriginal : null;
-  const check = vi.fn(async () => {
+  const check = vi.fn(async (): Promise<unknown> => {
     checks++;
     return {
       ...publicOriginal,
