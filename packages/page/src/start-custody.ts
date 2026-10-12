@@ -34,7 +34,7 @@ function read(origin: string, storage: ClaimStorage): KeptStart | null {
     if (row["operation"] !== undefined && (typeof row["operation"] !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(row["operation"]))) throw unavailable();
     if (row["recoverySaved"] !== undefined && row["recoverySaved"] !== true) throw unavailable();
     const configured = row["configured"];
-    if (!isRecord(configured) || Object.keys(configured).sort().join(",") !== "definition,register" || configured["definition"] !== "platform:register@7" || !isScopeRef(configured["register"]) || configured["register"].kind !== "register") throw unavailable();
+    if (!isRecord(configured) || Object.keys(configured).sort().join(",") !== "definition,register" || !["platform:register@7", "platform:register@8"].includes(configured["definition"] as string) || !isScopeRef(configured["register"]) || configured["register"].kind !== "register") throw unavailable();
     secret = unb64url(row["secret"]);
     if (!secret || secret.length !== 32 || b64url(secret) !== row["secret"]) throw unavailable();
     return row as unknown as KeptStart;
@@ -75,7 +75,7 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
     let row = read(origin, storage);
     if (options.mode === "new") {
       if (row) throw new Error("An original Start is already retained. Check status or explicitly Continue that original creation.");
-      if (!options.offer || !isFoundingOffer(options.offer, origin)) throw new Error("A current same-origin demo founding offer is required. Nothing was submitted.");
+      if (!options.offer || !isFoundingOffer(options.offer, origin) || options.offer.definition !== "platform:register@8") throw new Error("A current same-origin register8 demo founding offer is required. Nothing was submitted.");
       const label = options.label?.trim() ?? "";
       if (!label || label.length > 256) throw new Error("Enter a personal room label of at most 256 characters.");
       const secret = crypto.getRandomValues(new Uint8Array(32));
@@ -91,7 +91,11 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
       if (!stillCurrent()) throw unavailable();
       if (options.mode === "check" && !status.operation) return { key: status.key, configured: status.configured, handle: held.handle, operation: "", label: held.label, repository: null, pending: true, outcome: { code: 1, lines: ["The Start key is retained, but no original claim has been prepared. Check sent nothing. Continue explicitly to prepare the first request."] } };
       const result = await claimRoom({ service: origin, secret, ...(options.fetch ? { fetch: options.fetch } : {}), ...(options.now ? { now: options.now } : {}) }, held.configured, storage, held.label, {
-        ...(options.pause ? { pause: options.pause } : {}), ...(options.tries !== undefined ? { tries: options.tries } : {}), ...(options.foundingOffer ? { foundingOffer: options.foundingOffer } : {}), mode: status.operation ? "resume" : "new", ...(status.operation ? { operation: status.operation } : {}),
+        ...(options.pause ? { pause: options.pause } : {}), ...(options.tries !== undefined ? { tries: options.tries } : {}), ...(options.foundingOffer ? { foundingOffer: async (register: ClaimRegister["register"]) => {
+          const offered = await options.foundingOffer!(register);
+          if (!isFoundingOffer(offered, origin, held.configured.register) || offered.definition !== held.configured.definition) throw unavailable();
+          return offered;
+        } } : {}), mode: status.operation ? "resume" : "new", ...(status.operation ? { operation: status.operation } : {}),
         handle: held.handle, readOnlyCheck: options.mode === "check", locks,
         retainOperation: operation => {
           if (!stillCurrent() || held.operation && held.operation !== operation) throw unavailable();

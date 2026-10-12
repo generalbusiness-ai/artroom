@@ -8,7 +8,7 @@ export interface FoundingOffer {
   readonly v: 1;
   readonly origin: string;
   readonly register: ScopeRef;
-  readonly definition: "platform:register@7";
+  readonly definition: "platform:register@7" | "platform:register@8";
   readonly at: Head;
   readonly registerItem: {
     readonly id: number; readonly revision: number; readonly state: "open";
@@ -36,7 +36,7 @@ function exactOrigin(value: string): string {
 export function isFoundingOffer(value: unknown, origin: string, register?: ScopeRef): value is FoundingOffer {
   try {
     const expectedOrigin = exactOrigin(origin);
-    if (!closed(value, ["v", "origin", "register", "definition", "at", "registerItem"]) || value["v"] !== 1 || value["origin"] !== expectedOrigin || value["definition"] !== "platform:register@7"
+    if (!closed(value, ["v", "origin", "register", "definition", "at", "registerItem"]) || value["v"] !== 1 || value["origin"] !== expectedOrigin || !["platform:register@7", "platform:register@8"].includes(value["definition"] as string)
       || !closed(value["register"], ["scope", "kind", "inc"]) || !isScopeRef(value["register"]) || value["register"].kind !== "register"
       || !closed(value["at"], ["seq", "hash"]) || !isHead(value["at"])) return false;
     const ref = value["register"], at = value["at"], item = value["registerItem"];
@@ -48,10 +48,11 @@ export function isFoundingOffer(value: unknown, origin: string, register?: Scope
       && typeof item["namespace"] === "string" && utf8(item["namespace"]).length > 0 && utf8(item["namespace"]).length <= 256;
   } catch { return false; }
 }
-/** Exactly one anonymous GET. Redirects, foreign origins and unbounded replies are refused. */
-export async function foundingOffer(origin: string, options: { fetch?: FoundingOfferFetch } = {}): Promise<FoundingOffer> {
+/** One anonymous GET: fresh register8, or an explicitly retained full reference. */
+export async function foundingOffer(origin: string, options: { fetch?: FoundingOfferFetch; register?: ScopeRef } = {}): Promise<FoundingOffer> {
   try {
-    const endpoint = `${exactOrigin(origin)}/v1/demo/founding-offer`;
+    if (options.register && (!closed(options.register, ["scope", "kind", "inc"]) || !isScopeRef(options.register) || options.register.kind !== "register")) throw failed();
+    const endpoint = `${exactOrigin(origin)}/v1/demo/founding-offer${options.register ? `?register=${encodeURIComponent(options.register.scope)}&inc=${encodeURIComponent(options.register.inc)}` : ""}`;
     const send = options.fetch ?? (globalThis as { fetch?: FoundingOfferFetch }).fetch;
     if (!send) throw failed();
     const bytes = await within(30, async signal => {
@@ -61,7 +62,7 @@ export async function foundingOffer(origin: string, options: { fetch?: FoundingO
     });
     if (bytes === LATE || bytes === null) throw failed();
     const value: unknown = parseStrict(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes));
-    if (!isFoundingOffer(value, origin)) throw failed();
+    if (!isFoundingOffer(value, origin, options.register) || !options.register && value.definition !== "platform:register@8") throw failed();
     return value;
   } catch { throw failed(); }
 }

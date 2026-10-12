@@ -5,8 +5,8 @@ import { foundingOffer, isFoundingOffer, type FoundingOffer, type FoundingOfferF
 // Actual SDK byte/URL guard over SCRIPTED HTTP, no native founding or permission.
 test("fixed same-origin founding discovery accepts only the closed bounded demo projection and refuses redirects without consuming their body", async () => {
   const origin = "https://offer.test";
-  const register = { kind: "register" as const, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@7", creator: null, cause: textDigest("TEST offer"), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(8)) };
-  const offer: FoundingOffer = { v: 1, origin, register, definition: "platform:register@7", at: { seq: 0, hash: textDigest("TEST head") }, registerItem: { id: 0, revision: 1, state: "open", host: "github.com", namespace: "generalbusiness-ai", policy: "open", purpose: "demo-start" } };
+  const register = { kind: "register" as const, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@8", creator: null, cause: textDigest("TEST offer"), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(8)) };
+  const offer: FoundingOffer = { v: 1, origin, register, definition: "platform:register@8", at: { seq: 0, hash: textDigest("TEST head") }, registerItem: { id: 0, revision: 1, state: "open", host: "github.com", namespace: "generalbusiness-ai", policy: "open", purpose: "demo-start" } };
   let calls = 0;
   const fetch: FoundingOfferFetch = async (url, init) => {
     calls++;
@@ -30,4 +30,18 @@ test("fixed same-origin founding discovery accepts only the closed bounded demo 
   const oversized = { getReader: () => ({ read: async () => ({ done: false, value: new Uint8Array(16 * 1024 + 1) }), cancel: async () => { canceled++; } }) };
   await expect(foundingOffer(origin, { fetch: async url => ({ status: 200, url, redirected: false, body: oversized }) })).rejects.toThrow("No claim was submitted");
   expect(canceled).toBe(2);
+  const legacy = { ...register, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@7", creator: null, cause: textDigest("TEST retained offer"), ordinal: 0 }) };
+  const legacyOffer: FoundingOffer = { ...offer, register: legacy, definition: "platform:register@7" };
+  let selectedReads = 0;
+  const selected: FoundingOfferFetch = async url => {
+    selectedReads++;
+    expect(url).toBe(`${origin}/v1/demo/founding-offer?register=${legacy.scope}&inc=${legacy.inc}`);
+    return { status: 200, url, redirected: false, body: Response.json(legacyOffer).body };
+  };
+  expect(await foundingOffer(origin, { register: legacy, fetch: selected })).toEqual(legacyOffer);
+  expect(selectedReads).toBe(1);
+  expect(isFoundingOffer({ ...offer, definition: "platform:register@9" }, origin)).toBe(false);
+  await expect(foundingOffer(origin, { fetch: async url => ({ status: 200, url, redirected: false, body: Response.json(legacyOffer).body }) })).rejects.toThrow("No claim was submitted");
+  await expect(foundingOffer(origin, { register: legacy, fetch: async url => ({ status: 200, url, redirected: false, body: Response.json(offer).body }) })).rejects.toThrow("No claim was submitted");
+  await expect(foundingOffer(origin, { register: { ...legacy, inc: newIncarnation(new Uint8Array(16).fill(9)) }, fetch: async url => ({ status: 200, url, redirected: false, body: Response.json(legacyOffer).body }) })).rejects.toThrow("No claim was submitted");
 });

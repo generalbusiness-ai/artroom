@@ -663,7 +663,7 @@ function startScreen(): HTMLElement {
       const offer = mode === "new" ? await foundingOffer(location.origin) : undefined;
       if (!current()) return;
       const result = await startRoom(location.origin, localStorage, { mode, ...(offer ? { offer } : {}), label: name.value,
-        foundingOffer: async register => { const offered = await foundingOffer(location.origin); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
+        foundingOffer: async register => { const offered = await foundingOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
       await showResult(result);
     } catch (error) { tell(error instanceof Error ? error.message : "The original creation remains unresolved. Check status without replacing its key.", true); }
     finally { connectionBusy = false; if (current()) { restore(); if (!blocked) { submit.removeAttribute("disabled"); check.removeAttribute("disabled"); } } }
