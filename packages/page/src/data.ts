@@ -689,13 +689,26 @@ export async function loadSite(room: Pick<Room, "session" | "directory">, path: 
 
 /** Conservative presentation evidence; failed reads never imply an uninitialized room. */
 export type RoomInitialization =
-  | { state: "not-initialized"; scope: ScopeRef; head: Head; rulesItem: number }
+  | { state: "not-initialized"; scope: ScopeRef; head: Head; definition: Summary["definition"]; rulesItem: number; context: string }
   | { state: "configured" }
   | { state: "unknown"; reason: string };
 
+const initializationContext = (room: Room): string => canonicalize({ service: room.session.service, directory: room.directory, membership: room.membership, key: room.key, rules: room.rules });
+
+/** One final head/context check after the view's other reads; no classification or pagination repeats. */
+export async function initializationStillCurrent(room: Room, proof: Extract<RoomInitialization, { state: "not-initialized" }>): Promise<boolean> {
+  if (initializationContext(room) !== proof.context) return false;
+  try {
+    await fresh(room);
+    const { summary, at } = await summaryOf(handleOf(room, room.rules));
+    return initializationContext(room) === proof.context && summary.status === "active"
+      && canonicalize(summary.scope) === canonicalize(proof.scope) && summary.definition === proof.definition && canonicalize(at) === canonicalize(proof.head);
+  } catch { return false; }
+}
+
 export async function roomInitialization(room: Room): Promise<RoomInitialization> {
   const unavailable: RoomInitialization = { state: "unknown", reason: "The complete rules could not be read. Check status before editing." };
-  const context = () => canonicalize({ service: room.session.service, directory: room.directory, membership: room.membership, key: room.key, rules: room.rules });
+  const context = () => initializationContext(room);
   const captured = context();
   try {
     await fresh(room);
@@ -729,7 +742,7 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
       || latestDirectory.summary.status !== "active" || canonicalize(latestDirectory.summary.scope) !== canonicalize(directory.summary.scope)
       || canonicalize(latestRepository?.refs["rules"]) !== canonicalize(named)
       || canonicalize(latestRepository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
-    return { state: "not-initialized", scope: summary.scope, head: at, rulesItem: current.id };
+    return { state: "not-initialized", scope: summary.scope, head: at, definition: summary.definition, rulesItem: current.id, context: captured };
   } catch {
     return unavailable;
   }

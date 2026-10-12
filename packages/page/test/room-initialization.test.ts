@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { Head, Item, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
 import { digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { Session as ReadSession } from "@generalbusiness/artroom-client";
-import { roomInitialization, type Room } from "../src/data.ts";
+import { roomInitialization, initializationStillCurrent, type Room } from "../src/data.ts";
 import { initializationMessage } from "../src/shell.ts";
 
 // Scripted authenticated read answers, not native founding or permission evidence.
@@ -22,27 +22,32 @@ test("initialization guidance needs complete initial rules and no live or retire
     reads++;
     if ((init?.method ?? "GET") !== "GET") { mutations++; throw new Error("No mutation is permitted by this fixture"); }
     const path = new URL(url).pathname;
+    const frontier: Head = mode === "live" ? { seq: 2, hash: digestBytes(new Uint8Array([2])) } : mode === "retired" ? { seq: 3, hash: digestBytes(new Uint8Array([3])) } : head;
     if (path === `/v1/scopes/${D.scope}`) return Response.json({ ok: true, complete: true, at: head, value: summary(D, [repository]) });
     if (path === `/v1/scopes/${Q.scope}`) {
       if (mode === "forbidden") return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
       const definitions = mode === "live" ? [item({ id: 2, type: "definition", state: "active", values: { name: "issue", digest } })] : [];
-      return Response.json({ ok: true, complete: mode !== "incomplete", at: head, value: summary(Q, mode === "missing" ? [] : [rule, ...definitions]) });
+      return Response.json({ ok: true, complete: mode !== "incomplete", at: frontier, value: summary(Q, mode === "missing" ? [] : [rule, ...definitions]) });
     }
     if (path === `/v1/scopes/${Q.scope}/items/definition`) {
       const cursor = new URL(url).searchParams.get("cursor");
       if (mode === "context") { pageEntered(); await new Promise<void>(resolve => { resumePage = resolve; }); }
-      if (mode === "retired" && cursor === null) return Response.json({ ok: true, complete: false, next: "retained-page-two", at: head, value: [] });
+      if (mode === "retired" && cursor === null) return Response.json({ ok: true, complete: false, next: "retained-page-two", at: frontier, value: [] });
       const values = mode === "retired" ? [item({ id: 2, type: "definition", state: "retired", values: { name: "issue", digest } })] : [];
-      return Response.json({ ok: true, complete: true, at: mode === "moved" ? { ...head, seq: 2 } : head, value: values });
+      return Response.json({ ok: true, complete: true, at: mode === "moved" ? { ...head, seq: 2 } : frontier, value: values });
     }
     throw new Error("Unexpected scripted read");
   };
   const secret = new Uint8Array(32), key = keyIdOfSecret(secret);
   const room: Room = { session: { service: "https://room.test", secret, fetch, now: () => Date.parse("2026-10-12T00:00:00Z") }, directory: D.scope, membership: M, rules: Q.scope, destination: G.scope, key, me: null, reader: new ReadSession("SCRIPTED-private-session", { v: 1, deployment: "SCRIPTED", membership: M, member: "@reader", key, reads: ["summary", "items"], ends: "2026-10-12T00:10:00Z" }), unsessioned: null, definitions: new Map() };
   const initial = await roomInitialization(room);
-  expect(initial).toEqual({ state: "not-initialized", scope: Q, head, rulesItem: 0 });
+  expect(initial).toMatchObject({ state: "not-initialized", scope: Q, head, definition: "platform:rules@3", rulesItem: 0 });
+  if (initial.state !== "not-initialized") throw new Error("Expected positive scripted initial state");
+  expect(await initializationStillCurrent(room, initial)).toBe(true);
   expect(initializationMessage(initial.state)).toBe("This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.");
-  mode = "live"; expect((await roomInitialization(room)).state).toBe("configured");
+  mode = "live";
+  expect(await initializationStillCurrent(room, initial)).toBe(false); // Initialization observed after H0 and before display.
+  expect((await roomInitialization(room)).state).toBe("configured");
   mode = "retired"; expect((await roomInitialization(room)).state).toBe("configured");
   for (const failure of ["forbidden", "incomplete", "missing", "moved"] as const) {
     mode = failure; const unknown = await roomInitialization(room);

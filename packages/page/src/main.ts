@@ -20,7 +20,7 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
@@ -630,14 +630,22 @@ async function draw(focus = false): Promise<void> {
     if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     const { destination, scope } = route;
     const loaded = room;
-    const initialization = await roomInitialization(room);
+    let initialization = await roomInitialization(room);
+    if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== settingsContext(kept)) return;
     let notice = initializationMessage(initialization.state);
     const showRoom = (...content: HTMLElement[]) => show(...shell(destination, room, ...(notice ? [h("p", { class: "answer room-initialization", role: "status" }, notice)] : []), ...content));
+    const presentationCurrent = async (): Promise<boolean> => {
+      if (initialization.state === "not-initialized" && !await initializationStillCurrent(loaded, initialization)) {
+        initialization = { state: "unknown", reason: "The room changed or could not be read before showing this view." }; notice = null;
+      }
+      return currentDraw === drawing && settingsContext(settings() ?? { place: null, secret: "" }) === settingsContext(kept);
+    };
     const last = (s: string): Answer | null => lastActs.get(actAssociation(loaded, s as ScopeId))?.answer ?? null;
     if (destination === "issues" && scope) {
       const issue = await loadIssue(room, scope as ScopeId);
       const defaults = issue.intent === undefined ? undefined : Object.fromEntries(["edit-own", "edit-any", "close-own", "close-any", "reopen-own", "reopen-any"].map((kind) => [kind, { on: issue.intent! }]));
       const offered = await actsOn(room, scope as ScopeId);
+      if (!await presentationCurrent()) return;
       const screen = issueScreen(room, issue);
       const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) };
       const association = actAssociation(room, scope as ScopeId);
@@ -661,6 +669,8 @@ async function draw(focus = false): Promise<void> {
     }
     if (destination === "changes" && scope) {
       const change = await loadChange(room, scope as ScopeId);
+      const offered = await actsOn(room, scope as ScopeId);
+      if (!await presentationCurrent()) return;
       const current = change.currentManifest === undefined ? change.manifests.find((manifest) => manifest.state === "current") : change.manifests.find((manifest) => manifest.id === change.currentManifest);
       const defaults = {
         ...(current ? Object.fromEntries(["review-verdict", "request-check"].map((kind) => [kind, { fields: { manifest: String(current.id) } }])) : {}),
@@ -693,7 +703,7 @@ async function draw(focus = false): Promise<void> {
         }));
       }
       const association = actAssociation(room, scope as ScopeId);
-      const panel = await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { tasks: (acts, send, context) => {
+      const panel = await panelFor(room, scope as ScopeId, { defaults: { ...defaults, ...taskContext.defaults }, ...(taskContext.choices ? { choices: taskContext.choices } : {}), uncertain, statusShown: uncertain, primary, blockedKinds }, { offered, tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
         if (comment) {
@@ -723,6 +733,7 @@ async function draw(focus = false): Promise<void> {
         return showRoom(h("main", { class: "screen" }, h("h1", {}, "Rules"), h("p", { class: "answer", role: "status" }, "The complete rules could not be read. Check status before editing."), ...(known ? [answerLine({ ...known, observation: known.observation ?? "The subsequent view could not be read." })] : [])));
       }
       const offered = await actsOn(room, room.rules);
+      if (!await presentationCurrent()) return;
       const editable = rules.item !== undefined && offered.acts.some((act) => act.kind === "publish");
       const options: PanelOptions = { offered, ...(editable ? { represented: ["publish"], customForm: (send, blocked, draftKey) => rulesEditor(rules, send, { blocked, draftKey }) } : {}) };
       const screen = rulesScreen(room, rules, editable);
@@ -732,8 +743,10 @@ async function draw(focus = false): Promise<void> {
     const kind = destination === "changes" ? "change" : "issue";
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
     const lanes = await listLanes(room);
+    const offered = await actsOn(room, room.directory);
+    if (!await presentationCurrent()) return;
     const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
-    const panel = await panelFor(loaded, loaded.directory, {}, { tasks: (acts, send, context) => {
+    const panel = await panelFor(loaded, loaded.directory, {}, { offered, tasks: (acts, send, context) => {
       if (destination === "changes") {
         const open = acts.acts.find(act => act.kind === "open-pr");
         if (open) screen.querySelector('[data-action-slot="create"]')?.append(proposeFromRecordedSource(loaded, lanes.changes, context));
