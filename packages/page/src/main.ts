@@ -563,9 +563,9 @@ function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
     if (!result) { tell("No original enrollment is retained. Paste an invitation to join."); return; }
     if (result.status === "verified") { try { await selectRoom({ place: result.place, secret: b64url(result.secret) }, result.handle); } finally { result.secret.fill(0); } return; }
     const unknown = result.status === "unknown" || result.status === "blocked";
-    tell(result.reason ?? (unknown ? "The original join is unresolved. Check status without sending a replacement." : "Refused because the invitation was not accepted."), true);
+    tell(result.status === "refused" ? `${result.reason} That invitation remains refused. Paste a different invitation to join with the retained key; Check status only reads the original result.` : result.reason ?? "The original join is unresolved. Check status without sending a replacement.", true);
     if (unknown) {
-      try { const original = originalJoin(location.origin, localStorage); if (original) { if (original.status === "unknown" || original.status === "refused") invitation.setAttribute("disabled", ""); else invitation.removeAttribute("disabled"); check.removeAttribute("hidden"); } else { invitation.removeAttribute("disabled"); check.setAttribute("hidden", ""); } }
+      try { const original = originalJoin(location.origin, localStorage); if (original) { if (original.status === "unknown") invitation.setAttribute("disabled", ""); else invitation.removeAttribute("disabled"); check.removeAttribute("hidden"); } else { invitation.removeAttribute("disabled"); check.setAttribute("hidden", ""); } }
       catch { invitation.setAttribute("disabled", ""); check.setAttribute("hidden", ""); }
     } else invitation.removeAttribute("disabled");
   };
@@ -573,9 +573,9 @@ function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {
   try { held = originalJoin(location.origin, localStorage); }
   catch { tell("Original enrollment custody is unavailable. Nothing will be replaced.", true); invitation.setAttribute("disabled", ""); }
   if (held) {
-    if (held.status === "unknown" || held.status === "refused") invitation.setAttribute("disabled", "");
+    if (held.status === "unknown") invitation.setAttribute("disabled", "");
     check.removeAttribute("hidden");
-    tell(held.status === "verified" ? "The original join is verified. Check status to open its saved room, or paste another invitation." : held.status === "prepared" ? "The original join was prepared. Paste the same invitation to continue with that exact request." : "An original join is retained. Check status without sending a replacement.", held.status === "unknown" || held.status === "refused");
+    tell(held.status === "verified" ? "The original join is verified. Check status to open its saved room, or paste another invitation." : held.status === "prepared" ? "The original join was prepared. Paste the same invitation to continue with that exact request." : held.status === "refused" ? "That invitation remains refused. Paste a different invitation to join with the retained key; Check status only reads the original result." : "An original join is retained. Check status without sending a replacement.", held.status === "unknown" || held.status === "refused");
   }
   invitation.addEventListener("input", () => {
     invitationDraft = invitation.value;

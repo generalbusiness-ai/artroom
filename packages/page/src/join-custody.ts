@@ -9,8 +9,9 @@ export interface JoinLock { run<T>(work: () => Promise<T>): Promise<T> }
 export interface JoinOptions { secret?: Uint8Array; fetch?: Fetch; now?: () => number; current?: () => boolean; lock?: JoinLock }
 export interface OriginalJoin { status: "prepared" | "unknown" | "refused" | "verified"; key: KeyId; place: Place; handle: string }
 export type JoinResult = (Omit<OriginalJoin, "status"> & { status: "unknown" | "refused" | "blocked"; reason: string; answer?: Answer }) | (Omit<OriginalJoin, "status"> & { status: "verified"; /** Private Settings handoff, never render or log. */ secret: Uint8Array; answer: Extract<Answer, { answer: "accepted" }> });
-interface RecordJoin { v: 1; origin: string; secret: string; prepared: PreparedJoin; phase: OriginalJoin["status"]; receipt?: Receipt; refusal?: Extract<Answer, { answer: "refused" }> }
-const MOST = 64 * 1024;
+interface PriorRefusal { prepared: PreparedJoin; refusal: Extract<Answer, { answer: "refused" }> }
+interface RecordJoin { history?: PriorRefusal[]; v: 1; origin: string; secret: string; prepared: PreparedJoin; phase: OriginalJoin["status"]; receipt?: Receipt; refusal?: Extract<Answer, { answer: "refused" }> }
+const MOST = 64 * 1024, MAX_REFUSALS = 8;
 const error = () => new Error("The original private enrollment is unavailable or no longer current. Nothing was replaced.");
 const closed = (value: unknown, required: string[], optional: string[] = []): value is Record<string, unknown> => isRecord(value) && required.every(k => Object.hasOwn(value, k)) && Object.keys(value).every(k => required.includes(k) || optional.includes(k));
 function originOf(origin: string): void {
@@ -27,7 +28,7 @@ function read(origin: string, storage: JoinStorage): RecordJoin | null {
   try {
     if (utf8(raw).length > MOST) throw error();
     const row: unknown = JSON.parse(raw);
-    if (!closed(row, ["v", "origin", "secret", "prepared", "phase"], ["receipt", "refusal"]) || row["v"] !== 1 || row["origin"] !== origin || typeof row["secret"] !== "string" || !["prepared", "unknown", "refused", "verified"].includes(String(row["phase"]))) throw error();
+    if (!closed(row, ["v", "origin", "secret", "prepared", "phase"], ["receipt", "refusal", "history"]) || row["v"] !== 1 || row["origin"] !== origin || typeof row["secret"] !== "string" || !["prepared", "unknown", "refused", "verified"].includes(String(row["phase"]))) throw error();
     seed = unb64url(row["secret"]);
     if (!seed || seed.length !== 32 || b64url(seed) !== row["secret"]) throw error();
     const p = row["prepared"];
@@ -37,6 +38,16 @@ function read(origin: string, storage: JoinStorage): RecordJoin | null {
     if (row["phase"] === "verified" && !row["receipt"]) throw error();
     if (row["refusal"] !== undefined && (!closed(row["refusal"], ["answer", "reason", "judgedAt"], ["name"]) || row["refusal"]["answer"] !== "refused" || typeof row["refusal"]["reason"] !== "string" || !isHead(row["refusal"]["judgedAt"]))) throw error();
     if (row["phase"] === "refused" && !row["refusal"]) throw error();
+    if (row["history"] !== undefined) {
+      if (!Array.isArray(row["history"]) || row["history"].length > MAX_REFUSALS) throw error();
+      for (const prior of row["history"]) {
+        if (!closed(prior, ["prepared", "refusal"])) throw error();
+        // Each retained request must still verify under this same origin/key.
+        // No nested history is admitted and no original signed bytes change.
+        const bytes = canonicalize({ v: 1, origin, secret: row["secret"], prepared: prior["prepared"], phase: "refused", refusal: prior["refusal"] });
+        read(origin, { getItem: () => bytes, setItem: () => { throw error(); } });
+      }
+    }
     return row as unknown as RecordJoin;
   } catch { throw error(); } finally { seed?.fill(0); }
 }
@@ -88,7 +99,17 @@ export async function joinInvitation(origin: string, invitation: string, storage
   return locked(origin, options, async () => {
     current(options);
     let row = read(origin, storage);
-    if (row?.phase === "refused") return checked(row, storage, options);
+    if (row?.phase === "refused") {
+      if (row.prepared.link === target.link) return checked(row, storage, options);
+      if ((row.history?.length ?? 0) >= MAX_REFUSALS) throw new Error("Private enrollment refusal history is full. Nothing was replaced.");
+      const secret = unb64url(row.secret)!;
+      try {
+        const prepared = await prepareJoin({ service: origin, secret, ...(options.now ? { now: options.now } : {}) }, invitation);
+        current(options);
+        const history = [...(row.history ?? []), { prepared: row.prepared, refusal: row.refusal! }];
+        row = write({ v: 1, origin, secret: row.secret, prepared, phase: "prepared", history }, storage, options);
+      } finally { secret.fill(0); }
+    }
     if (row && row.phase !== "prepared" && row.phase !== "verified") return unknown(row, "The original enrollment is retained. Check its status before another invitation.");
     if (row && row.prepared.link !== target.link) {
       if (row.phase !== "verified") return { ...publicOf(row), status: "blocked", reason: "Another original enrollment is retained. Nothing was replaced." };
