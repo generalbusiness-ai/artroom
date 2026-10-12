@@ -50,10 +50,13 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   const root = new Element("div");
   type Place = { directory: string; membership: { scope: string; kind: string; inc: string } };
   let context: { place: Place; secret: string; label?: { text: string; place: Place } } = { place: { directory: "directory", membership: { scope: "membership", kind: "membership", inc: "one" } }, secret: "device" };
-  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: [], ref: { membership: context.place.membership, member: "@reader" } } };
+  const room = { session: { service: "https://page.test", secret: new Uint8Array(32) }, ...context.place, rules: "rules", key: "key", me: { handle: "@reader", role: "member", actions: ["change.propose"], ref: { membership: context.place.membership, member: "@reader" } } };
   let redraw!: () => void;
   let send!: (kind: string, on: string, fields: Record<string, string>, accepted?: () => void) => void;
   const panels: { pending?: boolean; uncertain?: boolean; primary?: readonly string[]; blockedKinds?: readonly string[] }[] = [];
+  let initialization: "configured" | "not-initialized" | "unknown" = "configured";
+  let rulesUnavailable = false;
+  let initializedDuringView = false;
   const rejects: ((error: Error) => void)[] = [];
   const posts = vi.fn();
   const attempt = gate();
@@ -69,14 +72,15 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
   const drain = async () => { for (let turn = 0; turn < 20; turn++) await Promise.resolve(); };
   vi.doMock("@generalbusiness/artroom-bytes", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-bytes")>("@generalbusiness/artroom-bytes"), b64url: () => "device", unb64url: () => new Uint8Array(32), keyIdOfSecret: () => "key", isScopeRef: (value: unknown) => !!value && typeof value === "object" && "kind" in value }));
   vi.doMock("../src/data.ts", () => ({
-    act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: ["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own"].map((kind) => ({ kind, fields: [] })), hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
-    openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership, name: `Recorded ${context.place.directory}` }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
-    joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: vi.fn(),
+    act: dataAct, actAssociation: (_room: unknown, scope: string) => `room/member/${scope}`, actsOn: async () => ({ acts: [...["comment", "close-own", "close-any", "reopen-own", "merge", "review-verdict", "ready-own", "open-pr"].map((kind) => ({ kind, fields: [] })), ...(initializedDuringView ? [{ kind: "open-issue", step: "open", on: "lane", line: "Open", fields: [{ name: "definition", type: "digest", required: true, choices: [{ label: "Issue", value: "SCRIPTED-current-definition" }] }, { name: "title", type: "text", required: true }, { name: "conditions", type: "list", required: true }] }] : [])], hidden: 0 }), fieldValue: (_room: unknown, _type: unknown, value: string) => value,
+    initializationStillCurrent: async () => !initializedDuringView, roomInitialization: async () => initialization === "not-initialized" ? { state: initialization, scope: { scope: "rules", kind: "rules", inc: "one" }, head: { seq: 1, hash: "head" }, rulesItem: 0, definition: "platform:rules@3", context: "SCRIPTED-private-read-context" } : initialization === "unknown" ? { state: initialization, reason: "Scripted read unavailable" } : { state: initialization }, openRoom: async () => ({ ...room, directory: context.place.directory, membership: context.place.membership, name: `Recorded ${context.place.directory}` }), listLanes: async () => ({ issues: [], changes: [] }), siteAddress: () => "/site/", placeOf: () => null,
+    joinRoom: vi.fn(), loadChange: async () => ({ state: "open", manifests: [{ id: 1, state: "current", file: { path: "../unsafe.md" } }], merges: [] }), loadIssue: issueRead, loadRules: async () => { if (rulesUnavailable) throw new Error("Scripted rules read unavailable"); return { scope: "rules", head: { seq: 1, hash: "head" }, revision: null, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: null, definitions: [], controllers: [] }; },
   }));
   vi.doMock("../src/view.ts", () => ({
+    whoLine: () => new Element("p"),
     icon: () => new Element("svg"),
     h: (tag: string, attrs: Record<string, string> = {}, ...children: unknown[]) => { const el = new Element(tag); el.attrs = attrs; el.append(...children.flat().filter((child) => child !== null && child !== false && child !== undefined) as (Element | string)[]); return el; },
-    roomScreen: () => screen("create"), issueScreen: () => screen("comment", "next"), changeScreen: () => screen("comment", "next", "edit"), rulesScreen: vi.fn(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
+    roomScreen: () => screen("create"), issueScreen: () => screen("comment", "next"), changeScreen: () => screen("comment", "next", "edit"), rulesScreen: () => screen(), failureScreen: vi.fn(), answerLine: (result: { kind: string; answer: { answer: string } }) => { const line = new Element("p"); line.append(`Known ${result.kind} ${result.answer.answer}`); return line; }, nonacceptedAnswerText: vi.fn(),
     actsPanel: (_offered: unknown, callback: typeof send, last: Element | null, options: (typeof panels)[number]) => { send = callback; panels.push(options); const panel = new Element("section"); if (last) panel.append(last); return panel; },
   }));
   vi.stubGlobal("document", { getElementById: () => root, createElement: (tag: string) => new Element(tag) });
@@ -92,6 +96,33 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     // Main owns these public association hosts; the view stand-in must expose them.
     expect(root.querySelectorAll('[data-request-context]').map(node=>node.getAttribute('data-request-context'))).toEqual(['room/member/directory']);
     expect(root.querySelectorAll('[data-task-context]').map(node=>node.getAttribute('data-task-context'))).toEqual(['room/member/directory']);
+    // A complete empty source list keeps Propose change disabled without a
+    // second absence paragraph in the toolbar. The view owns the list copy.
+    location.hash = "#/?kind=change"; rendered = gate(); redraw(); await rendered.promise;
+    const propose = root.all().find(node => node.getAttribute("aria-label") === "Propose change")!;
+    expect(propose.hasAttribute("disabled")).toBe(true);
+    expect(root.textContent).not.toContain("No recorded change is available here as a text source");
+    propose.handlers.get("click")?.({ preventDefault() {} });
+    await drain(); expect(dataAct).not.toHaveBeenCalled();
+    location.hash = "#/"; rendered = gate(); redraw(); await rendered.promise;
+    initialization = "not-initialized";
+    const banner = "This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.";
+    for (const route of ["#/", "#/?kind=change", "#/rules"]) {
+      location.hash = route; rendered = gate(); redraw(); await rendered.promise;
+      expect(root.all().filter(node => node.attrs["class"] === "answer room-initialization")).toHaveLength(1);
+      expect(root.textContent).toContain(banner);
+    }
+    initializedDuringView = true; location.hash = "#/"; rendered = gate(); redraw(); await rendered.promise;
+    expect(root.textContent).not.toContain(banner);
+    expect(root.querySelector('[data-task-act="open-issue"]')).not.toBeNull(); // Fresh native-shaped choices replace H0 suppression.
+    expect(dataAct).not.toHaveBeenCalled();
+    initializedDuringView = false; location.hash = "#/rules";
+    rulesUnavailable = true; rendered = gate(); redraw(); await rendered.promise;
+    expect(root.textContent).not.toContain(banner); // Later denial retires the earlier positive read.
+    initialization = "unknown"; rendered = gate(); redraw(); await rendered.promise;
+    expect(root.textContent).not.toContain(banner);
+    expect(root.textContent).toContain("The complete rules could not be read. Check status before editing.");
+    initialization = "configured"; rulesUnavailable = false; location.hash = "#/"; rendered = gate(); redraw(); await rendered.promise;
     const beforePending = panels.length;
     send("comment", "", Object.fromEntries([["__proto__", "literal field"]]));
     await attempt.promise;
@@ -152,12 +183,14 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     expect(panels.at(-1)?.uncertain).toBe(false);
     expect(posts).toHaveBeenCalledTimes(1);
     const reading = gate(), releaseRead = gate();
+    const sourceReadsBefore = issueRead.mock.calls.length;
     issueRead.mockImplementationOnce(async () => { reading.resolve(); await releaseRead.promise; return { state: "closed", intent: 0 }; });
     location.hash = "#/issue/delayed";
     redraw(); await reading.promise;
     context = { ...context, place: { ...context.place, directory: "newest-room" } };
     context.label = { text: "Newest local label", place: context.place };
     rendered = gate(); releaseRead.resolve(); await rendered.promise;
+    expect(issueRead).toHaveBeenCalledTimes(sourceReadsBefore + 2); // Old read retires; the existing draw opens the actual current room once.
     expect(root.textContent).toContain("Newest local label");
     expect(root.textContent).toContain("Recorded newest-room");
     expect(root.textContent).not.toContain("Recorded another-room");
@@ -271,7 +304,10 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
     return new Promise((resolve,reject)=>attempts.push({args,finish:answer=>{const result={kind:args[2],scope:args[1],on:null,answer:answer==='accepted'?{answer,receipt:{fact:{at:{scope:args[1],inc:'one',kind:'lane'},seq:3,hash:'hash'}}}:{answer,reason:'guard-failed'},before:{seq:2,hash:'old'},after:{seq:3,hash:'new'},observation:null};(args[4]as(value:unknown)=>void)(result);resolve(result);},lose:()=>reject(new Error('Reply lost'))}));
   });
   vi.doMock('@generalbusiness/artroom-bytes',async()=>({...await vi.importActual<typeof import('@generalbusiness/artroom-bytes')>('@generalbusiness/artroom-bytes'),b64url:()=> 'device',unb64url:()=>new Uint8Array(32),keyIdOfSecret:()=> 'key'}));
-  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,openRoom:async()=>room,listLanes:async()=>({issues:[{scope:'issue',number:1,title:'Native issue',state:'open'}],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope===change.scope?[comment,review]:[comment],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:vi.fn(),siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
+  // resetModules keeps cached manual mocks. This case uses actual view
+  // creation against its own Node document, never the prior Element factory.
+  vi.doMock('../src/view.ts', async () => vi.importActual<typeof import('../src/view.ts')>('../src/view.ts'));
+  vi.doMock('../src/data.ts',()=>({Unreadable:class Unreadable extends Error{},act,actAssociation:(_room:unknown,scope:string)=>`room/member/${scope}`,fieldValue:(_room:unknown,_type:string,value:string)=>value,initializationStillCurrent: async () => true, roomInitialization: async () => ({ state: "configured" }), openRoom:async()=>room,listLanes:async()=>({issues:[{scope:'issue',number:1,title:'Native issue',state:'open'}],changes:[]}),actsOn:async(_room:unknown,scope:string)=>({acts:scope==='directory'?[create]:scope===change.scope?[comment,review]:[comment],hidden:0}),loadIssue:async()=>issue,loadChange:async()=>change,loadRules:vi.fn(),siteAddress:()=>'/site/HEAD/',placeOf:vi.fn(),joinRoom:vi.fn(),enrollmentAssociation:vi.fn(),joinAssociation:vi.fn()}));
   vi.doMock('../src/retained-editor.ts',()=>({retainedEditor:()=>new Node('div')}));
   let redraw!:()=>void;const location={origin:'https://page.test',hash:'#/'};
   vi.stubGlobal('document',doc);vi.stubGlobal('location',location);vi.stubGlobal('localStorage',{getItem:()=>JSON.stringify(settings)});vi.stubGlobal('window',{addEventListener:(_name:string,callback:()=>void)=>{redraw=callback;}});
@@ -374,6 +410,6 @@ test("retained dialogs use the live scope; accepted draft retirement and refresh
   } finally {
     // Every held fake attempt is drained before removing its document.
     for(const attempt of attempts)attempt.lose();for(let n=0;n<30;n++)await Promise.resolve();
-    vi.unstubAllGlobals();vi.doUnmock('../src/data.ts');vi.doUnmock('../src/retained-editor.ts');vi.doUnmock('@generalbusiness/artroom-bytes');vi.resetModules();
+    vi.unstubAllGlobals();vi.doUnmock('../src/view.ts');vi.doUnmock('../src/data.ts');vi.doUnmock('../src/retained-editor.ts');vi.doUnmock('@generalbusiness/artroom-bytes');vi.resetModules();
   }
 });

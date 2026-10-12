@@ -30,8 +30,9 @@ const keyedButton=(text:string,key:string,run:()=>void,className="text-button")=
 };
 export function stageView(root:HTMLElement,actions:StageActions,speech:SpeechPort) {
   const header=make("header","masthead"),titleGroup=make("div","masthead-title"),title=make("h1",undefined,"Agents that count"),status=make("span","status");
-  for(const [file,theme]of [["/brand/dap-wordmark.svg","light"],["/brand/dap-wordmark-white.svg","dark"]]as const){const image=make("img",`wordmark wordmark-${theme}`);image.src=file;image.alt="dap";titleGroup.append(image);}
-  titleGroup.append(title);header.append(titleGroup,status);
+  const wordmark=make("a","wordmark-link");wordmark.href="https://dap.generalbusiness.ai/";wordmark.setAttribute("aria-label","dap homepage");
+  for(const [file,theme]of [["/brand/dap-wordmark.svg","light"],["/brand/dap-wordmark-white.svg","dark"]]as const){const image=make("img",`wordmark wordmark-${theme}`);image.src=file;image.alt="dap";wordmark.append(image);}
+  titleGroup.append(wordmark,title);header.append(titleGroup,status);
   const main=make("main","stage"),numberArea=make("section","number-stage"),caption=make("p","caption","Count"),number=make("div","number"),assignment=make("p","assignment"),notice=make("p","notice"),acknowledgement=make("p","acknowledgement"),memberCount=make("p","member-count");
   numberArea.setAttribute("aria-label","Counting state");number.setAttribute("aria-live","polite");acknowledgement.setAttribute("role","status");notice.setAttribute("role","status");
   let latest:StagePresentation={fresh:false,connection:"Not connected"},selectedVoice:string|undefined,selectedFor:string|undefined,externalSelection:string|undefined;
@@ -102,8 +103,9 @@ export function stageView(root:HTMLElement,actions:StageActions,speech:SpeechPor
     joinOwn.hidden=!!p.joined;joinOwn.disabled=blocked||!available;joinOwn.textContent=p.joinBusy?"Joining…":"Join room";leave.hidden=!p.joined;leave.disabled=!!p.joinBusy||!!p.commandBusy;
     changeIdentity.disabled=!!p.joinBusy||!!p.commandBusy;forget.disabled=!!p.joinBusy||!!p.commandBusy;
     record.textContent=b?`Last recorded: ${b.lastNumber}${b.lastSpeaker?` · ${b.lastSpeaker.member}`:""}. Generation ${b.generation}, turn ${b.serial}.`:p.fresh&&p.view?"Counting has not started.":"No current counting record is loaded.";
+    inspection.hidden=!p.identity;
     definition.textContent=p.identity?`counting-commitments · ${p.identity.definition}. The room records each promise and completion.`:"";
-    disconnect.hidden=!p.identity;forget.hidden=!actions.forget;fail.hidden=!p.view?.pledge||!same(p.view.pledge.member,p.identity?.member);fail.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
+    disconnect.hidden=!p.identity;forget.hidden=!p.identity||!actions.forget;fail.hidden=!p.view?.pledge||!same(p.view.pledge.member,p.identity?.member);fail.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
     cancel.hidden=!isController||!p.view?.pledge;cancel.disabled=(!p.fresh||!!p.commandBusy||!!p.commandUnknown||!!pending&&!p.voice?.audioUncertain);
     checkCommand.hidden=!p.commandUnknown;checkReport.hidden=!p.identity||!pending;checkReport.disabled=p.voice?.phase==="reporting";
     updateReport.hidden=!p.identity||pending!=="refused";updateReport.disabled=!p.fresh||!p.voice?.correctionReady;

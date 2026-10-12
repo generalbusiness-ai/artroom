@@ -687,6 +687,70 @@ export async function loadSite(room: Pick<Room, "session" | "directory">, path: 
 
 // ---------------------------------------------------------------- the rules
 
+/** Conservative presentation evidence; failed reads never imply an uninitialized room. */
+export type RoomInitialization =
+  | { state: "not-initialized"; scope: ScopeRef; head: Head; definition: Summary["definition"]; rulesItem: number; context: string }
+  | { state: "configured" }
+  | { state: "unknown"; reason: string };
+
+const initializationContext = (room: Room): string => canonicalize({ service: room.session.service, directory: room.directory, membership: room.membership, key: room.key, rules: room.rules });
+
+/** One final head/context check after the view's other reads; no classification or pagination repeats. */
+export async function initializationStillCurrent(room: Room, proof: Extract<RoomInitialization, { state: "not-initialized" }>): Promise<boolean> {
+  if (initializationContext(room) !== proof.context) return false;
+  try {
+    await fresh(room);
+    const { summary, at } = await summaryOf(handleOf(room, room.rules));
+    return initializationContext(room) === proof.context && summary.status === "active"
+      && canonicalize(summary.scope) === canonicalize(proof.scope) && summary.definition === proof.definition && canonicalize(at) === canonicalize(proof.head);
+  } catch { return false; }
+}
+
+export async function roomInitialization(room: Room): Promise<RoomInitialization> {
+  const unavailable: RoomInitialization = { state: "unknown", reason: "The complete rules could not be read. Check status before editing." };
+  const context = () => initializationContext(room);
+  const captured = context();
+  try {
+    await fresh(room);
+    const directory = await summaryOf(handleOf(room, room.directory));
+    const repository = directory.summary.items.find(item => item.type === "repository");
+    const named = repository?.refs["rules"];
+    if (directory.summary.status !== "active" || directory.summary.scope.scope !== room.directory || directory.summary.scope.kind !== "directory"
+      || !fullScopeRef(named) || named.kind !== "rules" || named.scope !== room.rules
+      || canonicalize(repository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    const handle = handleOf(room, room.rules), { summary, at } = await summaryOf(handle);
+    if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(named)
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return unavailable;
+    const rules = summary.items.filter(item => item.type === "rules");
+    if (rules.length !== 1) return unavailable;
+    const current = rules[0]!;
+    if (current.id !== 0 || current.state !== "current" || !Number.isSafeInteger(current.revision) || current.revision < 1) return unavailable;
+    // Complete summary evidence already proves configured. A historical read
+    // cannot discard that positive result or delay ordinary navigation.
+    const published = current.refs["published"];
+    if (published !== undefined && published !== null || current.revision > 1 || summary.items.some(item => item.type === "definition")) return { state: "configured" };
+    // Proving absence still needs complete coherent current/retained pages:
+    // a retired definition also proves that this room has been configured.
+    const definitions = await itemsOf(handle, summary, "definition", at);
+    if (definitions.length > 0) return { state: "configured" };
+    // Known rules1–3 initial item, not merely a missing/failed policy read.
+    if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
+      || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"
+      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== false || current.values["singleControllerException"] !== false
+      || ["checks", "labels", "extents"].some(name => current.values[name] !== undefined && current.values[name] !== null)) return unavailable;
+    const after = await summaryOf(handle);
+    const latestDirectory = await summaryOf(handleOf(room, room.directory));
+    const latestRepository = latestDirectory.summary.items.find(item => item.type === "repository");
+    if (context() !== captured || canonicalize(after.at) !== canonicalize(at) || canonicalize(after.summary.scope) !== canonicalize(summary.scope)
+      || latestDirectory.summary.status !== "active" || canonicalize(latestDirectory.summary.scope) !== canonicalize(directory.summary.scope)
+      || canonicalize(latestRepository?.refs["rules"]) !== canonicalize(named)
+      || canonicalize(latestRepository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
+    return { state: "not-initialized", scope: summary.scope, head: at, definition: summary.definition, rulesItem: current.id, context: captured };
+  } catch {
+    return unavailable;
+  }
+}
+
 export interface RulesView {
   /** The actual rules item, used by publish transitions. */
   item?: number;

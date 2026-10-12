@@ -13,6 +13,9 @@ import { rita } from "./support-founding.ts";
 // D6/M5 digests were validated from the complete actual catalog at f1455d940.
 // Evidence: /tmp/artroom-m1-f145-generation-execution/complete-catalog-validation.json
 // SHA-256: 47545c46bbc0b5fd6c577aa8635d518b76a8416a020fe988d30755eb6a5a950c. Generation is not a test or gate pass.
+// Rules4 was generated and validated from the actual catalog at 15a922de916a28c3062775acef4ba8673708f458; its tests remained held.
+// Evidence: /tmp/artroom-rules4-generation-one/result.json
+// SHA-256: 41f71c59e0b534042ccfc5b9bed61f4bb4cfc753809db6fabfec4acc4ebe3761.
 const DIGESTS: Readonly<Record<string, string>> = {
   "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
   "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155",
@@ -20,6 +23,7 @@ const DIGESTS: Readonly<Record<string, string>> = {
   "platform:register@5": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@5": "sha256:db86423258d5de0df43956187460d5ade0d3e878371c24d89c33ecd51c2b1bd5",
   "platform:membership@4": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
+  "platform:rules@4": "sha256:e3fa2a716deb5580674095272973c2830d8259bf089390b5a753db6d29b65454",
   "platform:rules@3": "sha256:e9ed7ebe04bf66f1dd7c2b39a43d55b5e3b71317d5e3e3cf1a96dd16b2804ed5",
   "platform:inbox@1": "sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748",
   "platform:register@1": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
@@ -38,11 +42,18 @@ const DIGESTS: Readonly<Record<string, string>> = {
 };
 
 test("every shipped version resolves to its own data, pinned by digest, and version 1 of each is the data that main shipped; no other version resolves; default founding keeps the existing cohort", () => {
-  expect(Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]))).toEqual(DIGESTS);
+  const digests = Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]));
+  expect(digests).toEqual(DIGESTS); // Every supported version has its exact observed golden literal.
+  const next = platform("platform:rules@4")!;
+  expect(next).toBe(VERSIONS["platform:rules@4"]);
+  expect(next.data.items["rules"]!.values["ownerMayReview"]!.default).toBe(true);
+  expect(next.rules).toBe(platform("platform:rules@3")!.rules);
+  expect(digests["platform:rules@4"]).not.toBe(DIGESTS["platform:rules@3"]);
+  expect(["platform:rules@1", "platform:rules@2", "platform:rules@3"].map(named => platform(named)!.data.items["rules"]!.values["ownerMayReview"]!.default)).toEqual([false, false, false]);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
   expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
-  // The explicit application pins do not replace the existing default cohort.
-  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership]);
+  // Explicit application and prospective Rules4 pins do not replace the existing default cohort.
+  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4"]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.

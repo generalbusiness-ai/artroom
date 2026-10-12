@@ -173,6 +173,10 @@ test("Invitation paste joins automatically once; Back and reload keep unknown en
   };
   try {
     await import("../src/main.ts");
+    const entryWordmarks = root.all().filter(element => element.tag === "a" && element.attrs["aria-label"] === "dap homepage");
+    expect(entryWordmarks).toHaveLength(1);
+    expect(entryWordmarks[0]!.attrs["href"]).toBe("https://dap.generalbusiness.ai/");
+    expect(entryWordmarks[0]!.children).toHaveLength(2);
     const input = root.all().find((e) => e.attrs["name"] === "invitation")!;
     expect(
       root

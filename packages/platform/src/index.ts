@@ -25,7 +25,7 @@ import { register, registerRules } from "./register.ts";
 import { directory, directory2, directory3, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
 import { RULES } from "./rules.ts";
-import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
+import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScope4, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
 export { inbox, membership, membership5, register, directory, directory2, destination, destination2 };
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
@@ -43,7 +43,7 @@ export { mintRevoked as destinationRevokedMint } from "./destination.ts";
 export { DESTINATION_CHANGED_SET, NOT_RESERVED, fileSound, isJudgeChanges, isJudgeEvidence, isRecordedJudgeEvidence, judgeReservation, type EditFile } from "./reservation.ts";
 export type { JudgeChanges, JudgeEvidence, RecordedJudgeEvidence, Reservation, ReservationAsked, ReservationRead, Statement } from "./reservation.ts";
 export { RULES };
-export { rulesScope };
+export { rulesScope, rulesScope4 };
 export { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, RULES_SCOPE_1, extentsOf, membershipId, referenceOf, revisionOf, rulesAnswer, rulesMembership, rulesObservedValues } from "./rules-scope.ts";
 export type { PlatformName, RuleTable } from "./rules.ts";
 export { CONTROLLER, EXTENTS_MOST, EXTENT_CLASSES, LANDING, RULES_EXTENT, RULES_PATTERNS, classify, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "./extents.ts";
@@ -135,6 +135,7 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   "platform:membership@2": { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, MEMBERSHIP) },
   "platform:rules@1": { data: rulesScope, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE_1), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:rules@2": { data: rulesScope2, rules: rulesScopeRules, observed: (state, asked) => rulesAnswer(state, asked, RULES_SCOPE), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
+  "platform:rules@4": { data: rulesScope4, rules: rulesScopeRules3, observed: (state, asked) => rulesAnswer(state, asked, "platform:rules@4"), observedValues: rulesObservedValues, revised: PUBLISH, membership: rulesMembership },
   "platform:destination@1": { data: destination, rules: destinationRules, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@3": { data: destination3, rules: destinationRules3, membership: destinationMembership, rulesScope: destinationRulesScope },
