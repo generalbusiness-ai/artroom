@@ -1,6 +1,6 @@
 # One MCP service for every dap application
 
-2026-10-12. Draft 6, for checker review before implementation.
+2026-10-12. Draft 7, for checker review before implementation.
 Planned against main `d309b6b9baca9e6a51a1dfb2c7979145463b229c`.
 Draft 1 (`ab740346`) received changes requested in review `ca8a00f6`, with
 eight corrections; Draft 2 (`41ed9eff`) answered each, and section 14 maps
@@ -12,7 +12,8 @@ section 16 maps them. Review `1a18fff8` requested five more; Draft 5
 answered them, and section 17 maps them. Draft 6 follows Hugh's direction
 of 2026-10-12 16:30 Eastern: the tool names use the user-facing words of
 plan 030's glossary ("create", not "found"), one vocabulary across the
-command line, the page and the agent surface.
+command line, the page and the agent surface. Review `28ff4ada` requested three corrections
+to that mapping; Draft 7 answers them, and section 19 maps them.
 
 Hugh's direction, 2026-10-12 13:50 Eastern: the MCP plan
 (`notes/2026-10-01-mcp-plan.md`, revision 4, and plan 009) is reasonable,
@@ -98,7 +99,7 @@ Every activity in dap is therefore one of:
    destination's host.
 
 The command line proves this by construction. Its single-act commands
-(`actions`, `act`, `record`, `show`, `verify`) are one read or one intent. Its
+(`acts`, `act`, `log`, `show`, `verify`) are one read or one intent. Its
 founding commands (`install`, `claim`) are a founding and an act. Its
 composite commands (`issue open`, `propose`, `edit`, `merge`, `clone`) are
 sequences of reads, intents and Git (`packages/cli/src/commands.ts`,
@@ -153,25 +154,35 @@ kept).
 **One tool per act declaration.** A tool is bound to exact declarations,
 never to a name alone. For each definition in the room's inventory
 (section 6) and each act of it that is not its genesis, the server takes
-the canonical bytes of that act's declaration (its `ActType` as the
-definition retains it, with the item types it names). Definitions with the
-same `name` whose declaration of a kind is byte-identical share one tool,
-named `<name>.<kind>`: `issue.comment` serves the `issue` definition and
-its demo profile alike, because their `comment` rows are the same object.
-Where same-name definitions declare a kind differently, there is one tool
-per distinct declaration, named with the first eight hexadecimal
-characters of the act declaration's digest: `change.propose-manifest@3f0389ba`
-and `change.propose-manifest@<other>`. Two distinct declarations whose
-first eight characters collide are named with sixteen, and so on by
-eights until they differ; the rule is deterministic, the full digest is in
-every descriptor, and the binding check never relies on the name. Each
-description says which definition digests it binds and which lanes in the
-inventory run under them. The repository has this case today:
-`change.json` and `change3.json` are both named `change`, and their
-`propose-manifest` fields are incompatible. A platform definition uses its
-short name (`member.invite`, `issue.create`), and a
-platform version change that changes a declaration gets a variant the same
-way.
+the act's **binding identity**: the definition's `name`, the native kind,
+and the digest of the canonical bytes of that act's declaration (its
+`ActType` as the definition retains it, with the item types it names).
+Declarations with the same binding identity under different definition
+digests are one tool that serves every such digest: `issue.comment` serves
+the `issue` definition and its demo profile alike, because their `comment`
+rows are the same object. Two byte-identical rows under different native
+kinds, or under different definition names, are different identities and
+different tools, because the native routing differs.
+
+**Names are resolved after mapping, across the whole catalogue.** Each
+identity is given its surface name by the words table (below), then the
+server checks the whole advertised list: a surface name that exactly one
+identity carries is used as it is; a surface name that two or more
+identities carry is given to none of them unsuffixed, and each becomes
+`<surface name>@<variant>`, where the variant is the first eight
+hexadecimal characters of a digest over the binding identity, extended by
+eights until the variants differ. The rule is deterministic, so the same
+catalogue gives the same names on every connection and after a reconnect;
+the full identity and the digests served are in every descriptor; and the
+binding check never relies on the name. No name is privileged: a
+platform act and an unfamiliar application's act that map to the same
+surface name both get variants, and both stay reachable in every launch
+mode. The repository has the same-name case today: `change.json` and
+`change3.json` are both named `change`, and their `propose-manifest` rows
+differ, so there are `change.propose-version@<v1>` and
+`change.propose-version@<v2>`, each saying which digests it binds and
+which lanes run under them. A platform version change that changes a row
+gets a variant the same way.
 
 **Every descriptor records its binding:** the definition name, the exact
 digests it serves, and the digest of the act declaration it was derived
@@ -196,18 +207,24 @@ named `<surface noun>.<surface verb>`, where the surface words come from a
 **words table**, data in the server (`words.json`), seeded from the
 glossary and keyed by definition name and act kind. A kind the table does
 not map keeps its record word, so an unfamiliar application's acts are
-named as their author named them. The descriptor records the record kind
+named as their author named them. The descriptor records the native kind
 and the definition it binds beside the surface name, and `inspect
-describe` shows both, so nothing is hidden by the renaming. Two kinds of
-one definition may not map to one surface name; the build's test refuses
-a table that does. The platform rows, from the glossary (register,
+describe` shows both, so nothing is hidden by the renaming. The table maps
+names only: it never changes the signed native kind, a field or its type,
+the target or its incarnation, an expected revision, a beside domain or
+the requested-meaning identity. Collisions after mapping are resolved
+across the whole catalogue by the rule above, so the table cannot hide a
+valid activity; a table that maps two kinds of one definition to one name
+is still refused by the build's test, as a mistake rather than a
+collision. The words table's digest is one of the semantic inputs of the
+list generation, so a change of words is a list change. The platform rows, from the glossary (register,
 directory, membership, inbox are "not said", so their nouns become the
 thing a person sees: the room, a member, a key, an issue, a change, the
 repository):
 
 | Record | Surface tool |
 |---|---|
-| register `create` | `room.create` |
+| register `found` (its genesis `install` is reached through the generic `create`) | `room.create` |
 | directory `open-issue`, `open-pr`, `open-task`, `retry-import` | `issue.create`, `change.create`, `task.create`, `repository.retry-import` |
 | membership `join`, `enrol`, `seat`, `first-key`, `rotate-recovery` | `room.join`, `room.enrol`, `room.seat`, `room.first-key`, `room.rotate-recovery` |
 | membership `invite-member`, `add-member`, `set-role`, `set-actions`, `remove-member` | `member.invite`, `member.add`, `member.role`, `member.actions`, `member.remove` |
@@ -262,7 +279,7 @@ scopes are read with `wait`.
 section 4 derives, so the agent reads what the act does and what would
 refuse it before choosing, and the host validates the input from the
 schema. A description that would pass its bound points at
-`scope describe` for the rest (section 9).
+`inspect describe` for the rest (section 9).
 
 **What is listed.** For the caller's current standing on each membership
 the inventory uses, read at each `tools/list`: every act of every
@@ -346,7 +363,7 @@ Every generic read is read-only. `credential`'s description says its
 result is a secret.
 
 **Not in the list, on purpose.** No `verify`, no `clone`, no `propose` as
-tools. `verify` is a verifier over `record` that an agent runs as a command.
+tools. `verify` is a verifier over the native `log` read, the `record` tool, that an agent runs as a command.
 `clone` and `propose` are Git work that the agent does with Git, after
 `repository.read-token` and `credential`. Section 10's inventory names
 each step.
@@ -381,7 +398,7 @@ admin, maintainer, member, agent, checker`; `definition (required): the
 digest of a value in the definition domain, up to 262144 bytes; choices
 from the rules scope: issue sha256:82a9…, change sha256:d86c…`. A `record`
 lists its members; a `list` names its element type and `max`; a `fact`
-names its kinds and the definition they are under; a `inspect`, `commit` or
+names its kinds and the definition they are under; a `scope`, `commit` or
 `tree` says so. The JSON Schema beside it carries the same facts for a host
 that validates.
 
@@ -427,10 +444,10 @@ it.
 | platform mark (`code`) | the platform's own one-line text for that mark, from a table in the server keyed by `platform:<name>@<version>` and the mark's code; the table is part of the platform's documentation, not of any application. A mark with no text renders as `the platform rule <code> (row <row>) holds`. |
 
 A `where` clause renders as its guard. Sentences are never cut: a long
-guard renders whole in the complete text, which `scope describe <kind>`
+guard renders whole in the complete text, which `inspect describe <kind>`
 returns for any act. A tool description is bounded at 1,000 characters: it
 carries the sentence, the fields and as many whole guard sentences as fit,
-then one pointer line, `guards <m> to <n> of <n>: see scope describe
+then one pointer line, `guards <m> to <n> of <n>: see inspect describe
 <kind>`, which is itself bounded and never contradicts the gate. A refusal
 that names a guard is rendered from the complete text, so it always has
 its sentence. The pointer names a position range, not the omitted guards'
@@ -629,8 +646,10 @@ by a digest of the record's identity:
   standing is read from, the signer's key ID, the target scope and
   incarnation (or `create` and the definition digest), and the idempotency
   key;
-- **binding:** the definition name and digest the target was under and the
-  act declaration digest the tool was derived from (section 3);
+- **binding:** the binding identity of section 3 (definition name, native
+  kind, act declaration digest) and the definition digest the target was
+  under; never the surface name, so a change of the words table changes no
+  record's identity or replay;
 - **requested meaning:** the digest of the canonical form of what was
   asked: kind, on, fields as given, the texts', values' and presented
   facts' digests and domains;
@@ -798,7 +817,7 @@ note reports the counts for the stories as observed figures.
 |---|---|---|
 | Each tool as sent | description at most 1,000 characters, with the pointer of section 4 when the complete text is longer; a schema is never cut: every declared field is in it. The contract bounds an act at 4 `also` subjects, 4 presented facts and 24 guards as written, and each field at one type with at most 64 list elements, so a derived schema stays far under a page; a tool whose descriptor would still exceed a page is served alone on a page of its own, whole, and reported; instructions at most 512 characters | the canonical JSON the server sends |
 | `tools/list` as sent, per role | one page at most 256 KiB, with a cursor to the next; no aggregate cap, every tool reachable; the total bytes and the token count (by a pinned counter named in the note) for an admin, a maintainer, a member and an agent in the demo room, and for an admin with the full lane definitions and both change declarations, measured and reported | the canonical JSON the server sends, for each role in W2's room |
-| Tool results | the response bound of section 8, with paging; `idempotencyKey` at most 128 bytes; diagnostics bounded (at most eight keys in a `full` error; sentences from the complete text, paged by `scope describe` when long) | bytes of the whole response |
+| Tool results | the response bound of section 8, with paging; `idempotencyKey` at most 128 bytes; diagnostics bounded (at most eight keys in a `full` error; sentences from the complete text, paged by `inspect describe` when long) | bytes of the whole response |
 | List changes | one notification per real change of the generation, delivered by the rules of the client's wire revision, and none otherwise | counted by the test's client over the W2 story |
 | Each tool result | the response bound of section 8, with paging | bytes of the whole response |
 | Canonical activities, per launch mode | Default: open an issue and learn its number, `issue.create` then `wait` (2 calls); comment on it, `issue.comment` (1); read an issue with its comments, `inspect` then `text` per comment; clone, `repository.read-token`, `wait`, `credential`, then Git (3). `--generic`: the same with `actions` once per scope then `act` in place of each act tool (open an issue: `actions`, `act`, `wait`, 3 calls). `--generic=add`: either recipe. `docs/mcp.md` gives every W1 activity in all three modes with its count. | counted from the story tests; reported as a sum of steps |
@@ -817,7 +836,7 @@ never change for a digest, so a hosted server may cache them by digest.
 | Claim | Witness | Where |
 |---|---|---|
 | (a) complete | **W1 inventory.** `docs/mcp.md` lists every command of `docs/cli.md` and every page action of `docs/page.md` with the tool calls that perform it in the default mode and in `--generic` mode: `install` through `create` of the register, `claim` through `room.create` then `wait` for the created directory and its children, then `room.seat` and `room.first-key` within the founder's window, `issue open` with its definition value, `edit` and `propose` with their detached texts and presented facts, `clone` with `repository.read-token`, `wait` and `credential`, `verify` over `record`, send outcomes over `sends` and `wait`, and a capability step over `prepare` followed by the act tool under the same key; each activity given for the default mode, `--generic` and `--generic=add` with its call count, and no default recipe naming a hidden tool. A test asserts that rendering is total over every act of every definition in the repository (the six platform definitions, `issue`, `change`, `change3`, `issue-demo`, `change-demo`, `change-demo3`, `counting` and the unfamiliar test definition), over every guard form and operand of the contract, and that every act that declares `presents` or a byte domain is exercised with that input somewhere in W2. | `packages/mcp/test/inventory.test.ts`; `docs/mcp.md` |
-| (a) driven by available acts | **W2 story, room.** Against the real test Worker: `create` the register and the room, publish rules, activate the demo definitions, `set-role` a member, open an issue with its definition value and body text, comment, assign, close, open a change by `propose-file` with its presented facts, review, merge, and two distinct capability steps through `prepare` at a resource scope that is not the act's target, a same-step retry answered with the first entry, a lost step reply recovered without moving the act's phase, then the act's submission and its own settlement, with the step's preparation entry never returned as the act's receipt; all through the act tools over an in-process client, and once more through `actions` and `act` in `--generic` mode. The test fetches `tools/list` before each step and asserts that every tool it calls was listed for the caller's role at that moment, that a list-change notification arrived after the activation, the role change and the first lane of a new declaration, and that none arrived otherwise. **W2 story, binding.** Two same-name definitions with incompatible `propose-manifest` (the repository's `change` and `change3`) in one room: two variant tools, each refusing the other's lane as `stale-descriptor`; an old lane under a retired definition still served; a different-name definition declaring the same kind not served by either; a field named like a control under `fields` with no collision; a cached descriptor after an activation refused and the list refreshed. **W2 story, discovery.** A standalone scope founded on one connection is listed by a second connection and by a restarted one; an activation made outside any call reaches an idle subscribed client within the watch interval; an ordinary head advance with an unchanged catalogue produces no notification and no cursor restart, and a genuine declaration or standing change produces exactly one; a mixed room lists each scope's acts under its own standing; a `tools/list` cursor across a change is refused with `restart`. | `packages/mcp/test/room.scope.test.ts`; `binding.scope.test.ts`; `discovery.scope.test.ts` |
+| (a) driven by available acts | **W2 story, room.** Against the real test Worker: `create` the register and the room, publish rules, activate the demo definitions, `set-role` a member, open an issue with its definition value and body text, comment, assign, close, open a change by `propose-file` with its presented facts, review, merge, and two distinct capability steps through `prepare` at a resource scope that is not the act's target, a same-step retry answered with the first entry, a lost step reply recovered without moving the act's phase, then the act's submission and its own settlement, with the step's preparation entry never returned as the act's receipt; all through the act tools over an in-process client, and once more through `actions` and `act` in `--generic` mode. The test fetches `tools/list` before each step and asserts that every tool it calls was listed for the caller's role at that moment, that a list-change notification arrived after the activation, the role change and the first lane of a new declaration, and that none arrived otherwise. **W2 story, binding.** Two same-name definitions with incompatible `propose-manifest` (the repository's `change` and `change3`) in one room: two variant tools, each refusing the other's lane as `stale-descriptor`; an unfamiliar definition whose act maps to `issue.create` beside the directory's, and another whose row is byte-identical to a platform row under a different kind, each resolved to variants with both activities reachable in the default, `--generic` and `--generic=add` modes, with the same names on a second connection and after a reconnect; an old lane under a retired definition still served; a different-name definition declaring the same kind not served by either; a field named like a control under `fields` with no collision; a cached descriptor after an activation refused and the list refreshed. **W2 story, discovery.** A standalone scope founded on one connection is listed by a second connection and by a restarted one; an activation made outside any call reaches an idle subscribed client within the watch interval; an ordinary head advance with an unchanged catalogue produces no notification and no cursor restart, and a genuine declaration or standing change produces exactly one; a mixed room lists each scope's acts under its own standing; a `tools/list` cursor across a change is refused with `restart`. | `packages/mcp/test/room.scope.test.ts`; `binding.scope.test.ts`; `discovery.scope.test.ts` |
 | (c) one service | **W2 story, unfamiliar.** A definition written in the test (three acts, two item types, a `distinct` guard, a presented fact, a detached text) is founded and driven through the same server. **W2 story, Counter.** A Counter scope under its cohort: `join`, `start`, `spoken`, `leave`. No counting import in the server; the import boundary test refuses one. | `packages/mcp/test/unfamiliar.scope.test.ts`; `counter.scope.test.ts`; `scripts/active-source.test.mjs` |
 | (b) descriptions | **W3.** The five worked examples of section 4 are snapshot tests of the tool descriptions as `tools/list` sends them, with the expected text in `docs/mcp.md`, so the checker reads what an agent reads. A test renders every guard form and operand of the contract once and asserts no form falls through to raw JSON, and that a description over 1,000 characters names what it left out. | `packages/mcp/test/describe.test.ts` |
 | (b) errors | **W4.** Table-driven over every reason of `RefusalReason`, `UnavailableReason`, `MismatchReason` and `ReadRefusal`, plus shape, transport, custody and credential errors: the sentence names the scope, the kind, the head when the answer carries one, the source of the finding, and a next step. Two cases use a definition with two unnamed guards and assert the sentence attributes neither. One case moves an item's state after the judgment and asserts the sentence reports the judged head, not the new state. One story drives a session token, a key, an invitation secret and a read credential through every tool and asserts the credential appears only in `credential`'s structured field and the others nowhere. | `packages/mcp/test/errors.test.ts` |
@@ -910,8 +929,10 @@ says so if it recurs.
     the generation (section 3).
 12. Tool names use the user-facing words of plan 030's glossary through a
     words table, data in the server; unmapped kinds keep their record
-    word; descriptors keep the record kind (section 3). Hugh's direction,
-    2026-10-12 16:30 Eastern.
+    word; descriptors keep the native kind; collisions are resolved after
+    mapping across the whole catalogue by a deterministic variant of the
+    binding identity, with no privileged name (section 3). Hugh's
+    direction, 2026-10-12 16:30 Eastern.
 8. Packs and the application-server topology of the plan are replaced as
    section 1 states; Hugh's adoption of this note confirms the replacement.
 
@@ -958,7 +979,7 @@ the act tools exactly as they applied to `act`.
 | 3. Authoritative discovery and invalidation | Section 6: the durable inventory (repository, lanes, configured standalone roots that `create` and `--scope` append), standing per membership, unknown standing listed without denial or grant; section 3: the generation, the bounded watch for subscribed clients, paged `tools/list` with generation cursors and `restart`; section 8 accounts for the watch. W2 discovery story. |
 | 4. Reconcile default and fallback modes | Section 3 "Launch modes": default lists act tools; `--generic` replaces them with the pair; `--generic=add` lists both; W1 and W2 prove every activity in the default mode with act tools alone and in `--generic` mode with the pair alone; standing refresh through `room`; section 14's token-gate wording corrected. |
 | 5. Preserve terminal outcomes and correct expiry | Section 7: terminal records return their retained outcome and are never resent without `resubmit: true`, both outcomes kept; what resolves `unknown` and what does not, from the scope's own replay and settlement rules; expiry resolves nothing by itself; no automatic key. W6's added cases. |
-| 6. Complete output under the bounds | Section 9: a 256 KiB page bound with cursors and no aggregate cap; schemas never cut, over-size ones listed whole and reported; the bounded pointer of section 4 and `scope describe` for complete text; the key bounded at 128 bytes; diagnostics bounded; section 7: record size, archive files, atomic index, no deletion. W5 measures the defined behaviour. |
+| 6. Complete output under the bounds | Section 9: a 256 KiB page bound with cursors and no aggregate cap; schemas never cut, over-size ones listed whole and reported; the bounded pointer of section 4 and `inspect describe` for complete text; the key bounded at 128 bytes; diagnostics bounded; section 7: record size, archive files, atomic index, no deletion. W5 measures the defined behaviour. |
 | 7. Separate the two wire revisions truthfully | Section 7's table from the 2026-07-28 changelog and the 2025-11-25 transport rules: no handshake, per-request `_meta`, `server/discover`, `subscriptions/listen`, `ttlMs` and `cacheScope`, `resultType`, removed methods; against `initialize`, session header, `GET`, `DELETE`, `404`, `notifications/tools/list_changed`; separate per-connection state; the minimal-handler alternative must implement each revision in full. W7 drives a real client of each. |
 
 ## 17. Draft 5 against review `1a18fff8`
@@ -982,7 +1003,15 @@ the full table is reviewed with the build. The descriptor keeps the record
 kind, so binding, custody and every witness are unchanged. The direction
 is recorded as decision 12 in section 13.
 
-## 19. Sources read for this note
+## 19. Draft 7 against review `28ff4ada`
+
+| Correction | Where answered |
+|---|---|
+| 1. Aliases unique across the whole catalogue | Section 3: the binding identity (definition name, native kind, declaration digest); names resolved after mapping across the whole list; a shared surface name goes to none unsuffixed and each identity gets a deterministic variant of its binding identity; no privileged name; the W2 binding story adds platform and unfamiliar collisions with differing and byte-identical rows, stable names on reconnect, and reachability in every mode. |
+| 2. Surface vocabulary apart from native symbols | Native assertions restored: the CLI's `acts`, `act` and `log`; the register's `found` and its genesis `install`; the contract's `scope` field type. The words table maps names only and never a signed kind, field, type, target, revision, domain or meaning; custody binding uses the binding identity, never the surface name; the words table's digest is a semantic input of the generation. |
+| 3. Continuation pointers | Every pointer now names `inspect` with its `describe` parameter, in all three launch modes; native type and API names stay where they are provenance. |
+
+## 20. Sources read for this note
 
 `notes/2026-10-01-mcp-plan.md` (sections 1, 4, 5, 6, 10, 11, 12, 13, 14);
 `plans/009-2026-10-03-mcp-clarification.md`; decision `775acdd3`; review
