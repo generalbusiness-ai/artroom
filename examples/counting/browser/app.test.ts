@@ -13,9 +13,11 @@ import { nativeGateway, type CommandStore, type StageGateway } from "./client.ts
 import type { CountingView } from "./model.ts";
 import type { ActorIdentity, AudioStart, PendingReport, PreparedEnvelope } from "./voice-controller.ts";
 class Element {
+  constructor(readonly tag="div") {}
+  href="";attrs:Record<string,string>={};
   children:Element[]=[];dataset:Record<string,string>={};hidden=false;disabled=false;className="";textContent="";value="";onclick?:()=>void;onchange?:()=>void;
   classes=new Set<string>();classList={toggle:(name:string,on:boolean)=>{if(on)this.classes.add(name);else this.classes.delete(name);}};
-  setAttribute(){} append(...elements:Element[]){this.children.push(...elements);} replaceChildren(...elements:Element[]){this.children=elements;}
+  setAttribute(name:string,value:string){this.attrs[name]=value;} append(...elements:Element[]){this.children.push(...elements);} replaceChildren(...elements:Element[]){this.children=elements;}
   contains(element:Element):boolean{return this===element||this.children.some(child=>child.contains(element));}
   querySelectorAll(selector:string):Element[]{return this.children.flatMap(child=>[...(selector==="[data-focus-key]"&&child.dataset["focusKey"]?[child]:[]),...child.querySelectorAll(selector)]);}
   querySelector(){return null;}focus(){}remove(){}
@@ -151,9 +153,11 @@ test("Explicit Resume command fences active playback before dispatch and display
 // Fake DOM and already classified presentation inputs: no native receipt or audio proof.
 test("Counter acknowledgement requires a recorded local effect and keeps playback, unknown and refusal messages",()=>{
   const oldDocument=globalThis.document,oldHTMLElement=globalThis.HTMLElement,oldButton=globalThis.HTMLButtonElement;
-  Object.assign(globalThis,{document:{createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null},HTMLElement:Element,HTMLButtonElement:Element});
+  Object.assign(globalThis,{document:{createElement:(tag:string)=>new Element(tag),createElementNS:()=>new Element(),activeElement:null},HTMLElement:Element,HTMLButtonElement:Element});
   const root=new Element(),noop=()=>{},ui=stageView(root as unknown as HTMLElement,{control:noop,arm:noop,disarm:noop,check:noop,checkReport:noop,resumeCommand:noop,resumeReport:noop,correct:noop,connect:noop,disconnect:noop,forget:noop},{voices:()=>[],play:()=>noop});
   try{
+    const logos=elements(root).filter(e=>e.tag==="a"&&e.attrs["aria-label"]==="dap homepage");
+    assert.equal(logos.length,1);assert.equal(logos[0]!.href,"https://dap.generalbusiness.ai/");assert.equal(logos[0]!.children.length,2);
     const base:StagePresentation={fresh:true,connection:"Connected"};
     const acknowledgement=()=>elements(root).find(e=>e.className==="acknowledgement")!.textContent;
     ui.render(base);assert.equal(acknowledgement(),"");
