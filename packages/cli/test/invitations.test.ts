@@ -3,7 +3,7 @@ import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
 import { join as pathJoin } from "node:path";
 import { tmpdir } from "node:os";
 import { fileStore } from "../src/files.ts";
-import type { Receipt, SignedIntent, Summary, Entry, DutyId } from "@generalbusiness/artroom-contract";
+import type { Receipt, SignedIntent, Summary, Entry, DutyId, Item } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/artroom-platform";
@@ -22,7 +22,7 @@ test("retained native agent opening and key invitation survive loss; independent
   const receipts = new Map<string, Receipt>(), sent: SignedIntent[] = [];
   let wrongDirectory = false, sessionRequests = 0, crossReads = 0;
   let lose: "add-member" | "enrol" | null = "add-member", loseSettle = false;
-  const liveItems = () => Object.entries(m.definition.declared.items).flatMap(([type, item]) => m.state.page(type, Object.keys(item.states).filter(s => !item.states[s]!.final), null, 100).items).map(item => {
+  const liveItems = (): Item[] => Object.entries(m.definition.declared.items).flatMap(([type, item]) => m.state.page(type, Object.keys(item.states).filter(s => !item.states[s]!.final), null, 100).items).map((item): Item => {
     if (item.type === "roster") return { ...item, refs: { ...item.refs, directory } }; // SCRIPTED directory creator projection.
     if (item.type !== "member" || item.values["kind"] !== "agent") return item;
     const entry = m.entries[item.id]!.entry, send = entry.sends.find(s => "creator" in s.to && s.to.kind === "inbox");
