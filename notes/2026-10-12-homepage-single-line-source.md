@@ -30,3 +30,24 @@ witness and bounded actual browser geometry need their released checks. The
 normal homepage build, deployment and served-page readback follow approved
 landing. Source preparation alone does not close the hosted or human acceptance
 scope, and this note claims no approval or delivery of the larger rendered logo.
+
+The subsequent original browser run `80424` passed all eight local cases at
+Source `64e68b8dea675180c59af6b2358e3865a94e218d`. At a 1280-pixel viewport, the
+measured wordmark height rose from 98.90625 to 123.625 pixels, a ratio of
+1.249921. At 390 pixels, it rose from 75.625 to 94.53125 pixels, a ratio of
+1.25. The exact sole tagline occupies one desktop row and two naturally wrapped
+mobile rows. The supporting sentence is absent. Static Room and Counter
+marketing headers match the new homepage height at both widths. All 52 requests
+were allowed local GETs, with no browser errors. Root directly viewed all eight
+captures and recorded the seven-point fidelity check. The browser proof is
+`/Users/hughpyle/play/artroom-diagnostics/homepage-single-line-browser-source/output-one/public-result.json`,
+SHA-256 `5c6ed195c575b6205044a555ea906fb9615111698b145a3bd23f6e3d83dd67ec`. The
+fidelity record is
+`/Users/hughpyle/play/artroom-diagnostics/homepage-single-line-browser-source/root-fidelity.public.json`,
+SHA-256 `d104132a8ece07174d7c8d3155426d42389a22292179227ce699fa7068762148`.
+These measurements use exact Source HTML, CSS, and public brand assets on
+loopback with fresh browser contexts. They establish no deployed page or served
+readback. No application link or Jam page was opened. The normal homepage
+production build remains after approved landing. The gate and exact-head review
+remain pending, and Forms lands before Home. This successor changes only this
+note.
