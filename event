@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fa26f3d73b796ba6b2a82299e592e9c80bf30d86","text":"Merge retired a covered predecessor; the successor is at homepage/src/style.css."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:690b09b5463431b9cd9bcb9c76b2ef0b5849c91e","text":"Duplicate of the component rename request 2726f05a, narrowed to the minimal rename (package names, the dap command, metadata) by assert 69f3b878; the builder's promise continues under 2726f05a."}
