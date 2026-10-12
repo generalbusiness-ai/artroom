@@ -19,6 +19,7 @@
  */
 
 import { foundingOffer } from "@generalbusiness/artroom-client";
+import { connectInvitation, originalConnection, founderConnectionFiles, saveFounderRecoveryOnce, type FounderBinding } from "./connection-custody.ts";
 import { originalStart, startRoom, type StartedRoom } from "./start-custody.ts";
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
@@ -552,24 +553,99 @@ function startScreen(): HTMLElement {
       const next: Settings = { place, secret: encoded, register: result.configured.register,
         label: { text: result.label, place, register: result.configured.register },
         claimSelection: { operation: result.operation, place, register: result.configured.register, origin: location.origin, key: result.key } };
-      const open = h("button", { type: "button", class: "primary" }, "Open room");
+      const open = h("button", { type: "button", class: "primary start-open" }, "Open room");
       open.addEventListener("click", () => {
         if (!current()) return;
         if (!keep(next)) { tell("The room is verified, but connection storage could not be read back. Check the saved original before another request.", true); return; }
         opened.clear(); startDraft = ""; location.hash = "#/"; void draw(true);
       });
-      const recovery = h("button", { type: "button", class: "link-button" }, "Download recovery files");
-      recovery.addEventListener("click", () => {
+      const expected: FounderBinding = { key: result.key, operation: result.operation, membership: result.repository.membership };
+      const connectionPanel = h("section", { class: "start-connection-panel", hidden: "", "aria-live": "polite" });
+      const connectionOptions = { current };
+      const showConnection = (kind: "person" | "agent-key") => {
         if (!current()) return;
-        download("device.key", encoded + "\n", "text/plain");
-        download("config.json", JSON.stringify({ v: 1, service: location.origin, key: "device.key", register: result.configured.register, repository: result.repository, handle: result.handle }, null, 2) + "\n", "application/json");
+        const label = kind === "person" ? "Create invitation" : "Create agent invitation";
+        const connectionTitle = h("h2", {}, label);
+        const handle = h("input", { name: "handle", required: "", maxlength: "256", autocomplete: "off", placeholder: kind === "person" ? "@person" : "@agent" }) as HTMLInputElement;
+        const send = h("button", { type: "submit", class: "primary" }, label);
+        const originalCheck = h("button", { type: "button", class: "link-button", hidden: "" }, "Check status");
+        const continueOriginal = h("button", { type: "button", class: "link-button", hidden: "" }, "Continue original connection");
+        const answer = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
+        const linkHost = h("div");
+        const editor = h("form", { class: "entry-form" }, h("label", {}, "Handle", handle), send);
+        let blockedCustody = false;
+        const restoreConnection = () => {
+          try {
+            const retained = originalConnection(location.origin, localStorage, expected);
+            if (retained && !["verified", "refused"].includes(retained.state)) {
+              handle.value = retained.handle; handle.setAttribute("disabled", ""); send.setAttribute("disabled", "");
+              originalCheck.removeAttribute("hidden"); continueOriginal.removeAttribute("hidden");
+              const originalKind = retained.kind === "person" ? "person invitation" : "agent key invitation";
+              connectionTitle.textContent = `Original ${originalKind} for ${retained.handle}`;
+              answer.textContent = `${retained.kind !== kind ? "Another connection is already in progress. " : ""}The original ${originalKind} for ${retained.handle} is retained. Check only reads; Continue explicitly resumes that original request.`;
+            } else if (retained) {
+              originalCheck.removeAttribute("hidden"); continueOriginal.setAttribute("hidden", "");
+              if (retained.state === "refused") answer.textContent = retained.reason ?? "The original connection was refused. No replacement was submitted.";
+            }
+          } catch { blockedCustody = true; send.setAttribute("disabled", ""); originalCheck.setAttribute("disabled", ""); continueOriginal.setAttribute("disabled", ""); answer.textContent = "Original connection custody is unavailable. Nothing will be replaced."; }
+        };
+        restoreConnection();
+        const runConnection = async (mode: "new" | "check" | "continue") => {
+          if (!current() || connectionBusy || blockedCustody || mode === "new" && send.hasAttribute("disabled")) return;
+          if (mode === "new" && !handle.value.trim()) { answer.textContent = "Enter the handle for this connection."; return; }
+          connectionBusy = true; send.setAttribute("disabled", ""); originalCheck.setAttribute("disabled", ""); continueOriginal.setAttribute("disabled", ""); linkHost.replaceChildren();
+          answer.textContent = mode === "check" ? "Reading the original connection status" : "Working on the connection";
+          try {
+            const issued = await connectInvitation(location.origin, localStorage, expected,
+              { kind, handle: handle.value.trim(), hours: 24, ...(kind === "person" ? { role: "member" as const } : {}) }, { ...connectionOptions, mode });
+            if (!current()) return;
+            if (issued.state === "verified" && issued.link) {
+              answer.textContent = issued.kind === "person" ? "Invitation created. This private link lets its named person join." : "Agent key invitation created. The independent agent must enroll its own key; this does not say it has joined yet.";
+              const privateLink = h("textarea", { readonly: "", "aria-label": "Private invitation link", spellcheck: "false" }, issued.link) as HTMLTextAreaElement;
+              const copy = h("button", { type: "button", class: "link-button" }, "Copy invitation link");
+              copy.addEventListener("click", () => { if (!current()) return; if (!navigator.clipboard) { answer.textContent = "Select the private invitation link to copy it yourself."; return; } void navigator.clipboard.writeText(issued.link!).catch(() => { if (current()) answer.textContent = "Copy was unavailable. Select the private invitation link to copy it yourself."; }); });
+              const instructions = issued.kind === "agent-key" ? h("div", {},
+                h("p", {}, "On the agent’s computer, use a new owner-only ARTROOM_HOME directory so it creates its own key. Do not use the founder’s config or key."),
+                h("pre", {}, "artroom join <private invitation link>"),
+                h("p", {}, "If its reply is lost, check the exact original without submitting:"), h("pre", {}, "artroom join <same-private-link> --check")) : null;
+              linkHost.replaceChildren(privateLink, copy, ...(instructions ? [instructions] : []));
+              handle.value = ""; handle.removeAttribute("disabled"); continueOriginal.setAttribute("hidden", "");
+            } else answer.textContent = issued.reason ?? "The original connection remains unresolved. Check status without replacing it.";
+          } catch (error) { if (current()) answer.textContent = error instanceof Error ? error.message : "The original connection remains unresolved. Nothing was replaced."; }
+          finally {
+            connectionBusy = false;
+            if (current()) { send.removeAttribute("disabled"); originalCheck.removeAttribute("disabled"); continueOriginal.removeAttribute("disabled"); restoreConnection(); }
+          }
+        };
+        editor.addEventListener("submit", event => { event.preventDefault(); void runConnection("new"); });
+        originalCheck.addEventListener("click", () => { void runConnection("check"); });
+        continueOriginal.addEventListener("click", () => { void runConnection("continue"); });
+        connectionPanel.replaceChildren(connectionTitle, editor, answer, originalCheck, continueOriginal, linkHost);
+        connectionPanel.removeAttribute("hidden");
+      };
+      const row = (title: string, description: string, label: string, action: () => void) => {
+        const button = h("button", { type: "button", class: "link-button" }, label, " →");
+        button.addEventListener("click", action);
+        return h("div", { class: "start-connection" }, h("div", {}, h("h2", {}, title), h("p", {}, description)), button);
+      };
+      const files = () => { if (!current() || connectionBusy) return; connectionBusy = true; void founderConnectionFiles(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) { download("config.json", value.config, "application/json"); download("device.key", value.key, "text/plain"); connectionPanel.replaceChildren(h("h2", {}, "Connect command line"), h("p", {}, "Use an owner-only ARTROOM_HOME directory. Put config.json in that directory and device.key in its keys/device.key path. Keep the key private."), h("pre", {}, "artroom issues")); connectionPanel.removeAttribute("hidden"); } }).catch(error => tell(error instanceof Error ? error.message : "The original founder connection could not be verified.", true)).finally(() => { connectionBusy = false; }); };
+      const recovery = h("button", { type: "button", class: "link-button" }, "Save a recovery file");
+      try { if (originalStart(location.origin, localStorage)?.recoverySaved) recovery.setAttribute("disabled", ""); } catch { recovery.setAttribute("disabled", ""); }
+      recovery.addEventListener("click", () => {
+        if (!current() || connectionBusy || recovery.hasAttribute("disabled")) return;
+        connectionBusy = true; recovery.setAttribute("disabled", "");
+        void saveFounderRecoveryOnce(location.origin, localStorage, expected, connectionOptions).then(value => { if (current()) download("recovery.key", value, "text/plain"); }).catch(error => tell(error instanceof Error ? error.message : "The recovery file could not be saved. Its original key remains in private custody.", true)).finally(() => { connectionBusy = false; });
       });
       form.setAttribute("hidden", ""); check.setAttribute("hidden", "");
-      heading.textContent = "Your room is ready"; intro.textContent = "Your founding membership is verified.";
-      ready.replaceChildren(h("p", {}, room.name ?? "Your verified room"),
-        h("p", { class: "muted small" }, `Personal label: ${result.label}`), open, recovery);
-      ready.removeAttribute("hidden"); document.title = room.name ? `dap - workroom ${room.name}` : "dap - workroom";
-      tell("The room and its founding membership are verified. Keep the recovery files private.");
+      heading.textContent = "Your room is ready"; intro.setAttribute("hidden", "");
+      ready.replaceChildren(h("p", { class: "start-room-title" }, room.name ?? "Your verified room"),
+        h("p", { class: "muted small" }, `Personal label: ${result.label}`), open,
+        h("section", { class: "start-connections", "aria-label": "Connect to your room" },
+          row("Invite people", "Send a link to join this room.", "Create invitation", () => showConnection("person")),
+          row("Connect command line", "Use this room from your computer.", "Get connection files", files),
+          row("Connect an agent", "Give an agent its own access.", "Create agent invitation", () => showConnection("agent-key"))), connectionPanel, recovery);
+      ready.removeAttribute("hidden"); about.setAttribute("hidden", ""); document.title = room.name ? `dap - workroom ${room.name}` : "dap - workroom";
+      message.textContent = "";
     } finally { secret.fill(0); }
   };
   const run = async (mode: "new" | "continue" | "check") => {
@@ -591,9 +667,9 @@ function startScreen(): HTMLElement {
   };
   form.addEventListener("submit", event => { event.preventDefault(); void run(original ? "continue" : "new"); });
   check.addEventListener("click", () => { void run("check"); });
-  return h("main", { class: "screen entry-screen" }, h("a", { class: "entry-back", href: "#/join" }, "‹", "Back"),
-    heading, intro, form, message, check, ready,
-    h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your founder key when you explicitly start. Keep the recovery files to reconnect to the same room.")));
+  const about = h("details", {}, h("summary", {}, "About your account"), h("p", {}, "Your browser creates and retains your founder key when you explicitly start. Keep the recovery file to reconnect to the same room."));
+  return h("main", { class: "screen entry-screen entry-start" }, h("a", { class: "entry-back", href: "#/join" }, "‹", "Back"),
+    heading, intro, form, message, check, ready, about);
 }
 
 function connectionScreen(path: "join" | "invitation" | "config"): HTMLElement {

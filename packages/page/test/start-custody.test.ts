@@ -8,7 +8,7 @@ import type { Context, PendingClaim, Repository } from "@generalbusiness/artroom
 // workflow/locks/storage. No native admission, browser custody or host proof.
 const cli = vi.hoisted(() => ({ claim: vi.fn(), checkClaim: vi.fn() }));
 vi.mock("@generalbusiness/artroom-cli", async () => ({ ...await vi.importActual<typeof import("@generalbusiness/artroom-cli")>("@generalbusiness/artroom-cli"), ...cli }));
-import { originalStart, startRoom } from "../src/start-custody.ts";
+import { originalStart, startRoom, recoveryKeyOnce } from "../src/start-custody.ts";
 import type { ClaimStorage } from "../src/claim.ts";
 const origin = "https://start-custody.test";
 const ref = (kind: "register" | "directory" | "membership") => ({ scope: scopeIdOf({ v: 1, kind, definition: kind === "register" ? "platform:register@7" : kind === "directory" ? "platform:directory@3" : "platform:membership@2", creator: null, cause: textDigest("SCRIPTED Start " + kind), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(6)), kind });
@@ -128,4 +128,10 @@ test("scripted completed Start handoff returns the enrolled founder seed rather 
     expect(result.secret && keyIdOfSecret(result.secret)).toBe(result.key);
     expect(result.secret && b64url(result.secret) === b64url(new Uint8Array(32).fill(92))).toBe(false);
   } finally { actual.fill(0); result.secret?.fill(0); }
+  const recovery = await recoveryKeyOnce(origin, f.storage, { key: result.key, operation: result.operation }, { locks });
+  expect(recovery.trim() === (JSON.parse(f.values.get(`artroom-page-start:${origin}`)!) as { secret: string }).secret).toBe(true);
+  expect(originalStart(origin, f.storage)?.recoverySaved).toBe(true);
+  const preserved = [...f.values.entries()];
+  await expect(recoveryKeyOnce(origin, f.storage, { key: result.key, operation: result.operation }, { locks })).rejects.toThrow("already offered");
+  expect(canonicalize([...f.values.entries()]) === canonicalize(preserved)).toBe(true);
 });

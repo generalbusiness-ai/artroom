@@ -5,8 +5,8 @@ import { b64url, canonicalize, isRecord, isScopeRef, keyIdOfSecret, unb64url, ut
 import { isFoundingOffer, type FoundingOffer, type Fetch } from "@generalbusiness/artroom-client";
 import { claimRoom, claimStatus, type ClaimOptions, type ClaimRegister, type ClaimStorage, type ClaimedRoom } from "./claim.ts";
 
-interface KeptStart { v: 1; origin: string; secret: string; configured: ClaimRegister; label: string; handle: "@founder"; operation?: string }
-export interface StartStatus { key: KeyId; configured: ClaimRegister; label: string; handle: "@founder"; state: "prepared" | "pending" | "complete"; operation?: string }
+interface KeptStart { v: 1; origin: string; secret: string; configured: ClaimRegister; label: string; handle: "@founder"; operation?: string; recoverySaved?: true }
+export interface StartStatus { key: KeyId; configured: ClaimRegister; label: string; handle: "@founder"; state: "prepared" | "pending" | "complete"; operation?: string; recoverySaved?: true }
 export interface StartOptions extends Pick<ClaimOptions, "locks" | "current" | "pause" | "tries" | "foundingOffer"> {
   mode: "new" | "continue" | "check";
   offer?: FoundingOffer;
@@ -30,8 +30,9 @@ function read(origin: string, storage: ClaimStorage): KeptStart | null {
   try {
     if (utf8(raw).length > 4096) throw unavailable();
     const row: unknown = JSON.parse(raw);
-    if (!isRecord(row) || (Object.keys(row).sort().join(",") !== "configured,handle,label,origin,secret,v" && Object.keys(row).sort().join(",") !== "configured,handle,label,operation,origin,secret,v") || row["v"] !== 1 || row["origin"] !== origin || row["handle"] !== "@founder" || typeof row["label"] !== "string" || !row["label"].trim() || row["label"].length > 256 || typeof row["secret"] !== "string") throw unavailable();
+    if (!isRecord(row) || !Object.keys(row).every(key => ["v", "origin", "secret", "configured", "label", "handle", "operation", "recoverySaved"].includes(key)) || row["v"] !== 1 || row["origin"] !== origin || row["handle"] !== "@founder" || typeof row["label"] !== "string" || !row["label"].trim() || row["label"].length > 256 || typeof row["secret"] !== "string") throw unavailable();
     if (row["operation"] !== undefined && (typeof row["operation"] !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(row["operation"]))) throw unavailable();
+    if (row["recoverySaved"] !== undefined && row["recoverySaved"] !== true) throw unavailable();
     const configured = row["configured"];
     if (!isRecord(configured) || Object.keys(configured).sort().join(",") !== "definition,register" || configured["definition"] !== "platform:register@7" || !isScopeRef(configured["register"]) || configured["register"].kind !== "register") throw unavailable();
     secret = unb64url(row["secret"]);
@@ -57,7 +58,7 @@ function publicOf(row: KeptStart, storage: ClaimStorage): StartStatus {
     // Never infer never-dispatched from a missing or mismatched journal.
     // The descriptor binds the reserved operation before the CLI can sign.
     if (row.operation ? !status || status.operation !== row.operation : status !== null) throw unavailable();
-    return { key: keyIdOfSecret(secret), configured: structuredClone(row.configured), label: row.label, handle: row.handle, state: status?.state ?? "prepared", ...(status ? { operation: status.operation } : {}) };
+    return { key: keyIdOfSecret(secret), configured: structuredClone(row.configured), label: row.label, handle: row.handle, state: status?.state ?? "prepared", ...(status ? { operation: status.operation } : {}), ...(row.recoverySaved ? { recoverySaved: true } : {}) };
   } finally { secret.fill(0); }
 }
 export function originalStart(origin: string, storage: ClaimStorage): StartStatus | null {
@@ -101,5 +102,25 @@ export async function startRoom(origin: string, storage: ClaimStorage, options: 
       if (!stillCurrent()) throw unavailable();
       return { ...result, key: status.key, configured: status.configured, handle: held.handle, ...(result.repository ? { secret: secret.slice() } : {}) };
     } finally { secret.fill(0); }
+  });
+}
+
+/** One optional recovery-download attempt, separately from CLI connection files.
+ * The caller must first reverify the enrolled founder; this binds that public
+ * key/operation and reads back the once marker before releasing key bytes. */
+export async function recoveryKeyOnce(origin: string, storage: ClaimStorage, expected: { key: KeyId; operation: string }, options: Pick<StartOptions, "locks" | "current"> = {}): Promise<string> {
+  originOf(origin);
+  const browser = globalThis as { navigator?: { locks?: import("./claim.ts").ClaimLocks } };
+  const locks = options.locks ?? browser.navigator?.locks;
+  if (!locks) throw unavailable();
+  return locks.request(`artroom-page-start:${origin}`, async () => {
+    const guard: StartOptions = { ...options, mode: "check" };
+    current(guard);
+    const row = read(origin, storage);
+    if (!row) throw unavailable();
+    const status = publicOf(row, storage);
+    if (status.state !== "complete" || status.key !== expected.key || status.operation !== expected.operation || row.recoverySaved) throw new Error("The optional recovery file was already offered or its verified founder context changed. No key was exported.");
+    const saved = save({ ...row, recoverySaved: true }, storage, guard);
+    return saved.secret + "\n";
   });
 }
