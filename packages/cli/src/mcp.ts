@@ -25,6 +25,10 @@ export async function mcp(ctx: Context, home: string, argv: readonly string[]): 
       const c = await ctx.store.config();
       return { service: c!.service, ...(c!.register ? { register: c!.register } : {}), ...(c!.repository ? { repository: c!.repository } : {}), ...(c!.roots ? { roots: c!.roots } : {}) };
     },
+    setRepository: async (repository: NonNullable<McpConfig["repository"]>): Promise<void> => {
+      const c = (await ctx.store.config())!;
+      await ctx.store.save({ ...c, repository });
+    },
     addRoot: async (root: Root): Promise<void> => {
       const c = (await ctx.store.config())!;
       await ctx.store.save({ ...c, roots: [...(c.roots ?? []).filter((r) => r.scope !== root.scope), root] });
