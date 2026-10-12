@@ -142,3 +142,16 @@ This successor changes only this note. Application Source, tests, package wiring
 and generated assets remain byte-identical to the gated head. Independent review,
 normal landing and managed deployments remain outstanding. The separate Jam
 sibling and all earlier failures, gates and browser proofs retain their own heads.
+
+### Core publishing scope
+
+Bounded request `8c52c7c4`, promised in `6bcc3224`, covers the Core source
+review and main landing. Its receipt does not close full request `06c86377`:
+the separate Jam source review and landing, and all four hosted deployments
+and readbacks, remain owed there. This clarification changes only this note
+after `88499305489ccf8041f93c68335f24a8adcf7406`.
+
+The external Jam commit's four changed paths are `README.md`,
+`notes/2026-10-12-wordmark-home-delivery.md`, `page/index.html` and
+`test/original-demo.test.ts`. These correct the last two path labels in the
+earlier Core reporting annotation; the Jam head and tree are unchanged.
