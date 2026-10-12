@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import type { Answer, SignedIntent } from "@generalbusiness/artroom-contract";
 import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { signedIntent } from "@generalbusiness/artroom-client";
-import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
+import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, memoryStore, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";
 import { blockedBy, fileStore, releaseLock, takeLock } from "../src/node.ts";
 import { T0, accepted, build, identity, lane, notAfter, receiptOf, refused, resource, signer } from "./support/custody.ts";
 
@@ -328,6 +328,38 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     expect("answer" in again && [again.retained, again.answer.answer, again.answer.answer === "accepted" && again.answer.receipt.fact.seq]).toEqual([true, "accepted", 9]);
     expect((await custody.settle(identity("spilled"), async () => { throw new Error("must not read"); }))!.decided?.answer.answer).toBe("accepted");
     expect(delivered).toBe(1);
+  });
+
+  // Invariant: the search for a record's decisive outcome holds one slice of its segment at a time, at most 64 outcomes, newest
+  // first, and stops at the older attempt's boundary; the whole history stays in the segment.
+  test("the decisive outcome is searched slice by slice, newest first, within the attempt", async () => {
+    const store = memoryStore();
+    const reads: { from: number; limit: number }[] = [];
+    const segmented = store.segmented;
+    store.segmented = async (id, from, limit) => { reads.push({ from, limit }); return segmented(id, from, limit); };
+    const custody = new Custody(store, () => timeOf(T0));
+    // 300 lost replies in one attempt: unresolved, so the search reads back to the start and finds nothing decisive.
+    for (let i = 0; i < 300; i++) await custody.send(identity("long"), meaningOf("l"), build("long"), async () => { throw new Lost(); }, { notAfter });
+    const long = (await custody.find(identity("long")))!;
+    reads.length = 0;
+    expect(await custody.decided(identityId(identity("long")), long)).toBeNull();
+    expect([Math.max(...reads.map((r) => r.limit)), reads.map((r) => r.from)]).toEqual([64, [172, 108, 44, 0]]);
+    expect((await custody.outcomes(identityId(identity("long")), long)).length).toBe(300);
+    // A refusal, then a resubmission whose replies are lost 100 times: the search stops at the refusal's attempt.
+    await custody.send(identity("again"), meaningOf("a"), build("again"), async () => refused, { notAfter });
+    for (let i = 0; i < 100; i++) await custody.send(identity("again"), meaningOf("a"), build("again"), async () => { throw new Lost(); }, { notAfter, resubmit: i === 0 });
+    const again = (await custody.find(identity("again")))!;
+    reads.length = 0;
+    expect([await custody.decided(identityId(identity("again")), again), again.attempt]).toEqual([null, 2]);
+    expect(reads.every((r) => r.limit <= 64)).toBe(true);
+    // Every outcome spilled to keep the record within 2 MiB, the accepted one at the segment's end: one slice is read.
+    const body = "y".repeat(2_000_000);
+    const big = (signed: SignedIntent): Answer => ({ answer: "accepted", receipt: { ...receiptOf(signed, 12), effects: Array.from({ length: 400 }, (_, i) => ({ effect: "value", item: i, slot: "s", value: "v".repeat(400) })) as never } });
+    await custody.send(identity("found"), meaningOf("f"), build("found", body), async (e) => big(e.signed), { notAfter, bytes: body.length });
+    const found = (await custody.find(identity("found")))!;
+    reads.length = 0;
+    expect([found.outcomes.length, (await custody.decided(identityId(identity("found")), found))?.answer.answer]).toEqual([0, "accepted"]);
+    expect(reads).toEqual([{ from: 0, limit: 1 }]);
   });
 
   // Invariant: a dead owner's lock is reclaimed by exactly one of several processes trying at once, and a release removes only

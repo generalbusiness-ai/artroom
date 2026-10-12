@@ -64,6 +64,8 @@ export const UNRESOLVED_MOST = 256;
 export const OUTCOMES_INLINE = 64;
 export const RECORD_BYTES = 2 * 1024 * 1024;
 export const KEY_BYTES = 128;
+/** The most outcomes the search for a record's decisive outcome reads from its segment at once. */
+export const DECIDED_SLICE = 64;
 
 export interface Identity {
   service: string;
@@ -227,22 +229,28 @@ export class Custody {
 
   /** The decisive outcome of a record's current attempt, reading the segment only when the inline outcomes do not reach back far enough. */
   async decided(id: string, record: CustodyRecord): Promise<{ at: string; answer: Answer } | null> {
-    const inline = decisive(record.outcomes, record.attempt);
-    // Found inline, or the inline outcomes already reach back past the attempt's start, or there is nothing in the segment.
+    // Newest first: the inline outcomes, then the segment's slices from its end backward, one slice held at a time. The search
+    // stops at the newest decisive outcome of the current attempt, or at an outcome of an older attempt, which ends it.
     const inSegment = record.count - record.outcomes.length;
-    if (inline || inSegment === 0 || (record.outcomes.length > 0 && record.outcomes[0]!.attempt !== record.attempt)) return inline;
-    // Every outcome of this attempt that is inline is undecided, or none is inline at all (each spilled to meet the byte bound):
-    // read the segment's tail backwards, a bounded slice at a time, until the decisive one or the attempt's start.
-    const SLICE = 64;
-    let tail: Outcome[] = [...record.outcomes];
-    for (let end = inSegment; end > 0; end -= SLICE) {
-      const from = Math.max(0, end - SLICE);
-      const slice = await this.store.segmented(id, from, end - from);
-      tail = [...slice, ...tail];
-      const found = decisive(tail, record.attempt);
-      if (found || slice.some((o) => o.attempt !== record.attempt)) return found;
+    const search = (list: readonly Outcome[]): { at: string; answer: Answer } | "older" | null => {
+      for (let i = list.length - 1; i >= 0; i--) {
+        const o = list[i]!;
+        if (o.attempt !== record.attempt) return "older";
+        if ("settled" in o) return { at: o.at, answer: { answer: "accepted", receipt: o.settled } };
+        if ("answer" in o && o.answer.answer !== "unavailable") return { at: o.at, answer: o.answer };
+      }
+      return null;
+    };
+    const inline = search(record.outcomes);
+    if (inline === "older") return null;
+    if (inline) return inline;
+    for (let end = inSegment; end > 0; end -= DECIDED_SLICE) {
+      const from = Math.max(0, end - DECIDED_SLICE);
+      const found = search(await this.store.segmented(id, from, end - from));
+      if (found === "older") return null;
+      if (found) return found;
     }
-    return decisive(tail, record.attempt);
+    return null;
   }
 
   /** The record under an identity, or null. */
