@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/public-release.mjs","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"scripts/public-release.mjs"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:007c9df63f87cc31f1ac19c11e86684895397fc1","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/worker.ts."}
