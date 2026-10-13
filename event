@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bf43151726f255a2addf3aaa3b753273fc3b2a70","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/device-key.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bf50f0b0c62b42817db039999dfeca39d01a48e4","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/github-host.ts."}
