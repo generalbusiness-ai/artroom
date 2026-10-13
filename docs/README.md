@@ -61,6 +61,7 @@ its design is in the [jam room note](../notes/2026-10-01-jam-room.md).
 
 | Page | What it gives you |
 |---|---|
+| [Run dap in 10 minutes](self-host.md) | Do: deploy a Worker, create a room, and invite another device. |
 | [Deploy the scope Worker](deploy.md) | Service settings and the deployment procedure. |
 | [Configure a Git host](hosts.md) | Repository host configuration and credentials. |
 | [Rehearse the demo](demo.md) | Run and record the observed repository story. |

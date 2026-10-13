@@ -48,6 +48,9 @@ configuration file and key of a member who has already joined.
 
 ## Where to read next
 
+- [Run dap in 10 minutes](docs/self-host.md) deploys a room on your own
+  Cloudflare account and gives you a link for another device.
+
 - [What is dap?](docs/what-is-dap.md) explains the framework, the actor
   model and the applications.
 - [Build a counter](docs/build-a-counter.md) is a tutorial. You write a
