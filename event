@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:eb0d64235315c80c85635cd3fcb27067dbb7d273","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/support/standin.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f09e8d9ebae0182afe425418cda08cdafb64bf17","text":"Merge retired a covered predecessor; the successor is at package-lock.json."}
