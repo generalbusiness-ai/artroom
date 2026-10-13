@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8ac6e25b3ae2ef83eb4734b0882eb7d0d088987d","text":"Corrected reporting edge to own promise at identical Source/path/head; primary successor360348. Old cross-request pointer remains history."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c35afe28c7a840f8a1be49e666110f37dd9aee84","text":"Corrected reporting edge to own promise at identical Source/path/head; primary successor1113cd. Old cross-request pointer remains history."}
