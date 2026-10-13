@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-logo-two-tails.md","body":{"commit":"0555cf5551e673e8d1886ca09dd92f659c4b4271","path":"notes/2026-10-13-logo-two-tails.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:213e2136fd423a32d23bc5586261f940148be8df","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-logo-two-tails.md."}
