@@ -42,7 +42,7 @@ export interface LendingGateway {
   pending(): Promise<Pending | null>;
   /** Check: a read that settles whether the kept original took effect. It sends nothing. */
   check(): Promise<ActOutcome | null>;
-  /** Continue: send the kept original, only when the journal shows it was never sent. */
+  /** Resume an unsent original. Unknown delivery needs explicit continueOriginal. */
   resume(): Promise<ActOutcome | null>;
   /** Explicit Continue: resend the same kept envelope before its deadline. */
   continueOriginal(): Promise<ActOutcome | null>;

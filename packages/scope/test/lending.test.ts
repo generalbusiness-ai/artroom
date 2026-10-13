@@ -176,7 +176,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
 
     // The member interface's gateway, on the same real scopes. The private store and the
     // lock are in-memory STAND-INS for the browser's; the lost reply is made by the test.
-    const browser = (who: Actor, handle: `@${string}`, lose: { reply: boolean } = { reply: false }) => {
+    const browser = (who: Actor, handle: `@${string}`, lose: { reply: boolean } = { reply: false }, readFetch: Fetch = fetch, current: () => boolean = () => true) => {
       let slot: string | null = null, posts = 0;
       const envelopes: string[] = [];
       const store: KeptStore = { load: async () => slot === null ? null : JSON.parse(slot) as Kept, save: async (value) => { slot = JSON.stringify(value); }, clear: async () => { slot = null; } };
@@ -185,7 +185,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
       const open = (): ReturnType<typeof lendingGateway> => lendingGateway(
         { origin: SERVICE, deployment: "lending-fixture", scope: scopeOfLending, definition: LENDING_DEFINITION, membership, member: { membership, member: handle }, publicKey: who.key },
         { key: who.key, sign: async (bytes: Uint8Array) => (await import("@generalbusiness/artroom-client")).secretSigner(who.secret).sign(bytes) },
-        { current: () => true, lock, store, fetch, now: () => timeMs(soon(0))! + skew.ms,
+        { current, lock, store, fetch: readFetch, now: () => timeMs(soon(0))! + skew.ms,
           actFetch: async (url, init) => { posts++; envelopes.push(String(init?.body)); const response = await fetch(url, init); if (lose.reply) throw new Error("the reply was lost"); return response as never; } });
       return { open, store, posts: () => posts, kept: () => slot, envelopes };
     };
@@ -238,6 +238,36 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect(hers.envelopes[1]).toBe(hers.envelopes[0]);
     expect(await head()).toEqual(beforeContinue);
     reloaded.dispose(); g.dispose();
+
+    // A summary reply captured before a newer confirmed view cannot roll that view back.
+    let holdSummary = true, releaseSummary!: () => void, enteredSummary!: () => void;
+    const entered = new Promise<void>(resolve => { enteredSummary = resolve; });
+    const released = new Promise<void>(resolve => { releaseSummary = resolve; });
+    const delayed: Fetch = async (url, init) => {
+      const response = await fetch(url, init);
+      if (holdSummary && new URL(url).pathname === `/v1/scopes/${L.name}`) {
+        holdSummary = false; enteredSummary(); await released;
+      }
+      return response;
+    };
+    let sameView = true;
+    const fenced = browser(neighbour, "@neighbour", { reply: false }, delayed, () => sameView), reader = fenced.open();
+    const older = reader.look();
+    await entered;
+    try {
+      await L.did(neighbour, "borrow", await on(small));
+      const newer = await reader.look();
+      expect(newer).toMatchObject({ status: "current" });
+      releaseSummary();
+      const late = await older;
+      expect(late).toMatchObject({ status: "current" });
+      if (late.status !== "current") throw Error("The older read did not preserve the newer view");
+      expect(late.view.things.find(thing => thing.id === small)?.state).toBe("lent");
+      await L.did(neighbour, "return", await on(small));
+      sameView = false;
+      await expect(reader.act("donate", { name: "Old view", description: "Must not be sent." })).rejects.toThrow("no longer current");
+      expect([fenced.posts(), fenced.kept()]).toEqual([0, null]);
+    } finally { releaseSummary(); reader.dispose(); }
 
     // A visitor joins from a browser with an invitation link, under the application cohort's
     // membership, with a device key that WebCrypto holds. Then the visitor's own device finds
