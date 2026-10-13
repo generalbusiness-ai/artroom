@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:789fa8eb18f7e13ffee26c9ed567f9d88af48872","text":"Merge retired a covered predecessor; the successor is at packages/platform/test/timed-opener.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:78a70508f868aa01156d29bc24380bfd0039187a","text":"Merge retired a covered predecessor; the successor is at packages/checkers/src/reservation-snapshot.ts."}
