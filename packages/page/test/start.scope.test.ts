@@ -158,7 +158,7 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     expect([kept.completed.found.signed.intent.idempotencyKey, kept.completed.found.signed.intent.notAfter]).toEqual([original.intent.idempotencyKey, original.intent.notAfter]);
     const O = lifetime.platform(completed.repository!.directory.scope), M = lifetime.platform(completed.repository!.membership.scope);
     expect((await lifetime.wait(() => O.summary())).value.definition).toBe(WEB_DEMO_COHORT.directory);
-    const Q = lifetime.platform(completed.repository!.rules.scope);
+    const Q = lifetime.platform(completed.repository!.rules);
     const bornRules = (await lifetime.wait(() => Q.summary())).value;
     expect(bornRules.definition).toBe(WEB_DEMO_COHORT.rules);
     expect(bornRules.items.find(item => item.type === "rules")?.values["ownerMayReview"]).toBe(true);
