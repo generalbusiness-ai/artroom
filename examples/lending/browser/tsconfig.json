@@ -10,5 +10,5 @@
       "@generalbusiness/artroom-client": ["../../../packages/client/src/index.ts"]
     }
   },
-  "include": ["client.ts", "custody.ts", "join.ts", "model.ts"]
+  "include": ["*.ts"]
 }
