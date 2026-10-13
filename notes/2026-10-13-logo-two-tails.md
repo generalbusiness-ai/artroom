@@ -90,7 +90,7 @@ Hugh’s icon acceptance in amendment `fb1c9d66a2dbb32b42d01b160e91a6c642861346`
 
 ## Hosted delivery and served wordmark measurements
 
-This final record covers full request `259e2eaba532bfe4ab0038f8d5ce47c83b3c1dc4` and promise `8e4f75181a509eb3c45ca428dbfe1ce8f49ba188`. It updates the historical outstanding-host statements above. The bounded Source child `3dc428daf40730e7fb9b48490820855bf2e5fcf9` and promise `fbd2e76ee66889389ba6463d85be47e659122645` were already satisfied and are not the basis for this hosted-delivery review.
+This record documents completed non-Jam hosted delivery under full request `259e2eaba532bfe4ab0038f8d5ce47c83b3c1dc4`. Bounded record request `98d520513a76e3f1d4d115ca3d02979e81ef980c` and its own promise `c565e0e1bc72f121c755711c3d21b08396f7fb98` are the basis for this delivery review. The full parent and promise `8e4f75181a509eb3c45ca428dbfe1ce8f49ba188` remain open for deferred Jam-owned scope. This record updates the historical outstanding-host statements above. The bounded Source child `3dc428daf40730e7fb9b48490820855bf2e5fcf9` and promise `fbd2e76ee66889389ba6463d85be47e659122645` were already satisfied and are not the basis for this hosted-delivery review.
 
 The reviewed Source remains `950ee6a85690a7ff5643a146bd69899077db11f9`, tree `40f349a34285ee069c3e2d9ced706bfb03d4e730`. Approval `0b4c76430215823cafc54dd4f0301e028b49514d`, ratification `3d2a21f3bca8b4531fdf55609e709dd3cc41b07d`, and normal landing receipt `fbedaa11f779801a2705c8719f5c0537e56b07ee` bind that Source. Hosted publication used main snapshot `d3f5aa74218cabd8200468616a4b9e60c8d6f8a6`, tree `fe870241e071387305e97efc70aca3af2028794d`, whose executable Source matches the approved candidate. This final candidate changes only this note from that snapshot; external correspondence records every other leaf unchanged.
 
@@ -108,7 +108,7 @@ Served geometry command 45787 exited 0. All ten desktop and mobile cases passed 
 
 | Surface | Desktop height | Mobile height | Qualification |
 |---|---:|---:|---|
-| Home marketing | 123.625 px | 94.53125 px | Earlier served Home heights retained. |
+| Home, Room and Counter marketing pages | 123.625 px | 94.53125 px | Earlier served Home heights retained; current Room and Counter marketing measurements match. |
 | Page | 41.875 px | 41.875 px | Current served measurement; prior app height baseline unproved. |
 | Counter | 51.1875 px | 41.875 px | Current served measurement; prior app height baseline unproved. |
 
@@ -124,4 +124,4 @@ The five direct public proofs are:
 | Separate Counter read-only completion | `1736a66de8d5f4544680ce8249276fe0ec76c145141560bc07563d4587198fc7` |
 | Served geometry and requests | `787eb65094da4e0aa49e8e2caaa61fb70766df4b0cd5fb69a0734ecc7d0ea0d7` |
 
-No producer, build, test, gate, provider command, or rendering was repeated for this note. Earlier checks retain their original head qualifications. Review and approval of this final full-request delivery remain pending.
+No producer, build, test, gate, provider command, or rendering was repeated for this note. Earlier checks retain their original head qualifications. Review and approval of bounded record 98d520 under promise c565e0 remain pending. The full parent remains open for deferred Jam-owned scope.
