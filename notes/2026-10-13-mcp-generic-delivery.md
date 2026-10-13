@@ -349,6 +349,67 @@ round added `test/proto.scope.test.ts` and `test/support/pantry.ts`); `packages/
 new package and its pinned development dependencies) and
 `vitest.config.ts` (the mcp project and the mcp stories).
 
+## Discovery of application scopes (request f9ca5f96)
+
+The plan 031 build landed as main `bd02ecff` (review `7fce4467`). This
+head continues the branch from that main (`git reset --hard origin/main`)
+and adds one thing: an agent finds a Counter, or any application the
+room's application factory created, without being handed its scope ID.
+It needs no new act and no contract change: the application cohort's
+directory (`directory5`, `packages/platform/src/application.ts`) already
+records each application it creates as an item of type `application`
+(states `creating`, `created`, `refused`, `conflict`; ref `scope` to the
+created scope; value `definition`, its digest).
+
+| Item of the request | What changed | Witness |
+|---|---|---|
+| 1. Hold the directory's applications | `inventory.ts` reads the directory's `application` items from the directory summary it already reads, and holds each one in state `created` whose `scope` is set, as place `application` under the directory's membership, as lanes are held. Its act tools derive from its pinned definition as from any held scope's | `counter.scope.test.ts`: after `application.create`, the list holds `counting.join`, `counting.start`, `counting.spoken` and `counting.leave`, with no configuration |
+| 2. `room` and `inspect` | `room` lists the applications beside the lanes, each with its definition name, digest, scope and state, paged with the other collections within 8 KiB; an application not yet created, or refused, is listed with no scope and holds no tools. `inspect` reads one by its scope ID. The `room` tool's description names the applications | `counter.scope.test.ts`: `room` lists `{ definition: "counting", digest, scope, state: "created" }`; `inspect` by scope ID. `budget.test.ts`: 60 lanes, 30 applications and 40 roots in 6 pages, each within 8 KiB (observed) |
+| 3. `wait` sees a new application | Nothing to change: `wait` on the directory after `application.create` (the directory's `establish-application`) already reports the created scope with its definition, as it reports a created lane | `counter.scope.test.ts`: each story takes the Counter's scope from `wait`'s created list and from `room`, and they agree |
+| 4. Hand-configured roots | A root configured with `--scope` stays supported for scopes outside the repository. A root that is also one of the directory's applications is skipped as a root: held once, as the application, and listed once | `counter.scope.test.ts`: with the Counter also written as a root, `room` lists it once among the applications and not among the roots, and the list has one `counting.join`. Writing a root is a configuration change, which the generation counts, as for any root |
+| 5. The generation | `generationOf` includes the held applications, each as its scope and digest. An application is held only once created, so a new one changes the generation once | `counter.scope.test.ts`: a subscribed client is told once of a new application (observed: once), and the generation differs before and after |
+| 6. The stories and the docs | The Counter story no longer writes a root: it finds the Counter through `room`, and takes part in each launch mode, checked against `docs/mcp.md`'s new section "Taking part in a Counter". A second story creates an application through the tools and asserts `room`, the list, `inspect` and the one list change, with no configuration write. `docs/mcp.md` says which scopes are found, that `--scope` is not needed for an application, and that a new application changes the list | `counter.scope.test.ts`, three tests. Without the source change all three fail (observed) |
+
+**The recipe, observed.** Taking part in a Counter that an admin has
+initialized: in the default mode `room`, `counting.join`, `inspect`,
+`counting.start`, `inspect`, `counting.spoken`, `inspect`,
+`counting.leave`: 8 calls; in `--generic` mode `room`, `actions`, `act`,
+`inspect`, `act`, `inspect`, `act`, `inspect`, `act`: 9 calls. The story
+asserts the tools and the count against the docs' table in each mode. This
+recipe has its own section, after the W1 inventory, because the W1 recipe
+test runs one room of the default cohort, and a Counter needs the
+application cohort; its witness is the Counter story.
+
+**Observed figures of this head.** Reads per tool are unchanged; the
+applications come from the directory summary that `room` and the list
+already read. `room`'s warm response is 3,874 bytes, 38 more than before
+(the empty `applications` section, in the text and the structured
+content). The list is 58 bytes larger for every role (and 9 to 11 tokens
+more, proxy), from the `room` description: demo room, admin 146,531 bytes
+and 37,745 tokens; maintainer 114,615 and 29,617; member 108,040 and
+27,860; agent 102,274 and 26,421; the full lane definitions 339,157 and
+88,992; `--generic` 15,236 and 3,581 (observed; the table in "Observed
+figures" holds the same). The room story: 229 and
+286 requests in the default mode, 241 and 283 in `--generic`, list
+changes told 7 (3 while founding) and 4 (observed).
+
+**Paths.** `git diff --name-only origin/main...HEAD` lists 9 paths:
+`packages/mcp/src/catalogue.ts`, `packages/mcp/src/inventory.ts`,
+`packages/mcp/src/service.ts`, `packages/mcp/test/budget.test.ts`,
+`packages/mcp/test/counter.scope.test.ts`,
+`packages/mcp/test/support/catalogue.ts`, `docs/mcp.md`,
+`docs/mcp-tools.json` and this note.
+
+**What ran in this head.**
+
+| Command | Result |
+|---|---|
+| `npx vitest run --project scope packages/mcp/test/counter.scope.test.ts --reporter=verbose`, with the source change | `Tests  3 passed (3)` |
+| The same, with `packages/mcp/src` as on main | `Tests  3 failed (3)` |
+| `npx vitest run --project mcp --reporter=verbose` | `Tests  73 passed (73)` |
+| `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Test Files  7 passed (7)`, `Tests  14 passed (14)` |
+| `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
+
 ## The SDK choice
 
 The server is a minimal JSON-RPC handler, which plan 031 section 7 allows
@@ -480,12 +541,12 @@ tokenizer gives other counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 146473 | 37734 |
-| Demo room, maintainer | 57 | 1 | 114557 | 29606 |
-| Demo room, member | 54 | 1 | 107982 | 27849 |
-| Demo room, agent | 52 | 1 | 102216 | 26410 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339099 | 88983 |
-| Demo room, admin, `--generic` | 16 | 1 | 15178 | 3570 |
+| Demo room, admin | 71 | 1 | 146531 | 37745 |
+| Demo room, maintainer | 57 | 1 | 114615 | 29617 |
+| Demo room, member | 54 | 1 | 108040 | 27860 |
+| Demo room, agent | 52 | 1 | 102274 | 26421 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339157 | 88992 |
+| Demo room, admin, `--generic` | 16 | 1 | 15236 | 3581 |
 
 The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
@@ -494,8 +555,9 @@ The bytes were taken again in the round of review b04a53c8, after the
 wording of `items` changed: 63 bytes more per list than before. The runs
 of the rounds of reviews ad2576fb, 6a86304e, f7a8d2d4, 16fcc428 and
 c790797b gave the same figures. After the composition onto the renamed
-main the list is 8 bytes shorter, as the table shows: `join`'s description
-names `dap invite` and `dap join`.
+main the list was 8 bytes shorter: `join`'s description names `dap invite`
+and `dap join`. In the discovery head (request f9ca5f96) it is 58 bytes
+longer, as the table shows: `room`'s description names the applications.
 
 ### Reads per tool
 
@@ -532,15 +594,15 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, after the composition onto the renamed main. The second member's
+Worker, in the discovery head (request f9ca5f96). The second member's
 request count varies between runs with the timing of `wait`'s polls: in
-the default mode 286, 288, 288, 286, 286, 286 and 288, and in `--generic`
-283, 283, 281, 283, 281, 281 and 283, in the runs of the last seven
-rounds.
+the default mode 286, 288, 288, 286, 286, 286, 288, 288 and 286, and in
+`--generic` 283, 283, 281, 283, 281, 281, 283, 283 and 283, in the runs of
+the last nine rounds and heads.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 288 |
+| Default | 7 | 3 | 4 | 229 | 286 |
 | `--generic` | 7 | 3 | 4 | 241 | 283 |
 
 The second member joins from an empty configuration through `join`, after
