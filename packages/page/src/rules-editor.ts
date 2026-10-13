@@ -37,15 +37,15 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
   const extentInputs = rules.extents.map((extent, index) => {
     const input = h("input", { type: "number", min: "0", step: "1", required: "", name: `extent:${index}`, value: value(`extent:${index}`, String(extent.approvals)), "aria-label": `Approvals for ${extent.name}` }) as HTMLInputElement;
     form.append(h("div", { class: "rule-row" },
-      h("div", {}, h("strong", { class: "rule-label" }, extent.name), h("span", { class: "rule-path" }, extent.patterns?.length ? extent.patterns.join(", ") : "Paths unmatched by another extent")),
+      h("div", {}, h("strong", { class: "rule-label" }, extent.name), h("span", { class: "rule-path" }, extent.patterns?.length ? extent.patterns.join(", ") : "Any other file paths")),
       h("label", {}, "Approvals", input)));
     return input;
   });
   form.prepend(h("h2", {}, "Review requirements"));
-  form.append(h("label", {}, "Default approvals", approvals), h("label", {}, "Allow author's controller review", owner));
+  form.append(h("label", {}, "Default approvals", approvals), h("label", {}, "Agent controllers can review their own agents?", owner));
   const checks = h("textarea", { name: "checks", rows: "5" }, value("checks", baseline["checks"]!)) as HTMLTextAreaElement;
   const labels = h("textarea", { name: "labels", rows: "2" }, value("labels", baseline["labels"]!)) as HTMLTextAreaElement;
-  form.append(h("details", {}, h("summary", {}, "Advanced rules"), h("label", {}, "Checks", checks), h("label", {}, "Labels", labels), h("label", {}, "Single controller exception", exception)));
+  form.append(h("details", {}, h("summary", {}, "Advanced rules"), h("label", {}, "Checks", checks), h("label", {}, "Labels", labels), h("label", {}, "Single controller exception?", exception)));
   const save = h("button", { type: "submit", class: "primary" }, "Save changes");
   const message = h("p", { role: "status", hidden: "" });
   const confirmation = h("div", { class: "rules-confirmation", hidden: "" });
@@ -72,10 +72,21 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
       ["checks", serialized(rawChecks)], ["labels", serialized(rawLabels)], ["extents", serialized(extents)],
     ]);
   };
+  const changedFields = (next: Record<string, string>) => Object.keys(baseline).filter((key) => baseline[key] !== next[key]);
+  const updateSave = () => {
+    let disabled = !!context.blocked || submitted;
+    if (!disabled) {
+      try { disabled = changedFields(read()).length === 0; }
+      catch { /* Keep malformed edits available for validation on submit. */ }
+    }
+    if (disabled) save.setAttribute("disabled", "");
+    else save.removeAttribute("disabled");
+  };
   const hideConfirmation = () => { pending = null; confirmation.setAttribute("hidden", ""); confirmation.replaceChildren(); };
   const changedInput = () => {
     hideConfirmation();
     if (draftKey) drafts.set(draftKey, Object.fromEntries(controls.map((control) => [control.name, control.value])));
+    updateSave();
   };
   form.addEventListener("input", changedInput);
   form.addEventListener("change", changedInput);
@@ -85,13 +96,13 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
     let next: Record<string, string>;
     try { next = read(); }
     catch (error) { message.textContent = error instanceof Error ? error.message : "The rules could not be read."; message.removeAttribute("hidden"); return; }
-    const changed = Object.keys(baseline).filter((key) => baseline[key] !== next[key]);
+    const changed = changedFields(next);
     if (changed.length === 0) { hideConfirmation(); message.textContent = "No changes to save."; message.removeAttribute("hidden"); return; }
     message.setAttribute("hidden", "");
     pending = next;
     const confirm = h("button", { type: "button", class: "primary" }, "Confirm changes");
     const cancel = h("button", { type: "button" }, "Cancel");
-    const names: Record<string, string> = { approvals: "Default approvals", ownerMayReview: "Author's controller review", singleControllerException: "Single controller exception", checks: "Checks", labels: "Labels", extents: "Review requirements" };
+    const names: Record<string, string> = { approvals: "Default approvals", ownerMayReview: "Agent controllers can review their own agents?", singleControllerException: "Single controller exception?", checks: "Checks", labels: "Labels", extents: "Review requirements" };
     confirmation.replaceChildren(h("h3", {}, "Confirm rule changes"), ...changed.map((key) => h("div", {}, h("strong", {}, names[key]!), h("pre", {}, `${baseline[key]}\n→ ${next[key]}`))), confirm, cancel);
     confirmation.removeAttribute("hidden");
     cancel.addEventListener("click", hideConfirmation);
@@ -102,5 +113,6 @@ export function rulesEditor(rules: Rules, send: Send, context: { blocked?: boole
       send("publish", String(rules.item), pending);
     });
   });
+  updateSave();
   return form;
 }

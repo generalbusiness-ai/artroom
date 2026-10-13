@@ -680,3 +680,18 @@ export const rulesScopeRules3: Rules = {
 
 /** Version 3 adds explicit closure places; versions 1 and 2 retain their exact data. */
 export const rulesScope3: PlatformData = { ...rulesScope2, acts: { ...rulesScope2.acts, activate: { ...rulesScope2.acts["activate"]!, fields: { ...rulesScope2.acts["activate"]!.fields, ...definitionDependencies } } } };
+
+/** Prospective version 4 defaults to agent-controller review; older pinned data stays unchanged. */
+export const rulesScope4: PlatformData = {
+  ...rulesScope3,
+  items: {
+    ...rulesScope3.items,
+    rules: {
+      ...rulesScope3.items["rules"]!,
+      values: {
+        ...rulesScope3.items["rules"]!.values,
+        ownerMayReview: { ...rulesScope3.items["rules"]!.values["ownerMayReview"]!, default: true },
+      },
+    },
+  },
+};

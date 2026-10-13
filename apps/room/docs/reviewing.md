@@ -35,7 +35,20 @@ The current declaration needs `change.review` to record the act. The destination
 
 ## Keep the subject and reviewer independent
 
-The manifest must still be current when the verdict takes effect. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. By default an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
+The manifest must still be current when the verdict takes effect. The lane refuses an author reviewing their own manifest. The destination judges the current reviewer and controller relationship as well as the required action. Under the originally cited Rules policy, an authoring agent's controller is not independent of that author. An explicitly permitted content policy may allow that controller's review; the author remains excluded, and the `rules` extent keeps its stricter requirement.
+
+An explicitly selected `platform:rules@4` scope starts with agent-controller
+review enabled. Versions 1, 2 and 3 keep their prior defaults. Existing rooms
+are not migrated. The author remains excluded, the `rules` extent keeps its
+stricter requirement, and approvals and checks still follow the recorded policy.
+The approval default remains 1. This setting grants no new role or action.
+
+The prospective web founding cohort selects `platform:register@8`,
+`platform:directory@7`, `platform:membership@2`, `platform:rules@4` and
+`platform:destination@3`. This is Source support. Its actual installation,
+deployed configuration and Start integration remain pending. These added
+versions do not change the existing ordinary CLI founding default or old pins.
+
 
 A declared single-controller exception is a separate merge rule. It applies only when the actual observed rules, controller count and author/controller relationship meet all its conditions. It does not turn an author's verdict into independent review or remove checks. Missing relationship/count evidence cannot justify assuming the exception. [Independence and exception](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L436)
 

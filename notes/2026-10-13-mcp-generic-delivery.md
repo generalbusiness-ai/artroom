@@ -162,8 +162,15 @@ planner's amendment is kept.
 
 ## Corrections of review 6a86304e
 
-Origin's main had not moved, so no merge was made in this round. The
-planner's amendment is kept.
+Origin's main had not moved when this round's corrections were made. It
+moved afterwards (the forms head landed as `2086f60e`), and the planner
+merged it into this branch at its head, with no conflict and no change to
+the branch's own paths; at the merged head `git diff --name-only
+origin/main...HEAD` lists 60 paths, every one under packages/mcp,
+packages/cli, packages/client (index.ts, invitation.ts), docs/mcp.md,
+docs/mcp-tools.json, this note, scripts/active-source.test.mjs,
+parked/README.md, plans/README.md, package-lock.json, vitest.config.ts
+or tsconfig, and none elsewhere. The planner's amendment is kept.
 
 | Item | What changed | Witness |
 |---|---|---|
@@ -244,6 +251,16 @@ In this session, after the last change to what each covers:
 | `npm run gate` at `9feae202` (a second attempt was cut off when the cloud worker restarted, and was run again) | FAILED at the test step: `Tests  4 failed \| 1104 passed \| 2 skipped (1110)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review b04a53c8, once, at `296166a7` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1112 passed \| 2 skipped (1118)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review ad2576fb, once, at `324af0e4` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1114 passed \| 2 skipped (1120)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
+
+## The planner's second amendment, after the merge
+
+The witness "a dead reclaimer under a long ARTROOM_HOME" builds a home of
+more than 2 KiB, lawful on Linux, where the cloud container ran it. macOS
+caps a path at 1024 bytes, so on the planner's machine its `mkdir` fails
+with `ENAMETOOLONG` before the witness begins. The planner marked it
+`skipIf` on `darwin`, with the reason in its comment, and changed nothing
+else; on this machine it is skipped, not passed, and the local gate counts
+it as a skip.
 
 ## The planner's amendment after the second cloud gate
 
