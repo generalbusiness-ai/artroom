@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5e59f13c97cf6a709ec20cd5b99e6f2d483d5a2c","text":"Merge retired a covered predecessor; the successor is at packages/lanes/src/shared.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5e69d350d479802b0ae646f9a043fcfb9a5242c3","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/counting-commitments.test.ts."}
