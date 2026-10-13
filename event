@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-11-practice-script.md","body":{"commit":"61e703793fd469e72febc5bff41cb2223b931f6e","path":"notes/2026-10-11-practice-script.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:19de5057c6db9d672719fd54612fb6f9b9fc7ee5","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-11-practice-script.md."}
