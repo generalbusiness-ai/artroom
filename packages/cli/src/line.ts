@@ -29,6 +29,7 @@ export const USAGE = [
   "  dap issue assign <issue> <@member>",
   "  dap issue close <issue>",
   "  dap issues",
+  "  dap mcp [--generic | --generic=add] [--tools <definition>,...] [--http 127.0.0.1:<port>] [--scope <scope> --membership <scope>]",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
   "An issue is its number, as dap issues lists it, or its lane's scope ID.",
 ].join("\n");

@@ -82,6 +82,11 @@ export interface Config {
   remote?: string;
   /** Exact pending enrollment; retry the same invitation link to continue. */
   join?: PendingJoin;
+  /**
+   * Standalone scopes the MCP server lists acts for: each a scope outside the repository, and the membership scope that standing
+   * for it is read from, or null when none is known. `artroom mcp --scope` and the server's `create` append one.
+   */
+  roots?: { scope: ScopeId; membership: ScopeRef | null }[];
 }
 
 export interface Store {
