@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-public-sdk-counter-tutorial.md","body":{"commit":"5cd6bb6989226209fce2f3ac1981fd46c7c06a0b","path":"notes/2026-10-13-public-sdk-counter-tutorial.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4287467cad76a369383791f11241166e14d28fcf","text":"Merge retired a covered predecessor; the successor is at docs/write-an-application.md."}
