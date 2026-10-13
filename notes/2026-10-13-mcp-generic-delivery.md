@@ -146,6 +146,20 @@ this round. The planner's amendment is kept.
 | 5. Notifications | A notification is never answered, on either transport. A request-only method sent as a notification is counted and dropped before dispatch; over HTTP it gets 202 with no body and no session | `wire.test.ts`: over HTTP, notification-shaped `tools/call`, `initialize` and `tools/list` (with a session) and two real notifications each get 202, an empty body, no session header and no scope request, with the real client's call after each; 3 counted. On stdio, the same five write nothing, and the next request gets the only line |
 | 6. The cursor's wording | `items` and its reference no longer say a cursor continues only its traversal; they tell callers to continue with the same scope, type and final flag | `docs/mcp.md`, `docs/mcp-tools.json`, regenerated from the descriptors |
 
+## Corrections of review ad2576fb
+
+Origin's main had not moved, so no merge was made in this round. The
+planner's amendment is kept.
+
+| Item | What changed | Witness |
+|---|---|---|
+| P2. Bounded diagnostics | `clip` in `errors.ts` repeats a caller's fragment (a target, a field's name, a key, a scope as given, a tool's name, a link's service or membership) for at most 128 characters, then an ellipsis and the original length, without splitting a surrogate pair. `Finding` clips each such fragment where the sentence is made; `shape.ts` clips each unknown field or presented name where the path is made, and a path is held to 512 characters; `#scope` clips the target it quotes. `failed` holds the whole serialized result within 2 KiB, the smallest tool bound, so it fits whichever tool gave it; past that, only the sentence is cut, and says so, and `error` and `next` stay whole. No accepted input was narrowed | `budget.test.ts`, "oversized targets and field names": a 100 KiB target to `inspect`, to `issue.comment` and to `act`, and a 100 KiB unknown field name to `create`; each whole serialized result within its tool's bound (839, 839, 839 and 805 bytes, observed), the length stated, no 200-character run of the input repeated, nothing posted, nothing unresolved. "an error past its bound is cut in its sentence only": a 10,000-character finding, within 2 KiB, with its kind and next step whole |
+| P3. The list figures in the reference | `docs/mcp.md`'s list table taken again from this round's run, and labelled so | `docs/mcp.md`, "The list, per role" |
+| P3. credential's wording | The server's instructions say only `credential` returns a credential by design, and that `step` and `record` can show a join's signed invitation; the instructions stay within 512 characters (511) | `service.ts` |
+
+`docs/mcp.md` also gains a paragraph on the server's own errors: the
+128-character fragments and the 2 KiB bound.
+
 **Paths that differ from main.** After the third merge, and still at this round's head,
 `git diff --stat origin/main...HEAD` lists 58 files, all this branch's own:
 the 42 files of `packages/mcp`; `packages/cli/package.json`,
@@ -200,6 +214,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| `npx vitest run --project mcp`, after each item of review ad2576fb | `Tests  68 passed (68)` after the P2 and after the P3 |
+| `npx vitest run --project scope packages/mcp/test`, after each item of review ad2576fb, the last time with `--reporter=verbose` | `Test Files  6 passed (6)`, `Tests  8 passed (8)` each time |
 | `npx vitest run --project mcp`, after each item of review b04a53c8 | `Tests  66 passed (66)` after items 5 and 6 |
 | `npx vitest run --project scope packages/mcp/test --reporter=verbose`, after each item of review b04a53c8 | `Test Files  6 passed (6)`, `Tests  8 passed (8)` after items 5 and 6 |
 | `npx vitest run --project mcp packages/mcp/test/custody`, twice after the standalone lifecycle | `Tests  29 passed (29)` each time |
@@ -248,7 +264,8 @@ The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
-wording of `items` changed: 63 bytes more per list than before.
+wording of `items` changed: 63 bytes more per list than before. The round
+of review ad2576fb's run gave the same figures.
 
 ### Reads per tool
 
@@ -285,11 +302,13 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker:
+Worker, in the round of review ad2576fb. The second member's request count
+varies between runs with the timing of `wait`'s polls: 286 in the default
+mode in the previous round's run, 288 in this one.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 286 |
+| Default | 7 | 3 | 4 | 229 | 288 |
 | `--generic` | 7 | 3 | 4 | 241 | 283 |
 
 The second member joins from an empty configuration through `join`, after

@@ -173,6 +173,14 @@ and the sends it created, or `refused`, `unavailable` or `mismatch` with a
 sentence that names the scope, the kind, the judged head and, for a named
 guard, the guard's sentence, and a next step.
 
+An error the server finds itself (a shape, a target, custody, a read) is
+`error`, `message` and `next`. A fragment of what the caller gave, such as
+a target, a field's name, a key or a tool's name, is repeated in the
+message for at most 128 characters, then an ellipsis and its length. The
+whole error result is at most 2 KiB, the smallest tool bound; if the
+message would pass it, only the message is cut, and says so. `error` and
+`next` are always whole.
+
 ### Custody
 
 The server keeps each signed envelope before it sends it, under the
