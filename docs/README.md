@@ -1,41 +1,9 @@
 # Documentation
 
-A programmable coordination fabric for people and agents. These pages
+A durable action platform for people and agents. These pages
 cover the dap framework first, then the three applications built on it,
 then the guides for operating a deployment. Within each group, pages go
 from learning to understanding, then doing, then looking up.
-
-## Names in transition
-
-These pages use the final names: the `dap` command and the
-`@generalbusiness/dap-*` packages. The rename has not landed at this
-commit. It lands as its own change. Until it does, the command is
-`artroom`, and the packages carry the names in their `package.json`
-files:
-
-| Final name in these pages | Name at this commit |
-|---|---|
-| `dap` | `artroom`, from `packages/cli` |
-| `@generalbusiness/dap-contract` | `@generalbusiness/artroom-contract` |
-| `@generalbusiness/dap-bytes` | `@generalbusiness/artroom-bytes` |
-| `@generalbusiness/dap-derive` | `@generalbusiness/artroom-derive` |
-| `@generalbusiness/dap-scope` | `@generalbusiness/artroom-scope` |
-| `@generalbusiness/dap-client` | `@generalbusiness/artroom-client` |
-| `@generalbusiness/dap-replay` | `@generalbusiness/artroom-replay` |
-| `@generalbusiness/dap-git` | `@generalbusiness/artroom-git` |
-| `@generalbusiness/dap-checkers` | `@generalbusiness/artroom-checkers` |
-| `@generalbusiness/dap-cli` | `@generalbusiness/artroom-cli` |
-| `@generalbusiness/dap-room` | `@generalbusiness/artroom-platform`, with `@generalbusiness/artroom-lanes` |
-| `@generalbusiness/dap-room-page` | `@generalbusiness/artroom-page` |
-
-To run a command from these pages at this commit, type `artroom` where
-the page says `dap`, and use the package name in the right column. The
-command's own output also says `artroom` until the rename lands. Three
-names stay as they are at this commit, because the rename has not set
-their new form: the replay command `artroom-replay`, the import path
-`@generalbusiness/artroom-lanes` in [Lanes](../apps/room/docs/lanes.md),
-and the source values that keep the name artroom, such as
-`ARTROOM_HOME`, Worker names and `refs/artroom/`.
 
 ## The framework
 

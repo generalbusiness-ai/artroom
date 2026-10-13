@@ -43,9 +43,6 @@ or in the command line's config.
 
 ## The order
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 The host setting pins the register's scope ID, so the setting must name
 the register before its first claim. A register's ID is a function of its
 install's signed intent, so the command line computes it before the
