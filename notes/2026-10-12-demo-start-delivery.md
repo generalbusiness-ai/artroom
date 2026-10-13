@@ -102,3 +102,66 @@ cold-outsider Start with usable ready connections remain owed. No deployed
 acceptance, provider effect, public SDK delivery or full-request completion is
 claimed here. Private keys, links, journals, raw diagnostics and captures remain
 outside the public evidence whitelist.
+
+## Source delivery after the dap rename
+
+The bounded Source request `a5f34eefd1127779087744e8a2a452f79e0af79c`,
+promise `13f6a923942340258076160df190b324db724c5b`, uses checked head
+`8f44ad8f02ee1bd3dd790a4f7d659e5601357686`, tree
+`719591655cd7c9be20f5505b4ac399e80a6df74f`. It composes Start onto the
+actual rename landing. This append changes only this note.
+
+Root materialized the owned dependency namespace once without installation:
+3,882 verified files, 216 unchanged external lock rows, twelve workspace
+links, six renamed package links, and the shared `dap` and `artroom` launchers.
+The normal Page producer then returned 0, with its postguard passed. Its sole
+tracked generated output was committed at the checked head above.
+
+The focused wrapper returned 2 for coverage metadata. All ten compiler
+commands returned 0, and the body command returned 0. That body actually ran
+309 passing cases. Root reconciled the original report and found all 21 intended
+owning cases present and passing, with 288 additional cases. Inherited include
+arrays broadened selection. The JSON reporter also uses a space between suite
+and title, while the earlier ledger used `>` for one CLI case. The original
+wrapper failure remains preserved. An exact 21-case execution is not claimed.
+
+The one ordinary `npm run gate` child returned 0. Whitespace, typecheck, and
+test phases returned 0, and installation was skipped. Vitest recorded 1,056
+passing cases and two existing skips across 195 passing files and one skipped
+file. The chained Node groups recorded nine passes and 55 Counter passes, with
+no failures or skips. Its wrapper returned 1 after a log-directory parser
+assertion. Root admitted the original owned private log directory, read the
+original counts, and rechecked Source, dependency, npm, and namespace guards.
+The successful gate child and failed wrapper remain distinct. No cause of the
+log-directory choice is inferred. No producer, compiler, body, or gate was rerun.
+
+Recorded command wall times are 0.152 seconds for production, 23.492 seconds
+for the focused body alone, and 108.325 seconds for the ordinary gate child.
+These are separate observations, not an aggregate run time. The gate's recorded
+phase times are 0.01 seconds for whitespace, 5.85 seconds for typecheck, and
+101.96 seconds for tests. Their user and system CPU totals are 0.01, 19.52,
+and 152.66 seconds respectively. The closed records do not establish machine
+load or operating-system cache state, so no performance comparison is claimed.
+
+The following six closed records support this append. Nested private paths,
+logs, reports, captures, and credentials are outside this read and evidence list.
+
+| Closed record | SHA256 |
+|---|---|
+| [materialization-public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/materialization-public.json) | `55fd64328bad24658de7eb7c6362cd44acade97738ccbccc8cc8d7cdd99cc682` |
+| [producer-one/result.public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/producer-one/result.public.json) | `a647c58ae24ef97159137bc51bd6104427291b1fad89d22d70ffdbe6b3def08d` |
+| [focused-one/result.public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/focused-one/result.public.json) | `617fe3e6d8c58ff80f1cfcfbeef552b95ecbc9005fc49c08652685ce1d55ac49` |
+| [focused-one/owner-coverage-reconciliation.public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/focused-one/owner-coverage-reconciliation.public.json) | `aa6ecf8811ca2ced39916cccd04896c40c1d1ef93adb8cf53ee7e384ddc0f5b2` |
+| [ordinary-gate-held/gate-one/terminal.public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/ordinary-gate-held/gate-one/terminal.public.json) | `1d02edac3a636e8bb16be83ba815184b640c57c445e01a3613008c4bd619c247` |
+| [ordinary-gate-held/gate-one/gate-reconciliation.public.json](/Users/hughpyle/play/artroom-diagnostics/demo-start-rename-landed-execution-preparation/ordinary-gate-held/gate-one/gate-reconciliation.public.json) | `09275e517089cb398ceb11981a5ace3b03764b1617e78ac3e637b5cf789b8189` |
+
+The full Start request `32da4f2a`, promise `344f195a`, remains open. Actual
+hosted native admission, usable founder recovery and ready connections, demo
+configuration and redeployment, and independent Source review and landing
+remain owed. The intended hosted route is the explicitly configured GitHub
+adapter with fresh register@8 and optional exact retained legacy register@7.
+The current Artifacts adapter binds its ordinary configured register only.
+Dual demo roots under Artifacts are unavailable and are not claimed here.
+Earlier register@7 browser and native evidence retains its original heads and
+stand-in qualifications. This Source record does not transfer those results
+onto the current hosted deployment or complete the full request.
