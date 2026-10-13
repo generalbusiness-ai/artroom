@@ -132,7 +132,7 @@ and a deployed service that supports all six exact application pins:
 dap install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
 # Configure that host's registerScope with the printed planned ID.
 dap install --planned --cohort application
-dap claim <label> --handle @operator
+dap create <label> --handle @operator
 ```
 
 Keep the operator key and pending envelopes in that private directory;
@@ -184,9 +184,14 @@ retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
 independent Source review are still required for this successor.
 
-**`dap claim <name> [--handle @you] [--branch main] [--again]`**
-signs the register's `found` act. It then waits until the directory,
-membership, the rules scope and the destination are created and
+**`dap create <name> [--handle @you] [--branch main] [--again]`**
+
+`found` remains an alias for one release and prints `dap create` as the new
+command name. The existing `claim` command remains compatible with retained
+workflows. All three commands use the same creation and recovery code.
+
+The command signs the register's recorded `found` act. It waits until the
+directory, membership, the rules scope and the destination are created and
 confirmed. Then it takes the founder's seat and first key in membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
@@ -200,10 +205,10 @@ a later run keeps the same signature and deadline. An accepted marker is
 checked against the receipt for that exact envelope before reuse.
 
 ```
-Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
+Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `dap claim <name>` again to continue the saved claim. The command
+Run `dap create <name>` again to continue the saved claim. The command
 reads or retries the exact saved steps, then waits for their confirmed
 scopes. It checks child identities against the actual directory seed and
 full reference. It does not extend a saved deadline or invent a replacement
@@ -219,7 +224,7 @@ when deliberately starting another claim. An expired envelope stays saved
 until this explicit replacement.
 
 ```
-Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
+Created demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
 You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 ```
 

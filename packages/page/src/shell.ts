@@ -71,5 +71,5 @@ export class ScopeSending {
 
 /** Initialization guidance is shown only for positive native absence evidence. */
 export function initializationMessage(state: "not-initialized" | "configured" | "unknown"): string | null {
-  return state === "not-initialized" ? "This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used." : null;
+  return state === "not-initialized" ? "This room is not initialized yet. Its creator initializes it before issues, changes and rules can be used." : null;
 }
