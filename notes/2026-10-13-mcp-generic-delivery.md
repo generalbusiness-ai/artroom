@@ -202,6 +202,28 @@ other path. Both of the planner's amendments are kept.
 | P3(a). The overview's measure | The note's overview, a sentence of `docs/mcp.md` and the budget test's comments now say a result is measured whole as the service makes it, with the 2026-07-28 metadata measured apart | this note, `docs/mcp.md`, `budget.test.ts` |
 | P3(b). The marked minimum | `failed` measures each fallback as it would be returned: the sentence's longest marked cut with the next step whole; else the sentence's mark with the next step's longest marked cut; else both marks, a few hundred bytes. It no longer tests the empty sentence in place of its mark | `budget.test.ts`, "an error at the edge of its bound": every next-step length from 700 to 1,100 characters, across the edge where the empty-sentence result fits and the marked one would not, gives a result within 2,048 bytes. The old code returned 2,153 bytes there, observed in this round |
 
+## Corrections of review 16fcc428
+
+Main had moved again: the sprint report landed as `b69ee8ef`. It was
+merged into this branch with `git merge --no-edit origin/main` at
+`08726e2c`, with no conflict, taking main's version of every path this
+branch does not own. After that merge, and at this round's head, `git
+diff --name-only origin/main...HEAD` lists 60 paths, every one of them
+the branch's own, and `git diff --name-only origin/main HEAD` lists no
+other path. Both of the planner's amendments are kept, and the gate lines
+the planner wrote are left as they were.
+
+| Item | What changed | Witness |
+|---|---|---|
+| P2. Expected revisions follow the scope's defaults | `shape.ts` gains `effectiveFields`: each declared field the caller gave, else its declared `default`, read as derive's `readFields` reads them (an own value, else the default; an absent optional with no default stays absent), written with own-property writes. `expectedOf` resolves the act's subjects from that view, for an act tool and for `join`. The intent still signs the fields as given, and the requested meaning's digest is still over them, so the scope applies its defaults itself | `proto.scope.test.ts`, "a defaulted selector", on the real test Worker through the generic `act` tool, with `pantry`'s new `recheck` (an `also` alias named `__proto__` bound by an optional `jar` whose default, 2, is the first jar), `glance` (the same with no default) and `shake` (a transition that moves a jar). Observed in this round: `recheck` with `jar` left out is accepted, with no `jar` in the intent and `expected` holding `on` and `__proto__` at jar 2's revision; with `jar` given as the second jar it is accepted, expecting that jar; an envelope kept by `prepare` with the default's revision, sent after `shake` moved jar 2, is refused `revision-moved`; `glance` with `jar` left out is accepted, expecting `on` only. With the old resolution, observed: the defaulted `recheck` refused `bad-intent` |
+
+`docs/mcp.md` gains a paragraph under the act tool's input: a field left
+out is not signed, the scope applies its default, and the server resolves
+the items the act names with those defaults applied.
+
+While writing the witness, a transition with no effects was observed not
+to move its item's revision, so `shake` writes a value.
+
 **Paths that differ from main.** After the third merge, and at the head of
 the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
 60 files, all this branch's own: the 44 files of `packages/mcp` (this
@@ -257,6 +279,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| `npx vitest run --project mcp`, after the item of review 16fcc428 | `Tests  72 passed (72)` |
+| `npx vitest run --project scope packages/mcp/test`, after the item of review 16fcc428, again with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  11 passed (11)` |
 | `npx vitest run --project mcp`, after each item of review f7a8d2d4 | `Tests  72 passed (72)` after the P2 and P3(b), and again after P3(a) (the budget file alone: `Tests  16 passed (16)`) |
 | `npx vitest run --project scope packages/mcp/test`, after each item of review f7a8d2d4, the last time with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  10 passed (10)` |
 | `npx vitest run --project mcp`, after each item of review 6a86304e | `Tests  68 passed (68)` after item 1, `70` after item 2, `71` after item 3 |
@@ -326,8 +350,8 @@ under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
 wording of `items` changed: 63 bytes more per list than before. The runs
-of the rounds of reviews ad2576fb, 6a86304e and f7a8d2d4 gave the same
-figures.
+of the rounds of reviews ad2576fb, 6a86304e, f7a8d2d4 and 16fcc428 gave
+the same figures.
 
 ### Reads per tool
 
@@ -364,15 +388,15 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in the round of review f7a8d2d4. The second member's request count
+Worker, in the round of review 16fcc428. The second member's request count
 varies between runs with the timing of `wait`'s polls: in the default mode
-286, 288, 288 and 286, and in `--generic` 283, 283, 281 and 283, in the
-runs of the last four rounds.
+286, 288, 288, 286 and 286, and in `--generic` 283, 283, 281, 283 and 281,
+in the runs of the last five rounds.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
 | Default | 7 | 3 | 4 | 229 | 286 |
-| `--generic` | 7 | 3 | 4 | 241 | 283 |
+| `--generic` | 7 | 3 | 4 | 241 | 281 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,

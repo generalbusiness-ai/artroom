@@ -173,6 +173,11 @@ and the sends it created, or `refused`, `unavailable` or `mismatch` with a
 sentence that names the scope, the kind, the judged head and, for a named
 guard, the guard's sentence, and a next step.
 
+A field left out is left out of the intent: the scope applies the field's
+declared default itself. The server reads the revisions of the items the
+act names from the same fields with those defaults applied, so an item a
+default selects is expected like one the caller named.
+
 An error the server finds itself (a shape, a target, custody, a read) is
 `error`, `message` and `next`. A fragment of what the caller gave, such as
 a target, a field's name, a key or a tool's name, is repeated in the
