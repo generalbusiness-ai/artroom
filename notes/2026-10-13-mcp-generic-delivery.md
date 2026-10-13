@@ -709,8 +709,9 @@ delivery's.
 
 - **The hosted endpoint** of plan 031's stage 2: a remote MCP endpoint
   with a bearer per agent, a session store for the 2025-11-25 revision, and
-  each bearer's sessions and subscriptions kept apart. Nothing of it is
-  built. Whether it builds on `@modelcontextprotocol/server` is open.
+  each bearer's sessions and subscriptions kept apart. Its design has
+  landed on main as `notes/2026-10-13-hosted-mcp-endpoint.md` (Draft 5);
+  nothing of it is built on this branch.
 - **The optional amendment of `docs/cli.md`**, naming `dap mcp` in its
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
