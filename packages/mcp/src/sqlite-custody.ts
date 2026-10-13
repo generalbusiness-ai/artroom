@@ -46,6 +46,7 @@ export interface Sql {
 export const CHUNK_BYTES = 1024 * 1024;
 export const SEGMENT_ROW_BYTES = 512 * 1024;
 /** One identity's completion need: a record at its bound and one more segment row. */
+/** One identity's completion need for an empty record: the record at its bound and one more segment row. */
 export const COMPLETION_BYTES = RECORD_BYTES + SEGMENT_ROW_BYTES;
 export const CUSTODY_BUDGET = 1024 * 1024 * 1024;
 export const IDENTITY_MOST = 64 * 1024 * 1024;
@@ -115,10 +116,10 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
    * Top the identity's reservation up to its completion need, before a dispatch. Refuses `full` before anything is written when
    * the top-up would cross the budget or the identity's limit; what is already reserved, for this identity and every other, stays.
    */
-  const arm = (id: string) => {
+  const arm = (id: string, recordBytes: number) => {
     const me = identityOf(id);
-    // The completion need is growth beyond what the identity already holds: a record at its bound and one more segment row.
-    const need = COMPLETION_BYTES;
+    // The completion need is the net growth a dispatch can cause: the record up to its bound, and one more segment row.
+    const need = Math.max(0, RECORD_BYTES - recordBytes) + SEGMENT_ROW_BYTES;
     const topUp = Math.max(0, need - me.reserved);
     if (me.stored + need > bounds.identityMost) throw new CustodyError({ held: "full", reason: "bytes", bytes: me.stored + need });
     if (topUp === 0) return;
@@ -138,13 +139,19 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
     return out;
   };
   const parse = (bytes: Uint8Array): CustodyRecord => JSON.parse(decoder.decode(bytes)) as CustodyRecord;
-  /** Move the oldest terminal records past the count or the age to the archive: the same bytes, in the same transaction. */
+  /**
+   * Move the oldest terminal records past the count or the age to the archive: the same bytes, in the same transaction. A
+   * record archived before and made live again (a refusal resubmitted) is archived again in place of its earlier copy: the
+   * record itself carries every outcome, and its segment rows were never removed, so nothing of its history is lost.
+   */
   const archive = () => {
     const terminal = sql.exec(`SELECT id, updated FROM record WHERE phase IN ('accepted', 'refused', 'mismatch', 'settled') ORDER BY updated ASC`).toArray();
     const old = now() - bounds.ageDays * 86_400_000;
     const due = terminal.filter((r, i) => i < terminal.length - bounds.terminalMost || Date.parse(String(r["updated"])) < old);
     for (const r of due) {
       const id = String(r["id"]);
+      sql.exec(`DELETE FROM archive_chunk WHERE id = ?`, id);
+      sql.exec(`DELETE FROM archive WHERE id = ?`, id);
       sql.exec(`INSERT INTO archive SELECT * FROM record WHERE id = ?`, id);
       sql.exec(`INSERT INTO archive_chunk SELECT * FROM chunk WHERE id = ?`, id);
       sql.exec(`DELETE FROM chunk WHERE id = ?`, id);
@@ -177,15 +184,19 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
       if (archived) return parse(readChunks("archive_chunk", id, Number(archived["chunks"])));
       return null;
     },
-    write: async (id, record) => {
+    write: async (id, record, options = {}) => {
       const bytes = utf8(canonicalize(record));
       const terminal = TERMINAL.has(record.phase);
       sql.transaction(() => {
-        // Before a dispatch: the reservation, before anything is written. A terminal write consumes what it holds.
-        if (!terminal) arm(id);
+        // Before a dispatch: the reservation, before anything is written, whatever the record's phase (a step on a terminal act
+        // dispatches too). A result's write consumes what is held and reserves nothing.
+        if (options.dispatch) arm(id, bytes.length);
         bounds.fail?.();
         const before = one(`SELECT size FROM record WHERE id = ?`, id);
         const was = before ? Number(before["size"]) : 0;
+        // A record made live again takes its archived copy's place: one owner at a time.
+        const archived = one(`SELECT size FROM archive WHERE id = ?`, id);
+        if (archived) { sql.exec(`DELETE FROM archive_chunk WHERE id = ?`, id); sql.exec(`DELETE FROM archive WHERE id = ?`, id); }
         sql.exec(`DELETE FROM chunk WHERE id = ?`, id);
         let size = 0;
         let chunks = 0;
@@ -197,7 +208,7 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
         size += 256;
         sql.exec(`INSERT INTO record (id, phase, key, created, updated, chunks, size) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET phase = excluded.phase, updated = excluded.updated, chunks = excluded.chunks, size = excluded.size`,
           id, record.phase, record.identity.key, record.created, record.updated, chunks, size);
-        store(id, size - was);
+        store(id, size - (before ? was : archived ? Number(archived["size"]) : 0));
         if (terminal) { release(id); archive(); }
       });
       const back = await (async () => {

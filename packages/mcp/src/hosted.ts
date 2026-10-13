@@ -142,6 +142,16 @@ class ControlPlane {
     if (!row.answer) return null;
     return now > timeMs(row.notAfter)! + ANSWER_RETENTION_MS ? answer(409, { error: "op", rule: "stale" }) : row.answer;
   }
+  /**
+   * Remove every answer body past its retention, keeping the row (its fingerprint, deadline and state are the tombstone). The
+   * caller removes any other copy it keeps. Run inside the caller's transaction, before an answer is looked up.
+   */
+  expire(now: number): string[] {
+    const due = this.sql.exec(`SELECT op, not_after FROM control WHERE answer IS NOT NULL`).toArray()
+      .filter((r) => now > timeMs(String(r["not_after"]))! + ANSWER_RETENTION_MS).map((r) => String(r["op"]));
+    for (const op of due) this.sql.exec(`UPDATE control SET answer = NULL WHERE op = ?`, op);
+    return due;
+  }
 }
 
 // ---------------------------------------------------------------- the registry
@@ -162,6 +172,9 @@ export class HostedRegistry {
     sql.exec(`CREATE TABLE IF NOT EXISTS agents (agent TEXT PRIMARY KEY, handle TEXT NOT NULL, key TEXT, state TEXT NOT NULL, created TEXT NOT NULL)`);
     this.#control = new ControlPlane(sql);
   }
+
+  /** The agent object ID a reservation under `op` allotted, for a test's eyes; null when there is none. */
+  reservedAgent(op: string): string | null { return this.#control.row(op)?.agent ?? null; }
 
   /** The agents of this repository, for a test's eyes: no route lists them in this head. */
   agents(): { agent: string; handle: string; key: string | null; state: string }[] {
@@ -185,8 +198,9 @@ export class HostedRegistry {
     const authority = await authorityOf(this.ports, r.membership, r.actor, link.handle as MemberId);
     if (!authority.ok || (authority.by === "controller" && authority.member !== link.controller.member)) return answer(403, { error: "unauthorized" });
     const fingerprint = fingerprintOf(r);
-    // The reservation, in one transaction, before the handoff to the agent object.
+    // The reservation, in one transaction, before the handoff to the agent object; expired answer bodies go first.
     const reserved = this.sql.transaction((): ControlAnswer | { agent: string } => {
+      this.#control.expire(now);
       const row = this.#control.row(r.op);
       if (row) {
         if (row.fingerprint !== fingerprint) return answer(409, { error: "op", rule: "fingerprint" });
@@ -227,11 +241,22 @@ export interface AgentPorts extends Authority {
 interface AgentRow { op: string; seed: Uint8Array; key: KeyId; state: "enrolling" | "enrolled" | "retired" | "refused"; membership: ScopeRef; handle: string; config: McpConfig; bearer: string | null; answer: ControlAnswer | null }
 
 /** One agent: its key, bearer, configuration, sessions, custody and control identities, all in this object. */
+class Queue {
+  #last: Promise<unknown> = Promise.resolve();
+  run<T>(section: () => Promise<T>): Promise<T> {
+    const result = this.#last.then(section);
+    this.#last = result.catch(() => undefined);
+    return result;
+  }
+}
+
 export class HostedAgent {
   readonly #control: ControlPlane;
   #service: McpService | null = null;
   #http: McpHttp | null = null;
   readonly #failures = new Map<string, number[]>();
+  /** Control operations run one at a time in this object: a retry of `create` waits for the first and then finds its answer. */
+  readonly #controls = new Queue();
   constructor(private readonly sql: Sql, private readonly ports: AgentPorts) {
     sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK (id = 1), op TEXT NOT NULL, seed BLOB NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, membership TEXT NOT NULL, handle TEXT NOT NULL, config TEXT NOT NULL, bearer TEXT, answer TEXT, created TEXT NOT NULL, updated TEXT NOT NULL)`);
     sql.exec(`CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, row TEXT NOT NULL, created INTEGER NOT NULL)`);
@@ -278,12 +303,22 @@ export class HostedAgent {
     return this.#http;
   }
 
-  /** The registry's call: make the key, enrol it, mint the bearer. Idempotent on `op`; resumable at every step. */
-  async create(op: string, request: ControlRequest, link: AgentKeyInvitation): Promise<ControlAnswer> {
+  /** Remove expired answer bodies from both copies: the control row's, and the agent row's, which holds the bearer shown at creation. */
+  #expire(now: number): void {
+    for (const op of this.#control.expire(now)) this.sql.exec(`UPDATE agent SET answer = NULL WHERE id = 1 AND op = ?`, op);
+  }
+
+  /** The registry's call: make the key, enrol it, mint the bearer. Idempotent on `op`; resumable at every step; one at a time. */
+  create(op: string, request: ControlRequest, link: AgentKeyInvitation): Promise<ControlAnswer> {
+    return this.#controls.run(() => this.#create(op, request, link));
+  }
+
+  async #create(op: string, request: ControlRequest, link: AgentKeyInvitation): Promise<ControlAnswer> {
     const now = this.ports.now();
+    this.sql.transaction(() => this.#expire(now));
     let row = this.#row();
     if (row && row.op !== op) return answer(409, { error: "op", rule: "agent" });
-    if (row?.state === "enrolled" || row?.state === "refused") return row.answer!;
+    if (row?.state === "enrolled" || row?.state === "refused") return row.answer ?? answer(409, { error: "op", rule: "stale" });
     if (row?.state === "retired") return answer(409, { error: "retired" });
     if (!row) {
       // The seed is written before the envelope is built; the control budget is reserved before the key exists.
@@ -341,21 +376,34 @@ export class HostedAgent {
     const secret = b64url(this.ports.random(32));
     const bearer = `${this.ports.id}.${secret}`;
     const result = answer(201, { agent: this.ports.id, key: signer.key, handle: link.handle, member: fact, bearer });
-    this.sql.transaction(() => {
-      const config: McpConfig = { ...row!.config, repository: { ...link.repository, ...(inbox ? { inbox } : {}) } };
+    // The terminal transition is decided on the durable state as it is now: an agent retired or completed meanwhile keeps its
+    // answer, and no second bearer is ever minted for one creation.
+    const decided = this.sql.transaction((): ControlAnswer => {
+      const current = this.#row()!;
+      if (current.state === "retired") return answer(409, { error: "retired" });
+      if (current.state !== "enrolling") return current.answer ?? answer(409, { error: "op", rule: "stale" });
+      const config: McpConfig = { ...current.config, repository: { ...link.repository, ...(inbox ? { inbox } : {}) } };
       this.sql.exec(`UPDATE agent SET state = 'enrolled', bearer = ?, answer = ?, config = ?, updated = ? WHERE id = 1`, digestBytes(utf8(secret)), JSON.stringify(result), canonicalize(config as never), timeOf(now));
       this.#control.complete(op, "complete", result);
+      return result;
     });
     this.#service = null;   // derived again with the configuration that names the inbox
     this.#http = null;
-    return result;
+    return decided;
   }
 
   /** `bearer` and `retire`: the rotation or the ending, every session's deletion, every stream's close and the answer, in one transaction. */
-  async control(signed: SignedControl, action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> {
+  control(signed: SignedControl, action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> {
+    return this.#controls.run(() => this.#control_(signed, action, body));
+  }
+
+  async #control_(signed: SignedControl, action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> {
     const now = this.ports.now();
+    this.sql.transaction(() => this.#expire(now));
     const row = this.#row();
-    if (!row || row.state === "enrolling") return answer(404, { error: "agent" });
+    if (!row) return answer(404, { error: "agent" });
+    // An enrolment still unfinished can be retired by its authority; it cannot be re-issued a bearer, having none.
+    if (row.state === "enrolling" && action === "bearer") return answer(409, { error: "enrolling" });
     const refused = bound(signed, row.config.service, action, this.ports.id, body, now);
     if (refused) return refused;
     const r = signed.request;
@@ -365,14 +413,15 @@ export class HostedAgent {
     if (!authority.ok) return answer(403, { error: "unauthorized" });
     const fingerprint = fingerprintOf(r);
     const secret = action === "bearer" ? b64url(this.ports.random(32)) : null;
-    const result = this.sql.transaction((): ControlAnswer => {
+    // `fresh`: this call committed the action now. A replay returns the retained answer and disturbs nothing opened since.
+    const { result, fresh } = this.sql.transaction((): { result: ControlAnswer; fresh: boolean } => {
       const existing = this.#control.row(r.op);
       if (existing) {
-        if (existing.fingerprint !== fingerprint) return answer(409, { error: "op", rule: "fingerprint" });
-        return this.#control.retained(existing, now) ?? answer(409, { error: "op", rule: "stale" });
+        if (existing.fingerprint !== fingerprint) return { result: answer(409, { error: "op", rule: "fingerprint" }), fresh: false };
+        return { result: this.#control.retained(existing, now) ?? answer(409, { error: "op", rule: "stale" }), fresh: false };
       }
-      if (row.state === "retired") return answer(409, { error: "retired" });
-      if (!this.#control.reserve(action)) return answer(507, { error: "full", rule: "control-budget" });
+      if (row.state === "retired") return { result: answer(409, { error: "retired" }), fresh: false };
+      if (!this.#control.reserve(action)) return { result: answer(507, { error: "full", rule: "control-budget" }), fresh: false };
       const done = action === "bearer"
         ? answer(200, { agent: this.ports.id, by: authority.by, bearer: `${this.ports.id}.${secret}` })
         : answer(200, { agent: this.ports.id, by: authority.by, retired: true });
@@ -381,10 +430,10 @@ export class HostedAgent {
       this.sql.exec(`DELETE FROM session`);
       this.#control.insert(r.op, fingerprint, action, this.ports.id, "complete", r.notAfter, timeOf(now));
       this.#control.complete(r.op, "complete", done);
-      return done;
+      return { result: done, fresh: true };
     });
-    if (result.status === 200 && this.#http) {
-      // Graceful: every open stream closes with a final event; the sessions are already gone.
+    if (fresh && this.#http) {
+      // Graceful: every open stream closes with a final event, every listen with its result; the sessions are already gone.
       const http = this.#http;
       this.#http = null;
       await http.closeAll();

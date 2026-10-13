@@ -74,7 +74,7 @@ describe("the custody store over SQLite", () => {
     const sql = nodeSql();
     let failing = false;
     const store = sqliteStore(sql, { budget: 256 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30, fail: () => { if (failing) throw new Error("SQLITE_FULL"); } });
-    await store.write("a", recordOf("a", "sent"));
+    await store.write("a", recordOf("a", "sent"), { dispatch: true });
     const many: Outcome[] = Array.from({ length: 120 }, (_, i) => ({ at: T, answer: { answer: "refused", reason: "x".repeat(20 * 1024) + i } as never, attempt: 1 }));
     await store.segment("a", 0, many);
     expect(await store.segmented("a", 0, 120)).toEqual(many);
@@ -111,17 +111,19 @@ describe("the custody store over SQLite", () => {
 
   test("the budget: armed before a dispatch, refused full before anything is written, consumed by results, released at the end", async () => {
     const sql = nodeSql();
-    const bounds: SqliteCustodyBounds = { budget: 2 * COMPLETION_BYTES + 64 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
+    const bounds: SqliteCustodyBounds = { budget: 2 * COMPLETION_BYTES + 4096, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
     const store = sqliteStore(sql, bounds);
-    await store.write("a", recordOf("a", "sent"));
-    // The write before the send is part of the dispatch: it draws its own bytes from the reservation it armed.
-    expect(store.identity("a").reserved).toBe(COMPLETION_BYTES - store.identity("a").stored);
-    expect(store.used() + store.reserved()).toBe(COMPLETION_BYTES);
-    await store.write("b", recordOf("b", "sent"));
-    const held = 2 * COMPLETION_BYTES;
+    await store.write("a", recordOf("a", "sent"), { dispatch: true });
+    // The need is the net growth: the record up to its bound and one segment row; the write before the send draws its own
+    // bytes from the reservation it armed.
+    const needOf = (record: CustodyRecord) => COMPLETION_BYTES - sized(record);
+    expect(store.identity("a").reserved).toBe(needOf(recordOf("a", "sent")) - store.identity("a").stored);
+    expect(store.used() + store.reserved()).toBe(needOf(recordOf("a", "sent")));
+    await store.write("b", recordOf("b", "sent"), { dispatch: true });
+    const held = needOf(recordOf("a", "sent")) + needOf(recordOf("b", "sent"));
     expect(store.used() + store.reserved()).toBe(held);
     // A third identity cannot be armed: refused full before dispatch, nothing written, the two reservations intact.
-    const error = await store.write("c", recordOf("c", "sent")).catch((e: unknown) => e);
+    const error = await store.write("c", recordOf("c", "sent"), { dispatch: true }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CustodyError);
     expect((error as CustodyError).why).toMatchObject({ held: "full", reason: "bytes" });
     expect(await store.read("c")).toBeNull();
@@ -135,20 +137,20 @@ describe("the custody store over SQLite", () => {
     // Replay needs nothing: b's unresolved record is read while the budget is otherwise full.
     expect((await store.read("b"))?.phase).toBe("sent");
     // The released space admits c now.
-    await store.write("c", recordOf("c", "sent"));
+    await store.write("c", recordOf("c", "sent"), { dispatch: true });
     expect(store.identity("c").reserved).toBeGreaterThan(0);
   });
 
   test("an identity's own limit: repeated attempts are paid in advance, and refuse full past the bound", async () => {
     const sql = nodeSql();
     const store = sqliteStore(sql, { budget: 1024 * 1024 * 1024, identityMost: COMPLETION_BYTES + SEGMENT_ROW_BYTES + 256 * 1024, terminalMost: 1024, ageDays: 30 });
-    await store.write("a", recordOf("a", "sent"));
+    await store.write("a", recordOf("a", "sent"), { dispatch: true });
     const outcome = (n: number): Outcome => ({ at: T, answer: { answer: "refused", reason: "z".repeat(SEGMENT_ROW_BYTES - 4096) } as never, attempt: n });
     await store.segment("a", 0, [outcome(1)]);
     await store.write("a", recordOf("a", "unknown"));
     await store.segment("a", 1, [outcome(2)]);
     // A further attempt would need more than the identity may hold: refused before dispatch, the record unchanged.
-    const error = await store.write("a", recordOf("a", "sent")).catch((e: unknown) => e);
+    const error = await store.write("a", recordOf("a", "sent"), { dispatch: true }).catch((e: unknown) => e);
     expect((error as CustodyError).why).toMatchObject({ held: "full" });
     expect((await store.read("a"))?.phase).toBe("unknown");
     expect(await store.segmented("a", 0, 2)).toEqual([outcome(1), outcome(2)]);
@@ -169,4 +171,65 @@ describe("the custody store over SQLite", () => {
     await Promise.all([1, 2, 3].map((n) => store.exclusive(async () => { seen.push(n); await new Promise((r) => setTimeout(r, 5)); seen.push(-n); })));
     expect(seen).toEqual([1, -1, 2, -2, 3, -3]);
   });
+});
+
+test("an archived refusal resubmitted is live again, terminal again and archived again, with its history", async () => {
+  const sql = nodeSql();
+  const store = sqliteStore(sql, { budget: 64 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 0, ageDays: 30 });
+  const refused: Outcome = { at: T, answer: { answer: "refused", reason: "not-yet" } as never, attempt: 1 };
+  await store.write("a", recordOf("a", "refused", 0, [refused]));
+  expect([store.archived(), count(sql, "record", "a"), count(sql, "archive", "a")]).toEqual([1, 0, 1]);
+  // The explicit resubmission: a new attempt, kept unresolved before anything is sent, takes the archived copy's place.
+  const again = recordOf("a", "sent", 0, [refused]);
+  again.attempt = 2;
+  await store.write("a", again, { dispatch: true });
+  expect([count(sql, "record", "a"), count(sql, "archive", "a")]).toEqual([1, 0]);
+  expect((await store.read("a"))?.attempt).toBe(2);
+  // Its terminal result archives it again, in place, with both outcomes.
+  const done = recordOf("a", "accepted", 0, [refused, settled(2)]);
+  done.attempt = 2;
+  await store.write("a", done);
+  expect([count(sql, "record", "a"), count(sql, "archive", "a"), store.archived()]).toEqual([0, 1, 1]);
+  expect(await store.read("a")).toEqual(done);
+  expect(store.identity("a").reserved).toBe(0);
+});
+
+test("at a saturated budget, results that the reservation covers are written, and only a dispatch needs new capacity", async () => {
+  const sql = nodeSql();
+  const first = recordOf("a", "sent");
+  // Room for exactly one identity's completion need and nothing more.
+  const store = sqliteStore(sql, { budget: COMPLETION_BYTES - sized(first) + 512, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 });
+  await store.write("a", first, { dispatch: true });
+  expect(store.used() + store.reserved()).toBeLessThanOrEqual(COMPLETION_BYTES - sized(first) + 512);
+  // 65 lost outcomes: the 65th spills a segment row; each result write consumes the held capacity and reserves nothing.
+  const outcomes: Outcome[] = [];
+  for (let n = 1; n <= 65; n++) {
+    outcomes.push({ at: T, lost: true, attempt: 1 });
+    const record = recordOf("a", "unknown", 0, outcomes.slice(-64));
+    record.count = outcomes.length;
+    if (outcomes.length > 64) await store.segment("a", outcomes.length - 65, [outcomes[outcomes.length - 65]!]);
+    await store.write("a", record);
+  }
+  expect((await store.read("a"))?.count).toBe(65);
+  expect(await store.segmented("a", 0, 1)).toEqual([outcomes[0]]);
+  // A second identity's dispatch is refused full before anything is written; a's receipt is still written from what it holds.
+  const error = await store.write("b", recordOf("b", "sent"), { dispatch: true }).catch((e: unknown) => e);
+  expect((error as CustodyError).why).toMatchObject({ held: "full" });
+  const done = recordOf("a", "accepted", 0, [...outcomes.slice(-63), settled(1)]);
+  done.count = 66;
+  await store.write("a", done);
+  expect((await store.read("a"))?.phase).toBe("accepted");
+});
+
+test("a step on a terminal act is a dispatch: it reserves before sending and refuses full at a full budget", async () => {
+  const sql = nodeSql();
+  const done = recordOf("a", "accepted", 0, [settled(1)]);
+  const store = sqliteStore(sql, { budget: sized(done) + 4096, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 });
+  await store.write("a", done);
+  expect(store.reserved()).toBe(0);
+  // The write before a step's dispatch, on the terminal act: armed, and refused full because the budget admits no completion.
+  const stepped = { ...done, steps: { s: { intent: "sha256:i" as never, resource: ref, capability: "hold@1", step: "instance", phase: "sent" as const, answers: [] } } };
+  const error = await store.write("a", stepped, { dispatch: true }).catch((e: unknown) => e);
+  expect((error as CustodyError).why).toMatchObject({ held: "full" });
+  expect((await store.read("a"))?.steps).toEqual({});
 });

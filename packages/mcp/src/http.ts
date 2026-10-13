@@ -94,7 +94,10 @@ type Body = { status: "ok"; value: unknown } | { status: "too-large" } | { statu
 export class McpHttp {
   /** The 2025-11-25 sessions, oldest first. */
   readonly sessions = new Map<string, LegacySession>();
+  /** Every open stream, legacy and listen, and a slot reserved for one being opened: the count is taken before any await. */
   readonly #open = new Set<object>();
+  /** The listen streams by their owner, so a graceful ending can complete each one. */
+  readonly #listens = new Map<object, { end: (final: boolean) => void }>();
   constructor(readonly port: HttpPort) {
     port.wire.hooks.changed = (session) => (session.id === null ? undefined : port.persist?.(rowOf(session)));
   }
@@ -236,13 +239,24 @@ export class McpHttp {
     };
   }
 
-  /** The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. */
+  /**
+   * The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. The
+   * stream's slot is taken before anything is awaited, so two concurrent opens cannot both pass the limit; a replacement takes
+   * no new slot.
+   */
   async #stream(session: LegacySession): Promise<Response> {
-    if (session.stream === null && this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
+    const slot = {};
+    if (session.stream === null) {
+      if (this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
+      this.#open.add(slot);
+    }
     // Reconciliation before the stream is attached: a change made while no stream was open, or while the object was evicted, is
     // told once now, unless the client has listed since.
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
+    this.#open.delete(slot);
+    // The session may have ended while the snapshot was read: then no stream opens.
+    if (session.id !== null && !this.sessions.has(session.id)) return bare(404);
     const old = session.stream;
     const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });
     const stream: Stream = {
@@ -263,15 +277,27 @@ export class McpHttp {
     return new Response(sse.body, { status: 200, headers: SSE });
   }
 
-  /** A 2026-07-28 listen: its own stream, ended by the client, by the subscription's end, or by the server. */
+  /**
+   * A 2026-07-28 listen: its own stream, ended by the client, by the subscription's end, or by the server. A graceful ending
+   * completes the subscription (its result, as the revision defines) and closes the body; an abrupt one sends nothing.
+   */
   #listen(m: Message): Response {
     const owner = {};
-    const sse = this.#sse(() => { this.#open.delete(owner); this.port.wire.dropStream(owner); });
+    const sse = this.#sse(() => { this.#open.delete(owner); this.#listens.delete(owner); this.port.wire.dropStream(owner); });
     this.#open.add(owner);
     const send = (out: Message) => {
       sse.send(`event: message\ndata: ${JSON.stringify(out)}\n\n`);
-      if (out.id !== undefined && (out.result !== undefined || out.error !== undefined)) { sse.close(); this.#open.delete(owner); }
+      if (out.id !== undefined && (out.result !== undefined || out.error !== undefined)) { sse.close(); this.#open.delete(owner); this.#listens.delete(owner); }
     };
+    this.#listens.set(owner, {
+      end: (final) => {
+        if (final) this.port.wire.endStream(owner);   // each listen completes with its result, written to this stream
+        else this.port.wire.dropStream(owner);
+        sse.close();
+        this.#open.delete(owner);
+        this.#listens.delete(owner);
+      },
+    });
     this.port.wire.handle(m, null, send, owner).then((response) => { if (response) send(response); }, () => send(rpcError(m.id ?? null, -32603, "Internal error")));
     return new Response(sse.body, { status: 200, headers: SSE });
   }
@@ -285,9 +311,10 @@ export class McpHttp {
     return bare(200);
   }
 
-  /** End every session and stream gracefully: `retire`, `bearer`, a server's close. */
+  /** End every session and stream gracefully: `retire`, `bearer`, a server's close. Legacy streams get a final event; listens their result. */
   async closeAll(): Promise<void> {
     for (const session of [...this.sessions.values()]) await this.#end(session, true);
+    for (const listen of [...this.#listens.values()]) listen.end(true);
     this.port.wire.closeAll();
     this.#open.clear();
   }

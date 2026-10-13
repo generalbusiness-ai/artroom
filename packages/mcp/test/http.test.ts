@@ -18,6 +18,8 @@ let standIn: StandIn;
 let scopes: Server;
 let service: string;
 let s: HttpServing;
+/** A test holds the service's configuration read, and with it every snapshot, while it opens streams concurrently. */
+let hold: Promise<void> | null = null;
 
 beforeAll(async () => {
   standIn = new StandIn(signer.key);
@@ -32,7 +34,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => scopes.listen(0, "127.0.0.1", resolve));
   service = `http://127.0.0.1:${(scopes.address() as { port: number }).port}`;
   const config: McpConfig = { ...standIn.config(), service };
-  const mcp = new McpService({ service, signer, config: { read: async () => config, addRoot: async () => {} }, custody: memoryStore(), every: () => () => {} });
+  const mcp = new McpService({ service, signer, config: { read: async () => { if (hold) await hold; return config; }, addRoot: async () => {} }, custody: memoryStore(), every: () => () => {} });
   s = await serveHttp(mcp, "127.0.0.1", 0, () => {});
 });
 afterAll(async () => { await s.close(); scopes.close(); });
@@ -208,5 +210,30 @@ describe("H8, the HTTP layer, through the loopback server", () => {
     expect([posted.status, typeof posted.json().result], "a POST with no header and no _meta version is served at S's recorded version").toEqual([200, "object"]);
     expect((await send("DELETE", { "mcp-session-id": S })).status, "a header-less DELETE ends the named live session").toBe(200);
     expect((await send("POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": S }, { jsonrpc: "2.0", id: 4, method: "tools/list" })).status).toBe(404);
+  });
+});
+
+describe("H8, streams opened concurrently", () => {
+  test("two GETs that enter while the snapshot is held cannot both pass the limit", async () => {
+    const sessions = [await legacySession(), await legacySession(), await legacySession(), await legacySession(), await legacySession()];
+    const held = sessions.slice(0, 3).map((id) => openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": id }));
+    for (const st of held) expect(await until(() => st.text().includes(": stream"))).toBe(true);
+    expect(s.http.streams).toBe(3);
+    // The snapshot every stream open takes is held; two more GETs, on two more sessions, arrive while it is.
+    let release!: () => void;
+    hold = new Promise<void>((r) => { release = r; });
+    const a = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[3]! });
+    const b = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[4]! });
+    await new Promise((r) => setTimeout(r, 100));
+    release();
+    hold = null;
+    // The refused one answers at once with JSON; the admitted one is a stream, which ends only when aborted.
+    const refused = await Promise.race([a.opened, b.opened]);
+    expect(refused, "one was refused").toBe(409);
+    expect(await until(() => a.text().includes(": stream") || b.text().includes(": stream")), "the other opened").toBe(true);
+    expect(s.http.streams).toBe(STREAMS_MOST);
+    for (const st of [...held, a, b]) st.abort.abort();
+    expect(await until(() => s.http.streams === 0)).toBe(true);
+    for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
   });
 });

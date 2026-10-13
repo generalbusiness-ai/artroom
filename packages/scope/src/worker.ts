@@ -489,9 +489,11 @@ export async function mcpRoute(request: Request, env: Partial<Pick<McpEnv, "REGI
   const signed = controlOf(request.headers.get("authorization"));
   if (!signed) return json(400, { error: "control", rule: "header" });
   if (signed.request.action !== control.action || signed.request.agent !== control.agent) return json(400, { error: "control", rule: "binding" });
-  // The body, within its bound, as bytes: the object digests it against the request's binding.
-  const bytes = new Uint8Array(await request.arrayBuffer().catch(() => new ArrayBuffer(0)));
-  if (bytes.length > CONTROL_BODY_BYTES) return json(413, { error: "too-large" });
+  // The body, within its bound, as the exact bytes the object digests against the request's binding: read in chunks and
+  // cancelled at the chunk that passes the bound, before anything is authenticated or any object is reached.
+  const bytes = await boundedBytes(request, CONTROL_BODY_BYTES);
+  if (bytes === "too-large") return json(413, { error: "too-large" });
+  if (bytes === "unreadable") return json(400, { error: "bad-request" });
   if (control.action === "create") {
     const registry = REGISTRIES.get(REGISTRIES.idFromName(signed.request.membership.scope)) as unknown as { create(signed: unknown, body: Uint8Array, origin: string): Promise<ControlAnswer> };
     return answered(await registry.create(signed, bytes, url.origin));
@@ -500,6 +502,28 @@ export async function mcpRoute(request: Request, env: Partial<Pick<McpEnv, "REGI
   try { id = AGENTS.idFromString(control.agent); } catch { return json(404, { error: "agent" }); }
   const agent = AGENTS.get(id) as unknown as { control(signed: unknown, action: "bearer" | "retire", body: Uint8Array, origin: string): Promise<ControlAnswer> };
   return answered(await agent.control(signed, control.action, bytes, url.origin));
+}
+
+/** A request body as exact bytes within `most`: cancelled at the chunk that passes the bound; a declared length over it is not read. */
+async function boundedBytes(request: Request, most: number): Promise<Uint8Array | "too-large" | "unreadable"> {
+  try {
+    if (Number(request.headers.get("content-length") ?? 0) > most) return "too-large";
+    if (!request.body) return new Uint8Array(0);
+    const reader = request.body.getReader();
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > most) { await reader.cancel(); return "too-large"; }
+      parts.push(value);
+    }
+    const out = new Uint8Array(size);
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
+  } catch { return "unreadable"; }
 }
 
 /** The membership object's observation read, as the hosted objects check authority: a real read of the membership now. */
@@ -515,6 +539,10 @@ const sqlOf = (ctx: DurableObjectState) => ({
 /** One repository's registry of hosted agents, named by its membership scope ID. */
 export class McpRegistry<E extends McpEnv = McpEnv> extends DurableObject<E> {
   #registry: HostedRegistry | null = null;
+  /** The persisted answer bodies, for a test's subclass. */
+  protected answers(): { op: string; answer: boolean }[] {
+    return this.ctx.storage.sql.exec(`SELECT op, answer IS NOT NULL AS held FROM control ORDER BY created`).toArray().map((r) => ({ op: String(r["op"]), answer: Number(r["held"]) === 1 }));
+  }
   protected scopes(): Binding { return this.env.SCOPES; }
   protected now(): number { return Date.now(); }
   #of(origin: string): HostedRegistry {
@@ -529,6 +557,7 @@ export class McpRegistry<E extends McpEnv = McpEnv> extends DurableObject<E> {
   }
   async create(signed: Parameters<HostedRegistry["create"]>[0], body: Uint8Array, origin: string): Promise<ControlAnswer> { return this.#of(origin).create(signed, body); }
   agents(): ReturnType<HostedRegistry["agents"]> { return this.#of("").agents(); }
+  reservedAgent(op: string): string | null { return this.#of("").reservedAgent(op); }
 }
 
 /** One hosted agent: its key, bearer, sessions, custody and control identities. */
@@ -553,4 +582,10 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
   protected evict(): void { this.#agent = null; }
   /** What this instance holds in memory now. For a test's subclass. */
   protected held(): HostedAgent | null { return this.#agent; }
+  /** The persisted answer bodies, for a test's subclass: whether each control row and the agent row still hold one. */
+  protected answers(): { control: { op: string; answer: boolean }[]; agent: boolean } {
+    const rows = this.ctx.storage.sql.exec(`SELECT op, answer IS NOT NULL AS held FROM control ORDER BY created`).toArray();
+    const agent = this.ctx.storage.sql.exec(`SELECT answer IS NOT NULL AS held FROM agent WHERE id = 1`).toArray()[0];
+    return { control: rows.map((r) => ({ op: String(r["op"]), answer: Number(r["held"]) === 1 })), agent: agent ? Number(agent["held"]) === 1 : false };
+  }
 }

@@ -1388,8 +1388,8 @@ operator and a controller need.
 | Route | Authorization | What it does |
 |---|---|---|
 | `POST /mcp/agents` | `Control`, action `create` | Creates and enrols an agent. Body: `{ "link": "<artroom-agent-key:…>" }`, the agent-key invitation from `dap invite --kind agent-key`. Answers `201` once with `{ agent, key, handle, member, bearer }`; the bearer is shown this once, and again only to the same `op` |
-| `POST /mcp/agents/<agent>/bearer` | `Control`, action `bearer` | A new bearer. Every session of the agent ends and every stream closes with a final event |
-| `DELETE /mcp/agents/<agent>` | `Control`, action `retire` | Retires the bearer; sessions and streams end the same way. A retired agent answers `401` from then on, and no later `bearer` revives it |
+| `POST /mcp/agents/<agent>/bearer` | `Control`, action `bearer` | A new bearer. Every session of the agent ends, every 2025-11-25 stream closes with a final event and every listen completes with its result. A replay of a completed `op` returns its answer and ends nothing |
+| `DELETE /mcp/agents/<agent>` | `Control`, action `retire` | Retires the bearer; sessions and streams end the same way. A retired agent answers `401` from then on, and no later `bearer` or unfinished `create` revives it. An enrolment still unfinished can be retired |
 | `POST /mcp` | `Bearer <agent>.<secret>` | One JSON-RPC request or notification, either revision |
 | `GET /mcp` | `Bearer`, `Mcp-Session-Id` | The 2025-11-25 server stream of that session |
 | `DELETE /mcp` | `Bearer`, `Mcp-Session-Id` | Ends that 2025-11-25 session |
@@ -1429,7 +1429,8 @@ the caller's identity for the operation, 1 to 128 bytes. The same `op` with
 the same request answers the same, resuming unfinished work; another
 request under the same `op` is refused `409`; an answer is kept seven days
 past the request's `notAfter`, then `409` as stale, and the `op` is never
-reused. Refusals are fixed bodies naming a rule, never a value: `403` for a
+reused. Each object removes expired answer bodies when it next acts; the
+`create` answer, which shows the bearer, is among them. Refusals are fixed bodies naming a rule, never a value: `403` for a
 bad signature, another service, another repository or incarnation, a
 revoked key, an ended member or a signer without authority; `400` for a
 binding that does not match the route, a body digest that differs or a

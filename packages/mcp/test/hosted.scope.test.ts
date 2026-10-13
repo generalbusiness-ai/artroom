@@ -84,6 +84,14 @@ test("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinn
     // The same op answers the same, including the bearer; another body under the same op is refused.
     const again = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, "create-1"), body));
     expect([again.status, (await again.json() as { bearer: string }).bearer]).toEqual([201, answer.bearer]);
+    // Two concurrent creates under one op, from the reservation through the enrolment: one agent, one key, one bearer.
+    const { link: link3 } = await invite(room, rita, "@bot3");
+    const body3 = JSON.stringify({ link: link3 });
+    const pair = await room.wait(() => Promise.all([1, 2].map(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body3, "create-3"), body3))));
+    const answers = await Promise.all(pair.map((r) => r.json() as Promise<{ agent: string; key: string; bearer: string }>));
+    expect(pair.map((r) => r.status), JSON.stringify(answers)).toEqual([201, 201]);
+    expect([answers[0]!.agent, answers[0]!.key, answers[0]!.bearer]).toEqual([answers[1]!.agent, answers[1]!.key, answers[1]!.bearer]);
+    expect((await registryStub(M.scope).agents()).filter((a) => a.handle === "@bot3")).toHaveLength(1);
     const other = JSON.stringify({ link: (await invite(room, rita, "@bot2")).link });
     expect((await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, other, "create-1"), other))).status, "another request under the same op").toBe(409);
     // The key reads back active for @bot, enrolled by the entry the answer names.
@@ -110,7 +118,7 @@ test("H1, the whole recipe: add-member, invite-key, create, enrol, then the pinn
     expect(steps.filter((e) => e.kind === "open-issue" && e.signer === answer.key).length, "two issues signed by the agent's key").toBe(2);
     // The secret of the invitation appears in no hosted row but the retained envelope: the agent object's tables hold no copy.
     const registry = env.REGISTRIES.get(env.REGISTRIES.idFromName(M.scope)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]> };
-    expect(await registry.agents()).toEqual([{ agent: answer.agent, handle: "@bot", key: answer.key, state: "enrolled" }]);
+    expect(await registry.agents()).toEqual(expect.arrayContaining([{ agent: answer.agent, handle: "@bot", key: answer.key, state: "enrolled" }]));
     void invitation;
   } finally { hostedTest.now = null; hostedTest.pause = null; room.done(); }
 });
@@ -164,7 +172,18 @@ function stream(bearer: string, session: string): { text: () => string; stop: ()
   return { text: () => seen.join(""), stop: () => abort.abort(), ended };
 }
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
-const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }> };
+const until = async (check: () => boolean, ms = 3000) => { for (let t = 0; t < ms && !check(); t += 25) await new Promise((r) => setTimeout(r, 25)); return check(); };
+const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }> };
+const registryStub = (membership: string) => env.REGISTRIES.get(env.REGISTRIES.idFromName(membership)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]>; heldAnswers(): Promise<{ op: string; answer: boolean }[]> };
+/** A 2026-07-28 listen, read in the background: its events so far. */
+function listen(bearer: string): { text: () => string; stop: () => void; ended: Promise<number> } {
+  const abort = new AbortController();
+  const seen: string[] = [];
+  const body = { jsonrpc: "2.0", id: 0, method: "subscriptions/listen", params: { notifications: { toolsListChanged: true }, _meta: META } };
+  const ended = routed(`${SERVICE}/mcp`, { method: "POST", signal: abort.signal, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", "mcp-protocol-version": MODERN, "mcp-method": "subscriptions/listen" }, body: JSON.stringify(body) })
+    .then(async (res) => { if (res.status !== 200 || !res.body) return res.status; const reader = res.body.getReader(); try { for (;;) { const r = await reader.read(); if (r.done) break; seen.push(new TextDecoder().decode(r.value)); } } catch { /* aborted */ } return res.status; }).catch(() => -1);
+  return { text: () => seen.join(""), stop: () => abort.abort(), ended };
+}
 
 test("H2, H3 and H4: agents kept apart, control authority, the bearer and revocation", async () => {
   const { room, rita } = await roomWithIssues();
@@ -240,8 +259,25 @@ test("H2, H3 and H4: agents kept apart, control authority, the bearer and revoca
     expect((await mcp(bot.bearer, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } })).status).toBe(401);
     expect((await mcp(botNew, "POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": botSession }, { jsonrpc: "2.0", id: 2, method: "tools/list" })).status, "the old session is gone").toBe(404);
     expect((await mcp(botNew, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } })).status).toBe(200);
-    // After retire: 401 for the bearer, and the control answers 409 for a further bearer.
+    // A completed control replay has no effect: a stream and a listen opened under the new bearer stay open through the replay.
+    const afterSession = await legacySession(botNew);
+    const afterStream = stream(botNew, afterSession);
+    const afterListen = listen(botNew);
+    await settle();
+    expect(await until(() => afterListen.text().includes("acknowledged"))).toBe(true);
+    expect((await agentStub(bot.agent).counts()).streams).toBe(2);
+    const replayed = await room.wait(() => post(`/mcp/agents/${bot.agent}/bearer`, control(room, rita.secret, "bearer", M, bot.agent, "", "rita-bearer-bot"), ""));
+    expect([replayed.status, (await replayed.json() as { bearer: string }).bearer]).toEqual([200, botNew]);
+    await settle();
+    expect((await agentStub(bot.agent).counts()).streams, "the replay disturbed nothing").toBe(2);
+    expect(afterStream.text()).not.toContain("event: end");
+    // After retire: 401 for the bearer, and the control answers 409 for a further bearer. The stream gets its final event; the
+    // listen its result and the end of its body.
     expect((await room.wait(() => post(`/mcp/agents/${bot.agent}`, control(room, rita.secret, "retire", M, bot.agent, "", "rita-retire-bot"), "", "DELETE"))).status).toBe(200);
+    expect(await afterStream.ended).toBe(200);
+    expect(afterStream.text()).toContain("event: end");
+    expect(await afterListen.ended, "the listen's body ended").toBe(200);
+    expect(afterListen.text(), "with its result").toContain('"resultType":"complete"');
     expect((await mcp(botNew, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } })).status).toBe(401);
     expect((await room.wait(() => post(`/mcp/agents/${bot.agent}/bearer`, control(room, rita.secret, "bearer", M, bot.agent, "", "after-retire"), ""))).status).toBe(409);
     // After revoke-key of bot3's key by the admin: its act is refused by the scope with membership's reason, and custody records it.
@@ -249,6 +285,22 @@ test("H2, H3 and H4: agents kept apart, control authority, the bearer and revoca
     expect((await rita.ok("key.revoke", { on: keyItem.id, fields: { as: "retired" }, idempotencyKey: "revoke-bot3" }))["answer"]).toBe("accepted");
     const refused = await factOf(await room.wait(() => modernCall(bot3Rotated, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "after revocation", conditions: ["done"] }, idempotencyKey: "after-revoke" })));
     expect(refused.answer, JSON.stringify(refused)).toBe("refused");
+    // Expiry: seven days past the original request's deadline, the op is stale and no answer body remains in either object.
+    room.advance(8 * 86_400_000);
+    expect((await room.wait(() => post(`/mcp/agents/${bot3.agent}/bearer`, control(room, rita.secret, "bearer", M, bot3.agent, "", "rita-bearer-3"), ""))).status, "stale").toBe(409);
+    const heldByAgent = await agentStub(bot3.agent).heldAnswers();
+    expect(heldByAgent.control.every((r) => !r.answer), JSON.stringify(heldByAgent)).toBe(true);
+    expect(heldByAgent.agent, "the creation's answer, with the bearer shown once, is gone").toBe(false);
+    // The registry removes its copies at its next control operation: a stale replay of the creation finds the op stale and no body kept.
+    expect((await room.wait(() => post("/mcp/agents", control(room, paul.secret, "create", M, null, body3, "paul-create-3"), body3))).status, "a stale creation replay").toBe(409);
+    expect((await registryStub(M.scope).heldAnswers()).every((r) => !r.answer)).toBe(true);
+    // An oversized streaming control body is refused while it streams, before any object is reached: no row appears.
+    const before = (await registryStub(M.scope).agents()).length;
+    const chunk = new TextEncoder().encode("x".repeat(16 * 1024));
+    const big = new ReadableStream<Uint8Array>({ pull: (c) => { c.enqueue(chunk); } });
+    const over = await routed(`${SERVICE}/mcp/agents`, { method: "POST", headers: { authorization: control(room, rita.secret, "create", M, null, "", "big"), "content-type": "application/json" }, body: big, duplex: "half" } as RequestInit);
+    expect(over.status).toBe(413);
+    expect((await registryStub(M.scope).agents()).length).toBe(before);
     // A revoked key cannot sign control: paul's key is revoked, then his bearer for @bot3 is refused.
     const paulKey = (await allItems(rita, "membership")).find((i) => i.type === "key" && i.values["id"] === paul.key)!;
     expect((await rita.ok("key.revoke", { on: paulKey.id, fields: { as: "retired" }, idempotencyKey: "revoke-paul" }))["answer"]).toBe("accepted");
@@ -323,6 +375,22 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     const repeatBody = (await repeat.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
     expect([repeatBody["answer"], repeatBody["retained"]], JSON.stringify(repeatBody)).toEqual(["accepted", true]);
     expect((repeatBody["fact"] as FactRef).seq).toBe((settledBody["fact"] as FactRef).seq);
+    // An enrolment whose reply is lost stays unfinished; an admin retires it; the create's retry does not revive it.
+    const { link: lostLink } = await invite(room, rita, "@bot4");
+    const lostLinkBody = JSON.stringify({ link: lostLink });
+    hostedTest.lose = `/${rita.config.repository!.membership.scope}/acts`;
+    const unresolved = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", rita.config.repository!.membership, null, lostLinkBody, "create-4"), lostLinkBody));
+    const unresolvedBody = await unresolved.json() as { error: string };
+    expect([unresolved.status, unresolvedBody.error]).toEqual([503, "unresolved"]);
+    const agents = await registryStub(rita.config.repository!.membership.scope).agents();
+    expect(agents.some((a) => a.handle === "@bot4"), "no agent row until the enrolment resolves").toBe(false);
+    const retireUrl = (id: string) => `/mcp/agents/${id}`;
+    // The reserved agent ID is the registry's: find it by retiring through the control route with the reserved ID from the op's row.
+    const reservedId = (await (env.REGISTRIES.get(env.REGISTRIES.idFromName(rita.config.repository!.membership.scope)) as unknown as { reservedAgent(op: string): Promise<string | null> }).reservedAgent("create-4"))!;
+    expect(reservedId).toMatch(/^[0-9a-f]{64}$/);
+    expect((await room.wait(() => post(retireUrl(reservedId), control(room, rita.secret, "retire", rita.config.repository!.membership, reservedId, "", "retire-4"), "", "DELETE"))).status, "an admin retires the unfinished agent").toBe(200);
+    const retried = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", rita.config.repository!.membership, null, lostLinkBody, "create-4"), lostLinkBody));
+    expect([retried.status, (await retried.json() as { error: string }).error], "the retry does not revive it").toEqual([409, "retired"]);
     // H7. The HTTP framing overhead of a 2026-07-28 tools/call: the response's bytes beyond the CallResult, measured once.
     const framed = await room.wait(() => modernCall(bot.bearer, "room", {}));
     const text = await framed.text();

@@ -735,6 +735,27 @@ is one retirement for an agent, many times over. The operator recipe is in
 `docs/mcp.md`. No retained operation and no original outcome is replaced
 or forgotten.
 
+**Corrections of review 7e00dc3a (first filing, `c6ef8a4e`).** Nine P2
+findings, each repaired in source with a witness through the actual custody
+and Worker paths.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. Concurrent creation could mint a second bearer | The agent object runs its control operations one at a time (a queue), and decides the terminal transition on the durable row as it is then: an agent already enrolled answers its stored answer, one retired answers `409`, and no second bearer is minted for one creation | H1: two concurrent `create` requests under one op answer one agent, one key and one bearer; the registry lists one agent |
+| 2. Expired answer bodies stayed in storage | Each object removes every answer body past its retention at the start of its next control operation, in the same transaction, from the control row and from the agent row (which held the bearer shown at creation); the row's fingerprint, deadline and state stay as the tombstone. Expiry is lazy: a copy is removed when that object next acts, so the registry's copy goes at the registry's next `create` | H3: eight days on, a replay is `409` stale and the persisted rows of both objects hold no answer body (read through a test-only hook) |
+| 3. A completed control replay closed current streams | `control` returns whether this call committed the action; only a fresh action closes streams and ends sessions. A replay returns the retained answer and disturbs nothing opened since | H4: rotate, open a stream and a listen under the new bearer, replay the rotation: both stay open |
+| 4. An unfinished enrolment could not be retired | `retire` is admitted while the agent is `enrolling`, under the same authority check; the creation's terminal transition re-reads the row and never revives a retired agent; `bearer` on an unfinished agent is `409` | H6: an enrolment whose reply is lost is `503` unresolved; an admin retires the reserved agent; the creation's retry is `409` retired |
+| 5. Archived refusals could not be archived again | A record written live takes its archived copy's place in the same transaction; archival replaces an earlier copy. The record carries every outcome and its segment rows are never removed, so history is kept | `sqlite-custody.test.ts`: an archived refusal is resubmitted, live again, terminal again and archived again, with both outcomes |
+| 6. Reservations at the wrong boundary | `CustodyStore.write` takes `dispatch: true` from custody on the writes that precede a send, a resubmit and a step, whatever the record's phase; the store arms only then, reserving the net growth (the record up to its bound plus one segment row) and refusing `full` before anything is written; a result's write consumes what is held and reserves nothing. `custody.ts` also applies the design's 256 KiB inline threshold | `sqlite-custody.test.ts`: at a saturated budget 65 lost outcomes spill and complete from the held capacity while another dispatch is refused; a step on a terminal act arms and is refused full |
+| 7. Modern listens did not close gracefully | The HTTP layer keeps each listen's handle; a graceful ending completes every listen with its result on its own stream and closes the body (`Wire.endStream`); an abrupt one sends nothing | H4: a listen open at `retire` receives its result and the end of its body |
+| 8. Concurrent legacy `GET`s could exceed four streams | A stream's slot is taken before the awaited snapshot and released on refusal; a session ended during the snapshot opens nothing | `http.test.ts`: with three streams open and the snapshot held, two concurrent `GET`s on two sessions admit one and refuse one |
+| 9. The control body was buffered before its bound | The Worker reads the control body in chunks and cancels at the chunk that passes 64 KiB, before any object is reached; the exact bytes read are what the object digests | H3: a streaming body of unbounded length is `413` and no registry row appears |
+
+Non-blocking: the 256 KiB inline threshold is implemented as above; an
+unknown method under the modern revision stays `404` with `-32601` and a
+request-only method sent as a notification stays `202` as the matrix
+states.
+
 **What differs from the design's words.** The `create` body is
 `{ link }`, the agent-key invitation link itself, rather than its fields
 spelled out: it is the same information, already encoded and validated by
@@ -750,7 +771,7 @@ invitation's, recorded at creation. The watch timer is the runtime's
 
 | Command | Result |
 |---|---|
-| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  83 passed \| 1 skipped (84)` (observed): the wire tests with the modern headers, H8 over loopback, the SQLite store |
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  87 passed \| 1 skipped (88)` (observed, after the corrections of review 7e00dc3a): the wire tests with the modern headers, H8 over loopback with the concurrent admission, the SQLite store with the archived-refusal, saturated-budget and terminal-step cases |
 | `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
 | `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
 

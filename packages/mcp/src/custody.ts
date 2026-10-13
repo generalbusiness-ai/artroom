@@ -62,6 +62,8 @@ import { canonicalize, digestBytes, intentDigest, utf8 } from "@generalbusiness/
 
 export const UNRESOLVED_MOST = 256;
 export const OUTCOMES_INLINE = 64;
+/** The most canonical bytes the inline outcomes hold before the oldest spill to the segment (the hosted design, section 3.6). */
+export const OUTCOMES_INLINE_BYTES = 256 * 1024;
 export const RECORD_BYTES = 2 * 1024 * 1024;
 export const KEY_BYTES = 128;
 /** The most outcomes the search for a record's decisive outcome reads from its segment at once. */
@@ -129,8 +131,12 @@ export interface CustodyStore {
   /** Run `work` alone among every process sharing the store: admission against the capacity. */
   exclusive<T>(work: () => Promise<T>): Promise<T>;
   read(id: string): Promise<CustodyRecord | null>;
-  /** Write whole, then read back and compare; throws when the bytes read back differ. */
-  write(id: string, record: CustodyRecord): Promise<void>;
+  /**
+   * Write whole, then read back and compare; throws when the bytes read back differ. `dispatch`: this write precedes a
+   * dispatch (a send, a resubmit, a step), so a store that accounts capacity reserves the completion need before it, and
+   * refuses with its own `full` before anything is sent; a write of a result consumes what was reserved and reserves nothing.
+   */
+  write(id: string, record: CustodyRecord, options?: { dispatch?: boolean }): Promise<void>;
   /** The records not yet terminal, oldest first: their identity digests and keys. */
   unresolved(): Promise<{ id: string; key: string; created: string }[]>;
   /**
@@ -197,11 +203,11 @@ export class Custody {
     try { return await this.store.read(id); } catch { throw new CustodyError({ held: "unreadable" }); }
   }
 
-  async #write(id: string, record: CustodyRecord): Promise<void> {
+  async #write(id: string, record: CustodyRecord, dispatch = false): Promise<void> {
     if (bytesOf(record) > RECORD_BYTES) throw new CustodyError({ held: "too-large" });
     // A store may refuse a write by its own account (`full`: the hosted store's budget, before anything is dispatched); any
     // other failure is a storage failure, which settles nothing.
-    try { await this.store.write(id, record); } catch (error) { throw error instanceof CustodyError ? error : new CustodyError({ held: "unreadable" }); }
+    try { await this.store.write(id, record, dispatch ? { dispatch: true } : {}); } catch (error) { throw error instanceof CustodyError ? error : new CustodyError({ held: "unreadable" }); }
   }
 
   /**
@@ -212,7 +218,7 @@ export class Custody {
     record.outcomes.push(outcome);
     record.count++;
     let spill = Math.max(0, record.outcomes.length - OUTCOMES_INLINE);
-    while (spill < record.outcomes.length && bytesOf({ ...record, outcomes: record.outcomes.slice(spill) }) > RECORD_BYTES) spill++;
+    while (spill < record.outcomes.length && (bytesOf(record.outcomes.slice(spill)) > OUTCOMES_INLINE_BYTES || bytesOf({ ...record, outcomes: record.outcomes.slice(spill) }) > RECORD_BYTES)) spill++;
     if (spill > 0) {
       const inSegment = record.count - record.outcomes.length;
       await this.store.segment(id, inSegment, record.outcomes.splice(0, spill));
@@ -316,12 +322,12 @@ export class Custody {
           record.attempt++;
           record.phase = "sent";
           record.updated = this.now();
-          await this.#write(id, record);
+          await this.#write(id, record, true);
         });
       } else {
         record.phase = "sent";
         record.updated = this.now();
-        await this.#write(id, record);
+        await this.#write(id, record, true);
       }
       let answer: Answer;
       try {
@@ -394,7 +400,7 @@ export class Custody {
       entry.phase = "sent";
       fresh.steps[sid] = entry;
       if (fresh.standalone) fresh.phase = "sent";
-      await this.#write(id, fresh);
+      await this.#write(id, fresh, true);
       let answer: Answer | null = null;
       try { answer = await deliver(fresh.envelope.signed); } catch (error) { if (!(error instanceof Lost)) throw error; }
       entry.phase = answer === null || answer.answer === "unavailable" ? "unknown" : "answered";

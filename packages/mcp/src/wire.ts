@@ -296,6 +296,12 @@ export class Wire {
     if (of && of.size === 0) this.listens.delete(owner);
   }
 
+  /** End every listen of a client stream gracefully: each completes with its result on that stream, and its watchers are removed. */
+  endStream(owner: object): void {
+    for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) listen.end();
+    this.listens.delete(owner);
+  }
+
   /** End every listen of a client stream that closed: no result is sent, as for an abrupt close; its watchers are removed. */
   dropStream(owner: object): void {
     for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) { listen.closed = true; listen.unsubscribe(); }

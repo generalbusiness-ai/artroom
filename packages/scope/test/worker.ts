@@ -156,6 +156,7 @@ type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
 export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
   protected override now(): number { return hostedTest.now?.() ?? Date.now(); }
+  heldAnswers(): { op: string; answer: boolean }[] { return this.answers(); }
 }
 export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
@@ -163,6 +164,7 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   reset(): void { this.evict(); }
   /** Fire the service's watch once, as 30 seconds passing would. */
   async tick(): Promise<boolean> { const service = this.held()?.inside().service; if (!service) return false; await service.check(); return true; }
+  heldAnswers(): { control: { op: string; answer: boolean }[]; agent: boolean } { return this.answers(); }
   /** The open streams and sessions this instance holds. */
   counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
   protected override ports() {
