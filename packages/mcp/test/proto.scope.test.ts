@@ -145,3 +145,40 @@ test("a defaulted selector: the alias's revision follows the default, the field 
     expect([Object.hasOwn(glance.fields, "jar"), Object.keys(glance.expected)]).toEqual([false, ["on"]]);
   } finally { room.done(); }
 }, 120_000);
+
+// Invariant: an also item selected by a declared fact field is expected like one selected by an item ID: the scope reads a local
+// fact as its seq, and so does the server when it resolves the act's subjects, while the intent signs the fact as given. Through
+// act: the fill that opened a jar selects it, the act is accepted with the original fact in the signed fields and the alias's
+// revision in expected; an envelope kept with that revision is refused revision-moved once the jar moves.
+test("a local fact selects the also item: the fact signed as given, the alias's revision expected", async () => {
+  const room = mcpRoom();
+  try {
+    const rita = await pantryRoom(room, "add");
+    const root = 1;
+    const viaAct = async (kind: string, args: Record<string, unknown>) => {
+      const acts = await rita.ok("actions", { scope: root });
+      return accepted(room, rita, "act", { target: root, kind, digest: acts["digest"], ...args });
+    };
+    const intentOf = async (done: Record<string, unknown>) => ((await rita.ok("step", { scope: root, seq: (done["fact"] as FactRef).seq }))["entry"] as { input: { signed: { intent: { fields: Record<string, unknown>; expected: Record<string, unknown> } } } }).input.signed.intent;
+    const live = async () => (await rita.ok("inspect", { scope: root }))["items"] as { id: number; type: string; revision: number }[];
+
+    const fill = (await viaAct("fill", { fields: JSON.parse('{ "__proto__": "jam", "label": { "__proto__": "red" } }'), idempotencyKey: "fill" }))["fact"] as FactRef;
+    const jar = (await live()).find((i) => i.type === "jar")!;
+    expect(jar.id, "the fill's seq is the jar it opened").toBe(fill.seq);
+    const shelf = () => live().then((items) => items.find((i) => i.type === "shelf")!.id);
+
+    const verified = await intentOf(await viaAct("verify", { on: await shelf(), fields: { jarFact: fill, title: "Verified" }, idempotencyKey: "verify" }));
+    expect([own(verified.fields, "jarFact"), Object.keys(verified.expected).sort(), own(verified.expected, "selected")]).toEqual([fill, ["on", "selected"], jar.revision]);
+
+    // A kept envelope, then the selected jar moves: refused revision-moved.
+    const acts = await rita.ok("actions", { scope: root });
+    const args = { target: root, kind: "verify", digest: acts["digest"], on: await shelf(), fields: { jarFact: fill, title: "Kept" }, idempotencyKey: "verify-moved" };
+    const kept = await rita.ok("prepare", { resource: root, capability: "hold@1", step: "stage", ...args });
+    expect((kept["act"] as { phase: string }).phase).toBe("prepared");
+    const before = (await live()).find((i) => i.id === jar.id)!.revision;
+    await viaAct("shake", { on: jar.id, fields: { note: "shaken" }, idempotencyKey: "shake" });
+    expect((await live()).find((i) => i.id === jar.id)!.revision, "the jar's revision moved").toBe(before + 1);
+    const moved = await rita.ok("act", args);
+    expect([moved["answer"], moved["reason"]], JSON.stringify(moved)).toEqual(["refused", "revision-moved"]);
+  } finally { room.done(); }
+}, 120_000);

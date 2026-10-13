@@ -5,7 +5,8 @@
  * takes the fields the directory's `open-issue` sends, so the room's directory creates it as a lane. `stock` and `close` declare
  * optional names that an object's prototype also has (`__proto__`, `constructor`, `toString`, `valueOf`), for omission.
  * `recheck` binds its `also` item by an optional field whose default, 2, is the first jar the lane opens; `glance` binds it by
- * an optional field with no default; `shake` moves a jar's revision.
+ * an optional field with no default; `verify` binds it by a fact field, the fill that opened the jar; `shake` moves a jar's
+ * revision.
  */
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 
@@ -82,6 +83,14 @@ export const pantry = JSON.parse(`{
       "also": { "__proto__": { "item": "jar", "by": "jar" } },
       "fields": { "jar": { "type": "item", "of": "jar", "required": false }, "title": { "type": "text", "max": 256, "required": true } },
       "guards": [],
+      "effects": [{ "value": { "slot": "title", "from": { "field": "title" } } }],
+      "sends": [], "attention": []
+    },
+    "verify": {
+      "step": "transition", "on": "shelf", "grant": "issue.comment",
+      "also": { "selected": { "item": "jar", "by": "jarFact" } },
+      "fields": { "jarFact": { "type": "fact", "kind": ["fill"], "under": "pantry", "required": true }, "title": { "type": "text", "max": 256, "required": true } },
+      "guards": [{ "state": ["open"], "of": "also.selected" }],
       "effects": [{ "value": { "slot": "title", "from": { "field": "title" } } }],
       "sends": [], "attention": []
     },
