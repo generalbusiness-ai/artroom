@@ -151,7 +151,7 @@ export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promi
  * fixture's clock, and the pause between two polls of `wait`, which drives
  * the fixture's operations as a deployment's alarms would.
  */
-export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null; /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */ lose: string | null } = { now: null, pause: null, lose: null };
+export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null; /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */ lose: string | null; /** A small control budget for an agent object made while it is set, in place of 16 MiB and 1 MiB. */ controlBudget: { budget: number; reserve: number } | null } = { now: null, pause: null, lose: null, controlBudget: null };
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
 export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
@@ -165,11 +165,13 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   /** Fire the service's watch once, as 30 seconds passing would. */
   async tick(): Promise<boolean> { const service = this.held()?.inside().service; if (!service) return false; await service.check(); return true; }
   heldAnswers(): { control: { op: string; answer: boolean }[]; agent: boolean } { return this.answers(); }
+  used(): number { return this.controlUsed(); }
   /** The open streams and sessions this instance holds. */
   counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
   protected override ports() {
     const scopes = this.env.PLATFORM;
     return {
+      ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}),
       now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
       pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
       fetch: (async (url: string, init?: RequestInit) => {

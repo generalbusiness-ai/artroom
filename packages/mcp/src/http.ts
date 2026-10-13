@@ -33,7 +33,7 @@
  */
 
 import type { Digest } from "@generalbusiness/dap-contract";
-import { LEGACY, MODERN, PROTOCOL_META, UNSUPPORTED_VERSION, Wire, frameOf, isFrame, isNotificationMethod, newSession, type Id, type LegacySession, type Message, type Stream } from "./wire.ts";
+import { LEGACY, MODERN, PROTOCOL_META, SESSION_FULL, UNSUPPORTED_VERSION, Wire, frameOf, isFrame, isNotificationMethod, newSession, type Id, type LegacySession, type Message, type Stream } from "./wire.ts";
 
 /** The 2026-07-28 transport's error for a header that does not match the body. */
 export const HEADER_MISMATCH = -32020;
@@ -43,6 +43,10 @@ export const SESSIONS_MOST = 16;
 export const STREAMS_MOST = 4;
 export const SERVED: readonly string[] = [MODERN, LEGACY];
 const TOO_MANY_STREAMS = -32001;
+/** The most canonical bytes a 2025-11-25 client's declared capabilities may hold: a session row is bounded control state. */
+export const CAPABILITIES_BYTES = 16 * 1024;
+/** Thrown by a transport's `persist` when its store admits no more session state; the session is not issued. */
+export class SessionFull extends Error { constructor() { super("No room for another session."); this.name = "SessionFull"; } }
 
 /** A 2025-11-25 session as it is persisted: what survives eviction. Its open stream does not. */
 export interface SessionRow { id: string; version: string | null; initialized: boolean; capabilities: Record<string, unknown>; listed: Digest | null; created: number }
@@ -222,6 +226,9 @@ export class McpHttp {
       session = found;
     }
     const response = await this.port.wire.handle(m, session, (out) => session.stream?.send(out));
+    // An initialize that is refused issues no session: nothing of it stays in memory, and no session header is sent. A store
+    // that could not keep it answers 507.
+    if (issued && response?.error) { this.port.wire.endLegacy(session); this.sessions.delete(issued); return json(response.error.code === SESSION_FULL ? 507 : 200, response); }
     if (!response) return bare(202);
     return json(200, response, issued ? { "mcp-session-id": issued } : {});
   }
@@ -241,21 +248,24 @@ export class McpHttp {
 
   /**
    * The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. The
-   * stream's slot is taken before anything is awaited, so two concurrent opens cannot both pass the limit; a replacement takes
-   * no new slot.
+   * stream's slot is owned before anything is awaited: a fresh open takes a new slot or is refused, and a replacement takes
+   * over the incumbent's slot at once, so the incumbent's cancellation during the await frees nothing for another session.
    */
   async #stream(session: LegacySession): Promise<Response> {
     const slot = {};
-    if (session.stream === null) {
+    const incumbent = session.stream;
+    if (incumbent === null) {
       if (this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
-      this.#open.add(slot);
+    } else {
+      this.#open.delete(incumbent);   // the slot passes to the replacement now
     }
+    this.#open.add(slot);
     // Reconciliation before the stream is attached: a change made while no stream was open, or while the object was evicted, is
     // told once now, unless the client has listed since.
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
     this.#open.delete(slot);
-    // The session may have ended while the snapshot was read: then no stream opens.
+    // The session may have ended while the snapshot was read: then no stream opens, and the slot is released.
     if (session.id !== null && !this.sessions.has(session.id)) return bare(404);
     const old = session.stream;
     const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });

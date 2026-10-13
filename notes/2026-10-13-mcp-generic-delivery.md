@@ -756,6 +756,15 @@ unknown method under the modern revision stays `404` with `-32601` and a
 request-only method sent as a notification stays `202` as the matrix
 states.
 
+**Corrections of review 2e85245b (second filing, `b3a7b418`).** Seven of
+the nine were credited; three P2s remained, each repaired with a witness.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. The control budget was not an aggregate: session rows and the agent row were not charged | Every persisted row of the control plane is charged by its stored bytes against one budget: a control row (its `op`, fingerprint and answer; an operation reserves 4 KiB first and its answer is charged beyond that), each session row (its JSON as stored, the difference on an update, credited when the session ends), and the agent row's configuration (its growth, so a root added is charged). A session's declared capabilities are bounded at 16 KiB, so a session row is bounded; a session the store cannot keep is not issued (`-32001`, `507`). Expired answer bodies credit their bytes; the tombstone keeps its row. The last 1 MiB stays `retire`'s | The hosted story: with a 64 KiB test budget and an 8 KiB reserve, a 20 KiB capabilities declaration is refused and an 8 KiB one is charged and credited; rotations with distinct 128-byte ops reach the ceiling and the next is `507`; at the ceiling no session is issued; after a reset the used bytes read the same and the next rotation is still refused; `retire` succeeds from the reserve |
+| 2. A step on a terminal act released its capacity before the step was sent | The store releases an identity's capacity only when nothing is in flight: not on a write that precedes a dispatch, and not while any step is `sent` or `unknown`. The reservation lives through the step's durable result, a lost answer and a restart | `sqlite-custody.test.ts`: through `Custody.step` on an accepted act with the delivery paused, the reservation is held, a competing identity's dispatch is refused `full`, a lost answer keeps it, a store opened again over the same storage reads it back, the answered step consumes it, and the competitor is admitted |
+| 3. A replacement `GET` could exceed four streams | A replacement takes over the incumbent's slot before the awaited snapshot, so the incumbent's cancellation during the await frees nothing for another session; a session that ends during the await opens nothing and its slot is released | `http.test.ts`: four streams open, the snapshot held, the first session's replacement entered, its incumbent cancelled, a fifth session's `GET` refused `409`, the replacement opens, four streams |
+
 **What differs from the design's words.** The `create` body is
 `{ link }`, the agent-key invitation link itself, rather than its fields
 spelled out: it is the same information, already encoded and validated by
@@ -771,14 +780,17 @@ invitation's, recorded at creation. The watch timer is the runtime's
 
 | Command | Result |
 |---|---|
-| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  87 passed \| 1 skipped (88)` (observed, after the corrections of review 7e00dc3a): the wire tests with the modern headers, H8 over loopback with the concurrent admission, the SQLite store with the archived-refusal, saturated-budget and terminal-step cases |
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  89 passed \| 1 skipped (90)` (observed, after the corrections of reviews 7e00dc3a and 2e85245b): the wire tests with the modern headers, H8 over loopback with the concurrent admission, the SQLite store with the archived-refusal, saturated-budget and terminal-step cases |
 | `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
 | `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
 
 **Paths.** The discovery head landed as main `8235c6b3` while this head was
-being built; main was merged into the branch, taking main's version of
-every path this head does not change. At the head, `git diff --name-only
-origin/main...HEAD` lists this head's own paths and no other.
+being built, and main moved again to `27bb745f` (the logo and self-host
+delivery records) during review; main was merged into the branch each
+time, taking main's version of every path this head does not change. At
+the head, `git diff --name-only origin/main...HEAD` lists this head's own
+25 paths (the page and counting Worker modules among them, regenerated for
+the bytes and contract changes) and no other.
 
 ## What is owed
 

@@ -31,7 +31,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, digestBytes, isKeyId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, timeMs, timeOf, unb64url, utf8, verifyControl } from "@generalbusiness/artroom-bytes";
 import { TransportError, agentKeyInvitationOf, secretSigner, signedIntent, type AgentKeyInvitation, type Fetch } from "@generalbusiness/artroom-client";
 import { CustodyError, Lost, meaningOf, type Envelope, type Identity } from "./custody.ts";
-import { McpHttp, type SessionRow } from "./http.ts";
+import { McpHttp, SessionFull, type SessionRow } from "./http.ts";
 import type { McpConfig, Root } from "./inventory.ts";
 import { McpService } from "./service.ts";
 import { sqliteStore, type Sql } from "./sqlite-custody.ts";
@@ -39,8 +39,10 @@ import { Wire } from "./wire.ts";
 
 export const CONTROL_BUDGET = 16 * 1024 * 1024;
 export const RETIRE_RESERVE = 1024 * 1024;
-/** What one control operation reserves before anything else: its row, its answer and its tombstone. */
-export const CONTROL_ROW_BYTES = 16 * 1024;
+/** What one control operation reserves before anything else: room for its row, its answer and its tombstone, as stored. */
+export const CONTROL_ROW_BYTES = 4 * 1024;
+/** The fixed overhead charged for each persisted row beside its bytes. */
+export const ROW_OVERHEAD = 128;
 /** How long a stored answer is kept past the original request's `notAfter`. */
 export const ANSWER_RETENTION_MS = 7 * 86_400_000;
 export const CONTROL_BODY_BYTES = 64 * 1024;
@@ -112,29 +114,42 @@ export function bound(signed: SignedControl, service: string, action: ControlAct
 
 /** The control table and budget of one object: reservations keyed by `op`, answers, tombstones. */
 class ControlPlane {
-  constructor(private readonly sql: Sql) {
+  constructor(private readonly sql: Sql, private readonly budget: number = CONTROL_BUDGET, private readonly retireReserve: number = RETIRE_RESERVE) {
     sql.exec(`CREATE TABLE IF NOT EXISTS control (op TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, action TEXT NOT NULL, agent TEXT, state TEXT NOT NULL, answer TEXT, not_after TEXT NOT NULL, created TEXT NOT NULL)`);
     sql.exec(`CREATE TABLE IF NOT EXISTS control_budget (k TEXT PRIMARY KEY, v INTEGER NOT NULL)`);
     sql.exec(`INSERT OR IGNORE INTO control_budget (k, v) VALUES ('used', 0)`);
   }
   used(): number { return Number(this.sql.exec(`SELECT v FROM control_budget WHERE k = 'used'`).toArray()[0]!["v"]); }
-  /** Reserve one operation's space, inside the caller's transaction. False: the budget admits none; `retire` alone may draw on the reserve. */
-  reserve(action: ControlAction): boolean {
+  /**
+   * Charge `bytes` of persisted control state against the budget, inside the caller's transaction. False: the budget admits
+   * none; `retire` alone may draw on the last 1 MiB. A negative charge credits what a removed row held. Every persisted row of
+   * the control plane is charged by its stored bytes: control rows, session rows, the agent row's configuration.
+   */
+  charge(bytes: number, action: ControlAction | "session" | "config"): boolean {
     const used = this.used();
-    const ceiling = action === "retire" ? CONTROL_BUDGET : CONTROL_BUDGET - RETIRE_RESERVE;
-    if (used + CONTROL_ROW_BYTES > ceiling) return false;
-    this.sql.exec(`UPDATE control_budget SET v = ? WHERE k = 'used'`, used + CONTROL_ROW_BYTES);
+    const ceiling = action === "retire" ? this.budget : this.budget - this.retireReserve;
+    if (bytes > 0 && used + bytes > ceiling) return false;
+    this.sql.exec(`UPDATE control_budget SET v = ? WHERE k = 'used'`, Math.max(0, used + bytes));
     return true;
   }
+  /** Reserve one operation's space before anything else: room for its row, its answer and its tombstone. */
+  reserve(action: ControlAction): boolean { return this.charge(CONTROL_ROW_BYTES, action); }
+  /** The bytes a control row holds as stored. */
+  static rowBytes(op: string, fingerprint: string, answer: ControlAnswer | null): number { return utf8(op).length + fingerprint.length + (answer ? JSON.stringify(answer).length : 0) + ROW_OVERHEAD; }
   row(op: string): { fingerprint: string; action: string; agent: string | null; state: string; answer: ControlAnswer | null; notAfter: string } | null {
     const r = this.sql.exec(`SELECT fingerprint, action, agent, state, answer, not_after FROM control WHERE op = ?`, op).toArray()[0];
     if (!r) return null;
     return { fingerprint: String(r["fingerprint"]), action: String(r["action"]), agent: r["agent"] === null ? null : String(r["agent"]), state: String(r["state"]), answer: r["answer"] === null ? null : JSON.parse(String(r["answer"])) as ControlAnswer, notAfter: String(r["not_after"]) };
   }
+  /** Insert a row, settling its reservation against its stored bytes: the reservation covers the row and its answer to come. */
   insert(op: string, fingerprint: string, action: ControlAction, agent: string | null, state: string, notAfter: string, created: string): void {
     this.sql.exec(`INSERT INTO control (op, fingerprint, action, agent, state, answer, not_after, created) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`, op, fingerprint, action, agent, state, notAfter, created);
   }
+  /** Write the answer; bytes beyond the reservation are charged, and a refusal here is a storage failure the caller reports. */
   complete(op: string, state: string, result: ControlAnswer): void {
+    const row = this.row(op)!;
+    const beyond = ControlPlane.rowBytes(op, row.fingerprint, result) - CONTROL_ROW_BYTES;
+    if (beyond > 0 && !this.charge(beyond, row.action as ControlAction)) throw new Error("SQLITE_FULL: the control budget is exhausted");
     this.sql.exec(`UPDATE control SET state = ?, answer = ? WHERE op = ?`, state, JSON.stringify(result), op);
   }
   /** Retention: an answer is kept seven days past the original request's deadline; the tombstone stays. */
@@ -147,10 +162,13 @@ class ControlPlane {
    * caller removes any other copy it keeps. Run inside the caller's transaction, before an answer is looked up.
    */
   expire(now: number): string[] {
-    const due = this.sql.exec(`SELECT op, not_after FROM control WHERE answer IS NOT NULL`).toArray()
-      .filter((r) => now > timeMs(String(r["not_after"]))! + ANSWER_RETENTION_MS).map((r) => String(r["op"]));
-    for (const op of due) this.sql.exec(`UPDATE control SET answer = NULL WHERE op = ?`, op);
-    return due;
+    const due = this.sql.exec(`SELECT op, not_after, answer FROM control WHERE answer IS NOT NULL`).toArray()
+      .filter((r) => now > timeMs(String(r["not_after"]))! + ANSWER_RETENTION_MS);
+    for (const r of due) {
+      this.sql.exec(`UPDATE control SET answer = NULL WHERE op = ?`, String(r["op"]));
+      this.charge(-String(r["answer"]).length, "retire");   // the body's bytes are credited; the tombstone keeps its row
+    }
+    return due.map((r) => String(r["op"]));
   }
 }
 
@@ -236,6 +254,8 @@ export interface AgentPorts extends Authority {
   random(bytes: number): Uint8Array;
   every?: (ms: number, run: () => void) => () => void;
   pause?: (waiting: readonly string[]) => Promise<void>;
+  /** A test's control budget and retirement reserve in place of 16 MiB and 1 MiB. */
+  controlBudget?: { budget: number; reserve: number };
 }
 
 interface AgentRow { op: string; seed: Uint8Array; key: KeyId; state: "enrolling" | "enrolled" | "retired" | "refused"; membership: ScopeRef; handle: string; config: McpConfig; bearer: string | null; answer: ControlAnswer | null }
@@ -260,8 +280,11 @@ export class HostedAgent {
   constructor(private readonly sql: Sql, private readonly ports: AgentPorts) {
     sql.exec(`CREATE TABLE IF NOT EXISTS agent (id INTEGER PRIMARY KEY CHECK (id = 1), op TEXT NOT NULL, seed BLOB NOT NULL, key TEXT NOT NULL, state TEXT NOT NULL, membership TEXT NOT NULL, handle TEXT NOT NULL, config TEXT NOT NULL, bearer TEXT, answer TEXT, created TEXT NOT NULL, updated TEXT NOT NULL)`);
     sql.exec(`CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, row TEXT NOT NULL, created INTEGER NOT NULL)`);
-    this.#control = new ControlPlane(sql);
+    this.#control = new ControlPlane(sql, ports.controlBudget?.budget, ports.controlBudget?.reserve);
   }
+
+  /** The control budget's used bytes, for a test's eyes. */
+  controlUsed(): number { return this.#control.used(); }
 
   #row(): AgentRow | null {
     const r = this.sql.exec(`SELECT op, seed, key, state, membership, handle, config, bearer, answer FROM agent WHERE id = 1`).toArray()[0];
@@ -269,7 +292,16 @@ export class HostedAgent {
     const seed = r["seed"] instanceof Uint8Array ? r["seed"] : new Uint8Array(r["seed"] as ArrayBuffer);
     return { op: String(r["op"]), seed, key: String(r["key"]) as KeyId, state: String(r["state"]) as AgentRow["state"], membership: JSON.parse(String(r["membership"])) as ScopeRef, handle: String(r["handle"]), config: JSON.parse(String(r["config"])) as McpConfig, bearer: r["bearer"] === null ? null : String(r["bearer"]), answer: r["answer"] === null ? null : JSON.parse(String(r["answer"])) as ControlAnswer };
   }
-  #setConfig(config: McpConfig): void { this.sql.exec(`UPDATE agent SET config = ?, updated = ? WHERE id = 1`, canonicalize(config as never), timeOf(this.ports.now())); }
+  /** The agent row's configuration is control state too: its growth (a root added) is charged, and refused when the budget is full. */
+  #setConfig(config: McpConfig): void {
+    const text = canonicalize(config as never);
+    this.sql.transaction(() => {
+      const before = this.sql.exec(`SELECT config FROM agent WHERE id = 1`).toArray()[0];
+      const delta = text.length - (before ? String(before["config"]).length : 0);
+      if (!this.#control.charge(delta, "config")) throw new Error("The agent's control budget is full: the configuration cannot grow.");
+      this.sql.exec(`UPDATE agent SET config = ?, updated = ? WHERE id = 1`, text, timeOf(this.ports.now()));
+    });
+  }
 
   /** The service of this agent: its key from the seed, its configuration from the row, its custody in this object's storage. */
   #serviceOf(row: AgentRow): McpService {
@@ -295,8 +327,23 @@ export class HostedAgent {
       wire, bodyBytes: 1024 * 1024, now: this.ports.now,
       mintSession: () => b64url(this.ports.random(16)),
       authorized: () => true,   // the bearer was checked before the request reached the layer
-      persist: (session: SessionRow) => { this.sql.transaction(() => { this.sql.exec(`INSERT INTO session (id, row, created) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET row = excluded.row`, session.id, JSON.stringify(session), session.created); }); },
-      remove: (id) => { this.sql.exec(`DELETE FROM session WHERE id = ?`, id); },
+      persist: (session: SessionRow) => {
+        // A session row is control state: its bytes as stored are charged, the difference on an update; no room, no session.
+        const text = JSON.stringify(session);
+        this.sql.transaction(() => {
+          const before = this.sql.exec(`SELECT row FROM session WHERE id = ?`, session.id).toArray()[0];
+          const delta = text.length + ROW_OVERHEAD - (before ? String(before["row"]).length + ROW_OVERHEAD : 0);
+          if (!this.#control.charge(delta, "session")) throw new SessionFull();
+          this.sql.exec(`INSERT INTO session (id, row, created) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET row = excluded.row`, session.id, text, session.created);
+        });
+      },
+      remove: (id) => {
+        this.sql.transaction(() => {
+          const before = this.sql.exec(`SELECT row FROM session WHERE id = ?`, id).toArray()[0];
+          if (before) this.#control.charge(-(String(before["row"]).length + ROW_OVERHEAD), "retire");
+          this.sql.exec(`DELETE FROM session WHERE id = ?`, id);
+        });
+      },
     });
     // The sessions as persisted survive eviction; their streams do not, and the next GET reconciles.
     this.#http.restore(this.sql.exec(`SELECT row FROM session ORDER BY created`).toArray().map((r) => JSON.parse(String(r["row"])) as SessionRow));
@@ -326,8 +373,10 @@ export class HostedAgent {
         if (!this.#control.reserve("create")) return answer(507, { error: "full", rule: "control-budget" });
         const seed = this.ports.random(32);
         const config: McpConfig = { service: link.service, repository: link.repository, handle: link.handle };
+        const configText = canonicalize(config as never);
+        if (!this.#control.charge(configText.length + 256 + ROW_OVERHEAD, "create")) return answer(507, { error: "full", rule: "control-budget" });
         this.sql.exec(`INSERT INTO agent (id, op, seed, key, state, membership, handle, config, bearer, answer, created, updated) VALUES (1, ?, ?, ?, 'enrolling', ?, ?, ?, NULL, NULL, ?, ?)`,
-          op, seed, keyIdOfSecret(seed), canonicalize(link.repository.membership as never), link.handle, canonicalize(config as never), timeOf(now), timeOf(now));
+          op, seed, keyIdOfSecret(seed), canonicalize(link.repository.membership as never), link.handle, configText, timeOf(now), timeOf(now));
         this.#control.insert(op, fingerprintOf(request), "create", this.ports.id, "reserved", request.notAfter, timeOf(now));
         return null;
       });
@@ -427,7 +476,9 @@ export class HostedAgent {
         : answer(200, { agent: this.ports.id, by: authority.by, retired: true });
       if (action === "bearer") this.sql.exec(`UPDATE agent SET bearer = ?, updated = ? WHERE id = 1`, digestBytes(utf8(secret!)), timeOf(now));
       else this.sql.exec(`UPDATE agent SET state = 'retired', bearer = NULL, updated = ? WHERE id = 1`, timeOf(now));
+      const held = this.sql.exec(`SELECT row FROM session`).toArray().reduce((n, s) => n + String(s["row"]).length + ROW_OVERHEAD, 0);
       this.sql.exec(`DELETE FROM session`);
+      this.#control.charge(-held, "retire");
       this.#control.insert(r.op, fingerprint, action, this.ports.id, "complete", r.notAfter, timeOf(now));
       this.#control.complete(r.op, "complete", done);
       return { result: done, fresh: true };

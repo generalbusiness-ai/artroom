@@ -582,6 +582,8 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
   protected evict(): void { this.#agent = null; }
   /** What this instance holds in memory now. For a test's subclass. */
   protected held(): HostedAgent | null { return this.#agent; }
+  /** The control budget's used bytes, for a test's subclass. */
+  protected controlUsed(): number { return this.#of().controlUsed(); }
   /** The persisted answer bodies, for a test's subclass: whether each control row and the agent row still hold one. */
   protected answers(): { control: { op: string; answer: boolean }[]; agent: boolean } {
     const rows = this.ctx.storage.sql.exec(`SELECT op, answer IS NOT NULL AS held FROM control ORDER BY created`).toArray();

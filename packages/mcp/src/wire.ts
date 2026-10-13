@@ -35,6 +35,10 @@ export const SUBSCRIPTION_META = "io.modelcontextprotocol/subscriptionId";
 export const SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
 /** The error a 2026-07-28 server answers for a protocol version it does not serve. */
 export const UNSUPPORTED_VERSION = -32022;
+/** The error a transport answers when its store admits no more session state (the hosted endpoint's control budget). */
+export const SESSION_FULL = -32001;
+/** The most canonical bytes a 2025-11-25 client's declared capabilities may hold. */
+export const CAPABILITIES_MOST = 16 * 1024;
 export const TOOLS_TTL_MS = 30_000;
 
 export type Id = string | number;
@@ -196,8 +200,11 @@ export class Wire {
       case "initialize": {
         const asked = typeof params["protocolVersion"] === "string" ? params["protocolVersion"] : LEGACY;
         session.version = asked === LEGACY ? LEGACY : LEGACY;
-        session.capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
-        await this.hooks.changed?.(session);
+        const capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
+        // The declared capabilities are kept with the session, so they are bounded: a session is bounded control state.
+        if (JSON.stringify(capabilities).length > CAPABILITIES_MOST) return error(id, -32602, `The client's capabilities exceed ${CAPABILITIES_MOST} bytes.`);
+        session.capabilities = capabilities;
+        try { await this.hooks.changed?.(session); } catch (thrown) { if ((thrown as Error).name === "SessionFull" || /No room for another session/.test(String((thrown as Error).message))) return error(id, SESSION_FULL, "No room for another session."); throw thrown; }
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
       case "notifications/initialized":

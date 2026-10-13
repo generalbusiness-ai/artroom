@@ -237,3 +237,29 @@ describe("H8, streams opened concurrently", () => {
     for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
   });
 });
+
+describe("H8, a replacement while the snapshot is held", () => {
+  test("the incumbent's slot passes to the replacement: its cancellation frees nothing for another session", async () => {
+    const sessions = [await legacySession(), await legacySession(), await legacySession(), await legacySession(), await legacySession()];
+    const held = sessions.slice(0, 4).map((id) => openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": id }));
+    for (const st of held) expect(await until(() => st.text().includes(": stream"))).toBe(true);
+    expect(s.http.streams).toBe(STREAMS_MOST);
+    // A replacement of the first session's stream enters and blocks on the held snapshot; its incumbent is then cancelled by the client.
+    let release!: () => void;
+    hold = new Promise<void>((r) => { release = r; });
+    const replacement = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[0]! });
+    await new Promise((r) => setTimeout(r, 100));
+    held[0]!.abort.abort();
+    await new Promise((r) => setTimeout(r, 100));
+    // Another session's GET competes for what the cancellation seemed to free: refused, the slot belongs to the replacement.
+    const competitor = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[4]! });
+    expect(await competitor.opened, "no fifth stream").toBe(409);
+    release();
+    hold = null;
+    expect(await until(() => replacement.text().includes(": stream")), "the replacement opened").toBe(true);
+    expect(s.http.streams).toBe(STREAMS_MOST);
+    for (const st of [...held, replacement]) st.abort.abort();
+    expect(await until(() => s.http.streams === 0)).toBe(true);
+    for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
+  });
+});

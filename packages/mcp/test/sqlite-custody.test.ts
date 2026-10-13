@@ -8,7 +8,7 @@ import { describe, expect, test } from "vitest";
 import type { Receipt } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 import { COMPLETION_BYTES, SEGMENT_ROW_BYTES, sqliteStore, type Sql, type SqlValue, type SqliteCustodyBounds } from "../src/sqlite-custody.ts";
-import { CustodyError, RECORD_BYTES, type CustodyRecord, type Outcome } from "../src/custody.ts";
+import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, type CustodyRecord, type Outcome } from "../src/custody.ts";
 
 /** Node's SQLite as the store sees a Durable Object's: `exec` with bindings, and a transaction that rolls back on a throw. */
 function nodeSql(): Sql & { db: DatabaseSync } {
@@ -232,4 +232,45 @@ test("a step on a terminal act is a dispatch: it reserves before sending and ref
   const error = await store.write("a", stepped, { dispatch: true }).catch((e: unknown) => e);
   expect((error as CustodyError).why).toMatchObject({ held: "full" });
   expect((await store.read("a"))?.steps).toEqual({});
+});
+
+test("a step on a terminal act keeps its reservation through the dispatch: competing admission waits, loss keeps it, a restart reads it back", async () => {
+  const sql = nodeSql();
+  const done = recordOf("a", "accepted", 0, [settled(1)]);
+  // Room for the accepted record and one step's completion need, and nothing for a second identity while the step is in flight.
+  const bounds: SqliteCustodyBounds = { budget: sized(done) + COMPLETION_BYTES + 8192, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
+  const store = sqliteStore(sql, bounds);
+  const identity = done.identity;
+  const id = identityId(identity);   // custody names the record by its identity
+  await store.write(id, done);
+  const custody = new Custody(store, () => T);
+  // The step's delivery pauses after custody armed and wrote the step as sent.
+  let resume!: (answer: "accepted" | "lost") => void;
+  const paused = new Promise<"accepted" | "lost">((r) => { resume = r; });
+  const stepping = custody.step(identity, ref, "hold@1", "instance", async () => {
+    const how = await paused;
+    if (how === "lost") throw new Lost();
+    return { answer: "accepted", receipt: receipt() } as never;
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  expect(store.identity(id).reserved, "the step holds the act's completion capacity while it is in flight").toBeGreaterThan(0);
+  // Another identity's dispatch cannot take that space.
+  const other = await store.write("b", recordOf("b", "sent"), { dispatch: true }).catch((e: unknown) => e);
+  expect((other as CustodyError).why).toMatchObject({ held: "full" });
+  // The answer is lost: the step is unknown, the reservation stays, and a store opened again over the same storage reads it.
+  resume("lost");
+  const lost = await stepping;
+  expect(lost.step.phase).toBe("unknown");
+  expect(store.identity(id).reserved).toBeGreaterThan(0);
+  const again = sqliteStore(sql, bounds);
+  expect(Object.values((await again.read(id))!.steps).map((s) => s.phase)).toEqual(["unknown"]);
+  expect(again.identity(id).reserved).toBe(store.identity(id).reserved);
+  // Asked again, the same signed step is sent and answered; the answer's write consumes the reservation and releases the rest.
+  const custody2 = new Custody(again, () => T);
+  const answered = await custody2.step(identity, ref, "hold@1", "instance", async () => ({ answer: "accepted", receipt: receipt() }) as never);
+  expect(answered.step.phase).toBe("answered");
+  expect(again.identity(id).reserved).toBe(0);
+  // Now the other identity is admitted.
+  await again.write("b", recordOf("b", "sent"), { dispatch: true });
+  expect(again.identity("b").reserved).toBeGreaterThan(0);
 });

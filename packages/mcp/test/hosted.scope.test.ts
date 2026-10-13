@@ -143,7 +143,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };
 }
-const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; room.done(); };
+const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
 const mcp = async (bearer: string, method: string, headers: Record<string, string>, body?: unknown): Promise<Response> => {
   const response = await routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
@@ -173,7 +173,7 @@ function stream(bearer: string, session: string): { text: () => string; stop: ()
 }
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const until = async (check: () => boolean, ms = 3000) => { for (let t = 0; t < ms && !check(); t += 25) await new Promise((r) => setTimeout(r, 25)); return check(); };
-const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }> };
+const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }>; used(): Promise<number> };
 const registryStub = (membership: string) => env.REGISTRIES.get(env.REGISTRIES.idFromName(membership)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]>; heldAnswers(): Promise<{ op: string; answer: boolean }[]> };
 /** A 2026-07-28 listen, read in the background: its events so far. */
 function listen(bearer: string): { text: () => string; stop: () => void; ended: Promise<number> } {
@@ -469,5 +469,57 @@ test("H8 through the route: the matrix, the modern headers, the legacy rules, an
     expect((await agentStub(bot.agent).counts()).sessions).toBe(16);
     expect((await list({ "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status, "the oldest session ended").toBe(404);
     expect((await mcp(B, "DELETE", { "mcp-session-id": S })).status).toBe(404);
+  } finally { done(room); }
+});
+
+test("the control budget is one aggregate: operations, sessions and configuration are charged as stored, and retire keeps its reserve", async () => {
+  const { room, rita } = await roomWithIssues();
+  // A small budget for the agent objects made in this test: 64 KiB, of which the last 8 KiB admit retire alone.
+  hostedTest.controlBudget = { budget: 64 * 1024, reserve: 8 * 1024 };
+  try {
+    const M = rita.config.repository!.membership;
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const stub = agentStub(bot.agent);
+    const afterCreate = await stub.used();
+    expect(afterCreate, "the creation's reservation and the agent row's configuration are charged").toBeGreaterThan(4 * 1024);
+    // A session's declared capabilities are bounded; within the bound, the session row's bytes are charged and credited on DELETE.
+    const big = { experimental: { pad: "x".repeat(20 * 1024) } };
+    const tooLarge = await mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: big, clientInfo: { name: "h", version: "0" } } });
+    expect([tooLarge.status, (await tooLarge.json() as { error: { code: number } }).error.code, tooLarge.headers.get("mcp-session-id")]).toEqual([200, -32602, null]);
+    const within = { experimental: { pad: "y".repeat(8 * 1024) } };
+    const opened = await mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: within, clientInfo: { name: "h", version: "0" } } });
+    const S = opened.headers.get("mcp-session-id")!;
+    expect(opened.status).toBe(200);
+    const withSession = await stub.used();
+    expect(withSession - afterCreate, "the session row's bytes are charged").toBeGreaterThan(8 * 1024);
+    expect((await mcp(bot.bearer, "DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status).toBe(200);
+    expect(await stub.used(), "and credited when the session ends").toBe(afterCreate);
+    // Rotations with distinct 128-byte ops fill the budget to its ceiling for create and bearer; the next is refused 507.
+    let rotations = 0;
+    let bearer = bot.bearer;
+    for (let n = 0; n < 40; n++) {
+      const op = `rotate-${String(n).padStart(3, "0")}-${"p".repeat(117)}`;
+      expect(utf8(op).length).toBe(128);
+      const r = await room.wait(() => post(`/mcp/agents/${bot.agent}/bearer`, control(room, rita.secret, "bearer", M, bot.agent, "", op), ""));
+      if (r.status === 507) { expect((await r.json() as { error: string }).error).toBe("full"); break; }
+      expect(r.status, `rotation ${n}`).toBe(200);
+      bearer = (await r.json() as { bearer: string }).bearer;
+      rotations++;
+    }
+    expect(rotations, "the ceiling was reached by the operations' stored state").toBeGreaterThan(5);
+    expect(rotations).toBeLessThan(40);
+    const full = await stub.used();
+    expect(full).toBeLessThanOrEqual(64 * 1024 - 8 * 1024);
+    // At the ceiling, a session cannot be kept either: initialize answers the session-full error and issues no session.
+    const noRoom = await mcp(bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: within, clientInfo: { name: "h", version: "0" } } });
+    expect([noRoom.status, noRoom.headers.get("mcp-session-id")]).toEqual([507, null]);
+    expect((await stub.counts()).sessions).toBe(0);
+    // The counters are durable: after a reset the object sees the same used bytes, and the next rotation is still refused.
+    await stub.reset();
+    expect(await stub.used()).toBe(full);
+    expect((await room.wait(() => post(`/mcp/agents/${bot.agent}/bearer`, control(room, rita.secret, "bearer", M, bot.agent, "", "rotate-after-reset"), ""))).status).toBe(507);
+    // Retire draws on the reserve: it succeeds where create and bearer were refused.
+    expect((await room.wait(() => post(`/mcp/agents/${bot.agent}`, control(room, rita.secret, "retire", M, bot.agent, "", "retire-at-full"), "", "DELETE"))).status).toBe(200);
+    expect((await mcp(bearer, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } })).status).toBe(401);
   } finally { done(room); }
 });

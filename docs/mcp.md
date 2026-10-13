@@ -1477,7 +1477,7 @@ change the client has not listed is told once more.
 |---|---|---|
 | Custody, per agent | 1 GiB | A new send, resubmit, repeat step or settle that cannot reserve its completion need (2 MiB record plus a 512 KiB segment row) is refused `full` before anything is dispatched; retained answers stay readable |
 | One identity's history | 64 MiB | Further attempts on that identity refuse `full`; its retained answer stays readable |
-| Control, per registry and per agent | 16 MiB, the last 1 MiB for `retire` alone | `create` and `bearer` refuse `507`; `retire` still succeeds. Were the reserve exhausted too, the admin's `key.revoke` ends the agent's authority in the scope regardless of the hosted objects |
+| Control, per registry and per agent | 16 MiB, the last 1 MiB for `retire` alone; one aggregate of every persisted row: each operation (4 KiB reserved, its answer charged beyond that), each 2025-11-25 session row (its declared capabilities at most 16 KiB), and the agent's configuration | `create` and `bearer` refuse `507`; a session cannot be issued (`507`, error `-32001`); a root cannot be added; `retire` still succeeds. Were the reserve exhausted too, the admin's `key.revoke` ends the agent's authority in the scope regardless of the hosted objects |
 
 Nothing is deleted: terminal custody records move to an archive table in
 the same object. A storage failure rolls its transaction back and settles

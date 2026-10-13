@@ -209,7 +209,10 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
         sql.exec(`INSERT INTO record (id, phase, key, created, updated, chunks, size) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET phase = excluded.phase, updated = excluded.updated, chunks = excluded.chunks, size = excluded.size`,
           id, record.phase, record.identity.key, record.created, record.updated, chunks, size);
         store(id, size - (before ? was : archived ? Number(archived["size"]) : 0));
-        if (terminal) { release(id); archive(); }
+        // Capacity is released only once nothing is in flight: a terminal record whose write precedes a dispatch (a step on a
+        // terminal act) keeps its reservation through the step's durable result; a step still `sent` or `unknown` keeps it too.
+        const inFlight = options.dispatch || Object.values(record.steps).some((s) => s.phase === "sent" || s.phase === "unknown");
+        if (terminal && !inFlight) { release(id); archive(); }
       });
       const back = await (async () => {
         const live = one(`SELECT chunks FROM record WHERE id = ?`, id);
