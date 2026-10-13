@@ -5,67 +5,146 @@ import { valueDigest } from "@generalbusiness/dap-derive";
 import { APPLICATION_COHORT, CONFIGURATION_DOMAIN, FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
-import { mcpRoom } from "./support/room.ts";
+import { mcpRoom, type Agent, type Room } from "./support/room.ts";
 import { exercises } from "./support/story.ts";
+import DOC from "../../../docs/mcp.md?raw";
 
-// Invariant: a Counter, an application created by the room's application factory and configured into the server by hand as a
-// standalone scope under its membership, is driven through the same server with no counting code: join, start, spoken, leave.
-test("the Counter under its cohort: join, start, spoken, leave", async () => {
+/** docs/mcp.md's recipe for taking part in a Counter, by mode: the tools it names, in order, and its count. */
+function counterRecipe(mode: "default" | "generic"): { tools: string[]; count: number } {
+  const at = DOC.indexOf("## Taking part in a Counter");
+  const row = DOC.slice(at, DOC.indexOf("\n## ", at + 5)).split("\n").find((l: string) => l.startsWith("| Take part in a Counter"))!;
+  const cell = row.split(" | ")[mode === "default" ? 1 : 2]!;
+  return { tools: [...cell.matchAll(/`([a-z][a-z0-9.-]*)`/g)].map((m) => m[1]!), count: Number([...cell.matchAll(/: (\d+)/g)].at(-1)![1]) };
+}
+
+/** A room of the application cohort, founded by rita, with the Counter's definition active and its actions in the admin role. */
+async function counterRoom(room: Room, options: { subscribe?: boolean } = {}): Promise<Agent> {
+  const rita = room.agent("rita", options);
+  // The explicit application cohort: register@5, whose claim creates directory@5, membership@4, rules@3 and destination@2.
+  const installed = await rita.ok("create", { definition: APPLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+  const register = installed["scope"] as ScopeId;
+  await room.wireRegister(register);
+  const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
+  expect(claimed["answer"], JSON.stringify(claimed)).toBe("accepted");
+  const w = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as FactRef).seq });
+  expect(w["timedOut"], JSON.stringify(w)).toBe(false);
+  room.know(rita.config.repository!.destination);
+  const seat = await rita.ok("room.seat", { idempotencyKey: "seat" });
+  await rita.ok("room.first-key", { fields: { member: (seat["fact"] as FactRef).seq }, idempotencyKey: "first-key" });
+  // The Counter's definition activated with its bytes; the room's role list holds the Counter's actions.
+  expect((await rita.ok("rules.activate", { fields: { digest: COUNTING_DEFINITION, name: "counting" }, values: [canonicalize(counting)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
+  // A check configuration kept by the rules scope, its bytes beside the act.
+  exercises("platform:rules", "keep-configuration", "values");
+  const configuration = { name: "unit", image: `sha256:${"a".repeat(64)}`, environment: {}, steps: [["npm", "test"]], judged: { passed: { exit: 0, line: "ok" }, failed: { exit: 1, line: "not ok" } }, limits: { seconds: 600, bytes: 65536 } };
+  const kept = await rita.ok("rules.keep-configuration", { fields: { digest: valueDigest(CONFIGURATION_DOMAIN, configuration), name: "unit" }, values: [canonicalize(configuration)], idempotencyKey: "configuration" });
+  expect(kept["answer"], JSON.stringify(kept)).toBe("accepted");
+  const actions = [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "counting.control", "counting.join", "counting.spoken", "counting.leave"];
+  expect((await rita.ok("member.actions", { on: 0, fields: { role: "admin", actions }, idempotencyKey: "actions" }))["answer"]).toBe("accepted");
+  room.advance(301_000);   // the earlier grant's reuse window ends; no immediate-revocation claim
+  return rita;
+}
+
+/** The application factory creates a Counter, a child under the room's membership; wait sees it as it sees a created lane. */
+async function establish(rita: Agent, key: string): Promise<ScopeId> {
+  exercises("platform:directory", "establish-application", "values");
+  const established = await rita.ok("application.create", { fields: { definition: COUNTING_DEFINITION, values: '{"target":3}', execution: "recorded-do" }, values: [canonicalize(counting)], idempotencyKey: key });
+  expect(established["answer"], JSON.stringify(established)).toBe("accepted");
+  const created = await rita.ok("wait", { scope: "directory", entry: (established["fact"] as FactRef).seq });
+  expect(created["timedOut"], JSON.stringify(created)).toBe(false);
+  return (created["created"] as { scope: ScopeId; definition: string }[]).find((c) => c.definition === COUNTING_DEFINITION)!.scope;
+}
+
+/** room's applications. */
+const applicationsOf = async (agent: Agent) => (await agent.ok("room", {}))["applications"] as { definition: string | null; digest: string | null; scope: ScopeId | null; state: string }[];
+
+/**
+ * The recipe of docs/mcp.md, run by `taker` in its mode: find the Counter through room, join, start, speak once, leave. Returns
+ * the tools called. An admin has initialized the board before.
+ */
+async function takePart(taker: Agent, mode: "default" | "generic"): Promise<string[]> {
+  const from = taker.calls.length;
+  const found = (await applicationsOf(taker)).find((a) => a.definition === "counting" && a.state === "created");
+  expect(found, "room lists the Counter among the applications").toBeDefined();
+  const counter = found!.scope!;
+  let digest = "";
+  const act = async (kind: string, args: Record<string, unknown>) => {
+    if (mode === "default") return taker.ok(`counting.${kind}`, { target: counter, ...args });
+    if (!digest) digest = (await taker.ok("actions", { scope: counter }))["digest"] as string;
+    return taker.ok("act", { target: counter, kind, digest, ...args });
+  };
+  const board = async () => ((await taker.ok("inspect", { scope: counter }))["items"] as { id: number; type: string; values: Record<string, number> }[]).find((i) => i.type === "board")!;
+  const joined = await act("join", { idempotencyKey: `join-${mode}` });
+  expect(joined["answer"], JSON.stringify(joined)).toBe("accepted");
+  const participant = (joined["fact"] as FactRef).seq;
+  const basis = [{ id: participant, member: "@rita" }];
+  let b = await board();
+  const started = await act("start", { on: b.id, fields: { n: b.values["lastNumber"]! + 1, nextSerial: b.values["serial"]! + 1, basis, next: participant }, idempotencyKey: `start-${mode}` });
+  expect(started["answer"], JSON.stringify(started)).toBe("accepted");
+  b = await board();
+  const spoken = await act("spoken", { on: b.id, fields: { generation: b.values["generation"]!, serial: b.values["serial"]!, n: b.values["number"]!, nextN: Math.min(b.values["number"]! + 1, b.values["target"]!), nextSerial: b.values["serial"]! + 1, basis, next: participant }, idempotencyKey: `spoken-${mode}` });
+  expect(spoken["answer"], JSON.stringify(spoken)).toBe("accepted");
+  b = await board();
+  expect(b.values["lastNumber"]).toBe(1);
+  const left = await act("leave", { on: participant, fields: { generation: b.values["generation"]!, serial: b.values["serial"]!, nextSerial: b.values["serial"]! + 1, basis: [], replace: false }, idempotencyKey: `leave-${mode}` });
+  expect(left["answer"], JSON.stringify(left)).toBe("accepted");
+  expect(((await taker.ok("steps", { scope: counter }))["steps"] as { kind: string }[]).filter((s) => ["initialize", "join", "start", "spoken", "leave"].includes(s.kind)).map((s) => s.kind)).toEqual(["initialize", "join", "start", "spoken", "leave"]);
+  return taker.calls.slice(from, -1);
+}
+
+// Invariant: a Counter, an application created by the room's application factory, is found through room with no configuration
+// and no scope ID handed over, and is driven through the same server with no counting code, in each launch mode: join, start,
+// spoken, leave, calling exactly the tools docs/mcp.md's recipe names, as many times as it counts.
+for (const mode of ["default", "generic"] as const) {
+  test(`the Counter under its cohort, found through room: join, start, spoken, leave (${mode})`, async ({ annotate }) => {
+    const room = mcpRoom();
+    try {
+      const rita = await counterRoom(room);
+      const before = JSON.stringify(rita.config);
+      await establish(rita, "counter");
+      expect(JSON.stringify(rita.config), "nothing is written to the configuration").toBe(before);
+      expect(await rita.names()).toEqual(expect.arrayContaining(["counting.initialize", "counting.join", "counting.start", "counting.spoken", "counting.leave"]));
+      const counter = (await applicationsOf(rita)).find((a) => a.definition === "counting")!.scope!;
+      expect((await rita.ok("counting.initialize", { target: counter, idempotencyKey: "initialize" }))["answer"]).toBe("accepted");
+      // The taker: rita's own connection in the default mode; a second connection of her configuration in --generic mode.
+      const taker = mode === "default" ? rita : room.agent("rita, --generic", { mode: "generic", secret: rita.secret, config: rita.config, share: true });
+      const calls = await takePart(taker, mode);
+      const recipe = counterRecipe(mode);
+      expect([calls, calls.length]).toEqual([recipe.tools, recipe.count]);
+      await annotate(`${mode}: taking part in a Counter, found through room: ${calls.length} calls (${calls.join(", ")})`);
+    } finally { room.done(); }
+  }, 600_000);
+}
+
+// Invariant: an application created through the tools is discovered with no configuration write: room lists it with its
+// definition name, digest, scope and state; the list holds its tools; inspect reads it by scope ID; a subscribed client is told
+// of it once; and a root configured by hand that is also the directory's application is listed once, as the application.
+test("an application created through the tools: room, the list and one list change, with no configuration", async ({ annotate }) => {
   const room = mcpRoom();
   try {
-    const rita = room.agent("rita");
-    // The explicit application cohort: register@5, whose claim creates directory@5, membership@4, rules@3 and destination@2.
-    const installed = await rita.ok("create", { definition: APPLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
-    const register = installed["scope"] as ScopeId;
-    await room.wireRegister(register);
-    const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
-    expect(claimed["answer"], JSON.stringify(claimed)).toBe("accepted");
-    const w = await rita.ok("wait", { scope: register, entry: (claimed["fact"] as FactRef).seq });
-    expect(w["timedOut"], JSON.stringify(w)).toBe(false);
-    room.know(rita.config.repository!.destination);
-    const seat = await rita.ok("room.seat", { idempotencyKey: "seat" });
-    await rita.ok("room.first-key", { fields: { member: (seat["fact"] as FactRef).seq }, idempotencyKey: "first-key" });
-
-    // The Counter's definition activated with its bytes; the room's role list holds the Counter's actions.
-    expect((await rita.ok("rules.activate", { fields: { digest: COUNTING_DEFINITION, name: "counting" }, values: [canonicalize(counting)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
-    // A check configuration kept by the rules scope, its bytes beside the act.
-    exercises("platform:rules", "keep-configuration", "values");
-    const configuration = { name: "unit", image: `sha256:${"a".repeat(64)}`, environment: {}, steps: [["npm", "test"]], judged: { passed: { exit: 0, line: "ok" }, failed: { exit: 1, line: "not ok" } }, limits: { seconds: 600, bytes: 65536 } };
-    const kept = await rita.ok("rules.keep-configuration", { fields: { digest: valueDigest(CONFIGURATION_DOMAIN, configuration), name: "unit" }, values: [canonicalize(configuration)], idempotencyKey: "configuration" });
-    expect(kept["answer"], JSON.stringify(kept)).toBe("accepted");
-    const actions = [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "counting.control", "counting.join", "counting.spoken", "counting.leave"];
-    expect((await rita.ok("member.actions", { on: 0, fields: { role: "admin", actions }, idempotencyKey: "actions" }))["answer"]).toBe("accepted");
-    room.advance(301_000);   // the earlier grant's reuse window ends; no immediate-revocation claim
-
-    // The application factory creates the Counter, a child under the room's membership.
-    exercises("platform:directory", "establish-application", "values");
-    const established = await rita.ok("application.create", { fields: { definition: COUNTING_DEFINITION, values: '{"target":3}', execution: "recorded-do" }, values: [canonicalize(counting)], idempotencyKey: "counter" });
-    expect(established["answer"], JSON.stringify(established)).toBe("accepted");
-    const created = await rita.ok("wait", { scope: "directory", entry: (established["fact"] as FactRef).seq });
-    expect(created["timedOut"], JSON.stringify(created)).toBe(false);
-    const counter = (created["created"] as { scope: ScopeId; definition: string }[]).find((c) => c.definition === COUNTING_DEFINITION)!.scope;
-
-    // Configured by hand, as `dap mcp --scope <counter> --membership membership` records it.
-    rita.config.roots = [...(rita.config.roots ?? []), { scope: counter, membership: rita.config.repository!.membership }];
+    const rita = await counterRoom(room, { subscribe: true });
+    await rita.tick(); await rita.tick();
+    const told = rita.told;
+    const before = JSON.stringify(rita.config);
+    expect((await applicationsOf(rita))).toEqual([]);
+    expect((await rita.names()).some((n) => n.startsWith("counting.") && n !== "counting.initialize")).toBe(false);
+    const generation = (await rita.service.page()).generation;
+    const counter = await establish(rita, "discovered");
+    expect(JSON.stringify(rita.config), "nothing is written to the configuration").toBe(before);
+    expect(await applicationsOf(rita)).toEqual([{ definition: "counting", digest: COUNTING_DEFINITION, scope: counter, state: "created" }]);
+    expect(await rita.names()).toEqual(expect.arrayContaining(["counting.join", "counting.start", "counting.spoken", "counting.leave"]));
+    const inspected = await rita.ok("inspect", { scope: counter });
+    expect(inspected["scope"]).toBe(counter);
+    expect((await rita.service.page()).generation).not.toBe(generation);
+    await rita.tick(); await rita.tick();
+    const toldOfApplication = rita.told - told;
+    expect(toldOfApplication, "a new application is told once").toBe(1);
+    // A hand-configured root that is also the directory's application: held and listed once, as the application. (Writing a
+    // root is itself a configuration change, which the generation counts, as for any root.)
+    rita.config.roots = [{ scope: counter, membership: rita.config.repository!.membership }];
+    const page = await rita.ok("room", {});
+    expect([(page["applications"] as { scope: string }[]).filter((a) => a.scope === counter).length, (page["roots"] as { scope: string }[]).filter((r) => r.scope === counter).length]).toEqual([1, 0]);
     const names = await rita.names();
-    expect(names).toEqual(expect.arrayContaining(["counting.initialize", "counting.join", "counting.start", "counting.spoken", "counting.leave"]));
-
-    const board = async () => ((await rita.ok("inspect", { scope: counter }))["items"] as { id: number; type: string; state: string; values: Record<string, number> }[]);
-    expect((await rita.ok("counting.initialize", { target: counter, idempotencyKey: "initialize" }))["answer"]).toBe("accepted");
-    const joined = await rita.ok("counting.join", { target: counter, idempotencyKey: "join" });
-    expect(joined["answer"], JSON.stringify(joined)).toBe("accepted");
-    const participant = (joined["fact"] as FactRef).seq;
-    const basis = [{ id: participant, member: "@rita" }];
-    let b = (await board()).find((i) => i.type === "board")!;
-    const started = await rita.ok("counting.start", { target: counter, on: b.id, fields: { n: b.values["lastNumber"]! + 1, nextSerial: b.values["serial"]! + 1, basis, next: participant }, idempotencyKey: "start" });
-    expect(started["answer"], JSON.stringify(started)).toBe("accepted");
-    b = (await board()).find((i) => i.type === "board")!;
-    const spoken = await rita.ok("counting.spoken", { target: counter, on: b.id, fields: { generation: b.values["generation"]!, serial: b.values["serial"]!, n: b.values["number"]!, nextN: Math.min(b.values["number"]! + 1, b.values["target"]!), nextSerial: b.values["serial"]! + 1, basis, next: participant }, idempotencyKey: "spoken" });
-    expect(spoken["answer"], JSON.stringify(spoken)).toBe("accepted");
-    b = (await board()).find((i) => i.type === "board")!;
-    expect(b.values["lastNumber"]).toBe(1);
-    const left = await rita.ok("counting.leave", { target: counter, on: participant, fields: { generation: b.values["generation"]!, serial: b.values["serial"]!, nextSerial: b.values["serial"]! + 1, basis: [], replace: false }, idempotencyKey: "leave" });
-    expect(left["answer"], JSON.stringify(left)).toBe("accepted");
-    expect(((await rita.ok("steps", { scope: counter }))["steps"] as { kind: string }[]).filter((s) => ["initialize", "join", "start", "spoken", "leave"].includes(s.kind)).map((s) => s.kind)).toEqual(["initialize", "join", "start", "spoken", "leave"]);
+    expect(names.filter((n) => n === "counting.join")).toHaveLength(1);
+    await annotate(`a new application: told ${toldOfApplication} time; room lists ${JSON.stringify(page["applications"])}`);
   } finally { room.done(); }
 }, 600_000);

@@ -27,7 +27,7 @@ import { surfaceOf, wordsDigest, type Words } from "./words.ts";
 import { markRefusals, markText } from "./marks.ts";
 
 /** Where a scope of the inventory sits. */
-export type Place = "register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "lane" | "root";
+export type Place = "register" | "directory" | "membership" | "rules" | "destination" | "inbox" | "lane" | "application" | "root";
 
 /** One scope of the inventory, with the definition it pins. */
 export interface Held {
@@ -259,6 +259,8 @@ export function generationOf(bindings: readonly Binding[], inventory: Inventory,
     bindings: bindings.map((b) => [b.definition, b.kind, b.declaration, b.digests]),
     standing,
     roots: [...inventory.roots].map((r) => [r.scope, r.membership?.scope ?? null]).sort(),
+    // The directory's created applications, each with its digest: a new one changes the list once, when it is created.
+    applications: inventory.scopes.filter((s) => s.place === "application").map((s) => [s.scope, s.pinned]).sort(),
     active: [...inventory.active].map((a) => [a.name, a.digest]).sort(),
   })));
 }

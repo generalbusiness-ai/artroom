@@ -185,25 +185,92 @@ describe("what a call costs, end to end", () => {
     await annotate(`room with 2 roots and a second membership: warm ${reads(warm.requests)} reads; cold ${reads(cold.requests)} reads and ${sessions(cold.requests)} sessions`);
   });
 
-  // Invariant: room pages every collection it returns (lanes, roots, standing, active definitions, act tools not held) by bytes,
-  // within its 8 KiB bound, with a continuation; every entry is reached once.
+  // Invariant: room pages every collection it returns (lanes, applications, roots, standing, active definitions, act tools not
+  // held) by bytes, within its 8 KiB bound, with a continuation; every entry is reached once.
   test("room pages its collections within its bound", async ({ annotate }) => {
     const lanes = Array.from({ length: 60 }, () => issueDemo);
     const s = roomOf("member", lanes);
     for (let i = 0; i < 40; i++) s.config.roots = [...(s.config.roots ?? []), { scope: s.stand.add("lane", issueDemo).scope, membership: s.config.repository!.membership }];
+    // 30 applications the directory's factory created, as directory items of type application.
+    const directory = s.stand.scopes.get(s.stand.directory.scope)!;
+    for (let i = 0; i < 30; i++) directory.items.push({ id: 10_000 + i, type: "application", state: "created", revision: 0, opened: null, parties: {}, refs: { scope: s.stand.add("lane", issueDemo) }, values: { definition: definitionDigest(issueDemo) }, attributed: [] } as unknown as Item);
     const seen: Record<string, number> = {};
     let cursor: string | undefined, pages = 0;
     do {
       const got = await counted(s, () => s.service.call("room", cursor ? { cursor } : {}));
       expect(got.bytes, `room page ${pages + 1}`).toBeLessThanOrEqual(BOUNDS.room);
-      for (const k of ["lanes", "roots", "standing", "active", "notHeld"]) seen[k] = (seen[k] ?? 0) + (got.result.structuredContent[k] as unknown[]).length;
+      for (const k of ["lanes", "applications", "roots", "standing", "active", "notHeld"]) seen[k] = (seen[k] ?? 0) + (got.result.structuredContent[k] as unknown[]).length;
       cursor = got.result.structuredContent["cursor"] as string | undefined;
       pages++;
     } while (cursor);
-    expect([seen["lanes"], seen["roots"], seen["standing"], seen["active"]]).toEqual([60, 40, 1, 1]);
+    expect([seen["lanes"], seen["applications"], seen["roots"], seen["standing"], seen["active"]]).toEqual([60, 30, 40, 1, 1]);
     expect(seen["notHeld"]).toBeGreaterThan(0);
     expect(pages).toBeGreaterThan(1);
-    await annotate(`room: 60 lanes, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
+    await annotate(`room: 60 lanes, 30 applications, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
+  });
+
+  // Invariant: room's continuation is bound to its own layout, not to the tool list's generation. A row the list does not count
+  // (an application still being created, or one whose creation then fails and leaves the directory's live items) moves the
+  // entries after it without changing the generation; a continuation made before the move restarts at the first entry and says
+  // so, and the walk from there returns every root once, within the bound. The totals-and-bounds case above proves no more than
+  // totals and bounds; this one proves the pages agree with each other.
+  test("room's continuation across a creating, a created and a refused application: restart, no repeat, no skip", async ({ annotate }) => {
+    const s = roomOf("member", Array.from({ length: 30 }, () => issueDemo));
+    const roots = Array.from({ length: 40 }, () => s.stand.add("lane", issueDemo).scope);
+    s.config.roots = roots.map((scope) => ({ scope, membership: s.config.repository!.membership }));
+    const directory = s.stand.scopes.get(s.stand.directory.scope)!;
+    type Page = { roots: { scope: string }[]; applications: { scope: string | null; state: string }[]; cursor?: string; restarted?: string };
+    const room = async (cursor?: string): Promise<Page> => {
+      const got = await counted(s, () => s.service.call("room", cursor ? { cursor } : {}));
+      expect(got.bytes).toBeLessThanOrEqual(BOUNDS.room);
+      return got.result.structuredContent as unknown as Page;
+    };
+    // A cursor whose next page starts inside the roots.
+    const insideRoots = async (): Promise<string> => {
+      let seen = 0;
+      for (let page = await room(); page.cursor; page = await room(page.cursor)) {
+        seen += page.roots.length;
+        if (seen > 0 && seen < roots.length) return page.cursor;
+      }
+      throw new Error("no continuation inside the roots");
+    };
+    // The walk from a page on: every root once, and the applications as listed.
+    const walk = async (first: Page) => {
+      const seen: string[] = [];
+      const applications: Page["applications"] = [];
+      for (let page: Page | null = first; page; page = page.cursor ? await room(page.cursor) : null) { seen.push(...page.roots.map((r) => r.scope)); applications.push(...page.applications); }
+      expect([seen.length, new Set(seen).size, roots.every((r) => seen.includes(r))]).toEqual([roots.length, roots.length, true]);
+      return applications;
+    };
+    const application = (id: number, state: string, scope: ScopeRef | null) => ({ id, type: "application", state, revision: 0, opened: null, parties: {}, refs: scope ? { scope } : {}, values: { definition: definitionDigest(issueDemo) }, attributed: [] }) as unknown as Item;
+    const generation = (await s.service.page()).generation;
+    const restarts: string[] = [];
+    const resume = async (cursor: string, what: string) => {
+      const page = await room(cursor);
+      expect(page.restarted, what).toBe("The room's collections changed since the cursor was made; this page restarts at the first entry.");
+      restarts.push(what);
+      return page;
+    };
+
+    // A creating application: the generation does not change; the continuation restarts.
+    let cursor = await insideRoots();
+    directory.items.push(application(9_001, "creating", null));
+    expect((await s.service.page()).generation).toBe(generation);
+    expect(await walk(await resume(cursor, "creating"))).toEqual([{ definition: "issue", digest: definitionDigest(issueDemo), scope: null, state: "creating" }]);
+    // The same application created: listed with its scope; a continuation made while it was creating restarts.
+    cursor = await insideRoots();
+    const created = s.stand.add("lane", issueDemo);
+    directory.items.splice(directory.items.findIndex((i) => i.id === 9_001), 1, application(9_001, "created", created));
+    expect((await walk(await resume(cursor, "created"))).map((a) => [a.scope, a.state])).toEqual([[created.scope, "created"]]);
+    // A second application, creating and then refused: a final row leaves the directory's live items, and the room's list.
+    directory.items.push(application(9_002, "creating", null));
+    cursor = await insideRoots();
+    directory.items.splice(directory.items.findIndex((i) => i.id === 9_002), 1);
+    expect((await walk(await resume(cursor, "refused"))).map((a) => [a.scope, a.state])).toEqual([[created.scope, "created"]]);
+    // With nothing moved, a continuation goes on with no restart.
+    cursor = await insideRoots();
+    expect((await room(cursor)).restarted).toBeUndefined();
+    await annotate(`room continuations: restarted after ${restarts.join(", ")}; each walk from the restart returned all ${roots.length} roots once, every page within 8 KiB`);
   });
 
   // Invariant: a history search goes on from where it stopped, with bounded work per poll or call and no fixed cutoff: a mint's
