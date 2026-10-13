@@ -5,17 +5,6 @@ cover the dap framework first, then the three applications built on it,
 then the guides for operating a deployment. Within each group, pages go
 from learning to understanding, then doing, then looking up.
 
-## Names
-
-The command is `dap`. `artroom` remains an alias. The published SDK packages
-are `@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
-`@generalbusiness/dap-client`, `@generalbusiness/dap-derive`,
-`@generalbusiness/dap-platform`, and `@generalbusiness/dap-replay`, all at
-`0.1.0-dev.2`. Inside this repository, the scope, git, checkers, bytes,
-client, and replay workspaces still use `@generalbusiness/artroom-*` names.
-Public names are mapped at publication. The `artroom-replay` command,
-`ARTROOM_HOME`, `refs/artroom/`, and Worker names are unchanged.
-
 ## The framework
 
 | Page | What it gives you |

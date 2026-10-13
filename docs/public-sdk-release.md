@@ -30,17 +30,20 @@ node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-c
 node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json --native-capture /private/tmp/reviewed-native-capture.json --native-capture-sha256 <reviewed-SHA256> --esbuild /absolute/pinned-native-esbuild/bin/esbuild --esbuild-sha256 <reviewed-SHA256>
 ```
 
-Hugh adopted the coordinated version `0.1.0-dev.2` for publication in
-assertions `447e0178` and `46eafb31`. The six distribution names, in build
-order, are `@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
+The six published SDK packages, in build order, are
+`@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
 `@generalbusiness/dap-client`, `@generalbusiness/dap-derive`,
-`@generalbusiness/dap-platform` and `@generalbusiness/dap-replay`. Their
-publication follows the minimal rename's landing; this guide records no
-publication result or token rights.
+`@generalbusiness/dap-platform`, and `@generalbusiness/dap-replay`, all at
+`0.1.0-dev.2`.
 
-The workspace rename changes contract, derive, lanes, page, platform and
-cli. The bytes, client and replay workspace names remain internal
-`@generalbusiness/artroom-*` names. The producer keeps an exact original
+The command is `dap`. `artroom` remains an alias. The contract, derive,
+lanes, page, platform, and cli workspaces use `@generalbusiness/dap-*`
+names. Inside this repository, scope, git, checkers, bytes, client, and
+replay still use `@generalbusiness/artroom-*` workspace names, with public
+SDK names mapped at publication. The `artroom-replay` command,
+`ARTROOM_HOME`, `refs/artroom/`, and Worker names are unchanged.
+
+The producer keeps an exact original
 copy of each tracked SDK input, then changes only genuine module literals
 in its separate compiler inputs to the distribution names. Ordinary strings,
 protocol names, package directories and source workspace versions remain
