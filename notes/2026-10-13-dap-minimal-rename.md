@@ -52,10 +52,15 @@ The previously unrun Node checks passed nine cases; Counter passed 55. Neither
 phase had failures or skips. All three phases passed their final Source, tool
 and dependency guards. This separate completion took 40.31 seconds wall and
 44.37 seconds CPU. Its individual command walls were 34.61 seconds for native
-cases, 1.36 for Node and 2.07 for Counter; these are separate phase figures.. The recorder was not run.
+cases, 1.36 for Node and 2.07 for Counter; these are separate phase figures.
+The recorder was not run.
 The 1,037 passing cases, typechecks, whole gate and Page producer were not
 repeated. The original gate remains a failed attempt, with the two-line repair
 and failed/unrun completion reported separately.
+
+Both attempts used Mac17,7, macOS 27.0.1, Node 26.11.1 and npm 11.20.0.
+They reused the owned dependencies without installation or a cache clear.
+Machine load and OS or native cache state were not measured.
 
 This final note changes no executable Source, tests, settings, dependencies
 or generated assets from that repaired and checked Source. Exact-head review
