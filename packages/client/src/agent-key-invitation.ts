@@ -1,4 +1,5 @@
 /** Explicit private agent-key handoff. Encoding is not native authority. */
+import { invitationServiceUrl } from "./invitation-service.ts";
 import type { FactRef, MemberRef, ScopeRef, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isFactRef, isMemberRef, isRecord, isScopeId, isScopeRef, parseStrict, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 export const AGENT_KEY_LINK = "artroom-agent-key:";
@@ -15,10 +16,8 @@ const revision = (n: unknown): n is number => Number.isSafeInteger(n) && Number(
 export function isAgentKeyInvitation(value: unknown): value is AgentKeyInvitation {
   try {
     if (!closed(value, ["v", "kind", "service", "repository", "definition", "handle", "controller", "member", "invitation", "secret", "expected"]) || value["v"] !== 1 || value["kind"] !== "agent-key" || value["definition"] !== "platform:membership@2" || typeof value["service"] !== "string" || typeof value["handle"] !== "string" || utf8(value["handle"]).length > 256 || !/^@[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value["handle"])) return false;
-    const Url = (globalThis as { URL?: new (url: string) => { origin: string; pathname: string; username: string; password: string; search: string; hash: string; protocol: string } }).URL;
-    if (!Url) return false;
-    const origin = new Url(value["service"]);
-    if (!["http:", "https:"].includes(origin.protocol) || origin.origin !== value["service"] || origin.pathname !== "/" || origin.username || origin.password || origin.search || origin.hash) return false;
+    const origin = invitationServiceUrl(value["service"]);
+    if (!origin || origin.origin !== value["service"] || origin.pathname !== "/") return false;
     const r = value["repository"];
     if (!closed(r, ["directory", "membership", "rules", "destination"]) || !closed(r["directory"], ["scope", "inc", "kind"]) || !isScopeRef(r["directory"]) || r["directory"].kind !== "directory" || !closed(r["membership"], ["scope", "inc", "kind"]) || !isScopeRef(r["membership"]) || r["membership"].kind !== "membership" || !isScopeId(r["rules"]) || !isScopeId(r["destination"]) || !closed(value["controller"], ["membership", "member"]) || !isMemberRef(value["controller"]) || !same(value["controller"]["membership"], r["membership"])) return false;
     if (!closed(value["member"], ["at", "seq", "hash"]) || !isFactRef(value["member"]) || !same(value["member"]["at"], r["membership"]) || value["member"]["seq"] < 1 || !closed(value["invitation"], ["at", "seq", "hash"]) || !isFactRef(value["invitation"]) || !same(value["invitation"]["at"], r["membership"]) || value["invitation"]["seq"] <= value["member"]["seq"] || !closed(value["expected"], ["on", "member"]) || !revision(value["expected"]["on"]) || !revision(value["expected"]["member"])) return false;
