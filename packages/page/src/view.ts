@@ -202,7 +202,7 @@ export function rulesScreen(room: Room, rules: RulesView, editable = false): HTM
 /** Actual nonaccepted category; no claim that a timed drain wrote nothing. */
 export function nonacceptedAnswerText(answer: Exclude<Answer, { answer: "accepted" }>): string {
   switch (answer.answer) {
-    case "refused": return `Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}. The request was refused.`;
+    case "refused": return `Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name === "founding-policy" ? "creation-policy" : answer.name === "founding-key" ? "initial-key" : answer.name})` : ""}. The request was refused.`;
     case "unavailable": return `Unavailable: ${answer.reason}. Outcome unknown; no acceptance is confirmed.`;
     case "mismatch": return `Mismatch: ${answer.reason}. The idempotency key names another recorded intent.`;
   }

@@ -64,6 +64,11 @@ test("page join refuses mismatched encoding before submission and accepts script
     expect([joined.answer.answer, joined.place]).toEqual(["accepted", { directory: repository.directory.scope, membership: repository.membership }]);
   }
   expect(submissions).toHaveLength(2);
+  const policyRefusal = { answer: "refused", reason: "guard-failed", name: "founding-policy", judgedAt: { seq: 0, hash: textDigest("scripted policy refusal") } } as const;
+  expect(nonacceptedAnswerText(policyRefusal)).toBe("Refused: guard-failed (creation-policy). The request was refused.");
+  expect(nonacceptedAnswerText({ ...policyRefusal, name: "founding-key" })).toBe("Refused: guard-failed (initial-key). The request was refused.");
+  expect(policyRefusal.name).toBe("founding-policy"); // Presentation must not rewrite the recorded refusal.
+
   for (const answer of [{ answer: "unavailable", reason: "busy" }, { answer: "mismatch", reason: "idempotency-mismatch" }, { answer: "refused", reason: "unauthorized", judgedAt: { seq: 0, hash: textDigest("scripted refused head") } }] as const) {
     expect(nonacceptedAnswerText(answer)).toMatch(new RegExp(`^${answer.answer === "unavailable" ? "Unavailable" : answer.answer === "mismatch" ? "Mismatch" : "Refused"}:`));
     expect(nonacceptedAnswerText(answer)).not.toContain("Nothing was written");
