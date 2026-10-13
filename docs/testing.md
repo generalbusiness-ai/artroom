@@ -52,7 +52,7 @@ Put each test at the cheapest boundary that can show its property.
 A stand-in proves only the boundary it exposes. A retry, an order of events or a
 restart is shown against the thing that really retries, orders or restarts.
 
-The scripted capability of `@generalbusiness/dap-scope/testing` is a
+The scripted capability of `@generalbusiness/artroom-scope/testing` is a
 stand-in for the code of `hold@1` and `git-read@1`. The derive package
 has that code, and the production ports hold it. A test that uses the stand-in says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
@@ -80,7 +80,7 @@ it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
 Membership has two stand-ins of its own, in
-`@generalbusiness/dap-room/testing`. `office` is a made-up
+`@generalbusiness/dap-platform/testing`. `office` is a made-up
 directory that creates one membership scope: it stands for the real
 directory and the register. `Roster` is a membership scope in memory
 below such an office. A test that uses one says so. It shows
@@ -197,7 +197,7 @@ now state their own rows, separately from these fixtures. Each
 observation of that file is written by hand. A test that uses it says so.
 It shows where a subject comes from, what the judges retain and what a verifier derives,
 and nothing about a rule of a destination or of a rules scope.
-`Controls.rulebook`, of `@generalbusiness/dap-scope/testing`, is a
+`Controls.rulebook`, of `@generalbusiness/artroom-scope/testing`, is a
 scripted rules scope, beside the scripted membership: the test writes
 each answer and the bytes that are said to come beside it, and where the
 scope is said to record that reference. The platform rules scope has its
@@ -342,8 +342,9 @@ keeping native introspection and RPC behavior. It changes no pool settings.
 Before a direct package or Vitest invocation, run this same script from the
 repository root. Unknown package versions or bytes stop preparation.
 
-The package names in the commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
+The names on this page match the repository workspace manifests. Internal
+workspace test exports are not the public six-package SDK. In particular,
+`@generalbusiness/dap-platform/testing` is available only in this checkout.
 
 Run the tests of what you changed, not the repository.
 
@@ -498,7 +499,7 @@ copy of a fixture or change to the native Worker classes. The lanes package keep
 files alone, in a Worker of its own with the same classes: for `npm test`
 in the package, for `scripts/control.mjs` and for
 `scripts/measure-tests.sh`. A scenario's client calls the scope service's
-own operations, `api` of `@generalbusiness/dap-scope/worker`, in the
+own operations, `api` of `@generalbusiness/artroom-scope/worker`, in the
 test's isolate. A few acts go over the Worker's HTTP routes, where the
 scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has

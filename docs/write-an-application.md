@@ -103,16 +103,18 @@ declares named rules, pass `RULE_PROFILES` from
 the validator calls for the room's lane definitions and their demo
 profiles, which declare no named rules.
 
-The package names and commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
+The validator imports below use the published SDK names. The lane demo
+definitions remain checkout-only source because the public SDK has no lanes
+package.
 
 From the repository root, with its workspace dependencies installed, this
-command validates both demo profiles:
+command validates both demo profiles. Unlike the standalone Counter tutorial,
+this mixed example requires the checkout for `issueDemo` and `changeDemo`:
 
 ```sh
 node --input-type=module <<'JS'
-import { PROPOSED_BOUNDS } from './packages/contract/src/bounds.ts';
-import { validateDefinition } from './packages/derive/src/validate/index.ts';
+import { PROPOSED_BOUNDS } from '@generalbusiness/dap-contract';
+import { validateDefinition } from '@generalbusiness/dap-derive';
 import { issueDemo, changeDemo } from './packages/lanes/src/demo.ts';
 for (const definition of [issueDemo, changeDemo]) {
 	const result = validateDefinition(definition, PROPOSED_BOUNDS);
@@ -126,8 +128,9 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-Run on 2026-10-12 at main `d309b6b9` with `node` v22.22.0, it exited 0
-and printed:
+Before the package-import substitution, this command ran on 2026-10-12
+at main `d309b6b9` with `node` v22.22.0 and exited 0. That historical run
+printed the following output. The changed imports have not yet been run:
 
 ```
 issue: valid, sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e
