@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLAN, ROOT, args, childEnv, compile, compilerTool, contained, digest, inventory, json, nameOf, outputClosure, productionInputs, publishManifest, references, refusal, sourceIdentity, writeJson } from "./public-release-lib.mjs";
+import { PLAN, ROOT, args, childEnv, compile, compilerTool, contained, digest, inventory, json, nameOf, outputClosure, productionInputs, publishManifest, references, rewritePublishedRefs, refusal, sourceIdentity, writeJson } from "./public-release-lib.mjs";
 
 /** esbuild 0.28.1's parser inserts its already-resolved helper import. Only
  * this exact edge of the pinned copied JSONata input is synthetic metadata.
@@ -28,6 +28,11 @@ export function check(manifestFile, captureFile, captureSha256, browserTool, bro
   for (const input of release.inputs) {
     if (!/^(?:LICENSE|NOTICE|packages\/(?:contract|bytes|client|derive|platform|replay)\/(?:src\/[^\n]+\.ts|package\.json|README\.md)|packages\/derive\/test\/fixtures\.ts)$/.test(input.path) || input.path === "packages/replay/src/bin.ts" || !contained(output, realpathSync(input.copy))) refusal("input-path");
     if (digest(readFileSync(join(ROOT, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256) refusal("input-integrity");
+    if (/\.ts$/.test(input.path)) {
+      const [, dir, ...parts] = input.path.split("/");
+      const compiledInput = join(output, "inputs", dir, ...parts);
+      if (readFileSync(compiledInput, "utf8") !== rewritePublishedRefs(readFileSync(input.copy, "utf8"))) refusal("renamed-input-integrity");
+    }
   }
   const expectedExcluded = [];
   for (const spec of PLAN.packages) {
@@ -81,8 +86,8 @@ export function check(manifestFile, captureFile, captureSha256, browserTool, bro
   const capturePath = realpathSync(captureFile), captureBytes = readFileSync(capturePath);
   if (contained(ROOT, capturePath) || captureBytes.length > 16 * 1024 * 1024 || digest(captureBytes) !== captureSha256) refusal("native-capture-integrity");
   const captureCopy = join(consumer, "native-capture.json"); writeFileSync(captureCopy, captureBytes, { flag: "wx" });
-  const replayJourney = `import { canonicalize } from '@generalbusiness/artroom-bytes';
-import { MemorySource, verify, TRUSTS } from '@generalbusiness/artroom-replay';
+  const replayJourney = `import { canonicalize } from '@generalbusiness/dap-bytes';
+import { MemorySource, verify, TRUSTS } from '@generalbusiness/dap-replay';
 import { platform } from '@generalbusiness/dap-platform';
 import { capabilitiesOf, holdCapability, TOKENS_FLOOR, gitRead } from '@generalbusiness/dap-derive';
 const require = (condition, why) => { if (!condition) throw new Error(why); };
@@ -110,8 +115,8 @@ export async function replayCapture(capture) {
 import { readFileSync, writeFileSync } from 'node:fs';
 import { replayCapture } from './replay-journey.mjs';
 import { PROPOSED_BOUNDS } from '@generalbusiness/dap-contract';
-import { canonicalBytes, keyIdOfSecret, sign, verify, verifySignedIntent } from '@generalbusiness/artroom-bytes';
-import { secretSigner, signedIntent, shapeDeclaredAct } from '@generalbusiness/artroom-client';
+import { canonicalBytes, keyIdOfSecret, sign, verify, verifySignedIntent } from '@generalbusiness/dap-bytes';
+import { secretSigner, signedIntent, shapeDeclaredAct } from '@generalbusiness/dap-client';
 import { validateDefinition } from '@generalbusiness/dap-derive';
 import { RULE_PROFILES, evaluate, assertEngine } from '@generalbusiness/dap-derive/rule';
 import { small, variant } from '@generalbusiness/dap-derive/testing';
@@ -137,11 +142,11 @@ writeFileSync(new URL('./replay-result.json',import.meta.url),JSON.stringify(rep
   const runtime = join(consumer, "compiled-output.mjs"); writeFileSync(runtime, witness, { flag: "wx" });
   execFileSync(process.execPath, [runtime], { cwd: consumer, env: childEnv(join(output, "tmp")), stdio: "pipe" });
   const typed = `import type { DeclaredDefinition, Intent } from '@generalbusiness/dap-contract';
-import { canonicalBytes } from '@generalbusiness/artroom-bytes';
-import { secretSigner, signedIntent, type Signer } from '@generalbusiness/artroom-client';
+import { canonicalBytes } from '@generalbusiness/dap-bytes';
+import { secretSigner, signedIntent, type Signer } from '@generalbusiness/dap-client';
 import { validateDefinition, type ValidDefinition } from '@generalbusiness/dap-derive';
 import { RULE_PROFILES } from '@generalbusiness/dap-derive/rule';
-import { verify as replay, httpSource, type Options, type Verification } from '@generalbusiness/artroom-replay';
+import { verify as replay, httpSource, type Options, type Verification } from '@generalbusiness/dap-replay';
 import { platform } from '@generalbusiness/dap-platform';
 import { small } from '@generalbusiness/dap-derive/testing';
 const definition: DeclaredDefinition = small;
@@ -166,7 +171,7 @@ void replayResult;
   // Ambient-only bytes/web is opt-in, not a module type import or ordinary globals injection.
   const ambient = join(consumer, "ambient.ts"); writeFileSync(ambient, "new TextEncoder().encode('opt-in'); new AbortController().abort();\n", { flag: "wx" });
   const config = join(consumer, "tsconfig.ambient.json");
-  writeJson(config, { compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "ESNext.Disposable"], types: ["@generalbusiness/artroom-bytes/web"], strict: true, skipLibCheck: false, noEmit: true }, files: [ambient] });
+  writeJson(config, { compilerOptions: { target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "ESNext.Disposable"], types: ["@generalbusiness/dap-bytes/web"], strict: true, skipLibCheck: false, noEmit: true }, files: [ambient] });
   compilerProof.push({ mode: "ambient-only-no-DOM-no-Node", files: compile(tool, config, consumer, [consumer, join(output, "packages"), tool.dir], join(consumer, "ambient.log")) });
   // This bundles actual compiled output; the existing Bundler type context alone is not a browser bundle.
   if (!isAbsolute(browserTool) || !/^[a-f0-9]{64}$/.test(browserToolSha256)) refusal("browser-tool-path");
