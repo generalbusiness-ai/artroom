@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:652c2d3cbd6a7765686f65a0d47cae2f010807ab","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/forms-prepare.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:652f6d18a3871e9775f7720230241fa9764e6144","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/artifacts-wiring.test.ts."}
