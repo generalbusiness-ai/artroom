@@ -10,6 +10,7 @@
 import type { FactRef, FieldValue, Item, MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
 import { isDigest, isFactRef, isMemberRef, isRecord, isScopeRef, textDigest, timeMs, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import type { ActLike, FieldLike } from "./describe.ts";
+import { clip } from "./errors.ts";
 
 /** A value that is not of its declared shape. Nothing was signed. */
 export class Unshaped extends Error {
@@ -65,7 +66,7 @@ function shaped(type: FieldLike, value: unknown, path: string, at: Shaping): Fie
 }
 
 function named(types: Readonly<Record<string, FieldLike>>, given: Readonly<Record<string, unknown>>, path: string, at: Shaping): Record<string, FieldValue> {
-  for (const name of Object.keys(given)) if (!Object.hasOwn(types, name)) throw new Unshaped(`${path}.${name}`, "is not declared", "no such field");
+  for (const name of Object.keys(given)) if (!Object.hasOwn(types, name)) throw new Unshaped(`${path}.${clip(name)}`, "is not declared", "no such field");
   const out: Record<string, FieldValue> = {};
   for (const [name, type] of Object.entries(types)) {
     const value = given[name];
@@ -90,7 +91,7 @@ export function shapeFields(act: ActLike, fields: Readonly<Record<string, unknow
 export function shapePresented(act: ActLike, presented: Readonly<Record<string, unknown>> | undefined): Record<string, FactRef> {
   const declared = act.presents ?? {};
   const out: Record<string, FactRef> = {};
-  for (const name of Object.keys(presented ?? {})) if (!Object.hasOwn(declared, name)) throw new Unshaped(`presented.${name}`, "is not declared", "no such presented fact");
+  for (const name of Object.keys(presented ?? {})) if (!Object.hasOwn(declared, name)) throw new Unshaped(`presented.${clip(name)}`, "is not declared", "no such presented fact");
   for (const [name, p] of Object.entries(declared)) {
     const value = presented?.[name];
     if (value === undefined) { if (p.required) throw new Unshaped(`presented.${name}`, "is required", `a fact of kind ${p.kind.join(" or ")}`); continue; }

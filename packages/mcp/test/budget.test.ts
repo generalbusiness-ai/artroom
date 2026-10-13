@@ -9,6 +9,7 @@ import { secretSigner } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/artroom-lanes";
 import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
+import { ERROR_BYTES, failed } from "../src/service.ts";
 import { fileStore } from "../src/node.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
@@ -308,6 +309,48 @@ describe("what a call costs, end to end", () => {
     }
     expect(await s.service.custody.store.unresolved()).toEqual([]);
     await annotate(`over-long names: refused with nothing kept or sent, results of at most ${Math.max(...sizes)} bytes`);
+  });
+
+  // Invariant: a caller's fragment in an error is clipped to 128 characters with its length, and the whole serialized error
+  // fits the bound of the tool that gave it: an oversized target to inspect, to an act tool and to act, and a 100 KiB unknown
+  // field name to create. Nothing is kept or sent for any of them.
+  test("oversized targets and field names: errors within the tool's bound", async ({ annotate }) => {
+    const s = roomOf("admin", [issueDemo], { custody: memoryStore(), mode: "add" });
+    await s.service.page();
+    const huge = "t".repeat(100 * 1024);
+    const sizes: string[] = [];
+    const cases: [string, string, Record<string, unknown>, number][] = [
+      ["inspect", "inspect", { scope: huge }, BOUNDS.inspect],
+      ["an act tool", "issue.comment", { target: huge, fields: { body: "x" }, idempotencyKey: "huge-target" }, BOUNDS.act],
+      ["act", "act", { target: huge, kind: "comment", fields: { body: "x" }, idempotencyKey: "huge-act" }, BOUNDS.act],
+      ["create", "create", { definition: issueDemo, kind: "file", fields: { opener: "@agent", title: "T", conditions: ["c"], [huge]: 1 }, membership: s.config.repository!.membership, idempotencyKey: "huge-field" }, BOUNDS.act],
+    ];
+    for (const [label, tool, args, bound] of cases) {
+      const got = await counted(s, () => s.service.call(tool, args));
+      expect(got.result.isError, label).toBe(true);
+      expect(got.bytes, `${label}: ${got.bytes} bytes`).toBeLessThanOrEqual(bound);
+      const message = got.result.structuredContent["message"] as string;
+      // A target that names no scope is quoted as its JSON, so its length counts the two quotes.
+      expect(message, label).toMatch(/… \(10240[02] characters\)/);
+      expect(JSON.stringify(got.result), label).not.toContain("t".repeat(200));
+      expect(got.result.structuredContent["next"], label).toEqual(expect.any(String));
+      expect(got.requests.filter((r) => r.startsWith("POST")), `${label}: nothing sent`).toEqual([]);
+      sizes.push(`${label} ${got.bytes}`);
+    }
+    expect(await s.service.custody.store.unresolved()).toEqual([]);
+    await annotate(`oversized fragments: whole errors of ${sizes.join(", ")} bytes`);
+  });
+
+  // Invariant: an error whose sentence would pass the error bound is cut in its sentence only, says so, and keeps its kind and
+  // its next step whole.
+  test("an error past its bound is cut in its sentence only", () => {
+    const got = failed({ error: "target", what: `${"w".repeat(10_000)}` });
+    const structured = got.structuredContent as { error: string; message: string; next: string };
+    expect(new TextEncoder().encode(JSON.stringify(got)).length).toBeLessThanOrEqual(ERROR_BYTES);
+    expect(structured.error).toBe("target");
+    expect(structured.next).toBe("Call room for the scopes and lanes of the room; give target as a scope ID or a number.");
+    expect(structured.message).toMatch(/^Before signing, the server could not resolve the target: w+… \(the sentence is cut here; it had \d+ characters\)$/);
+    expect(JSON.parse(got.content[0]!.text)).toEqual(structured);
   });
 
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation

@@ -19,7 +19,7 @@ import { platform } from "@generalbusiness/artroom-platform";
 import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, generationOf, listed, selected, type Binding, type Held, type Inventory, type Mode, type Tool } from "./catalogue.ts";
 import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
 import { describeAct, grantAction, onOf, schemaOf, type DefinitionLike } from "./describe.ts";
-import { answered, finding, type Finding } from "./errors.ts";
+import { answered, clip, finding, type Finding } from "./errors.ts";
 import { Kept, definitionOf, readInventory, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
 import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.ts";
 import { Reads } from "./reads.ts";
@@ -99,7 +99,22 @@ const ok = (structured: Record<string, unknown>, bound: number = BOUNDS.act): Ca
   if (bytesOf(whole) <= bound) return whole;
   return { content: [{ type: "text", text: `The result is in structuredContent: ${bytesOf(structured)} bytes of JSON, which this text does not repeat.` }], structuredContent: structured, isError: false };
 };
-const failed = (f: Finding): CallResult => { const said = finding(f); const structured = { error: said.error, message: said.sentence, next: said.next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
+/** The bound of every error result: the smallest tool's bound, so an error fits whichever tool gave it. */
+export const ERROR_BYTES = Math.min(...Object.values(BOUNDS));
+/**
+ * An error result. Its whole serialized size is held within ERROR_BYTES: when the sentence would pass it, only the sentence
+ * is cut, and says so; the error's kind and its next step are always whole.
+ */
+export const failed = (f: Finding): CallResult => {
+  const said = finding(f);
+  const result = (message: string): CallResult => { const structured = { error: said.error, message, next: said.next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
+  const whole = result(said.sentence);
+  if (bytesOf(whole) <= ERROR_BYTES) return whole;
+  const cut = (n: number) => { const end = /[\uD800-\uDBFF]/.test(said.sentence[n - 1] ?? "") ? n - 1 : n; return result(`${said.sentence.slice(0, end)}… (the sentence is cut here; it had ${said.sentence.length} characters)`); };
+  let lo = 0, hi = said.sentence.length;
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (bytesOf(cut(mid)) <= ERROR_BYTES) lo = mid; else hi = mid - 1; }
+  return cut(lo);
+};
 
 /**
  * A native answer, projected for a result: its kind, the fact and the duties of an acceptance, the reason, name and judged head
@@ -295,7 +310,7 @@ export class McpService {
       }
       if (lane) return at(lane.ref.scope);
     }
-    return stop({ error: "target", what: `${JSON.stringify(named)} names no scope here` });
+    return stop({ error: "target", what: `${clip(JSON.stringify(named) ?? String(named))} names no scope here` });
   }
 
   async #summary(scope: ScopeId, membership: ScopeRef | null): Promise<{ summary: Summary; at: Read<Summary> & { ok: true } }> {
@@ -798,12 +813,12 @@ export class McpService {
     if (!link || !wellFormedInvitation(link)) return failed({ error: "shape", field: "link", what: "is no invitation link from artroom invite, or its repository references are not well formed", declared: "artroom-invite:..." });
     const config = await this.#port.config.read();
     if (config.repository && config.repository.membership.scope !== link.repository.membership.scope) return failed({ error: "target", what: `this configuration has a room already (directory ${config.repository.directory.scope}); use another ARTROOM_HOME to join another` });
-    if (this.#service !== "" && this.#service !== link.service) return failed({ error: "target", what: `the link names the service ${link.service}, and this server serves ${this.#service}` });
+    if (this.#service !== "" && this.#service !== link.service) return failed({ error: "target", what: `the link names the service ${clip(link.service)}, and this server serves ${this.#service}` });
     if (this.#service === "") { this.#service = link.service; this.#reads = this.#readsOf(link.service); }
     const named = (link.definition ?? "platform:membership@1") as PlatformDefinition;
     const membershipData = platform(named)?.data as unknown as DefinitionLike | undefined;
     const act = membershipData?.name === "platform:membership" ? membershipData.acts["join"] : undefined;
-    if (!act) return failed({ error: "target", what: `the invitation is in ${named}, which this server does not know as membership` });
+    if (!act) return failed({ error: "target", what: `the invitation is in ${clip(named)}, which this server does not know as membership` });
     const M = link.repository.membership;
     const fields = { invitation: link.invitation, secret: link.secret };
     const identity: Identity = { service: this.#service, membership: M, signer: this.#port.signer.key, target: M, key: key as string };

@@ -118,7 +118,28 @@ export function readRefused(scope: string, reason: ReadRefusal): Said {
   return { sentence: `${scope} did not answer the read: ${reason} (${note.sentence}).`, next: note.next };
 }
 
-/** The server's own findings, before or beside the scope's judgment. Each is a tool error, never a scope's answer. */
+/** How many characters of a caller's fragment (a target, a field name, a key, a value) a diagnostic repeats. */
+export const FRAGMENT_CHARS = 128;
+
+/** A field's path is clipped name by name where it is made (shape.ts); its whole is held to a few clipped names. */
+const PATH_CHARS = 4 * FRAGMENT_CHARS;
+
+/**
+ * A caller's fragment as a diagnostic shows it: a string as given, any other value as its JSON, cut to FRAGMENT_CHARS
+ * characters with an ellipsis and the original length when it is longer. A cut never splits a surrogate pair.
+ */
+export function clip(value: unknown, chars: number = FRAGMENT_CHARS): string {
+  const whole = typeof value === "string" ? value : JSON.stringify(value) ?? String(value);
+  if (whole.length <= chars) return whole;
+  const cut = /[\uD800-\uDBFF]/.test(whole[chars - 1]!) ? chars - 1 : chars;
+  return `${whole.slice(0, cut)}… (${whole.length} characters)`;
+}
+
+/**
+ * The server's own findings, before or beside the scope's judgment. Each is a tool error, never a scope's answer. Every
+ * fragment a caller gave (a field's path, a key, a scope or target as given, a tool's name) is clipped here, where the
+ * sentence is made; a finding's `what` that quotes a caller's value clips it where it is written.
+ */
 export type Finding =
   | { error: "shape"; field: string; what: string; declared: string }
   | { error: "stale-descriptor"; scope: string; runs: string; tool: string | null }
@@ -132,13 +153,13 @@ export type Finding =
 
 export function finding(f: Finding): Said & { error: string } {
   switch (f.error) {
-    case "shape": return { error: f.error, sentence: `Before signing, the server found field ${f.field} ${f.what}; declared: ${f.declared}. Nothing was sent.`, next: "Correct the field and call again with the same idempotencyKey." };
-    case "stale-descriptor": return { error: f.error, sentence: `Before signing, the server found that ${f.scope} runs ${f.runs}, which this tool does not serve. Nothing was sent.${f.tool ? ` The tool for that target is ${f.tool}.` : " No listed tool serves it for your standing."}`, next: "List tools again; call the named tool." };
+    case "shape": return { error: f.error, sentence: `Before signing, the server found field ${clip(f.field, PATH_CHARS)} ${f.what}; declared: ${f.declared}. Nothing was sent.`, next: "Correct the field and call again with the same idempotencyKey." };
+    case "stale-descriptor": return { error: f.error, sentence: `Before signing, the server found that ${clip(f.scope)} runs ${clip(f.runs)}, which this tool does not serve. Nothing was sent.${f.tool ? ` The tool for that target is ${f.tool}.` : " No listed tool serves it for your standing."}`, next: "List tools again; call the named tool." };
     case "restart": return { error: f.error, sentence: "The tool list changed; list again from the start.", next: "Call tools/list without a cursor." };
-    case "transport": return { error: f.error, sentence: `The reply from ${f.scope} was lost or malformed; the outcome is unknown.${f.submitted ? " The envelope is under custody." : ""}`, next: f.submitted ? HINTS.settle : "Call again; nothing was submitted." };
+    case "transport": return { error: f.error, sentence: `The reply from ${clip(f.scope)} was lost or malformed; the outcome is unknown.${f.submitted ? " The envelope is under custody." : ""}`, next: f.submitted ? HINTS.settle : "Call again; nothing was submitted." };
     case "custody": {
       const extra = f.state === "full" && f.bytes !== undefined ? ` The envelope would carry about ${f.bytes} bytes, more than a record of 2 MiB holds with its outcomes; nothing was signed.`
-        : f.state === "full" && f.keys ? ` The oldest unresolved keys: ${f.keys.join(", ")}.` : f.recorded ? ` It holds ${f.recorded}.`
+        : f.state === "full" && f.keys ? ` The oldest unresolved keys: ${f.keys.map((k) => clip(k)).join(", ")}.` : f.recorded ? ` It holds ${f.recorded}.`
         : f.state === "locked" && f.stale ? ` A process died while recovering this lock and left ${f.stale}; the server does not break it, so that no two processes can recover at once.` : "";
       const next = f.state === "conflicting" ? "Use a new idempotencyKey for a new meaning."
         : f.state === "locked" && f.stale ? `Once no process of this ARTROOM_HOME runs, remove ${f.stale}, then call again with the same idempotencyKey.`
@@ -147,11 +168,11 @@ export function finding(f: Finding): Said & { error: string } {
         : f.state === "full" ? "Call settle for the unresolved keys first."
         : f.state === "terminal" ? "The retained outcome is in the result; resubmit: true sends the same envelope again, deliberately."
         : f.state === "too-large" ? "Make the act smaller." : "Report it; nothing was sent.";
-      return { error: f.error, sentence: `The server's record for key ${f.key} on ${f.scope} is ${f.state}; nothing was sent.${extra}`, next };
+      return { error: f.error, sentence: `The server's record for key ${clip(f.key)} on ${clip(f.scope)} is ${f.state}; nothing was sent.${extra}`, next };
     }
-    case "credential": return { error: f.error, sentence: `No read token of yours is readable at ${f.destination} (${f.why}); nothing was returned.`, next: "Call repository.read-token first (or act in --generic mode), then wait for its outcome, then credential." };
+    case "credential": return { error: f.error, sentence: `No read token of yours is readable at ${clip(f.destination)} (${f.why}); nothing was returned.`, next: "Call repository.read-token first (or act in --generic mode), then wait for its outcome, then credential." };
     case "target": return { error: f.error, sentence: `Before signing, the server could not resolve the target: ${f.what}. Nothing was sent.`, next: "Call room for the scopes and lanes of the room; give target as a scope ID or a number." };
-    case "unknown-tool": return { error: f.error, sentence: `No tool is named ${f.name.length > 256 ? `${f.name.slice(0, 256)}...` : f.name} in this list.`, next: "Call tools/list." };
-    case "read": { const said = readRefused(f.scope, f.reason); return { error: f.error, ...said }; }
+    case "unknown-tool": return { error: f.error, sentence: `No tool is named ${clip(f.name)} in this list.`, next: "Call tools/list." };
+    case "read": { const said = readRefused(clip(f.scope), f.reason); return { error: f.error, ...said }; }
   }
 }
