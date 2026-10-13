@@ -218,8 +218,9 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
     await hold("register", config.register.scope, null);
   }
 
+  const applicationScopes = new Set(scopes.filter((s) => s.place === "application").map((s) => s.scope));
   for (const root of config.roots ?? []) {
-    if (scopes.some((s) => s.scope === root.scope && s.place === "application")) continue;
+    if (applicationScopes.has(root.scope)) continue;
     const read = await summaryOf(root.scope, root.membership);
     if (!read.ok) { unread.push({ scope: root.scope, reason: read.reason }); continue; }
     heads[root.scope] = headText(read.at);

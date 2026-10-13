@@ -115,8 +115,10 @@ directory's application factory created, such as a Counter: an
 the created scope. A lane and an application are both held under the
 directory's membership, so the caller's role there decides their tools.
 `room` lists the applications beside the lanes, with each one's definition
-name, digest, scope and state; an application still being created, or
-refused, is listed with no scope and has no tools. A scope outside the
+name, digest, scope and state. `room` reads the directory's live items
+only: an application still being created is listed as `creating`, with no
+scope and no tools; a creation that was refused or conflicted is final,
+leaves the live items, and is not listed. A scope outside the
 repository is added with `--scope`; a configured scope that is also one of
 the directory's applications is held and listed once, as the application.
 
@@ -1351,6 +1353,11 @@ scope and state, and the list holds the Counter's act tools from then on.
 `packages/mcp/test/counter.scope.test.ts` runs this recipe on the real
 test Worker in both modes, after an admin has initialized the board, and
 checks the tools called and their count against this table (observed).
+The count covers taking part, from finding the Counter to leaving; the
+room's setup, the board's initialization and the story's final reading
+of the steps are not counted. In `--generic` mode the story's second
+connection shares the first one's key and configuration: the same member,
+not a second admitted one.
 
 | Activity | Default | --generic |
 |---|---|---|
@@ -1382,7 +1389,12 @@ item larger than a page, which is served whole, alone on its page.
 
 `room` pages every collection it returns (lanes, applications, standalone scopes,
 standing, active definitions, the act tools not held, the scopes not read)
-together, by bytes, with a cursor bound to the list's generation.
+together, by bytes, with a cursor. The cursor is bound to the layout of
+those collections, a digest of every entry in order, not to the tool
+list's generation: an application being created moves the entries after
+it without changing the generation. A cursor whose layout no longer holds
+is answered with the first page and `restarted`, so no entry is repeated
+or skipped.
 
 The searches of `wait` and `credential` keep their position between polls
 and calls and read at most 16 entries, or 4 pages of final items, each
@@ -1421,6 +1433,12 @@ of the warm call, as the service makes it; the test asserts both calls' sizes ag
 operation's outcome names the token (two here), then the credential route:
 3 reads where plan 031 counts 1.
 
+The warm counts above are of a room with no applications. An application
+the directory created costs reads the first time the server sees it: one
+summary of its scope for its pin, and its definition's bytes once per
+digest; both are kept, so later calls read nothing more for it. Its row
+comes from the directory summary the list already reads.
+
 Other observed figures from the same run:
 
 - A session that has ended: the next read asks for a new one, +1.
@@ -1431,7 +1449,12 @@ Other observed figures from the same run:
 - A room with two standalone roots, one under a second membership: `room`
   warm reads 6 (3, + 2 roots, + 1 for standing on the second membership);
   cold, 2 session requests.
-- A room of 60 lanes, 30 applications and 40 roots: `room` in 6 pages, each within 8 KiB.
+- A room of 60 lanes, 30 applications and 40 roots: `room` in 6 pages
+  (observed; the test asserts more than one), each within 8 KiB. That
+  case proves the totals and the bound, not that pages agree with each
+  other; a second case does: a continuation inside the roots, after an
+  application appears as `creating`, is created, or is refused, restarts,
+  and the walk from the restart returns every root once.
 - 20 prepared steps under one key: `settle` in 4 pages, each within 4 KiB;
   each `prepare` result at most 1692 bytes.
 - A known tool name called at a root another process added under a second
