@@ -50,7 +50,7 @@ test("list handlers restore query and filter through detail/back while literal q
   expect(returned.textContent).toContain("<script>Guide</script>");
   expect(returned.all("script")).toEqual([]);
   kept = { query: "", filter: "open" };
-  expect(show().textContent).toContain("No matches.");
+  expect(show().textContent).toContain("Clear the search or choose another filter to find an issue.");
 });
 
 test("one current condition follows the selected version, never an internally confirmed operation or an older version", () => {
@@ -215,7 +215,7 @@ test("an empty change list explains the first recorded source once in its list c
     expect(emptyIssues.all("a").some(link => link.textContent === "How to propose a change")).toBe(false);
     expect(empty.all("a").find(link => link.textContent === "How to propose a change")?.attributes["href"]).toBe("https://github.com/generalbusiness-ai/dap/blob/main/apps/room/docs/first-change.md");
     const changed = roomScreen(room, { issues: [], changes: [{ scope: "sc_change", number: 1, kind: "pr", title: "Recorded source", state: "merged", draft: false }] } as never, "change", { state: { filter: "open", query: "" }, changed: () => {} }) as unknown as Element;
-    expect(changed.textContent).toContain("No matches.");
+    expect(changed.textContent).toContain("Clear the search or choose another filter to find a change.");
     expect(changed.textContent).not.toContain(text);
     expect(changed.all("a").some(link => link.textContent === "How to propose a change")).toBe(false);
   } finally { vi.unstubAllGlobals(); }
