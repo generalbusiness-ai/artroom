@@ -3,8 +3,8 @@
  * This module never installs a register or imports an operator key. */
 import type { PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, parseStrict, unb64url } from "@generalbusiness/artroom-bytes";
-import { ScopeHandle, httpTransport, secretSigner, signedReads, type Fetch } from "@generalbusiness/artroom-client";
-import { claim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/dap-cli";
+import { ScopeHandle, httpTransport, secretSigner, signedReads, isFoundingOffer, type Fetch } from "@generalbusiness/artroom-client";
+import { claim, checkClaim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/dap-cli";
 import { DIRECTORY_OF } from "@generalbusiness/dap-platform";
 import type { Session } from "./data.ts";
 
@@ -15,8 +15,12 @@ export interface ClaimStorage { getItem(key: string): string | null; setItem(key
 /** Exclusive across all callers/tabs sharing the private record. Production
  * uses Web Locks; a test supplies its explicitly labelled lock stand-in. */
 export interface ClaimLocks { request<T>(name: string, run: () => Promise<T>): Promise<T> }
-export interface ClaimOptions extends Pick<Context, "pause" | "tries"> {
+export interface ClaimOptions extends Pick<Context, "pause" | "tries" | "foundingOffer"> {
   handle?: string;
+  /** Only settle/follow the exact saved stages; never Continue or prepare. */
+  readOnlyCheck?: boolean;
+  /** Local custody callback after operation reservation, before native signing. */
+  retainOperation?: (operation: string) => void;
   locks?: ClaimLocks;
   /** True only while the Page still selects the captured room, key and register.
    * Checked after waiting for the lock and immediately before mutation delivery.
@@ -90,17 +94,19 @@ function readJournal(session: Session, configured: ClaimRegister, storage: Claim
 }
 /** A local descriptor only. It carries neither signing keys nor permission,
  * and a complete hint is revalidated natively before a new creation. */
-export function claimStatus(session: Session, configured: ClaimRegister, storage: ClaimStorage): ClaimStatus | null {
+export function claimStatus(session: Session, configured: ClaimRegister, storage: ClaimStorage, selectedOperation?: string): ClaimStatus | null {
   const { binding, journal } = readJournal(session, configured, storage);
   if (!journal) return null;
-  const kept = readKept(journal.claims[journal.active]!, binding, session, configured);
-  return { operation: journal.active, label: kept.label, state: kept.completed ? "complete" : "pending" };
+  const operation = selectedOperation ?? journal.active;
+  if (!Object.hasOwn(journal.claims, operation)) throw new Error("The exact original creation is missing from its private journal. Nothing was submitted.");
+  const kept = readKept(journal.claims[operation]!, binding, session, configured);
+  return { operation, label: kept.label, state: kept.completed ? "complete" : "pending" };
 }
 
 /** One journal write commits the operation ID and its complete private record
  * before a mutation can leave. Existing signing keys stay in Page settings;
  * each new operation generates and retains its own recovery key. */
-function storeFor(session: Session, configured: ClaimRegister, storage: ClaimStorage, label: string, operation: string, fresh = false): { store: Store; kept(): Kept } {
+function storeFor(session: Session, configured: ClaimRegister, storage: ClaimStorage, label: string, operation: string, fresh = false): { store: Store; kept(): Kept; retain(): void } {
   const read = readJournal(session, configured, storage);
   const { binding, storageKey } = read;
   let journal = read.journal ?? { v: 2 as const, binding, active: operation, claims: {} };
@@ -135,7 +141,7 @@ function storeFor(session: Session, configured: ClaimRegister, storage: ClaimSto
     private: async () => null,
     keepPrivate: async () => { throw new Error("Claiming does not create a private invitation record."); },
   };
-  return { store, kept: () => structuredClone(record) };
+  return { store, kept: () => structuredClone(record), retain: () => write(record) };
 }
 
 /** Authoritative offer check for an explicitly configured full register ref.
@@ -168,7 +174,8 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
     };
     checkCurrent();
     if (!label.trim() || label.length > 256) throw new Error("Enter a local room label of at most 256 characters.");
-    const { handle, locks: _locks, current: _current, mode: _mode, operation: _operation, ...waiting } = options;
+    const { handle, readOnlyCheck, retainOperation, locks: _locks, current: _current, mode: _mode, operation: _operation, ...waiting } = options;
+    if (readOnlyCheck && options.mode !== "resume") throw new Error("Check requires a retained original creation. Nothing was submitted.");
     let blocked = false;
     const send = session.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
     const guardedFetch: Fetch = (url, init) => {
@@ -180,7 +187,8 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
       return send(url, init);
     };
     async function runNative(privateStore: ReturnType<typeof storeFor>, localLabel: string): Promise<Outcome> {
-      return claim({ store: privateStore.store, fetch: guardedFetch, ...session.now ? { now: session.now } : {}, ...waiting }, localLabel, handle !== undefined ? { handle } : {});
+      const context = { store: privateStore.store, fetch: guardedFetch, ...session.now ? { now: session.now } : {}, ...waiting };
+      return readOnlyCheck ? checkClaim(context, localLabel) : claim(context, localLabel, handle !== undefined ? { handle } : {});
     }
     const loaded = readJournal(session, configured, storage);
     const active = loaded.journal?.active;
@@ -200,7 +208,11 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
         if (verified.code !== 0) return { outcome: verified, operation: active, label: kept.label, repository: null, pending: true };
       }
       checkCurrent();
-      const eligible = await allowedClaim(session, configured.register);
+      const eligible = options.foundingOffer ? await (async () => {
+        const offer = await options.foundingOffer!(configured.register);
+        if (!isFoundingOffer(offer, session.service, configured.register)) throw new Error("The founding offer does not match this exact origin and register. Nothing was submitted.");
+        return { definition: offer.definition };
+      })() : await allowedClaim(session, configured.register);
       if (eligible.definition !== configured.definition) throw new Error("The register read does not match the configured pinned version. Nothing was submitted.");
       checkCurrent();
       operation = crypto.randomUUID();
@@ -209,6 +221,9 @@ export async function claimRoom(session: Session, configured: ClaimRegister, sto
     const privateStore = storeFor(session, configured, storage, label.trim(), operation, fresh);
     const before = privateStore.kept();
     if (before.config.repository && !before.completed) throw new Error("The saved room has no exact native claim recovery proof. It is kept; nothing was submitted.");
+    checkCurrent();
+    if (fresh) privateStore.retain();
+    if (!readOnlyCheck) retainOperation?.(operation);
     checkCurrent();
     const native = await runNative(privateStore, before.label);
     const outcome: Outcome = blocked ? { code: 1, lines: ["The Page room, key or register changed. This continuation sent no new mutation after the context changed. The exact saved original claim is kept; earlier steps may already be accepted or unknown. Inspect or resume only under its original context."] } : native;

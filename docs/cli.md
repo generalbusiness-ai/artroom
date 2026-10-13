@@ -235,7 +235,7 @@ Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
 Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
 ```
 
-**`dap join <link>`** is membership's `join`, signed by a new key
+**`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
 is absent from public config. It saves the accepted fact and inbox progress
@@ -249,6 +249,28 @@ link stops the retry; it never signs a replacement automatically.
 Joined as @una on key key_H1bY2Hml....
 Your inbox: sc_zbtu7vax....
 ```
+
+**`dap join <artroom-agent-key:…>`** enrolls a genuine agent key with
+membership's `enrol`. A verified room controller first creates an agent
+member with `add-member`, then invites its key with `invite-key`. The private
+handoff carries that invitation and full native references. It carries no
+signing key. A person invitation with the role `agent` is still a person;
+it cannot substitute for this agent-key protocol.
+
+Use a separate empty owner-only `ARTROOM_HOME` for the receiving agent. The
+command generates and retains an independent key and saves the exact private
+enrollment envelope before delivery. After an unknown answer, use the same
+link with `--check` to settle and follow the original without submitting a
+mutation. Run the same command without `--check` only to Continue explicitly.
+It retains the original signature, idempotency key and deadline.
+
+The command saves a usable connection only after it verifies the accepted
+enrollment, genuine agent and key kinds, controller, recorded directory
+siblings, and active inbox incarnation. A missing private request, changed
+link, person/agent mismatch or definite native refusal keeps the original;
+it does not generate a replacement key or request. Existing `artroom-invite:`
+links and pending person joins retain their original behavior. Treat either
+invitation link as private.
 
 **`dap acts [<scope>]`** lists the acts of the scope's definition
 that the caller's role holds now, with each act's fields. The role and
