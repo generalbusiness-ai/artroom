@@ -151,7 +151,7 @@ export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promi
  * fixture's clock, and the pause between two polls of `wait`, which drives
  * the fixture's operations as a deployment's alarms would.
  */
-export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null } = { now: null, pause: null };
+export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null; /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */ lose: string | null } = { now: null, pause: null, lose: null };
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
 export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
@@ -165,5 +165,16 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   async tick(): Promise<boolean> { const service = this.held()?.inside().service; if (!service) return false; await service.check(); return true; }
   /** The open streams and sessions this instance holds. */
   counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
-  protected override ports() { return { now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {}, pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)) }; }
+  protected override ports() {
+    const scopes = this.env.PLATFORM;
+    return {
+      now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
+      pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
+      fetch: (async (url: string, init?: RequestInit) => {
+        const response = await route(new Request(url, init), scopes);
+        if (hostedTest.lose !== null && new URL(url).pathname.endsWith(hostedTest.lose)) { hostedTest.lose = null; await response.body?.cancel(); throw new Error("scripted loss of the reply"); }
+        return response;
+      }) as never,
+    };
+  }
 }

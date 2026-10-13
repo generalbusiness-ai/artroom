@@ -10,11 +10,11 @@ import type { ControlRequest, FactRef, KeyId, MemberId, ScopeRef } from "@genera
 import { b64url, canonicalize, digestBytes, keyIdOfSecret, newIncarnation, signControl, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
 import { firstExtents } from "@generalbusiness/dap-platform";
-import { DEMO_DIGESTS, issueDemo } from "@generalbusiness/dap-lanes";
+import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { mcpRoute } from "../../scope/src/worker.ts";
 import { hostedTest } from "../../scope/test/worker.ts";
-import { MODERN } from "../src/index.ts";
+import { MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { founded } from "./support/story.ts";
@@ -135,7 +135,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };
 }
-const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; room.done(); };
+const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
 const mcp = (bearer: string, method: string, headers: Record<string, string>, body?: unknown) =>
   routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
@@ -249,5 +249,85 @@ test("H2, H3 and H4: agents kept apart, control authority, the bearer and revoca
     const paulKey = (await allItems(rita, "membership")).find((i) => i.type === "key" && i.values["id"] === paul.key)!;
     expect((await rita.ok("key.revoke", { on: paulKey.id, fields: { as: "retired" }, idempotencyKey: "revoke-paul" }))["answer"]).toBe("accepted");
     expect((await room.wait(() => post(`/mcp/agents/${bot3.agent}/bearer`, control(room, paul.secret, "bearer", M, bot3.agent, "", "paul-after-revoke"), ""))).status, "a revoked key").toBe(403);
+  } finally { done(room); }
+});
+
+test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply and a reset, the framing overhead", async () => {
+  const { room, rita } = await roomWithIssues();
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const stub = agentStub(bot.agent);
+    const list = (session: string) => mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": session }, { jsonrpc: "2.0", id: 2, method: "tools/list" });
+    const told = (s: { text: () => string }) => s.text().split("notifications/tools/list_changed").length - 1;
+    // H5. A legacy session lists at generation A; the inventory changes to B with the stream open; the stream is told once.
+    const S = await legacySession(bot.bearer);
+    expect((await list(S)).status).toBe(200);
+    const open1 = stream(bot.bearer, S);
+    await settle();
+    expect(open1.text()).toContain(": stream");
+    expect(told(open1), "nothing told before a change").toBe(0);
+    expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.change, name: "change" }, values: [canonicalize(changeDemo)], idempotencyKey: "activate-change" }))["answer"]).toBe("accepted");
+    expect(await stub.tick()).toBe(true);
+    await settle();
+    expect(told(open1), "told once with the stream open").toBe(1);
+    expect(await stub.tick()).toBe(true);
+    await settle();
+    expect(told(open1), "not told again").toBe(1);
+    // The object is reset without the client listing: on reconnect the client is told once more, because listed is still A.
+    open1.stop();
+    await stub.reset();
+    const open2 = stream(bot.bearer, S);
+    await settle();
+    expect(open2.text(), "the session survived the reset").toContain(": stream");
+    expect(told(open2), "reconciliation tells the unlisted change once").toBe(1);
+    // It lists (listed = B); a further reconnect without a change receives nothing.
+    expect((await list(S)).status).toBe(200);
+    open2.stop();
+    await stub.reset();
+    const open3 = stream(bot.bearer, S);
+    await settle();
+    expect(open3.text()).toContain(": stream");
+    expect(told(open3), "nothing to reconcile after listing").toBe(0);
+    // A change while no stream is open is told once at the next stream; a second GET closes the first stream, the second keeps receiving.
+    open3.stop();
+    await settle();
+    await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue2" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue2" }).catch(() => undefined);
+    expect((await rita.ok("member.add", { fields: { handle: "@seen", kind: "checker" }, idempotencyKey: "add-seen" }))["answer"]).toBe("accepted");
+    await stub.tick();
+    const open4 = stream(bot.bearer, S);
+    await settle();
+    const toldAtOpen = told(open4);
+    const open5 = stream(bot.bearer, S);
+    await settle();
+    expect(await open4.ended, "the first stream closed on replacement").toBe(200);
+    expect(open5.text()).toContain(": stream");
+    expect((await stub.counts()).streams).toBe(1);
+    void toldAtOpen;
+    open5.stop();
+    await settle();
+    // H6. A reply lost on the way back leaves the record unknown; settle after a reset resolves it from the scope; a repeat under the
+    // same key signs nothing and returns the retained answer.
+    hostedTest.lose = `/${rita.config.repository!.directory.scope}/acts`;
+    const lost = await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "lost on the way back", conditions: ["done"] }, idempotencyKey: "lost-1" }));
+    const lostBody = (await lost.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    expect(lostBody["error"], JSON.stringify(lostBody)).toBe("transport");
+    await stub.reset();
+    const settled = await room.wait(() => modernCall(bot.bearer, "settle", { idempotencyKey: "lost-1", target: "directory" }));
+    const settledBody = (await settled.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    expect(settledBody["answer"], JSON.stringify(settledBody)).toBe("accepted");
+    const repeat = await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "lost on the way back", conditions: ["done"] }, idempotencyKey: "lost-1" }));
+    const repeatBody = (await repeat.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    expect([repeatBody["answer"], repeatBody["retained"]], JSON.stringify(repeatBody)).toEqual(["accepted", true]);
+    expect((repeatBody["fact"] as FactRef).seq).toBe((settledBody["fact"] as FactRef).seq);
+    // H7. The HTTP framing overhead of a 2026-07-28 tools/call: the response's bytes beyond the CallResult, measured once.
+    const framed = await room.wait(() => modernCall(bot.bearer, "room", {}));
+    const text = await framed.text();
+    const result = (JSON.parse(text) as { result: Record<string, unknown> }).result;
+    const { resultType: _r, _meta: _m, ...callResult } = result;
+    const overhead = utf8(text).length - utf8(JSON.stringify(callResult)).length;
+    // The JSON-RPC envelope with a one-digit id, plus what 2026-07-28 adds to every result; docs/mcp.md states both (observed here).
+    const envelope = utf8(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} })).length - 2;
+    expect(overhead, "the JSON-RPC envelope and the modern result's added members").toBe(envelope + MODERN_RESULT_EXTRA);
+    expect(framed.headers.get("content-type")).toBe("application/json");
   } finally { done(room); }
 });
