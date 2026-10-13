@@ -179,6 +179,8 @@ export type CreationFence = "reservation" | "seed" | "kept" | "accepted" | "comp
 
 export interface RegistryPorts extends Authority {
   now(): number;
+  /** A test's control budget and retirement reserve in place of 16 MiB and 1 MiB. */
+  controlBudget?: { budget: number; reserve: number };
   /** A test's fault: called at the named fence; throwing there is the reset. */
   fault?: (fence: CreationFence) => void;
   /** A fresh, unique agent object ID. */
@@ -192,7 +194,7 @@ export class HostedRegistry {
   readonly #control: ControlPlane;
   constructor(private readonly sql: Sql, private readonly ports: RegistryPorts) {
     sql.exec(`CREATE TABLE IF NOT EXISTS agents (agent TEXT PRIMARY KEY, handle TEXT NOT NULL, key TEXT, state TEXT NOT NULL, created TEXT NOT NULL)`);
-    this.#control = new ControlPlane(sql);
+    this.#control = new ControlPlane(sql, ports.controlBudget?.budget, ports.controlBudget?.reserve);
   }
 
   /** The agent object ID a reservation under `op` allotted, for a test's eyes; null when there is none. */
@@ -267,6 +269,8 @@ export interface AgentPorts extends Authority {
   custodyBounds?: SqliteCustodyBounds;
   /** A test's fault: called at the named fence; throwing there is the reset. */
   fault?: (fence: CreationFence) => void;
+  /** A test's fault on a session-row write: throwing there is the storage failure. */
+  sessionFault?: () => void;
 }
 
 interface AgentRow { op: string; seed: Uint8Array; key: KeyId; state: "enrolling" | "enrolled" | "retired" | "refused"; membership: ScopeRef; handle: string; config: McpConfig; bearer: string | null; answer: ControlAnswer | null }
@@ -342,6 +346,7 @@ export class HostedAgent {
         // A session row is control state: its bytes as stored are charged, the difference on an update; no room, no session.
         const text = JSON.stringify(session);
         this.sql.transaction(() => {
+          this.ports.sessionFault?.();
           const before = this.sql.exec(`SELECT row FROM session WHERE id = ?`, session.id).toArray()[0];
           const delta = utf8(text).length + ROW_OVERHEAD - (before ? utf8(String(before["row"])).length + ROW_OVERHEAD : 0);
           if (!this.#control.charge(delta, "session")) throw new SessionFull();
@@ -541,6 +546,27 @@ export class HostedAgent {
 
   /** For a test: the service and the layer as this object holds them now. */
   inside(): { service: McpService | null; http: McpHttp | null } { return { service: this.#service, http: this.#http }; }
+
+  /** What an eviction does to this instance's memory: every stream ends abruptly, with no event; nothing durable changes. */
+  abrupt(): void { this.#http?.abrupt(); this.#http = null; this.#service = null; }
+
+  /** The durable facts of this agent a witness compares across a reset: its key, its state, and the digest of its kept enrol intent. */
+  durable(): { key: string | null; state: string | null; enrol: string | null; bearer: boolean } {
+    const row = this.#row();
+    if (!row) return { key: null, state: null, enrol: null, bearer: false };
+    const hasStore = this.sql.exec(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'record'`).toArray().length > 0;
+    const records = hasStore ? this.sql.exec(`SELECT id, chunks FROM record WHERE key LIKE 'enrol:%'`).toArray() : [];
+    let enrol: string | null = null;
+    if (records[0]) {
+      const parts = this.sql.exec(`SELECT bytes FROM chunk WHERE id = ? ORDER BY idx`, String(records[0]["id"])).toArray().map((r) => (r["bytes"] instanceof Uint8Array ? r["bytes"] : new Uint8Array(r["bytes"] as ArrayBuffer)));
+      const whole = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+      let at = 0;
+      for (const p of parts) { whole.set(p, at); at += p.length; }
+      const record = JSON.parse(new TextDecoder().decode(whole)) as { envelope: { signed: { intent: unknown } } };
+      enrol = digestBytes(utf8(canonicalize(record.envelope.signed.intent as never)));
+    }
+    return { key: row.key, state: row.state, enrol, bearer: row.bearer !== null };
+  }
 }
 
 export type { ControlRequest, SignedControl, Digest };

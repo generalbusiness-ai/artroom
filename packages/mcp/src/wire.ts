@@ -133,7 +133,10 @@ export class Wire {
   ignored = 0;
   /** Open listen subscriptions, by the client stream they belong to, then by request ID. */
   readonly listens = new Map<object, Map<string, Listen>>();
-  /** `changed`: a session's persisted fields changed (issue, initialization, a listing); the transport writes its row before the response. */
+  /**
+   * `changed`: a session's persisted fields are about to change (issue, initialization, a listing); the transport writes the
+   * row with the prospective state before the response, and the live session takes that state only once the write succeeded.
+   */
   readonly hooks: { changed?: (session: LegacySession) => void | Promise<void> } = {};
   constructor(readonly service: McpService) {}
 
@@ -209,8 +212,9 @@ export class Wire {
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
       case "notifications/initialized":
+        // The durable row is written with the prospective state first; the live session changes only once that succeeded.
+        await this.hooks.changed?.({ ...session, initialized: true });
         session.initialized = true;
-        await this.hooks.changed?.(session);
         this.watchLegacy(session);
         return null;
       case "notifications/cancelled": return null;
@@ -218,9 +222,10 @@ export class Wire {
       case "tools/list": {
         if (!session.initialized && !notification) session.initialized = session.version !== null;
         const page = await this.service.page(params["cursor"]);
-        // The listed generation is durable: written through the hook before the response is emitted.
+        // The listed generation is durable: the row is written with the prospective value before the response is emitted, and
+        // the live marker moves only once that write succeeded, so a failed write leaves live and durable truth the same.
+        await this.hooks.changed?.({ ...session, listed: page.generation });
         session.listed = page.generation;
-        await this.hooks.changed?.(session);
         return reply(id, { tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
       }
       case "tools/call": {

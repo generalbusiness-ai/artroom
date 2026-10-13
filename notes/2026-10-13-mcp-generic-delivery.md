@@ -778,6 +778,20 @@ witnesses remained.
 | H6 through the endpoint | A test's custody bounds and a scripted write failure on the agent's store | With room for two completion needs, one act is accepted beside the enrolment's record and the next is refused `full` before anything is signed (the scope saw one act), while the first's retained answer is read; a write that fails as a result is written leaves the act admitted by the scope and the record unresolved, `settle` writes the receipt, and the act is never signed twice |
 | H7 through the endpoint | | The plan 031 bounds hold through the route: `room`, `inspect`, an act, `steps` and `settle` each within their bound beyond the measured framing |
 
+**Corrections of review 10e33e40 (fourth filing, `e0aa08e5`).** The
+earlier P2 and P3 were credited; two P2s and the acceptance obligations
+remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. A failed `tools/list` persistence advanced the live `listed` marker | The transport's hook is given the prospective session state and writes the row first; the live session takes the state only once that write succeeded, for a listing and for `notifications/initialized` alike, so live and durable truth stay the same | The hosted story: a listing whose session-row write fails answers a correlated internal error and no list; a reconnect without a reset is told the change once; a listing that succeeds suppresses further reconciliation |
+| 2. The completion budget was admitted after signing | `CustodyStore` gains `admit` and `unadmit`: under the exclusive admission, before the envelope is built and signed, a store with a budget reserves the new identity's completion need or refuses `full`; nothing admitted stays reserved when no record came of it | `sqlite-custody.test.ts`: through `Custody.send` with the budget held, the build is never called, no record and no reservation remain, the first identity's envelope is untouched, and after it completes the second is admitted and built once. The endpoint: `settle` for the refused key finds no record |
+| H1, the fences | The agent exposes its durable facts to a test hook: its key, its state, the digest of the kept enrol intent, and whether a bearer exists | After each fence the facts are captured; after the retry the key and the kept intent are the same, the bearer exists only after the `complete` fence, and the admitted entry's intent (read through `step`) is the kept one |
+| H5, the modern reset | Eviction ends every stream abruptly through the layer, with no event, before the memory is dropped | The old listen's body ends, with no result and no final event |
+| The full-budget incumbent | | The session is kept before the budget fills, so the check is unconditional |
+| H6 matrix through the endpoint | | A dispatch write that fails leaves the kept envelope, the retry sends it once and a later repeat returns it from the archive; concurrent send and settle on one key leave one decisive outcome; two lost replies with a reset between then settle leave one entry; a scope refusal archived at once is returned by a repeat and sent again by an explicit resubmit; 256 unresolved records (the most) refuse the next by count before anything is sent and a settle admits it; a full registry control budget refuses `create` with no reservation and no agent |
+| H7 matrix through the endpoint | | Each response is a successful outcome within its bound beyond the framing: `room`, `inspect`, an act, `settle`, the declaration, `items`, `steps` paged through a continuation |
+
 **What differs from the design's words.** The `create` body is
 `{ link }`, the agent-key invitation link itself, rather than its fields
 spelled out: it is the same information, already encoded and validated by
@@ -793,17 +807,18 @@ invitation's, recorded at creation. The watch timer is the runtime's
 
 | Command | Result |
 |---|---|
-| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  89 passed \| 1 skipped (90)` (observed, after the corrections of reviews 7e00dc3a and 2e85245b): the wire tests with the modern headers, H8 over loopback with the concurrent admission, the SQLite store with the archived-refusal, saturated-budget and terminal-step cases |
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  90 passed \| 1 skipped (91)` (observed, after the corrections of reviews 7e00dc3a, 2e85245b, ce968d18 and 10e33e40): the wire tests with the modern headers, H8 over loopback with the concurrent admission, the SQLite store with the archived-refusal, saturated-budget and terminal-step cases |
 | `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
 | `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
 
 **Paths.** The discovery head landed as main `8235c6b3` while this head was
 being built, and main moved again to `27bb745f` (the logo and self-host
-delivery records) during review; main was merged into the branch each
-time, taking main's version of every path this head does not change. At
-the head, `git diff --name-only origin/main...HEAD` lists this head's own
-25 paths (the page and counting Worker modules among them, regenerated for
-the bytes and contract changes) and no other.
+delivery records) and to `2a40db9b` (the Counter preparation note) during
+review; main was merged into the branch each time, taking main's version
+of every path this head does not change. At the head, `git diff
+--name-only origin/main...HEAD` lists this head's own 27 paths (the page
+and counting Worker modules and their built assets among them, regenerated
+for the bytes and contract changes) and no other.
 
 ## What is owed
 

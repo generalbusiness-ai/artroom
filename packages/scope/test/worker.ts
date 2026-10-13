@@ -38,6 +38,7 @@ import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts"
 import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
 import { DeployedScope, McpAgent, McpRegistry, ScopeService, mcpRoute, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
+import type { HostedAgent } from "@generalbusiness/dap-mcp";
 import { outsideOf, owners, wired } from "./outside.ts";
 
 export { ScopeObject };
@@ -163,14 +164,16 @@ export const hostedTest: {
   failWrite: "keep" | "dispatch" | "result" | "segment" | null;
   /** The creation fence at which the next creation fails, as a reset would: the object throws there and drops its memory. */
   faultAt: "reservation" | "seed" | "kept" | "accepted" | "complete" | null;
-} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null };
+  /** The next session-row write of an agent fails, as a storage failure would. */
+  failSession: boolean;
+} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false };
 /** The scripted reset: thrown at a fence, once. */
 export class ScriptedReset extends Error { constructor(fence: string) { super(`scripted reset at ${fence}`); } }
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
 export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
   protected override now(): number { return hostedTest.now?.() ?? Date.now(); }
-  protected override ports() { return { fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } } }; }
+  protected override ports() { return { ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}), fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } } }; }
   reset(): void { this.evict(); }
   heldAnswers(): { op: string; answer: boolean }[] { return this.answers(); }
 }
@@ -182,6 +185,7 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   async tick(): Promise<boolean> { const service = this.held()?.inside().service; if (!service) return false; await service.check(); return true; }
   heldAnswers(): { control: { op: string; answer: boolean }[]; agent: boolean } { return this.answers(); }
   used(): number { return this.controlUsed(); }
+  durableFacts(): ReturnType<HostedAgent["durable"]> { return this.durable(); }
   /** The open streams and sessions this instance holds. */
   counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
   protected override ports() {
@@ -190,6 +194,7 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
       ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}),
       ...(hostedTest.custodyBounds ? { custodyBounds: { ...hostedTest.custodyBounds, fail: (point: "keep" | "dispatch" | "result" | "segment") => { if (hostedTest.failWrite === point) { hostedTest.failWrite = null; throw new Error("SQLITE_FULL: scripted"); } } } } : {}),
       fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } },
+      sessionFault: () => { if (hostedTest.failSession) { hostedTest.failSession = false; throw new Error("SQLITE_FULL: scripted session write"); } },
       now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
       pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
       fetch: (async (url: string, init?: RequestInit) => {

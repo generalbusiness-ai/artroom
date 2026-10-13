@@ -274,3 +274,24 @@ test("a step on a terminal act keeps its reservation through the dispatch: compe
   await again.write("b", recordOf("b", "sent"), { dispatch: true });
   expect(again.identity("b").reserved).toBeGreaterThan(0);
 });
+
+test("a new identity's completion need is admitted before anything is built or signed, and released when nothing came of it", async () => {
+  const sql = nodeSql();
+  const first = recordOf("a", "sent");
+  const store = sqliteStore(sql, { budget: COMPLETION_BYTES + 4096, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 });
+  await store.write(identityId(first.identity), first, { dispatch: true });
+  const custody = new Custody(store, () => T);
+  // A second identity: the budget admits no second completion need, so build is never called and nothing is signed or kept.
+  let built = 0;
+  const second = { ...first.identity, key: "b" };
+  const error = await custody.send(second, "sha256:m" as never, async () => { built++; return { binding: first.binding, envelope: first.envelope }; }, async () => { throw new Error("never"); }, { notAfter: T }).catch((e: unknown) => e);
+  expect((error as CustodyError).why).toMatchObject({ held: "full", reason: "budget" });
+  expect(built, "nothing was built or signed").toBe(0);
+  expect(await store.read(identityId(second))).toBeNull();
+  expect(store.identity(identityId(second)).reserved, "nothing stays reserved for an identity with no record").toBe(0);
+  // The first identity's envelope and reservation are untouched; once it completes, the second is admitted and built once.
+  expect((await store.read(identityId(first.identity)))?.envelope).toEqual(first.envelope);
+  await store.write(identityId(first.identity), recordOf("a", "accepted", 0, [settled(1)]));
+  const sent = await custody.send(second, "sha256:m" as never, async () => { built++; return { binding: first.binding, envelope: first.envelope }; }, async () => ({ answer: "accepted", receipt: receipt() }) as never, { notAfter: T });
+  expect([built, "answer" in sent ? sent.answer.answer : "lost"]).toEqual([1, "accepted"]);
+});

@@ -140,6 +140,14 @@ export interface CustodyStore {
   /** The records not yet terminal, oldest first: their identity digests and keys. */
   unresolved(): Promise<{ id: string; key: string; created: string }[]>;
   /**
+   * A store that accounts capacity reserves a new identity's completion need here, under the exclusive admission, before the
+   * envelope is built and signed; it throws its own `full` when the need cannot be reserved. `bytes` is the caller's account
+   * of what the envelope will carry. A store without a budget leaves this out.
+   */
+  admit?(id: string, bytes: number): Promise<void>;
+  /** Release what `admit` reserved for an identity whose preparation did not come to a record. */
+  unadmit?(id: string): Promise<void>;
+  /**
    * Put outcomes in the record's segment at position `at` (the count the segment holds by the record's account), in order.
    * Anything the segment holds past `at`, from an interrupted earlier append, is cut first, so a repeat is idempotent.
    */
@@ -289,13 +297,21 @@ export class Custody {
     return this.store.exclusive(async () => {
       const open = await this.store.unresolved();
       if (open.length >= UNRESOLVED_MOST) throw new CustodyError({ held: "full", reason: "count", keys: open.slice(0, 8).map((o) => o.key) });
-      const { binding, envelope } = await build();
-      const at = this.now();
-      const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at, ...(standalone ? { standalone: true as const } : {}) };
-      const size = bytesOf(record);
-      if (size + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes: size });
-      await this.#write(id, record);
-      return record;
+      // A store with a budget admits the new identity's completion need now, before anything is signed.
+      await this.store.admit?.(id, bytes + RECORD_OVERHEAD);
+      try {
+        const { binding, envelope } = await build();
+        const at = this.now();
+        const record: CustodyRecord = { v: 1, identity, binding, meaning, envelope, phase: "prepared", outcomes: [], count: 0, attempt: 1, steps: {}, created: at, updated: at, ...(standalone ? { standalone: true as const } : {}) };
+        const size = bytesOf(record);
+        if (size + RECORD_OVERHEAD > RECORD_BYTES) throw new CustodyError({ held: "full", reason: "bytes", bytes: size });
+        await this.#write(id, record);
+        return record;
+      } catch (error) {
+        // No record came of it: what was admitted for this identity is released.
+        await this.store.unadmit?.(id).catch(() => undefined);
+        throw error;
+      }
     });
   }
 

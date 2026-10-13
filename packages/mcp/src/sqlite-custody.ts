@@ -222,6 +222,13 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
       })();
       if (back.length !== bytes.length || !back.every((b, i) => b === bytes[i])) throw new Error(`${id} read back differs`);
     },
+    admit: async (id, bytes) => {
+      // Before anything is signed: the identity's completion need, as if its record held `bytes`, reserved or refused `full`.
+      sql.transaction(() => { arm(id, bytes); });
+    },
+    unadmit: async (id) => {
+      sql.transaction(() => { if (!one(`SELECT id FROM record WHERE id = ?`, id)) release(id); });
+    },
     unresolved: async () => sql.exec(`SELECT id, key, created FROM record WHERE phase NOT IN ('accepted', 'refused', 'mismatch', 'settled') ORDER BY created ASC`).toArray()
       .map((r) => ({ id: String(r["id"]), key: String(r["key"]), created: String(r["created"]) })),
     segment: async (id, at, outcomes) => {

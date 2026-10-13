@@ -582,7 +582,9 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
   async control(signed: Parameters<HostedAgent["control"]>[0], action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> { return this.#of().control(signed, action, body); }
   override async fetch(request: Request): Promise<Response> { return this.#of().fetch(request); }
   /** Drop this instance's memory, as an eviction would: streams end with no event, storage stays. For a test's subclass. */
-  protected evict(): void { this.#agent = null; }
+  protected evict(): void { this.#agent?.abrupt(); this.#agent = null; }
+  /** The durable facts a witness compares across a reset. For a test's subclass. */
+  protected durable(): ReturnType<HostedAgent["durable"]> { return this.#of().durable(); }
   /** What this instance holds in memory now. For a test's subclass. */
   protected held(): HostedAgent | null { return this.#agent; }
   /** The control budget's used bytes, for a test's subclass. */

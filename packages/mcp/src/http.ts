@@ -325,6 +325,17 @@ export class McpHttp {
     return bare(200);
   }
 
+  /** End every stream abruptly, as an eviction or an exception does: the bodies end with no event, and the session rows stay. */
+  abrupt(): void {
+    for (const session of this.sessions.values()) {
+      const stream = session.stream;
+      this.port.wire.endLegacy(session);
+      if (stream) { this.#open.delete(stream); stream.close(false); }
+    }
+    for (const listen of [...this.#listens.values()]) listen.end(false);
+    this.#open.clear();
+  }
+
   /** End every session and stream gracefully: `retire`, `bearer`, a server's close. Legacy streams get a final event; listens their result. */
   async closeAll(): Promise<void> {
     for (const session of [...this.sessions.values()]) await this.#end(session, true);
