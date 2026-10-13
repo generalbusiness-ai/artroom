@@ -4,7 +4,7 @@
 import type { Answer, Entry, FactRef, MemberRef, Receipt, SignedIntent, Summary, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, isMemberRef, isScopeRef, isScopeId, isRecord, isHead, isKeyId, REFUSAL_REASONS, unb64url, timeMs, isReceipt, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, encodeAgentKeyInvitation, httpTransport, ScopeHandle, secretSigner, signedIntent, requestSession, sessionRequest } from "@generalbusiness/artroom-client";
-import { isHandle, platform } from "@generalbusiness/artroom-platform";
+import { DEMO_REGISTER, DIRECTORY_OF, WEB_DEMO_COHORT, isHandle, platform } from "@generalbusiness/artroom-platform";
 import { expectedOf, LINK, linkOf, type Context, type DefinitionShape, type Link, type Outcome } from "./commands.ts";
 import type { Config, PendingInvitationIssue, Repository } from "./store.ts";
 
@@ -39,7 +39,7 @@ async function boundDirectory(ctx: Context, service: string, reader: string, rep
   const roster = membership.items.find(item => item.type === "roster" && item.state === "open");
   if (!roster || !same(roster.refs["directory"], repository.directory)) return null;
   const read = await handle(ctx, service, repository.directory.scope, reader).summary();
-  if (!read.ok || !read.complete || read.next !== undefined || read.value.status !== "active" || read.value.definition !== "platform:directory@3" || !same(read.value.scope, repository.directory)) return null;
+  if (!read.ok || !read.complete || read.next !== undefined || read.value.status !== "active" || (read.value.definition !== DIRECTORY_OF[DEMO_REGISTER] && read.value.definition !== WEB_DEMO_COHORT.directory) || !same(read.value.scope, repository.directory)) return null;
   const item = read.value.items.find(item => item.type === "repository"), rules = item?.refs["rules"], destination = item?.refs["destination"];
   if (!item || !same(item.refs["membership"], repository.membership) || !isScopeRef(rules) || rules.kind !== "rules" || rules.scope !== repository.rules || !isScopeRef(destination) || destination.kind !== "destination" || destination.scope !== repository.destination) return null;
   return { directory: read.value.scope, membership: membership.scope, rules: rules.scope, destination: destination.scope };
