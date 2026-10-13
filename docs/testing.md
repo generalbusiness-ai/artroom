@@ -342,9 +342,6 @@ keeping native introspection and RPC behavior. It changes no pool settings.
 Before a direct package or Vitest invocation, run this same script from the
 repository root. Unknown package versions or bytes stop preparation.
 
-The package names in the commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 Run the tests of what you changed, not the repository.
 
 ```

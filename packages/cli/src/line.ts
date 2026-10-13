@@ -10,7 +10,7 @@ export const USAGE = [
   "  dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
   "  dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
   "  dap install --planned [--cohort application|counting-commitments]",
-  "  dap claim <name> [--handle @you] [--branch main] [--again]",
+  "  dap create <name> [--handle @you] [--branch main] [--again]",
   "  dap invite <@member> --role <role> [--hours 24]",
   "  dap join <link>",
   "  dap acts [<scope>]",
@@ -29,6 +29,7 @@ export const USAGE = [
   "  dap issue assign <issue> <@member>",
   "  dap issue close <issue>",
   "  dap issues",
+  "  dap mcp [--generic | --generic=add] [--tools <definition>,...] [--http 127.0.0.1:<port>] [--scope <scope> --membership <scope>]",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
   "An issue is its number, as dap issues lists it, or its lane's scope ID.",
 ].join("\n");
@@ -58,7 +59,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned", "cohort"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -83,7 +84,12 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
       if (first === undefined) return needs("a base URL");
       return flag("plan") ? planInstall(ctx, first, where) : install(ctx, first, where);
     }
-    case "claim": return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
+    case "create":
+    case "found":
+    case "claim": {
+      const outcome = first === undefined ? needs("a name") : await claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
+      return name === "found" ? { ...outcome, lines: ["Use dap create instead of dap found. The found alias remains for one release.", ...outcome.lines] } : outcome;
+    }
     case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : join(ctx, first);
     case "acts": return acts(ctx, first);

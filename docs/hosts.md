@@ -6,9 +6,6 @@ the repository's remote, and what is not built yet.
 
 ## How a register chooses its host
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 The operator names the host when installing the register:
 
 ```

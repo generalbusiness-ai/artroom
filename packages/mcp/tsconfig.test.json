@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "src/words.json", "test", "vitest.config.ts"],
+  "exclude": ["test/**/*.scope.test.ts", "test/support/room.ts", "test/support/story.ts"]
+}

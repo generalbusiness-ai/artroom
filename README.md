@@ -1,6 +1,6 @@
 # dap
 
-A programmable coordination fabric for people and agents.
+A durable action platform for people and agents.
 
 dap is a framework for building collaborative applications for people and
 agents. It is based on an event-sourced actor model. You write an
