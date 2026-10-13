@@ -83,7 +83,7 @@ stay open. The earlier component failures remain historical, and the user queue
 remains Forms, then the homepage change, then Start. All Jam work stays deferred.
 
 
-## Completed local checks and current final gate
+## Historical local checks and final d6 gate
 
 At `1cd5a5f3bb5dc5016654ab43bb26ee9aa14d4e1e`, original run 89987 passed Page
 Source, Page Test and Page Scope compilers and the whole one-case initialization
@@ -135,7 +135,7 @@ observations, not a speed comparison or physical drain claim. Final proof:
 `/Users/hughpyle/play/artroom-diagnostics/forms-round2-final-gate-d6-source/gate-one/public-proof.json`,
 SHA-256 `24909fbff4fce3a43506843ee66008ac259cb1179a07f29e1ede1d2331977452`.
 
-## Qualified rendered completion and retained browser history
+## Historical qualified rendered completion and browser history
 
 The browser checks used the actual built Page with scripted transport and
 synthetic answers. They do not complete the original authenticated hosted browser
@@ -175,7 +175,7 @@ Root's qualified fidelity is
 SHA-256 `f2d4269edafd6ec3c2a9830cb0e0378feec2cbc436b62d10eab2f885d8028f34`.
 This is completion across qualified local attempts, not a same-run aggregate.
 
-## Review and parent duties
+## Historical 7f reporting successor and continuing parent duties
 
 Item 8 remains nrep under effective assertion
 `104832109c87e075fac6831eef683c2ba79e9076`. No hosted cause is invented and no
@@ -197,3 +197,105 @@ native accepted-Create, deployment, readback and human acceptance duties.
 A Source child receipt closes only that child. No hosted or Hugh acceptance is
 claimed. The reporting successor changes this note only. Every other Source and asset byte
 remains at the gated d6 head. No gate was repeated for this document-only change.
+
+## Current filtered-list correction and evidence access
+
+Checker report `1d7f998fe617823240946ec468d9366f5b6f9d04` returned changes requested
+with one P2: the filtered “No matches.” message lacked a next action. The narrow
+Source correction is `39bcce45782a0abae21bd743e0dc85a5ce67b2ee`, tree
+`ee1e42ab0f0c28b06887a838afc44d8ec21d6553`. It changes only the list renderer and
+two assertions within the existing owning tests. A filtered issue list now says
+“Clear the search or choose another filter to find an issue.” The equivalent
+change-list message says “a change.” Truly empty lists retain their first-item
+guidance and link. Query/filter behavior, membership authority and native
+mutations are unchanged. The following results cover this renderer correction. Earlier evidence retains its original head.
+
+Effective assertion `38655619faa10ef8c2cb6c19f3e45da35ed758b3` permits the checker
+to read exactly 17 closed public JSON bodies in the reviewed allowlist:
+`/Users/hughpyle/play/artroom-diagnostics/forms-round2-checker-public-allowlist-source/allowlist-final-inert.json`,
+SHA-256 `8031fa60c516692fa84bd584a1ad51f36be73ab5855d09be60043cf0e07d2e96`.
+That permission covers only those bodies after their hashes and sizes match.
+Nested paths and URLs grant no access to private logs, programs, credentials,
+canonical definitions, encoded generated artifacts or images. The small cohort
+generation projection is public metadata; its original result and program are
+excluded. The earlier review and evidence heads remain historical.
+
+## Current focused checks, generated asset, rendered states and gate
+
+Original session `11429` completed with command and wrapper exit zero at
+renderer Source `39bcce45782a0abae21bd743e0dc85a5ce67b2ee`, tree
+`ee1e42ab0f0c28b06887a838afc44d8ec21d6553`. Page Source and Page Test compilers
+passed. Exactly the two changed owning view bodies passed; the other ten view
+bodies were unrun in this focused invocation. One normal Page producer then
+passed, with its existing two internal pageFiles calls. Source, dependency,
+workspace and alias guards passed before and after each phase. The generated
+HTML matches Source and dist; the embedded JavaScript matches dist and contains
+the actionable instruction with both issue/change articles. Header digests match.
+[Focused and producer proof](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-verification-39bc-source/run-one/public-result.json),
+SHA-256 `322c33aaa2783bd32a7267f08d70cc13de80eb3e59c026818989f08d3e48f0e1`.
+
+The asset-only successor is `b38445b396b195d4e1173bf960ee279ebfa6c01e`, tree
+`53c024ac3389a9405e13f188e8f34b3c4f64d49b`. Its Page module is 629,025 bytes,
+SHA-256 `fcbafb76b692c615e08e07335f6e6ce61562fa73f811972b85450b4b2795eb0c`.
+Its JavaScript is 581,399 bytes, SHA-256
+`10602d6215317c46386c7460c4c44100f81a65d37c12544cc1920b11f854eb81`.
+HTML is unchanged at 25,162 bytes, SHA-256
+`94589216e00f4605e78d2e936381eb49037c149b956c3da9c338d8595cd8073b`.
+[Generated asset metadata](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-verification-39bc-source/asset-commit.public.json),
+SHA-256 `4f433c2c571afc6a6bf641d8960710c3a04748f2544b942b8ff0ffc7d93a5a4d`.
+
+Original browser session `74668` exited zero at b384. It rendered only the two
+new filtered-empty states at 390 by 844 pixels, using actual production Page
+assets and the unchanged scripted transport. Both lists were nonempty before
+the query. Each shows its exact actionable sentence, no records after filtering,
+and no first-change link. No mutation POST, browser or console error, external
+network attempt or shutdown error was recorded. Root directly viewed both
+captures and accepted six local comparisons: copy, typography, palette,
+navigation, layout and controls. The prior fourteen positive states were not
+repeated. This is local scripted rendering, with no native authority, hosted
+service, provider or Hugh acceptance claim.
+[Rendered proof](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-browser-preparation/output-one/public-result.json),
+SHA-256 `cb759090966ab59d068874b0eab48b3f77d63c2668c1545261e7e9c5a84f89c9`.
+[Original browser terminal](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-browser-preparation/output-one/owner-terminal-public.json),
+SHA-256 `3d1ccbda3cc85ad5d92d193b4e1fdac662b842c1c34b7720840b7345cb856848`.
+[Root fidelity record](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-browser-preparation/root-fidelity.public.json),
+SHA-256 `bacfce28966afd98c9f36fb7884771afc02895c6c58b5cd7d8d7b000af9d399b`.
+
+The ordinary changed-Source gate, original session `19998`, passed at b384.
+Command and wrapper exited zero. Whitespace, workspace typechecks and tests
+exited zero. Vitest passed 1,042 cases with two existing skips; 186 files passed
+and one was skipped. The chained Node checks passed 9 and 55 cases. Installation
+was skipped against the matching lock stamp. Postguards found the checkout
+clean and verified 1,430 Source files, 3,882 resolved dependency files and twelve
+workspace links. The measured npm wall time was 106.3966 seconds. The raw test
+log contains zero RefcountedCanceler tokens and two SQLITE_CONSTRAINT tokens;
+no physical drain or clean-log claim follows.
+[Current gate proof](/Users/hughpyle/play/artroom-diagnostics/forms-round2-final-gate-p2-source/gate-one/public-proof.json),
+SHA-256 `a9b607bb1605177e8af545e0f37d941f2208587067707969b872c4a6cfcea8aa`.
+[Original gate command exit](/Users/hughpyle/play/artroom-diagnostics/forms-round2-final-gate-p2-source/gate-one/command-exit.public.json),
+SHA-256 `17bd0117e5e7ff07594cea0abcb0ffb40aac096b3830e543204eb28cb2ec2632`.
+
+Effective supplemental permission `c5a8e538e141615315f7fc80478ed0ac80316070`
+adds exactly seven closed public JSON bodies to the earlier seventeen-body
+permission. [Supplemental allowlist](/Users/hughpyle/play/artroom-diagnostics/forms-filtered-empty-public-evidence/allowlist.json),
+2,756 bytes, SHA-256
+`da64cb1b23c87081061e22c1188dc29878798922f350bcf73611f8c2f4b0702a`.
+The same exact-body boundary applies: nested paths do not permit reads of
+private logs, programs, credentials, canonical definitions, generated modules,
+images or URLs. No execution or provider permission is added.
+
+This reporting successor changes only this note. Every other tracked leaf's
+mode, type and blob remains exact to the gated b384 head. No check, producer,
+browser or gate is repeated for this document change. Historical failed attempts,
+the d6 gate and the 7f report remain at their own subjects. Independent exact-head
+review and normal main landing remain delivery duties; no replacement approval,
+landing or deployment is claimed here.
+
+Item 8 remains nrep under `104832109c87e075fac6831eef683c2ba79e9076`. The joint
+Source child `932a112d58907e5f5c25c2fa25e44916012cce75` and promise
+`3a379ced40e696ad333a360ce9bc251793a67c76` remain the Source review binding.
+Full Forms `543616a28fce8c3594ebf2aec88ed72dcd0113df` and Round 2
+`84f45948c29607677c7e78c5317798ceb1949af7` retain their authenticated hosted,
+native accepted-Create, deployment, readback and Hugh acceptance duties.
+Rules 4 and factory 8 qualifications remain. No broader scope or Jam work is
+introduced by this filtered-message repair or this evidence permission.
