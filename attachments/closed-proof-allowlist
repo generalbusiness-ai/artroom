@@ -1,0 +1,59 @@
+{
+  "draft": false,
+  "ready": true,
+  "sourceChildRequest": "3dc428daf40730e7fb9b48490820855bf2e5fcf9",
+  "sourceChildPromise": "fbd2e76ee66889389ba6463d85be47e659122645",
+  "checkedHead": "5df0af38fa7b79ab0fc1e17d33ba6a12698b1343",
+  "checkedTree": "7ab8b2287711becc1efcb77e37dcada031331022",
+  "contextOnlyFullParent": "259e2eaba532bfe4ab0038f8d5ce47c83b3c1dc4/8e4f75181a509eb3c45ca428dbfe1ce8f49ba188; not artifact basis or completion",
+  "files": [
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/source-correspondence.public.json",
+      "bytes": 1008,
+      "sha256": "b7f7d4fa53e3b2e2e1b12239e2e1dfe06ffdaada3746fa856faaae8774d75db4"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/home-input-correspondence.public.json",
+      "bytes": 2533,
+      "sha256": "4de3fee6cd62bdf62d76ff3b2c362e3ac702230618f90f1214e9361126069acb"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-delivery-appendix-held/producer-namespace-results.public.json",
+      "bytes": 7381,
+      "sha256": "5d465f6e764947aaca2605f732a402f39a82906cecc6f7de3f99f2e370031b9a"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/focused-result.public.json",
+      "bytes": 5032,
+      "sha256": "f0fbe4945160d2ae36e46132e36e3a1c274bbcd6c1dece33765781550edaef0e"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/ordinary-gate-held/gate-one/result.public.json",
+      "bytes": 2983,
+      "sha256": "487a59b7a4bac4c8ddcaa3bb4cac282c2d25b0f2d9adb00a4b8b8593ebbad13a"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-two-tails-dist-generation-one/public-result.json",
+      "bytes": 4208,
+      "sha256": "87bc11fd958a502cb1cabac4ff41473c3a38fc64b18ffed1887d838d00d29aeb"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/ordinary-gate-held/gate-one/terminal.public.json",
+      "bytes": 324,
+      "sha256": "fbe423c95dd90227ca25ae3403e7c2a2ed59e86efcc0bf53e3081bf560155912"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-execution-mcp13-held/ordinary-gate-held/gate-one/skip-identities.public.json",
+      "bytes": 1214,
+      "sha256": "633ffd40421f9f8e663c4fc4a4e9068c6385dcc5fe7b11ba0c94646c8afd9921"
+    },
+    {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/dap-logo-actual062-delivery-appendix-held/final-correspondence.public.json",
+      "bytes": 914,
+      "sha256": "c69cf0f13ec5c634aafc1be5f489235666d5fb4b31e662b54d0c6d8061608652"
+    }
+  ],
+  "limits": "Exactly NINE direct closed public proof files plus this exact list; read-only, no nested referenced paths, logs, helper programs, image captures, generated payload decoding, dependency inventories, credentials or directory traversal. Root verified all bytes/hashes. Original head/projection limits retained.",
+  "finalHead": "bc5791a3b18ab56b2bc1519aea6c645cc5c6cc0b",
+  "finalTree": "dcf33de9e5e8a736e23419babaa0461f4bb46e9a"
+}
