@@ -14,8 +14,8 @@
  * of the object, as the outside system does.
  */
 
-import type { OperationId } from "@generalbusiness/artroom-contract";
-import type { Opening, OperationRules, Owners } from "@generalbusiness/artroom-derive";
+import type { OperationId } from "@generalbusiness/dap-contract";
+import type { Opening, OperationRules, Owners } from "@generalbusiness/dap-derive";
 import type { EffectAnswer, EffectRequest, LateAnswers, Outside, Ports } from "../src/index.ts";
 
 const tick = () => new Promise<void>((resolve) => { setTimeout(resolve, 1); });

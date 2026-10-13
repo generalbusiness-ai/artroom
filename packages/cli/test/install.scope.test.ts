@@ -1,9 +1,9 @@
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { Entry, OperationId, Receipt, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId, Receipt, Seed } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, seedDigest, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { EffectRequest } from "../../scope/src/operations.ts";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { DIRECTORY_OF, repositoryName } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, repositoryName } from "@generalbusiness/dap-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed, settle } from "../../scope/test/repository.ts";
@@ -221,7 +221,7 @@ async function planned(): Promise<void> {
   expect([plan.code, kept1.register, kept1.plan?.register]).toEqual([0, undefined, expect.stringMatching(/^sc_/)]);
   expect(plan.lines).toEqual([
     `Planned: register ${kept1.plan!.register}, under ${kept1.plan!.definition}, on host git.example, namespace artroom. The seed's time is ${kept1.plan!.founding.intent.notAfter}.`,
-    `Set registerScope to ${kept1.plan!.register} in the Worker's host setting, then run artroom install --planned before ${kept1.plan!.founding.intent.notAfter}.`,
+    `Set registerScope to ${kept1.plan!.register} in the Worker's host setting, then run dap install --planned before ${kept1.plan!.founding.intent.notAfter}.`,
   ]);
   await noSecret(rita);
 

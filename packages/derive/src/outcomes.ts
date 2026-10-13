@@ -16,7 +16,7 @@
  * and for every other owner as the given owners do.
  */
 
-import type { Digest, EffectForm, OutcomeMark, PlatformData, Send, SendForm } from "@generalbusiness/artroom-contract";
+import type { Digest, EffectForm, OutcomeMark, PlatformData, Send, SendForm } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
 import type { Reading } from "./fields.ts";

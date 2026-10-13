@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { canonicalBytes, canonicalize, digestBytes, intentDigest, signIntent } from "@generalbusiness/artroom-bytes";
-import { Scope, grantOf, laneDefinition } from "@generalbusiness/artroom-derive/testing";
+import { Scope, grantOf, laneDefinition } from "@generalbusiness/dap-derive/testing";
 import { at, definition, found, rita, una } from "./support.ts";
 
 describe("the answers to a submitted act, on real storage (section 4.2)", () => {

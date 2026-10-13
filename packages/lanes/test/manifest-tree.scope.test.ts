@@ -1,12 +1,12 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test, onTestFinished } from "vitest";
-import { PROPOSED_BOUNDS, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/artroom-platform";
+import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
-import { validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
+import { validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
@@ -65,7 +65,7 @@ test("an unknown reservation deletion retains the live publication cleanup duty 
   try { await story(ownHost(), wired, false, false, true); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-test("artroom edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async () => {
+test("dap edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async () => {
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
   onTestFinished(owner.close);
@@ -415,7 +415,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     } else {
       expect([result.code, links, merges, acts.filter((kind) => kind === "link-own").length, host.refs.get("refs/heads/main")]).toEqual([1, linkFault === "summary" ? 0 : 1, 0, linkFault === "reply" ? 1 : 0, first]);
       expect(result.lines[1]).toMatch(linkFault === "unavailable" ? /^Unavailable: busy\./ : /^Linking could not be confirmed: a required request or reply was unavailable\.$/);
-      expect(result.lines.at(-1)).toBe(`Inspect artroom show ${recorded.at.scope}:${recorded.seq} and artroom log ${recorded.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`);
+      expect(result.lines.at(-1)).toBe(`Inspect dap show ${recorded.at.scope}:${recorded.seq} and dap log ${recorded.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`);
       expect(acts).not.toContain("merge");
     }
     expect(result.lines.join("\n")).not.toContain("TEST private linking transport detail");
@@ -693,11 +693,11 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   }
   const checkerSecret = (await checker.store.secret((await checker.store.config())!.key))!;
   const checkerKey = keyIdOfSecret(checkerSecret);
-  const Gsnapshot = { reservationSnapshot: async (asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> => {
+  const Gsnapshot = { reservationSnapshot: async (asked: import("@generalbusiness/dap-contract").SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> => {
     const response = await routed(`${SERVICE}/v1/scopes/${G.name}/reservation-snapshot`, { method: "POST", headers: { "content-type": "application/json" }, body: canonicalize({ signed: asked }) });
     if (response.status === 409) return await response.json() as { refused: "reservation-stage-missing" | "reservation-stage-mismatch" };
     if (response.status !== 200) return null;
-    const value = await response.json() as Omit<import("@generalbusiness/artroom-contract").ReservationSnapshot, "objects"> & { objects: { id: string; type: "blob" | "tree" | "commit"; data: string }[] };
+    const value = await response.json() as Omit<import("@generalbusiness/dap-contract").ReservationSnapshot, "objects"> & { objects: { id: string; type: "blob" | "tree" | "commit"; data: string }[] };
     return { ...value, objects: value.objects.map((object) => ({ ...object, data: unb64url(object.data)! })) };
   } };
   let runs = 0, prepares = 0, snapshots = 0;

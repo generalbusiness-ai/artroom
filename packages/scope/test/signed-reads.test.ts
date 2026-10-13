@@ -1,12 +1,12 @@
 import { describe, expect, onTestFinished, test } from "vitest";
 import { env, runInDurableObject } from "cloudflare:test";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, FactRef, Intent, OperationId, ReadRequest, ScopeId, ScopeRef, Sealed, Seed, SignedReadName } from "@generalbusiness/dap-contract";
 import { b64url, canonicalBytes, entryHash, intentDigest, retainedReadArgument, scopeIdOf, seedDigest, signIntent, signRead } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedLogReader, signedReader, type Fetch } from "@generalbusiness/artroom-client";
-import { timeMs, timeOf, useOf } from "@generalbusiness/artroom-derive";
-import { d, keys, otherLane, t, type Actor } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
+import { timeMs, timeOf, useOf } from "@generalbusiness/dap-derive";
+import { d, keys, otherLane, t, type Actor } from "@generalbusiness/dap-derive/testing";
+import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CHAIN_STEPS, Chains, rootOf } from "../src/signed-reads.ts";
 import { SqliteStore } from "../src/sqlite.ts";

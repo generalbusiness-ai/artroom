@@ -40,9 +40,9 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/artroom-contract";
+import type { Digest, FieldValue, OperationId, PlatformData, PlatformDefinition, ScopeId, Seed } from "@generalbusiness/dap-contract";
 import { base32, intentDigest, isDigest, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { isObject, type Item, type Opening, type OutcomeRule, type Own, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
+import { isObject, type Item, type Opening, type OutcomeRule, type Own, type RuleGiven, type Rules, type StateView } from "@generalbusiness/dap-derive";
 import { handleForm } from "./membership.ts";
 import { pinnedBy } from "./versions.ts";
 

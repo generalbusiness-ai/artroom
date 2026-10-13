@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/dap-contract";
 import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
-import { grantFrom, namedBy, observationOf } from "@generalbusiness/artroom-derive";
-import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/artroom-derive/testing";
+import { grantFrom, namedBy, observationOf } from "@generalbusiness/dap-derive";
+import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
 import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, standingOf } from "../../platform/src/index.ts";
 import { Roster } from "../../platform/test/support.ts";

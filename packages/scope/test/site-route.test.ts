@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
-import type { Intent, Seed } from "@generalbusiness/artroom-contract";
+import type { Intent, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, utf8, digestBytes, takeBytes } from "@generalbusiness/artroom-bytes";
-import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/artroom-platform";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { DIRECTORY, REGISTER, receiptObjects } from "@generalbusiness/dap-platform";
 import { idOf, objectId, GitRefusal, snapshotCommit, type SnapshotFile } from "@generalbusiness/artroom-git";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
@@ -239,7 +239,7 @@ const publishedScopes: Binding = {
       siteRoom: () => object.siteRoom(),
       siteDestination: () => object.siteDestination(),
       // SCRIPTED proof and matching Git receipt objects; not native publication evidence.
-      sitePublishedCommit: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository, commit: string) => {
+      sitePublishedCommit: async (directory: import("@generalbusiness/dap-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository, commit: string) => {
         const actual = await object.sitePublication(directory, repository);
         if (!actual) return { ok: false, reason: "not-published" };
         const fact = { at: actual.at, seq: 1, hash: `sha256:${"a".repeat(64)}` } as const;
@@ -251,7 +251,7 @@ const publishedScopes: Binding = {
         return { ok: true, proof: { at: actual.at, head: actual.head, directory, repository, commit, publication: fact, written: fact,
           receipt: { ref, commit: receipt.commit, tree: receipt.objects.find(o => o.kind === "tree")!.id, blob: receipt.objects.find(o => o.kind === "blob")!.id, file } } };
       },
-      sitePublication: async (directory: import("@generalbusiness/artroom-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
+      sitePublication: async (directory: import("@generalbusiness/dap-contract").ScopeRef, repository: import("../src/destination-host.ts").DestinationRepository) => {
         const actual = await object.sitePublication(directory, repository);
         return actual && { ...actual, refs: [...host.refs].filter(([ref]) => !ref.startsWith("refs/artroom/receipts/")).map(([ref, target]) => ({ ref, target: ref === "refs/tags/release" ? nav : target })) };
       },

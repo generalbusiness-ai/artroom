@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type PlatformData } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type PlatformData } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { validateDefinition, type StateView } from "@generalbusiness/artroom-derive";
-import { d, founded, keys, on, valid } from "@generalbusiness/artroom-derive/testing";
+import { validateDefinition, type StateView } from "@generalbusiness/dap-derive";
+import { d, founded, keys, on, valid } from "@generalbusiness/dap-derive/testing";
 import { View } from "../src/view.ts";
 
 // Made-up platform data, with no marked rules. The fixture's test authority

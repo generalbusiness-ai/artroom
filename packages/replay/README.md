@@ -11,7 +11,7 @@ its section "Replay", and `notes/2026-10-05-i2-contract-deltas.md` in its
 entries DJ10 and DJ14.
 
 This package does not import the scope runtime. A replay derives each entry
-again with the judges and the fold of `@generalbusiness/artroom-derive`,
+again with the judges and the fold of `@generalbusiness/dap-derive`,
 which are pure functions. The turn, the store and transport are not here.
 The library runs under Node and under Workers.
 

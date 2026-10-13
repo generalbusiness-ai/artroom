@@ -34,9 +34,9 @@
  * `hold@1` that is not built (I3 deltas, entry ES12).
  */
 
-import type { Digest, DutyId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, DutyId, Entry, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isDutyId, isOperationId } from "@generalbusiness/artroom-bytes";
-import { isObject, timeMs } from "@generalbusiness/artroom-derive";
+import { isObject, timeMs } from "@generalbusiness/dap-derive";
 import type { Clock, Transport } from "./ports.ts";
 import type { Sql } from "./sqlite.ts";
 import type { Dispatched, Store } from "./store.ts";

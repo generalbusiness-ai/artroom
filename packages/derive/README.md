@@ -1,4 +1,4 @@
-# @generalbusiness/artroom-derive
+# @generalbusiness/dap-derive
 
 Derivation for an Artroom scope: the definition validator, the state that
 entries fold into, the fold, and the judges. Everything in the main entry is
@@ -15,8 +15,8 @@ and `notes/2026-10-05-i2-contract-deltas.md` record what was implemented.
 
 The package has two entry points:
 
-- `@generalbusiness/artroom-derive`: everything below but the evaluator.
-- `@generalbusiness/artroom-derive/rule`: the evaluator of `rule` guards. It
+- `@generalbusiness/dap-derive`: everything below but the evaluator.
+- `@generalbusiness/dap-derive/rule`: the evaluator of `rule` guards. It
   is asynchronous and loads the JSONata engine, so it runs in preparation,
   before the commit, and the judges never import it.
 
@@ -203,15 +203,15 @@ asynchronous, so a rule can never be evaluated inside the commit.
 ## How to test
 
 ```
-npm test --workspace @generalbusiness/artroom-derive
-npm run typecheck --workspace @generalbusiness/artroom-derive
+npm test --workspace @generalbusiness/dap-derive
+npm run typecheck --workspace @generalbusiness/dap-derive
 ```
 
 `test/fixtures.ts` holds the one fixture set: a key set, four small
 definitions, a scope in memory that judges, seals and folds as a commit
 does, and helpers that pass the entries of one scope to another. It is not
 exported from the package's main entry. The export
-`@generalbusiness/artroom-derive/testing` gives it to the tests of the
+`@generalbusiness/dap-derive/testing` gives it to the tests of the
 packages that build on derive, and to nothing else.
 
 `test/fixtures-f.ts` adds two definitions for the tests of fields and of

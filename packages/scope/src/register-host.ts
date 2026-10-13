@@ -3,9 +3,9 @@
  * operations driver owns sending and retrying; this adapter makes one provider
  * call and accepts only that call's own answer. No listing settles an attempt.
  */
-import type { FieldValue, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FieldValue, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, intentDigest, isDigest, isOperationId, seedDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { DIRECTORY_OF, isOf, repositoryName } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, isOf, repositoryName } from "@generalbusiness/dap-platform";
 import type { OutsideGiven } from "./object.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 

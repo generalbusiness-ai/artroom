@@ -1,7 +1,7 @@
 /** Native screens built only from the room's recorded observations. */
 import { timeMs } from "@generalbusiness/artroom-bytes";
-import { editPath, matches } from "@generalbusiness/artroom-platform";
-import type { Answer } from "@generalbusiness/artroom-contract";
+import { editPath, matches } from "@generalbusiness/dap-platform";
+import type { Answer } from "@generalbusiness/dap-contract";
 import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 import { LIST_QUERY_LIMIT, type ListState } from "./list-context.ts";

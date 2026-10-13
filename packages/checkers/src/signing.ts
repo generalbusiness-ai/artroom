@@ -30,8 +30,8 @@
  * `judge` answered: its type has no other member.
  */
 
-import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Base64Url, FieldValue, Intent, KeyId, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Base64Url, FieldValue, Intent, KeyId, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { b64url, canonicalBytes, domainBytes, parseStrictBytes, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Job } from "./job.ts";
 import { detailsDigest, type Details, type Outcome } from "./outcome.ts";

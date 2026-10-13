@@ -61,10 +61,10 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, PlatformDefinition, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, PlatformDefinition, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
+import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/dap-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
 import { isOf, pinnedBy } from "./versions.ts";
 

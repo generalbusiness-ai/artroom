@@ -7,9 +7,9 @@
  * configuration leaves every outside effect unsent. No configuration, token
  * or plaintext belongs in a scope's history.
  */
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { destinationBranch, isOf } from "@generalbusiness/artroom-platform";
+import { destinationBranch, isOf } from "@generalbusiness/dap-platform";
 import { ArtifactsProvider, type ArtifactsNamespace, type CreationCustody } from "./artifacts-host.ts";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type SnapshotReader, type DestinationRepository } from "./destination-host.ts";

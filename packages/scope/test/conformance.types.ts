@@ -7,7 +7,7 @@
  */
 
 import type { WorkerEntrypoint } from "cloudflare:workers";
-import type { ScopeApi } from "@generalbusiness/artroom-contract";
+import type { ScopeApi } from "@generalbusiness/dap-contract";
 import type { ServiceBinding, Transport } from "@generalbusiness/artroom-client";
 import type { ScopeService } from "../src/worker.ts";
 

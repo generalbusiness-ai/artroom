@@ -5,7 +5,7 @@
  */
 
 import { ed25519 } from "@noble/curves/ed25519.js";
-import type { Base64Url, KeyId } from "@generalbusiness/artroom-contract";
+import type { Base64Url, KeyId } from "@generalbusiness/dap-contract";
 import { b64url, unb64url } from "./encode.ts";
 
 /** `key_` + unpadded base64url of the 32-byte public key. */

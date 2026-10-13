@@ -20,7 +20,7 @@
  * that the same signed intent may be sent again.
  */
 
-import type { ScopeApi } from "@generalbusiness/artroom-contract";
+import type { ScopeApi } from "@generalbusiness/dap-contract";
 import { LATE, takeBytes, within, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { ANSWERS } from "./answers.ts";
 import { TransportError, type Transport } from "./handle.ts";

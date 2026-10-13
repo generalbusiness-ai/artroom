@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { b64url, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest, verify, verifySessionRequest } from "@generalbusiness/artroom-bytes";
 import { signerSessionRequest } from "@generalbusiness/artroom-client";
-import type { ScopeRef } from "@generalbusiness/artroom-contract";
+import type { ScopeRef } from "@generalbusiness/dap-contract";
 import { COUNTING_COMMITMENTS_DEFINITION } from "../commitments-pin.ts";
 import { deviceSigner, importDemoBundle, importLegacyDevice } from "./device-key.ts";
 

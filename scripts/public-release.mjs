@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ROOT, PLAN, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, productionInputs, publishManifest, references, refusal, rewriteDeclarationRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
+import { ROOT, PLAN, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, productionInputs, publishManifest, references, refusal, rewriteDeclarationRefs, rewritePublishedRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
 
 export function produce(options) {
   const source = realpathSync(options.source), selected = version(options.version);
@@ -34,8 +34,14 @@ export function produce(options) {
     if (!names.length || names.some(name => !name.endsWith(".ts"))) refusal("unplanned-input");
     for (const name of names) {
       const relativeName = name.slice(`packages/${spec.dir}/`.length);
-      inputs.push({ path: name, copy: join(input, relativeName), ...copyFileVerified(join(source, name), join(input, relativeName)) });
+      const original = join(output, "source-inputs", spec.dir, relativeName);
+      inputs.push({ path: name, copy: original, ...copyFileVerified(join(source, name), original) });
+      const copied = join(input, relativeName);
+      mkdirSync(dirname(copied), { recursive: true });
+      writeFileSync(copied, rewritePublishedRefs(readFileSync(original, "utf8")), { flag: "wx" });
     }
+    const sourceManifest = json(join(source, `packages/${spec.dir}/package.json`));
+    const manifest = publishManifest(spec, sourceManifest, selected);
     // Refuse unplanned source dependencies before the compiler can resolve them.
     for (const name of names) {
       const copied = join(input, name.slice(`packages/${spec.dir}/`.length));
@@ -45,14 +51,12 @@ export function produce(options) {
           if (!contained(input, target) || !existsSync(target) || !lstatSync(target).isFile()) refusal("input-relative-closure");
         } else {
           const dependency = ref.split("/").slice(0, ref.startsWith("@") ? 2 : 1).join("/");
-          if (!(dependency in spec.dependencies) || !existsSync(join(output, "node_modules", dependency, "package.json"))) refusal("input-bare-closure");
+          if (!(dependency in (manifest.dependencies ?? {})) || !existsSync(join(output, "node_modules", dependency, "package.json"))) refusal("input-bare-closure");
         }
       }
     }
     const namespace = join(output, "node_modules/@generalbusiness");
     if (lstatSync(namespace).isSymbolicLink() || JSON.stringify(readdirSync(namespace).sort()) !== JSON.stringify(packages.map(pkg => pkg.name.split("/")[1]).sort())) refusal("compiled-ancestor-set");
-    const sourceManifest = json(join(source, `packages/${spec.dir}/package.json`));
-    const manifest = publishManifest(spec, sourceManifest, selected);
     writeJson(join(stage, "package.json"), manifest);
     for (const [from, to] of [[`packages/${spec.dir}/package.json`, "source-package.json"], [`packages/${spec.dir}/README.md`, "README.md"], ["LICENSE", "LICENSE"], ["NOTICE", "NOTICE"]]) {
       const target = to === "source-package.json" ? join(input, to) : join(stage, to);
@@ -86,6 +90,10 @@ export function produce(options) {
   }
   sourceIdentity(source, options.head);
   if ([...inputs, ...excludedInputs].some(input => digest(readFileSync(join(source, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256)) refusal("input-changed");
+  for (const input of inputs.filter(input => /\.ts$/.test(input.path))) {
+    const [, dir, ...parts] = input.path.split("/");
+    if (readFileSync(join(output, "inputs", dir, ...parts), "utf8") !== rewritePublishedRefs(readFileSync(input.copy, "utf8"))) refusal("renamed-input-changed");
+  }
   const result = { format: "artroom-public-sdk-release-1", status: "producer-output-only-not-published", source: identity, version: selected,
     lockSha256: digest(readFileSync(join(source, "package-lock.json"))), planSha256: digest(readFileSync(join(ROOT, "scripts/public-release.json"))),
     tools: { node: process.version, nodePath: process.execPath, nodeSha256: digest(readFileSync(process.execPath)), compiler: tool, npm: { version: npmPackage.version, cli: npmCli, sha256: digest(readFileSync(npmCli)) } },

@@ -1,8 +1,8 @@
 /** Supporting cohort's explicit bounded declaration closure, using existing value places. */
-import { PROPOSED_BOUNDS, type DeclaredDefinition, type Digest } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type Digest } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { validateDefinition, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
+import { validateDefinition, type RuleGiven } from "@generalbusiness/dap-derive";
+import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
 
 export const DEFINITION_DEPENDENCIES = 16;
 export const definitionDependencies = Object.fromEntries(Array.from({ length: DEFINITION_DEPENDENCIES }, (_, index) => [

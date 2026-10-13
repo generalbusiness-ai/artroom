@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type Entry, type FieldValue, type OperationId, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Entry, type FieldValue, type OperationId, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, d } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/artroom-platform";
+import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/dap-derive";
+import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
+import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/dap-platform";
 import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../platform/test/support-founding.ts";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside, type ArtifactsBindings } from "../src/artifacts-wiring.ts";

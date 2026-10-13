@@ -69,7 +69,7 @@
  * deltas, entries EB6 and EC2).
  */
 
-import type { Bounds, Input } from "@generalbusiness/artroom-contract";
+import type { Bounds, Input } from "@generalbusiness/dap-contract";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { holding } from "./held.ts";
 import { closureOf, type Owners } from "./ledger.ts";

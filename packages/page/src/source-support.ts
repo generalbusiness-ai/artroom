@@ -1,7 +1,7 @@
 /** Exact native LIST1 declarations adopted for b8. This is a supported
  * cohort, not an inference from a declaration's name or similar fields.
  * These pins match lanes/src/digests3.ts at the adopted b8 checkpoint. */
-import type { DeclaredDefinition, Digest } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest } from "@generalbusiness/dap-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 
 export const LIST1_DEFINITION_DIGESTS = {

@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { SELF } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Answer, Intent } from "@generalbusiness/artroom-contract";
+import type { Answer, Intent } from "@generalbusiness/dap-contract";
 import { signIntent } from "@generalbusiness/artroom-bytes";
-import { grantOf } from "@generalbusiness/artroom-derive/testing";
+import { grantOf } from "@generalbusiness/dap-derive/testing";
 import type { Founded } from "../src/index.ts";
 import { route, type Api } from "../src/worker.ts";
 import { definition } from "./support.ts";

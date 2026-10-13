@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { act, actsOn, fieldValue, listLanes, loadChange, loadIssue, openRoom, placeOf } from "../src/data.ts";
 import { changeTaskContext, issueTaskValues } from "../src/task-values.ts";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { demo } from "./support/demo.ts";
 
 // The same pure form payload reaches actual native Page signing and Scope

@@ -35,9 +35,9 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
@@ -113,7 +113,7 @@ export type LateAnswers = (operation: OperationId, attempt: number, answer: Effe
  * releases or drops it here, on what the sealed entry says.
  */
 export interface Outside {
-  snapshot?(asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
+  snapshot?(asked: import("@generalbusiness/dap-contract").SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
   send(request: EffectRequest): Promise<EffectAnswer | null>;
   late?(deliver: LateAnswers): void;

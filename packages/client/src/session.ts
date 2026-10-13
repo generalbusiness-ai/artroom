@@ -24,9 +24,9 @@
  * (I5), by the proof plan's key O12.
  */
 
-import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
+import { SESSION_DOMAINS } from "@generalbusiness/dap-contract";
 import type { Signer } from "./intent.ts";
-import type { ScopeId, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SessionRequest, SignedSessionRequest, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ScopeId, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SessionRequest, SignedSessionRequest, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalBytes, parseStrictBytes, taggedBytes, LATE, isKeyId, isMemberId, keyIdOfSecret, signSessionRequest, takeBytes, timeMs, within } from "@generalbusiness/artroom-bytes";
 import { TransportError } from "./handle.ts";
 import { REPLY_SECONDS, type Fetch } from "./http.ts";

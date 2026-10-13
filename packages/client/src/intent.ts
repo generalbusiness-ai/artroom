@@ -9,8 +9,8 @@
  * act answer with the same receipt.
  */
 
-import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Base64Url, FieldValue, Intent, KeyId, ScopeRef, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Base64Url, FieldValue, Intent, KeyId, ScopeRef, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { b64url, canonicalBytes, domainBytes, keyIdOf, keyIdOfSecret, parseStrictBytes, sign } from "@generalbusiness/artroom-bytes";
 
 /** Signs bytes as one Ed25519 key. It gives out the key's ID and signatures, and never the private key. */

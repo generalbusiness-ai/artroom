@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { otherLane } from "@generalbusiness/artroom-derive/testing";
-import type { Digest, Read, RetainedInput } from "@generalbusiness/artroom-contract";
+import { otherLane } from "@generalbusiness/dap-derive/testing";
+import type { Digest, Read, RetainedInput } from "@generalbusiness/dap-contract";
 import { HOLD, at, definition, found, reader, rita } from "./support.ts";
 
 describe("reads (section 9.1)", () => {

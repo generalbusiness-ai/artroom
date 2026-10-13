@@ -3,7 +3,7 @@
  * 7.5). The static size of a timed entry is built from these.
  */
 
-import type { Bounds, FieldType } from "@generalbusiness/artroom-contract";
+import type { Bounds, FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 
 /** The canonical bytes of a value that the definition states. */

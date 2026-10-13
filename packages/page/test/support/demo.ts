@@ -15,17 +15,17 @@ import { beginSessionFixture, beginSessionChild, type SessionOwner } from "../..
  */
 import { env } from "cloudflare:workers";
 import { expect } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { site } from "../../../scope/src/site/route.ts";
 import type { SiteEnv } from "../../../scope/src/site/host.ts";
 import { ownHost, type Stand } from "../../../scope/test/hosts.ts";
 import { type Platform, routed } from "../../../scope/test/repository.ts";
 import { nativeFixtureLifetime, driveFixture } from "../../../scope/test/support/native-fixture-lifetime.ts";
-import { command, memoryStore, type Config, type Context, type Outcome } from "@generalbusiness/artroom-cli";
-import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
+import { command, memoryStore, type Config, type Context, type Outcome } from "@generalbusiness/dap-cli";
+import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
 import type { Session } from "../../src/index.ts";
 
 export const SERVICE = "https://scopes.test";

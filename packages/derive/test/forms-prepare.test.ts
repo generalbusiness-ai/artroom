@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { SignedIntent } from "@generalbusiness/dap-contract";
 import { intentDigest, isSealed } from "@generalbusiness/artroom-bytes";
 import { JOB_READ_ACTION, WINDOWS, capabilitiesOf, clockOf, gitRead, holdCapability, judgePreparation, preparationStatus, settleOutcome } from "../src/index.ts";
 import type { GrantDecision, Steps, Window } from "../src/index.ts";

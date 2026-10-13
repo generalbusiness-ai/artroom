@@ -1,7 +1,7 @@
 /** Test-only ownership for the clone and Page claim fixtures. No native cancellation. */
 import { onTestFinished } from "vitest";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { Digest, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Digest, ScopeId } from "@generalbusiness/dap-contract";
 import { net } from "../../src/testing.ts";
 import type { SessionOwner } from "../session-settings.ts";
 import { Platform } from "../repository.ts";

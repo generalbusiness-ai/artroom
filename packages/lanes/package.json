@@ -1,7 +1,7 @@
 {
-  "name": "@generalbusiness/artroom-lanes",
+  "name": "@generalbusiness/dap-lanes",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's two lane definitions, issue and change, as data. No platform package depends on it.",
+  "description": "dap's two lane definitions, issue and change, as data. No platform package depends on it.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -17,14 +17,14 @@
     "reference": "node scripts/reference.mjs"
   },
   "dependencies": {
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1"
+    "@generalbusiness/dap-contract": "0.1.0-dev.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "5.20260815.1",
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
     "@generalbusiness/artroom-client": "0.1.0-dev.1",
-    "@generalbusiness/artroom-derive": "0.1.0-dev.1",
+    "@generalbusiness/dap-derive": "0.1.0-dev.1",
     "@generalbusiness/artroom-replay": "0.1.0-dev.1",
     "@generalbusiness/artroom-scope": "0.1.0-dev.1",
     "@types/node": "26.6.3",
@@ -32,5 +32,11 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generalbusiness-ai/dap.git",
+    "directory": "packages/lanes"
+  },
+  "homepage": "https://dap.generalbusiness.ai/"
 }

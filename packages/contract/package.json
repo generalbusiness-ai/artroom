@@ -1,7 +1,7 @@
 {
-  "name": "@generalbusiness/artroom-contract",
+  "name": "@generalbusiness/dap-contract",
   "version": "0.1.0-dev.1",
-  "description": "Artroom's scope contract: the types and constants every other package shares. No runtime logic.",
+  "description": "dap's scope contract: the types and constants every other package shares. No runtime logic.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -13,5 +13,11 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generalbusiness-ai/dap.git",
+    "directory": "packages/contract"
+  },
+  "homepage": "https://dap.generalbusiness.ai/"
 }

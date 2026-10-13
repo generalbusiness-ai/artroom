@@ -9,9 +9,9 @@
  * another does not wake a Durable Object reliably.
  */
 
-import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, PlatformDefinition, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Capabilities, ContentStates, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
+import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, PlatformDefinition, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
+import type { Capabilities, ContentStates, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { observing } from "./authority.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";

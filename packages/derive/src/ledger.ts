@@ -19,7 +19,7 @@
  * its operations is judged.
  */
 
-import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationId, PlatformDefinition, Send, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Effect, Entry, Evidence, Input, OperationId, PlatformDefinition, Send, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalBytes, digestBytes, isEvidence, isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import type { Own } from "./fields.ts";
 import type { Draft } from "./judge.ts";

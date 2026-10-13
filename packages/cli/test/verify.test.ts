@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { entryHash, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { command, memoryStore } from "../src/index.ts";

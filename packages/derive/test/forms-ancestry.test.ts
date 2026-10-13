@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, FactRef } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef } from "@generalbusiness/dap-contract";
 import { intentDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { ANCESTRY_BOUNDS, ledgerOf, recordEffects, stagedRefName, walk } from "../src/index.ts";
 import type { AncestryCheck, GitObject, PriorCheck, WalkInput } from "../src/index.ts";

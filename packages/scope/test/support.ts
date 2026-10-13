@@ -6,11 +6,11 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Bounds, Entry, Grant, Head, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Answer, Bounds, Entry, Grant, Head, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeMs, timeOf, type ValidDefinition } from "@generalbusiness/artroom-derive";
-import { grantOf, keys, lane, variant, type Actor, type Over } from "@generalbusiness/artroom-derive/testing";
+import { timeMs, timeOf, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { grantOf, keys, lane, variant, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
 import { READ_BOUNDS, type ReadBounds, type Sealed, type Summary } from "../src/index.ts";
 import { controls, type Controls } from "../src/testing.ts";
 import type { TestScope } from "./worker.ts";

@@ -18,13 +18,13 @@
  * storage, so serve the page from an origin that runs nothing else.
  */
 
-import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
 import { act, actAssociation, actsOn, issueCreation, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
 import { bindDisclosures, openDialog, releaseDialog } from "./popups.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
-import { editPath } from "@generalbusiness/artroom-platform";
+import { editPath } from "@generalbusiness/dap-platform";
 import { reconcileActionDrafts, type ActionContext } from "./actions.ts";
 import { rulesEditor } from "./rules-editor.ts";
 import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, reconcileIssueDialogs, requestedReviewCandidates, reviewSelectionProblem, taskForm, taskReviewExtents, type ReviewSelection } from "./tasks.ts";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, KeyId, Observation, ObservationUse, ScopeRef } from "@generalbusiness/artroom-contract";
-import { WINDOWS, agrees } from "@generalbusiness/artroom-derive";
-import { d, membership } from "@generalbusiness/artroom-derive/testing";
+import type { Entry, KeyId, Observation, ObservationUse, ScopeRef } from "@generalbusiness/dap-contract";
+import { WINDOWS, agrees } from "@generalbusiness/dap-derive";
+import { d, membership } from "@generalbusiness/dap-derive/testing";
 import { HOLD, at, definition, found, rita, una, type Lane } from "./support.ts";
 
 const actions = Object.values(definition.declared.acts).map((a) => a.grant);

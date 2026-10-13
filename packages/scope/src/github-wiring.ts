@@ -4,9 +4,9 @@
  * Missing or invalid configuration leaves every outside effect unsent.
  * No configuration, key, token or plaintext belongs in a scope's history.
  */
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
-import { isOf } from "@generalbusiness/artroom-platform";
+import { isOf } from "@generalbusiness/dap-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type SnapshotReader } from "./destination-host.ts";

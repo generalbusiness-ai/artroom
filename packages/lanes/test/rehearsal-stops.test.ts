@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
-import type { Entry, Read, ScopeRef, Seed, Sealed, Summary } from "@generalbusiness/artroom-contract";
+import type { Entry, Read, ScopeRef, Seed, Sealed, Summary } from "@generalbusiness/dap-contract";
 import { entryHash, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { memoryStore, type Context, type Outcome } from "@generalbusiness/artroom-cli";
+import { memoryStore, type Context, type Outcome } from "@generalbusiness/dap-cli";
 import { DEMO_DIGESTS, MANIFEST_DIGESTS } from "../src/index.ts";
 import { prepareConcurrentAndMerge, staleReproposal, type Found } from "../../../scripts/demo/rehearse.ts";
 
@@ -9,7 +9,7 @@ import { prepareConcurrentAndMerge, staleReproposal, type Found } from "../../..
 // below are scripted. Production composite code still judges exact results,
 // hashes and identities. No native admission, Git host or provider runs here.
 const ports = vi.hoisted(() => ({ command: vi.fn(), session: vi.fn(), entry: vi.fn(), summary: vi.fn() }));
-vi.mock("@generalbusiness/artroom-cli", async importOriginal => ({ ...await importOriginal<typeof import("@generalbusiness/artroom-cli")>(), command: ports.command }));
+vi.mock("@generalbusiness/dap-cli", async importOriginal => ({ ...await importOriginal<typeof import("@generalbusiness/dap-cli")>(), command: ports.command }));
 vi.mock("@generalbusiness/artroom-client", async importOriginal => ({
   ...await importOriginal<typeof import("@generalbusiness/artroom-client")>(), requestSession: ports.session,
   ScopeHandle: class {
@@ -86,9 +86,9 @@ test("scripted preparation answers stop the composite before the next mutation, 
       if (kind === "propose-manifest") return { code: fault === "wrong-manifest-code" ? 1 : 0, lines: [fault === "wrong-manifest-output" ? "Unexpected manifest answer." : took(stale.scope, 4)] };
       return { code: fault === "wrong-winner-code" ? 1 : 0, lines: fault === "wrong-winner-output" ? ["Unexpected winner answer."] : [`Published: commit ${NEW}, by the merge ${C.scope}:5.`, ...(manifest ? [] : ["Page: scripted page"])] };
     });
-    const lines = ["Proposal base: {publishedCommit}.", "$ artroom act open-pr <...>", "Took effect: entry {directory}:<staleOpening>, hash <staleOpeningHash>.", "Exit 0.", "Opened change: <stale>.", "$ artroom act ask-rules <...>", "Took effect: entry {stale}:<seq>, hash <hash>.", "Exit 0.", "$ artroom act propose-file <...>", `Took effect: entry {stale}:<${manifest ? "staleSource" : "staleVersion"}>, hash <hash>.`, "Exit 0.", "$ artroom merge {controlled}", "Published: commit <controlledCommit>, by the merge {controlled}:<seq>.", "Page: scripted page", "Exit 0."];
+    const lines = ["Proposal base: {publishedCommit}.", "$ dap act open-pr <...>", "Took effect: entry {directory}:<staleOpening>, hash <staleOpeningHash>.", "Exit 0.", "Opened change: <stale>.", "$ dap act ask-rules <...>", "Took effect: entry {stale}:<seq>, hash <hash>.", "Exit 0.", "$ dap act propose-file <...>", `Took effect: entry {stale}:<${manifest ? "staleSource" : "staleVersion"}>, hash <hash>.`, "Exit 0.", "$ dap merge {controlled}", "Published: commit <controlledCommit>, by the merge {controlled}:<seq>.", "Page: scripted page", "Exit 0."];
     if (manifest) {
-      lines.splice(11, 0, "$ artroom act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
+      lines.splice(11, 0, "$ dap act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
       lines.splice(lines.length - 2, 1);
     }
     const result = await prepareConcurrentAndMerge(ctx, OLD, C.scope, { code: 0, lines }, found, manifest);
@@ -124,7 +124,7 @@ test("scripted refusal and replacement answers stop before further work, and the
     const ctx = await context(), calls: string[] = [], events: string[] = [];
     let clock = 100, measured: number | undefined;
     const found: Found = { stale: stale.scope, staleVersion: "3" };
-    const refusal = `Not published: the merge ${stale.scope}:4 is refused, out-of-date. The change ${stale.scope} stays open at version 3. When it may be merged, run: artroom merge ${stale.scope}`;
+    const refusal = `Not published: the merge ${stale.scope}:4 is refused, out-of-date. The change ${stale.scope} stays open at version 3. When it may be merged, run: dap merge ${stale.scope}`;
     ports.command.mockImplementation(async (_ctx: Context, args: string[]): Promise<Outcome> => {
       calls.push(args[0]!); events.push(args[0]!);
       if (args[0] === "merge") {
@@ -135,7 +135,7 @@ test("scripted refusal and replacement answers stop before further work, and the
       const identity = fault === "same-replacement" ? stale.scope : fault === "invalid-replacement" ? "not-a-scope" : fresh.scope;
       return { code: fault === "wrong-edit-code" ? 1 : 0, lines: fault === "wrong-edit-output" ? ["Unexpected fresh edit answer."] : [`Proposed guide/concurrent.md (1 bytes) as change ${identity}, version 5.`, `Published: commit ${NEW}, by the merge ${identity}:6.`, "Page: scripted page"] };
     });
-    const expected = { code: 0, lines: ["Old base: <...>.", "$ artroom merge {stale}", "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: artroom merge {stale}", "Exit 1.", "$ artroom edit <...>", "Proposed guide/concurrent.md (1 bytes) as change <reproposed>, version <reproposedVersion>.", "Published: commit <reproposedCommit>, by the merge {reproposed}:<seq>.", "Page: scripted page", "Exit 0."] };
+    const expected = { code: 0, lines: ["Old base: <...>.", "$ dap merge {stale}", "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: dap merge {stale}", "Exit 1.", "$ dap edit <...>", "Proposed guide/concurrent.md (1 bytes) as change <reproposed>, version <reproposedVersion>.", "Published: commit <reproposedCommit>, by the merge {reproposed}:<seq>.", "Page: scripted page", "Exit 0."] };
     const result = await staleReproposal(ctx, OLD, NEW, expected, found, () => clock, () => Date.parse(TIME), ms => { measured = ms; events.push("measured"); });
     if (["wrong-reason", "wrong-code", "wrong-version", "unknown-refusal"].includes(fault)) {
       expect(calls, `no fresh edit after ${fault}`).toEqual(["merge"]);

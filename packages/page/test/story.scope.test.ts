@@ -2,7 +2,7 @@ import { beginSessionChild } from "../../scope/test/session-settings.ts";
 import { expect, test } from "vitest";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { net } from "@generalbusiness/artroom-scope/testing";
-import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
+import { DEMO_DIGESTS } from "@generalbusiness/dap-lanes";
 import { act, actsOn, changeStates, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, siteAddress, Unreadable } from "../src/index.ts";
 import { SERVICE, demo } from "./support/demo.ts";
 

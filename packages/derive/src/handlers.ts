@@ -6,7 +6,7 @@
  * send is run again from the entry that sent it.
  */
 
-import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, PlatformReceive, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { ActType, Advisory, AlsoMark, AlsoRule, Bounds, Digest, Effect, EffectForm, Entry, FactRef, FactUse, FieldType, FieldValue, Guard, Input, Notify, PlatformData, PlatformReceive, Prepared, Reason, ReceiveType, RefusalReason, Request, ResultClauses, ScopeRef, Send, SendForm, SendMark, Settles, UnavailableReason } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { boundTo, decisionCounts, selectedByIndex, selectorOf } from "./binding.ts";

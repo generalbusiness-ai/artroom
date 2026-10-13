@@ -45,11 +45,11 @@ test("no platform package depends on the lanes package or imports from it", () =
   assert.ok(files.includes("packages/lanes/package.json"), "the lanes package was listed");
   const pageTests = (f) => /^packages\/(page|mcp)\/test\//.test(f) || f === "packages/page/package.json" || f === "packages/mcp/package.json";
   const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !pageTests(f) && !f.endsWith(".md"));
-  assert.deepEqual(platform.filter((f) => /artroom-lanes|[.\/]\/lanes\//.test(text(f))), []);
+  assert.deepEqual(platform.filter((f) => /(?:artroom|dap)-lanes|[.\/]\/lanes\//.test(text(f))), []);
   const page = JSON.parse(text("packages/page/package.json") || "{}");
-  assert.equal(page.dependencies?.["@generalbusiness/artroom-lanes"], undefined, "the page depends on the lanes package for its tests only");
+  assert.equal(page.dependencies?.["@generalbusiness/dap-lanes"], undefined, "the page depends on the lanes package for its tests only");
   const mcp = JSON.parse(text("packages/mcp/package.json") || "{}");
-  assert.equal(mcp.dependencies?.["@generalbusiness/artroom-lanes"], undefined, "the MCP server depends on the lanes package for its tests only");
+  assert.equal(mcp.dependencies?.["@generalbusiness/dap-lanes"], undefined, "the MCP server depends on the lanes package for its tests only");
 });
 
 // The platform package is pure data and rules over the contract, the bytes and the derivation (I3 plan, section 3.1). It names no
@@ -61,9 +61,9 @@ test("the platform package depends only on contract, bytes and derive, and only 
   assert.ok(files.includes("packages/platform/package.json"), "the platform package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/platform/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(scope|replay|client|lanes)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(scope|replay|client|lanes)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes|cli|page|mcp)\//.test(f));
-  assert.deepEqual(named.filter((f) => /artroom-platform/.test(text(f))), []);
+  assert.deepEqual(named.filter((f) => /(?:artroom|dap)-platform/.test(text(f))), []);
 });
 
 // The git package is the one place that touches a Git repository or a Git host (I3 plan, section 3.1). It depends only on contract and
@@ -73,7 +73,7 @@ test("the git package depends only on contract and bytes, and only scope, checke
   assert.ok(files.includes("packages/git/package.json"), "the git package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/git/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes|checkers)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(derive|platform|scope|replay|client|lanes|checkers)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !/^packages\/(git|scope|checkers)\/|^packages\/platform\/test\//.test(f));
   assert.deepEqual(named.filter((f) => /artroom-git/.test(text(f))), []);
 });
@@ -86,7 +86,7 @@ test("the checkers package depends only on contract, bytes and git, and no packa
   assert.ok(files.includes("packages/checkers/package.json"), "the checkers package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/checkers/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !f.startsWith("packages/checkers/"));
   assert.deepEqual(named.filter((f) => /artroom-checkers/.test(text(f))), []);
   const reaches = files.filter((f) => source(f) && !f.startsWith("packages/checkers/") && /[.\/]\/checkers\//.test(text(f)));
@@ -101,9 +101,9 @@ test("the MCP server's source imports only contract, bytes, client, platform and
   const inside = files.filter((f) => f.startsWith("packages/mcp/src/") && f.endsWith(".ts"));
   assert.ok(inside.length > 5, "the server's source was listed");
   const named = (f) => [...text(f).matchAll(/from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g)].map((m) => m[1] ?? m[2]);
-  const allowed = /^(@generalbusiness\/artroom-(contract|bytes|client|platform|derive)(\/.*)?|node:[a-z_/]+|\.\/[\w.-]+)$/;
+  const allowed = /^(@generalbusiness\/(artroom-(bytes|client)|dap-(contract|platform|derive))(\/.*)?|node:[a-z_/]+|\.\/[\w.-]+)$/;
   assert.deepEqual(inside.flatMap((f) => named(f).filter((m) => !allowed.test(m)).map((m) => `${f}: ${m}`)), []);
-  assert.deepEqual(inside.filter((f) => /artroom-(lanes|page|checkers|scope|replay|git)|examples\/|\.\.\//.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(lanes|page|checkers|scope|replay|git)|examples\/|\.\.\//.test(text(f))), []);
   const mcp = JSON.parse(text("packages/mcp/package.json") || "{}");
-  assert.deepEqual(Object.keys(mcp.dependencies ?? {}).filter((d) => !/^@generalbusiness\/artroom-(contract|bytes|client|platform|derive)$/.test(d)), []);
+  assert.deepEqual(Object.keys(mcp.dependencies ?? {}).filter((d) => !/^@generalbusiness\/(artroom-(bytes|client)|dap-(contract|platform|derive))$/.test(d)), []);
 });

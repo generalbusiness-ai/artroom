@@ -19,8 +19,8 @@
  * `u` has 3 attempts, lists no kind, and no item holds it.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, OperationId, PlatformData, PlatformDefinition, Request } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Entry, OperationId, PlatformData, PlatformDefinition, Request } from "@generalbusiness/dap-contract";
 import { entryHash, factRefOf } from "@generalbusiness/artroom-bytes";
 import { PROFILES, applyEntry, clockOf, entryOf, fits, judgeDelivery, owed, settleOutcome, validateDefinition } from "../src/index.ts";
 import type { Draft, Operation, OutcomeGives, PlatformRule, PlatformRules, RuleEffect, RuleGiven, RuleRequest, ValidDefinition, Validation } from "../src/index.ts";

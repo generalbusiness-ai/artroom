@@ -22,10 +22,10 @@
  * duty.
  */
 
-import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
-import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/artroom-derive";
-import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/dap-derive";
+import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { NO_INCARNATION, Observes, Received, ownOf, retainedFacts, snapshotsOf, used, valuesOf, type Scope } from "./core.ts";
 import { namedBy } from "./definitions.ts";
 import type { DefinitionRead, Delivery, Ports } from "./ports.ts";

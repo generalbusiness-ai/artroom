@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { SignedIntent } from "@generalbusiness/dap-contract";
 import { digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { prepareRules, validateDefinition } from "../src/index.ts";
 import { ENGINE_FINGERPRINT, RULE_PROFILES, admit, evaluate, evaluateRules, probeResults, type RuleEvalError } from "../src/rule/index.ts";

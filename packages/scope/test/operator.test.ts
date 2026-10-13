@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { Duty, Entry, Read } from "@generalbusiness/artroom-contract";
+import type { Duty, Entry, Read } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
-import type { Delivered } from "@generalbusiness/artroom-derive";
+import type { Delivered } from "@generalbusiness/dap-derive";
 import { incidentsOf, type Incident, type Resent } from "../src/index.ts";
 import { desk, later, net, settle, ticket, una, type Node } from "./net.ts";
 import { reader } from "./support.ts";

@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
-import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
+import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Judgment } from "@generalbusiness/dap-derive";
+import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
 import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
 import { rulesScope2, rulesScopeRules } from "../src/rules-scope.ts";

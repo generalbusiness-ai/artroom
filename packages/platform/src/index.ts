@@ -15,7 +15,7 @@ export { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, direct
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 
-import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/artroom-contract";
+import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
@@ -23,7 +23,7 @@ import { DEMO_REGISTER, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, demoRegister, demoRe
 export { DEMO_REGISTER, DEMO_PURPOSE, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, demoRegister, demoRegisterRules, webDemoRegister } from "./demo-register.ts";
 import { register, registerRules } from "./register.ts";
 import { directory, directory2, directory3, directory7, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
-import type { RecordedRef, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { RecordedRef, Rules, StateView } from "@generalbusiness/dap-derive";
 import { RULES } from "./rules.ts";
 import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScope4, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 

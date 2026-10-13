@@ -17,12 +17,12 @@
  *   (`packages/scope/test/founding-real.test.ts`).
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, FactRef, PlatformData, Request, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, FactRef, PlatformData, Request, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/dap-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, ownersOf, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
+import { PROFILES, clockOf, judgeDelivery, judgeGenesis, judgeOutcome, ownersOf, validateDefinition } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Judgment, PlatformRules, Source, ValidDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, T0, forged, keys, t, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { DIRECTORY, REGISTER, directoryRules, directorySeed, platform, registerRules, repositoryName } from "../src/index.ts";
 
 export const { rita, una, vic, paul, sam } = keys;

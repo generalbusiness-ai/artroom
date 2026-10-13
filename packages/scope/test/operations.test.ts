@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { abortAllDurableObjects } from "cloudflare:test";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { OperationId, Read } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { OperationId, Read } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { operationId, snapshotInput, snapshotRead, stagedRefName, timeMs } from "@generalbusiness/artroom-derive";
+import { operationId, snapshotInput, snapshotRead, stagedRefName, timeMs } from "@generalbusiness/dap-derive";
 import { isAnswer } from "../src/operations.ts";
 import { ScopeObject, SqliteStore, type EffectAnswer, type EffectRequest, type OperationStatus, type OutcomeRecorded, type Outside, type Wiring } from "../src/index.ts";
-import { variant } from "@generalbusiness/artroom-derive/testing";
+import { variant } from "@generalbusiness/dap-derive/testing";
 import { controls, testPorts } from "../src/testing.ts";
 import { FENCE, MINT, mint, outsideOf, owners, pushOf, wired, type OutsideDouble } from "./outside.ts";
 import { open } from "./operation-opening.ts";

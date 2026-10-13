@@ -63,7 +63,7 @@
  * `not-the-checker`. Nothing is recorded for any of them.
  */
 
-import type { ReservationSnapshot, Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, Answer, Digest, PlatformDefinition, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, isRecord } from "@generalbusiness/artroom-bytes";
 import { readConfiguration, type Configuration } from "./configuration.ts";
 import { verifyReservationObjects } from "./reservation-snapshot.ts";

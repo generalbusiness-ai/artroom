@@ -14,7 +14,7 @@ import { execFile } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, expect, test } from "vitest";
-import type { Digest, Head, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, Head, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, entryHash, isEntry, parseStrict, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { READ_BOUNDS, Reader, idOf, objectId, refName, snapshotFiles } from "@generalbusiness/artroom-git";
 import { readConfiguration } from "../src/configuration.ts";

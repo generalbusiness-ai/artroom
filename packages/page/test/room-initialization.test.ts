@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Head, Item, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { Head, Item, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { Session as ReadSession } from "@generalbusiness/artroom-client";
 import { roomInitialization, initializationStillCurrent, type Room } from "../src/data.ts";

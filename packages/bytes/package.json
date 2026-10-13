@@ -14,7 +14,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
+    "@generalbusiness/dap-contract": "0.1.0-dev.1",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0"
   },

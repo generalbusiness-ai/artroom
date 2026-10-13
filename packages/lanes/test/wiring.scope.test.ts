@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { CONFIGURATION_DOMAIN, firstExtents, platform } from "@generalbusiness/artroom-platform";
+import { CONFIGURATION_DOMAIN, firstExtents, platform } from "@generalbusiness/dap-platform";
 import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
-import { valueDigest } from "@generalbusiness/artroom-derive";
+import { valueDigest } from "@generalbusiness/dap-derive";
 import { MemorySource, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { DIGESTS, change, issue } from "../src/index.ts";
