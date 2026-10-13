@@ -3,8 +3,8 @@
  * lending act at a time. It follows notes/2026-10-13-lending-library.md, section 4.1.
  *
  * An act is signed once and kept (custody.ts) before anything is sent. After a
- * lost reply or a reload the original is checked by a read; it is sent again only
- * when its mark shows it was never sent. Nothing here signs a replacement.
+ * lost reply or a reload Check is read-only. Explicit Continue reuses that
+ * original envelope. Nothing here signs a replacement.
  */
 import type { Entry, Receipt, Summary } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, intentDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
@@ -44,6 +44,8 @@ export interface LendingGateway {
   check(): Promise<ActOutcome | null>;
   /** Continue: send the kept original, only when the journal shows it was never sent. */
   resume(): Promise<ActOutcome | null>;
+  /** Explicit Continue: resend the same kept envelope before its deadline. */
+  continueOriginal(): Promise<ActOutcome | null>;
   /** Give up the kept original, only when a read shows it did not take effect and its deadline has passed. */
   abandon(): Promise<boolean>;
   dispose(): void;
@@ -59,7 +61,8 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
 
   const now = options.now ?? (() => Date.now()), binding = lendingBinding(identity);
   const lifetime = new AbortController();
-  let alive = true, session: Session | null = null, observer: Observation | undefined, view: LendingView | undefined, fresh = false;
+  let readVersion = 0;
+  let alive = true, session: Session | null = null, observer: Observation | undefined, view: LendingView | undefined, fresh = false, currentEntries: readonly Entry[] = [];
   const usable = () => alive && options.current();
   const current = () => { if (!usable()) throw new Error("This device context is no longer current."); };
   const transport = httpTransport(identity.origin, { fetch: options.fetch ?? ((url, init) =>
@@ -134,26 +137,36 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
           if (state.status !== "current") { fresh = false; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
           const snapshot: CompleteSnapshot<Summary> = state.snapshot;
           // One coherent view: the summary, its head, and the record up to that head.
+          const version = ++readVersion;
           void record(snapshot.at.seq).then((entries) => {
-            if (!usable()) return;
-            view = lendingView(snapshot.value, snapshot.at, entries); fresh = !view.behind;
+            if (!usable() || version !== readVersion) return;
+            const next = lendingView(snapshot.value, snapshot.at, entries);
+            if (view && next.record.seq < view.record.seq) return;
+            view = next; fresh = !view.behind; currentEntries = entries;
             emit(view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries });
-          }).catch((error: unknown) => { if (usable()) { fresh = false; emit({ status: "behind", reason: error instanceof Error ? error.message : "The record could not be read.", ...(view ? { view } : {}) }); } });
+          }).catch((error: unknown) => { if (usable() && version === readVersion) { fresh = false; emit({ status: "behind", reason: error instanceof Error ? error.message : "The record could not be read.", ...(view ? { view } : {}) }); } });
         },
       });
       return observer;
     },
     async look() {
+      const version = ++readVersion;
+      const superseded = (): LendingState => view && fresh ? { status: "current", view, entries: currentEntries } : { status: "behind", reason: "A newer read replaced this one.", ...(view ? { view } : {}) };
       try {
         current();
         const refusal = await signIn();
+        if (version !== readVersion) return superseded();
         if (refusal !== null) { fresh = false; return { status: "behind", reason: `The room refused a read session: ${refusal}.`, ...(view ? { view } : {}) }; }
         const read = completeSummary(await handle().summary()); current();
+        if (version !== readVersion) return superseded();
         if (!read.ok) { fresh = false; return { status: "behind", reason: `The library could not be read: ${read.reason}.`, ...(view ? { view } : {}) }; }
         const entries = await record(read.value.at.seq);
-        view = lendingView(read.value.value, read.value.at, entries); fresh = !view.behind;
+        if (version !== readVersion) return superseded();
+        const next = lendingView(read.value.value, read.value.at, entries);
+        if (view && next.record.seq < view.record.seq) return superseded();
+        view = next; fresh = !view.behind; currentEntries = entries;
         return view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries };
-      } catch (error) { fresh = false; return { status: "behind", reason: error instanceof Error ? error.message : "The library could not be read.", ...(view ? { view } : {}) }; }
+      } catch (error) { if (version !== readVersion) return superseded(); fresh = false; return { status: "behind", reason: error instanceof Error ? error.message : "The library could not be read.", ...(view ? { view } : {}) }; }
     },
     act(kind, input = {}) {
       return options.lock.run(async (): Promise<ActOutcome> => {
@@ -200,6 +213,16 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         return conclude(held, await advance(options.store, binding, ports, held.envelope));
       });
     },
+    continueOriginal() {
+      return options.lock.run(async () => {
+        current(); const held = await options.store.load(); current();
+        if (held === null || held === undefined) return null;
+        if (!validKept(held, binding)) return { status: "unknown" as const, reason: "The kept request cannot be read. It stays in this browser." };
+        const deadline = timeMs(held.envelope.signed.intent.notAfter);
+        if (deadline === null || now() > deadline) return { status: "unknown" as const, reason: "The original request's deadline has passed. Check it; nothing was sent." };
+        return conclude(held, await advance(options.store, binding, ports, held.envelope, false, true));
+      });
+    },
     abandon() {
       return options.lock.run(async () => {
         current(); const held = await options.store.load(); current();
@@ -214,6 +237,6 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         return true;
       });
     },
-    dispose() { alive = false; lifetime.abort(); observer?.cancel(); session = null; view = undefined; fresh = false; },
+    dispose() { alive = false; readVersion++; lifetime.abort(); observer?.cancel(); session = null; view = undefined; fresh = false; },
   };
 }

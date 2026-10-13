@@ -17,7 +17,7 @@ import { actStore, browserLock, joinStore, remembered, type Remembered } from ".
 type Notice = { kind: "plain" | "refusal"; text: string } | null;
 const root = document.querySelector<HTMLElement>("#lending")!;
 /** Each change of room or view raises this, so an answer for a view the person has left is ignored. */
-let epoch = 0;
+let epoch = 0, reading = 0;
 let memory: Remembered | null = null, gateway: LendingGateway | null = null, state: LendingState = { status: "loading" };
 let kept: Pending | null = null, keptJoin: Seat | null = null, notice: Notice = null, busy = false, timer: number | undefined;
 /** Controls whose typed text a redraw must drop: a donation that took effect empties its form. */
@@ -45,10 +45,10 @@ async function work(task: () => Promise<void>): Promise<void> {
 }
 
 async function look(): Promise<void> {
-  const at = epoch, using = gateway;
+  const at = epoch, version = ++reading, using = gateway;
   if (!using) return;
   const [next, pending] = [await using.look(), await using.pending()];
-  if (at !== epoch) return;
+  if (at !== epoch || version !== reading || using !== gateway) return;
   state = next; kept = pending; draw();
 }
 function tell(kind: LendingAct | "kept", outcome: ActOutcome | null): void {
@@ -68,7 +68,7 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
 });
 
 async function open(next: Remembered): Promise<void> {
-  epoch++; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
+  epoch++; reading++; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
   memory = next;
   if (timer !== undefined) clearInterval(timer);
   if (!next.identity) return;
@@ -77,25 +77,43 @@ async function open(next: Remembered): Promise<void> {
   await look();
   timer = window.setInterval(() => { if (!busy && document.visibilityState === "visible") void look(); }, 15_000);
 }
-async function seated(device: DeviceKey, seat: Seat): Promise<void> {
+async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Promise<void> {
   const found = await findLending(seat, device);
+  if (expectedEpoch !== epoch) return;
   await remembered.save({ v: 1, device, seat, ...(found.ok ? { identity: found.identity } : {}) });
+  if (expectedEpoch !== epoch) return;
   if (!found.ok) notice = { kind: "plain", text: found.reason };
-  await open((await remembered.load())!);
+  const saved = await remembered.load();
+  if (expectedEpoch !== epoch || !saved) return;
+  await open(saved);
 }
-function joined(device: DeviceKey, outcome: JoinOutcome | null): Promise<void> | void {
+function joined(device: DeviceKey, outcome: JoinOutcome | null, expectedEpoch = epoch): Promise<void> | void {
+  if (expectedEpoch !== epoch) return;
   if (outcome === null) return;
-  if (outcome.status === "joined") { notice = { kind: "plain", text: `You joined as ${outcome.seat.handle}.` }; keptJoin = null; return seated(device, outcome.seat); }
+  if (outcome.status === "joined") { notice = { kind: "plain", text: `You joined as ${outcome.seat.handle}.` }; keptJoin = null; return seated(device, outcome.seat, expectedEpoch); }
   notice = { kind: outcome.status === "refused" ? "refusal" : "plain", text: outcome.reason };
   if (outcome.status === "refused") keptJoin = null;
   if (outcome.status === "unknown" && outcome.seat) keptJoin = outcome.seat;
 }
+function joinFor(device: DeviceKey, expectedEpoch = epoch) {
+  return joining(device, { lock: browserLock, store: joinStore, current: () => expectedEpoch === epoch });
+}
 /** The device key of this browser, made on first need and remembered before it is used. */
 async function device(): Promise<DeviceKey> {
-  if (memory) return memory.device;
-  const made: Remembered = { v: 1, device: await newDeviceKey() };
-  await remembered.save(made); memory = made;
-  return made.device;
+  const at = epoch;
+  return browserLock.run(async () => {
+    if (at !== epoch) throw new Error("This device context is no longer current.");
+    if (memory) return memory.device;
+    const existing = await remembered.load();
+    if (at !== epoch) throw new Error("This device context is no longer current.");
+    if (existing) { memory = existing; return existing.device; }
+    const made: Remembered = { v: 1, device: await newDeviceKey() };
+    if (at !== epoch) throw new Error("This device context is no longer current.");
+    await remembered.save(made);
+    if (at !== epoch) throw new Error("This device context is no longer current.");
+    memory = made;
+    return made.device;
+  });
 }
 
 function drawJoin(): Node[] {
@@ -103,13 +121,15 @@ function drawJoin(): Node[] {
   if (location.hash.startsWith("#artroom-invite:")) link.value = location.hash.slice(1);
   const nodes: Node[] = [h("p", { class: "eyebrow" }, "Lending library"), h("h1", {}, "Join the library"),
     h("p", {}, "To borrow, return or donate, you need a seat in this room. Paste the invitation link you were given.")];
-  if (keptJoin) nodes.push(h("div", { class: "notice kept" }, h("p", {}, `A join as ${keptJoin.handle} was sent and no answer came back. It is kept in this browser. Check it; do not use the invitation again.`),
-    button("Check the join", () => void work(async () => { const key = await device(); await joined(key, await joining(key, { lock: browserLock, store: joinStore }).check()); }))));
+  if (keptJoin) nodes.push(h("div", { class: "notice kept" }, h("p", {}, `A join as ${keptJoin.handle} was sent and no answer came back. It is kept in this browser. Check reads its outcome; Continue sends that same join.`),
+    button("Check the join", () => void work(async () => { const at = epoch, key = await device(); if (at !== epoch) return; await joined(key, await joinFor(key, at).check(), at); })),
+    button("Continue the join", () => void work(async () => { const at = epoch, key = await device(); if (at !== epoch) return; await joined(key, await joinFor(key, at).continueOriginal(), at); }))));
   else nodes.push(field("Invitation link", link), button("Join", () => void work(async () => {
     const invited = readInvitation(link.value, location.origin);
     if (!invited.ok) { notice = { kind: "plain", text: `${invited.reason} Nothing was sent.` }; return; }
-    const key = await device();
-    await joined(key, await joining(key, { lock: browserLock, store: joinStore }).join(invited.link, invited.seat));
+    const at = epoch, key = await device();
+    if (at !== epoch) return;
+    await joined(key, await joinFor(key, at).join(invited.link, invited.seat), at);
     if (location.hash) history.replaceState(null, "", location.pathname);
   })));
   nodes.push(h("p", { class: "muted" }, "This browser makes a key for you and keeps it. The key cannot be copied out of this browser."));
@@ -120,8 +140,8 @@ function drawKept(): Node | null {
   if (!kept || !gateway) return null;
   const using = gateway, what = kept.name ? `${kept.kind} “${kept.name}”` : kept.thing === null ? kept.kind : `${kept.kind} of thing ${kept.thing}`;
   const settle = (ask: () => Promise<ActOutcome | null>) => () => void work(async () => { const at = epoch; const outcome = await ask(); if (at !== epoch) return; tell("kept", outcome); await look(); });
-  const box = h("div", { class: "notice kept" }, h("p", {}, `An earlier request is kept in this browser: ${what}. ${kept.unsent ? "It was not sent." : "It may have been sent. It will not be sent again."}`),
-    h("div", { class: "row" }, button("Check", settle(() => using.check())), ...(kept.unsent ? [button("Send it", settle(() => using.resume()), true)] : []),
+  const box = h("div", { class: "notice kept" }, h("p", {}, `An earlier request is kept in this browser: ${what}. ${kept.unsent ? "It was not sent." : "It may have been sent. Continue sends only that same request."}`),
+    h("div", { class: "row" }, button("Check", settle(() => using.check())), button("Continue", settle(() => using.continueOriginal()), true),
       button("Give up", () => void work(async () => { const gone = await using.abandon(); notice = { kind: "plain", text: gone ? "The kept request did not take effect and was given up." : "It cannot be given up yet: it may still take effect, or it already did. Check it." }; await look(); }), true)));
   return box;
 }

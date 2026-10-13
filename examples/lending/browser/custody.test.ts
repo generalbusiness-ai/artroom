@@ -87,3 +87,25 @@ test("only this identity's whole lending request is taken from custody; anything
   expect(await advance(ended.store, identity, { ...ended.ports, current: () => false }, e)).toEqual({ status: "unknown" });
   expect(ended.calls).toEqual([]);
 });
+
+// Explicit user authorization is separate from ordinary read-only recovery.
+test("explicit Continue keeps the exact envelope after loss; storage or context failure stops its resend", async () => {
+  const e = envelope();
+  const lost = bench(kept("unknown", e));
+  const sent: string[] = [];
+  lost.ports.post = async request => { sent.push(JSON.stringify(request)); return { answer: "accepted", receipt } as Answer; };
+  expect(await advance(lost.store, identity, lost.ports, e, false, true)).toEqual({ status: "recorded" });
+  expect(sent).toEqual([JSON.stringify(e)]);
+  expect(lost.calls).toEqual(["save inflight", "recorded", "save recorded"]);
+  expect((await lost.store.load() as Kept).envelope).toEqual(e);
+  // An explicit continuation cannot use a different signed request or a stale view.
+  const other = bench(kept("unknown", e));
+  expect(await advance(other.store, identity, other.ports, envelope("Kettle"), false, true)).toEqual({ status: "unknown" });
+  expect(await advance(other.store, identity, { ...other.ports, current: () => false }, e, false, true)).toEqual({ status: "unknown" });
+  expect(other.calls).toEqual([]);
+  // A failed private mark means the original stays unknown and no send leaves the browser.
+  const broken = bench(kept("unknown", e));
+  broken.store.save = async () => { throw Error("private transaction did not commit"); };
+  expect(await advance(broken.store, identity, broken.ports, e, false, true)).toEqual({ status: "unknown" });
+  expect([broken.phase(), broken.calls]).toEqual(["unknown", []]);
+});

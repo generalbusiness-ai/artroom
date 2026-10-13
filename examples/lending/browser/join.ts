@@ -4,12 +4,12 @@
  *
  * The device key is made by WebCrypto and cannot be read out. The join is one
  * signed act to the room's membership, under the same custody as a lending act
- * (custody.ts): kept before it is sent, sent at most once, then settled only by
- * a read. The kept join holds the invitation's secret, as the signed act does;
+ * (custody.ts): kept before it is sent, ordinary recovery by a read, and
+ * explicit Continue with the original envelope. The kept join holds the invitation's secret, as the signed act does;
  * it stays in this origin's private storage and is cleared once the join is settled.
  */
 import type { KeyId, MemberId, Receipt, ScopeRef, Summary } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, intentDigest, keyIdOf, timeOf } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, intentDigest, keyIdOf, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, invitationOf, requestSession, signedIntent, signerSessionRequest, wellFormedInvitation,
   type Fetch, type InvitationLink, type Signer } from "@generalbusiness/artroom-client";
 import { LENDING_DEFINITION } from "../pin.ts";
@@ -82,10 +82,13 @@ export interface Joining {
   pending(): Promise<Seat | null>;
   /** Check: a read that settles whether the kept join took effect. It sends nothing. */
   check(): Promise<JoinOutcome | null>;
+  /** Explicit Continue sends the kept join, without signing another one. */
+  continueOriginal(): Promise<JoinOutcome | null>;
 }
 
 export function joining(device: DeviceKey, options: { lock: CustodyLock; store: JoinStore; current?: () => boolean; now?: () => number; fetch?: Fetch; actFetch?: Fetch }): Joining {
   const signer = deviceSigner(device), now = options.now ?? (() => Date.now()), usable = options.current ?? (() => true);
+  const current = () => { if (!usable()) throw new Error("This join context is no longer current."); };
   const transport = (origin: string, fetch?: Fetch) => httpTransport(origin, fetch ? { fetch } : {});
   const ports = (seat: Seat): Ports => {
     // A person who has not joined has no read session. Settlement by the exact signed request needs none.
@@ -108,34 +111,48 @@ export function joining(device: DeviceKey, options: { lock: CustodyLock; store: 
   };
   const inner = (held: KeptJoin): KeptStore => ({ load: async () => { const now = await options.store.load(); return validJoin(now, device.publicKey) ? now.kept : null; },
     save: (kept) => options.store.save({ v: 1, seat: held.seat, kept }), clear: () => options.store.clear() });
-  const conclude = async (held: KeptJoin, readOnly: boolean): Promise<JoinOutcome> => {
-    const settled = await advance(inner(held), joinBinding(held.seat, device.publicKey), ports(held.seat), held.kept.envelope, readOnly);
+  const conclude = async (held: KeptJoin, readOnly: boolean, continueOriginal = false): Promise<JoinOutcome> => {
+    current();
+    const settled = await advance(inner(held), joinBinding(held.seat, device.publicKey), ports(held.seat), held.kept.envelope, readOnly, continueOriginal);
+    current();
     if (settled.status === "unknown") return { status: "unknown", seat: held.seat, reason: "No answer came back that could be trusted. The original join is kept. Check it; do not use the invitation again." };
-    const latest = await options.store.load();
+    const latest = await options.store.load(); current();
     if (!validJoin(latest, device.publicKey) || envelopeKey(latest.kept.envelope) !== envelopeKey(held.kept.envelope) || latest.kept.phase !== settled.status)
       return { status: "unknown", seat: held.seat, reason: "The original join is kept. Check it." };
     // Settled: the invitation's secret leaves this browser with the kept join.
-    await options.store.clear();
+    await options.store.clear(); current();
     return settled.status === "recorded" ? { status: "joined", seat: held.seat } : { status: "refused", reason: refusalWords(settled.reason) };
   };
   return {
     join(link, seat) {
       return options.lock.run(async (): Promise<JoinOutcome> => {
+        current();
         if ((await options.store.load() ?? null) !== null) return { status: "nothing-sent", reason: "An earlier join is kept. Check it first." };
+        current();
         let held: KeptJoin;
         try {
-          const signed = await signedIntent(signer, { to: seat.membership, kind: "join", fields: { invitation: link.invitation, secret: link.secret }, expected: {} }, { now: now() });
+          const signed = await signedIntent(signer, { to: seat.membership, kind: "join", fields: { invitation: link.invitation, secret: link.secret }, expected: {} }, { now: now() }); current();
           held = { v: 1, seat, kept: { v: 1, kind: "join", envelope: { signed, grants: [], beside: {} }, phase: "prepared" } };
           if (!validJoin(held, device.publicKey)) throw new Error("not a join of this device");
-          await options.store.save(held);
+          await options.store.save(held); current();
         } catch { return { status: "nothing-sent", reason: "The join could not be signed and kept. Nothing was sent." }; }
         return conclude(held, false);
+      });
+    },
+    continueOriginal() {
+      return options.lock.run(async () => {
+        current(); const held = await options.store.load(); current();
+        if ((held ?? null) === null) return null;
+        if (!validJoin(held, device.publicKey)) return { status: "unknown" as const, reason: "The kept join cannot be read. It stays in this browser." };
+        const deadline = timeMs(held.kept.envelope.signed.intent.notAfter);
+        if (deadline === null || now() > deadline) return { status: "unknown" as const, seat: held.seat, reason: "The original join's deadline has passed. Check it; nothing was sent." };
+        return conclude(held, false, true);
       });
     },
     async pending() { const held = await options.store.load(); return validJoin(held, device.publicKey) ? held.seat : null; },
     check() {
       return options.lock.run(async () => {
-        const held = await options.store.load();
+        current(); const held = await options.store.load(); current();
         if ((held ?? null) === null) return null;
         if (!validJoin(held, device.publicKey)) return { status: "unknown" as const, reason: "The kept join cannot be read. It stays in this browser." };
         return conclude(held, true);

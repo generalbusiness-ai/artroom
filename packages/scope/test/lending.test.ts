@@ -178,6 +178,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     // lock are in-memory STAND-INS for the browser's; the lost reply is made by the test.
     const browser = (who: Actor, handle: `@${string}`, lose: { reply: boolean } = { reply: false }) => {
       let slot: string | null = null, posts = 0;
+      const envelopes: string[] = [];
       const store: KeptStore = { load: async () => slot === null ? null : JSON.parse(slot) as Kept, save: async (value) => { slot = JSON.stringify(value); }, clear: async () => { slot = null; } };
       let chain: Promise<unknown> = Promise.resolve();
       const lock = { run: <T>(work: () => Promise<T>): Promise<T> => { const next = chain.then(work, work); chain = next.catch(() => undefined); return next; } };
@@ -185,8 +186,8 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
         { origin: SERVICE, deployment: "lending-fixture", scope: scopeOfLending, definition: LENDING_DEFINITION, membership, member: { membership, member: handle }, publicKey: who.key },
         { key: who.key, sign: async (bytes: Uint8Array) => (await import("@generalbusiness/artroom-client")).secretSigner(who.secret).sign(bytes) },
         { current: () => true, lock, store, fetch, now: () => timeMs(soon(0))! + skew.ms,
-          actFetch: async (url, init) => { posts++; const response = await fetch(url, init); if (lose.reply) throw new Error("the reply was lost"); return response as never; } });
-      return { open, store, posts: () => posts, kept: () => slot };
+          actFetch: async (url, init) => { posts++; envelopes.push(String(init?.body)); const response = await fetch(url, init); if (lose.reply) throw new Error("the reply was lost"); return response as never; } });
+      return { open, store, posts: () => posts, kept: () => slot, envelopes };
     };
     const scopeOfLending = await L.at(), skew = { ms: 0 };
     const countThings = async () => (await things()).length;
@@ -211,7 +212,8 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect(await lost.act("donate", { name: "Sieve", description: "Fine mesh." })).toMatchObject({ status: "unknown" });
     expect([hers.posts(), await countThings()]).toEqual([1, 4]);
     expect(await lost.pending()).toMatchObject({ kind: "donate", name: "Sieve", unsent: false });
-    // No second act is signed while the original is kept, and Continue does not send it again.
+    const retainedDonation = JSON.parse(hers.kept()!) as Kept;
+    // No second act is signed while the original is kept; ordinary recovery does not send it again.
     expect(await lost.act("donate", { name: "Sieve", description: "Fine mesh." })).toMatchObject({ status: "nothing-sent" });
     expect(await lost.resume()).toMatchObject({ status: "unknown" });
     // Even long after its deadline it cannot be given up: a read finds that it took effect.
@@ -228,6 +230,13 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect([hers.posts(), hers.kept(), await countThings()]).toEqual([1, null, 4]);
     expect((await things()).filter((thing) => thing.values["name"] === "Sieve")).toHaveLength(1);
     expect(await reloaded.pending()).toBeNull();
+    // The original is deliberately retained again to exercise explicit same-envelope continuation against native idempotency.
+    const beforeContinue = await head();
+    await hers.store.save(retainedDonation);
+    expect(await reloaded.continueOriginal()).toEqual({ status: "recorded" });
+    expect([hers.posts(), hers.kept(), await countThings()]).toEqual([2, null, 4]);
+    expect(hers.envelopes[1]).toBe(hers.envelopes[0]);
+    expect(await head()).toEqual(beforeContinue);
     reloaded.dispose(); g.dispose();
 
     // A visitor joins from a browser with an invitation link, under the application cohort's
@@ -251,6 +260,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     const membersBefore = (await M.summary()).at;
     expect(await door().join(read.link, read.seat)).toMatchObject({ status: "unknown", seat: { handle: "@visitor" } });
     expect((await M.summary()).at.seq).toBe(membersBefore.seq + 1);
+    const retainedJoin = JSON.parse(joinSlot!) as KeptJoin;
     // The join is kept. A second use of the invitation signs nothing; after a reload, Check settles the original by a read.
     expect(await door().join(read.link, read.seat)).toMatchObject({ status: "nothing-sent" });
     loseJoin = false;
@@ -259,6 +269,10 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect(await reopened.check()).toEqual({ status: "joined", seat: read.seat });
     const joinsOf = async (key: string) => (await M.entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "join" && entry.input.signed.intent.actor === key).length;
     expect([joinPosts, joinSlot, await joinsOf(device.publicKey)]).toEqual([1, null, 1]);
+    // Explicit Continue reuses the original M4 join after a reload, never another enrollment.
+    await joinStore.save(retainedJoin);
+    expect(await reopened.continueOriginal()).toEqual({ status: "joined", seat: read.seat });
+    expect([joinPosts, joinSlot, await joinsOf(device.publicKey)]).toEqual([2, null, 1]);
     // A used invitation is refused in plain words, and nothing stays kept.
     const second = await newDeviceKey();
     expect(await joining(second, { lock: serial, store: joinStore, now: clock, fetch }).join(read.link, read.seat)).toMatchObject({ status: "refused" });

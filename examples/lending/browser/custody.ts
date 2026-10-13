@@ -1,11 +1,12 @@
 /**
  * Custody of one lending request, as notes/2026-10-13-lending-library.md, section 4.1,
- * requires. The original signed request is kept before it is sent. It is sent at
- * most once. After that, only a read can settle it. Nothing here signs.
+ * requires. The original signed request is kept before it is sent. Ordinary
+ * recovery is read-only. Explicit Continue may resend only that same retained
+ * envelope. Nothing here signs.
  *
  * The phases of a kept request:
  *   prepared  signed and kept; certainly not sent
- *   inflight  marked before the one send; from here on it may have been sent
+ *   inflight  marked before an authorized send; from here on it may have been sent
  *   unknown   sent, or possibly sent, with no answer that could be trusted
  *   recorded  the scope's own record holds this exact request (final)
  *   refused   the scope refused this exact request (final)
@@ -65,11 +66,11 @@ export interface Ports {
 }
 
 /**
- * Take the kept request one step. With `readOnly`, or from any phase after
- * `prepared`, nothing is sent: a read settles it or it stays unknown. The caller
- * holds the custody lock.
+ * Take the kept request one step. Ordinary recovery after `prepared` is a
+ * read. `continueOriginal` is an explicit authorization to resend the exact
+ * retained envelope, never to sign or replace one. The caller holds the lock.
  */
-export async function advance(store: KeptStore, identity: Binding, ports: Ports, expected: Envelope, readOnly = false): Promise<Settled> {
+export async function advance(store: KeptStore, identity: Binding, ports: Ports, expected: Envelope, readOnly = false, continueOriginal = false): Promise<Settled> {
   const current = () => { if (!ports.current()) throw new Error("This device context is no longer current."); };
   const load = async (): Promise<Kept> => {
     current(); const held = await store.load(); current();
@@ -94,11 +95,11 @@ export async function advance(store: KeptStore, identity: Binding, ports: Ports,
   try {
     if (held.phase === "recorded") return { status: "recorded" };
     if (held.phase === "refused") return { status: "refused", reason: held.refusal ?? "refused" };
-    if (readOnly || held.phase !== "prepared") {
+    if (readOnly || (held.phase !== "prepared" && !continueOriginal)) {
       const receipt = await ports.settle(held.envelope); current();
       return receipt ? await accept(held, receipt) : { status: "unknown" };
     }
-    // Marked before the send: a crash from here on leaves a request that may have been sent.
+    // Mark before each authorized send. Every send uses the original retained envelope.
     held = await mark(held, "inflight");
     const answer = await ports.post(held.envelope); current();
     if (answer.answer === "accepted") return await accept(held, answer.receipt);
