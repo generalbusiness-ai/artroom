@@ -133,7 +133,8 @@ no failures or skips. Its wrapper returned 1 after a log-directory parser
 assertion. Root admitted the original owned private log directory, read the
 original counts, and rechecked Source, dependency, npm, and namespace guards.
 The successful gate child and failed wrapper remain distinct. No cause of the
-log-directory choice is inferred. No producer, compiler, body, or gate was rerun.
+log-directory choice is inferred. No completed command was repeated to repair
+either wrapper.
 
 Recorded command wall times are 0.152 seconds for production, 23.492 seconds
 for the focused body alone, and 108.325 seconds for the ordinary gate child.
