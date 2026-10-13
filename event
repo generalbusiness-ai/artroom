@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-hosted-mcp-endpoint.md","body":{"commit":"77d9cca0796689acd807d1d753099f0ba0a10630","path":"notes/2026-10-13-hosted-mcp-endpoint.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:534366f4dd14e0bd37de78be560231a0520a0d65","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-hosted-mcp-endpoint.md."}
