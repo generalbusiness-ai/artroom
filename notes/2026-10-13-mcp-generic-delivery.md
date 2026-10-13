@@ -182,6 +182,26 @@ or tsconfig, and none elsewhere. The planner's amendment is kept.
 | The gate of this round: the lease witnesses | The first gate of this round, at `80fe2ee9`, failed one witness of its own besides the four checkers tests: after the dead reclaimer's file was removed, two of four children reported `entered`. Each child holds the lease for 300 ms; under the gate's load a child that starts late may enter after another has left, which is lawful. The two lease witnesses counted entries, so they could not tell that apart from two holders at once. Each child now reports when it was inside, just after taking the lease and just before releasing it, and both witnesses assert that at least one entered, that no two holdings overlap, and that the rest were refused. No code of the server changed | `custody.test.ts`: three concurrent runs of the file, 29 of 29 each; with a temporary change that let every child enter, the simultaneous-reclaimers witness failed with 3 overlaps, observed in this round |
 | 3. The modern result's overhead | The bounds are stated to hold for the service's CallResult. What 2026-07-28 adds is one constant, `MODERN_RESULT_EXTRA`: 110 bytes | `wire.test.ts`: a real 2026-07-28 `tools/call` carries the CallResult and exactly those bytes more, `resultType` and the server's information; `docs/mcp.md` and the budget test say so |
 
+## Corrections of review f7a8d2d4
+
+Main had moved again: the Home head landed as `02d6ccb7` after the
+planner's merge. It was merged into this branch with `git merge --no-edit
+origin/main` at `632ba47d`, with no conflict; main's version of every
+path this branch does not own was taken unchanged. After that merge, and
+at this round's head, `git diff --name-only origin/main...HEAD` lists 60
+paths, every one of them the branch's own (packages/mcp, packages/cli,
+packages/client's index.ts and invitation.ts, docs/mcp.md,
+docs/mcp-tools.json, this note, scripts/active-source.test.mjs,
+parked/README.md, plans/README.md, package-lock.json and
+vitest.config.ts), and `git diff --name-only origin/main HEAD` lists no
+other path. Both of the planner's amendments are kept.
+
+| Item | What changed | Witness |
+|---|---|---|
+| P2. Only own incoming names | `shape.ts` reads each incoming field, record member and presented fact only when it is an own property (`Object.hasOwn`), and leaves an absent optional name absent, so the scope applies its own default, as derive's `readFields` does. The `also` rule, the field an alias is bound by, and a value's digest field are read the same way. The writes stay own-property writes. No name is banned or renamed | `proto.scope.test.ts`, "optional prototype names left out stay out, through act", on the real test Worker through the generic `act` tool: `stock` with only an empty required record (`{ "box": {} }`), its optional `__proto__`, `constructor` and `toString` (text and record) left out, accepted, with only `box` in the intent and nothing in it; the same names given, accepted, each an own property with its value; `close` with an optional presented fact named `constructor`, with presented left out and with presented `{}`, each accepted. With the old reads, observed in this round: the first `stock` refused before signing as `fields.__proto__ is not a text`, and, with only the presented read restored, the `close` with `{}` refused as `presented.constructor is not a fact` |
+| P3(a). The overview's measure | The note's overview, a sentence of `docs/mcp.md` and the budget test's comments now say a result is measured whole as the service makes it, with the 2026-07-28 metadata measured apart | this note, `docs/mcp.md`, `budget.test.ts` |
+| P3(b). The marked minimum | `failed` measures each fallback as it would be returned: the sentence's longest marked cut with the next step whole; else the sentence's mark with the next step's longest marked cut; else both marks, a few hundred bytes. It no longer tests the empty sentence in place of its mark | `budget.test.ts`, "an error at the edge of its bound": every next-step length from 700 to 1,100 characters, across the edge where the empty-sentence result fits and the marked one would not, gives a result within 2,048 bytes. The old code returned 2,153 bytes there, observed in this round |
+
 **Paths that differ from main.** After the third merge, and at the head of
 the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
 60 files, all this branch's own: the 44 files of `packages/mcp` (this
@@ -237,6 +257,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| `npx vitest run --project mcp`, after each item of review f7a8d2d4 | `Tests  72 passed (72)` after the P2 and P3(b), and again after P3(a) (the budget file alone: `Tests  16 passed (16)`) |
+| `npx vitest run --project scope packages/mcp/test`, after each item of review f7a8d2d4, the last time with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  10 passed (10)` |
 | `npx vitest run --project mcp`, after each item of review 6a86304e | `Tests  68 passed (68)` after item 1, `70` after item 2, `71` after item 3 |
 | `npx vitest run --project scope packages/mcp/test`, after each item of review 6a86304e, the last time with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  9 passed (9)` each time |
 | `npx vitest run --project mcp`, after each item of review ad2576fb | `Tests  68 passed (68)` after the P2 and after the P3 |
@@ -303,7 +325,8 @@ under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
 wording of `items` changed: 63 bytes more per list than before. The runs
-of the rounds of reviews ad2576fb and 6a86304e gave the same figures.
+of the rounds of reviews ad2576fb, 6a86304e and f7a8d2d4 gave the same
+figures.
 
 ### Reads per tool
 
@@ -340,15 +363,15 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in the round of review 6a86304e. The second member's request count
+Worker, in the round of review f7a8d2d4. The second member's request count
 varies between runs with the timing of `wait`'s polls: in the default mode
-286, 288 and 288, and in `--generic` 283, 283 and 281, in the runs of the
-last three rounds.
+286, 288, 288 and 286, and in `--generic` 283, 283, 281 and 283, in the
+runs of the last four rounds.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 288 |
-| `--generic` | 7 | 3 | 4 | 241 | 281 |
+| Default | 7 | 3 | 4 | 229 | 286 |
+| `--generic` | 7 | 3 | 4 | 241 | 283 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,
