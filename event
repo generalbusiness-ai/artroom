@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at examples/counting/tsconfig.json","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"examples/counting/tsconfig.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at examples/counting/vitest.config.ts","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"examples/counting/vitest.config.ts"}}
