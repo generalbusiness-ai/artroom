@@ -11,9 +11,11 @@ screens. The Worker serves the interface at `/lending/`.
 **The screens and the browser storage have not been run in a browser.**
 They typecheck and bundle. Everything beneath them (the model, the
 custody, the gateway and joining) is tested, on real scopes where that
-matters. Not built yet: publishing a shelf page (the interface shows each
-page's text and says it is not published), the room's runbook, the
-online room and the homepage page.
+matters. Publishing a shelf page is not built yet: the interface shows its text as
+unpublished. The [runbook](runbook.md) and homepage Library page are prepared,
+with deployment destinations unset. The deployed run, browser witnesses,
+final online room, and homepage publication remain unrun. Fold publication
+waits for its separate design approval.
 
 ## What is here
 
@@ -31,6 +33,7 @@ online room and the homepage page.
 | `browser/storage.ts` | This origin's private storage: the device key, the seat, and the kept requests, in IndexedDB under a Web Lock. |
 | `browser/main.ts`, `index.html`, `style.css` | The screens: join, the shelf, donate, borrow, return, cancel, the kept request, each page's text, and the record. |
 | `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `packages/scope/src/lending-assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
+| `runbook.md` | Deployed provisioning and six-output observation ledger; unrun, with actual destinations still unset. |
 | `demo-script.md` | The script for the recording. |
 | `definition.test.ts` | Plain-function tests: the bytes and the pin, the story of Nasruddin and the pot, and the bounds. Grants are scripted. |
 
