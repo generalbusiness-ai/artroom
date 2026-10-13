@@ -359,7 +359,8 @@ export class HostedAgent {
     const refused = bound(signed, row.config.service, action, this.ports.id, body, now);
     if (refused) return refused;
     const r = signed.request;
-    if (!same(r.membership, row.membership)) return answer(400, { error: "control", rule: "membership" });
+    // Another repository or another incarnation: refused as the design states, with a fixed body.
+    if (!same(r.membership, row.membership)) return answer(403, { error: "unauthorized", rule: "membership" });
     const authority = await authorityOf(this.ports, row.membership, r.actor, row.handle as MemberId);
     if (!authority.ok) return answer(403, { error: "unauthorized" });
     const fingerprint = fingerprintOf(r);

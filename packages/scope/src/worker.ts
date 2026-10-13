@@ -549,4 +549,8 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
   async create(op: string, request: Parameters<HostedAgent["create"]>[1], link: Parameters<HostedAgent["create"]>[2]): Promise<ControlAnswer> { return this.#of().create(op, request, link); }
   async control(signed: Parameters<HostedAgent["control"]>[0], action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> { return this.#of().control(signed, action, body); }
   override async fetch(request: Request): Promise<Response> { return this.#of().fetch(request); }
+  /** Drop this instance's memory, as an eviction would: streams end with no event, storage stays. For a test's subclass. */
+  protected evict(): void { this.#agent = null; }
+  /** What this instance holds in memory now. For a test's subclass. */
+  protected held(): HostedAgent | null { return this.#agent; }
 }
