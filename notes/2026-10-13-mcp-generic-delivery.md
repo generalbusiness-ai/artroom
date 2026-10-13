@@ -706,13 +706,68 @@ signing and proxy settings are not the cause. No newer Git was tried here.
 The fix, in the runner or in the cloud image's Git, is not this
 delivery's.
 
+## The hosted endpoint (request 9b3084d4)
+
+Built locally by the planner, in the worktree `planner/mcp-hosted` from the
+discovery head `0728c881`, as notes/2026-10-13-hosted-mcp-endpoint.md
+designs it (Draft 5, checker approval 4a0af914, landed as main 77d9cca0).
+Hugh, 2026-10-13 15:08 Eastern: no cloud session; the build is local.
+
+| Section of the design | What was built | Witness |
+|---|---|---|
+| 3.4, the HTTP layer | `packages/mcp/src/http.ts`, one module for the loopback server and the hosted endpoint: the revision selected before the method is handled, from the header, else the request's content or the named session's recorded version; exactly the two commissioned revisions; one method and version matrix; `Mcp-Method` and `Mcp-Name` with the sentinel on the raw value; batches refused; errors with `id` null when undetectable; 16 sessions, 4 streams; `405` with `Allow: POST`. `node.ts` serves loopback HTTP through it, so the loopback server now requires the modern headers too (the wire tests send them) | `test/http.test.ts` (H8 over loopback, 4 tests); `test/hosted.scope.test.ts` H8 through the route |
+| 3.5, wire and sessions | `wire.ts`: `told` split into `listed` (durable, set by `tools/list`, written through `Wire.hooks.changed` before the response) and `notified` (per stream, in memory); reconciliation when a stream opens, only for a session that has listed; a replacement `GET` closes the old stream without detaching the watch | H5; `test/wire.test.ts` |
+| 3.6, custody | `sqlite-custody.ts`: records in chunks of at most 1 MiB, outcomes in segment rows of at most 512 KiB with split outcomes and an atomic index, an archive that deletes nothing, `used` and `reserved` counters topped up to the completion need before every unresolved write (the write before a send, a refused resubmit, a repeat step), refusing `full` inside the transaction before anything is written; a terminal write consumes its reservation and releases the rest; a storage failure rolls back and settles nothing. `custody.ts` lets a store's own `full` pass through `write` | `test/sqlite-custody.test.ts` (6 tests on Node's SQLite); H6 through the route |
+| 3.1 to 3.3, 3.7, objects and control | `hosted.ts`: `HostedRegistry` and `HostedAgent` over a SQLite port; control requests under `artroom-mcp-control-1` (`contract/session.ts`, `bytes/session.ts` `signControl` and `verifyControl`); the checks before any effect, then current authority through the membership's observation read, then the reservation under `op` in one transaction before the handoff; enrolment by the object's own key, kept under custody before sending, read back and confirmed active before the bearer is minted; `bearer` and `retire` in one transaction with every session deleted and every stream closed with a final event; the bearer's digest compared in constant time, failures that name the agent counted per address; a 16 MiB control budget per object with 1 MiB for `retire` alone; answers retained seven days past the original request's deadline, tombstones kept | H1, H2, H3, H4 |
+| 5, deployment | `packages/scope/src/worker.ts`: `McpRegistry` and `McpAgent`, `mcpRoute`, `McpEnv`; `wrangler.jsonc`: the bindings `REGISTRIES` and `AGENTS` and migration `v2`; `packages/scope/package.json` depends on `@generalbusiness/dap-mcp`; the test Worker binds `PlatformMcpRegistry` and `PlatformMcpAgent` over `PLATFORM`, with `hostedTest` lending the fixture's clock, its pause and a scripted lost reply | the stories |
+| 9, docs | `docs/mcp.md`, "The hosted endpoint": routes, the controller's recipe, the control request, the bearer and its limiter, the two revisions over HTTP as the matrix, budgets and recovery including `key.revoke` as the authority-ending recovery that is not a hosted `retire`, and the observed framing overhead; the loopback section points at the shared rules | `inventory.test.ts` reads the docs |
+
+**The checker's non-blocking points of approval 4a0af914.** A header-less
+`GET` or `DELETE` without session context is `405`, stated in the docs'
+matrix and in `http.ts`. Version consistency is checked before `Wire` in
+both directions: a July header on a body without the July `_meta` and a
+November header on July body metadata are both `-32020` (H8). A retired
+agent is terminal: its bearer answers `401`, a later `bearer` under a new
+`op` answers `409`, and each control operation under a fresh `op` is
+charged its row against the control budget, so "retirement is always
+possible" holds for as many retirements as the 1 MiB reserve admits, which
+is one retirement for an agent, many times over. The operator recipe is in
+`docs/mcp.md`. No retained operation and no original outcome is replaced
+or forgotten.
+
+**What differs from the design's words.** The `create` body is
+`{ link }`, the agent-key invitation link itself, rather than its fields
+spelled out: it is the same information, already encoded and validated by
+`agentKeyInvitationOf`, and it carries the repository references the
+agent's configuration needs. The bearer's failures are counted by the
+agent they name, per address, because a Worker has no state across
+isolates; a request naming no valid agent is `401` and counted nowhere,
+which brute-forces no secret. The hosted agent's `service` is the
+invitation's, recorded at creation. The watch timer is the runtime's
+`setInterval` while a stream holds the object.
+
+**What ran in this head.**
+
+| Command | Result |
+|---|---|
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  83 passed \| 1 skipped (84)` (observed): the wire tests with the modern headers, H8 over loopback, the SQLite store |
+| `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
+| `npm run gate`, once, at the exact head | see the gate row below |
+
+**Paths.** The discovery head landed as main `8235c6b3` while this head was
+being built; main was merged into the branch, taking main's version of
+every path this head does not change. At the head, `git diff --name-only
+origin/main...HEAD` lists this head's own paths and no other.
+
 ## What is owed
 
-- **The hosted endpoint** of plan 031's stage 2: a remote MCP endpoint
-  with a bearer per agent, a session store for the 2025-11-25 revision, and
-  each bearer's sessions and subscriptions kept apart. Its design has
-  landed on main as `notes/2026-10-13-hosted-mcp-endpoint.md` (Draft 5);
-  nothing of it is built on this branch.
+- **The hosted endpoint** of plan 031's stage 2 is built in this head (the
+  section above). Owed after it lands: the planner's deployment of the
+  scope Worker with the two new bindings and the migration, the live check
+  against the deployment, and a note-only head recording it; the `export`
+  control action for a budget-full agent; OAuth, the pinned diff and file
+  reads, resources and prompts. The handler stays the minimal one; the SDK
+  choice is unchanged.
 - **The optional amendment of `docs/cli.md`**, naming `dap mcp` in its
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.

@@ -331,3 +331,69 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     expect(framed.headers.get("content-type")).toBe("application/json");
   } finally { done(room); }
 });
+
+test("H8 through the route: the matrix, the modern headers, the legacy rules, and the methods across eras", async () => {
+  const { room, rita } = await roomWithIssues();
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const B = bot.bearer;
+    const listBody = { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } };
+    const code = async (r: Response) => (await r.json() as { error?: { code: number } }).error?.code;
+    // Modern: the header is required and must agree with _meta in both directions; Mcp-Method and Mcp-Name are checked on the raw value.
+    expect([(await mcp(B, "POST", { "mcp-method": "tools/list" }, listBody)).status, await code(await mcp(B, "POST", { "mcp-method": "tools/list" }, listBody))]).toEqual([400, -32020]);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} })), "a July header without July metadata").toBe(-32020);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": LEGACY }, listBody)), "a November header on July metadata").toBe(-32020);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN }, listBody)), "missing Mcp-Method").toBe(-32020);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call" }, listBody)), "Mcp-Method differs").toBe(-32020);
+    const call = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "room", arguments: {}, _meta: META } };
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call" }, call)), "missing Mcp-Name").toBe(-32020);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call", "mcp-name": "inspect" }, call)), "Mcp-Name differs").toBe(-32020);
+    expect(await code(await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call", "mcp-name": "=?base64?###?=" }, call)), "a sentinel that is not base64").toBe(-32020);
+    const sentinel = `=?base64?${btoa("room")}?=`;
+    expect((await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call", "mcp-name": sentinel }, call)).status, "a sentinel that decodes equal").toBe(200);
+    const unsupported = await mcp(B, "POST", { "mcp-protocol-version": "2025-03-26", "mcp-method": "tools/list" }, listBody);
+    expect([unsupported.status, (await unsupported.json() as { error: { code: number; data: { supported: string[] } } }).error.data.supported]).toEqual([400, [MODERN, LEGACY]]);
+    const unknown = await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "no/such" }, { jsonrpc: "2.0", id: 1, method: "no/such", params: { _meta: META } });
+    expect([unknown.status, await code(unknown)]).toEqual([404, -32601]);
+    const notified = await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "notifications/cancelled" }, { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 1, _meta: META } });
+    expect([notified.status, await notified.text(), notified.headers.get("mcp-session-id")]).toEqual([202, "", null]);
+    for (const [raw, expected] of [["{", -32700], ['{"id":1}', -32600], ["[]", -32600]] as const) {
+      const r = await routed(`${SERVICE}/mcp`, { method: "POST", headers: { authorization: `Bearer ${B}`, "content-type": "application/json", "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, body: raw });
+      const parsed = await r.json() as { id: unknown; error: { code: number } };
+      expect([r.status, parsed.id, parsed.error.code], raw).toEqual([400, null, expected]);
+    }
+    // Both: Origin, the body bound, a batch under every header.
+    expect((await routed(`${SERVICE}/mcp`, { method: "POST", headers: { authorization: `Bearer ${B}`, origin: "https://evil.example", "content-type": "application/json" }, body: JSON.stringify(listBody) })).status).toBe(403);
+    expect((await routed(`${SERVICE}/mcp`, { method: "POST", headers: { authorization: `Bearer ${B}`, "content-type": "application/json", "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, body: JSON.stringify({ ...listBody, pad: "x".repeat(1024 * 1024 + 16) }) })).status).toBe(413);
+    for (const headers of [{ "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { "mcp-protocol-version": LEGACY }, {}]) expect(await code(await mcp(B, "POST", headers, [listBody])), JSON.stringify(headers)).toBe(-32600);
+    // Legacy, and the methods across eras with a live session S.
+    const S = await legacySession(B);
+    const list = (headers: Record<string, string>) => mcp(B, "POST", headers, { jsonrpc: "2.0", id: 2, method: "tools/list" });
+    expect((await list({ "mcp-protocol-version": LEGACY, "mcp-session-id": S, "mcp-method": "tools/call", "mcp-name": "ignored" })).status, "modern headers ignored on a legacy request").toBe(200);
+    expect((await list({ "mcp-session-id": S })).status, "header absent, live session").toBe(200);
+    expect((await list({ "mcp-protocol-version": LEGACY })).status, "no session").toBe(400);
+    expect((await list({ "mcp-protocol-version": LEGACY, "mcp-session-id": "no-such" })).status).toBe(404);
+    expect((await mcp(B, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list", "mcp-session-id": S }, listBody)).status, "a modern request ignores the session").toBe(200);
+    for (const method of ["GET", "DELETE"]) {
+      for (const id of [S, "no-such"]) {
+        const r = await mcp(B, method, { "mcp-protocol-version": MODERN, "mcp-session-id": id });
+        expect([r.status, r.headers.get("allow")], `${method} July naming ${id === S ? "S" : "an unknown ID"}`).toEqual([405, "POST"]);
+      }
+      expect((await mcp(B, method, { "mcp-protocol-version": LEGACY })).status, `${method} November without a session`).toBe(400);
+      expect((await mcp(B, method, {})).status, `${method} no header, no session`).toBe(405);
+      expect((await mcp(B, method, { "mcp-session-id": "no-such" })).status, `${method} no header, unknown session`).toBe(404);
+      expect((await mcp(B, method, { "mcp-protocol-version": "x", "mcp-session-id": S })).status, `${method} an unsupported version`).toBe(400);
+    }
+    expect((await list({ "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status, "S serves after the July attempts").toBe(200);
+    const open = stream(B, S);
+    await settle();
+    expect(open.text(), "S opens its stream after the July attempts").toContain(": stream");
+    expect((await mcp(B, "GET", { "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status, "a 2nd stream replaces the 1st").toBe(200);
+    expect(await open.ended).toBe(200);
+    // A 17th session ends the oldest.
+    for (let n = 1; n < 17; n++) await legacySession(B);
+    expect((await agentStub(bot.agent).counts()).sessions).toBe(16);
+    expect((await list({ "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status, "the oldest session ended").toBe(404);
+    expect((await mcp(B, "DELETE", { "mcp-session-id": S })).status).toBe(404);
+  } finally { done(room); }
+});
