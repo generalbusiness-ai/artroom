@@ -119,7 +119,7 @@ test("join validates its service before signing or changing an empty configurati
   for (const service of invalid) {
     const answer = await mcp.call("join", { link: link(service), idempotencyKey: "invalid-join" });
     expect(answer.isError, service).toBe(true);
-    expect(answer.structuredContent, service).toMatchObject({ error: "shape", field: "link" });
+    expect(answer.structuredContent, service).toMatchObject({ error: "shape", message: expect.stringContaining("link"), next: expect.any(String) });
   }
   expect([signed, fetched, configReads, configWrites, custodyWrites]).toEqual([0, 0, 0, 0, 0]);
   expect(empty).toEqual({ service: "", roots: [] });
