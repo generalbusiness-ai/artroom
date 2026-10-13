@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-self-host-delivery.md","body":{"commit":"27bb745f0012ce5994ea983ae1bd51e9e3ad17f8","path":"notes/2026-10-13-self-host-delivery.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:399f0b6e4c61316d9082f187c6502c8d0e0cedc0","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-self-host-delivery.md."}
