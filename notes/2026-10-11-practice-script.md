@@ -133,22 +133,21 @@ Printed shapes: `Proposed guide/start.md (53 bytes) as change …, version 5.`,
 `Published: commit …, by the merge …`, and `1 issues, 0 open.`
 Use the take's actual bytes, version, and issue count on screen.
 
-### 2:20 to 2:50. Show the concurrent-edit beat
+**Say:** “A clean textual merge can still be wrong, and only a test catches it, if one exists. So the room never merges text: it prevents by rule, composes by selection, and refuses when stale.”
 
-- **On screen:** two changes made against the same published base.
-- **Do:** publish the first. Attempt to publish the second. Ask the
-  person who proposed the second change to propose it again against the
-  new head, then publish it.
-- **Appears:** a refusal because the second change's base is out of date,
-  followed by a second publication. **To be confirmed:** the rehearsal
-  shot and its exact output have not yet been observed. The internal
-  reason is `out-of-date`. Copy the actual line after the observed run.
-- **Say:** “Both changes started from the same version. The second is
-  refused because that version is no longer current. The loser is not
-  patched by a model; it is re-proposed under the same rules.”
+### 2:20 to 2:50. Narrate the concurrent-edit story
 
-Keep this beat directly after the first publication. Do not substitute
-a textual merge or a test result for the observed rehearsal shot.
+- **On screen:** keep the page from the preceding publication visible.
+- **Do:** explain the rule in words. Do not attempt another publication
+  or add a stale-base rehearsal shot for this segment.
+- **Say:** “If two changes start from the same version, publishing one
+  changes the shared state. The other would be refused because its
+  starting version is no longer current. Its proposer would need to
+  propose it again from the current version, under the same rules.”
+
+This is a narrated example, not an observed concurrent-edit run. Keep it
+directly after the first publication. Do not label the visible page as
+proof of a stale refusal or a second publication.
 
 ### 2:50 to 3:15. Refuse a change to the rules
 
@@ -200,6 +199,11 @@ offered request for review. Use the updated browser's original request
 selection and check its recorded result before claiming that outcome.
 
 ## 2. Run the Counter, 3:45 to 4:45
+
+**Say, within this minute:** “a merge conflict with the code removed: three agents, one shared state, exclusive turns, an expiry, a restart, every turn signed”.
+“Two agents show a handoff. Three is the smallest number that shows a
+contested turn, a bystander tracking the shared state, and a restart at
+once.”
 
 - **On screen:** three browsers at
   `https://artroom-counting.inguz.workers.dev/counting/`, plus a silent
@@ -277,9 +281,9 @@ Prepare this room off camera with:
 
 - **Appears:** the 8 October default rehearsal printed each history
   `consistent.` and `All consistent: 12 scopes.` **To be confirmed:**
-  the new take's actual count and lines, especially after the additional
-  concurrent-edit shot. Never require twelve if the take has more rooms
-  in its record.
+  the new take's actual count and lines. The narrated concurrency example
+  adds no room or verifier result. Never require twelve if the take has
+  more rooms in its record.
 - **Say:** “The verifier replays the record and checks each history.
   Nothing you saw depends on trusting our database.” Say that proof line
   only after the take's verifier result supports it. Close with:
@@ -317,10 +321,11 @@ Prepare this room off camera with:
     node --import tsx --no-warnings scripts/demo-run.ts <base-url> --host github.com --namespace generalbusiness-ai --scratch <new-scratch-directory> --out <new-scratch-directory>/out --name <unique-room-name>
    ```
 
-   The current default has 26 shots. The new stale-base shot and its
-   resulting total are **to be confirmed**. Require every observed row
-   to say `yes`. Keep the transcript. Do not pass `--setting-set` as proof
-   of the pin.
+   Use the current runner's actual table and keep its transcript. The
+   stale-base recording shot is canceled; do not add or run it for this
+   narration. Require every observed row to say `yes`. Do not present
+   the narrated concurrency example as a measured run. Do not pass
+   `--setting-set` as proof of the pin.
 4. Arrange the operator's pin before planning. After shot 1, replace only
    the selected host setting's `registerScope` with the printed register.
    Verify the actual setting, preserve the other fields, and continue
@@ -346,7 +351,7 @@ Use these fallbacks when a part is not ready:
 | Part | Fallback |
 |---|---|
 | Repository browser action | Use the observed CLI route and show the current page. Mark an older capture as the earlier version. Do not claim an unobserved current browser outcome. |
-| Concurrent edit | Keep the beat pending until the stale-base rehearsal is observed. If the schedule slips under plan 030, narrate the rule over the existing refusal shot and identify that as narration. |
+| Concurrent edit | Narrate the conditional example over the preceding publication page. Identify it as narration; claim no observed stale refusal, second publication, shot count or timing. |
 | Counter | Use the bounded observed 0-to-5 evidence with its limits, or shorten the segment to the page and its retained record. Do not claim three audible devices or a completed 0-to-10 run. |
 | Jam | Use the current procedural page. If its playback cannot be recorded, omit the sound clip and identify any retained clip as the earlier version. |
 | GitHub | Use the retained 8 October transcript and identify the earlier room. Do not present its repository as the new take. |
