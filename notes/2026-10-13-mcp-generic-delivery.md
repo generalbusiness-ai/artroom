@@ -413,6 +413,7 @@ main's version of every path this head does not change. `git diff
 | `npx vitest run --project mcp --reporter=verbose` | `Tests  73 passed (73)` |
 | `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Test Files  7 passed (7)`, `Tests  14 passed (14)` |
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
+| `npm run gate`, once, at `35d48657` on main `765c4eb9` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1126 passed \| 2 skipped (1132)`, `Test Files  2 failed \| 199 passed \| 1 skipped (202)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure described in "The T36 checkers failure in the cloud", all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this head's verbose run of the mcp project), and is skipped on Darwin. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
 ## The SDK choice
 
