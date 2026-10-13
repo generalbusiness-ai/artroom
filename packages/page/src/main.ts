@@ -406,7 +406,7 @@ async function roomOf(kept: Settings, place: Place): Promise<Room> {
 function verifiedRoom(room: Room | null): room is Room & { me: NonNullable<Room["me"]> } {
   return !!room?.me?.handle && room.key === keyIdOfSecret(room.session.secret);
 }
-const wordmark = () => h("a", { class: "wordmark", href: "https://dap.generalbusiness.ai/", "aria-label": "dap homepage" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "72", height: "42" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "72", height: "42" }));
+const wordmark = () => h("a", { class: "wordmark", href: "https://dap.generalbusiness.ai/", "aria-label": "dap homepage" }, h("img", { class: "wordmark-light", src: "/brand/dap-wordmark.svg", alt: "dap", width: "432", height: "256" }), h("img", { class: "wordmark-dark", src: "/brand/dap-wordmark-white.svg", alt: "dap", width: "432", height: "256" }));
 function entryShell(...content: HTMLElement[]): HTMLElement[] {
   return [h("header", { class: "entry-header" }, wordmark()), h("div", { class: "content entry-content", id: "page-main", tabindex: "-1" }, ...content)];
 }
