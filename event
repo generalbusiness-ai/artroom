@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-counter-target100-cli-identities.md","body":{"commit":"2a40db9b18f262244e8a7973dafcd3c41ae99002","path":"notes/2026-10-13-counter-target100-cli-identities.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ea50abe618bbf5f70354727515a0808a4abd6715","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-counter-target100-cli-identities.md."}
