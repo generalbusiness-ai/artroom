@@ -752,7 +752,7 @@ invitation's, recorded at creation. The watch timer is the runtime's
 |---|---|
 | `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  83 passed \| 1 skipped (84)` (observed): the wire tests with the modern headers, H8 over loopback, the SQLite store |
 | `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
-| `npm run gate`, once, at the exact head | see the gate row below |
+| `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
 
 **Paths.** The discovery head landed as main `8235c6b3` while this head was
 being built; main was merged into the branch, taking main's version of
