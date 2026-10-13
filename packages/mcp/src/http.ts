@@ -81,7 +81,7 @@ export function decodeName(value: string): string | null {
   try {
     const text = atob(m[1]!);
     const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
   } catch { return null; }
 }
 
@@ -164,7 +164,7 @@ export class McpHttp {
     if (!request.body) return { status: "parse" };
     try {
       const reader = request.body.getReader();
-      const decoder = new TextDecoder("utf-8", { fatal: true });
+      const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
       let text = "";
       let size = 0;
       for (;;) {
@@ -244,15 +244,14 @@ export class McpHttp {
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
     const old = session.stream;
-    const owner = {};
-    const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(owner); this.port.wire.endLegacy(session); } });
+    const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });
     const stream: Stream = {
       notified: null,
       send: (message) => sse.send(`event: message\ndata: ${JSON.stringify(message)}\n\n`),
       close: (final) => { if (final) sse.send("event: end\ndata: {}\n\n"); sse.close(); },
     };
     if (old) { this.#open.delete(old); old.close(false); }
-    this.#open.add(owner);
+    this.#open.add(stream);
     session.stream = stream;
     sse.send(": stream\n\n");
     // A session that has listed is told once of a generation it has not listed; one that never listed has nothing to reconcile.

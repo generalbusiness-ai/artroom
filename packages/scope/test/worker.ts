@@ -37,7 +37,7 @@ import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
 import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
-import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
+import { DeployedScope, McpAgent, McpRegistry, ScopeService, mcpRoute, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
 import { outsideOf, owners, wired } from "./outside.ts";
 
 export { ScopeObject };
@@ -142,4 +142,22 @@ export class NetService extends ScopeService<NetEnv> {
   protected override scopes() { return this.env.NET; }
 }
 
-export default { fetch: (request: Request, env: NetEnv): Promise<Response> => route(request, env.NET) };
+export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promise<Response> => (await mcpRoute(request, env)) ?? route(request, env.NET) };
+
+/**
+ * The hosted MCP endpoint in this Worker: the deployed classes over the
+ * namespace `PLATFORM`, so a hosted agent reads and acts on the same real
+ * scopes the stories found. `hostedTest` holds what a test lends them: the
+ * fixture's clock, and the pause between two polls of `wait`, which drives
+ * the fixture's operations as a deployment's alarms would.
+ */
+export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null } = { now: null, pause: null };
+type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
+export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
+  protected override scopes() { return this.env.PLATFORM; }
+  protected override now(): number { return hostedTest.now?.() ?? Date.now(); }
+}
+export class PlatformMcpAgent extends McpAgent<HostedEnv> {
+  protected override scopes() { return this.env.PLATFORM; }
+  protected override ports() { return { now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {}, pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)) }; }
+}

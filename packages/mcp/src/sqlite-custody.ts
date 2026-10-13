@@ -20,7 +20,7 @@
  *   identities that may still receive a result. Before a write that leaves a
  *   record unresolved (the write before every send, resubmit, repeat step),
  *   the identity's reservation is topped up to its completion need: the
- *   record's bound plus one segment row beyond what it already holds. A
+ *   record's bound plus one segment row of growth beyond what it holds. A
  *   top-up that would cross the budget, or the identity's own limit, refuses
  *   `full` before anything is dispatched, and every reservation already
  *   outstanding stays. Bytes a write stores move from `reserved` to `used`;
@@ -70,7 +70,7 @@ class Queue {
 }
 
 const bytesOf = (bytes: SqlValue): Uint8Array => (bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes as ArrayBuffer));
-const decoder = new TextDecoder("utf-8", { fatal: true });
+const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
 
 export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTODY_BOUNDS, now: () => number = Date.now): CustodyStore & { used(): number; reserved(): number; archived(): number; identity(id: string): { stored: number; reserved: number } } {
   sql.exec(`CREATE TABLE IF NOT EXISTS record (id TEXT PRIMARY KEY, phase TEXT NOT NULL, key TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL, chunks INTEGER NOT NULL, size INTEGER NOT NULL)`);
@@ -117,7 +117,8 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
    */
   const arm = (id: string) => {
     const me = identityOf(id);
-    const need = Math.max(0, COMPLETION_BYTES - me.stored);
+    // The completion need is growth beyond what the identity already holds: a record at its bound and one more segment row.
+    const need = COMPLETION_BYTES;
     const topUp = Math.max(0, need - me.reserved);
     if (me.stored + need > bounds.identityMost) throw new CustodyError({ held: "full", reason: "bytes", bytes: me.stored + need });
     if (topUp === 0) return;

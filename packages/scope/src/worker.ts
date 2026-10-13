@@ -67,7 +67,8 @@
  */
 
 import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
-import { WorkerEntrypoint } from "cloudflare:workers";
+import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
+import { CONTROL_BODY_BYTES, HostedAgent, HostedRegistry, controlOf, type AgentPorts, type ControlAnswer, type RegistryPorts } from "@generalbusiness/dap-mcp";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, parseStrict, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
@@ -99,6 +100,8 @@ import { isBrand, brand } from "./brand.ts";
  * `DEPLOYMENT` is the deployment's name, which a session's token names.
  */
 export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: DurableObjectNamespace; SESSION_SECRET?: string; DEPLOYMENT?: string }
+/** The two namespaces of the hosted MCP endpoint (`McpRegistry`, `McpAgent`): one registry per repository, one object per agent. */
+export interface McpEnv extends Env { REGISTRIES: DurableObjectNamespace; AGENTS: DurableObjectNamespace }
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
@@ -438,8 +441,112 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
  * this Worker (`page.ts`); every other path is a route of the table above.
  */
 export default {
-  fetch: async (request: Request, env: Env): Promise<Response> => {
+  fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    const hosted = await mcpRoute(request, env);
+    if (hosted) return hosted;
     return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
   },
 };
+
+// ---------------------------------------------------------------- the hosted MCP endpoint
+
+/**
+ * The routes of the hosted MCP endpoint (notes/2026-10-13-hosted-mcp-endpoint.md,
+ * section 3.4), over the two namespaces. `POST /mcp/agents` goes to the
+ * repository's registry, named by the membership scope the control request
+ * names; the agent routes go to the agent object the path names; `/mcp`
+ * itself goes to the agent the bearer names. Null: not a hosted route.
+ *
+ * | Route | Authorization | Object |
+ * |---|---|---|
+ * | `POST /mcp/agents` | `Control`, action `create` | the registry of the membership |
+ * | `POST /mcp/agents/<id>/bearer` | `Control`, action `bearer` | the agent |
+ * | `DELETE /mcp/agents/<id>` | `Control`, action `retire` | the agent |
+ * | `POST`, `GET`, `DELETE /mcp` | `Bearer <id>.<secret>` | the agent |
+ */
+export async function mcpRoute(request: Request, env: Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response | null> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  if (path !== "/mcp" && !path.startsWith("/mcp/")) return null;
+  // A Worker without the two namespaces bound serves no hosted endpoint.
+  if (!env.REGISTRIES || !env.AGENTS) return json(404, { error: "not-found" });
+  const { REGISTRIES, AGENTS } = env;
+  const answered = (a: ControlAnswer): Response => new Response(JSON.stringify(a.body), { status: a.status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  if (path === "/mcp") {
+    const named = /^Bearer ([0-9a-f]{64})\./.exec(request.headers.get("authorization") ?? "");
+    if (!named) return new Response(null, { status: 401 });
+    let id: DurableObjectId;
+    try { id = AGENTS.idFromString(named[1]!); } catch { return new Response(null, { status: 401 }); }
+    return AGENTS.get(id).fetch(request);
+  }
+  const agentPath = /^\/mcp\/agents\/([0-9a-f]{64})(\/bearer)?$/.exec(path);
+  const control = path === "/mcp/agents" && request.method === "POST" ? { action: "create" as const, agent: null }
+    : agentPath && agentPath[2] && request.method === "POST" ? { action: "bearer" as const, agent: agentPath[1]! }
+    : agentPath && !agentPath[2] && request.method === "DELETE" ? { action: "retire" as const, agent: agentPath[1]! }
+    : null;
+  if (!control) return json(path === "/mcp/agents" || agentPath ? 405 : 404, { error: path === "/mcp/agents" || agentPath ? "method-not-allowed" : "not-found" });
+  const signed = controlOf(request.headers.get("authorization"));
+  if (!signed) return json(400, { error: "control", rule: "header" });
+  if (signed.request.action !== control.action || signed.request.agent !== control.agent) return json(400, { error: "control", rule: "binding" });
+  // The body, within its bound, as bytes: the object digests it against the request's binding.
+  const bytes = new Uint8Array(await request.arrayBuffer().catch(() => new ArrayBuffer(0)));
+  if (bytes.length > CONTROL_BODY_BYTES) return json(413, { error: "too-large" });
+  if (control.action === "create") {
+    const registry = REGISTRIES.get(REGISTRIES.idFromName(signed.request.membership.scope)) as unknown as { create(signed: unknown, body: Uint8Array, origin: string): Promise<ControlAnswer> };
+    return answered(await registry.create(signed, bytes, url.origin));
+  }
+  let id: DurableObjectId;
+  try { id = AGENTS.idFromString(control.agent); } catch { return json(404, { error: "agent" }); }
+  const agent = AGENTS.get(id) as unknown as { control(signed: unknown, action: "bearer" | "retire", body: Uint8Array, origin: string): Promise<ControlAnswer> };
+  return answered(await agent.control(signed, control.action, bytes, url.origin));
+}
+
+/** The membership object's observation read, as the hosted objects check authority: a real read of the membership now. */
+function observeThrough(binding: Binding): RegistryPorts["observe"] {
+  return (membership, ask) => (binding.get(binding.idFromName(membership.scope)) as unknown as { observe(asked: unknown): Promise<unknown> }).observe({ of: membership, ...ask });
+}
+
+const sqlOf = (ctx: DurableObjectState) => ({
+  exec: (query: string, ...bindings: (string | number | null | ArrayBuffer | Uint8Array)[]) => ctx.storage.sql.exec(query, ...bindings),
+  transaction: <T>(closure: () => T): T => ctx.storage.transactionSync(closure),
+});
+
+/** One repository's registry of hosted agents, named by its membership scope ID. */
+export class McpRegistry<E extends McpEnv = McpEnv> extends DurableObject<E> {
+  #registry: HostedRegistry | null = null;
+  protected scopes(): Binding { return this.env.SCOPES; }
+  protected now(): number { return Date.now(); }
+  #of(origin: string): HostedRegistry {
+    if (this.#registry) return this.#registry;
+    const agents = this.env.AGENTS;
+    this.#registry = new HostedRegistry(sqlOf(this.ctx), {
+      service: origin, now: () => this.now(), observe: observeThrough(this.scopes()),
+      mintId: () => agents.newUniqueId().toString(),
+      agent: (id) => agents.get(agents.idFromString(id)) as unknown as ReturnType<RegistryPorts["agent"]>,
+    });
+    return this.#registry;
+  }
+  async create(signed: Parameters<HostedRegistry["create"]>[0], body: Uint8Array, origin: string): Promise<ControlAnswer> { return this.#of(origin).create(signed, body); }
+  agents(): ReturnType<HostedRegistry["agents"]> { return this.#of("").agents(); }
+}
+
+/** One hosted agent: its key, bearer, sessions, custody and control identities. */
+export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
+  #agent: HostedAgent | null = null;
+  protected scopes(): Binding { return this.env.SCOPES; }
+  protected ports(): Partial<AgentPorts> { return {}; }
+  #of(): HostedAgent {
+    if (this.#agent) return this.#agent;
+    const scopes = this.scopes();
+    this.#agent = new HostedAgent(sqlOf(this.ctx), {
+      id: this.ctx.id.toString(), now: () => Date.now(), random: (n) => crypto.getRandomValues(new Uint8Array(n)), observe: observeThrough(scopes),
+      fetch: ((url: string, init?: RequestInit) => route(new Request(url, init), scopes)) as unknown as AgentPorts["fetch"],
+      ...this.ports(),
+    });
+    return this.#agent;
+  }
+  async create(op: string, request: Parameters<HostedAgent["create"]>[1], link: Parameters<HostedAgent["create"]>[2]): Promise<ControlAnswer> { return this.#of().create(op, request, link); }
+  async control(signed: Parameters<HostedAgent["control"]>[0], action: "bearer" | "retire", body: Uint8Array): Promise<ControlAnswer> { return this.#of().control(signed, action, body); }
+  override async fetch(request: Request): Promise<Response> { return this.#of().fetch(request); }
+}
