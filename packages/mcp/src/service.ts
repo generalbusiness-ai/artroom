@@ -85,7 +85,10 @@ type Run = (args: Args) => Promise<CallResult>;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const text = (structured: Record<string, unknown>): string => JSON.stringify(structured);
-/** Response bounds of plan 031, section 8, for the whole result as the client receives it: text and structured content together. */
+/**
+ * Response bounds of plan 031, section 8, for the whole CallResult as the service makes it: text, structured content and isError
+ * together. Over 2026-07-28 the wire adds MODERN_RESULT_EXTRA bytes to each result, which these bounds do not count.
+ */
 export const BOUNDS = { act: 4 * KIB, room: 8 * KIB, inspect: 8 * KIB, large: 64 * KIB, credential: 2 * KIB } as const;
 /** What a page of structured content may use of its bound: the rest is the envelope and the text that points at it. */
 const PAGE_SPARE = 512;

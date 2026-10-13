@@ -10,7 +10,7 @@ import { b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { McpService, MODERN, LEGACY, Wire, memoryStore, type McpConfig } from "../src/index.ts";
+import { McpService, MODERN, MODERN_RESULT_EXTRA, LEGACY, Wire, memoryStore, type McpConfig } from "../src/index.ts";
 import { serveHttp, serveStdio, type HttpServing } from "../src/node.ts";
 import { StandIn } from "./support/standin.ts";
 
@@ -328,6 +328,23 @@ describe("both MCP wire revisions, each by its own rules", () => {
     expect(lines.map((l) => l["id"])).toEqual(["after"]);
     input.end();
     await done;
+  });
+
+  // Invariant: the response bounds hold for the service's CallResult; a 2026-07-28 tool result carries exactly
+  // MODERN_RESULT_EXTRA bytes more (resultType and the server's information), and nothing else is added.
+  test("a 2026-07-28 tool result: the CallResult and a stated overhead", async () => {
+    const s = await http();
+    try {
+      const answer = await fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "room", arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }) });
+      const result = (await answer.json() as { result: Record<string, unknown> }).result;
+      const { resultType, _meta, ...callResult } = result;
+      expect([resultType, Object.keys(_meta as object)]).toEqual(["complete", ["io.modelcontextprotocol/serverInfo"]]);
+      expect(Object.keys(callResult).sort()).toEqual(["content", "isError", "structuredContent"]);
+      const bytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+      expect(bytes(result) - bytes(callResult)).toBe(MODERN_RESULT_EXTRA);
+      expect(MODERN_RESULT_EXTRA).toBeLessThan(128);
+    } finally { await s.close(); }
   });
 
   // Invariant: a listen whose stream closes while its first snapshot is being read leaves nothing behind: no watcher, no listen

@@ -95,8 +95,9 @@ describe("what a call costs, end to end", () => {
     const token2 = await s.service.call("repository.read-token", { on: 0, fields: { hours: 1 }, idempotencyKey: "rt-1" });
     const tokens = [tokenSeq, (token2.structuredContent["fact"] as { seq: number }).seq];
     let n = 0;
-    // Each tool: [name, arguments, reads bound (warm), response bound in bytes]. Bounds are section 8's, for the whole response as
-    // the client receives it: the structured content and the text together.
+    // Each tool: [name, arguments, reads bound (warm), response bound in bytes]. Bounds are section 8's, for the whole CallResult as
+    // the service makes it: the structured content, the text and isError together. Over 2026-07-28 the wire adds
+    // MODERN_RESULT_EXTRA bytes, which wire.test.ts measures and the bounds do not count.
     const tools: [string, () => Record<string, unknown>, number, number][] = [
       ["room", () => ({}), 3, BOUNDS.room],
       ["inspect", () => ({ scope: 1 }), 1, BOUNDS.inspect],

@@ -42,6 +42,13 @@ export interface Message { jsonrpc: "2.0"; id?: Id | null; method?: string; para
 export type Send = (message: Message) => void;
 
 const SERVER_INFO = { name: SERVER_NAME, version: SERVER_VERSION };
+/** What 2026-07-28 adds to every result. */
+const MODERN_ADDED = { resultType: "complete", _meta: { [SERVER_INFO_META]: SERVER_INFO } };
+/**
+ * The bytes a 2026-07-28 tool result carries beyond the service's CallResult: the members of MODERN_ADDED and one comma. The
+ * response bounds hold for the CallResult, as the service makes it; a client of 2026-07-28 receives this many bytes more.
+ */
+export const MODERN_RESULT_EXTRA = new TextEncoder().encode(JSON.stringify(MODERN_ADDED)).length - 2 + 1;
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const reply = (id: Id, result: unknown): Message => ({ jsonrpc: "2.0", id, result });
 const error = (id: Id | null, code: number, message: string, data?: unknown): Message => ({ jsonrpc: "2.0", id, error: { code, message, ...(data !== undefined ? { data } : {}) } });
@@ -205,7 +212,7 @@ export class Wire {
     }
     if (notification) return null;
     if (!isRecord(meta[CAPABILITIES_META])) return error(id, -32602, `Every ${MODERN} request names the client's capabilities in _meta.`);
-    const complete = (result: Record<string, unknown>): Message => reply(id, { ...result, resultType: "complete", _meta: { [SERVER_INFO_META]: SERVER_INFO } });
+    const complete = (result: Record<string, unknown>): Message => reply(id, { ...result, ...MODERN_ADDED });
     switch (m.method) {
       case "server/discover":
         return complete({ supportedVersions: [MODERN, LEGACY], capabilities: { tools: { listChanged: true } }, instructions: INSTRUCTIONS, ttlMs: 0, cacheScope: "private" });

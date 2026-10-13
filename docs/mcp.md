@@ -1324,15 +1324,18 @@ named test, or a sum of a recipe's steps.
 
 ### Whole responses
 
-A tool's bound is for the whole response as the client receives it: the
-structured content and the text together (plan 031, section 8: 4 KiB for an
+A tool's bound is for the whole tool result as the service makes it: the
+structured content, the text and `isError` together (plan 031, section 8: 4 KiB for an
 act, `wait`, `settle` and `prepare`; 8 KiB for `room` and a page of
 `inspect`; 64 KiB for `items`, `steps`, `step`, `record`, `sends`, `text`,
 `actions` and the declaration or complete text of `inspect`; 2 KiB for
 `credential`). The text repeats the structured content's JSON only when
 the whole response still fits; otherwise the text says where the result
-is. Pages are sized for the whole response, and a text slice is measured
-after JSON escaping. The one result larger than its bound is a single live
+is. Pages are sized for the whole result, and a text slice is measured
+after JSON escaping. Over 2026-07-28 each result also carries
+`resultType` and the server's information in `_meta`: 110 bytes more,
+observed in `wire.test.ts` (the constant `MODERN_RESULT_EXTRA`), which the
+bounds do not count. Over 2025-11-25 nothing is added. The one result larger than its bound is a single live
 item larger than a page, which is served whole, alone on its page.
 
 `room` pages every collection it returns (lanes, standalone scopes,
