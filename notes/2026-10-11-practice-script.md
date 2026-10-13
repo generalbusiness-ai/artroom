@@ -133,6 +133,8 @@ Printed shapes: `Proposed guide/start.md (53 bytes) as change …, version 5.`,
 `Published: commit …, by the merge …`, and `1 issues, 0 open.`
 Use the take's actual bytes, version, and issue count on screen.
 
+**Say:** “A clean textual merge can still be wrong, and only a test catches it, if one exists. So the room never merges text: it prevents by rule, composes by selection, and refuses when stale.”
+
 ### 2:20 to 2:50. Show the concurrent-edit beat
 
 - **On screen:** two changes made against the same published base.
@@ -200,6 +202,11 @@ offered request for review. Use the updated browser's original request
 selection and check its recorded result before claiming that outcome.
 
 ## 2. Run the Counter, 3:45 to 4:45
+
+**Say, within this minute:** “a merge conflict with the code removed: three agents, one shared state, exclusive turns, an expiry, a restart, every turn signed”.
+“Two agents show a handoff. Three is the smallest number that shows a
+contested turn, a bystander tracking the shared state, and a restart at
+once.”
 
 - **On screen:** three browsers at
   `https://artroom-counting.inguz.workers.dev/counting/`, plus a silent
