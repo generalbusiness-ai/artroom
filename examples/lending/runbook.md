@@ -14,6 +14,11 @@ or choosing those versions early.
 
 ## Bind the service and room
 
+The command blocks target the pending final physical launcher
+`packages/cli/bin/dap.js`. The preserved preparation Source still has
+`packages/cli/bin/artroom.js`. Bind the actual renamed file in the final
+composition before any command is run. No command here has been executed.
+
 Record the approved Source head, deployed bounds, exact application cohort,
 Worker name, Artifacts namespace, and verified service origin. Use a separate
 library deployment whose Artifacts binding and register configuration belong
@@ -24,7 +29,7 @@ Keep the operator key and each pending envelope in an owner-only
 `ARTROOM_HOME`. Supply the actual service origin and namespace below:
 
 ```sh
-node packages/cli/bin/artroom.js install --plan "<service-origin>" --cohort application --host artifacts --namespace "<namespace>"
+node packages/cli/bin/dap.js install --plan "<service-origin>" --cohort application --host artifacts --namespace "<namespace>"
 ```
 
 Retain the printed plan, its deadline, and its register ID. Set that
@@ -34,8 +39,8 @@ that deployment configuration through the separately reviewed deployment
 procedure. Then finish the retained plan:
 
 ```sh
-node packages/cli/bin/artroom.js install --planned --cohort application
-node packages/cli/bin/artroom.js create lending-library --handle @neighbour
+node packages/cli/bin/dap.js install --planned --cohort application
+node packages/cli/bin/dap.js create lending-library --handle @neighbour
 ```
 
 If the result is unknown, preserve the original plan and request. Resume
@@ -62,8 +67,8 @@ run's evidence. The current baseline pin is
 These commands describe that baseline, not a future publishing definition:
 
 ```sh
-node packages/cli/bin/artroom.js act activate --on rules --set digest=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set name=lending --value examples/lending/definition.json
-node packages/cli/bin/artroom.js act establish-application --on directory --set definition=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set 'values={}' --set execution=recorded-do --value examples/lending/definition.json
+node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set name=lending --value examples/lending/definition.json
+node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set 'values={}' --set execution=recorded-do --value examples/lending/definition.json
 ```
 
 Keep the exact signed establishment request before submission. Reconcile an
@@ -83,8 +88,8 @@ application, and change actions already present.
 Use the complete actual lists, encoded as JSON, in these command shapes:
 
 ```sh
-node packages/cli/bin/artroom.js act set-actions --on membership --target 0 --set role=admin --set 'actions=<complete-admin-JSON-list>'
-node packages/cli/bin/artroom.js act set-actions --on membership --target 0 --set role=member --set 'actions=<complete-member-JSON-list>'
+node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set role=admin --set 'actions=<complete-admin-JSON-list>'
+node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set role=member --set 'actions=<complete-member-JSON-list>'
 ```
 
 Record both before and after lists and their accepted facts. Show that an
@@ -95,11 +100,33 @@ time. Measure the actual grant reuse window before the lending acts.
 
 ## Join in a browser and show custody
 
-Create a private member invitation:
+**Baseline gap: retained membership 4 invitation issuance is unsupported.**
+The ordinary CLI invitation command reads the actual membership definition
+and tags its link accordingly, but does not retain the issuance secret and
+signed request before submission. The retained tagged issuance path in
+`packages/cli/src/invitations.ts` admits membership 2 and its demo directory,
+not this application's membership 4 and directory 5. Neither path is a
+shown recoverable issuance path for this runbook. Do not run a plausible
+`dap invite` command and claim this gap has been closed.
 
-```sh
-node packages/cli/bin/artroom.js invite @nasruddin --role member
-```
+A separately reviewed native membership 4 issuance helper must:
+
+1. Verify the actual membership 4 summary, issuer's active key and invitation
+   authority, and the directory's membership, rules, and destination references.
+2. Generate the invitation secret privately and retain it with the exact
+   signed `invite-member` request before dispatch.
+3. Verify the accepted receipt, intent digest, full membership reference,
+   incarnation, and recorded invitation's handle, role, hash, and expiry.
+4. Encode the private person link with the actual repository references,
+   invitation number, and explicit `platform:membership@4` tag.
+5. Reconcile an unknown issuance through that retained original request.
+   Do not generate another invitation or merely change a membership 2 tag.
+
+This helper and its deployed issuance remain **unrun and owed**. The CLI's
+person join loads the explicit membership pin and keeps its signed join.
+The Library browser additionally requires the membership 4 tag and the
+current service origin, then verifies the native receipt before enrollment
+is called joined. That receiver parity does not supply the missing issuer.
 
 Open the verified library service's `/lending/` interface in an independent
 browser profile. Paste the invitation into **Invitation link** and use the
@@ -113,8 +140,9 @@ Worker result does not substitute for this deployed browser witness.
 
 Exercise an interrupted donation and an interrupted join at the reviewed
 custody boundary. Retain the original request before dispatch. Reload, then
-use **Check** and the original-request continuation supported by the actual
-interface. Record the accepted fact and exactly one donation or enrollment.
+use **Check the join** or **Continue the join** for enrollment, and
+**Check** or **Continue** for a lending act. These are the prepared SDK
+interface labels, not observed browser results. Record the accepted fact and exactly one donation or enrollment.
 Do not sign a replacement for an unknown original. The custody owner prepares
 and reviews this harness separately; these steps have not been run.
 
@@ -147,8 +175,8 @@ This is the public history witness. It remains unrun.
 Members can inspect the lending history with the actual full scope reference:
 
 ```sh
-node packages/cli/bin/artroom.js log "<lending-scope>"
-node packages/cli/bin/artroom.js verify "<lending-scope>"
+node packages/cli/bin/dap.js log "<lending-scope>"
+node packages/cli/bin/dap.js verify "<lending-scope>"
 ```
 
 Record verifier coverage and trusts as well as the result. Missing foreign
@@ -173,8 +201,11 @@ deployment version, and byte, MIME, cache, and link readbacks.
 
 ## Observation ledger
 
-Every result below is currently **UNRUN**. Record original terminals and
-uncertain outcomes before any continuation. Keep failed attempts as evidence.
+All deployed and browser observation slots below are currently **UNRUN**.
+The existing definition and native-fixture witnesses retain their original
+Source bindings; this ledger does not say they never ran. Record original
+terminals and uncertain outcomes before any continuation. Keep failed
+attempts as evidence.
 
 | Output | Evidence to record |
 | --- | --- |

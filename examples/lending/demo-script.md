@@ -8,8 +8,9 @@ refusals are witnessed by the existing native scenario, not by screenshots
 or public pages. The screens exist in Source. Their actual controls and
 storage still need the browser run in [the runbook](runbook.md).
 
-The table's published-page outcomes describe the final approved fold
-publication, which is not built or observed here. Before that stage, show a
+The table's published-page outcomes require approval and implementation of
+the fold publication design. That stage is unapproved, unbuilt, and unrun
+in this preparation. Before that stage, show a
 lending act's acceptance separately and label its page unpublished. Do not
 make browser page edits to simulate automatic publication.
 
@@ -25,7 +26,9 @@ birth and the death are recorded the same way.
 - A room is provisioned as [the runbook](runbook.md) says, with the library
   established and empty.
 - The neighbour has joined as the room's founder. The neighbour is staff.
-- Nasruddin has joined with an invitation, as a member.
+- Nasruddin has joined with a verified membership 4 invitation, as a member.
+  The baseline retained issuer does not support that cohort; complete the
+  runbook's reviewed issuance dependency first.
 - Each has the member interface open. A third window shows the published
   shelf.
 - At least five minutes have passed since the roles were granted.
