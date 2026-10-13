@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fc1336f6acfd3781f345dd6bd3cdc56aca233dbf","text":"Merge retired a covered predecessor; the successor is at packages/derive/test/fixtures-holds.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fc5135fef8a31e5664df781665b96daea6b216bb","text":"Merge retired a covered predecessor; the successor is at packages/platform/src/demo-register.ts."}
