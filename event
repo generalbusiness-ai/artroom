@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-12-homepage-single-line-source.md","body":{"commit":"d1b845f837c2b4a8431b5be325b881e0f5c6027b","path":"notes/2026-10-12-homepage-single-line-source.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5092950a93c9b806a27077e3d6d10d1e83a16443","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-homepage-single-line-source.md."}
