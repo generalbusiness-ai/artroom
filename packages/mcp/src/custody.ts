@@ -199,7 +199,9 @@ export class Custody {
 
   async #write(id: string, record: CustodyRecord): Promise<void> {
     if (bytesOf(record) > RECORD_BYTES) throw new CustodyError({ held: "too-large" });
-    try { await this.store.write(id, record); } catch { throw new CustodyError({ held: "unreadable" }); }
+    // A store may refuse a write by its own account (`full`: the hosted store's budget, before anything is dispatched); any
+    // other failure is a storage failure, which settles nothing.
+    try { await this.store.write(id, record); } catch (error) { throw error instanceof CustodyError ? error : new CustodyError({ held: "unreadable" }); }
   }
 
   /**

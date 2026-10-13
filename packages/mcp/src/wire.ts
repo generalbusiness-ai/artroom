@@ -53,14 +53,27 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const reply = (id: Id, result: unknown): Message => ({ jsonrpc: "2.0", id, result });
 const error = (id: Id | null, code: number, message: string, data?: unknown): Message => ({ jsonrpc: "2.0", id, error: { code, message, ...(data !== undefined ? { data } : {}) } });
 
-/** The state of one 2025-11-25 session: the agreed version, whether it is initialized, what the client declared, and what it was last told. */
+/**
+ * One stream of a 2025-11-25 session: where its server-to-client messages go (the stdio stream, or the session's `GET` stream),
+ * and `notified`, the generation last written to this stream. A stream write is not a receipt, so `notified` lives with the
+ * stream, in memory, and is never persisted.
+ */
+export interface Stream { send: Send; notified: Digest | null; close(final: boolean): void }
+
+/**
+ * The state of one 2025-11-25 session: its ID (null on stdio), the agreed version, whether it is initialized, what the client
+ * declared, and `listed`, the generation the client last listed, set by `tools/list` alone and persisted by the transport's
+ * hook (`Wire.hooks.changed`) before the response is emitted. `told` was one field for both a list and a delivery; it is split.
+ */
 export interface LegacySession {
+  id: string | null;
+  created: number;
   version: string | null;
   initialized: boolean;
   capabilities: Record<string, unknown>;
-  told: Digest | null;
-  /** Where its server-to-client messages go: the stdio stream, or the session's `GET` stream; null while there is none. */
-  stream: Send | null;
+  listed: Digest | null;
+  /** The session's open stream; null while there is none. */
+  stream: Stream | null;
   unsubscribe: (() => void) | null;
 }
 
@@ -95,8 +108,8 @@ export function frameOf(v: unknown): "request" | "notification" | "response" | "
 /** Whether a value is a JSON-RPC 2.0 frame this server reads. Null, scalars, arrays and malformed objects are not. */
 export const isFrame = (v: unknown): v is Message => frameOf(v) !== "invalid";
 
-export function newSession(): LegacySession {
-  return { version: null, initialized: false, capabilities: {}, told: null, stream: null, unsubscribe: null };
+export function newSession(id: string | null = null): LegacySession {
+  return { id, created: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null };
 }
 
 /** The revision a request is served by. */
@@ -115,15 +128,22 @@ export class Wire {
   ignored = 0;
   /** Open listen subscriptions, by the client stream they belong to, then by request ID. */
   readonly listens = new Map<object, Map<string, Listen>>();
+  /** `changed`: a session's persisted fields changed (issue, initialization, a listing); the transport writes its row before the response. */
+  readonly hooks: { changed?: (session: LegacySession) => void | Promise<void> } = {};
   constructor(readonly service: McpService) {}
 
-  /** Watch the service's list for one 2025-11-25 session, while it has a stream. */
+  /**
+   * Watch the service's list for one 2025-11-25 session. A stream is told of a generation once, and only while the client has
+   * not listed it: a change is written to a stream when the generation differs from both the stream's `notified` and the
+   * session's `listed`. The watch stays with the session; the stream it writes to is whichever the session holds now.
+   */
   watchLegacy(session: LegacySession): void {
-    if (session.unsubscribe || !session.stream) return;
+    if (session.unsubscribe) return;
     session.unsubscribe = this.service.subscribe((generation) => {
-      if (session.told === generation || !session.stream) return;
-      session.told = generation;
-      session.stream({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+      const stream = session.stream;
+      if (!stream || stream.notified === generation || session.listed === generation) return;
+      stream.notified = generation;
+      stream.send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
     });
   }
 
@@ -177,10 +197,12 @@ export class Wire {
         const asked = typeof params["protocolVersion"] === "string" ? params["protocolVersion"] : LEGACY;
         session.version = asked === LEGACY ? LEGACY : LEGACY;
         session.capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
+        await this.hooks.changed?.(session);
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
       case "notifications/initialized":
         session.initialized = true;
+        await this.hooks.changed?.(session);
         this.watchLegacy(session);
         return null;
       case "notifications/cancelled": return null;
@@ -188,7 +210,9 @@ export class Wire {
       case "tools/list": {
         if (!session.initialized && !notification) session.initialized = session.version !== null;
         const page = await this.service.page(params["cursor"]);
-        session.told = page.generation;
+        // The listed generation is durable: written through the hook before the response is emitted.
+        session.listed = page.generation;
+        await this.hooks.changed?.(session);
         return reply(id, { tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
       }
       case "tools/call": {

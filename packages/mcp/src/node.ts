@@ -25,13 +25,15 @@ import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { join, relative, sep } from "node:path";
+import { Readable } from "node:stream";
 import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Signer, Fetch } from "@generalbusiness/artroom-client";
 import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Outcome } from "./custody.ts";
 import type { ConfigPort } from "./inventory.ts";
 import { McpService } from "./service.ts";
 import type { Mode } from "./catalogue.ts";
-import { Wire, frameOf, isFrame, isNotificationMethod, newSession, revisionOf, type LegacySession, type Message } from "./wire.ts";
+import { McpHttp } from "./http.ts";
+import { Wire, isFrame, newSession, type LegacySession, type Message } from "./wire.ts";
 
 // ---------------------------------------------------------------- custody on files
 
@@ -303,7 +305,7 @@ export function serveStdio(service: McpService, input: NodeJS.ReadableStream = p
   const session: LegacySession = newSession();
   const owner = {};
   const write = (message: Message) => { try { output.write(`${JSON.stringify(message)}\n`); } catch { /* the output is gone */ } };
-  session.stream = write;
+  session.stream = { send: write, notified: null, close: () => {} };
   let parts: Buffer[] = [];
   let held = 0;
   let skipping = false;
@@ -343,7 +345,7 @@ export function serveStdio(service: McpService, input: NodeJS.ReadableStream = p
 
 const LOOPBACK = /^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|::1|\[::1\])$/;
 
-export interface HttpServing { server: Server; url: string; bearer: string; wire: Wire; close(): Promise<void> }
+export interface HttpServing { server: Server; url: string; bearer: string; wire: Wire; http: McpHttp; close(): Promise<void> }
 
 /** Whether an address is loopback: 127.0.0.0/8 or ::1. A name such as `localhost` is not taken: it may resolve elsewhere. */
 export function isLoopback(host: string): boolean { return LOOPBACK.test(host); }
@@ -351,16 +353,21 @@ export function isLoopback(host: string): boolean { return LOOPBACK.test(host); 
 /**
  * Serve streamable HTTP at `http://<host>:<port>/mcp`. Refuses a host that is
  * not loopback before anything listens. The bearer is made here and given
- * once to `announce`, which the command writes to standard error.
+ * once to `announce`, which the command writes to standard error. Every
+ * request is validated by the shared HTTP layer (`http.ts`), as the hosted
+ * endpoint's are: this server only binds the socket, checks the bearer and
+ * carries the bytes.
  */
 export async function serveHttp(service: McpService, host: string, port: number, announce: (line: string) => void = (line) => process.stderr.write(`${line}\n`)): Promise<HttpServing> {
   if (!isLoopback(host)) throw new Error(`${host} is not a loopback address; the server binds 127.0.0.1 or ::1 only.`);
   const bearer = randomBytes(32).toString("base64url");
   const expected = Buffer.from(`Bearer ${bearer}`);
   const wire = new Wire(service);
-  const sessions = new Map<string, LegacySession>();
+  const http = new McpHttp({
+    wire, bodyBytes: FRAME_BYTES, mintSession: randomUUID,
+    authorized: (authorization) => { const given = Buffer.from(authorization ?? ""); return given.length === expected.length && timingSafeEqual(given, expected); },
+  });
   const bare = (res: ServerResponse, status: number) => { res.writeHead(status); res.end(); };
-
   const json = (res: ServerResponse, status: number, message: Message) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(message)); };
   // Every failure of one request is contained here: an aborted body, a parser or a handler that throws, a write to a closed
   // socket. Nothing rejects unhandled and no other request waits on it.
@@ -368,92 +375,34 @@ export async function serveHttp(service: McpService, host: string, port: number,
     req.on("error", () => { /* an aborted upload: the handler sees the end of the body */ });
     res.on("error", () => { /* the client is gone */ });
     handle(req, res).catch(() => {
-      try { if (!res.headersSent) json(res, 500, { jsonrpc: "2.0", id: null, error: { code: -32603, message: "Internal error" } }); else res.end(); } catch { /* the socket is gone */ }
+      try { if (!res.headersSent) json(res, 500, { jsonrpc: "2.0", id: null, error: { code: -32603, message: "Internal error" } }); else res.end(); } catch { /* gone */ }
     });
   });
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    // Origin: no browser origin is a client of a signing server.
+    // Origin and bearer first, then the path: no detail about this server leaves before the bearer is checked.
     if (req.headers["origin"] !== undefined) return bare(res, 403);
     const given = Buffer.from(String(req.headers["authorization"] ?? ""));
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return bare(res, 401);
     if (new URL(req.url ?? "/", "http://loopback").pathname !== "/mcp") return bare(res, 404);
-    const sessionId = typeof req.headers["mcp-session-id"] === "string" ? req.headers["mcp-session-id"] : null;
-    if (req.method === "DELETE") {
-      const session = sessionId ? sessions.get(sessionId) : undefined;
-      if (!session || !sessionId) return bare(res, 404);
-      wire.endLegacy(session);
-      sessions.delete(sessionId);
-      return bare(res, 200);
+    let request: Request;
+    try {
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(req.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+      const withBody = req.method === "POST";
+      request = new Request(`http://loopback${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(withBody ? { body: Readable.toWeb(req) as unknown as ReadableStream, duplex: "half" } : {}) } as RequestInit);
+    } catch { return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32020, message: "A header is not well formed." } }); }
+    const response = await http.handle(request);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    if (!response.body) { res.end(); return; }
+    const reader = response.body.getReader();
+    res.on("close", () => { void reader.cancel().catch(() => undefined); });
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (res.writableEnded) break;
+      res.write(value);
     }
-    if (req.method === "GET") {
-      // The 2025-11-25 session's stream. A 2026-07-28 client opens none: its stream is subscriptions/listen.
-      if (!sessionId) return bare(res, 405);
-      const session = sessions.get(sessionId);
-      if (!session) return bare(res, 404);
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-      res.write(": stream\n\n");
-      const stream = (message: Message) => { if (!res.writableEnded) res.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`); };
-      session.stream = stream;
-      wire.watchLegacy(session);
-      // The stream lives as long as the response: its close, from either side, ends the watch.
-      res.on("close", () => { if (session.stream === stream) wire.endLegacy(session); });
-      return;
-    }
-    if (req.method !== "POST") return bare(res, 405);
-    // The body is read whole, within the bound, and decoded once: a character split across chunks is not corrupted.
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of req) {
-      size += (chunk as Buffer).length;
-      if (size > FRAME_BYTES) return bare(res, 413);
-      chunks.push(chunk as Buffer);
-    }
-    if (!req.complete) return;   // aborted: nobody is listening for an answer
-    let message: unknown;
-    try { message = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); }
-    catch { return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }); }
-    if (Array.isArray(message)) return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Batches are not served." } });
-    // The frame is checked before its revision is read: null, a scalar or an object without jsonrpc is an invalid request.
-    if (!isFrame(message)) return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request: a JSON-RPC 2.0 object is expected." } });
-    const m = message;
-    // A notification is accepted with 202 and no body. One whose method is only a request runs nothing and issues no session.
-    if (frameOf(m) === "notification" && !isNotificationMethod(m.method!)) { wire.ignored++; return bare(res, 202); }
-    const revision = revisionOf(m, sessionId ? sessions.get(sessionId) ?? null : null);
-    if (revision === "modern" || (revision === "none" && !sessionId && m.method !== "initialize")) {
-      if (m.method === "subscriptions/listen") {
-        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-        const owner = {};
-        const send = (out: Message) => {
-          if (res.writableEnded) return;
-          res.write(`event: message\ndata: ${JSON.stringify(out)}\n\n`);
-          if (out.id !== undefined && (out.result !== undefined || out.error !== undefined)) res.end();
-        };
-        // The subscription lives as long as its response stream: a close from either side removes its watchers.
-        res.on("close", () => { wire.dropStream(owner); });
-        const response = await wire.handle(m, null, send, owner);
-        if (response) send(response);
-        return;
-      }
-      const response = await wire.handle(m, null, () => {});
-      if (!response) return bare(res, 202);
-      return json(res, 200, response);
-    }
-    // 2025-11-25: initialize issues the session; every later request names it, and an unknown one is answered 404.
-    let session: LegacySession | undefined;
-    let issued: string | null = null;
-    if (m.method === "initialize") {
-      issued = randomUUID();
-      session = newSession();
-      sessions.set(issued, session);
-    } else {
-      if (!sessionId) return bare(res, 400);
-      session = sessions.get(sessionId);
-      if (!session) return bare(res, 404);
-    }
-    const response = await wire.handle(m, session, (out) => session!.stream?.(out));
-    if (!response) return bare(res, 202);
-    res.writeHead(200, { "content-type": "application/json", ...(issued ? { "mcp-session-id": issued } : {}) });
-    res.end(JSON.stringify(response));
+    res.end();
   }
 
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(port, host.replace(/^\[|\]$/g, ""), () => resolve()); });
@@ -462,13 +411,12 @@ export async function serveHttp(service: McpService, host: string, port: number,
   const url = `http://${host.includes(":") && !host.startsWith("[") ? `[${host}]` : host}:${actual}/mcp`;
   announce(`dap mcp: serving ${url}; bearer (shown once): ${bearer}`);
   return {
-    server, url, bearer, wire,
-    close: () => new Promise<void>((resolve) => {
-      for (const session of sessions.values()) wire.endLegacy(session);
-      wire.closeAll();
+    server, url, bearer, wire, http,
+    close: async () => {
+      await http.closeAll();
       server.closeAllConnections?.();
-      server.close(() => resolve());
-    }),
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
   };
 }
 
