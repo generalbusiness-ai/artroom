@@ -7,9 +7,6 @@ what each command printed. It does not verify hardware identity. The
 captures script then takes pictures of the room's page. Run both the
 evening before a recording, and again on the morning of it.
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 ## What the runner does
 
 `scripts/demo-run.ts` runs 27 shots in order by default. Each ordinary shot

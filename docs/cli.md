@@ -1,8 +1,5 @@
 # The dap command
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 `dap` is a command-line client for the new model. Each command is a
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
