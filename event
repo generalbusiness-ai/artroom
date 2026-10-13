@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-public-sdk-publication.md","body":{"commit":"c4d9884881f7bfa0214514c43c2f5e1ca30a708c","path":"notes/2026-10-13-public-sdk-publication.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:237eb59b517f8b514a152ab231c9e2a7a3ae3eb4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-public-sdk-publication.md."}
