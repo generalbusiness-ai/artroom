@@ -45,7 +45,6 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    ```json
    "vars": {
-       "DEPLOYMENT": "dap-my-room",
        "ARTIFACTS_NAMESPACE": "dap-my-room"
    }
    ```
@@ -58,18 +57,21 @@ no global installation or Wrangler dependency in this checkout is needed.
    The entry's `remote: true` makes local Wrangler development use the live
    Artifacts binding. It is not a second deployment or an access credential.
 
-4. Deploy, then generate the session secret directly into Wrangler's stdin.
+4. Deploy, then send the deployment identity and a generated session secret
+   directly into Wrangler's stdin.
 
    ```sh
    npm run deploy:scope
    cd packages/scope
-   node --input-type=module -e 'import { randomBytes } from "node:crypto"; process.stdout.write(randomBytes(32).toString("base64url"));' | npx -y wrangler@4.147.0 secret put SESSION_SECRET
+   node --input-type=module -e 'import { randomBytes } from "node:crypto"; process.stdout.write(JSON.stringify({DEPLOYMENT:"dap-my-room",SESSION_SECRET:randomBytes(32).toString("base64url")}));' | npx -y wrangler@4.147.0 secret bulk
    cd ../..
    ```
 
    Deployment prints the Worker's `https://<name>.<subdomain>.workers.dev`
    address and version ID. Secret storage reports success without printing
-   the secret. Both `DEPLOYMENT` and `SESSION_SECRET` are required for sessions.
+   the secret. `DEPLOYMENT` is a nonsecret identity stored through the same
+   stdin operation; it retains that meaning even though Wrangler uses a secret
+   binding. Both bindings are required for sessions.
 
 5. Keep this room's signing keys in a new private directory. Substitute the
    deployed address and your namespace in the plan command.
@@ -116,7 +118,9 @@ no global installation or Wrangler dependency in this checkout is needed.
    do not include it in logs, screenshots, or a delivery note. On the second
    device, open `https://<name>.<subdomain>.workers.dev/page/`, choose
    **Invitation link**, and paste it. The page creates that device's key,
-   joins automatically, and opens the room. A new device has its own key;
+   joins automatically, and opens the room. There is no Join button on this
+   invitation path. If enrollment is unresolved, use **Check status** to read
+   the original request. A new device has its own key;
    do not copy the owner's key to it.
 
 ## Use GitHub instead
