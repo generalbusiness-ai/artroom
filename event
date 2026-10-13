@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:48a5bd8dd3322e05c17036b9eab48c4b1a9340cc","text":"Merge retired a covered predecessor; the successor is at packages/page/src/popups.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4a1190600974fdd442aef0cffd296c01f2a81825","text":"Merge retired a covered predecessor; the successor is at packages/platform/test/support-rules.ts."}
