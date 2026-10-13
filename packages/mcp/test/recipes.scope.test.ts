@@ -59,14 +59,14 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
     const accepted = (r: Record<string, unknown>) => { expect(r["answer"], JSON.stringify(r)).toBe("accepted"); return r; };
     const seqOf = (r: Record<string, unknown>) => (r["fact"] as FactRef).seq;
 
-    // install, claim (and Create room, the same calls).
+    // install, create (and Create room, the same calls).
     let register!: ScopeId;
     await recipe("`dap install", [rita], async () => {
       const installed = accepted(await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" }));
       register = installed["scope"] as ScopeId;
     });
     await room.wireRegister(register);
-    await recipe("`dap claim", [rita], async () => {
+    await recipe("`dap create", [rita], async () => {
       fresh(rita);
       const claimed = accepted(await act(rita, "room.create", register, "found", { fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" }));
       expect((await rita.ok("wait", { scope: register, entry: seqOf(claimed) }))["timedOut"]).toBe(false);

@@ -43,7 +43,7 @@ export interface Root { scope: ScopeId; membership: ScopeRef | null }
 export interface ConfigPort {
   read(): Promise<McpConfig>;
   addRoot(root: Root): Promise<void>;
-  /** Record the repository that the caller's own claim created, or the caller's inbox, as `dap claim` and `join` record them. */
+  /** Record the repository that the caller's own claim created, or the caller's inbox, as `dap create` and `join` record them. */
   setRepository?(repository: NonNullable<McpConfig["repository"]>): Promise<void>;
   /** Record a room the caller joined, as `dap join` records it: the service, the repository's scopes with the inbox, and the handle. */
   joined?(room: { service: string; repository: NonNullable<McpConfig["repository"]>; handle: string }): Promise<void>;

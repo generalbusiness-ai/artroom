@@ -964,7 +964,7 @@ export class McpService {
   }
 
   /**
-   * A room the caller's own claim created, or the caller's own inbox, is recorded in the configuration, as `dap claim` and
+   * A room the caller's own claim created, or the caller's own inbox, is recorded in the configuration, as `dap create` and
    * `join` record them, so the next list holds the room's scopes. Only an entry the caller's key signed is followed.
    */
   async #remember(entry: Entry, children: readonly { ref: ScopeRef | null; kind: string }[]): Promise<void> {

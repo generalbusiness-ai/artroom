@@ -19,7 +19,7 @@ and what ran.
 
 The server runs where the command line runs, with the same config
 directory (`ARTROOM_HOME`). Set the room up first with `dap install`
-and `dap claim`; or start the server with an empty config directory
+and `dap create`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
 there as `dap join` does. The link holds the invitation's secret.
 `join`'s own result never repeats it. The join that membership admits
@@ -1282,8 +1282,8 @@ works; the count given is the default recipe's.
 | Activity | Default | --generic | --generic=add |
 |---|---|---|---|
 | `dap install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and founder keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
-| `dap claim <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
-| Page: Create room | the same calls as `dap claim`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `dap claim`: 7 | 5 |
+| `dap create <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
+| Page: Create room | the same calls as `dap create`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `dap create`: 7 | 5 |
 | `dap invite <@member> --role <role>` | `member.invite` with the handle, the role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the link with the number and secret to the member: 1 | `actions` on membership, `act`: 2 | 1 |
 | `dap join <link>` | `join` with the link, from an empty configuration, then `wait` for the inbox: 2 | `join`, `wait`: 2 | 2 |
 | Page: Join with an invitation link | `join`, `wait`: 2 | `join`, `wait`: 2 | 2 |

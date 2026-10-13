@@ -302,6 +302,40 @@ are unchanged. In the room story the second member's request count was
 288 in the default mode and 283 in `--generic` (observed), within the
 range of earlier runs.
 
+## Corrections of review 84d36fa4
+
+The checker reviewed `c28193a5`, which is `bfbffab0` with the planner's
+third amendment. The branch was reset to that head (`git reset --hard
+origin/request/mcp-generic`) and main, now `fe121d9f`, was merged with
+`git merge --no-edit origin/main` at `90aec25c`, with no conflict. Main
+had landed, after the rename, the SDK publication note, the practice
+script, the 07:00 sprint report, the Home delivery record, the fork
+measurement record and the create wording head; main's version of every
+path this branch does not own was taken unchanged. At this round's head
+`git diff --name-only origin/main...HEAD` lists 61 paths, every one of
+them the branch's own, and `git diff --name-only origin/main HEAD` lists
+no other path.
+
+| Item | What changed | Witness |
+|---|---|---|
+| P2. The W1 inventory against the integrated help | The create wording head made the room-creating command `dap create <name>` in the command line's help; the command line still accepts `dap found`, with a message that the alias remains for one release, and `dap claim`, as main has them, and this branch leaves both as they are. `docs/mcp.md` now names `dap create <name>` in its W1 row, says the Page's Create room makes the same calls as `dap create`, and says to set a room up with `dap install` and `dap create`; the recipe test finds the row by that name, and two code comments say `dap create`. Every other `dap` usage line already matched its row. No descriptor text changed, so `docs/mcp-tools.json` is unchanged; the Page still says Create room, so that row's name stays | `inventory.test.ts` on the merged tree: before the change it failed on `dap create` (observed); after it, 5 of 5 pass. On this tree it reads the help's 23 `dap` usage rows, keeps 20 distinct commands, leaves out `dap mcp` and checks 19, every one found in the table (counted by running the test's own selection over `USAGE`). `recipes.scope.test.ts` runs the renamed row |
+| P3. The witness's count | The third amendment's paragraph now says 23 usage rows, 20 commands and 19 checked, as the help at `c28193a5` gives them (counted from that head's `line.ts`); the working test is unchanged | this note |
+
+The planner's public gate projection for `c28193a5` carries the same wrong
+descriptive number (21 commands, 20 besides `dap mcp`). Its bytes and its
+phase results are preserved unchanged. The planner's separate, closed
+correction record is at
+`~/play/artroom-diagnostics/mcp-generic-gate-c28193a5-correction.md`.
+The gate of `c28193a5` is not carried over to this tree; this tree's gate
+is run again and reported below.
+
+The observed figures were taken again on this tree and are the same as
+after the composition: the list sizes per role, the reads per tool and
+their response bytes, and in the room story 229 and 288 requests in the
+default mode and 241 and 283 in `--generic`. The `dap create` recipe
+takes 5 calls in the default mode and 7 in `--generic` (observed), as
+`dap claim` did.
+
 **Paths that differ from main.** After the third merge, and at the head of
 the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
 60 files, all this branch's own: the 44 files of `packages/mcp` (this
@@ -357,6 +391,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| After the corrections of review 84d36fa4, on the merged tree: `npx vitest run --project mcp packages/mcp/test/inventory.test.ts`, before and after the inventory change | before: `Tests  1 failed \| 4 passed (5)`, failing on `dap create`; after: `Tests  5 passed (5)` |
+| The same tree: `npx vitest run --project mcp --reporter=verbose`; `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Tests  73 passed (73)`; `Test Files  7 passed (7)`, `Tests  12 passed (12)` |
 | After the composition onto the renamed main, at `292e2206`: `npx vitest run --project mcp --project cli --project client` | `Tests  136 passed (136)` |
 | The same: `npx vitest run --project mcp --reporter=verbose` | `Tests  73 passed (73)` |
 | The same: `npx vitest run --project scope packages/mcp/test packages/cli/test`, then `packages/mcp/test` alone with `--reporter=verbose` | `Test Files  12 passed (12)`, `Tests  18 passed (18)`; then `Test Files  7 passed (7)`, `Tests  12 passed (12)` |
@@ -402,9 +438,12 @@ loop that checks every command against the inventory table in
 condition. The planner changed the prefix to `  dap ` and added two
 assertions before the loop: the set holds at least fifteen commands, and
 it contains `dap install`, `dap join`, `dap issues`, `dap merge` and
-`dap mcp`. With the prefix fixed the witness selects 21 commands (20
-besides `dap mcp`) and every one is found in the table; the owning test
-passes (5 of 5 in the file, observed). Nothing else changed.
+`dap mcp`. With the prefix fixed the witness reads the help's 23 `dap`
+usage rows, keeps 20 distinct commands, leaves out `dap mcp`, and checks
+19, every one found in the table; the owning test passes (5 of 5 in the
+file, observed). Nothing else changed. (This paragraph first said 21
+commands, 20 besides `dap mcp`; corrected in the corrections of review
+84d36fa4.)
 
 ## The planner's second amendment, after the merge
 
@@ -572,7 +611,7 @@ delivery's.
   with a bearer per agent, a session store for the 2025-11-25 revision, and
   each bearer's sessions and subscriptions kept apart. Nothing of it is
   built. Whether it builds on `@modelcontextprotocol/server` is open.
-- **The optional amendment of `docs/cli.md`**, naming `artroom mcp` in its
+- **The optional amendment of `docs/cli.md`**, naming `dap mcp` in its
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
 - **`credential`'s reads**: 3 where plan 031 counts 1, as reported above.
@@ -582,6 +621,11 @@ delivery's.
   the refusal. Mutual exclusion holds; recovery is manual. Automatic
   recovery would need an atomic conditional replace of a file, which Node
   does not give.
+- **Parity of the MCP join with the Start head's join.** Once the Start
+  head lands, the MCP `join` tool is to be assessed against its tagged
+  agent-key command line join and its `--check` (checker request 34c4).
+  The MCP join still uses the invitation-link parser, which is correct for
+  the links the room issues today.
 - **No gitseq request** was recorded from this session: no gitseq tool was
   available in the cloud container. The requester records one for this
   head.
