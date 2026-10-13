@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/brand-dist.mjs","body":{"commit":"6afbb5b53dd6950f537b4a8aab4421b7b926209a","path":"scripts/brand-dist.mjs"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:007d69dd08504bf24b44a05fb8c34ceda1a59783","text":"Merge retired a covered predecessor; the successor is at brand/dist/dap-wordmark-black.svg."}
