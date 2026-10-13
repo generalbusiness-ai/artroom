@@ -1,6 +1,6 @@
 # A lending library on dap
 
-13 October 2026. **Proposed design, Draft 1. Design only: no source, no
+13 October 2026. **Proposed design, Draft 2. Design only: no source, no
 test and no deployment was written or run for this note.** Baseline main
 `562357458b0b3f44873efc6c21429194b60a00f7`.
 
@@ -13,6 +13,10 @@ the library is filled by donations; anyone may return a lent thing; staff
 may cancel any thing with an informal reason; the shelf is the room's
 repository on the hosting's own Git service, published as pages; members
 act through a browser interface built on the design system.
+
+Draft 2 changes the demo script only: Nasruddin's donation of the small
+pot carries the description "Baby born when the big pot was with me"
+(Hugh, 13 October 2026). The definition is unchanged.
 
 ## 1. What the library does
 
@@ -75,7 +79,8 @@ Notes on the rules:
   member borrowed.
 - `cancel` belongs to staff alone. A borrower who breaks a thing tells
   staff, and staff sign the cancellation with the reason as told.
-- The scope does not judge the reason. It is kept as text.
+- The scope does not judge the reason or a description. Each is kept as
+  the signer's text.
 - A member may borrow a thing that they donated.
 - No act deletes a thing or edits its name.
 
@@ -212,24 +217,26 @@ Provisioning, in order:
 
 The story is Nasruddin and the pot.
 
-| Step | Who | Act | Result |
-|---|---|---|---|
-| 1 | Neighbour | `donate` "Big pot" | Takes effect. The shelf shows the pot, available. |
-| 2 | Nasruddin | `borrow` the big pot | Takes effect. The shelf shows it lent to Nasruddin. |
-| 3 | Nasruddin | `return` the big pot | Takes effect. Available again. |
-| 4 | Nasruddin | Says the pot had a baby, and offers to return the small pot too. | Nothing to sign: the small pot is not a thing in the library, so `return` has no item to name. |
-| 5 | Nasruddin | `donate` "Small pot" | Takes effect. The record says Nasruddin donated a small pot. It says nothing about a birth. |
-| 6 | Nasruddin | `borrow` the big pot again | Takes effect. |
-| 7 | Nasruddin | Says the pot died. | No act. |
-| 8 | Neighbour | `cancel` the big pot, reason "Nasruddin says the pot died" | Takes effect. The pot is gone; the reason is in the journal and on its page. |
-| 9 | Neighbour | `donate` "New big pot" | Takes effect. The shelf is replenished. |
+| Step | Who       | Act                                                              | Result                                                                                         |
+| ---- | --------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1    | Neighbour | `donate` "Big pot"                                               | Takes effect. The shelf shows the pot, available.                                              |
+| 2    | Nasruddin | `borrow` the big pot                                             | Takes effect. The shelf shows it lent to Nasruddin.                                            |
+| 3    | Nasruddin | `return` the big pot                                             | Takes effect. Available again.                                                                 |
+| 4    | Nasruddin | Says the pot had a baby, and offers to return the small pot too. | Nothing to sign: the small pot is not a thing in the library, so `return` has no item to name. |
+| 5    | Nasruddin | `donate` "Small pot", description "Baby born when the big pot was with me" | Takes effect. The record and the shelf page carry the description in Nasruddin's words. The scope does not judge it. |
+| 6    | Nasruddin | `borrow` the big pot again                                       | Takes effect.                                                                                  |
+| 7    | Nasruddin | Says the pot died.                                               | No act.                                                                                        |
+| 8    | Neighbour | `cancel` the big pot, reason "Nasruddin says the pot died"       | Takes effect. The pot is gone; the reason is in the journal and on its page.                   |
+| 9    | Neighbour | `donate` "New big pot"                                           | Takes effect. The shelf is replenished.                                                        |
 
 Two refusals to show beside the story: Nasruddin signs `cancel` and is
 refused for lack of `lending.staff`; a second `borrow` of a lent thing is
 refused by its guard.
 
 The point of the demo: the record holds what each person did, in order,
-and the rules decide what can be done. It holds no one's account of why.
+and the rules decide what can be done. A person's account of why is kept
+as their own signed text, in a description or a reason. The scope judges
+none of it: the birth and the death are recorded the same way.
 
 ## 9. What must be built
 
