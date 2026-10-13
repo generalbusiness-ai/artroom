@@ -4,7 +4,7 @@ One page, for people who are not designers. More do than don't.
 
 ## 1. The logo
 
-- **Idea.** The word is the logo. Its a is a sharp diamond with a short tail: the seed of a record, and the same 45 degree cut that the d and the p carry. The a alone is the symbol.
+- **Idea.** The word is the logo. Its a is a sharp diamond with two opposite tails: the seed of a record, and the same 45 degree cut that the d and the p carry. The a alone is the symbol.
 - **Versions.** Wordmark (primary), symbol (the a) for icons and avatars.
 - **Files.** `dap-*.svg` are the masters. `dist/` holds the one-colour versions, the square avatar, the favicon and the web icon set. Use SVG wherever you can; use the PNGs where you cannot.
 
@@ -27,7 +27,7 @@ Keep a clear zone equal to the a's tail (the side of the small triangle) on all 
 | Wordmark | 72 px wide | 18 mm wide |
 | Symbol | 16 px tall | 5 mm tall |
 
-The symbol reads at 16 px from the master drawing. The small cut in `dap-symbol-small.svg` is the same drawing with slightly less padding and a slightly lighter stroke, for favicon.ico.
+The small cut in `dap-symbol-small.svg` has less padding and a lighter stroke. Browser tab icons use that thinned path in white (#FFFFFF) on a forest green (#123F2B) disc, with transparent corners. At 16 pixels, check that both tails remain distinct before using the icon.
 
 ## 4. Colour
 
@@ -55,8 +55,8 @@ Cyan and amber are reserved for woah and keep. Do not use them with the dap logo
 
 ## 6. Don't
 
-Don't stretch, squash, rotate or slant it. Don't recolour outside the palette. Don't add shadows, outlines, gradients or effects. Don't separate the tail from the a or move it. Don't put the tail on entry markers; it belongs to the logo. Don't put it on a busy background without the tile. Don't retype the wordmark.
+Don't stretch, squash, rotate or slant it. Don't recolour outside the palette. Don't add shadows, outlines, gradients or effects. Don't separate either tail from the a or move it. Don't put the tails on entry markers; they belong to the logo. Don't put it on a busy background without the tile. Don't retype the wordmark.
 
 ## 7. Masters and construction
 
-`gen6.py` regenerates every file from the construction: a 256 grid with an 8 unit module; letters built from rings of radius 60 and stems of width 26 on an x-height of 120, with the ascender of d (170) and the descender of p (48) cut at 45 degrees. The a is a diamond outline of half diagonal 72, twelve units past the x-height so it sits even with the round letters, with a perpendicular stroke of 26. Its tail is a halved square of side 36 that sits on the baseline, its cut parallel to the diamond's lower-right edge at a perpendicular gap of 12; that places its right edge seven units inside the diamond's right vertex. Letter spacing is 12 on either side of the a.
+`gen6.py` regenerates the master SVGs from the construction: a 256 grid with an 8 unit module; letters built from rings of radius 60 and stems of width 26 on an x-height of 120, with the ascender of d (170) and the descender of p (48) cut at 45 degrees. The a is a diamond outline of half diagonal 72, twelve units past the x-height so it sits even with the round letters, with a perpendicular stroke of 26. Its tail is a halved square of side 36 that sits on the baseline, its cut parallel to the diamond's lower-right edge at a perpendicular gap of 12; that places its right edge seven units inside the diamond's right vertex. The second tail is the first rotated 180 degrees about the diamond’s centre. Letter spacing is 8 on either side of the a. The wordmark canvas is 432 × 256; keep its displayed height when replacing the earlier 440 × 256 drawing.
