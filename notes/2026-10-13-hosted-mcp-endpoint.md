@@ -1,7 +1,8 @@
 # The hosted MCP endpoint: plan 031, stage 2
 
-Date: 2026-10-13. Status: Draft 2, for checker review (Draft 1 was
-20e2344d; the checker's review 6a262c93 is answered in section 10).
+Date: 2026-10-13. Status: Draft 3, for checker review (Draft 1 was
+20e2344d, Draft 2 d69b46ba; the checker's reviews 6a262c93 and 89ec44b0
+are answered in section 10).
 Requested by Hugh on 2026-10-13 at 11:03 Eastern: "the hosted MCP
 endpoint should be prioritized", right after the discovery head (request
 f9ca5f96).
@@ -160,14 +161,45 @@ controller of the member named in the body. A revoked key, an ended
 member, another repository or another incarnation refuse `403` with a
 fixed body.
 
-Replay and lost replies: the registry (for `create`) and the agent object
-(for `bearer` and `retire`) record each `op` with its body digest and its
-answer until `notAfter`; the same `op` with the same digest returns the
-same answer, including the bearer shown at creation, so a controller whose
-reply was lost repeats the exact request and gets the exact answer; the
-same `op` with a different digest or action refuses `409`. Signed reads
-are not reused for this: they bind a read name and argument, not an
-action, a target or a body.
+**Reservation before any handoff.** A control request's identity is the
+tuple (`actor`, `membership` with incarnation, `action`, `agent`, `body`
+digest, `op`), its fingerprint. Before the registry or the agent object
+crosses to another object or awaits anything that can fail, it records the
+request durably in one `transactionSync`:
+
+- For `create`, the registry inserts a reservation row keyed by `op`:
+  the fingerprint, a freshly allocated agent object ID, state `reserved`.
+  Two concurrent requests with the same `op` cannot both insert; the
+  second reads the row and joins the same reservation. Only then does the
+  registry call the agent object, passing `op` and the body.
+- The agent object, on its first call, generates the seed and writes it
+  with state `enrolling` in one transaction, before building the envelope;
+  on a later call with the same `op` it finds the seed and resumes. The
+  `enrol` envelope is kept in custody before it is sent, as section 3.3
+  says, so a resume after any reset resubmits the exact envelope or
+  settles it, never signs a second one; the invitation is therefore
+  consumed by one key only, and no enrolled key is stranded.
+- When the enrol is decisive and read back, the agent object writes the
+  bearer digest, the answer and state `enrolled` in one transaction; the
+  registry then writes the answer and state `complete` in one transaction
+  **before** replying. A reset anywhere between these steps leaves a
+  resumable row, and the next request with the same `op` resumes from it.
+- For `bearer` and `retire`, the agent object writes the fingerprint, the
+  new bearer digest or the retired state, the deletion of every session,
+  the marking of every open stream to close, and the answer, in **one**
+  transaction, so the rotation and its answer cannot part.
+
+Replay rules: the same `op` with the same fingerprint returns the stored
+answer (including the bearer shown at creation) or resumes the unfinished
+work; the same `op` with any other fingerprint, or another action or
+target, refuses `409`. Current authority is checked again on every
+attempt, including a resume: a controller or admin whose authority ended
+between attempts refuses `403`, and the reservation stays, so an admin can
+still `retire` the agent. Unfinished reservations are never dropped,
+whatever `notAfter` says; completed answers are retained for seven days
+past `notAfter` for lost-reply replay, then the `op` refuses `409` as
+stale, stated in the error. Signed reads are not reused for any of this:
+they bind a read name and argument, not an action, a target or a body.
 
 ### 3.3 Enrolment: how the hosted key becomes a member key
 
@@ -195,8 +227,12 @@ which is the membership's own and adds no permission:
    resubmits the exact envelope, as custody does for every act; on a
    refusal (invitation lapsed, wrong secret, key in use) it retires itself
    and the `create` answers with the membership's reason. The secret is
-   held only inside the envelope, which custody retains as it retains
-   every signed act, and nowhere else.
+   where the membership puts it: in `enrol`'s signed fields, which the
+   membership hashes and retains in its admitted history as native bytes
+   (`membership.ts` 417-421, 679-684), and in the envelope custody
+   retains as it retains every signed act. The hosted layer keeps no
+   further copy: not in the `agent` row, the registry, a log or the
+   configuration; and no native byte is changed to make that so.
 5. The answer is `{ agent, key, handle, bearer }`, the bearer shown this
    once (and again only by the same `op`, section 3.2).
 
@@ -245,43 +281,75 @@ transport and the 2025-11-25 transport:
   `DELETE` without `Mcp-Session-Id` → `405`. No tool declares
   `x-mcp-header`, so no `Mcp-Param-*` header is expected, and one that is
   present is ignored as an intermediary would.
-- Legacy: `initialize` mints a session ID; a request with an unknown
-  session → `404`; `GET` with an unknown session → `404`; a second `GET`
-  for the same session replaces the first, which closes; a notification →
-  `202`; `Mcp-*` metadata headers are ignored.
+- Legacy (2025-11-25 transport): `initialize` mints a session ID; a
+  request, `GET` or `DELETE` with an unknown or ended session → `404`; a
+  request other than `initialize` without `Mcp-Session-Id` → `400`; an
+  `MCP-Protocol-Version` header that is present and not a version the
+  server serves (`2025-11-25`, or `2025-03-26` and `2025-06-18` as names
+  of the same handling) → `400` before dispatch, on `POST`, `GET` and
+  `DELETE` alike ("if the server receives a request with an invalid or
+  unsupported MCP-Protocol-Version, it MUST respond with 400 Bad
+  Request"); an absent header uses the session's negotiated version, or
+  `2025-03-26` for `initialize`, as the revision says a server should
+  assume; `Mcp-Method` and `Mcp-Name`, which only the modern revision
+  defines, are ignored on a legacy request; a second `GET` for the same
+  session replaces the first, which closes without detaching its
+  replacement; a notification → `202`; `Last-Event-ID` is ignored, streams
+  are not resumable, stated in the response to `GET`.
 - Both: a body over the bound → `413`; a batch → `400` with `-32600`; a
   frame that is not a request or notification → `400` with `-32600`.
 
 Every error body is a JSON-RPC error with the request's `id` when one was
-parsed and none otherwise, a fixed message that names the header or rule
-by name and never its value, the request text or any secret, and the
-code above; the message is for correlation, the code is the contract.
+parsed and `"id": null` when the id could not be detected (a parse error
+or an invalid request), as JSON-RPC 2.0 requires; a fixed message that
+names the header or rule by name and never its value, the request text or
+any secret; and the code above. The message is for correlation, the code
+is the contract. Header safety is judged on the **raw** header value as
+received (visible ASCII, space and tab only), before any sentinel
+decoding; a sentinel value that does not decode as base64 of valid UTF-8
+is a malformed header, `400` with `-32020`.
 
 ### 3.5 Wire and sessions
 
-`Wire` runs unchanged inside the agent object. The legacy session table
-(`id`, negotiated version, initialized flag, declared capabilities, `told`)
-is persisted in the object's SQLite, written in the same synchronous
-transaction as the request that changes it, so a session survives
-eviction; only its open stream is lost. `told` keeps its present meaning,
-the generation the client last **listed**, and is written only on
-`tools/list`; it is never advanced by sending a notification, because a
-stream write is not a receipt. Reconciliation: whenever a legacy stream
-opens (first open or reconnect) and whenever the object starts, the
-object computes the current generation and, if it differs from the
-session's durable `told`, sends one `notifications/tools/list_changed` on
-that stream; the watcher then continues as now. So a list that changed
-while the object was evicted, or while no stream was open, is told once
-at the next stream, and told again only if the client has still not
-listed; at most one notification per generation per stream open.
+`Wire` runs inside the agent object with one bounded change: today its
+legacy session holds a single `told`, which `tools/list` sets to the
+listed generation (`wire.ts` 191) and `watchLegacy` also sets just before
+it sends a notification (121-128), so one field mixes a list with a
+delivery. The change splits it: `listed`, the generation the client last
+listed, set only by `tools/list` and written through a persistence hook
+the transport supplies (the loopback server supplies one that keeps it in
+memory, the Worker one that writes the session row in the same
+synchronous transaction as the request); and `notified`, the generation
+last written to a given stream, held per stream in memory and never
+persisted, because a stream write is not a receipt. The persisted legacy
+session row is (`id`, negotiated version, initialized flag, declared
+capabilities, `listed`), so a session survives eviction and only its open
+stream is lost.
+
+Reconciliation: when a legacy stream opens (first open or reconnect) and
+when the object starts, the object computes the current generation and,
+if it differs from the session's durable `listed`, writes one
+`notifications/tools/list_changed` to that stream and sets the stream's
+`notified`; the watcher then continues, notifying a stream only when the
+current generation differs from both its `notified` and the session's
+`listed`. So a change made while the object was evicted, or while no
+stream was open, is told once at the next stream, and told again on a
+later stream only if the client has still not listed. When a second `GET`
+replaces a session's stream, the old stream's close detaches only the old
+stream's subscription, keyed by the stream, never the replacement's.
 
 Modern `subscriptions/listen` is per connection, as plan 031 section 7
 says: its state is in memory with the stream and ends with it; a client
-whose listen stream closed on eviction reopens it, and the acknowledgement
-tells it nothing was retained. At most 16 legacy sessions and 4 open
-streams per agent; the oldest session ends when a 17th initializes, and a
-5th stream is refused `409`. A `bearer` or `retire` control request ends
-them all.
+whose listen stream closed reopens it and receives the acknowledgement
+the revision defines, carrying the subscription ID and the notification
+types honored, and nothing from before the reopen is replayed. At most 16
+legacy sessions and 4 open streams per agent counting legacy streams and
+modern listens together; the oldest session ends when a 17th initializes,
+and a 5th stream is refused `409`. Endings are of two kinds and the
+witnesses tell them apart: graceful, when `retire`, `bearer` or `DELETE`
+ends sessions and closes streams with a final event; and abrupt, when
+eviction or an exception drops streams with no event, after which the
+session rows are still there.
 
 ### 3.6 Custody
 
@@ -294,8 +362,16 @@ file store's semantics:
   the platform's 2 MB row ceiling with the row overhead; `write` stores the
   chunks and the row in one `transactionSync`, then reads the chunks back
   and compares the digest before returning, as the file store reads back.
-  Outcome segments are rows of a `segment` table, one per segment, each
-  under 1 MiB by the existing 64-outcome spill rule.
+  Outcomes are partitioned by **bytes**, not only by count: the record
+  holds outcomes inline while they number at most 64 and their canonical
+  bytes stay under 256 KiB; beyond either, outcomes spill in order to a
+  `segment` table whose rows are each at most 512 KiB, a single outcome
+  larger than that split across consecutive rows by part index, with the
+  record's segment index (row count, byte count, last outcome ordinal)
+  written in the same transaction as the rows, so every outcome, however
+  large or many, is retained and readable in order under the platform's
+  2 MB row ceiling, and an interrupted spill leaves no row and no index
+  change. The existing 64-outcome rule stays as the count half of this.
 - **Archive, not deletion.** On every terminal write, terminal records
   beyond the newest 1,024 or older than 30 days move to an `archive` table
   with the same bytes and an index by identity, in the same transaction;
@@ -303,15 +379,27 @@ file store's semantics:
   idempotency key returns its retained answer, never prepares or signs
   again; segments are retained with their record. Nothing is deleted by
   this head; an expiry would be a separate contract and is not proposed.
-- **Growth and full.** Custody bytes per agent are counted in the `agent`
-  row and bounded at 1 GiB (stated in `docs/mcp.md`), well under the
-  object's 10 GB; `keep`, `prepare` and `step` refuse `full` with the
-  reason `bytes` when a write would cross it, and `SQLITE_FULL` on a write
-  is answered the same way with nothing partially written (the
-  transaction rolls back); existing records stay readable and `settle`
-  still works, so no act is sent unsaved and no retained answer is lost.
-  Recovery is a later `export` control action, listed as owed; until then
-  the controller retires the agent and creates another.
+- **Growth, reservation and full.** Custody has its own budget per
+  agent, 1 GiB (stated in `docs/mcp.md`), well under the object's 10 GB;
+  control rows, sessions, configuration and the key have a separate
+  budget of 16 MiB, so neither can starve the other. The custody budget
+  is accounted as `used + reserved`: when an identity is admitted
+  (`keep`, `prepare`, the first `step`), the store reserves its
+  **completion space** in the same transaction, `RECORD_BYTES` (2 MiB)
+  for the record's final form plus 1 MiB for its segments; the
+  reservation is released, and the actual bytes counted, when the record
+  becomes terminal and archived. Admission refuses `full` with the reason
+  `bytes` before anything is signed or sent when `used + reserved` plus
+  the new reservation would cross the budget. Because every in-flight
+  identity holds its completion space, a result that arrives after
+  dispatch (the native `settle` appends a receipt and writes the changed
+  record) always has room, whatever other records have done to the
+  budget since, so a decisive answer is never lost for lack of space and
+  an envelope is never replaced; `SQLITE_FULL` on a write that is within
+  budget rolls the transaction back and is answered `full`, existing
+  records stay readable, `settle` still works. Recovery is a later
+  `export` control action, listed as owed; until then the controller
+  retires the agent and creates another.
 - **Locks and admission.** The object is single-threaded but interleaves
   at `await`, so the store's `lock` and `exclusive` are real: a promise
   chain per identity and one for admission, as the scope object's `Queue`
@@ -389,7 +477,14 @@ harness's instance reset; storage stays.
   2025-11-25 and then pinned to 2026-07-28, lists tools and performs
   `issue.create` and `wait`; the entry is in the lane with the agent's key
   as actor. Then the `enrol` envelope is in custody as accepted and the
-  secret is nowhere else.
+  secret is in no hosted row, log or configuration. Handoff: with a reset
+  of the registry after its reservation, of the agent object after its
+  seed is written, after the envelope is kept, after the native `enrol`
+  is accepted but before the registry completes, and after completion but
+  before the reply, a repeated `create` with the same `op` resumes and
+  answers with the same agent, key, envelope and bearer; two concurrent
+  `create` requests with the same `op` produce one agent, one key, one
+  envelope and one bearer.
 - **H2, agents kept apart.** Two agents in one repository: one's custody
   records, sessions and listens are invisible to the other; the same
   idempotency key in both creates two distinct records.
@@ -404,17 +499,24 @@ harness's instance reset; storage stays.
 - **H4, the bearer and revocation.** A missing, malformed, wrong and
   retired bearer each answer `401` with the fixed body; eleven failures in
   a minute from one address answer the limiter's refusal; after `retire`
-  the open stream has closed and the sessions are gone; after `bearer`
-  the old bearer answers `401` and the new one serves; after `revoke-key`
-  the agent's acts are refused by the scope with the membership's reason
-  and custody records it as refused.
+  every open stream, legacy and listen, has closed with a final event and
+  the sessions are gone; after `bearer` the old bearer answers `401`, the
+  new one serves, and the streams and sessions that were open under the
+  old one are closed and gone; the `bearer` answer and the rotation are
+  found together after a reset between them; after `revoke-key` the
+  agent's acts are refused by the scope with the membership's reason and
+  custody records it as refused.
 - **H5, eviction and reconciliation.** A legacy session lists at
-  generation A (`told` = A); the object is reset; the inventory changes to
-  B while no stream is open; the client reconnects `GET /mcp` with its
-  session ID and receives exactly one `list_changed`; it lists, `told` =
-  B; a second reconnect without a change receives none. Also: a reset
-  with a modern listen open ends the stream and a reopened listen
-  acknowledges with nothing retained.
+  generation A (`listed` = A); the inventory changes to B with the stream
+  open and the stream is notified once (`notified` = B, `listed` still A);
+  the object is reset without the client listing; on reconnect the client
+  is notified once more, because `listed` is still A; it lists, `listed`
+  = B; a further reconnect without a change receives nothing. Separately:
+  a change while no stream is open is told once at the next stream; a
+  second `GET` for the session closes the first stream and the second
+  keeps receiving. A reset with a modern listen open ends it abruptly
+  with no event, and a reopened listen is acknowledged with its ID and
+  honored types and replays nothing.
 - **H6, custody across resets and interleaving.** A reset between keep
   and send leaves the record prepared and the exact bytes are sent on
   resubmit; a reset between send and answer leaves it unknown and `settle`
@@ -422,10 +524,17 @@ harness's instance reset; storage stays.
   same key serialize and leave one decisive outcome; two admissions
   started at 255 unresolved admit exactly one and refuse the other `full`;
   a publication interrupted inside the transaction leaves no row and no
-  chunk; a 2 MiB record is written in chunks and read back equal; a write
-  past the 1 GiB bound and a simulated `SQLITE_FULL` refuse `full` with
-  every earlier record still readable; a same-key call after archival
-  returns the retained answer without signing.
+  chunk; a 2 MiB record is written in chunks and read back equal; 120
+  refused resubmissions with 20 KiB names on one identity spill past the
+  byte bound into ordered segment rows and read back complete, and a spill
+  interrupted by a reset leaves the record's index and rows as they were;
+  storage filled to the budget with one exact intent outstanding: the
+  outstanding intent's accepted result is retained through `settle`, a
+  reset and read-back, its envelope unreplaced and the budget unbroken,
+  while a new admission is refused `full` before signing; a simulated
+  `SQLITE_FULL` within budget refuses `full` with every earlier record
+  still readable; a same-key call after archival returns the retained
+  answer without signing.
 - **H7, budgets and framing.** The plan 031 budget witnesses run through
   the endpoint and hold; the HTTP framing overhead is measured once and
   stated in `docs/mcp.md`.
@@ -434,12 +543,21 @@ harness's instance reset; storage stays.
   `supported`), missing `Mcp-Method`, `Mcp-Method` differing from the
   body, missing and differing `Mcp-Name` on `tools/call`, a sentinel-
   encoded `Mcp-Name` that decodes equal (accepted), a header with a
-  control character, an unknown method (`404`, `-32601`), a notification
-  (`202`, empty). Legacy: unknown session `404`, `GET` replaces a stream,
-  `Mcp-*` headers ignored. Both: `Origin` `403`, a body over the bound
-  `413`, a batch, a non-frame, a 5th stream `409`, a 17th session ending
-  the oldest. The same cases run against the loopback server through the
-  shared module.
+  control character or a non-ASCII byte in the raw value, a sentinel
+  carrying a Unicode name and one carrying leading whitespace (both
+  accepted when they decode equal), a sentinel that is not valid base64
+  and one that decodes to invalid UTF-8 (`-32020`), an unknown method
+  (`404`, `-32601`), a notification (`202`, empty), a parse error and an
+  invalid request answered with `"id": null`. Legacy: `POST`, `GET` and
+  `DELETE` each with a valid `MCP-Protocol-Version`, with the header
+  absent and a known session (served), with an invalid value and with an
+  unsupported value (`400` before dispatch); a request without a session
+  `400`; an unknown session `404`; `GET` replaces a stream without
+  detaching the replacement; `Mcp-Method` and `Mcp-Name` ignored. Both:
+  `Origin` `403`, a body over the bound `413`, a batch, a non-frame, a 5th
+  stream `409` counting a listen and a legacy stream together, a 17th
+  session ending the oldest. The same cases run against the loopback
+  server through the shared module.
 
 ## 7. Costs
 
@@ -484,7 +602,21 @@ Owed after this head, in the same stage: OAuth; the pinned `diff` and
 `file` reads; resources and prompts; an `export` control action for a
 full agent; the one-step `create` from the Start agent-key link.
 
-## 10. Corrections of review 6a262c93 (Draft 1 → Draft 2)
+## 10. Corrections of the reviews
+
+### Review 89ec44b0 (Draft 2 → Draft 3)
+
+| Finding | What Draft 3 does |
+|---|---|
+| 1. A reset between objects can allocate a second key or strand an enrolled one | Section 3.2: the fingerprint and the allocated agent ID are reserved in one transaction before any handoff; the seed, the kept envelope, the bearer and the answer are each written before the next step; resumes find the same seed and envelope; `bearer` and `retire` write identity, rotation, session deletion and answer in one transaction; replay, conflict, re-checked authority and retention after expiry stated; H1 resets at each step and the concurrent duplicate |
+| 2. A write guard conflicts with guaranteed settlement | Section 3.6: completion space reserved at admission (2 MiB + 1 MiB) and released on archival, a separate 16 MiB budget for control, session, configuration and key rows, `full` refused before signing; H6 fills storage with an exact intent outstanding and retains its result |
+| 3. Segments bounded by count, not bytes | Section 3.6: inline bound by count and bytes, segment rows of at most 512 KiB, oversized outcomes split by part index, index and rows in one transaction; H6 with 120 refusals of 20 KiB names and an interrupted spill |
+| 4. `told` mixes listing with delivery | Section 3.5: a bounded `Wire` change splitting `listed` (durable, set by `tools/list` through a persistence hook) from `notified` (per stream, memory); reconciliation against `listed`; replacement streams not detached; H5 notifies without listing, resets, reconnects, lists |
+| 5. Legacy version headers | Section 3.4: an invalid or unsupported `MCP-Protocol-Version` is `400` before dispatch on `POST`, `GET` and `DELETE`; an absent header uses the session's negotiated version; only the modern mirror headers are ignored; H8 cases |
+| `id: null`, raw header safety, sentinel cases, listen acknowledgement, eviction vs retirement, stream counting, rotation | Sections 3.4 and 3.5; H4, H5, H8 |
+| P3: the secret is in `enrol`'s signed fields and native history | Section 3.3 step 4 and H1 say where the secret is and that the hosted layer keeps no further copy, changing no native byte |
+
+### Review 6a262c93 (Draft 1 → Draft 2)
 
 | Finding | What Draft 2 does |
 |---|---|
