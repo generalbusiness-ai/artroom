@@ -20,7 +20,8 @@
 
 import type { Answer, FieldValue, MemberRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, unb64url } from "@generalbusiness/artroom-bytes";
-import { act, actAssociation, actsOn, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { act, actAssociation, actsOn, issueCreation, fieldValue, listLanes, loadChange, loadIssue, loadRules, roomInitialization, initializationStillCurrent, openRoom, placeOf, siteAddress, type Acted, type Place, type Room, type Session } from "./data.ts";
+import { bindDisclosures, openDialog, releaseDialog } from "./popups.ts";
 import { actsPanel, answerLine, nonacceptedAnswerText, changeScreen, failureScreen, h, icon, whoLine, issueScreen, roomScreen, rulesScreen } from "./view.ts";
 import { initializationMessage, RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf, type Destination } from "./shell.ts";
 import { editPath } from "@generalbusiness/artroom-platform";
@@ -109,10 +110,42 @@ let lastVerifiedContext: string | null = null;
 /** The scope's answer to the last act sent from this page, by service/room/member/scope, for the states and the answer line. */
 const lastActs = new Map<string, Acted>();
 const sending = new ScopeSending();
+interface CreationFollow { result: Acted; timer?: ReturnType<typeof setTimeout>; active: boolean; current(): boolean }
+let creationFollow: CreationFollow | null = null;
+function cancelCreationFollow(): void {
+  if (!creationFollow) return;
+  creationFollow.active = false;
+  if (creationFollow.timer !== undefined) clearTimeout(creationFollow.timer);
+  creationFollow = null;
+}
+/** One bounded read at a time while native creation is positively pending; no new submission. */
+async function followCreatedIssue(room: Room, result: Acted, current: () => boolean): Promise<void> {
+  if (creationFollow?.result === result && creationFollow.active && creationFollow.current() && current()) return;
+  cancelCreationFollow();
+  const owned: CreationFollow = { result, active: true, current };
+  creationFollow = owned;
+  let reads = 0;
+  const active = () => owned.active && creationFollow === owned && lastActs.get(actAssociation(room, room.directory)) === result && owned.current();
+  const check = async (): Promise<void> => {
+    if (!active()) { if (creationFollow === owned) cancelCreationFollow(); return; }
+    const read = await issueCreation(room, result, active); reads++;
+    if (!active()) { if (creationFollow === owned) cancelCreationFollow(); return; }
+    if (read.state === "confirmed") {
+      cancelCreationFollow();
+      location.hash = `#/issue/${read.child.scope}`;
+      await draw();
+    } else if (read.state === "pending") {
+      owned.timer = setTimeout(() => { void check(); }, Math.min(500 * 2 ** Math.min(reads - 1, 4), 5_000));
+    } else cancelCreationFollow(); // Unavailable/malformed: retain the known Answer and manual read action.
+  };
+  await check();
+}
+
 const claimDrafts = new Map<string, string>();
 const claiming = new Set<string>();
 let roomDialog: HTMLDialogElement | null = null;
 let roomDialogBinding: { settings: string; route: string } | null = null;
+let refusalDialog: { dialog: HTMLDialogElement; context: string; route: string; binding: string } | null = null;
 interface WorkbenchDialog {
   dialog: HTMLDialogElement; body: HTMLElement; context: string; route: string; kind: "record" | "review" | "source";
   opener: string; manifest?: number; action?: string; message: HTMLElement; binding: string;
@@ -131,7 +164,7 @@ function currentScopeHosts(context: string): HTMLElement[] {
   return [root(), ...(workbenchDialog?.context === context && workbenchDialog.route === location.hash ? [workbenchDialog.body] : [])];
 }
 function fenceCurrentScope(context: string): void {
-  for (const host of currentScopeHosts(context)) for (const control of host.querySelectorAll<HTMLElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea')) control.setAttribute("disabled", "");
+  for (const host of currentScopeHosts(context)) for (const control of host.querySelectorAll<HTMLElement>('[data-act] input, [data-act] textarea, [data-act] select, [data-act] button, [data-action-slot="create"] button, [data-action-slot="edit"] button, [data-action-slot="edit"] input, [data-action-slot="edit"] textarea, button[form]')) control.setAttribute("disabled", "");
 }
 /** A render prepared before submission still publishes the current scope fence. */
 function syncCurrentFences(): void {
@@ -150,7 +183,7 @@ function closeWorkbench(restore = true): void {
   const current = workbenchDialog;
   if (!current) return;
   workbenchDialog = null;
-  current.dialog.close(); current.dialog.remove();
+  releaseDialog(current.dialog); current.dialog.close(); current.dialog.remove();
   if (restore && location.hash === current.route && current.binding === settingsContext(settings() ?? { place: null, secret: "" })) returnToControl(current.opener);
 }
 function openWorkbench(title: string, body: HTMLElement, context: string, opener: string, kind: WorkbenchDialog["kind"], subject?: { manifest: number; action: string }): void {
@@ -161,8 +194,39 @@ function openWorkbench(title: string, body: HTMLElement, context: string, opener
   workbenchDialog = { dialog, body, message, context, route: location.hash, kind, opener, binding: settingsContext(settings() ?? { place: null, secret: "" }), ...subject };
   close.addEventListener("click", () => closeWorkbench());
   dialog.addEventListener("cancel", event => { event.preventDefault(); closeWorkbench(); });
-  document.body.append(dialog); dialog.showModal();
+  document.body.append(dialog); openDialog(dialog, restore => closeWorkbench(restore));
   (body.querySelector<HTMLElement>("input:not([type=hidden]), textarea, select, button, summary") ?? close).focus();
+}
+
+/** A native refusal is kept separately from the person's editable task dialog. */
+function closeRefusal(): void {
+  const current = refusalDialog;
+  if (!current) return;
+  refusalDialog = null;
+  releaseDialog(current.dialog); current.dialog.close(); current.dialog.remove();
+}
+function showRefusal(known: Acted, context: string): void {
+  if (known.answer.answer !== "refused") return;
+  closeRefusal();
+  const route = location.hash, binding = settingsContext(settings() ?? { place: null, secret: "" });
+  const focus = keepFocus(document.body);
+  const dismiss = h("button", { type: "button", class: "primary" }, "Dismiss");
+  const dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "request-refusal-title", "data-refusal-context": context },
+    h("h1", { id: "request-refusal-title" }, "Request refused"),
+    h("p", {}, nonacceptedAnswerText(known.answer)),
+    h("p", {}, known.answer.name ? `Guard: ${known.answer.name}` : "The scope did not supply a guard name."),
+    h("div", { class: "form-footer" }, dismiss)) as HTMLDialogElement;
+  refusalDialog = { dialog, context, route, binding };
+  const close = (restore = true) => {
+    if (refusalDialog?.dialog !== dialog) return;
+    closeRefusal();
+    if (restore && route === location.hash && binding === settingsContext(settings() ?? { place: null, secret: "" })) {
+      if (!restoreFocus(document.body, focus)) document.getElementById("page-main")?.focus();
+    }
+  };
+  dismiss.addEventListener("click", () => close());
+  dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
+  document.body.append(dialog); openDialog(dialog, close); dismiss.focus();
 }
 
 /** All deep records share one entry; status recovery remains a visible task. */
@@ -175,15 +239,26 @@ function inspectedScreen(screen: HTMLElement, panel: HTMLElement, context: strin
     const next = screen.querySelector('[data-action-slot="next"]') ?? screen.querySelector('[data-action-slot="create"]');
     next?.replaceChildren(recovery);
   }
+  const answer = panel.querySelector<HTMLElement>("[data-request-context]");
+  if (answer) { answer.remove(); screen.append(answer); }
   const notice = panel.querySelector<HTMLElement>("[data-task-status]");
   if (notice) { notice.remove(); screen.append(notice); }
   const rulesForm = panel.querySelector<HTMLElement>(".rules-editor");
-  if (rulesForm) { rulesForm.remove(); screen.append(rulesForm); }
+  if (rulesForm) {
+    const save = rulesForm.querySelector<HTMLElement>('button[type="submit"]');
+    const actions = screen.querySelector<HTMLElement>('[data-action-slot="next"]');
+    if (save && actions) {
+      const id = controlKey(context, "rules-form");
+      rulesForm.setAttribute("id", id); save.setAttribute("form", id);
+      save.remove(); actions.append(save);
+    }
+    rulesForm.remove(); screen.append(rulesForm);
+  }
   const body = h("div", { hidden: "", "data-record-body": "" }, record, panel);
   const key = controlKey(context, "inspect");
   const inspect = h("button", { type: "button", class: "icon-button", "aria-label": `Inspect ${label.toLowerCase()}`, "data-focus-key": key }, icon("more"));
   inspect.addEventListener("click", () => { body.removeAttribute("hidden"); openWorkbench(label, body, context, key, "record"); });
-  (screen.querySelector(".detail-top") ?? screen.querySelector('[data-action-slot="create"]') ?? screen).append(inspect);
+  (screen.querySelector('[data-action-slot="next"]') ?? screen.querySelector('[data-action-slot="create"]') ?? screen).append(inspect);
   screen.append(body);
   if (workbenchDialog?.kind === "record" && workbenchDialog.context === context && workbenchDialog.route === location.hash) {
     const saved = keepFocus(workbenchDialog.body);
@@ -356,15 +431,18 @@ function shell(destination: Destination, room: Room | null, ...content: HTMLElem
   const skip = h("a", { class: "skip", href: "#page-main" }, "Skip to content");
   skip.addEventListener("click", event => { event.preventDefault(); document.getElementById("page-main")?.focus(); });
   const create = () => { const button = h("button", { class: "nav-item", type: "button", "data-focus-key": controlKey(shellContext, "create-room") }, "Create room"); button.addEventListener("click", () => { if (offer) claimDialog(room, offer.kept, offer.configured, button); }); return button; };
-  return [skip,
+  const surfaces = [skip,
     h("aside", { class: "rail" }, wordmark(), roomSwitch(), navigation(), offer ? create() : null, h("div", { class: "rail-bottom" }, accountControl())),
     h("header", { class: "mobile-header" }, h("div", { class: "mobile-context" }, wordmark(), roomSwitch(), accountControl()), navigation(true), offer ? create() : null),
     h("div", { class: "content", id: "page-main", tabindex: "-1" }, ...content)];
+  bindDisclosures(surfaces.flatMap(surface => [...surface.querySelectorAll<HTMLElement>("details.shell-disclosure")]), root());
+  return surfaces;
 }
 
 function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, opener: HTMLElement): void {
   const binding = settingsContext(kept);
   if (settingsContext(settings() ?? { place: null, secret: "" }) !== binding) return;
+  if (roomDialog) releaseDialog(roomDialog);
   roomDialog?.close(); roomDialog?.remove();
   let status: ReturnType<typeof claimStatus>;
   try { status = claimStatus(sessionOf(kept), configured, localStorage); }
@@ -381,7 +459,7 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
   roomDialog = dialog;
   roomDialogBinding = { settings: binding, route: location.hash };
   const openerKey = opener.getAttribute("data-focus-key");
-  const close = (preserveDraft = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); dialog.close(); dialog.remove(); if (roomDialog === dialog) { roomDialog = null; roomDialogBinding = null; } if (openerKey) returnToControl(openerKey); };
+  const close = (preserveDraft = true, restore = true) => { if (preserveDraft) claimDrafts.set(binding, name.value); else claimDrafts.delete(binding); releaseDialog(dialog); dialog.close(); dialog.remove(); if (roomDialog === dialog) { roomDialog = null; roomDialogBinding = null; } if (restore && openerKey) returnToControl(openerKey); };
   cancel.addEventListener("click", () => { close(); });
   dialog.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   name.addEventListener("input", () => { claimDrafts.set(binding, name.value); });
@@ -422,13 +500,15 @@ function claimDialog(room: Room, kept: Settings, configured: ClaimRegister, open
       finally { claiming.delete(binding); submit.removeAttribute("disabled"); }
     })();
   });
-  document.body.append(dialog); dialog.showModal(); name.focus();
+  document.body.append(dialog); openDialog(dialog, restore => close(true, restore)); name.focus();
 }
 
 /** The acts panel for one scope: its form sends the act, keeps the answer and draws the screen again. */
 interface PanelOptions {
   offered?: Awaited<ReturnType<typeof actsOn>>;
   represented?: readonly string[];
+  beforeSign?: (kind: string, on: string) => Promise<void>;
+  settled?: (result: Acted, current: () => boolean) => Promise<void>;
   customForm?: (send: (kind: string, on: string, typed: Record<string, string>) => void, blocked: boolean, draftKey: string) => HTMLElement;
   tasks?: (offered: Awaited<ReturnType<typeof actsOn>>, send: Send, context: ActionContext) => readonly string[];
 }
@@ -455,6 +535,8 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
     const previous = lastActs.get(association);
     if (context.uncertain || context.blockedKinds?.includes(kind) || previous && (previous.answer.answer === "unavailable" || previous.answer.answer === "mismatch" || previous.observation !== null)) return;
     if (!sending.begin(association, kind)) return;
+    cancelCreationFollow();
+    if (refusalDialog?.context === association) closeRefusal();
     showLocally(h("p", { role: "status" }, "Sending request"), true, "Sending request");
     void (async () => {
       try {
@@ -462,6 +544,7 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
         const offered = (await actsOn(room, scope)).acts.find((a) => a.kind === kind);
         if (!currentContext()) throw new Error("The room or key changed. Open this view again before sending.");
         if (!offered) throw new Error("This action is no longer offered. Check status before sending.");
+        await options.beforeSign?.(kind, on);
         await beforeSign?.();
         if (!currentContext()) throw new Error("The room or key changed before signing. Nothing was sent.");
         const fields: Record<string, FieldValue> = Object.fromEntries(Object.entries(typed).map(([name, text]) => [name, fieldValue(room, offered.fields.find((f) => f.name === name)?.type ?? "text", text)]));
@@ -470,11 +553,13 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
           lastActs.set(association, known); sending.answered(association);
           showLocally(answerLine(known), true, known.answer.answer === "accepted" ? "Request accepted" : known.answer.answer === "refused" ? `Request refused: ${known.answer.reason}` : "Request outcome unknown");
           if (known.answer.answer === "accepted") accepted?.();
+          else if (known.answer.answer === "refused" && activeView()) showRefusal(known, association);
         }, () => {
           if (!currentContext()) throw new Error("The room or key changed before submission. Nothing was sent.");
           sending.submitting(association);
         });
         lastActs.set(association, result);
+        if (result.answer.answer === "accepted" && result.observation === null && activeView()) await options.settled?.(result, activeView);
         if (result.answer.answer === "refused" && result.observation === null) issueDialogOutcome(association, "editable", nonacceptedAnswerText(result.answer));
         else if (result.answer.answer !== "accepted" || result.observation !== null) issueDialogOutcome(association, "unknown", "The original request remains unresolved. Check status without sending a replacement.");
       } catch (error) {
@@ -497,7 +582,8 @@ async function panelFor(room: Room, scope: ScopeId, context: ActionContext = {},
   const advancedContext = { ...taskContext };
   delete advancedContext.choices;
   const panel = actsPanel(remaining, send, last ? answerLine(last) : null, { ...advancedContext, primary: [] });
-  const answerHost = h("div", { class: "request-answer", "aria-live": "polite", "data-request-context": association });
+  const answerHost = h("div", { class: "request-answer", "aria-live": "polite", "data-request-context": association },
+    pending ? h("p", { role: "status" }, "Sending request") : last ? answerLine(last) : null);
   panel.prepend(answerHost);
   const noticeHost = h("p", { "data-task-status": "", "data-task-context": association, role: "status", "aria-live": "polite", hidden: "" });
   if (pending || uncertain) { noticeHost.textContent = pending ? "Sending request" : "Request outcome unknown"; noticeHost.removeAttribute("hidden"); }
@@ -598,8 +684,9 @@ async function draw(focus = false): Promise<void> {
   const currentDraw = ++drawing;
   claimOffer = undefined;
   reconcileIssueDialogs();
+  if (refusalDialog && (refusalDialog.route !== location.hash || refusalDialog.binding !== settingsContext(settings() ?? { place: null, secret: "" }))) closeRefusal();
   if (roomDialog && (roomDialogBinding?.settings !== settingsContext(settings() ?? { place: null, secret: "" }) || roomDialogBinding?.route !== location.hash)) {
-    roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
+    releaseDialog(roomDialog); roomDialog.close(); roomDialog.remove(); roomDialog = null; roomDialogBinding = null;
   }
   if (workbenchDialog && (workbenchDialog.route !== location.hash || workbenchDialog.binding !== settingsContext(settings() ?? { place: null, secret: "" }))) closeWorkbench(false);
   const route = routeOf(location.hash);
@@ -666,9 +753,14 @@ async function draw(focus = false): Promise<void> {
       const offered = await actsOn(room, scope as ScopeId);
       if (!await presentationCurrent()) return;
       const screen = issueScreen(room, issue);
-      const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind)) };
+      const actionContext = { ...(defaults ? { defaults } : {}), ...issueActions(issue.state, offered.acts.map((act) => act.kind), issue.requesterRef, room.me?.ref) };
       const association = actAssociation(room, scope as ScopeId);
-      const panel = await panelFor(room, scope as ScopeId, actionContext, { offered, tasks: (acts, send, context) => {
+      const panel = await panelFor(room, scope as ScopeId, actionContext, { offered, beforeSign: async (kind, on) => {
+        if (!["close-own", "close-any", "reopen-own", "reopen-any"].includes(kind)) return;
+        const current = await loadIssue(loaded, scope as ScopeId);
+        if (!isScopeRef(issue.ref) || !isScopeRef(current.ref) || issue.ref.scope !== scope || current.ref.scope !== scope || canonicalize(current.ref) !== canonicalize(issue.ref) || current.definition !== issue.definition || current.intent !== issue.intent || on !== String(issue.intent)) throw new Error("The exact issue changed. Open this view again before closing or reopening it.");
+        if (issueActions(current.state, [kind], current.requesterRef, loaded.me?.ref).blockedKinds.includes(kind)) throw new Error("This issue action is unavailable to the current member or state. Check status before sending.");
+      }, tasks: (acts, send, context) => {
         const represented: string[] = [];
         const comment = acts.acts.find((act) => act.kind === "comment");
         if (comment) {
@@ -760,12 +852,16 @@ async function draw(focus = false): Promise<void> {
       return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.rules), "Rules record"));
     }
     const kind = destination === "changes" ? "change" : "issue";
+    const capturedListRoute = location.hash;
     const listContext = { origin: location.origin, directory: room.directory, membership: room.membership, key: room.key };
     const lanes = await listLanes(room);
     const offered = await actsOn(room, room.directory);
     if (!await presentationCurrent()) return;
     const screen = roomScreen(room, lanes, kind, { state: stateOf(listContext, kind), changed: (state) => { keepState(listContext, kind, state); }, focusKey: actAssociation(room, room.directory) });
-    const panel = await panelFor(loaded, loaded.directory, {}, { offered, tasks: (acts, send, context) => {
+    const panel = await panelFor(loaded, loaded.directory, {}, { offered, settled: async (result, current) => {
+      if (result.kind !== "open-issue") return;
+      await followCreatedIssue(loaded, result, current);
+    }, tasks: (acts, send, context) => {
       if (destination === "changes") {
         const open = acts.acts.find(act => act.kind === "open-pr");
         if (open) screen.querySelector('[data-action-slot="create"]')?.append(proposeFromRecordedSource(loaded, lanes.changes, context));
@@ -779,6 +875,12 @@ async function draw(focus = false): Promise<void> {
       // declaration from Inspect (for example a custom required field).
       return control.hasAttribute("data-task-act") ? [open.kind] : [];
     } });
+    const original = lastActs.get(actAssociation(loaded, loaded.directory));
+    if (original?.kind === "open-issue" && original.answer.answer === "accepted" && original.observation === null) {
+      const check = h("button", { type: "button" }, "Check created issue");
+      check.addEventListener("click", () => { if (currentDraw !== drawing || settingsContext(settings() ?? { place: null, secret: "" }) !== originalContext || location.hash !== capturedListRoute) return; void followCreatedIssue(loaded, original, () => currentDraw === drawing && settingsContext(settings() ?? { place: null, secret: "" }) === originalContext && location.hash === capturedListRoute); });
+      screen.append(h("p", {}, check));
+    }
     return showRoom(inspectedScreen(screen, panel, actAssociation(room, room.directory), "Room record"));
   } catch (error) {
     // Match the original service/room/member, even if opening this view failed.
@@ -795,5 +897,5 @@ async function draw(focus = false): Promise<void> {
   }
 }
 
-window.addEventListener("hashchange", () => { void draw(true); });
+window.addEventListener("hashchange", () => { cancelCreationFollow(); void draw(true); });
 void draw();
