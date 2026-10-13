@@ -20,7 +20,7 @@ import { StandIn } from "./support/standin.ts";
 const secret = new Uint8Array(32).fill(5);
 const signer = secretSigner(secret);
 const later = (name: string): DeclaredDefinition => ({ format: "artroom-definition-1", name, profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "g", items: {}, acts: {}, receives: {}, timed: {}, rules: {} } as unknown as DeclaredDefinition);
-const CLI = fileURLToPath(new URL("../../cli/bin/artroom.js", import.meta.url));
+const CLI = fileURLToPath(new URL("../../cli/bin/dap.js", import.meta.url));
 
 let standIn: StandIn;
 let scopes: Server;

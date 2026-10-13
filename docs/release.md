@@ -31,8 +31,9 @@ release script writes the tarball's manifest itself:
 
 1. `npm run build` in the package compiles `src` to `dist` with
    `tsconfig.build.json`: JavaScript and declarations, with each relative
-   `.ts` import rewritten to `.js`. The CLI's build bundles `dist/artroom.js`
-   as before.
+   `.ts` import rewritten to `.js`. The parked CLI's build bundles
+   `dist/artroom.js`. This inactive release tooling retains its original
+   bundle name.
 2. The script copies `dist` (and `bin` for the CLI), the package's README,
    and `LICENSE` and `NOTICE` from the repository root into a staging
    directory outside the repository. For the CLI it also writes
@@ -66,7 +67,7 @@ The five libraries are compiled, not bundled. Their tarballs hold only
 dap code, and npm installs what they depend on as separate packages
 with their own licence files.
 
-The command is different. `dist/artroom.js` is one bundled file that
+The parked command is different. `dist/artroom.js` is one bundled file that
 contains code from other packages, and nothing else is installed with it.
 So its tarball carries `THIRD-PARTY-NOTICES.txt`: for each such package,
 its name, version, declared licence and the complete text of the licence
