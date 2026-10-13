@@ -11,6 +11,7 @@ import { FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
 import { change, change3, changeDemo, issue, issueDemo } from "@generalbusiness/artroom-lanes";
 import { BOUNDS, McpService, memoryStore, type CallResult, type CustodyStore, type McpConfig, type Mode } from "../src/index.ts";
 import { ERROR_BYTES, failed } from "../src/service.ts";
+import { finding } from "../src/errors.ts";
 import { fileStore } from "../src/node.ts";
 import { SERVICE, StandIn } from "./support/standin.ts";
 
@@ -383,6 +384,24 @@ describe("what a call costs, end to end", () => {
     const after = await s.service.call("issue.comment", { target: 1, fields: { body: "Recovered." }, idempotencyKey: "long-home" });
     expect(after.structuredContent["answer"], JSON.stringify(after.structuredContent)).toBe("accepted");
     await annotate(`a dead reclaimer under a home of ${home.length} characters: an error of ${got.bytes} bytes`);
+  });
+
+  // Invariant: no error result passes the bound near its edge, where the result with an empty sentence fits but the sentence's
+  // mark alone does not: every length of a long next step across that edge gives a result within ERROR_BYTES, measured whole.
+  test("an error at the edge of its bound: the marked minimum is measured, not the empty sentence", () => {
+    const sizes: number[] = [];
+    let edge = 0;
+    for (let n = 700; n <= 1100; n++) {
+      const f = { error: "custody", state: "locked", key: "k", scope: "s", stale: "x".repeat(n) } as const;
+      const got = failed(f);
+      const size = new TextEncoder().encode(JSON.stringify(got)).length;
+      sizes.push(size);
+      const said = finding(f);
+      const empty = new TextEncoder().encode(JSON.stringify({ content: [{ type: "text", text: JSON.stringify({ error: said.error, message: "", next: said.next }) }], structuredContent: { error: said.error, message: "", next: said.next }, isError: true })).length;
+      if (empty <= ERROR_BYTES && empty + 2 * 60 > ERROR_BYTES) edge++;
+    }
+    expect(edge, "lengths whose empty-sentence result fits but whose marked sentence would not").toBeGreaterThan(0);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(ERROR_BYTES);
   });
 
   // Invariant: were a finding's next step itself past the bound, the result still fits: the sentence is cut away, and the next

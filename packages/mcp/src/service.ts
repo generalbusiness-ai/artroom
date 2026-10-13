@@ -115,16 +115,20 @@ export const failed = (f: Finding): CallResult => {
   const result = (message: string, next: string = said.next): CallResult => { const structured = { error: said.error, message, next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
   const whole = result(said.sentence);
   if (bytesOf(whole) <= ERROR_BYTES) return whole;
-  const fit = (full: string, make: (part: string) => CallResult, says: (length: number) => string): CallResult => {
+  /** The longest marked cut of `full` that fits, or null when even the marked cut of nothing does not fit. */
+  const fit = (full: string, make: (part: string) => CallResult, says: (length: number) => string): CallResult | null => {
     const cut = (n: number) => { const end = /[\uD800-\uDBFF]/.test(full[n - 1] ?? "") ? n - 1 : n; return make(`${full.slice(0, end)}… ${says(full.length)}`); };
+    if (bytesOf(cut(0)) > ERROR_BYTES) return null;
     let lo = 0, hi = full.length;
     while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (bytesOf(cut(mid)) <= ERROR_BYTES) lo = mid; else hi = mid - 1; }
     return cut(lo);
   };
   const cutNote = (n: number) => `(the sentence is cut here; it had ${n} characters)`;
-  if (bytesOf(result("")) <= ERROR_BYTES) return fit(said.sentence, (m) => result(m), cutNote);
+  const nextNote = (n: number) => `(the next step is cut here; it had ${n} characters)`;
   const message = `… ${cutNote(said.sentence.length)}`;
-  return fit(said.next, (n) => result(message, n), (n) => `(the next step is cut here; it had ${n} characters)`);
+  // The sentence cut, with the next step whole; else the sentence reduced to its mark and the next step cut; else both marks,
+  // which with an error's short kind are a few hundred bytes. Each step is measured as it would be returned.
+  return fit(said.sentence, (m) => result(m), cutNote) ?? fit(said.next, (n) => result(message, n), nextNote) ?? result(message, `… ${nextNote(said.next.length)}`);
 };
 
 /**
