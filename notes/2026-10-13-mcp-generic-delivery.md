@@ -303,6 +303,7 @@ In this session, after the last change to what each covers:
 | `npm run gate` in the round of review 6a86304e, first at `80fe2ee9` | FAILED at the test step: `Tests  5 failed \| 1117 passed \| 2 skipped (1124)`: the four checkers failures below and the lease witness described in the section on review 6a86304e, which counted entries. |
 | `npm run gate` in that round, again at `ac4d5f01`, after the lease witnesses changed and the planner's merge of main was merged in (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1119 passed \| 2 skipped (1125)`, `Test Files  2 failed \| 198 passed \| 1 skipped (201)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review f7a8d2d4, once, at `50d0796d` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1121 passed \| 2 skipped (1127)`, `Test Files  2 failed \| 198 passed \| 1 skipped (201)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this round's verbose run of `budget.test.ts`), and is skipped on Darwin, as the planner's second amendment says. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
+| `npm run gate` in the round of review 16fcc428, once, at `3e3d016f` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1122 passed \| 2 skipped (1128)`, `Test Files  2 failed \| 198 passed \| 1 skipped (201)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this round's verbose run of `budget.test.ts`), and is skipped on Darwin. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
 ## The planner's second amendment, after the merge
 
@@ -445,7 +446,7 @@ only, the same steps end in the lane's refusal of the version as
 
 ## The T36 checkers failure in the cloud
 
-It recurred, in all seven rounds. In each gate run, the same four tests of
+It recurred, in all eight rounds. In each gate run, the same four tests of
 `packages/checkers` failed with `checkout-failed`: T36 in
 `test/runner.test.ts`, the two other checkout tests there, and the staging
 test in `test/reservation-record.test.ts`. This branch changes nothing in
