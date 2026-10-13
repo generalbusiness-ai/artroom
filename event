@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:237eb59b517f8b514a152ab231c9e2a7a3ae3eb4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-public-sdk-publication.md."}
+{"kind":"artifact","text":"docs/mcp-tools.json at exact bfbffab0c860dc94a841c5601550142551ab53b1 on request/mcp-generic, under promise git:sha1…b686fac on request git:sha1…fd782a4","body":{"commit":"bfbffab0c860dc94a841c5601550142551ab53b1","path":"docs/mcp-tools.json"}}
