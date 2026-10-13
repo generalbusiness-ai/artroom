@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>dap logo</title><rect width="256" height="256" rx="57.6" fill="#123F2B"/><g transform="translate(44.36 44.36) scale(0.667)" fill="#ffffff">
-  <title id="t">dap symbol, small sizes</title>
-  <g transform="translate(10.2 10.2) scale(1.6)"><path fill="#ffffff" d="M72 0 L144 72 L72 144 L0 72 Z M72 33.8 L33.8 72 L72 110.2 L110.2 72 Z M101 132 L137 96 L137 132 Z"/></g>
-</g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t"><title id="t">dap app icon</title><rect width="256" height="256" rx="57.6" fill="#123F2B"/><g transform="translate(44.36 44.36) scale(0.667)"><g transform="translate(10.2 10.2) scale(1.6)"><path fill="#FFFFFF" d="M72 0 L144 72 L72 144 L0 72 Z M72 33.8 L33.8 72 L72 110.2 L110.2 72 Z M101 132 L137 96 L137 132 Z M43 12 L7 48 L7 12 Z"/></g></g></svg>

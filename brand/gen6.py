@@ -14,7 +14,7 @@ os.makedirs(OUT, exist_ok=True)
 INK, GREEN, BONE = '#16180F', '#123F2B', '#F3F1EA'
 XH, ST, RO, ASC, DESC, GAP = 120, 26, 60, 170, 48, 24
 RI = RO - ST
-A_H, A_GAP = 72, 12
+A_H, A_GAP = 72, 8    # gap 8 since 2026-10-12 (was 12)
 TAIL, TAIL_GAP = 36, 12   # tail side; perpendicular gap from the tail's cut to the diamond's edge
 
 def f1(v): return f'{v:.1f}'.rstrip('0').rstrip('.')
@@ -49,7 +49,11 @@ def a_glyph(x, base, h=A_H, tail=TAIL, gap=TAIL_GAP, stroke=ST, pin=False):
         # cut line x + y = (cx + cy + h) + gap*sqrt2 ; it meets the baseline at sx
         sx = cx + cy + h + gap * math.sqrt(2) - base
     tri = f'M{f1(sx)} {f1(base)} L{f1(sx+tail)} {f1(base-tail)} L{f1(sx+tail)} {f1(base)} Z'
-    return f'{outer} {inner} {tri}', 2 * h
+    # second tail (2026-10-12): the first turned half a circle about the diamond's centre, so it
+    # hangs from the x-height line at the top left
+    mx, my = 2 * cx - sx, 2 * cy - base
+    tri2 = f'M{f1(mx)} {f1(my)} L{f1(mx-tail)} {f1(my+tail)} L{f1(mx-tail)} {f1(my)} Z'
+    return f'{outer} {inner} {tri} {tri2}', 2 * h
 
 def letter(ch, x, base):
     cy = base - XH / 2
@@ -72,7 +76,7 @@ def wordmark(x0, base, **kw):
     pp, adv = letter('p', x, base); d.append(pp); x += adv
     return ' '.join(d), x - x0
 
-WM_W = 4 * RO + 2 * A_H + 2 * A_GAP   # 404
+WM_W = 4 * RO + 2 * A_H + 2 * A_GAP   # 400
 
 # ---- symbol: the a alone, scaled into the 256 box ----
 def symbol(fill=INK, pad=0.08, stroke_scale=1.0, tail=TAIL):
