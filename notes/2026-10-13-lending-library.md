@@ -1,6 +1,6 @@
 # A lending library on dap
 
-13 October 2026. **Proposed design, Draft 4. Design only: no source, no
+13 October 2026. **Proposed design, Draft 5. Design only: no source, no
 test and no deployment was written or run for this note.** Baseline main
 `562357458b0b3f44873efc6c21429194b60a00f7`.
 
@@ -20,6 +20,17 @@ pot carries the description "Baby born when the big pot was with me"
 Nasruddin's spoken line at step 4 of the script. Draft 4 names the
 final deliverable, an online demo room linked from the homepage
 (section 9).
+
+Draft 5 answers the checker's review `b41ffffb` of Draft 4. Its one
+required change is section 4.1: the interface keeps each original
+request before it sends it, so that a lost reply never leads to a
+second donation or a second change. The review's other points are
+taken as stated: literal text and numbered paths on the shelf
+(section 4), the role lists (section 3), the room's cohort (section 7),
+what a visitor sees (section 6), and more acceptance cases (section 9).
+The definition, the story and the six things to build are unchanged.
+Facts about the present source that this draft takes from that review
+are marked "(review)"; the planner did not check them again.
 
 ## 1. What the library does
 
@@ -111,11 +122,22 @@ Both also need the change lane's actions that the one-file edit uses
 (section 4). Enrollment alone allows none of these; membership must
 grant each one.
 
+Staff is a responsibility in the library, not a new kind of member. It
+is the action `lending.staff`, added to a role that membership already
+has.
+
+Membership's `set-actions` replaces a role's whole list of actions
+(review). So each grant in the runbook writes the role's full list: the
+administration, application and change actions the role already holds,
+and the lending actions added to them. A grant that names only the
+lending actions would take the others away.
+
 ## 4. The shelf
 
 Each thing has one page in the room's repository at
-`shelf/<thing>.md`, where `<thing>` is the item's identifier as the
-lending scope gives it. A page is plain markdown:
+`shelf/<thing>.md`, where `<thing>` is the item's number as the lending
+scope gives it. A path never uses the name that a member typed. A page
+is plain markdown:
 
 ```markdown
 # Big pot
@@ -124,16 +146,29 @@ A heavy copper pot. Holds eight litres.
 
 - Status: lent to @nasruddin
 - Donated by: @neighbour
-- Record: lending entry <entry identifier>
+- Record: lending scope <scope>, incarnation <incarnation>, entry <seq>, hash <hash>
 ```
 
 The status line reads `available`, `lent to <member>`, or `gone:` and the
 cancellation reason. The last line names the lending entry that the page
-reflects, so a reader can compare the page with the record.
+reflects, so a reader can compare the page with the record. The
+interface takes the thing's state and that pointer from one read, so the
+status and the entry it names always belong together.
+
+**A member's text is written as literal text.** A name, a description
+and a reason are a member's words. The interface writes each so that
+markdown reads it as plain text on one line: a heading mark, a link, a
+list mark or a new line in a member's text cannot make a second
+`Status` or `Record` line, or a link. The generated lines are the
+interface's alone.
 
 There is no index file. The site already answers a folder that has no
-index with a list of its markdown files by title, so
-`<base-url>/site/<directory>/HEAD/shelf/` lists the things.
+index with a list of its markdown files, so
+`<base-url>/site/<directory>/HEAD/shelf/` lists the things. That list
+shows the title of each of the first 100 files and the file name of each
+one after that (review). Cancelled things keep their pages, so a long-lived
+library can pass 100 pages, and its later pages are then listed by
+number. The demo room stays far below that.
 
 **Who writes a page.** The member interface writes it. When a lending act
 takes effect, the interface of the member who signed it submits the
@@ -150,7 +185,66 @@ a published copy. Two things keep the copy honest:
 
 - Each page names the entry it reflects.
 - The interface offers "refresh the shelf", which rewrites any page that
-  differs from the scope's current state. Any member can run it.
+  differs from the scope's current state. Any member can run it. It
+  reads every thing, page by page until the read is complete, and it
+  includes cancelled things and their reasons. The summary of the 64
+  live things is not enough for it.
+
+### 4.1 Two writes, and what the interface keeps
+
+A lending act and its page edit are two separate writes, and a reply to
+either can be lost. A device key does not help here: it can sign a new
+request, and a new request is a different one. If a donation took effect
+and its reply was lost, a freshly signed donation would open a second
+thing, and the scope's state cannot say which request made the first.
+The one-file edit has the same hazard: a fresh edit opens another lane
+and signs new requests, as the command line's own warning says.
+
+So the interface keeps the original before it sends anything, in
+storage that survives a reload. The Counter's browser application
+already keeps a pending request this way, in storage private to its
+origin; the lending interface follows that pattern.
+
+**Before it sends a lending act**, the interface stores:
+
+- the scope and its full incarnation, and the thing the act names;
+- the signer;
+- the operation's identity and its deadline;
+- the signed envelope, and any private input needed to send it again.
+
+**After a lost reply or a reload**, the interface does not sign a
+replacement. It shows the kept request and offers two things: **Check**,
+a read that settles whether the original took effect, and **Continue**,
+which sends the same envelope again. A member may also abandon a
+request once Check confirms it did not take effect and cannot any
+longer, and then start new work.
+
+**Before each step of the page edit** (open the lane, propose, merge),
+the interface stores:
+
+- the page's bytes, the base they were made against, and the one read
+  of the lending scope they came from;
+- the lane and the repository references;
+- the key and the signed envelope of each step, and each receipt as it
+  is learned.
+
+After a lost reply it resumes the same lane at the same step. It does
+not open a second lane for the same page.
+
+**The two results are shown apart.** A lending act that took effect is
+shown as accepted whatever happens to its page. The page then has its
+own status: pending, refused, unknown or published. A refused lending
+act changes nothing, writes no page, and is never called published.
+
+**Refresh is new work.** "Refresh the shelf" starts from a newly
+confirmed read of the scope. It is a new, authorised change and may
+open a new lane. The interface keeps it distinct from retrying an
+original whose outcome is unknown.
+
+This does not make the two writes one. A page can still be behind, and
+a permanent failure can still leave it behind until someone refreshes
+or copies it by hand. Publication from a fold is still the separate,
+later design.
 
 A separate note, *Publication from a fold*, designs the replacement in
 which the lending act itself causes the page commit. This demo does not
@@ -191,12 +285,35 @@ The interface must:
 6. Write the thing's shelf page after each act that takes effect, and
    offer "refresh the shelf".
 7. Link to the published shelf and show the journal.
+8. Keep each original request before sending it, and recover it after a
+   lost reply or a reload, as section 4.1 says.
+9. Show a lending act's result apart from its page's status.
+10. Ignore an answer that arrives for a room or a view the person has
+    left, and mark any list that is behind the scope's head as behind.
+
+**What a visitor without a seat sees.** The published shelf, each
+thing's page and the repository's commit history are public. The
+lending scope's journal is not: reading it needs a seat in the room. So
+the visitor's history is the shelf and its commits, and the interface
+labels its link to the record as for members. This design adds no
+read for people without a seat.
 
 ## 7. The room
 
 The library runs in a room created with the application cohort
 (`dap install --cohort application`), on the hosting's own Git service
 (host `artifacts`).
+
+That cohort is register 5, directory 5, membership 4, rules 3 and
+destination 2 (review). Its destination takes the one-file edit, which
+is the path this design uses; the manifest-list path of destination 3
+is not part of it. The demo cohort has no application factory, so it
+cannot stand in for this one. The runbook names the change lane
+definition that it activates, one that works with destination 2.
+
+The Page's present joining is shown for membership 1 and 2. Joining a
+membership 4 room from a browser is not yet shown, and it is a witness
+the build owes (section 9).
 
 The deployment's `ARTIFACTS_CONFIG` setting names one register scope. So
 the service that hosts the library must have that setting point at the
@@ -210,10 +327,11 @@ Provisioning, in order:
    definition that has the one-file edit.
 3. Validate the `lending` definition under the deployed bounds, and
    activate its digest in the rules scope.
-4. Sign `establish-application` for it, with no genesis values beyond
-   the opener.
+4. Sign `establish-application` for it. The opener is the only field
+   supplied, so the genesis values are the canonical empty values.
 5. Grant `lending.staff` and `lending.member` in membership, and the
-   change lane actions that the edit needs.
+   change lane actions that the edit needs, writing each role's whole
+   list (section 3).
 6. Invite Nasruddin as a member.
 
 ## 8. The demo script
@@ -256,10 +374,20 @@ none of it: the birth and the death are recorded the same way.
 
 1. **The definition.** `examples/lending/`: the declaration, its
    canonical bytes and its pin, validated, with one scenario test that
-   runs the demo script and its refusals against a real scope.
+   runs the demo script and its refusals against a real scope. The
+   same scenario also shows: a member other than the borrower returns
+   a thing; the 65th live thing is refused, and a donation takes effect
+   again once a thing is cancelled; no act changes a `gone` thing.
 2. **The member interface.** A browser application that meets section 6.
+   Its tests cover a lost reply and a reload during a donation, and
+   during each of the open, propose and merge steps. Each case ends
+   with one thing, one request and one lane, with no replacement key or
+   envelope, with the exact receipt, and with a status the member can
+   act on.
 3. **The room.** A provisioning runbook for section 7, run once against
-   a deployed service, with what was observed.
+   a deployed service, with what was observed. It shows that each role
+   keeps its earlier actions after the lending grants, and that a
+   person joins the membership 4 room from a browser.
 4. **The demo script**, as a document for the recording.
 5. **The online demo room.** This is the final deliverable (Hugh,
    13 October 2026): the library running in a room on the deployed
@@ -277,17 +405,16 @@ These are not settled by reading the source. Each is a check for the
 builder, not a design choice.
 
 - **Edits in an application room.** The application cohort's directory
-  inherits lane creation, and its destination version accepts one-file
-  manifests. This was read from the definitions and has not been run.
+  inherits lane creation, and destination 2 accepts the one-file edit.
+  The review read the same from the command line's maps. It has not
+  been run on a deployed service.
 - **Listing things.** The interface needs a read of the scope's `thing`
   items. The Counter's browser application reads its own items; the same
   read is assumed here and was not checked for a type with many items.
-- **Identifiers in a path.** Whether an item identifier is fit for a
-  file name as it stands, or needs a stated encoding.
-- **What a visitor can do.** The published shelf is public, so anyone
-  can read it. Acting needs a seat in the room. Whether the online room
-  hands out member invitations to visitors, and how it is reset after
-  they act, is not designed here.
+- **What a visitor can do.** Section 6 says what a visitor reads.
+  Acting needs a seat in the room. Whether the online room hands out
+  member invitations to visitors, and how it is reset after they act,
+  is not designed here.
 - **Removing a page.** The one-file edit writes a file. This design
   never removes a page: a cancelled thing keeps its page, marked `gone`.
 
