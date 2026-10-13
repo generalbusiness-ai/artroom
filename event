@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:635048e346b843c38a95fa9dedec36bc7f031e9c","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-create-wording.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:65bb9d67bf2c1771bd3ea152e1a8811be27e1e96","text":"Merge retired a covered predecessor; the successor is at packages/page/test/sending.test.ts."}
