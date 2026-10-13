@@ -1,8 +1,8 @@
 # The hosted MCP endpoint: plan 031, stage 2
 
-Date: 2026-10-13. Status: Draft 3, for checker review (Draft 1 was
-20e2344d, Draft 2 d69b46ba; the checker's reviews 6a262c93 and 89ec44b0
-are answered in section 10).
+Date: 2026-10-13. Status: Draft 4, for checker review (Draft 1 was
+20e2344d, Draft 2 d69b46ba, Draft 3 d8324363; the checker's reviews
+6a262c93, 89ec44b0 and e1463db8 are answered in section 10).
 Requested by Hugh on 2026-10-13 at 11:03 Eastern: "the hosted MCP
 endpoint should be prioritized", right after the discovery head (request
 f9ca5f96).
@@ -44,10 +44,11 @@ head's predecessor.
   `crypto.randomUUID` and `TextEncoder`, all present in a Worker. Every
   Node import is in `node.ts` (24-27).
 - `Wire.handle(message, session, send, owner)` (`wire.ts` 145-156) serves
-  both wire revisions. The legacy session keeps `told`, the generation
-  last listed, set on `tools/list` (191) and compared by `watchLegacy`
-  (121-128); the service takes no snapshot at construction (178-188), its
-  first `snapshot()` raises nothing (213-215). The loopback server
+  both wire revisions. The legacy session keeps one field `told`, set by
+  `tools/list` to the listed generation (191) and also set by
+  `watchLegacy` just before it sends a notification (121-128), so it mixes
+  a list with a delivery; the service takes no snapshot at construction
+  (178-188), its first `snapshot()` raises nothing (213-215). The loopback server
   (`node.ts` 356-473) reads `Origin`, `Authorization` and
   `Mcp-Session-Id` and nothing else: no `MCP-Protocol-Version`,
   `Mcp-Method` or `Mcp-Name` header is read; an unknown method answers
@@ -73,8 +74,10 @@ head's predecessor.
   (690-693); an agent member is made by `add-member` (431,
   `membership.manage`) with kind `agent` and a `controller` party that must
   be an active person member (443-452); `revoke-key` and `remove-member`
-  need `membership.manage` or the recovery key. The membership never sees
-  the secret, only its digest (676-684). The command line mints a person
+  need `membership.manage` or the recovery key. The secret travels in
+  `enrol`'s signed fields, which the membership hashes against the
+  invitation's digest (676-684) and retains in its admitted history as
+  native bytes. The command line mints a person
   invitation as `artroom-invite:` with the secret in the link
   (`commands.ts` 788-812); the Page only consumes a link.
 - Signed reads (`signed-reads.ts` 104-128, 293-346) bind `to` (scope ID,
@@ -163,9 +166,12 @@ fixed body.
 
 **Reservation before any handoff.** A control request's identity is the
 tuple (`actor`, `membership` with incarnation, `action`, `agent`, `body`
-digest, `op`), its fingerprint. Before the registry or the agent object
-crosses to another object or awaits anything that can fail, it records the
-request durably in one `transactionSync`:
+digest, `op`), its fingerprint. The signature, the binding and the current
+authority are verified **before** anything effectful is reserved; a
+request that fails them writes nothing. Then, before the registry or the
+agent object crosses to another object or awaits anything that can fail,
+it records the request durably in one `transactionSync`, having first
+reserved the space its answer will need (section 3.6, control budgets):
 
 - For `create`, the registry inserts a reservation row keyed by `op`:
   the fingerprint, a freshly allocated agent object ID, state `reserved`.
@@ -174,11 +180,11 @@ request durably in one `transactionSync`:
   registry call the agent object, passing `op` and the body.
 - The agent object, on its first call, generates the seed and writes it
   with state `enrolling` in one transaction, before building the envelope;
-  on a later call with the same `op` it finds the seed and resumes. The
-  `enrol` envelope is kept in custody before it is sent, as section 3.3
-  says, so a resume after any reset resubmits the exact envelope or
-  settles it, never signs a second one; the invitation is therefore
-  consumed by one key only, and no enrolled key is stranded.
+  on a later call with the same `op` it finds the seed and resumes. A
+  resume that finds the seed but no kept envelope builds and keeps the
+  first envelope; a resume that finds a kept envelope never builds
+  another, it resubmits that one exactly or settles it. So the invitation
+  is consumed by one key only, and no enrolled key is stranded.
 - When the enrol is decisive and read back, the agent object writes the
   bearer digest, the answer and state `enrolled` in one transaction; the
   registry then writes the answer and state `complete` in one transaction
@@ -192,13 +198,17 @@ request durably in one `transactionSync`:
 Replay rules: the same `op` with the same fingerprint returns the stored
 answer (including the bearer shown at creation) or resumes the unfinished
 work; the same `op` with any other fingerprint, or another action or
-target, refuses `409`. Current authority is checked again on every
-attempt, including a resume: a controller or admin whose authority ended
-between attempts refuses `403`, and the reservation stays, so an admin can
-still `retire` the agent. Unfinished reservations are never dropped,
-whatever `notAfter` says; completed answers are retained for seven days
-past `notAfter` for lost-reply replay, then the `op` refuses `409` as
-stale, stated in the error. Signed reads are not reused for any of this:
+target, refuses `409`. Three lifetimes are distinct: the control
+request's own `notAfter` bounds when a **freshly signed** request with
+that `op` is accepted, so a replay is a new signature over the same
+fingerprint within the lifetime; the stored answer is retained for seven
+days past `notAfter`, after which the `op` refuses `409` as stale, stated
+in the error; and the native `enrol` envelope's own `notAfter` is the
+scope's rule and is unchanged by any of this. Current authority is
+checked again on every attempt, including a resume: a controller or admin
+whose authority ended between attempts refuses `403`, and the
+reservation stays, so an admin can still `retire` the agent. Unfinished
+reservations are never dropped, whatever `notAfter` says. Signed reads are not reused for any of this:
 they bind a read name and argument, not an action, a target or a body.
 
 ### 3.3 Enrolment: how the hosted key becomes a member key
@@ -283,16 +293,22 @@ transport and the 2025-11-25 transport:
   present is ignored as an intermediary would.
 - Legacy (2025-11-25 transport): `initialize` mints a session ID; a
   request, `GET` or `DELETE` with an unknown or ended session → `404`; a
-  request other than `initialize` without `Mcp-Session-Id` → `400`; an
-  `MCP-Protocol-Version` header that is present and not a version the
-  server serves (`2025-11-25`, or `2025-03-26` and `2025-06-18` as names
-  of the same handling) → `400` before dispatch, on `POST`, `GET` and
-  `DELETE` alike ("if the server receives a request with an invalid or
+  request other than `initialize` without `Mcp-Session-Id` → `400`; the
+  server serves exactly the two commissioned revisions, `2025-11-25` and
+  `2026-07-28`, and no other: an `MCP-Protocol-Version` header that is
+  present and is not one of them → `400` before dispatch, on `POST`, `GET`
+  and `DELETE` alike ("if the server receives a request with an invalid or
   unsupported MCP-Protocol-Version, it MUST respond with 400 Bad
-  Request"); an absent header uses the session's negotiated version, or
-  `2025-03-26` for `initialize`, as the revision says a server should
-  assume; `Mcp-Method` and `Mcp-Name`, which only the modern revision
-  defines, are ignored on a legacy request; a second `GET` for the same
+  Request"), and an `initialize` whose `protocolVersion` is another
+  revision is answered as the 2025-11-25 negotiation says, with the
+  server's version, never by treating the request as that other revision;
+  an absent header uses the session's negotiated version, and for
+  `initialize` the request's own `protocolVersion`; an earlier revision
+  such as `2025-03-26`, whose transport permits batches, is not served and
+  not aliased, so a batch is refused on every request; `Mcp-Method` and
+  `Mcp-Name`, which only the modern revision defines, are ignored on a
+  legacy request, and a legacy `Mcp-Session-Id` is ignored on a modern
+  one; a second `GET` for the same
   session replaces the first, which closes without detaching its
   replacement; a notification → `202`; `Last-Event-ID` is ignored, streams
   are not resumable, stated in the response to `GET`.
@@ -323,8 +339,9 @@ synchronous transaction as the request); and `notified`, the generation
 last written to a given stream, held per stream in memory and never
 persisted, because a stream write is not a receipt. The persisted legacy
 session row is (`id`, negotiated version, initialized flag, declared
-capabilities, `listed`), so a session survives eviction and only its open
-stream is lost.
+capabilities, `listed`), written before the `tools/list` response is emitted (the
+output gate holds the response until the write is durable), so a session
+survives eviction and only its open stream is lost.
 
 Reconciliation: when a legacy stream opens (first open or reconnect) and
 when the object starts, the object computes the current generation and,
@@ -380,26 +397,54 @@ file store's semantics:
   again; segments are retained with their record. Nothing is deleted by
   this head; an expiry would be a separate contract and is not proposed.
 - **Growth, reservation and full.** Custody has its own budget per
-  agent, 1 GiB (stated in `docs/mcp.md`), well under the object's 10 GB;
-  control rows, sessions, configuration and the key have a separate
-  budget of 16 MiB, so neither can starve the other. The custody budget
-  is accounted as `used + reserved`: when an identity is admitted
-  (`keep`, `prepare`, the first `step`), the store reserves its
-  **completion space** in the same transaction, `RECORD_BYTES` (2 MiB)
-  for the record's final form plus 1 MiB for its segments; the
-  reservation is released, and the actual bytes counted, when the record
-  becomes terminal and archived. Admission refuses `full` with the reason
-  `bytes` before anything is signed or sent when `used + reserved` plus
-  the new reservation would cross the budget. Because every in-flight
-  identity holds its completion space, a result that arrives after
-  dispatch (the native `settle` appends a receipt and writes the changed
-  record) always has room, whatever other records have done to the
-  budget since, so a decisive answer is never lost for lack of space and
-  an envelope is never replaced; `SQLITE_FULL` on a write that is within
-  budget rolls the transaction back and is answered `full`, existing
-  records stay readable, `settle` still works. Recovery is a later
-  `export` control action, listed as owed; until then the controller
-  retires the agent and creates another.
+  agent, 1 GiB (stated in `docs/mcp.md`), well under the object's 10 GB.
+  The budget is accounted in two monotone counters: `used`, the bytes of
+  every serialized record, chunk, segment and index row as stored, and
+  `reserved`, the completion capacity outstanding for identities that
+  may still receive a result. The rules, each applied in the same
+  synchronous transaction as the operation it guards:
+  - **Arm before every dispatch.** Before a send, a resubmit of a refused
+    identity (which native custody reuses through `#kept` without a new
+    admission, `custody.ts` 299-322), a repeat `step` (376-408) and a
+    `settle`, the store tops the identity's reservation up to its
+    completion need: the record's bound (2 MiB) plus one segment row
+    (512 KiB) beyond what is already stored for it. If the top-up would
+    cross the budget, the operation refuses `full` **before** anything is
+    dispatched, every original and outcome stays, and any reservation an
+    earlier dispatch left outstanding stays for its `settle`.
+  - **Consume, never free.** When a result is written, its bytes move from
+    `reserved` into `used`; a reservation is released only when its
+    identity is terminal and archived, and only the part not consumed.
+    Nothing is counted twice and no operation creates free space.
+  - **Replay needs no reservation.** Reading a terminal record's retained
+    answer, inline or archived, is a read and dispatches nothing, so it
+    is served when the budget is full.
+  - **Growing state is bounded.** Repeated uncertain or refused attempts
+    add outcomes; each attempt's top-up pays for them in advance, and the
+    outcome history of one identity is itself bounded at 64 MiB (stated
+    in `docs/mcp.md`), after which further attempts on that identity
+    refuse `full` while its retained answer stays readable. Step state
+    (preparation steps and their outcomes) is accounted under the same
+    rules as outcomes.
+  - **Control budgets.** The registry and the agent object each have a
+    control budget of 16 MiB, apart from custody, for reservations,
+    answers, tombstones, the agent list, sessions, configuration and the
+    key. A `create` reserves the space for its complete answer and its
+    tombstone in the registry, and the agent object reserves the space
+    for its row, its answer and its tombstone, **before** allocation and
+    before enrolment, so a key is never enrolled and then found to have no
+    space for `create`'s answer; a control request that cannot reserve
+    refuses `full` before any effectful step; unfinished reservations
+    remain resumable.
+  - **Storage failure is not settlement.** `SQLITE_FULL` or any other
+    write failure rolls the transaction back and is reported as a
+    recoverable storage failure, not as an outcome: a record whose answer
+    arrived but could not be written stays exactly `unknown` with its
+    envelope unchanged and its reservation held, and the next `settle`
+    writes the receipt when writing succeeds again. Existing records stay
+    readable throughout. Recovery of a budget-full agent is a later
+    `export` control action, listed as owed; until then the controller
+    retires the agent and creates another.
 - **Locks and admission.** The object is single-threaded but interleaves
   at `await`, so the store's `lock` and `exclusive` are real: a promise
   chain per identity and one for admission, as the scope object's `Queue`
@@ -476,8 +521,9 @@ harness's instance reset; storage stays.
   accepted and the key reads back active; the pinned client, speaking
   2025-11-25 and then pinned to 2026-07-28, lists tools and performs
   `issue.create` and `wait`; the entry is in the lane with the agent's key
-  as actor. Then the `enrol` envelope is in custody as accepted and the
-  secret is in no hosted row, log or configuration. Handoff: with a reset
+  as actor. Then the `enrol` envelope is in custody as accepted, and the
+  secret appears in no hosted row, log or configuration other than that
+  retained envelope. Handoff: with a reset
   of the registry after its reservation, of the agent object after its
   seed is written, after the envelope is kept, after the native `enrol`
   is accepted but before the registry completes, and after completion but
@@ -531,10 +577,21 @@ harness's instance reset; storage stays.
   storage filled to the budget with one exact intent outstanding: the
   outstanding intent's accepted result is retained through `settle`, a
   reset and read-back, its envelope unreplaced and the budget unbroken,
-  while a new admission is refused `full` before signing; a simulated
-  `SQLITE_FULL` within budget refuses `full` with every earlier record
-  still readable; a same-key call after archival returns the retained
-  answer without signing.
+  while a new admission is refused `full` before signing; an archived
+  refused identity, then the budget filled by other work, then an explicit
+  resubmit: refused `full` before dispatch with the envelope and the
+  refusal unchanged, and served after the budget is freed by `retire` of
+  another agent's data in a fresh object (or by raising the budget in the
+  harness) with the same envelope; repeated uncertain attempts on one
+  identity each consume a top-up, with a reset and read-back between
+  them, the envelope unchanged and one decisive result at the end; a
+  `create` whose registry or agent control budget is full refuses `full`
+  before allocation and before enrolment; a simulated `SQLITE_FULL` while
+  a result is being written leaves the record `unknown` with its
+  envelope and reservation, and the receipt is written by the next
+  `settle` once writes succeed; a same-key call after archival returns
+  the retained answer without signing and without a reservation when the
+  budget is full.
 - **H7, budgets and framing.** The plan 031 budget witnesses run through
   the endpoint and hold; the HTTP framing overhead is measured once and
   stated in `docs/mcp.md`.
@@ -554,10 +611,18 @@ harness's instance reset; storage stays.
   unsupported value (`400` before dispatch); a request without a session
   `400`; an unknown session `404`; `GET` replaces a stream without
   detaching the replacement; `Mcp-Method` and `Mcp-Name` ignored. Both:
-  `Origin` `403`, a body over the bound `413`, a batch, a non-frame, a 5th
-  stream `409` counting a listen and a legacy stream together, a 17th
-  session ending the oldest. The same cases run against the loopback
-  server through the shared module.
+  `Origin` `403`, a body over the bound `413`, a batch on every request
+  including one claiming `2025-03-26`, a non-frame, a 5th stream `409`
+  counting a listen and a legacy stream together, a 17th session ending
+  the oldest. Mixed eras: a modern `_meta` with a legacy `Mcp-Session-Id`
+  (session ignored, served modern), a legacy session request carrying
+  `Mcp-Method` (ignored), an `MCP-Protocol-Version: 2026-07-28` header on
+  a body with no `_meta` version (`-32020`), an `initialize` naming
+  `2025-03-26` (answered with the server's version). Every accepted
+  response asserts its content type, `application/json` or
+  `text/event-stream`, and every `202` asserts an empty body and no
+  session header. The same cases run against the loopback server through
+  the shared module.
 
 ## 7. Costs
 
@@ -603,6 +668,15 @@ Owed after this head, in the same stage: OAuth; the pinned `diff` and
 full agent; the one-step `create` from the Start agent-key link.
 
 ## 10. Corrections of the reviews
+
+### Review e1463db8 (Draft 3 → Draft 4)
+
+| Finding | What Draft 4 does |
+|---|---|
+| 1. Completion capacity must be re-armed before every dispatch, across resubmits, steps and control handoffs | Section 3.6: `used` and `reserved` counters, a top-up before every send, refused resubmit, repeat step and settle, refusing `full` before dispatch while keeping outstanding reservations; consumption moves bytes monotonically; replay needs no reservation; per-identity outcome history bounded; control budgets in both objects reserved before allocation and enrolment; a write failure leaves the record `unknown` as a recoverable storage failure; H6 adds the archived-refusal resubmit, repeated uncertain attempts, control budget full and the deferred receipt |
+| 2. `2025-03-26` and `2025-06-18` are not aliases of November | Section 3.4: exactly `2025-11-25` and `2026-07-28` are served; any other version is `400` before dispatch; an `initialize` naming another revision is answered with the server's version; batches refused on every request; missing-header selection by session context or `InitializeRequest.protocolVersion`; H8 mixed-era and content-type cases |
+| Precision: authority before reservation; seed-only recovery builds the first envelope; renewal, retention and native expiry distinct; listed written before the response | Sections 3.2 and 3.5 |
+| P3: section 2 on the secret and on `told`; H1's wording | Section 2 bullets and H1 corrected to match sections 3.3 and 3.5 |
 
 ### Review 89ec44b0 (Draft 2 → Draft 3)
 
