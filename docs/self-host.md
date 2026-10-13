@@ -259,7 +259,7 @@ for an existing room.
 Pinned Wrangler exposes Artifacts namespace list and get commands but no
 namespace deletion command. Cloudflare's published Artifacts REST reference
 also lists no namespace deletion route
-([Artifacts REST API](https://developers.cloudflare.com/artifacts/api/rest-api/#namespaces)). Removing the repositories leaves an
+([Artifacts REST API](https://developers.cloudflare.com/artifacts/api/rest-api/#namespaces)). Removing the repositories leaves a
 namespace that was last confirmed empty after repository deletion. Namespace
 removal is **unsupported and unrun**. A later listing returned HTTP 403, so the
 current namespace state is unknown. A supported Cloudflare operation is still

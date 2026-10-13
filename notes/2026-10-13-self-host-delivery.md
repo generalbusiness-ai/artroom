@@ -49,7 +49,8 @@ Worker were removed. Empty Artifacts namespace removal is unsupported and
 keys, browser state, original requests, and proofs were retained.
 
 The owning checks on the recorded source passed: six Artifacts-wiring cases,
-one homepage-link case, and 263 local document links with none broken. The ordinary gate for the composed delivery source remains unrun.
+one homepage-link case, and 263 local document links with none broken. The
+ordinary gate for the composed delivery source remains unrun.
 GitHub deployment, Counter enrollment, optional page rebuild, physical-device
 join, and the displayed interactive Worker-deletion commands remain unrun in
 this rehearsal. Per-step guide notes distinguish executed commands from manual
@@ -58,8 +59,9 @@ shell and configuration variations.
 The delivery source incorporates the later Create, MCP, and Names changes
 from main commit `765c4eb9f7ef280e9f7b1ff245eb8736b35b4ffb`. The guide
 retains the tested `claim` command. Current CLI documentation presents
-`dap create` and retains `claim` as an alias. The recorded rehearsal executed `claim`, not `create`. If step 6 changes
-to `create`, that spelling must retain an unrun label until verified. Shared
-dispatch in the current source is not a new runtime result. The original
+`dap create` and retains `claim` as an alias. The recorded rehearsal executed
+`claim`, not `create`. If step 6 changes to `create`, that spelling must retain
+an unrun label until verified. Shared dispatch in the current source is not
+a new runtime result. The original
 measurement proves the recorded source only. The production homepage guide
 link still needs its final normal build, deployment, and readback.
