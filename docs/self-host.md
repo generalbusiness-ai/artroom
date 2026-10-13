@@ -118,8 +118,8 @@ no global installation or Wrangler dependency in this checkout is needed.
    do not include it in logs, screenshots, or a delivery note. On the second
    device, open `https://<name>.<subdomain>.workers.dev/page/`, choose
    **Invitation link**, and paste it. The page creates that device's key,
-   joins automatically, and opens the room. There is no Join button on this
-   invitation path. If enrollment is unresolved, use **Check status** to read
+   joins automatically, and opens the room. If enrollment is unresolved,
+   use **Check status** to read
    the original request. A new device has its own key;
    do not copy the owner's key to it.
 
