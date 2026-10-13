@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/test/support/catalogue.ts","body":{"commit":"8235c6b39da464dc076a094cd7f71d2bdb71a2bc","path":"packages/mcp/test/support/catalogue.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:43eebd0ceed6c17e262f8651b373cde25ab6fbfb","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/budget.test.ts."}
