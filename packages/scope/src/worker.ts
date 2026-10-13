@@ -66,6 +66,7 @@
  * observation read of a membership scope. It has no route here.
  */
 
+import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
@@ -329,7 +330,7 @@ export function outsideOf(given: OutsideGiven, sql: Pick<SqlStorage, "exec">, en
   };
   const pick = (): Outside => {
     const host = recordedHost(given);
-    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS], () => gitHubOutside(given, sql, env, fetch, snapshotReader));
+    if (host === "github.com" && env.GITHUB_APP_CONFIG) return wiring(host, [env.GITHUB_APP_CONFIG, env.GITHUB_APP_PRIVATE_KEY, env.GITHUB_CREATION_TOKEN, env.GITHUB_READ_TOKEN, env.GITHUB_CLEANUP_TOKENS, env.DEMO_START_CONFIG, env.DEPLOYMENT], () => gitHubOutside(given, sql, env, fetch, snapshotReader));
     if (host === ARTIFACTS_HOST && env.ARTIFACTS_CONFIG) return wiring(host, [env.ARTIFACTS_CONFIG, env.ARTIFACTS], () => artifactsOutside(given, sql, env, fetch, snapshotReader));
     return NO_OUTSIDE;
   };
@@ -439,6 +440,6 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
 export default {
   fetch: async (request: Request, env: Env): Promise<Response> => {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
-    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
   },
 };

@@ -8,7 +8,7 @@ import { captureSignedSummary, installSignedDiagnostic } from "../../scope/test/
 import { beginSessionFixture, type SessionOwner } from "../../scope/test/session-settings.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf, wired } from "../../scope/test/outside.ts";
-import { command, memoryStore, type Context } from "../src/index.ts";
+import { checkClaim, command, memoryStore, type Context } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
@@ -170,6 +170,14 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   const unsent = await run("create", "demo", "--handle", "@rita");
   expect(unsent).toMatchObject({ code: 1, lines: [expect.stringMatching(/^No answer:/)] });
   const savedFound = (await configOf())!.claim!.found!.signed;
+  const beforeCheck = await configOf();
+  const beforeCheckPosts = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
+  let checkPauses = 0;
+  const checkedMissing = await owner.required(() => checkClaim({ ...rita, foundingOffer: async () => { throw new Error("Check does not discover a new offer"); }, pause: async () => { checkPauses++; } }, "demo"));
+  expect(checkedMissing).toMatchObject({ code: 1, lines: [expect.stringContaining("not confirmed")] });
+  expect(await configOf()).toEqual(beforeCheck);
+  expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeCheckPosts);
+  expect(checkPauses).toBe(0);
   expect([(await founds()).length, sent["found"]]).toEqual([0, [savedFound]]);
   const beforeLegacy = (await configOf())!;
   await owner.required(async () => rita.store.save({ ...beforeLegacy, claim: { register: beforeLegacy.claim!.register, intent: beforeLegacy.claim!.intent, handle: beforeLegacy.claim!.handle } }));
@@ -233,6 +241,18 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   // Same founder key and handle, different room: a stale cache cannot splice
   // the first claim's actual membership into the second directory's refs.
   const originalSeated = (await configOf())!;
+  const beforeSeatCheckPosts = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
+  const checkedSeat = await owner.required(() => checkClaim({ ...rita, pause: async () => { checkPauses++; } }, "demo"));
+  expect(checkedSeat).toMatchObject({ code: 1, lines: [expect.stringContaining("no original first-key request")] });
+  const checkedJournal = (await configOf())!.claim!;
+  expect(checkedJournal.seat!.signed).toEqual(originalSeated.claim!.seat!.signed);
+  expect(checkedJournal.seat!.accepted).toBeDefined();
+  expect(checkedJournal.firstKey).toBeUndefined();
+  expect([sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length]).toEqual(beforeSeatCheckPosts);
+  expect(checkPauses).toBe(0);
+  // Return to this same original lost-marker checkpoint for the unchanged
+  // explicit-Continue assertions below; no native request or key is replaced.
+  await owner.required(() => rita.store.save(originalSeated));
   unavailableSettlement = true;
   const beforeUnavailableMarker = [sent["found"]!.length, sent["seat"]!.length, sent["first-key"]!.length];
   expect(await run("claim", "demo")).toEqual({ code: 1, lines: ["Cannot confirm the saved create step: unavailable. The exact request remains pending; nothing was submitted."] });
