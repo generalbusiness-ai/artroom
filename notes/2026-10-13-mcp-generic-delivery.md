@@ -10,7 +10,9 @@ heads in `packages/page`, whose bytes stay main's; the third time at
 `6198b199` or later, with main's documentation, homepage copy and layout,
 and `notes/2026-10-12-observability-design.md`, each taken as main has it.
 Every figure below is labelled by how it was taken: an observed run, a sum
-of steps, or a proxy.
+of steps, or a proxy. Since the composition onto the renamed main, the
+package is `@generalbusiness/dap-mcp` and the command is `dap mcp`; the
+sections written before it keep the names of their time.
 
 ## What was built
 
@@ -249,6 +251,57 @@ The defaults witness of review 16fcc428 is unchanged. `docs/mcp.md`'s
 paragraph on the act input now says a local fact is read as its entry's
 position when the server resolves the items an act names.
 
+## Composition onto the renamed main
+
+The checker approved head `a126d71e` (review `e222266f`) on main
+`b69ee8ef`. The minimal dap rename then landed alone, as main `b5d15349`,
+and this head composes the approved work onto it, in two commits:
+
+- **The merge, `564f578b`.** `git merge --no-edit origin/main`. Four paths
+  conflicted: `package-lock.json`, `packages/cli/package.json`,
+  `packages/cli/src/line.ts` and `scripts/active-source.test.mjs`. Each was
+  resolved by taking main's text and putting back this branch's own
+  additions in the new names: the command line's `mcp` in its description,
+  its dependency on the server and the usage line `dap mcp ...`; the
+  active-source rules' exceptions for `packages/mcp`, matching both the old
+  and the new package names as main's rules now do. The lockfile was taken
+  as main has it in the merge, so the merge commit alone does not install:
+  the server's package still had its old name there.
+- **The rename, `292e2206`.** The server's package is
+  `@generalbusiness/dap-mcp`, with dap's repository URL
+  (`generalbusiness-ai/dap`, directory `packages/mcp`) and homepage. Its
+  source, its tests and the command line's `mcp.ts` import `dap-contract`,
+  `dap-platform`, `dap-derive` and `dap-lanes`; `artroom-bytes`,
+  `artroom-client` and `artroom-scope` keep their names, as main keeps
+  them. `packages/client/src/invitation.ts`, which this branch adds,
+  imports `dap-contract`. The active-source rule for the server's imports
+  allows the new names. User-facing text says `dap mcp`, `dap join`,
+  `dap invite` and the rest: the `join` tool's description, the HTTP
+  announcement (`dap mcp: serving ...`), `docs/mcp.md`, `docs/mcp-tools.json`
+  (regenerated from the descriptors) and the command line's help.
+  `docs/mcp.md` says once that `artroom mcp` still runs through the
+  command line's alias for one release. `ARTROOM_HOME`, the custody
+  directory `private/mcp-custody`, the `artroom-invite:` link, the
+  definition domain `artroom-definition-1` and the launcher file
+  `bin/artroom.js` keep their names, as the rename keeps them. The
+  lockfile was regenerated in this commit by `npx -y npm@12.2.0 install`
+  from the root: additions only (183 lines: the `dap-mcp` workspace link
+  and the server's pinned development dependencies), no row of main's
+  changed. No behaviour changed.
+
+`packages/cli/src/commands.ts` is main's, byte for byte, so the page's
+bundle is main's. At this head `git diff --name-only origin/main...HEAD`
+lists 61 paths, every one of them the branch's own, and `git diff
+--name-only origin/main HEAD` lists no other path.
+
+The observed figures were taken again after the rename. The list is 8
+bytes shorter for every role (and 2 tokens fewer, proxy): `join`'s
+description says `dap invite` and `dap join` where it said `artroom
+invite` and `artroom join`. The reads per tool and their response bytes
+are unchanged. In the room story the second member's request count was
+288 in the default mode and 283 in `--generic` (observed), within the
+range of earlier runs.
+
 **Paths that differ from main.** After the third merge, and at the head of
 the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
 60 files, all this branch's own: the 44 files of `packages/mcp` (this
@@ -304,6 +357,10 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| After the composition onto the renamed main, at `292e2206`: `npx vitest run --project mcp --project cli --project client` | `Tests  136 passed (136)` |
+| The same: `npx vitest run --project mcp --reporter=verbose` | `Tests  73 passed (73)` |
+| The same: `npx vitest run --project scope packages/mcp/test packages/cli/test`, then `packages/mcp/test` alone with `--reporter=verbose` | `Test Files  12 passed (12)`, `Tests  18 passed (18)`; then `Test Files  7 passed (7)`, `Tests  12 passed (12)` |
+| The same: typecheck of `packages/mcp` (its three configurations), `packages/cli` and `packages/client`; `node --test scripts/active-source.test.mjs` | no errors; `# pass 7`, `# fail 0` |
 | `npx vitest run --project mcp`, after the item of review c790797b | `Tests  73 passed (73)` |
 | `npx vitest run --project scope packages/mcp/test`, after the item of review c790797b, again with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  12 passed (12)` |
 | `npx vitest run --project mcp`, after the item of review 16fcc428 | `Tests  72 passed (72)` |
@@ -367,12 +424,12 @@ tokenizer gives other counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 146481 | 37736 |
-| Demo room, maintainer | 57 | 1 | 114565 | 29608 |
-| Demo room, member | 54 | 1 | 107990 | 27851 |
-| Demo room, agent | 52 | 1 | 102224 | 26412 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339107 | 88985 |
-| Demo room, admin, `--generic` | 16 | 1 | 15186 | 3572 |
+| Demo room, admin | 71 | 1 | 146473 | 37734 |
+| Demo room, maintainer | 57 | 1 | 114557 | 29606 |
+| Demo room, member | 54 | 1 | 107982 | 27849 |
+| Demo room, agent | 52 | 1 | 102216 | 26410 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339099 | 88983 |
+| Demo room, admin, `--generic` | 16 | 1 | 15178 | 3570 |
 
 The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
@@ -380,7 +437,9 @@ exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
 wording of `items` changed: 63 bytes more per list than before. The runs
 of the rounds of reviews ad2576fb, 6a86304e, f7a8d2d4, 16fcc428 and
-c790797b gave the same figures.
+c790797b gave the same figures. After the composition onto the renamed
+main the list is 8 bytes shorter, as the table shows: `join`'s description
+names `dap invite` and `dap join`.
 
 ### Reads per tool
 
@@ -417,15 +476,16 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in the round of review c790797b. The second member's request count
-varies between runs with the timing of `wait`'s polls: in the default mode
-286, 288, 288, 286, 286 and 286, and in `--generic` 283, 283, 281, 283, 281
-and 281, in the runs of the last six rounds.
+Worker, after the composition onto the renamed main. The second member's
+request count varies between runs with the timing of `wait`'s polls: in
+the default mode 286, 288, 288, 286, 286, 286 and 288, and in `--generic`
+283, 283, 281, 283, 281, 281 and 283, in the runs of the last seven
+rounds.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
-| Default | 7 | 3 | 4 | 229 | 286 |
-| `--generic` | 7 | 3 | 4 | 241 | 281 |
+| Default | 7 | 3 | 4 | 229 | 288 |
+| `--generic` | 7 | 3 | 4 | 241 | 283 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,
