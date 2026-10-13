@@ -67,7 +67,7 @@
 
   .rail { background: var(--rail); padding: 18px; display: flex; flex-direction: column; min-width: 0; gap: 12px; }
   .wordmark { display: block; line-height: 1.4; padding: 0 2px; }
-  .wordmark img { display: block; width: 72px; height: auto; }
+  .wordmark img { display: block; width: calc(72px * 432 / 440); height: auto; }
   .wordmark .wordmark-dark { display: none; }
   :root[data-theme="dark"] .wordmark-light { display: none; }
   :root[data-theme="dark"] .wordmark-dark { display: block; }
@@ -309,7 +309,7 @@
   /* Accepted entry preview: one centered task before verified room navigation. */
   .artroom[data-entry="true"] { display: block; }
   .entry-header { grid-column: 1 / -1; padding: 20px 32px; min-height: 88px; border-bottom: 1px solid var(--line); }
-  .entry-header .wordmark { min-width: 72px; width: 72px; margin: 0; }
+  .entry-header .wordmark { min-width: calc(72px * 432 / 440); width: calc(72px * 432 / 440); margin: 0; }
   .entry-content { grid-column: 1 / -1; width: calc(100% - 48px); max-width: 620px; margin: 80px auto 64px; padding: 0; }
   .entry-content h1 { font-size: 36px; line-height: 1.2; letter-spacing: -1px; font-weight: 700; margin: 0 0 16px; }
   .entry-intro { font-family: var(--font-sans); font-size: 18px; line-height: 1.55; color: var(--muted-ink); margin-bottom: 34px; }

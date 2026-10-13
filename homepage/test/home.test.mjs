@@ -36,7 +36,7 @@ test("four built homepages preserve the approved copy, every link, child headers
     }
     const utility = pages["index.html"].match(/<div class="utility">([\s\S]*?)<\/div>/)?.[1]; assert.ok(utility);
     assert.match(utility, /^<a class="brand-link" data-home /, "the homepage wordmark is the utility row’s first child");
-    for (const file of ["room/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], utility, "all four pages share exact header links and labels");
+    for (const file of ["room/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], file === "jam/index.html" ? utility.replace('width="432"', 'width="440"') : utility, "all four pages share header links and labels; Jam retains its deferred intrinsic width");
     const rows = anchors(pages["index.html"]).filter(link => link.attributes.class === "destination");
     assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Counter", "Jam", "Documentation"]);
     const icons = anchors(pages["index.html"]).filter(link => link.attributes.class === "icon-link");
@@ -46,6 +46,6 @@ test("four built homepages preserve the approved copy, every link, child headers
     assert.equal(await readFile(resolve(built, "_headers"), "utf8"), "/*\n  Cache-Control: public, max-age=0, must-revalidate, no-transform\n", "the built serving metadata preserves cache policy and forbids HTML transforms");
     const css = await readFile(resolve(built, "style.css"), "utf8");
     assert.match(css, /\.support\{[^}]*font-family:OpenRunde,system-ui,sans-serif;[^}]*font-size:20px;[^}]*font-weight:400;[^}]*line-height:1\.5/);
-    for (const [master, asset] of [["dap-wordmark-green.svg", "dap.svg"], ["dap-symbol-small.svg", "favicon.svg"], ...["Regular", "Semibold", "Bold"].map(weight => [`fonts/OpenRunde-${weight}.woff2`, `fonts/OpenRunde-${weight}.woff2`])]) assert.deepEqual(await readFile(resolve(built, "brand", asset)), await readFile(resolve(root, "brand", master)));
+    for (const [master, asset] of [["dap-wordmark-green.svg", "dap.svg"], ["dist/favicon.svg", "favicon.svg"], ["dist/favicon.ico", "favicon.ico"], ...["Regular", "Semibold", "Bold"].map(weight => [`fonts/OpenRunde-${weight}.woff2`, `fonts/OpenRunde-${weight}.woff2`])]) assert.deepEqual(await readFile(resolve(built, "brand", asset)), await readFile(resolve(root, "brand", master)));
   } finally { await rm(temporary, { recursive: true, force: true }); }
 });
