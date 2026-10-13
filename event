@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at scripts/public-release.json","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"scripts/public-release.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at scripts/public-release.mjs","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"scripts/public-release.mjs"}}
