@@ -30,12 +30,14 @@
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
-  type Fetch, type ReadSigning, type Signing, type Transport,
+  ScopeHandle, ShapeError, TransportError, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
 import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/dap-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
+import { enrolAgentKey } from "./invitations.ts";
+import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
 const NEW_REGISTER = NEWEST["platform:register"]!;
 
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
@@ -50,6 +52,9 @@ export interface Context {
   /** Internal configured-service trust for this exact injected founding
    * transport. It authenticates no independent remote history. */
   trustedFoundingService?: { service: string; fetch: Fetch };
+  /** Explicit fixed-origin demo projection for fresh claim preflight only.
+   * It grants no authority and is never used to resume/check an original. */
+  foundingOffer?: (register: ScopeRef) => Promise<FoundingOffer>;
   /** The clock that intents are signed by, in milliseconds. The default is the runtime's. */
   now?: () => number;
   /**
@@ -283,7 +288,7 @@ const mismatchAnswer = (reason: string, scope: ScopeId | null): Outcome => faile
 function answered(scope: ScopeId, answer: Answer, took: string): Outcome {
   switch (answer.answer) {
     case "accepted": return done(`${took}: entry ${scope}:${answer.receipt.fact.seq}, hash ${answer.receipt.fact.hash.slice(0, 19)}.`);
-    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. The request was refused.`);
+    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name === "founding-policy" ? "creation-policy" : answer.name === "founding-key" ? "initial-key" : answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. The request was refused.`);
     case "unavailable": return unavailableAnswer(answer.reason, scope);
     case "mismatch": return mismatchAnswer(answer.reason, scope);
   }
@@ -509,7 +514,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
   if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
     const label = plan.definition === APPLICATION_COHORT.register ? "application" : "Counting";
-    return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. ${strictCustody
+    return failed(`Refused: plan-expired. The planned install could be created until ${plan.founding.intent.notAfter}. ${strictCustody
       ? `No request was sent by this run. Keep this original config directory unchanged. For a new ${label} plan, use a separate empty ARTROOM_HOME directory; configure the host with that new plan's register ID before installing.`
       : "Nothing was sent. Plan again, and set the new register ID."}`);
   }
@@ -584,7 +589,7 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
 }
 
 /**
- * `dap claim <name>`: the register's `found` act, signed by the founder
+ * `dap create <name>`: the register's `found` act, signed by the founder
  * key. The register fixes the directory's seed, so its ID is known from the
  * signed intent; the directory, once it exists, creates membership, the
  * rules scope and the destination. Then the founder takes the seat and the
@@ -604,10 +609,20 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
  * invents its missing signature. No signing key is in config.
  */
 export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean } = {}): Promise<Outcome> {
+  return walkClaim(ctx, name, options, false);
+}
+/** Settle and follow only retained original stages. No new act is prepared or submitted. */
+export function checkClaim(ctx: Context, name: string): Promise<Outcome> {
+  return walkClaim(ctx, name, {}, true);
+}
+function walkClaim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean }, readOnly: boolean): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
     const register = config.register ?? stop(usage("No register is known here. Run: dap install <base-url>."));
     if (config.repository) return usage(`A repository is claimed here already: directory ${config.repository.directory.scope}.`);
+    if (readOnly && !config.claim) return failed("No original claim is retained. Check prepares and submits nothing.");
+    // A status check reads once and invokes no injected scheduler/pause hook.
+    const waiting = readOnly ? { ...ctx, tries: 1, pause: async () => {} } : ctx;
     const secret = await signerOf(ctx, config);
     const signer = secretSigner(secret);
     const R = await handleOf(ctx, config, register.scope, null);
@@ -621,15 +636,33 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
       if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
     } else {
+      let offered: FoundingOffer | undefined;
+      if (ctx.foundingOffer) {
+        const value = await ctx.foundingOffer(structuredClone(register));
+        if (!isFoundingOffer(value, config.service, register)) return failed("The demo offer does not match the configured origin, full register reference, pin and purpose. Nothing was prepared or submitted.");
+        // Own the projection before asynchronous recovery-key preparation.
+        offered = JSON.parse(canonicalize(value)) as FoundingOffer;
+        if (!DIRECTORY_OF[offered.definition] || !platform(offered.definition)) return failed("The demo register version is unsupported here. Nothing was prepared or submitted.");
+      }
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
       const handle = options.handle ?? "@founder";
-      const registered = await summaryOf(R);
-      if (canonicalize(registered.scope) !== canonicalize(register)) return failed("The register read does not match the saved register reference; nothing was submitted.");
-      if (!DIRECTORY_OF[registered.definition]) return failed(`The register ${register.scope} is under ${registered.definition}, which this command does not know.`);
-      registerDefinition = registered.definition;
-      const shape = platform(registered.definition)!.data as unknown as DefinitionShape;
+      let definition: Digest | PlatformDefinition;
+      let items: readonly Item[];
+      if (offered) {
+        definition = offered.definition;
+        // Revision selector only: never present this projection as a Summary,
+        // an authenticated roster or authority for the native found judgment.
+        items = [{ id: offered.registerItem.id, revision: offered.registerItem.revision, type: "register", state: "open", opened: null, parties: {}, refs: {}, attributed: [], values: { host: offered.registerItem.host, namespace: offered.registerItem.namespace, policy: "open", purpose: "demo-start" } }];
+      } else {
+        const registered = await summaryOf(R);
+        if (canonicalize(registered.scope) !== canonicalize(register)) return failed("The register read does not match the saved register reference; nothing was submitted.");
+        definition = registered.definition; items = registered.items;
+      }
+      if (!DIRECTORY_OF[definition]) return failed(`The register ${register.scope} is under ${definition}, which this command does not know.`);
+      registerDefinition = definition;
+      const shape = platform(definition)!.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
@@ -663,16 +696,26 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
           } catch { /* Not a checked copy of this legacy claim. */ }
         }
       }
-      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact found signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
+      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact creation signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
       await keep({ ...pending, found });
     }
     const submitted = async (step: ClaimStep, at: ScopeRef, handle: ScopeHandle, took: string): Promise<FactRef> => {
       const digest = intentDigest(step.signed.intent);
+      if (readOnly) {
+        const settled = await handle.settle(step.signed);
+        if (!settled.ok) return stop(failed(`The original ${step.signed.intent.kind === "found" ? "create" : step.signed.intent.kind} is not confirmed: ${settled.reason}. It remains pending; Check submitted nothing.`));
+        const receipt = settled.value;
+        if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(at) || receipt.intent !== digest || step.accepted && canonicalize(receipt.fact) !== canonicalize(step.accepted)) return stop(failed("The checked receipt does not match the exact original stage. It remains pending; nothing was submitted."));
+        const followed = await handle.followReceipt(receipt);
+        if (!followed.ok || followed.entry.input.type !== "act" || canonicalize(followed.entry.input.signed) !== canonicalize(step.signed)) return stop(failed("The original accepted stage could not be followed exactly. It remains pending; nothing was submitted."));
+        if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) registerDefinition = receipt.definition;
+        return receipt.fact;
+      }
       if (step.accepted) {
         // Settlement admits nothing and is bound to the exact envelope. A
         // saved marker alone cannot stand for some other accepted request.
         const settled = await handle.settle(step.signed);
-        if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
+        if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind === "found" ? "create" : step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
         if (settled.value.intent !== digest || canonicalize(settled.value.fact) !== canonicalize(step.accepted)) return stop(failed("The saved accepted fact does not match this exact claim step; nothing was submitted."));
         if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) registerDefinition = settled.value.definition;
         return step.accepted;
@@ -685,7 +728,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       }
       return receipt.fact;
     };
-    const foundFact = await submitted(pending.found!, register, R, "Claimed");
+    const foundFact = await submitted(pending.found!, register, R, "Created");
     if (!pending.found!.accepted) {
       // An unavailable answer also requires the same request on retry. Even
       // an expired/refused envelope remains saved: only --again replaces it.
@@ -695,7 +738,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       // settle the found or change its already accepted request bytes.
       await R.summary();
     }
-    const resume = `run dap claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
+    const resume = `run dap create ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The checked register receipt selects the exact directory/sibling tuple.
     const directoryDefinition = registerDefinition === null ? undefined : DIRECTORY_OF[registerDefinition];
@@ -708,12 +751,12 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     if (!repository) {
       const D = await handleOf(ctx, config, scopeIdOf(seed), null);
       const children: ScopeId[] = [];
-      const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
+      const directory = await waitFor(waiting, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
       const made = await createdBy(D, 0);
       const kind = (k: string) => made.find((m) => m.seed.kind === k)?.scope ?? stop(failed(`The directory's genesis creates no ${k}.`));
       children.push(kind("membership"), kind("rules"), kind("destination"));
       const handles = await Promise.all(children.map((scope) => handleOf(ctx, config, scope, null)));
-      const summaries = await waitFor(ctx, () => [register.scope, D.scope, ...children], async () => {
+      const summaries = await waitFor(waiting, () => [register.scope, D.scope, ...children], async () => {
         const all = await Promise.all(handles.map(active));
         return all.every((s) => s !== null) ? (all as Summary[]) : null;
       }, "membership, the rules scope and the destination", resume);
@@ -728,9 +771,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const enrollment = { ...base, repository };
     const M = await handleOf(ctx, enrollment, repository.membership.scope);
     const mShape = platform(siblings.membership)!.data as unknown as DefinitionShape;
+    if (!pending.seat && readOnly) return failed("The creation and its children are confirmed, but no original seat request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.seat) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const members = summary.items.filter((item) => item.type === "member");
       const own = members.filter((item) => item.values["handle"] === pending.handle);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, seat: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "seat") });
@@ -744,9 +788,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const seat = await submitted(pending.seat!, repository.membership, M, "Seated");
     if (!pending.seat!.accepted) await keep({ ...pending, seat: { signed: pending.seat!.signed, accepted: seat } });
     const keyFields = { member: seat.seq };
+    if (!pending.firstKey && readOnly) return failed("The original seat is confirmed, but no original first-key request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.firstKey) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const keys = summary.items.filter((item) => item.type === "key");
       const own = keys.filter((item) => item.values["id"] === signer.key && item.refs["member"] === seat.seq);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, firstKey: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "first-key") });
@@ -762,12 +807,12 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const inbox = (await createdBy(M, seat.seq)).find((m) => m.seed.kind === "inbox")?.scope;
     if (inbox) {
       const I = await handleOf(ctx, enrollment, inbox);
-      await waitFor(ctx, () => [M.scope, inbox], () => active(I), "the founder's inbox");
+      await waitFor(waiting, () => [M.scope, inbox], () => active(I), "your inbox");
       repository.inbox = inbox;
     }
     await ctx.store.save({ ...base, repository, handle });
     return done(
-      `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+      `Created ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
       `Definitions: ${directoryDefinition}, ${[siblings.membership, siblings.rules, siblings.destination].join(", ")}.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
     );
@@ -792,7 +837,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     }
     if (!options.role || !(options.role in ROLE_LISTS)) return usage(`Name a role with --role: one of ${Object.keys(ROLE_LISTS).join(", ")}.`);
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap claim <name>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const M = await handleOf(ctx, config, repository.membership.scope);
     const summary = await summaryOf(M);
@@ -825,6 +870,7 @@ export function linkOf(text: string): Link | null {
 
 /** `dap join <link>` resumes the exact enrollment kept before delivery. */
 export function join(ctx: Context, text: string): Promise<Outcome> {
+  if (text.startsWith(AGENT_KEY_LINK)) return enrolAgentKey(ctx, text);
   return run(async () => {
     const link = linkOf(text) ?? stop(usage("That is not an invitation link from dap invite."));
     if (typeof link.service !== "string" || typeof link.handle !== "string" || link.invitation < 1
@@ -832,6 +878,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
       || !isScopeRef(link.repository?.membership) || link.repository.membership.kind !== "membership"
       || !isScopeId(link.repository?.rules) || !isScopeId(link.repository?.destination)) return usage("That invitation link has invalid repository references.");
     const before = await ctx.store.config();
+    if (before?.join?.kind === "enrol") return failed("An original agent enrollment is retained; a person invitation cannot replace it.");
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
     if (before && !before.join) return usage("This config directory is set up already; use another config directory to join.");
     const linkDigest = textDigest(canonicalize(link));
@@ -1121,7 +1168,7 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
 function verifyAll(ctx: Context): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    if (!config.repository) return usage("No repository is known here. Run: dap claim <name>, or dap join <link>.");
+    if (!config.repository) return usage("No repository is known here. Run: dap create <name>, or dap join <link>.");
     const reader = await readerOf(ctx, config);
     const lines: string[] = [];
     let first: string | null = null;
@@ -1182,7 +1229,7 @@ const remoteLine = (config: Config, repository: Recorded): string =>
  * destination answers where the key's claim caused it, within the intent window.
  */
 async function destinationOf(ctx: Context, config: Config): Promise<{ summary: Summary; reader: string | null; repository: Recorded }> {
-  const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: dap claim <name>, or dap join <link>."));
+  const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
   const reader = await readerOf(ctx, config);
   let read = await (await handleOf(ctx, config, scope, reader)).summary();
   if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
@@ -1407,7 +1454,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     if (bytes.length > EDIT_BYTES) return usage(`${options.file} has ${bytes.length} bytes; a change carries at most ${EDIT_BYTES}.`);
     const content = textOf(bytes, options.file);
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap claim <name>, or dap join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
     // The issue that the change closes is found before anything is signed.
@@ -1613,7 +1660,7 @@ export function merge(ctx: Context, named: string, options: { closes?: string } 
  * commit, and the page's address for a one-file version. Refused, by the lane or by the destination: the reason, and how to go on.
  */
 async function merging(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition): Promise<Outcome> {
-  const repository = config.repository ?? stop(usage("No repository is known here. Run: dap claim <name>, or dap join <link>."));
+  const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
   const signer = secretSigner(await signerOf(ctx, config));
   const L = await handleOf(ctx, config, lane, reader);
   const items = (await summaryOf(L)).items;
@@ -1727,7 +1774,7 @@ async function issueNamed(ctx: Context, config: Config, reader: string | null, n
 function issueAct(ctx: Context, named: string, choose: (issue: Issue, handle: string | undefined, membership: ScopeRef) => { kind: string; on: number | null; fields: Record<string, unknown> }, took: string): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap claim <name>, or dap join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const reader = await readerOf(ctx, config);
     const issue = await issueNamed(ctx, config, reader, named);
     const L = await handleOf(ctx, config, issue.lane, reader);
@@ -1753,7 +1800,7 @@ export function issueOpen(ctx: Context, options: { title?: string; body?: string
   return run(async () => {
     if (options.title === undefined) return usage("issue open needs --title <text>.");
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap claim <name>, or dap join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
     const issue = await activeDefinition(ctx, config, reader, "issue");
@@ -1794,7 +1841,7 @@ export function issueClose(ctx: Context, named: string): Promise<Outcome> {
 export function issues(ctx: Context): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    if (!config.repository) return usage("No repository is known here. Run: dap claim <name>, or dap join <link>.");
+    if (!config.repository) return usage("No repository is known here. Run: dap create <name>, or dap join <link>.");
     const all = await issuesOf(ctx, config, await readerOf(ctx, config));
     if (all.length === 0) return done("No issues.");
     const lines = all.map((issue) => `#${issue.number ?? "?"}  ${issue.state}${issue.reason ? ` (${issue.reason})` : ""}  ${issue.title}${issue.assignees.length > 0 ? `; assigned to ${issue.assignees.join(", ")}` : ""}; lane ${issue.lane}`);

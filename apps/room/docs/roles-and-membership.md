@@ -4,9 +4,6 @@ For a room admin and a person joining that room, this page explains the source C
 
 **Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** It assumes a supplied, configured source CLI; it supplies no public installation, hosted bootstrap or recovery wizard.
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 In the admin's existing room context:
 
 ```sh
