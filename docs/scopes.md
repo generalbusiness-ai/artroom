@@ -15,9 +15,6 @@ why. Nothing in either note is adopted by being built.
 
 ## The packages
 
-The package names and commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 | Package | Holds | Imports |
 |---|---|---|
 | `@generalbusiness/dap-contract` | Types and constant tables. No logic. | Nothing |

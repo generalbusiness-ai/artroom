@@ -6,9 +6,6 @@ site, what renders and what does not, the limits, and who can read it.
 Plan 025 (`plans/025-2026-10-07-published-pages.md` on `main`) is the
 design; this page describes what is built.
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 ## Opening a site
 
 A page's address is:

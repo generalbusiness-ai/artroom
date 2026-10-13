@@ -14,9 +14,6 @@ operator permission or new-room bootstrap.
 
 ## Join with your invitation
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 In a terminal with a fresh dap user context, run:
 
 ```sh

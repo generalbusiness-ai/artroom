@@ -18,9 +18,6 @@ current delivery evidence is reported separately.
 
 ## Build it
 
-The package name in this command is the final dap name. To run it at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 From the root of a checkout, after `npm ci`:
 
 ```

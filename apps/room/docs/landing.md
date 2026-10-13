@@ -4,9 +4,6 @@ For a maintainer or admin using an already configured source CLI, this page help
 
 **Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package release, hosted tutorial or rendered acceptance is established. Your room keeps its original definition pins; activating new declarations alone does not upgrade an older native destination.
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 Read the intended version, content and required evidence before the mutation:
 
 ```sh

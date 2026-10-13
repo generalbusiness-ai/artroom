@@ -103,9 +103,6 @@ declares named rules, pass `RULE_PROFILES` from
 the validator calls for the room's lane definitions and their demo
 profiles, which declare no named rules.
 
-The package names and commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 From the repository root, with its workspace dependencies installed, this
 command validates both demo profiles:
 
