@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5648d47c14a99968f43b7dab086ab6eb23b6e69f","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/github-wiring.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:59023e365fffc7a167fbbf5a98af56f17233a6ec","text":"Merge retired a covered predecessor; the successor is at packages/client/test/agent-key-invitation.test.ts."}
