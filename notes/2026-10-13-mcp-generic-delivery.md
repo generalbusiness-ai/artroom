@@ -162,8 +162,15 @@ planner's amendment is kept.
 
 ## Corrections of review 6a86304e
 
-Origin's main had not moved, so no merge was made in this round. The
-planner's amendment is kept.
+Origin's main had not moved when this round's corrections were made. It
+moved afterwards (the forms head landed as `2086f60e`), and the planner
+merged it into this branch at its head, with no conflict and no change to
+the branch's own paths; at the merged head `git diff --name-only
+origin/main...HEAD` lists 60 paths, every one under packages/mcp,
+packages/cli, packages/client (index.ts, invitation.ts), docs/mcp.md,
+docs/mcp-tools.json, this note, scripts/active-source.test.mjs,
+parked/README.md, plans/README.md, package-lock.json, vitest.config.ts
+or tsconfig, and none elsewhere. The planner's amendment is kept.
 
 | Item | What changed | Witness |
 |---|---|---|
