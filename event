@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7be1fafe990a7334630d09908d9cc7456eb83bbd","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/manifest-definitions.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7c29bf3f47d195580d8f7fe5ae3e9bc9e4d1c10c","text":"Merge retired a covered predecessor; the successor is at examples/counting/browser/view.ts."}
