@@ -2,7 +2,12 @@
 
 Request `ebda829bb491b43de02f1ab6e91bf2e18ef7e857`, amended by
 `19264feb21b49756fb3e9913b0ba11b2520e1e3a`, remains open for all six outputs.
-This work is under promise `23fed5e28dc5a51fb3da7ae730c12025898dc3f6`.
+The full delivery remains under promise
+`23fed5e28dc5a51fb3da7ae730c12025898dc3f6`.
+The bounded baseline and custody Source child is request
+`b34f37779e729f820ef3e3c392cad363dd99abc8`, under builder promise
+`6a4b395be30f6b5b48865fb5a0ba195aac2ae2bc`.
+Approval of that child closes no hosted output of the full parent.
 The approved Draft 5 design and baseline definition pin are unchanged.
 
 ## Checked Source
@@ -39,6 +44,7 @@ the later completion does not erase the failed startup.
 | Body completion 84771 | Exit 0. The same configuration bytes used an `.mts` filename. Exactly six cases in three modules passed, with no extra cases or retries; guards passed. The body took 5.051 seconds. Compilers were not repeated. |
 | Browser storage 96666 | Exit 0. Four checks passed, with zero page errors: actual WebCrypto, IndexedDB, Web Locks, two tabs, reload, and retained custody. Transport and recorded answers were scripted. |
 | Main context 76928 | Exit 0. Four checks passed, with zero page errors: actual `main.ts` context functions and DOM, late discovery, stored-context comparison, serialized persistence, and busy-state finalization. An external test lifecycle seam and scripted session refusal supplied the circumstances. |
+| Ordinary gate 54755 | Exit 0, postguard passed, at commit `34895578640c8e2171ef35cff7adbbb4ff0714a3`, tree `5ed28f5de3943767cd5a6b3a131cbf72b59646c0`. Whitespace, typecheck, and test phases passed. Vitest: 1160 passed and 3 skipped cases across 216 passed and 1 skipped files. Node: 10 passed. Counter: 55 passed. Installation was skipped. The command recorded 161.999 seconds. |
 
 The focused body covered the four custody cases, the existing native Lending
 scenario, and the existing static Lending route case. The native scenario
@@ -48,9 +54,12 @@ original retained request after Check to test native idempotency. The separate
 browser component witness supplies actual reload and storage behaviour.
 
 The browser results do not show a deployed member joining a hosted membership,
-a complete hosted interface story, or page publication. No whole suite was
-repeated and the final ordinary gate remains owed at the final executable
-freeze.
+a complete hosted interface story, or page publication. The one ordinary gate passed at the exact
+348955 Source freeze. This postgate commit changes only this delivery note.
+Its executable Source and all tests are identical to that freeze and to the
+checked 052b executable composition. No gate or asset producer is repeated
+for the prose-only successor. The original failed focused startup remains
+separate from the passed six-case completion and gate.
 
 ## What remains
 
@@ -81,8 +90,12 @@ Acceptance, publication and the public history must be recorded separately.
 Current steering permits hosted MCP work early; this note imposes no earlier
 hosted-work deferral. The current builder priority order still applies.
 
-Prepare and review the complete Source and owned deployment packet, run the
-one final ordinary gate before Source review, and obtain Source approval
-before any provider action. Retain every original failed or uncertain result.
+The bounded Source child is ready for independent exact-head review after
+its one ordinary gate. All authored and generated changes need their normal
+artifacts, with this delivery note as the primary. Source approval,
+ratification, and normal landing remain required. Owned deployment helpers
+and hosted operations remain separate work under the full parent. Obtain
+Source approval before any provider action. Retain every original failed or
+uncertain result.
 Do not call this six-output request delivered until the actual hosted results
 and homepage links have been checked.
