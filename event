@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0be34e4795af77eaa513b57c7a612d2f1e0f4834","text":"Merge retired a covered predecessor; the successor is at homepage/test/home.test.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:182e1a424811cfc0cc921338f1b8d3027ade292b","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/artifacts-wiring.test.ts."}
