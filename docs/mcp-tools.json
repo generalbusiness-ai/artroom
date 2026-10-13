@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "room",
-      "description": "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
+      "description": "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the applications its factory created (such as a Counter), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
       "inputSchema": {
         "type": "object",
         "properties": {

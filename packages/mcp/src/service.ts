@@ -469,7 +469,7 @@ export class McpService {
     const tool = (name: string, description: string, properties: Record<string, unknown>, required: string[], annotations: Record<string, unknown>, run: Run, output?: Record<string, unknown>): [string, { tool: Tool; run: Run }] =>
       [name, { tool: { name, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, ...(output ? { outputSchema: output } : {}), annotations }, run }];
     return Object.fromEntries([
-      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
+      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the applications its factory created (such as a Counter), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
         { cursor: { type: "string" } }, [], READ, (a) => this.#room(a)),
       tool("inspect", "One scope: its definition and digest, status, head, counts by item type and state, and its live items, paged by bytes at its head. With declaration: true, the definition's bytes, paged. With describe: <kind>, the complete derived text of one act, for an act whose tool description points here.",
         { scope: scopeArg, declaration: { type: "boolean" }, describe: { type: "string" }, cursor: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope"], READ, (a) => this.#inspect(a)),
@@ -508,32 +508,42 @@ export class McpService {
   }
 
   /**
-   * `room`: the header on every page, and the room's collections (lanes, roots, standing, active definitions, the act tools not
-   * held, the scopes not read) paged together by bytes, in that order, with a cursor bound to the list's generation.
+   * `room`: the header on every page, and the room's collections (lanes, applications, roots, standing, active definitions, the act
+   * tools not held, the scopes not read) paged together by bytes, in that order. The cursor is bound to the layout of those
+   * collections, a digest of every entry in order, and not to the tool list's generation: a row the list does not count, such as
+   * an application still being created, moves the entries after it. A continuation whose layout no longer holds restarts at the
+   * first entry and says so, so no entry is repeated or skipped.
    */
   async #room(args: Args): Promise<CallResult> {
     const s = await this.snapshot();
     const room = s.read.room;
+    const heldBy = new Map(s.read.inventory.scopes.map((h) => [h.scope, h] as const));
     const lanes = (room?.lanes ?? []).map((l) => {
-      const held = s.read.inventory.scopes.find((h) => h.scope === l.ref.scope);
+      const held = heldBy.get(l.ref.scope);
       return { number: l.number, kind: l.kind, title: l.title, state: l.state, scope: l.ref.scope, definition: held?.definition.name ?? null, digest: held?.pinned ?? null };
     });
     const places = Object.fromEntries(SINGLETON_PLACES.map((p) => [p, s.read.inventory.scopes.find((h) => h.place === p) ?? null]).filter(([, h]) => h !== null).map(([p, h]) => [p, { scope: (h as Held).scope, definition: (h as Held).pinned }]));
     const standing = Object.entries(s.read.inventory.standing).map(([membership, st]) => (st.known ? { membership, handle: st.handle, role: st.role, key: st.key } : { membership, standing: "your standing here is unknown", why: st.reason }));
+    const activeName = new Map(s.read.inventory.active.map((a) => [a.digest, a.name] as const));
+    const applications = (room?.applications ?? []).map((a) => {
+      const held = a.ref ? heldBy.get(a.ref.scope) : undefined;
+      return { definition: held?.definition.name ?? (a.digest !== null ? activeName.get(a.digest) ?? null : null), digest: a.digest, scope: a.ref?.scope ?? null, state: a.state };
+    });
     const roots = s.read.inventory.scopes.filter((h) => h.place === "root").map((h) => ({ scope: h.scope, definition: h.definition.name, digest: h.pinned, membership: h.membership }));
-    const sections = { lanes, roots, standing, active: s.read.inventory.active as unknown[], notHeld: s.hidden as unknown[], unread: s.read.unread as unknown[] };
+    const sections = { lanes, applications, roots, standing, active: s.read.inventory.active as unknown[], notHeld: s.hidden as unknown[], unread: s.read.unread as unknown[] };
     type Section = keyof typeof sections;
     const all = (Object.keys(sections) as Section[]).flatMap((section) => sections[section].map((value) => ({ section, value })));
     const header = { service: this.#service, key: this.#port.signer.key, mode: this.mode, generation: s.generation, scopes: places };
-    const given = fromCursor<{ g: string; i: number }>(args["cursor"]);
-    const moved = given !== null && given.g !== s.generation;
+    const layout = digestBytes(utf8(canonicalize(all as never)));
+    const given = fromCursor<{ l: string; i: number }>(args["cursor"]);
+    const moved = given !== null && given.l !== layout;
     const from = given && !moved ? Math.min(given.i, all.length) : 0;
     const { page, next } = pageBy(all, from, pageOf(BOUNDS.room) - bytesOf(header) - 256);
     const out: Record<string, unknown[]> = Object.fromEntries((Object.keys(sections) as Section[]).map((k) => [k, page.filter((e) => e.section === k).map((e) => e.value)]));
     return ok({
       ...header, ...out,
-      ...(next !== null ? { cursor: cursorOf({ g: s.generation, i: next }), more: `This page holds entries ${from + 1} to ${next} of ${all.length}; call room with cursor for the rest.` } : {}),
-      ...(moved ? { restarted: "The list's generation changed since the cursor was made; this page restarts at the first entry." } : {}),
+      ...(next !== null ? { cursor: cursorOf({ l: layout, i: next }), more: `This page holds entries ${from + 1} to ${next} of ${all.length}; call room with cursor for the rest.` } : {}),
+      ...(moved ? { restarted: "The room's collections changed since the cursor was made; this page restarts at the first entry." } : {}),
     }, BOUNDS.room);
   }
 

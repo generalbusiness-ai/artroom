@@ -5,10 +5,13 @@
  *
  * - the repository of the configuration, when there is one: its register,
  *   directory, membership, rules scope, destination and the caller's inbox,
- *   and every lane the directory lists;
+ *   every lane the directory lists, and every application the directory's
+ *   application factory created (an `application` item in state `created`
+ *   whose `scope` is set), each under the directory's membership;
  * - the configuration's standalone roots: `{ scope, membership }` entries,
  *   each a scope outside the repository and the membership scope that
- *   standing for it is read from.
+ *   standing for it is read from. A root that is also one of the
+ *   directory's applications is held once, as the application.
  *
  * Reads: the membership, directory and rules summaries, one summary per
  * root and per further membership. A scope's pinned definition never
@@ -77,6 +80,8 @@ export interface Room {
   inbox: ScopeRef | null;
   /** The directory's lane rows: number, kind, title, state and the lane's reference. */
   lanes: { ref: ScopeRef; number: number | null; kind: string | null; title: string | null; state: string | null }[];
+  /** The directory's application rows: the definition's digest, the item's state, and the created scope once it is set. */
+  applications: { digest: string | null; state: string; ref: ScopeRef | null }[];
   membershipItems: readonly Item[];
   directoryHead: Head;
 }
@@ -178,9 +183,14 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
         title: typeof item.values["title"] === "string" ? item.values["title"] : null,
         state: typeof item.values["state"] === "string" ? item.values["state"] : null,
       }));
+      const applications = d.items.filter((item) => item.type === "application").sort((a, b) => a.id - b.id).map((item) => ({
+        digest: typeof item.values["definition"] === "string" ? item.values["definition"] : null,
+        state: item.state,
+        ref: isRef(item.refs["scope"]) ? item.refs["scope"] as ScopeRef : null,
+      }));
       room = {
         register: ref("register") ?? config.register ?? null, directory: d.scope, membership: M,
-        rules: ref("rules") ?? (rulesRead.ok ? rulesRead.value.scope : null), destination: ref("destination"), inbox: null, lanes,
+        rules: ref("rules") ?? (rulesRead.ok ? rulesRead.value.scope : null), destination: ref("destination"), inbox: null, lanes, applications,
         membershipItems: membershipRead.ok ? membershipRead.value.items : [], directoryHead: directoryRead.at,
       };
       await hold("directory", d.scope.scope, M, d);
@@ -196,6 +206,8 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
         room.inbox = kept.pins.get(repository.inbox)?.ref ?? null;
       }
       for (const lane of lanes) await hold("lane", lane.ref.scope, M, undefined, { number: lane.number, kind: lane.kind, title: lane.title, state: lane.state });
+      // An application is held as a lane is, under the directory's membership, once it is created and its scope is known.
+      for (const application of applications) if (application.state === "created" && application.ref) await hold("application", application.ref.scope, M);
     } else {
       unread.push({ scope: repository.directory.scope, reason: directoryRead.reason });
       // Nothing of the room is readable yet: membership is held by the pin the configuration records, so its acts that a rule
@@ -206,7 +218,9 @@ export async function readInventory(reads: Reads, kept: Kept, config: McpConfig)
     await hold("register", config.register.scope, null);
   }
 
+  const applicationScopes = new Set(scopes.filter((s) => s.place === "application").map((s) => s.scope));
   for (const root of config.roots ?? []) {
+    if (applicationScopes.has(root.scope)) continue;
     const read = await summaryOf(root.scope, root.membership);
     if (!read.ok) { unread.push({ scope: root.scope, reason: read.reason }); continue; }
     heads[root.scope] = headText(read.at);

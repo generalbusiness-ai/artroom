@@ -69,7 +69,7 @@ new token. Batches are not served.
 | `--generic=add` | Lists the act tools and the pair. |
 | `--tools <names>` | Lists the act tools of these definition names only, separated by commas, such as `--tools issue,change`. The generic tools stay. |
 | `--http <address>:<port>` | Serves loopback HTTP in place of stdio. |
-| `--scope <scope> --membership <scope>` | Records a standalone scope in the config before serving, with the membership its standing is read from. The server lists its acts from then on. `--membership` is optional; without it the standing is unknown. |
+| `--scope <scope> --membership <scope>` | Records a standalone scope in the config before serving, with the membership its standing is read from. The server lists its acts from then on. `--membership` is optional; without it the standing is unknown. An application the room's directory created needs no `--scope`: the server finds it. |
 
 ### The two wire revisions
 
@@ -107,10 +107,26 @@ The list has two parts.
   of the declaration. Two declarations that share a name and differ get two
   tools, each named `<name>@<8 hex>`, and neither keeps the plain name.
 
+The room's scopes are found, not configured: the repository's platform
+scopes (register, directory, membership, rules, destination and your
+inbox), every lane the directory lists, and every application the
+directory's application factory created, such as a Counter: an
+`application` item of the directory in state `created`, whose `scope` names
+the created scope. A lane and an application are both held under the
+directory's membership, so the caller's role there decides their tools.
+`room` lists the applications beside the lanes, with each one's definition
+name, digest, scope and state. `room` reads the directory's live items
+only: an application still being created is listed as `creating`, with no
+scope and no tools; a creation that was refused or conflicted is final,
+leaves the live items, and is not listed. A scope outside the
+repository is added with `--scope`; a configured scope that is also one of
+the directory's applications is held and listed once, as the application.
+
 The list is a function of the room, the caller's standing and the launch
 options, never of a connection. The server computes a generation from those
 inputs. A change of the generation (an activation, a role change, a new
-kind of lane, a scope recorded in the config) is told once to each
+kind of lane, a new application, a scope recorded in the config) is told
+once to each
 subscribed client. An ordinary step, such as a comment, changes no
 generation, and nothing is told. While a client is subscribed, the server
 reads the generation's inputs every 30 seconds; with no subscriber, it
@@ -267,7 +283,7 @@ annotations. In the default mode, `actions` and `act` are not listed.
 
 ### `room`
 
-Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.
+Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the applications its factory created (such as a Counter), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.
 
 ```json
 {
@@ -1327,6 +1343,29 @@ entries; the agent sends no tree. Under the demo change definition,
 holds one version only, the same steps end in the lane's refusal of the
 version as `source-shape`; the recipe test asserts that refusal too.
 
+## Taking part in a Counter
+
+A Counter is an application the room's application factory creates
+(`application.create`, the directory's `establish-application`). The
+agent is handed no scope ID and no `--scope`: `room` lists the Counter
+among its applications, with its definition name (`counting`), digest,
+scope and state, and the list holds the Counter's act tools from then on.
+`packages/mcp/test/counter.scope.test.ts` runs this recipe on the real
+test Worker in both modes, after an admin has initialized the board, and
+checks the tools called and their count against this table (observed).
+The count covers taking part, from finding the Counter to leaving; the
+room's setup, the board's initialization and the story's final reading
+of the steps are not counted. In `--generic` mode the story's second
+connection shares the first one's key and configuration: the same member,
+not a second admitted one.
+
+| Activity | Default | --generic |
+|---|---|---|
+| Take part in a Counter: find it, join, start, speak once, leave | `room`, whose applications name the Counter's scope; `counting.join`; `inspect` on the Counter for the board, `counting.start`; `inspect`, `counting.spoken`; `inspect`, `counting.leave`: 8 | `room`; `actions` on the Counter, `act` join; `inspect`, `act` start; `inspect`, `act` spoken; `inspect`, `act` leave: 9 |
+
+Each further turn is one `inspect` and one `counting.spoken` (one `act` in
+`--generic` mode).
+
 ## Budgets and observed figures
 
 Each figure below is labelled by how it was taken: an observed run of a
@@ -1348,9 +1387,14 @@ observed in `wire.test.ts` (the constant `MODERN_RESULT_EXTRA`), which the
 bounds do not count. Over 2025-11-25 nothing is added. The one result larger than its bound is a single live
 item larger than a page, which is served whole, alone on its page.
 
-`room` pages every collection it returns (lanes, standalone scopes,
+`room` pages every collection it returns (lanes, applications, standalone scopes,
 standing, active definitions, the act tools not held, the scopes not read)
-together, by bytes, with a cursor bound to the list's generation.
+together, by bytes, with a cursor. The cursor is bound to the layout of
+those collections, a digest of every entry in order, not to the tool
+list's generation: an application being created moves the entries after
+it without changing the generation. A cursor whose layout no longer holds
+is answered with the first page and `restarted`, so no entry is repeated
+or skipped.
 
 The searches of `wait` and `credential` keep their position between polls
 and calls and read at most 16 entries, or 4 pages of final items, each
@@ -1366,7 +1410,7 @@ of the warm call, as the service makes it; the test asserts both calls' sizes ag
 
 | Tool | Reads, warm | Posts | Cold | Response bytes | Plan's bound, warm |
 |---|---|---|---|---|---|
-| `room` | 3 | 0 | +1 session | 3836 | 3, + roots and memberships |
+| `room` | 3 | 0 | +1 session | 3874 | 3, + roots and memberships |
 | `inspect` | 1 | 0 | +1 | 990 | 1 |
 | `inspect` with `describe` | 1 | 0 | +1 | 1471 | 2 |
 | `inspect` with `declaration` | 2 | 0 | +1 | 64536 | 2 |
@@ -1389,6 +1433,12 @@ of the warm call, as the service makes it; the test asserts both calls' sizes ag
 operation's outcome names the token (two here), then the credential route:
 3 reads where plan 031 counts 1.
 
+The warm counts above are of a room with no applications. An application
+the directory created costs reads the first time the server sees it: one
+summary of its scope for its pin, and its definition's bytes once per
+digest; both are kept, so later calls read nothing more for it. Its row
+comes from the directory summary the list already reads.
+
 Other observed figures from the same run:
 
 - A session that has ended: the next read asks for a new one, +1.
@@ -1399,7 +1449,12 @@ Other observed figures from the same run:
 - A room with two standalone roots, one under a second membership: `room`
   warm reads 6 (3, + 2 roots, + 1 for standing on the second membership);
   cold, 2 session requests.
-- A room of 60 lanes and 40 roots: `room` in 5 pages, each within 8 KiB.
+- A room of 60 lanes, 30 applications and 40 roots: `room` in 6 pages
+  (observed; the test asserts more than one), each within 8 KiB. That
+  case proves the totals and the bound, not that pages agree with each
+  other; a second case does: a continuation inside the roots, after an
+  application appears as `creating`, is created, or is refused, restarts,
+  and the walk from the restart returns every root once.
 - 20 prepared steps under one key: `settle` in 4 pages, each within 4 KiB;
   each `prepare` result at most 1692 bytes.
 - A known tool name called at a root another process added under a second
@@ -1421,8 +1476,8 @@ Other observed figures from the same run:
 
 ### The list, per role
 
-Observed run of `packages/mcp/test/budget.test.ts`, taken after the
-composition onto the renamed main. Bytes are the
+Observed run of `packages/mcp/test/budget.test.ts`, taken in the
+discovery head (request f9ca5f96). Bytes are the
 canonical JSON of each `tools/list` result as sent; every page is asserted
 to be at most 256 KiB. Tokens are counted by gpt-tokenizer 3.4.0 with the
 `o200k_base` encoding, a proxy: an agent host's own tokenizer gives other
@@ -1430,12 +1485,12 @@ counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 146473 | 37734 |
-| Demo room, maintainer | 57 | 1 | 114557 | 29606 |
-| Demo room, member | 54 | 1 | 107982 | 27849 |
-| Demo room, agent | 52 | 1 | 102216 | 26410 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339099 | 88983 |
-| Demo room, admin, `--generic` | 16 | 1 | 15178 | 3570 |
+| Demo room, admin | 71 | 1 | 146531 | 37745 |
+| Demo room, maintainer | 57 | 1 | 114615 | 29617 |
+| Demo room, member | 54 | 1 | 108040 | 27860 |
+| Demo room, agent | 52 | 1 | 102274 | 26421 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339157 | 88992 |
+| Demo room, admin, `--generic` | 16 | 1 | 15236 | 3581 |
 
 No cap applies to the whole list. `--tools` shortens it for an agent with
 one job; `--generic` replaces the act tools with the pair.
