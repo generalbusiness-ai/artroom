@@ -391,6 +391,21 @@ In this session, after the last change to what each covers:
 | `npm run gate` in the round of review c790797b, once, at `6bfa8e9a` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1124 passed \| 2 skipped (1130)`, `Test Files  2 failed \| 199 passed \| 1 skipped (202)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this round's verbose run of `budget.test.ts`), and is skipped on Darwin. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 | `npm run gate` after the composition onto the renamed main, once, at `3dc0024a` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1124 passed \| 2 skipped (1130)`, `Test Files  2 failed \| 199 passed \| 1 skipped (202)`. Install ran, from the regenerated lockfile, and passed (`exit 0`), and left the tree clean; whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this composition's verbose run of the mcp project), and is skipped on Darwin. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
+## The planner's third amendment, after the composition
+
+The checker's review of `bfbffab0` (`65320b8c`) found that the W1
+inventory witness in `packages/mcp/test/inventory.test.ts` still selected
+the command line's usage lines by the prefix `  artroom `, which the
+renamed help no longer prints: the selected command set was empty, so the
+loop that checks every command against the inventory table in
+`docs/mcp.md` checked nothing, and the green gate did not establish that
+condition. The planner changed the prefix to `  dap ` and added two
+assertions before the loop: the set holds at least fifteen commands, and
+it contains `dap install`, `dap join`, `dap issues`, `dap merge` and
+`dap mcp`. With the prefix fixed the witness selects 21 commands (20
+besides `dap mcp`) and every one is found in the table; the owning test
+passes (5 of 5 in the file, observed). Nothing else changed.
+
 ## The planner's second amendment, after the merge
 
 The witness "a dead reclaimer under a long ARTROOM_HOME" builds a home of

@@ -66,7 +66,10 @@ describe("every activity is reachable, and every act renders", () => {
   // Invariant: docs/mcp.md maps every command of the command line and every page action to tool calls in each launch mode, and
   // every tool a default recipe names is listed for an admin of the demo room (no recipe names a hidden tool).
   test("the W1 inventory in docs/mcp.md covers every command and page action, with listed tools only", async () => {
-    const commands = [...new Set(USAGE.split("\n").filter((l) => l.startsWith("  artroom ")).map((l) => l.trim().split(" ").slice(0, l.includes("dap issue ") ? 3 : 2).join(" ")))];
+    const commands = [...new Set(USAGE.split("\n").filter((l) => l.startsWith("  dap ")).map((l) => l.trim().split(" ").slice(0, l.includes("dap issue ") ? 3 : 2).join(" ")))];
+    // The selection must be the command line's real command set, or the coverage loop below checks nothing.
+    expect(commands.length).toBeGreaterThanOrEqual(15);
+    expect(commands).toEqual(expect.arrayContaining(["dap install", "dap join", "dap issues", "dap merge", "dap mcp"]));
     const table = DOC.slice(DOC.indexOf("## The W1 inventory"), DOC.indexOf("## ", DOC.indexOf("## The W1 inventory") + 5));
     const rows = table.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Activity") && !l.startsWith("|---"));
     for (const command of commands.filter((c) => c !== "dap mcp")) expect(rows.some((r) => r.includes(`\`${command}`)), command).toBe(true);
