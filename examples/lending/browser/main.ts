@@ -7,6 +7,7 @@
  * and says that it is not published by this interface yet.
  */
 import "./style.css";
+import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Entry } from "@generalbusiness/dap-contract";
 import { lendingGateway, type ActOutcome, type LendingGateway, type LendingState, type Pending } from "./client.ts";
 import { deviceSigner, findLending, joining, newDeviceKey, readInvitation, type DeviceKey, type JoinOutcome, type Seat } from "./join.ts";
@@ -42,7 +43,7 @@ async function work(task: () => Promise<void>): Promise<void> {
   const at = epoch;
   busy = true; draw();
   try { await task(); } catch (error) { if (at === epoch) notice = { kind: "plain", text: error instanceof Error ? error.message : "Something went wrong. Nothing was sent." }; }
-  finally { busy = false; draw(); }
+  finally { if (at === epoch) { busy = false; draw(); } }
 }
 
 async function look(): Promise<void> {
@@ -69,8 +70,8 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
 });
 
 async function open(next: Remembered): Promise<void> {
-  epoch++; reading++; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
-  memory = next;
+  epoch++; reading++; busy = false; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
+  memory = next; draw();
   if (timer !== undefined) clearInterval(timer);
   if (!next.identity) return;
   const at = epoch;
@@ -79,15 +80,23 @@ async function open(next: Remembered): Promise<void> {
   if (at !== epoch) return;
   timer = window.setInterval(() => { if (!busy && document.visibilityState === "visible") void look(); }, 15_000);
 }
+/** Public context only; the nonextractable key pair never enters this comparison. */
+const rememberedContext = (value: Remembered | null) => value === null ? null : canonicalize({ key: value.device.publicKey, seat: value.seat ?? null, identity: value.identity ?? null });
 async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Promise<void> {
+  const previous = rememberedContext(memory ?? { v: 1, device });
   const found = await findLending(seat, device);
   if (expectedEpoch !== epoch) return;
-  await remembered.save({ v: 1, device, seat, ...(found.ok ? { identity: found.identity } : {}) });
-  if (expectedEpoch !== epoch) return;
-  if (!found.ok) notice = { kind: "plain", text: found.reason };
-  const saved = await remembered.load();
-  if (expectedEpoch !== epoch || !saved) return;
-  await open(saved);
+  await browserLock.run(async () => {
+    if (expectedEpoch !== epoch) return;
+    const stored = await remembered.load();
+    if (expectedEpoch !== epoch || rememberedContext(stored) !== previous || stored?.device.publicKey !== device.publicKey) return;
+    const next: Remembered = { v: 1, device, seat, ...(found.ok ? { identity: found.identity } : {}) };
+    await remembered.save(next);
+    if (expectedEpoch !== epoch) return;
+    if (!found.ok) notice = { kind: "plain", text: found.reason };
+    // Every remembered writer takes this lock. Open the committed context before releasing it.
+    await open(next);
+  });
 }
 function joined(device: DeviceKey, outcome: JoinOutcome | null, expectedEpoch = epoch): Promise<void> | void {
   if (expectedEpoch !== epoch) return;
@@ -195,7 +204,15 @@ function drawLibrary(seat: Seat): Node[] {
     h("p", { class: "muted" }, `Every act that took effect, in order, up to entry ${view.record.seq}. A refused act is not in it.`), drawRecord(state.entries));
   nodes.push(h("p", {}, button("Look again", () => void work(look), true), " ", button("Forget this browser's seat", () => void work(async () => {
     if (kept || keptJoin) { notice = { kind: "plain", text: "A request is kept. Check it before forgetting this seat." }; return; }
-    await remembered.forget(); epoch++; gateway?.dispose(); gateway = null; memory = null; notice = { kind: "plain", text: "This browser's key and seat are forgotten. The room still has the seat." };
+    const at = epoch, previous = rememberedContext(memory);
+    await browserLock.run(async () => {
+      if (at !== epoch || rememberedContext(await remembered.load()) !== previous) return;
+      if (at !== epoch) return;
+      await remembered.forget();
+      if (at !== epoch) return;
+      epoch++; reading++; busy = false; gateway?.dispose(); gateway = null; memory = null;
+      notice = { kind: "plain", text: "This browser's key and seat are forgotten. The room still has the seat." }; draw();
+    });
   }), true)));
   return nodes;
 }
