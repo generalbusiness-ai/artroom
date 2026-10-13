@@ -25,7 +25,7 @@ test("the client's invitation link is the command line's", async () => {
   const agent = { v: 1, kind: "agent-key", service: link.service, repository, definition: "platform:membership@2", handle: "@helper", controller: { membership: repository.membership, member: "@founder" }, member: { at: repository.membership, seq: 4, hash: textDigest("SCRIPTED member") }, invitation: { at: repository.membership, seq: 6, hash: textDigest("SCRIPTED invitation") }, secret: b64url(new Uint8Array(32).fill(12)), expected: { on: 1, member: 5 } };
   const tagged = (service: string) => AGENT_KEY_LINK + b64url(utf8(JSON.stringify({ ...agent, service })));
   for (const service of invalid) {
-    expect(await command(ctx, ["join", text({ ...link, service })]), service).toMatchObject({ code: 1, lines: ["That invitation link has invalid repository references."] });
+    expect(await command(ctx, ["join", text({ ...link, service })]), service).toMatchObject({ code: 2, lines: ["That invitation link has invalid repository references."] });
     expect(await command(ctx, ["join", tagged(service)]), service).toMatchObject({ code: 1, lines: ["The original agent enrollment is unavailable or unverified. Nothing was replaced."] });
   }
   expect([storeCalls, fetchCalls]).toEqual([0, 0]);
