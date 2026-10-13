@@ -10,8 +10,8 @@
  * are the contract's, and are exported here again.
  */
 
-import type { Digest, Dispatched, Duty, Entry, FactRef, Message, OperationId, RetainedInput, ScopeRef, Sealed, Seed, Timestamp } from "@generalbusiness/artroom-contract";
-import type { Operation, RangeIndex, StateWriter } from "@generalbusiness/artroom-derive";
+import type { Digest, Dispatched, Duty, Entry, FactRef, Message, OperationId, RetainedInput, ScopeRef, Sealed, Seed, Timestamp } from "@generalbusiness/dap-contract";
+import type { Operation, RangeIndex, StateWriter } from "@generalbusiness/dap-derive";
 
 export type { Dispatched, Duty, Sealed };
 

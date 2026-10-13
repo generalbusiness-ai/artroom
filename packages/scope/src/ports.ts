@@ -9,10 +9,10 @@
  * are the platform package's, which is code of this runtime.
  */
 
-import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/artroom-derive";
-import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
-import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/dap-contract";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/dap-derive";
+import { evaluateRules } from "@generalbusiness/dap-derive/rule";
+import { platform, type Platform } from "@generalbusiness/dap-platform";
 import { toConsole, type DiagnosisSink } from "./diag.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
 

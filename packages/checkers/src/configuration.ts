@@ -18,7 +18,7 @@
  * are the narrowest that the table's words fit (I3 deltas, entry EW12).
  */
 
-import type { Digest, DomainTag } from "@generalbusiness/artroom-contract";
+import type { Digest, DomainTag } from "@generalbusiness/dap-contract";
 import { canonicalBytes, canonicalize, digestBytes, digestOfHash, domainBytes, isDigest, isRecord, parseStrict, sha256, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 
 /** The byte domain of a configuration's digest (section 3.11). The rules definition declares it (`packages/platform/src/rules-scope.ts`). */

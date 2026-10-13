@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { FactRef, Item, Read, Summary } from "@generalbusiness/artroom-contract";
+import type { FactRef, Item, Read, Summary } from "@generalbusiness/dap-contract";
 import { newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
 import { observeCleanup } from "../src/verify-cleanup.ts";
 

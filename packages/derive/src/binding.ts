@@ -21,7 +21,7 @@
  * judge's explanation: no entry records it, and no fold trusts it.
  */
 
-import type { BindingMark, Bound, FieldValue, PlatformReceive, ReceiveType, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { BindingMark, Bound, FieldValue, PlatformReceive, ReceiveType, ScopeRef } from "@generalbusiness/dap-contract";
 import { CanonicalError, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Judging } from "./guards.ts";
 import { RuleFault, markOf, outside, ruleFor, run, type Giving } from "./marks.ts";

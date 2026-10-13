@@ -44,9 +44,9 @@ test("no platform package depends on the lanes package or imports from it", () =
   assert.ok(files.includes("packages/lanes/package.json"), "the lanes package was listed");
   const pageTests = (f) => f.startsWith("packages/page/test/") || f === "packages/page/package.json";
   const platform = files.filter((f) => f.startsWith("packages/") && !f.startsWith("packages/lanes/") && !pageTests(f) && !f.endsWith(".md"));
-  assert.deepEqual(platform.filter((f) => /artroom-lanes|[.\/]\/lanes\//.test(text(f))), []);
+  assert.deepEqual(platform.filter((f) => /(?:artroom|dap)-lanes|[.\/]\/lanes\//.test(text(f))), []);
   const page = JSON.parse(text("packages/page/package.json") || "{}");
-  assert.equal(page.dependencies?.["@generalbusiness/artroom-lanes"], undefined, "the page depends on the lanes package for its tests only");
+  assert.equal(page.dependencies?.["@generalbusiness/dap-lanes"], undefined, "the page depends on the lanes package for its tests only");
 });
 
 // The platform package is pure data and rules over the contract, the bytes and the derivation (I3 plan, section 3.1). It names no
@@ -57,9 +57,9 @@ test("the platform package depends only on contract, bytes and derive, and only 
   assert.ok(files.includes("packages/platform/package.json"), "the platform package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/platform/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(scope|replay|client|lanes)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(scope|replay|client|lanes)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !/^packages\/(platform|scope|replay|lanes|cli|page)\//.test(f));
-  assert.deepEqual(named.filter((f) => /artroom-platform/.test(text(f))), []);
+  assert.deepEqual(named.filter((f) => /(?:artroom|dap)-platform/.test(text(f))), []);
 });
 
 // The git package is the one place that touches a Git repository or a Git host (I3 plan, section 3.1). It depends only on contract and
@@ -69,7 +69,7 @@ test("the git package depends only on contract and bytes, and only scope, checke
   assert.ok(files.includes("packages/git/package.json"), "the git package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/git/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes|checkers)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(derive|platform|scope|replay|client|lanes|checkers)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !/^packages\/(git|scope|checkers)\/|^packages\/platform\/test\//.test(f));
   assert.deepEqual(named.filter((f) => /artroom-git/.test(text(f))), []);
 });
@@ -82,7 +82,7 @@ test("the checkers package depends only on contract, bytes and git, and no packa
   assert.ok(files.includes("packages/checkers/package.json"), "the checkers package was listed");
   const source = (f) => f.startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && f.startsWith("packages/checkers/"));
-  assert.deepEqual(inside.filter((f) => /artroom-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
+  assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !f.startsWith("packages/checkers/"));
   assert.deepEqual(named.filter((f) => /artroom-checkers/.test(text(f))), []);
   const reaches = files.filter((f) => source(f) && !f.startsWith("packages/checkers/") && /[.\/]\/checkers\//.test(text(f)));

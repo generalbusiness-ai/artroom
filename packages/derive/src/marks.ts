@@ -16,7 +16,7 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { BindingSelect } from "./binding.ts";

@@ -2,10 +2,10 @@
  * The Git creation answer is scripted. No scope runtime, provider, or hosted
  * admission runs here. */
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { intentDigest, isDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, judgeGenesis, judgeOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, creation } from "@generalbusiness/artroom-derive/testing";
+import { PROFILES, clockOf, judgeGenesis, judgeOutcome, validateDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, T0, creation } from "@generalbusiness/dap-derive/testing";
 import { DEMO_PURPOSE, DEMO_REGISTER, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, platform, repositoryName } from "../src/index.ts";
 import { installing, paul, rita } from "./support-founding.ts";
 

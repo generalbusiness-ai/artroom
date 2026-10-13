@@ -1,4 +1,4 @@
-# @generalbusiness/artroom-contract
+# @generalbusiness/dap-contract
 
 The types and constants that every Artroom package shares. It has no runtime
 logic. The only values it exports are constant tables.
@@ -36,7 +36,7 @@ reference to the entry, are built after it is sealed.
 ## How to test
 
 ```
-npm run typecheck --workspace @generalbusiness/artroom-contract
+npm run typecheck --workspace @generalbusiness/dap-contract
 ```
 
 The package has no runtime tests, because it has no runtime logic.

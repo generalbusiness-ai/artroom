@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { checkOriginal, joinInvitation, originalJoin, type JoinStorage } from "../src/join-custody.ts";

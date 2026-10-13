@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
 import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskForm } from "../src/tasks.ts";
 import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef, ScopeRef } from "@generalbusiness/dap-contract";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.

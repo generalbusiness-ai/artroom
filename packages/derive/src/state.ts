@@ -6,7 +6,7 @@
  * `Status`, are the contract's, and are exported here again.
  */
 
-import type { CapabilityName, Digest, FactRef, FieldValue, Head, Held, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeId, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, FactRef, FieldValue, Head, Held, Incarnation, Item, KeyId, OperationId, Party, PlatformDefinition, Request, ScopeId, ScopeKind, ScopeRef, Seed, Status, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalBytes, canonicalize, digestBytes } from "@generalbusiness/artroom-bytes";
 import { pendingOf } from "./ledger.ts";
 import { byteOrder } from "./values.ts";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
-import type { FactUse, Input, KeyId, MemberId, Observation, ObservationUse, OperationId, Send } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, RETAINED_INPUT_BYTES } from "@generalbusiness/dap-contract";
+import type { FactUse, Input, KeyId, MemberId, Observation, ObservationUse, OperationId, Send } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, isEntry, isObservationUse, signIntent } from "@generalbusiness/artroom-bytes";
 import { PROFILES, actNeeds, clockOf, contentChecked, contentStates, judgeDelivery, observationBytes, retainable, retainableByRequest, rowsOfAct, rowsOfKind, settleOutcome, validateDefinition, valueDigest, type ActJudgment, type Fetched, type Judgment, type Observing, type OutcomeJudgment, type RuleGiven, type Subject } from "../src/index.ts";
 import { Scope, T0, arriving, forged, grantOf, keys, membership, otherLane, t } from "./fixtures.ts";

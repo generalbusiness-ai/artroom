@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import type { Answer } from "@generalbusiness/artroom-contract";
+import type { Answer } from "@generalbusiness/dap-contract";
 import type { ChangeView, Room } from "../src/data.ts";
 import { answerLine, changeCondition, changeScreen, issueScreen, whoLine, roomScreen, rulesScreen } from "../src/view.ts";
 import type { ListState } from "../src/list-context.ts";

@@ -6,8 +6,8 @@
  * hold.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { ActType, DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { ActType, DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { validateDefinition } from "../src/index.ts";
 import { lane, valid } from "./fixtures.ts";
 

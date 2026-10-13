@@ -29,13 +29,13 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { SessionAnswer } from "@generalbusiness/artroom-contract";
-import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { SessionAnswer } from "@generalbusiness/dap-contract";
+import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, timeMs, type Item } from "@generalbusiness/artroom-derive";
-import type { ScopeState } from "@generalbusiness/artroom-derive";
-import type { Delivered, StateView } from "@generalbusiness/artroom-derive";
+import { isEntryOf, timeMs, type Item } from "@generalbusiness/dap-derive";
+import type { ScopeState } from "@generalbusiness/dap-derive";
+import type { Delivered, StateView } from "@generalbusiness/dap-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
 import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
@@ -380,7 +380,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   async waiting(reader: unknown, list: "diagnosed" | "unanswered", cursor?: Cursor): Promise<Read<readonly Duty[]>> { this.#first(); await this.#prepared(reader, "waiting"); return this.#reads.waiting(reader, list, cursor); }
 
   /** Internal namespace read of one exact job's current state. */
-  async jobState(fact: import("@generalbusiness/artroom-contract").FactRef): Promise<{ state: string; decidedBy: import("@generalbusiness/artroom-contract").FactRef | null } | null> {
+  async jobState(fact: import("@generalbusiness/dap-contract").FactRef): Promise<{ state: string; decidedBy: import("@generalbusiness/dap-contract").FactRef | null } | null> {
     this.#first(); const scope = this.#store.scope(); const sealed = this.#store.stored(fact.seq);
     if (!scope || !sealed || fact.at.scope !== scope.at.scope || fact.at.inc !== scope.at.inc || sealed.hash !== fact.hash) return null;
     const item = this.#store.item(fact.seq);
@@ -389,7 +389,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return item?.type === "job" ? { state: item.state, decidedBy: entry ? { at: scope.at, seq: deciding as number, hash: entry.hash } : null } : null;
   }
   /** Authenticated by the signed job-read request and current configured checker. */
-  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> {
+  async reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null> {
     this.#first();
     try { return await this.#outside.snapshot?.(asked) ?? null; } catch { return null; }
   }

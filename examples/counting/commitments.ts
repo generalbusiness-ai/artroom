@@ -1,5 +1,5 @@
 /** Draft 4 counting commitments, using existing declaration forms only. */
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 
 export const countingCommitments: DeclaredDefinition = {
   "format": "artroom-definition-1",

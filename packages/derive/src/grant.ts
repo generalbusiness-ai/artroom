@@ -18,7 +18,7 @@
  * `run-returned`, which is over the order of entries and is the verifier's.
  */
 
-import type { Grant, Head, KeyId, Observation, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Grant, Head, KeyId, Observation, ObservationUse, ScopeFilter, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { isHead, isKeyId, isMemberId, isPlatformDefinition, isRecord, platformName } from "@generalbusiness/artroom-bytes";
 import { actionOf } from "./marks.ts";
 import type { StateView } from "./state.ts";

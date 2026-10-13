@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, OperationId } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 import { snapshotCommit, ZERO_ID } from "@generalbusiness/artroom-git";
 import { sendOnce } from "../src/github-host.ts";

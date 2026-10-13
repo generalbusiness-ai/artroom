@@ -1,6 +1,6 @@
 /** Counting application: scope-verified field proposals, native Join order, no outside effects. */
 import type { ActType, DeclaredDefinition, EffectForm, FieldType, FieldValue, Guard, ItemType, Range, Subject } from
-  "@generalbusiness/artroom-contract";
+  "@generalbusiness/dap-contract";
 const integer = (min:number,max:number) => ({type:"int",min,max} as const);
 const field = (type:FieldType, required=true): FieldType & {required:boolean} => ({...type,required});
 const value = (of:FieldType, required=false, defaultValue?:FieldValue): ItemType["values"][string] =>

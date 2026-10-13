@@ -1,6 +1,6 @@
 /** Attribution: whose work is in an item (scope contract, section 6.7). */
 
-import type { MemberRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef } from "@generalbusiness/dap-contract";
 import type { Item } from "./state.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { canonicalize } from "@generalbusiness/artroom-bytes";

@@ -1,8 +1,8 @@
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { Entry, OperationId, ScopeId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId, ScopeId, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, intentDigest, scopeIdOf, seedDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { DIRECTORY_OF, repositoryName } from "@generalbusiness/artroom-platform";
+import { DIRECTORY_OF, repositoryName } from "@generalbusiness/dap-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { captureSignedSummary, installSignedDiagnostic } from "../../scope/test/signed-read-diagnostic.ts";
 import { beginSessionFixture, type SessionOwner } from "../../scope/test/session-settings.ts";
@@ -177,14 +177,14 @@ async function resumed(owner: SessionOwner, cleanups: (() => void)[], resourcesA
   expect([(await founds()).length, sent["found"]!.length]).toEqual([0, 1]);
   await owner.required(async () => rita.store.save(beforeLegacy));
   unavailableFound = true;
-  expect(await run("claim", "demo")).toEqual({ code: 1, lines: [`Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect artroom log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
+  expect(await run("claim", "demo")).toEqual({ code: 1, lines: [`Unavailable: unavailable. Outcome unknown; no acceptance is confirmed. Inspect dap log ${R.name} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`] });
   expect((await configOf())!.claim!.found!.signed).toEqual(savedFound);
   expect((await founds()).length).toBe(0);
   advanceClock();
   await owner.required(() => R.restart());
   // The same found is admitted once; it then gives up waiting on Git settings.
   const first = await run("claim", "demo", "--handle", "@rita");
-  const resume = "run artroom claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.";
+  const resume = "run dap claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.";
   expect(first).toEqual({ code: 1, lines: [`Gave up waiting for the directory after 3 reads. What was asked may still take effect; ${resume}`] });
   const pending = (await configOf())!;
   expect([pending.repository, pending.claim]).toEqual([undefined, { register: R.name, intent: expect.stringMatching(/^sha256:/), handle: "@rita", found: { signed: savedFound, accepted: expect.objectContaining({ at: await owner.required(() => R.at()), seq: 1 }) } }]);

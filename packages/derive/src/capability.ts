@@ -15,8 +15,8 @@
  * cannot derive does not judge the input.
  */
 
-import { CAPABILITIES } from "@generalbusiness/artroom-contract";
-import type { Bounds, Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, ScopeRef, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { CAPABILITIES } from "@generalbusiness/dap-contract";
+import type { Bounds, Capability, CapabilityArg, CapabilityName, DeclaredDefinition, Effect, FieldValue, Guard, Operand, ScopeRef, UnavailableReason } from "@generalbusiness/dap-contract";
 import type { GuardResult, Judging } from "./guards.ts";
 import type { Underived } from "./validate/capability.ts";
 import { bindEach, covered } from "./lists.ts";

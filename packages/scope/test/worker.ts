@@ -30,8 +30,8 @@
  * of a package that runs its own definitions on real scopes.
  */
 
-import { platform } from "@generalbusiness/artroom-platform";
-import { lacking } from "@generalbusiness/artroom-platform/testing";
+import { platform } from "@generalbusiness/dap-platform";
+import { lacking } from "@generalbusiness/dap-platform/testing";
 import { ScopeObject, type Outside, type OutsideGiven, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";

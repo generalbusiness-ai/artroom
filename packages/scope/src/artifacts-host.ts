@@ -9,9 +9,9 @@
  * and gives no other identifier. No plaintext is recorded in an outside
  * answer.
  */
-import type { RetainedInput } from "@generalbusiness/artroom-contract";
+import type { RetainedInput } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { DestinationObject, RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import type { DestinationObject, RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource, type ReadBounds } from "@generalbusiness/artroom-git";
 import { SmartHttpSource } from "@generalbusiness/artroom-git/http-read";
 import type { DestinationBinding, DestinationInspection, DestinationProvider, DestinationRepository } from "./destination-host.ts";

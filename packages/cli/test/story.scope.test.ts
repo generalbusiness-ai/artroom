@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/artroom-contract";
+import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { repositoryName } from "@generalbusiness/artroom-platform";
+import { repositoryName } from "@generalbusiness/dap-platform";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf } from "../../scope/test/outside.ts";

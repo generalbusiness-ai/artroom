@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test } from "vitest";
-import type { Entry, ScopeId, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, ScopeId, Seed } from "@generalbusiness/dap-contract";
 import { intentDigest, messageDigest, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import { scriptedCapability, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";

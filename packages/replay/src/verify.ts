@@ -8,7 +8,7 @@
  * genesis's seed, and the actors' signatures. No judgment is derived again.
  *
  * **Replay** also folds the history from its genesis. For each entry it
- * derives the judgment again, with the judge of `@generalbusiness/artroom-derive`
+ * derives the judgment again, with the judge of `@generalbusiness/dap-derive`
  * for that input, from the folded state, the entry's recorded input, its
  * retained inputs and its recorded time; compares what it derives with what
  * the entry records; and proves each foreign fact the entry used, by replay
@@ -37,15 +37,15 @@
  * under `trusts`, that the head is the service's answer.
  */
 
-import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
   judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
-} from "@generalbusiness/artroom-derive";
-import type { ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/artroom-derive";
-import { RULE_PROFILES, evaluateRules } from "@generalbusiness/artroom-derive/rule";
+} from "@generalbusiness/dap-derive";
+import type { ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import { RULE_PROFILES, evaluateRules } from "@generalbusiness/dap-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
 

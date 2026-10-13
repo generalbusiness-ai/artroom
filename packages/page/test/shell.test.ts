@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import type { MemberRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef } from "@generalbusiness/dap-contract";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf } from "../src/shell.ts";
 
 test("closed issues offer one reopen and invalid changes offer no merge or review decision", () => {

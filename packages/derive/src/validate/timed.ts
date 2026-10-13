@@ -4,7 +4,7 @@
  * static size of the entry a rule writes (section 7.5).
  */
 
-import type { Bounds, PlatformTimedRule, TimedRule } from "@generalbusiness/artroom-contract";
+import type { Bounds, PlatformTimedRule, TimedRule } from "@generalbusiness/dap-contract";
 import { isObject } from "../values.ts";
 import { naming, type Ctx, type Defining, type Type } from "./context.ts";
 import { effectBytes, effects } from "./effects.ts";

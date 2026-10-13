@@ -30,7 +30,7 @@
  * revocation. `gitRead` is the code of both halves.
  */
 
-import type { CapabilityName, Digest, Evidence, FactRef, FieldValue, Intent, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { CapabilityName, Digest, Evidence, FactRef, FieldValue, Intent, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { isDigest, isFactRef, isLocalId, isRecord, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Capabilities, CapabilityGiven, Maximum, Recorded } from "../capability.ts";
 import { isLocalFact, type Own } from "../fields.ts";

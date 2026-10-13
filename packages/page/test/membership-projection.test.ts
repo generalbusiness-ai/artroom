@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Item, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Item, ScopeRef } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { currentStanding, reviewCandidates } from "../src/membership-projection.ts";
 

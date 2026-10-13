@@ -1,11 +1,11 @@
 /** Native founding through the existing CLI workflow, with private browser recovery.
  * A typed label is local intent, not the repository name selected by the host.
  * This module never installs a register or imports an operator key. */
-import type { PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isScopeRef, keyIdOfSecret, parseStrict, unb64url } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, secretSigner, signedReads, type Fetch } from "@generalbusiness/artroom-client";
-import { claim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/artroom-cli";
-import { DIRECTORY_OF } from "@generalbusiness/artroom-platform";
+import { claim, type Config, type Context, type Outcome, type PendingClaim, type Repository, type Store } from "@generalbusiness/dap-cli";
+import { DIRECTORY_OF } from "@generalbusiness/dap-platform";
 import type { Session } from "./data.ts";
 
 export interface ClaimRegister { register: ScopeRef; definition: PlatformDefinition }

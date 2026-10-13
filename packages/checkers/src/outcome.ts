@@ -22,7 +22,7 @@
  * word. The words here are this package's (I3 deltas, entry EW14).
  */
 
-import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef } from "@generalbusiness/dap-contract";
 import { canonicalBytes, digestBytes, isDigest, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { environmentDigest, exactly, type Configuration, type Variable } from "./configuration.ts";
 

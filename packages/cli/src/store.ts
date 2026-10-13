@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {

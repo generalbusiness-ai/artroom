@@ -1,9 +1,9 @@
 import { answerText, nonacceptedAnswerText } from "../src/view.ts";
 import { expect, test, vi } from "vitest";
-import type { SignedIntent, SignedRead } from "@generalbusiness/artroom-contract";
+import type { SignedIntent, SignedRead } from "@generalbusiness/dap-contract";
 import * as bytes from "@generalbusiness/artroom-bytes";
 import { b64url, definitionDigest, intentDigest, keyIdOfSecret, newIncarnation, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { changeDemo } from "@generalbusiness/artroom-lanes";
+import { changeDemo } from "@generalbusiness/dap-lanes";
 import { Session as ReadSession, type Fetch } from "@generalbusiness/artroom-client";
 import { invitationTarget, prepareJoin, joinAssociation, joinRoom, placeOf, type Session } from "../src/index.ts";
 

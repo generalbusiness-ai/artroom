@@ -9,7 +9,8 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), ".."));
 export const PLAN = JSON.parse(readFileSync(new URL("./public-release.json", import.meta.url), "utf8"));
-export const nameOf = (dir) => `@generalbusiness/artroom-${dir}`;
+const DAP_PACKAGES = new Set(["contract", "derive", "lanes", "page", "platform", "cli"]);
+export const nameOf = (dir) => `@generalbusiness/${DAP_PACKAGES.has(dir) ? "dap" : "artroom"}-${dir}`;
 export const digest = (bytes, algorithm = "sha256") => createHash(algorithm).update(bytes).digest("hex");
 export const refusal = (code) => { throw new Error(code); };
 export const json = (file) => JSON.parse(readFileSync(file, "utf8"));
@@ -86,6 +87,7 @@ export function publishManifest(spec, source, selected) {
   return {
     name: source.name, version: version(selected), description: source.description, license: source.license,
     type: "module", sideEffects: false, engines: source.engines,
+    ...(source.repository ? { repository: source.repository } : {}), ...(source.homepage ? { homepage: source.homepage } : {}),
     exports: Object.fromEntries(Object.entries(spec.exports).map(([key, path]) => [key, path.endsWith(".d.ts")
       ? { types: `./dist/${path}` } : { types: `./dist/${path}.d.ts`, default: `./dist/${path}.js` }])),
     files: ["dist", "README.md", "LICENSE", "NOTICE"], publishConfig: { access: "public" },

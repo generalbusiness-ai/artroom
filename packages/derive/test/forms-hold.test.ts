@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { judgeTimed, nextDue, owed, validateDefinition, type ProblemCode, type ValidDefinition } from "../src/index.ts";
 import { Scope, fields, keys, on, t, variant } from "./fixtures.ts";
 import { works, worksDefinition } from "./fixtures-f.ts";

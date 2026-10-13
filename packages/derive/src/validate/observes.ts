@@ -13,8 +13,8 @@
  * whose type is no member, and `bound` for a count or a size.
  */
 
-import type { Bounds, Observe } from "@generalbusiness/artroom-contract";
-import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
+import type { Bounds, Observe } from "@generalbusiness/dap-contract";
+import { RETAINED_INPUT_BYTES } from "@generalbusiness/dap-contract";
 import { isMemberRef } from "@generalbusiness/artroom-bytes";
 import { isObject } from "../values.ts";
 import type { Ctx, Defining } from "./context.ts";

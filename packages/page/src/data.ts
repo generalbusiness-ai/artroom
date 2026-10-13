@@ -33,14 +33,14 @@
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
 import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/artroom-platform";
-import type { Extent as PolicyExtent } from "@generalbusiness/artroom-platform";
+import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/dap-cli";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/dap-platform";
+import type { Extent as PolicyExtent } from "@generalbusiness/dap-platform";
 import { knownLIST1 } from "./source-support.ts";
 import { currentStanding, reviewCandidates } from "./membership-projection.ts";
 

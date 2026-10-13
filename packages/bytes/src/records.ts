@@ -33,7 +33,7 @@
 import type {
   Attempt, Dispatched, Duty, Effect, Entry, Evidence, FactRef, FactUse, FieldValue, Grant, Head, Input, Intent, Item, LogPage, MemberRef, Message, ObservationUse, Party, Prepared, Read, ReadRefusal, Receipt, RefusalReason,
   RetainedInput, ScopeRef, Sealed, Seed, Send, SignedIntent, Status, Summary,
-} from "@generalbusiness/artroom-contract";
+} from "@generalbusiness/dap-contract";
 import { MAX_DEPTH, wellFormed } from "./canonical.ts";
 import { isIncarnation, isScopeId } from "./domains.ts";
 import { isDigest } from "./hash.ts";

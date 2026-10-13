@@ -11,7 +11,7 @@
  * with the same function, so both see the same hold afterwards.
  */
 
-import type { Effect, ItemType, RefusalReason } from "@generalbusiness/artroom-contract";
+import type { Effect, ItemType, RefusalReason } from "@generalbusiness/dap-contract";
 import { UNDER, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import type { Judging } from "./guards.ts";
 import type { Item } from "./state.ts";

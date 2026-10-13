@@ -32,11 +32,11 @@
  * the same key, which records the reuse and the entry before it.
  */
 
-import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, ObservedScope, PlatformDefinition, RunId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, Input, KeyId, Observation, ObservationRequest, ObservationUse, ObservedScope, PlatformDefinition, RunId, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, hex, isObservationUse, isRecord, parseStrict } from "@generalbusiness/artroom-bytes";
-import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/artroom-derive";
+import { WINDOWS, contentChecked, contentStates, fixedBy, highestHead, isScopeRef, judgeGrant, membershipOf, namedBy, observationOf, observedName, observedOf, prefer, revoked, same, subjectName, valueDigest, type Clock as Reading, type ContentStates, type GrantJudgment, type Needed, type RecordedRef, type Retains, type StateView, type ValueRead } from "@generalbusiness/dap-derive";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
-import { SIBLINGS_OF, destinationBranch, platform, standingOf } from "@generalbusiness/artroom-platform";
+import { SIBLINGS_OF, destinationBranch, platform, standingOf } from "@generalbusiness/dap-platform";
 import type { Asked, Authority, Clock, Further, Random, Standing } from "./ports.ts";
 import type { SessionReading } from "./sessions.ts";
 

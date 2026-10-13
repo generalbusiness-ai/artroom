@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import type { MemberId } from "@generalbusiness/artroom-contract";
+import type { MemberId } from "@generalbusiness/dap-contract";
 import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches, platform } from "../src/index.ts";
 import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 

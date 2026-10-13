@@ -4,11 +4,12 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { PLAN, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
+import { PLAN, nameOf, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
 import { browserRuntimeEdge } from "./check-public-release.mjs";
 
 const root = new URL("../", import.meta.url);
 test("SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules", () => {
+  assert.deepEqual(["contract", "derive", "lanes", "page", "platform", "cli", "bytes", "client", "replay", "scope", "git", "checkers"].map(nameOf), ["@generalbusiness/dap-contract", "@generalbusiness/dap-derive", "@generalbusiness/dap-lanes", "@generalbusiness/dap-page", "@generalbusiness/dap-platform", "@generalbusiness/dap-cli", "@generalbusiness/artroom-bytes", "@generalbusiness/artroom-client", "@generalbusiness/artroom-replay", "@generalbusiness/artroom-scope", "@generalbusiness/artroom-git", "@generalbusiness/artroom-checkers"]);
   const capability = readFileSync(new URL("packages/contract/src/capability.ts", root), "utf8");
   assert.deepEqual(references(capability), []); // Actual three quoted 'from' rows.
   const source = [
@@ -45,7 +46,11 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     const replay = PLAN.packages.find(spec => spec.dir === "replay");
     const platformManifest = JSON.parse(readFileSync(new URL("packages/platform/package.json", root), "utf8"));
     const published = publishManifest(platform, platformManifest, "0.1.0-dev.2");
+    assert.equal(published.name, "@generalbusiness/dap-platform");
+    assert.deepEqual(published.repository, { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: "packages/platform" });
+    assert.equal(published.homepage, "https://dap.generalbusiness.ai/");
     assert.deepEqual(Object.keys(published.exports), ["."]);
+    assert.throws(() => publishManifest(platform, { ...platformManifest, name: "@generalbusiness/artroom-platform" }, "0.1.0-dev.2"), /unsupported-source-manifest/);
     assert.throws(() => publishManifest(platform, { ...platformManifest, exports: { ...platformManifest.exports, "./private": "./src/private.ts" } }, "0.1.0-dev.2"), /unsupported-source-manifest/);
     assert.deepEqual(productionInputs(replay, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), { names: ["packages/replay/src/index.ts"], omitted: ["packages/replay/src/bin.ts"] });
     assert.throws(() => productionInputs({ ...replay, excludedInputs: ["src/index.ts"] }, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), /source-input-exclusions/);

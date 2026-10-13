@@ -26,7 +26,7 @@
  * is ever written here.
  */
 
-import type { ReservationSnapshot, FactRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, FactRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, unb64url, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Details, Outcome } from "./outcome.ts";
 

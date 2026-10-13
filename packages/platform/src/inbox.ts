@@ -19,8 +19,8 @@
  * section 4 owns. They are written as the note has them.
  */
 
-import type { PlatformData } from "@generalbusiness/artroom-contract";
-import type { Rules } from "@generalbusiness/artroom-derive";
+import type { PlatformData } from "@generalbusiness/dap-contract";
+import type { Rules } from "@generalbusiness/dap-derive";
 
 export const inbox: PlatformData = {
   format: "artroom-definition-1",

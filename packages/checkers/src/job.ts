@@ -33,7 +33,7 @@
  * `configuration-unavailable`.
  */
 
-import type { ReservationSnapshot, Digest, Effect, FactRef, PlatformDefinition, ScopeRef, Sealed, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, Digest, Effect, FactRef, PlatformDefinition, ScopeRef, Sealed, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, utf8, entryHash, isDigest, isEntry, isFactRef, isLocalId, isScopeRef, timeMs, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { idOf, READ_BOUNDS, parseCommit, isObjectId, type ObjectId } from "@generalbusiness/artroom-git";
 

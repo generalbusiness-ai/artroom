@@ -1,7 +1,7 @@
 // Fake-only custody witnesses: no browser speech, provider, microphone, Worker, or native scope.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DOMAINS } from "@generalbusiness/artroom-contract";
+import { DOMAINS } from "@generalbusiness/dap-contract";
 import { domainBytes, keyIdOfSecret, newIncarnation, scopeIdOf, sign, textDigest } from "@generalbusiness/artroom-bytes";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";
 import { createVoiceController, type ActorIdentity, type Completion, type CustodyLock, type PendingReport,

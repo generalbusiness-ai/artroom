@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, Observation, ObservationUse } from "@generalbusiness/artroom-contract";
+import type { Entry, Observation, ObservationUse } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { grantFrom } from "@generalbusiness/artroom-derive";
-import { MEMBERSHIP, actionsIn, platform } from "@generalbusiness/artroom-platform";
-import { grantOf } from "@generalbusiness/artroom-derive/testing";
+import { grantFrom } from "@generalbusiness/dap-derive";
+import { MEMBERSHIP, actionsIn, platform } from "@generalbusiness/dap-platform";
+import { grantOf } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, TRUSTS, httpSource, platformCode, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { later, net, soon } from "./net.ts";
 import { copied, notify, office, repository, rewritten, rita, routed, settle, una, vic, type Platform } from "./repository.ts";

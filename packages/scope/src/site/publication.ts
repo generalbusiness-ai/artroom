@@ -2,9 +2,9 @@
  * There is one published branch in today's destination model and no tag registry.
  * These reads do not start dispatchers, operations, sessions or provider calls.
  */
-import type { Head, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isScopeRef } from "@generalbusiness/artroom-bytes";
-import { isOf, destinationReceipt, foundingOf } from "@generalbusiness/artroom-platform";
+import { isOf, destinationReceipt, foundingOf } from "@generalbusiness/dap-platform";
 import { isObjectId, refName } from "@generalbusiness/artroom-git";
 import type { DestinationRepository } from "../destination-host.ts";
 
@@ -61,8 +61,8 @@ export interface PublishedCommitProof {
   directory: ScopeRef;
   repository: DestinationRepository;
   commit: string;
-  publication: import("@generalbusiness/artroom-contract").FactRef;
-  written: import("@generalbusiness/artroom-contract").FactRef;
+  publication: import("@generalbusiness/dap-contract").FactRef;
+  written: import("@generalbusiness/dap-contract").FactRef;
   receipt: { ref: string; commit: string; tree: string; blob: string; file: string };
 }
 export type PublishedCommitSelection = { ok: true; proof: PublishedCommitProof } | { ok: false; reason: "not-published" | "publication-history-limit" };
@@ -89,7 +89,7 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
     if (!take(store.storedBytes(seq))) return null;
     const row = store.stored(seq);
     if (!row) return null;
-    const entry = JSON.parse(row.bytes) as import("@generalbusiness/artroom-contract").Entry;
+    const entry = JSON.parse(row.bytes) as import("@generalbusiness/dap-contract").Entry;
     if (entry.seq !== seq || canonicalize(entry.at) !== canonicalize(current.at) || entryHash(entry) !== row.hash) return null;
     return { entry, hash: row.hash };
   };

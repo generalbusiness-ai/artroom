@@ -1,7 +1,7 @@
 /** Send and attention forms, and the result clauses of a request (scope contract, sections 6.4 and 6.6). */
 
-import type { Notify } from "@generalbusiness/artroom-contract";
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { Notify } from "@generalbusiness/dap-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isPlatformDefinition, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { mark, marked, subject, type ClauseSet, type Ctx, type Defining, type Duties, type Type } from "./context.ts";

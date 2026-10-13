@@ -15,11 +15,11 @@
  *   own answer gives at its head.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, KeyId, ObservationUse, PlatformDefinition } from "@generalbusiness/artroom-contract";
-import { PROFILES, clockOf, grantFrom, judgeDelivery, judgeGenesis, observationOf, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment, PlatformRules, Presented, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, creation, founded, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, KeyId, ObservationUse, PlatformDefinition } from "@generalbusiness/dap-contract";
+import { PROFILES, clockOf, grantFrom, judgeDelivery, judgeGenesis, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Judgment, PlatformRules, Presented, ValidDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, T0, creation, founded, keys, sent, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, membership, platform, standingOf, type Platform } from "../src/index.ts";
 
 /**

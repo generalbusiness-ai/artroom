@@ -17,12 +17,12 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject } from "cloudflare:test";
-import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, intentDigest, isDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { hashOfBytes, type MemoryScope } from "@generalbusiness/artroom-replay";
-import type { Delivered, Item } from "@generalbusiness/artroom-derive";
-import { d, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import { officeDefinition } from "@generalbusiness/artroom-platform/testing";
+import type { Delivered, Item } from "@generalbusiness/dap-derive";
+import { d, keys, type Actor } from "@generalbusiness/dap-derive/testing";
+import { officeDefinition } from "@generalbusiness/dap-platform/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";

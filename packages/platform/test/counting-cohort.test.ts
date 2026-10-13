@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { overMax, runnable, validateDefinition, type StateView } from "@generalbusiness/artroom-derive";
-import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { overMax, runnable, validateDefinition, type StateView } from "@generalbusiness/dap-derive";
+import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
 import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, FIRST_ACTIONS_OF, NEWEST, SIBLINGS_OF, membership, platform } from "../src/index.ts";
 
 // Actual platform data/common admission function; counts are a SCRIPTED state.

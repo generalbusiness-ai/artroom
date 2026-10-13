@@ -4,8 +4,8 @@
  * one value. No value contains its own digest.
  */
 
-import { DOMAINS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, DeliveryCause, Digest, DomainTag, Entry, FactRef, Incarnation, Intent, Message, ScopeId, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import { DOMAINS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, DeliveryCause, Digest, DomainTag, Entry, FactRef, Incarnation, Intent, Message, ScopeId, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalBytes, utf8 } from "./canonical.ts";
 import { base32, unbase32 } from "./encode.ts";
 import { digestOfHash, sha256 } from "./hash.ts";

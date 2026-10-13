@@ -21,7 +21,7 @@ for(const name of readdirSync(resolve(root,"node_modules"))){if(name.startsWith(
 const names=["client","voice-controller","app","device-key"];
 const entries=names.map(name=>resolve(root,`examples/counting/browser/${name}.test.ts`));
 const output=realpathSync(await mkdtemp(resolve(tmpdir(),"artroom-counting-node-")));
-const aliases=Object.fromEntries(["client","bytes","contract"].map(name=>[`@generalbusiness/artroom-${name}`,resolve(root,`packages/${name}/src/index.ts`)]));
+const aliases=Object.fromEntries(["client","bytes","contract"].map(name=>[`@generalbusiness/${name === "contract" ? "dap" : "artroom"}-${name}`,resolve(root,`packages/${name}/src/index.ts`)]));
 const result=await build({entryPoints:entries,absWorkingDir:root,bundle:true,platform:"node",format:"esm",outdir:output,outExtension:{".js":".mjs"},alias:aliases,metafile:true,write:true,logLevel:"silent"});
 const meta=JSON.stringify(result.metafile);if(Buffer.byteLength(meta)>4*1024*1024)throw new Error("Counting witness metafile exceeds its bound.");
 await writeFile(resolve(output,"metafile.json"),meta);

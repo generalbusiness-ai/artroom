@@ -1,5 +1,5 @@
 /** Evidence values of one pinned owner: named outside the entry, retained at their declared maxima. */
-import { RETAINED_INPUT_BYTES, type Evidence } from "@generalbusiness/artroom-contract";
+import { RETAINED_INPUT_BYTES, type Evidence } from "@generalbusiness/dap-contract";
 import { isDigest } from "@generalbusiness/artroom-bytes";
 import type { EvidenceValue, OperationRules } from "./ledger.ts";
 

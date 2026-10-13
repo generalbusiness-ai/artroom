@@ -8,7 +8,7 @@
  * package exports both files. `scripts/pin.mjs` writes them from the values.
  */
 
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { change } from "./change.ts";
 import { issue } from "./issue.ts";
 

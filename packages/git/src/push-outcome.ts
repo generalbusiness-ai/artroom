@@ -26,7 +26,7 @@
  * `unknown` stays `unknown` (section 5.4, rule 2).
  */
 
-import type { Evidence } from "@generalbusiness/artroom-contract";
+import type { Evidence } from "@generalbusiness/dap-contract";
 import type { GitReason, ObjectId } from "./names.ts";
 
 /** What Git printed for one ref, in the stable format of `git push --porcelain`. */

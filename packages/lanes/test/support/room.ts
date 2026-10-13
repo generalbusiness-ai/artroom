@@ -18,20 +18,20 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Answer, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
-import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/artroom-derive";
-import { keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/artroom-platform";
+import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
+import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../platform/src/destination.ts";
 import { SqliteStore } from "../../../scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
 import { outsideOf, wired } from "../../../scope/test/outside.ts";
 import { Platform, copied, rewritten, routed, settle } from "../../../scope/test/repository.ts";
-import type { Actor as Signer } from "@generalbusiness/artroom-derive/testing";
-import type { Item } from "@generalbusiness/artroom-derive";
+import type { Actor as Signer } from "@generalbusiness/dap-derive/testing";
+import type { Item } from "@generalbusiness/dap-derive";
 import { DIGESTS, change, issue, type changeDemo } from "../../src/index.ts";
 import { Host, Node, net, reader, soon } from "./graph.ts";
 

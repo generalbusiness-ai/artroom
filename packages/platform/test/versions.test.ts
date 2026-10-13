@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusiness/dap-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import type { PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
-import { d } from "@generalbusiness/artroom-derive/testing";
+import type { PlatformRule, RuleGiven } from "@generalbusiness/dap-derive";
+import { d } from "@generalbusiness/dap-derive/testing";
 import { APPLICATION_COHORT, COUNTING_COHORT, DEMO_REGISTER, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
 import { rita } from "./support-founding.ts";
 

@@ -1,5 +1,5 @@
 /**
- * The `artroom` command under Node: the arguments, the files of
+ * The `dap` command under Node: the arguments, the files of
  * `files.ts`, the runtime's `fetch`, and the command line of `line.ts`. A
  * command's lines go to standard output when it is done, and to standard
  * error otherwise; the exit code is the command's.

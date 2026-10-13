@@ -19,8 +19,8 @@
  *   rules; keys that its rule names; and the holders of `x.do`.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, KeyId, MemberId, ObservationUse, Observe, PlatformData, PlatformDefinition, RulesContent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, KeyId, MemberId, ObservationUse, Observe, PlatformData, PlatformDefinition, RulesContent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { PROFILES, validateDefinition, type ContentStates, type FirstStep, type OutcomeRule, type PlatformRules, type RuleEffect, type RuleGiven, type Rules, type ValidDefinition } from "../src/index.ts";
 import { T0, d, membership, valid } from "./fixtures.ts";

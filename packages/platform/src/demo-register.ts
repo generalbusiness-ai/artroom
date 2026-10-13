@@ -1,7 +1,7 @@
 /** Explicit demo founding version. Existing registers and defaults keep their pins. */
-import type { PlatformData } from "@generalbusiness/artroom-contract";
+import type { PlatformData } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
-import type { Rules } from "@generalbusiness/artroom-derive";
+import type { Rules } from "@generalbusiness/dap-derive";
 import { register, registerRules } from "./register.ts";
 export const DEMO_REGISTER = "platform:register@7" as const;
 /** Explicit future web founding cohort; the original demo register keeps its pin. */

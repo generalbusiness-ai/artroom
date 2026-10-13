@@ -12,7 +12,7 @@
  * whole definition (section 6.1).
  */
 
-import type { Capability, CapabilityName } from "@generalbusiness/artroom-contract";
+import type { Capability, CapabilityName } from "@generalbusiness/dap-contract";
 import { declaredBy } from "../capability.ts";
 import { isObject, own } from "../values.ts";
 import type { Ctx, Defining, Type } from "./context.ts";

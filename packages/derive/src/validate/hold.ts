@@ -8,7 +8,7 @@
  * derives all three from a `hold` record.
  */
 
-import type { DeclaredDefinition, TimedRule } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, TimedRule } from "@generalbusiness/dap-contract";
 import { isObject, own } from "../values.ts";
 import { onSubject, type Ctx, type Defining, type Type } from "./context.ts";
 import { operand } from "./operands.ts";

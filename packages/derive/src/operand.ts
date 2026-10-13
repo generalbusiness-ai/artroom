@@ -7,7 +7,7 @@
  * none, which is `null` here. A part is never an error.
  */
 
-import type { Entry, EntryPart, FactRef, FieldValue, Operand, Part, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Entry, EntryPart, FactRef, FieldValue, Operand, Part, ScopeRef } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { creationFields, isEntryOf, isLocalFact } from "./fields.ts";
 import { bound } from "./handlers.ts";

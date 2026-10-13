@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents, foundingObjects, platform } from "@generalbusiness/artroom-platform";
+import { firstExtents, foundingObjects, platform } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -20,7 +20,7 @@ const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
 const reader = "a test reader";
 
-// Invariant: `artroom edit` proposes one file as a change of the room's lane, the room judges it by its rules, and the destination
+// Invariant: `dap edit` proposes one file as a change of the room's lane, the room judges it by its rules, and the destination
 // writes the published tree with that file and pushes the commit; the site route then serves the file. A change in the rules extent
 // waits for the rules scope's controller; a path no tree may hold is refused by name, and nothing is pushed. Both hosts' providers
 // push the commit the same way.
@@ -33,7 +33,7 @@ const reader = "a test reader";
 // | The site route | Real: `site` of the scope package, called as the Worker calls it, over the same stand-in. Its answer is read as text; no page is rendered in a browser. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of the scopes it waits on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces. |
-describe("artroom edit on real scopes, through the production wiring of each Git host's ports. The Git hosts and the scheduler are STAND-INs", () => {
+describe("dap edit on real scopes, through the production wiring of each Git host's ports. The Git hosts and the scheduler are STAND-INs", () => {
   for (const [label, made] of [["the hosting's own Git service", async () => ownHost()], ["GitHub", gitHub]] as const) {
     test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async () => {
       net.hold = net.deaf = null;
@@ -133,7 +133,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   ok(await run(rita, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   // Before the activation there is no change to open: nothing is signed.
   const none = await run(rita, "edit", "README.md", "--file", "readme.md");
-  expect([none.code, none.lines[0]]).toEqual([1, expect.stringMatching(/^The rules scope sc_\S+ holds no change definition active\. An admin activates one: artroom act activate/)]);
+  expect([none.code, none.lines[0]]).toEqual([1, expect.stringMatching(/^The rules scope sc_\S+ holds no change definition active\. An admin activates one: dap act activate/)]);
   // The real rules scope validates and activates these definitions. Local
   // preflight must refuse before the directory opens any partial lane.
   for (const [name, definition] of [["legacy.json", legacy], ["detached.json", detached]] as const) {
@@ -199,7 +199,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // AGENTS.md is in the rules extent. paul's merge is refused by the destination, named; nothing is pushed.
   const waiting = await run(paul, "edit", "AGENTS.md", "--file", "agents.md");
   const lane = /as change (sc_\S+), version (\d+)\./.exec(waiting.lines[0]!)!;
-  expect(waiting).toEqual({ code: 1, lines: [waiting.lines[0], expect.stringMatching(new RegExp(`^Not published: the merge ${lane[1]}:\\d+ is refused, rules-not-met:rules\\. The change ${lane[1]} stays open at version ${lane[2]}\\. When it may be merged, run: artroom merge ${lane[1]}$`))] });
+  expect(waiting).toEqual({ code: 1, lines: [waiting.lines[0], expect.stringMatching(new RegExp(`^Not published: the merge ${lane[1]}:\\d+ is refused, rules-not-met:rules\\. The change ${lane[1]} stays open at version ${lane[2]}\\. When it may be merged, run: dap merge ${lane[1]}$`))] });
   expect([host.refs.get("refs/heads/main"), (await page("AGENTS.md")).status]).toEqual([head2, 404]);
   // The rules scope's controller approves it for the rules extent; then paul's merge publishes it.
   ok(await run(rita, "act", "review-verdict", "--on", lane[1]!, "--set", `manifest=${lane[2]}`, "--set", "verdict=approve", "--set", "extent=rules"));
@@ -216,7 +216,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
 
   // The new destination's history, with its three publications of a one-file manifest and two refusals, replays consistent, with the
   // histories whose entries it names: a verifier reads each over HTTP and derives every entry again, with the platform package's
-  // rules and the capability code that the production ports hold, as `wiring.scope.test.ts` does. `artroom verify` carries no
+  // rules and the capability code that the production ports hold, as `wiring.scope.test.ts` does. `dap verify` carries no
   // capability code, and answers that it cannot derive a lane (the delivery note's section 5).
   const replayed = await verify(httpSource(SERVICE, { fetch: routed, reader }), { mode: "replay", scope: G.name, platform, grants: "proven", anchors: [], capabilities: CAPABILITY_CODE, owners: CAPABILITY_CODE, head: (await G.summary()).at });
   expect([replayed.report.result, replayed.why ?? null]).toEqual(["consistent", null]);
@@ -270,7 +270,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     expect([exhausted.code, exhausted.lines, reads, pauses, submits]).toEqual([
       1, [
         `Accepted merge: ${badLane}:${mergeSeq}, version ${version}, fact ${canonicalize(mergeFact)}.`,
-        `Observation unknown: wait-exhausted. Inspect artroom show ${badLane}:${mergeSeq} and artroom log ${badLane} before requesting another merge; do not resubmit this merge to recover observation.`,
+        `Observation unknown: wait-exhausted. Inspect dap show ${badLane}:${mergeSeq} and dap log ${badLane} before requesting another merge; do not resubmit this merge to recover observation.`,
       ],
       Array.from({ length: tries }, (_, n) => mergeSeq! + n + 1), tries, 1,
     ]);
@@ -309,7 +309,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
       expect([outcome.code, outcome.lines.slice(fault === "transport" ? 1 : 0), submitted]).toEqual([
         1, [
           `Accepted merge: ${accepted.at.scope}:${accepted.seq}, version ${acceptedVersion}, fact ${canonicalize(accepted)}.`,
-          `Observation unknown: ${fault === "refusal" ? "forbidden" : "transport-error"}. Inspect artroom show ${accepted.at.scope}:${accepted.seq} and artroom log ${accepted.at.scope} before requesting another merge; do not resubmit this merge to recover observation.`,
+          `Observation unknown: ${fault === "refusal" ? "forbidden" : "transport-error"}. Inspect dap show ${accepted.at.scope}:${accepted.seq} and dap log ${accepted.at.scope} before requesting another merge; do not resubmit this merge to recover observation.`,
         ], 1,
       ]);
       if (fault === "transport") expect(outcome.lines[0]).toMatch(new RegExp(`^Proposed \\.\\./outside\\.md \\(\\d+ bytes\\) as change ${accepted.at.scope}, version ${acceptedVersion}\\.$`));
@@ -349,7 +349,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     expect(unconfirmed.lines[0]).toBe(`Proposed ../outside.md (${files["readme.md"]!.length} bytes) as change ${proposal.at.scope}, version ${proposal.seq}.`);
     expect(unconfirmed.lines[1]).toMatch(/^Unavailable: busy\. Outcome unknown; no acceptance is confirmed\./);
     expect(unconfirmed.lines[1]).toContain("same original signed envelope");
-    for (const text of [conflict.lines.join("\n"), unconfirmed.lines.join("\n")]) expect(text).not.toMatch(/The change .* waits|When it may be merged, run: artroom merge/);
+    for (const text of [conflict.lines.join("\n"), unconfirmed.lines.join("\n")]) expect(text).not.toMatch(/The change .* waits|When it may be merged, run: dap merge/);
     expect((await new Platform(proposal.at.scope).entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "propose-file")).toHaveLength(1);
     await pause([badLane, proposal.at.scope, G.name]);
   }
