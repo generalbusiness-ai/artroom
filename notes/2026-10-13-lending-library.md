@@ -1,6 +1,6 @@
 # A lending library on dap
 
-13 October 2026. **Proposed design, Draft 2. Design only: no source, no
+13 October 2026. **Proposed design, Draft 3. Design only: no source, no
 test and no deployment was written or run for this note.** Baseline main
 `562357458b0b3f44873efc6c21429194b60a00f7`.
 
@@ -16,7 +16,8 @@ act through a browser interface built on the design system.
 
 Draft 2 changes the demo script only: Nasruddin's donation of the small
 pot carries the description "Baby born when the big pot was with me"
-(Hugh, 13 October 2026). The definition is unchanged.
+(Hugh, 13 October 2026). The definition is unchanged. Draft 3 adds
+Nasruddin's spoken line at step 4 of the script.
 
 ## 1. What the library does
 
@@ -222,12 +223,23 @@ The story is Nasruddin and the pot.
 | 1    | Neighbour | `donate` "Big pot"                                               | Takes effect. The shelf shows the pot, available.                                              |
 | 2    | Nasruddin | `borrow` the big pot                                             | Takes effect. The shelf shows it lent to Nasruddin.                                            |
 | 3    | Nasruddin | `return` the big pot                                             | Takes effect. Available again.                                                                 |
-| 4    | Nasruddin | Says the pot had a baby, and offers to return the small pot too. | Nothing to sign: the small pot is not a thing in the library, so `return` has no item to name. |
+| 4    | Nasruddin | Speaks the line below, and offers to return the small pot too. | Nothing to sign: the small pot is not a thing in the library, so `return` has no item to name. |
 | 5    | Nasruddin | `donate` "Small pot", description "Baby born when the big pot was with me" | Takes effect. The record and the shelf page carry the description in Nasruddin's words. The scope does not judge it. |
 | 6    | Nasruddin | `borrow` the big pot again                                       | Takes effect.                                                                                  |
 | 7    | Nasruddin | Says the pot died.                                               | No act.                                                                                        |
 | 8    | Neighbour | `cancel` the big pot, reason "Nasruddin says the pot died"       | Takes effect. The pot is gone; the reason is in the journal and on its page.                   |
 | 9    | Neighbour | `donate` "New big pot"                                           | Takes effect. The shelf is replenished.                                                        |
+
+Nasruddin's line at step 4, spoken in the recording and not written to
+any record (text supplied by Hugh, from a traditional telling):
+
+> "Oh," responded the Hodja. "While it was in my care your cauldron gave
+> birth to a little one. Because you are the owner of the mother
+> cauldron, it is only right that you should keep its baby. And in any
+> event, it would not be right to separate the child from its mother at
+> such a young age."
+
+The small pot's description at step 5 stays the short text shown there.
 
 Two refusals to show beside the story: Nasruddin signs `cancel` and is
 refused for lack of `lending.staff`; a second `borrow` of a lent thing is
