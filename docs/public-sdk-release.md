@@ -30,12 +30,23 @@ node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-c
 node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json --native-capture /private/tmp/reviewed-native-capture.json --native-capture-sha256 <reviewed-SHA256> --esbuild /absolute/pinned-native-esbuild/bin/esbuild --esbuild-sha256 <reviewed-SHA256>
 ```
 
-The proposed coordinated version `0.1.0-dev.2` is conditional. It is neither
-reserved nor an adopted public version. Publisher identity, npm namespace
-rights and that exact version's availability must be established before a
-separately authorized publication. Source workspace versions and lockfile
-remain unchanged. The producer parameter changes only staged manifests and
-their exact internal dependencies.
+Hugh adopted the coordinated version `0.1.0-dev.2` for publication in
+assertions `447e0178` and `46eafb31`. The six distribution names, in build
+order, are `@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
+`@generalbusiness/dap-client`, `@generalbusiness/dap-derive`,
+`@generalbusiness/dap-platform` and `@generalbusiness/dap-replay`. Their
+publication follows the minimal rename's landing; this guide records no
+publication result or token rights.
+
+The workspace rename changes contract, derive, lanes, page, platform and
+cli. The bytes, client and replay workspace names remain internal
+`@generalbusiness/artroom-*` names. The producer keeps an exact original
+copy of each tracked SDK input, then changes only genuine module literals
+in its separate compiler inputs to the distribution names. Ordinary strings,
+protocol names, package directories and source workspace versions remain
+unchanged. Staged manifests use the six distribution names and coordinated
+dependencies at the selected version, plus the dap repository and homepage.
+The checker verifies both the original copies and the exact module rewrites.
 
 The producer copies tracked inputs to an owned external build root and
 verifies their bytes. Every package compiles from its actual copied source
