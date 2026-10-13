@@ -12,7 +12,8 @@ recorded. No service, deployment or browser is involved.
 
 ## Before you start
 
-Use Node.js 26.11.1 and the published SDK version `0.1.0-dev.2`.
+This page ran with Node.js 26.11.1, npm 11.20.0, and all six published SDK
+packages at `0.1.0-dev.2`.
 Create an empty directory outside a repository checkout:
 
 ```sh
@@ -33,8 +34,12 @@ and folds entries, but allows every test key to take every action. Each
 refusal here comes from the definition's guards. This fixture does not
 establish native membership or hosted authority.
 
-The commands and output blocks below are prepared for this package version.
-The cold registry run is not yet recorded for this revision.
+The observed run installed the packages from npm in the fresh directory
+`/private/tmp/dap-counter-tutorial-82a401-one/my-counter`, outside any
+checkout. All five `node run.ts` commands exited 0. Output blocks in steps 1
+and 2 show the complete output. Steps 3 through 5 show the new trailing
+lines from those runs. The [delivery record](../notes/2026-10-13-public-sdk-counter-tutorial.md)
+retains each step's complete observed output.
 
 ## Step 1: declare the configuration and create the scope
 

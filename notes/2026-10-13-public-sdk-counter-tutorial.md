@@ -3,11 +3,13 @@
 Request `82a401071d275f6ca7bd66941c2054b88e08b779`, promise
 `ec79be679eaebec6848b8944c43e6fe0cf238104`.
 
-This is inert Source preparation. No cold install, tutorial command,
-compiler, test, gate, network request, or credential read ran here.
-The tutorial's current outputs remain expected results, not a newly observed
-run. Node 26.11.1 with `node run.ts` and an ESM package configuration is the
-proposed reader command until the cold run proves it.
+The cold registry run, original handle 41396, completed with exit 0. It
+installed all six exact public packages and ran all five tutorial states
+successfully. No tutorial command or install was repeated to update this
+record. The mixed checkout sample and one changed-head gate remain unrun.
+
+The original inert preparation and validation index below are retained as
+history. They are not a claim that the remaining checks have run.
 
 The source base is main `d1b845f837c2b4a8431b5be325b881e0f5c6027b`, tree
 `a624aa3b9ceefe6769b26602c08faf31c2957b06`.
@@ -35,7 +37,7 @@ package. Its old printed output is labelled as a historical run before this
 substitution. Other source links, pin commands, and application instructions
 are unchanged.
 
-## Cold-run validation index — unrun
+## Original cold-run validation index
 
 1. Create one fresh directory outside every checkout. Record its absolute
    path, Node and npm versions, and Source head and tree. Use an owned npm
@@ -70,5 +72,115 @@ are unchanged.
    landing of the original tutorial request. SDK publication evidence alone
    cannot satisfy this tutorial's cold consumer criterion.
 
-No observed run is recorded yet. Hosted Counter, browser, enrollment,
-speech, and deployed scope duties remain outside this in-memory tutorial.
+Hosted Counter, browser, enrollment, speech, and deployed scope duties
+remain outside this in-memory tutorial.
+
+## Observed cold registry run
+
+Tested Source: `6a5f4a5d52826f09fa64ea12f8f3b66d3d5d0c11`, tree
+`346dbf28747585f57a0e48917c24aec52096065a`.
+Fresh reader directory: `/private/tmp/dap-counter-tutorial-82a401-one/my-counter`.
+Node: `v26.11.1`. npm: `11.20.0`.
+
+The exact registry install and all five `node run.ts` commands exited 0.
+The source and tool guards passed before and after every command. No command
+timed out or ended by a signal. Each step's stderr was empty. The installed
+package manifests all reported `0.1.0-dev.2`: dap-contract, dap-bytes,
+dap-client, dap-derive, dap-platform, and dap-replay, under `@generalbusiness`.
+Actual imports of derive/rule and derive/testing succeeded. The public
+lockfile is 5,050 bytes, SHA-256
+`0c3e02fabcc3ac23031534e613f9534519872399862d5f2bad0edf566409daa7`.
+
+The closed result SHA-256 is
+`a86bc99a0f3942d4e36b67475bbc191d61660ff7183852aef41351ca6519be86`.
+The scratch run was preserved separately at
+`/Users/hughpyle/play/artroom-diagnostics/public-sdk-counter-tutorial-cold-one`.
+Its result bytes and original paths are unchanged. This update read only the
+closed result and the five named step stdout files, after verifying their
+recorded lengths and hashes. No other nested logs were followed.
+
+Each block below is the complete observed stdout for that step. The page's
+first two blocks match whole output. Its later three blocks match the
+observed suffixes, and the step 4 digest also matches its stated digest.
+
+### Step 1
+
+```text
+valid: sha256:5e5920090685d2c61ddd10ee5a7e5637f13c11ea85e48294e9bb6a85e848044e
+  item 0, configuration, ready: controller=@rita target=3
+```
+
+### Step 2
+
+```text
+valid: sha256:1a9565645b890ced4de65761cb7a4cc25ba114a964350f9b26a2a0c7920b0d6b
+  item 0, configuration, ready: controller=@rita target=3
+@una join: write
+@vic join: write
+@una join: refused (guard-failed, guards.1)
+  item 1, participant, joined: agent=@una
+  item 2, participant, joined: agent=@vic
+```
+
+### Step 3
+
+```text
+valid: sha256:f9c11a1f1dcd6312c2d6e25552698a995c5eaa0db1365f7bc8b8b4ed150a8f70
+  item 0, configuration, ready: controller=@rita target=3
+@una join: write
+@vic join: write
+@una join: refused (guard-failed, guards.1)
+  item 1, participant, joined: agent=@una
+  item 2, participant, joined: agent=@vic
+@vic initialize: refused (guard-failed, guards.1)
+@rita initialize: write
+  item 3, board, paused: controller=@rita target=3 lastNumber=0 serial=0
+```
+
+### Step 4
+
+```text
+valid: sha256:761d5a92b407842fd304f9e9a4f448811a36bf6f3c9989b046e1e38eb8e7514a
+  item 0, configuration, ready: controller=@rita target=3
+@una join: write
+@vic join: write
+@una join: refused (guard-failed, guards.1)
+  item 1, participant, joined: agent=@una
+  item 2, participant, joined: agent=@vic
+@vic initialize: refused (guard-failed, guards.1)
+@rita initialize: write
+  item 3, board, paused: controller=@rita target=3 lastNumber=0 serial=0
+@vic start: refused (guard-failed, guards.1)
+@rita start: write
+  item 3, board, running: controller=@rita speaker=@una target=3 lastNumber=0 serial=1 number=1 basis=[{"id":1,"member":"@una"},{"id":2,"member":"@vic"}]
+```
+
+### Step 5
+
+```text
+valid: sha256:761d5a92b407842fd304f9e9a4f448811a36bf6f3c9989b046e1e38eb8e7514a
+  item 0, configuration, ready: controller=@rita target=3
+@una join: write
+@vic join: write
+@una join: refused (guard-failed, guards.1)
+  item 1, participant, joined: agent=@una
+  item 2, participant, joined: agent=@vic
+@vic initialize: refused (guard-failed, guards.1)
+@rita initialize: write
+  item 3, board, paused: controller=@rita target=3 lastNumber=0 serial=0
+@vic start: refused (guard-failed, guards.1)
+@rita start: write
+  item 3, board, running: controller=@rita speaker=@una target=3 lastNumber=0 serial=1 number=1 basis=[{"id":1,"member":"@una"},{"id":2,"member":"@vic"}]
+@vic spoken: refused (guard-failed, guards.1)
+@una spoken: write
+  item 3, board, running: controller=@rita speaker=@vic target=3 lastNumber=1 serial=2 number=2 basis=[{"id":1,"member":"@una"},{"id":2,"member":"@vic"}]
+@vic spoken: write
+@una spoken: write
+  item 3, board, finished: controller=@rita target=3 lastNumber=3 serial=4
+8 entries; replay gives the same state: true
+```
+
+This update changes only documents. The measured executable source and tests
+are unchanged. The changed-head gate, mixed checkout sample, independent
+review, and landing remain owed. The tutorial does not prove browser,
+provider, or hosted authorization behaviour.
