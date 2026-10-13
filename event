@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/scope/test/worker.ts at exact 444b0eb66949b5ab35acd16851a01916f45720f2 on planner/mcp-hosted, under promise git:sha1…18c7466 on request git:sha1…b7f6cf8","body":{"commit":"444b0eb66949b5ab35acd16851a01916f45720f2","path":"packages/scope/test/worker.ts"}}
+{"kind":"artifact","text":"packages/scope/wrangler.jsonc at exact 444b0eb66949b5ab35acd16851a01916f45720f2 on planner/mcp-hosted, under promise git:sha1…18c7466 on request git:sha1…b7f6cf8","body":{"commit":"444b0eb66949b5ab35acd16851a01916f45720f2","path":"packages/scope/wrangler.jsonc"}}
