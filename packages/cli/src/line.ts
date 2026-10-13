@@ -3,6 +3,8 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
+import { enrolAgentKey } from "./invitations.ts";
+import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
 import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type InstallCohort, type Outcome } from "./commands.ts";
 
 export const USAGE = [
@@ -12,7 +14,7 @@ export const USAGE = [
   "  artroom install --planned [--cohort application|counting-commitments]",
   "  artroom claim <name> [--handle @you] [--branch main] [--again]",
   "  artroom invite <@member> --role <role> [--hours 24]",
-  "  artroom join <link>",
+  "  artroom join <link> [--check for an agent-key invitation]",
   "  artroom acts [<scope>]",
   "  artroom act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
   "  artroom log <scope> [--limit n]",
@@ -34,7 +36,7 @@ export const USAGE = [
 ].join("\n");
 
 /** The flags that take no value. */
-const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned"]);
+const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned", "check"]);
 
 /** The words of a command line: the positional ones, each `--name value`, and each switch; `--set` may be given more than once. */
 export function parse(argv: readonly string[]): { words: string[]; flags: Map<string, string[]> } | null {
@@ -58,7 +60,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned", "cohort"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: [], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -85,7 +87,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
     }
     case "claim": return first === undefined ? needs("a name") : claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
     case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
-    case "join": return first === undefined ? needs("a link") : join(ctx, first);
+    case "join": return first === undefined ? needs("a link") : flag("check") !== undefined ? first.startsWith(AGENT_KEY_LINK) ? enrolAgentKey(ctx, first, { mode: "check" }) : needs("an explicitly tagged agent-key invitation for --check") : join(ctx, first);
     case "acts": return acts(ctx, first);
     case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [], value: parsed.flags.get("value") ?? [] });
     case "log": return log(ctx, first, { ...(flag("limit") ? { limit: number("limit")! } : {}) });

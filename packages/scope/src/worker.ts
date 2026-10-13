@@ -66,6 +66,7 @@
  * observation read of a membership scope. It has no route here.
  */
 
+import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
 import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
@@ -439,6 +440,6 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
 export default {
   fetch: async (request: Request, env: Env): Promise<Response> => {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
-    return isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
   },
 };

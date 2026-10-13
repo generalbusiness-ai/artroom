@@ -30,6 +30,7 @@ test("navigation keeps lane identity and separates the room's Issues and Changes
   expect(routeOf("#/change/sc_exact?kind=issue")).toEqual({ destination: "changes", scope: "sc_exact" });
   expect(routeOf("#/issue/sc_other")).toEqual({ destination: "issues", scope: "sc_other" });
   expect(routeOf("#/rules")).toEqual({ destination: "rules", scope: null });
+  expect(routeOf("#/start")).toEqual({ destination: "start", scope: null });
   expect(routeOf("#/join")).toEqual({ destination: "join", scope: null });
   expect(routeOf("#/invitation")).toEqual({ destination: "invitation", scope: null });
   expect(routeOf("#/config")).toEqual({ destination: "config", scope: null });

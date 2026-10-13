@@ -9,3 +9,5 @@ export * from "./signed-read.ts";
 export * from "./credential.ts";
 export * from "./head-stream.ts";
 export * from "./observe.ts";
+export * from "./founding-offer.ts";
+export * from "./agent-key-invitation.ts";
