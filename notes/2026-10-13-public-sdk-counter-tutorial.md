@@ -6,7 +6,8 @@ Request `82a401071d275f6ca7bd66941c2054b88e08b779`, promise
 The cold registry run, original handle 41396, completed with exit 0. It
 installed all six exact public packages and ran all five tutorial states
 successfully. No tutorial command or install was repeated to update this
-record. The mixed checkout sample and one changed-head gate remain unrun.
+record. The exact mixed checkout sample and one changed-head gate also
+passed, separately from the cold tutorial.
 
 The original inert preparation and validation index below are retained as
 history. They are not a claim that the remaining checks have run.
@@ -181,6 +182,40 @@ valid: sha256:761d5a92b407842fd304f9e9a4f448811a36bf6f3c9989b046e1e38eb8e7514a
 ```
 
 This update changes only documents. The measured executable source and tests
-are unchanged. The changed-head gate, mixed checkout sample, independent
-review, and landing remain owed. The tutorial does not prove browser,
+are unchanged. Independent review and landing remain owed. The tutorial
+does not prove browser,
 provider, or hosted authorization behaviour.
+
+## Exact checkout sample and ordinary gate
+
+The owning command printed in `docs/write-an-application.md` ran once from
+the tutorial checkout at `fdafc051ae2ddc384c5dea940fe469e677993dec`, tree
+`6c3dd8ea38809ebeded0326a82b05b2ff7ef2c84`. Original handle 60460 completed
+with exit 0 and a passed postguard. It uses the materialized repository
+workspace SDK and checkout lane definitions. It is separate from the cold
+registry consumer run, which used compiled public packages.
+
+The command's observed stdout is the two-line output already shown on that
+page. Its 173 bytes have SHA-256
+`a836dc4a28d5999a2a2d63d83a222053d8734c3c266abb847550038b9b481c14`.
+Stderr is empty. The closed mixed result is 759 bytes, SHA-256
+`a9d8426d1715fbcad72f5657abba49f309c1acdac87fbbaa2ff3399c385ec6b3`.
+No second public mixed variant was executed.
+
+One ordinary `npm run gate`, original handle 74421, completed with exit 0
+at the same exact head and tree. Whitespace, typecheck, and test phases
+passed; 1,042 Vitest cases passed with the two original recorder skips.
+The Node groups passed 9 and 55 cases respectively. The postguard passed.
+Install was skipped under the reused exact lock and owned dependency view.
+The outer command took 123.329872 seconds wall. This is the original whole
+command's measured duration on the builder's macOS host, not a sum of phase
+times. Machine load and operating-system cache state were not measured.
+The closed gate result is 2,985 bytes, SHA-256
+`0e9f883c6a8b2f577b836a40b6b7468754b3798ec09836866c7fe59fa6f9aef0`.
+
+The final delivery update changes narrative only. All code and output fences
+remain identical to checked `fdafc051ae2ddc384c5dea940fe469e677993dec`.
+Executable source, tests, settings, lockfile, and assets also remain exact.
+The external correspondence proof names the final commit and tree alongside
+the checked head and tree. No cold install, tutorial step, mixed command, or
+gate was repeated for this update. Independent review and landing remain open.

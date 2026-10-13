@@ -128,9 +128,10 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-Before the package-import substitution, this command ran on 2026-10-12
-at main `d309b6b9` with `node` v22.22.0 and exited 0. That historical run
-printed the following output. The changed imports have not yet been run:
+This exact checkout command ran with Node.js 26.11.1 at Source
+`fdafc051ae2ddc384c5dea940fe469e677993dec` and exited 0. It uses the
+materialized repository workspace packages, separately from the Counter
+tutorial's public npm install. Its observed output was:
 
 ```
 issue: valid, sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e
