@@ -34,5 +34,13 @@ else if (asked.op === "resubmit") {
 } else if (asked.op === "lease") {
   const held = takeLock(asked.path!, {});
   if (!held) console.log("refused");
-  else { console.log("entered"); await new Promise((resolve) => setTimeout(resolve, 300)); releaseLock(held); }
+  else {
+    // When this process was inside, by the wall clock all children share: just after taking the lock, just before releasing it.
+    const at = () => performance.timeOrigin + performance.now();
+    const entered = at();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const leaving = at();
+    releaseLock(held);
+    console.log(`entered ${entered} ${leaving}`);
+  }
 }

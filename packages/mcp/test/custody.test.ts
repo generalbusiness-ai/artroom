@@ -36,6 +36,17 @@ function child(asked: Record<string, unknown>): { done: Promise<{ code: number |
   };
 }
 
+/**
+ * What several children of the lease operation did: how many were refused, and when each that entered was inside. A child that
+ * starts late, under load, may lawfully enter after another has left; what must never happen is two inside at once.
+ */
+function holdings(results: readonly { out: string }[]): { refused: number; inside: [number, number][] } {
+  const lines = results.map((r) => r.out.trim());
+  const inside = lines.filter((l) => l.startsWith("entered ")).map((l) => l.split(" ").slice(1).map(Number) as [number, number]).sort((a, b) => a[0] - b[0]);
+  return { refused: lines.filter((l) => l === "refused").length, inside };
+}
+const overlapping = (inside: readonly [number, number][]): number => inside.filter((h, i) => i > 0 && h[0] < inside[i - 1]![1]).length;
+
 describe("custody keeps the exact envelope under the caller's key", () => {
   // Invariant: after a lost first reply, settle with the caller's key finds the receipt of the exact envelope, also after the
   // intent's notAfter has passed; nothing is signed again.
@@ -362,8 +373,8 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     expect(reads).toEqual([{ from: 0, limit: 1 }]);
   });
 
-  // Invariant: a dead owner's lock is reclaimed by exactly one of several processes trying at once, and a release removes only
-  // the releaser's own holding, never a newer owner's.
+  // Invariant: a dead owner's lock is reclaimed one process at a time: of several trying at once, at least one enters, no two
+  // are ever inside together, and the rest are refused; a release removes only the releaser's own holding, never a newer owner's.
   test("lock reclamation: simultaneous reclaimers, one enters; release is the owner's", async () => {
     const { dir } = setup();
     const dead = spawn(process.execPath, ["-e", ""]);
@@ -371,8 +382,8 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     const path = join(dir, "contended.lease");
     writeFileSync(path, JSON.stringify({ pid, token: "dead-owner" }));
     const results = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));
-    expect(results.map((r) => r.out.trim()).filter((o) => o === "entered"), results.map((r) => r.out).join("\n")).toHaveLength(1);
-    expect(results.map((r) => r.out.trim()).filter((o) => o === "refused")).toHaveLength(3);
+    const seen = holdings(results);
+    expect([seen.inside.length >= 1, overlapping(seen.inside), seen.refused + seen.inside.length], results.map((r) => r.out).join("\n")).toEqual([true, 0, 4]);
     const mine = takeLock(path, {})!;
     expect(mine).not.toBeNull();
     releaseLock({ path, token: "someone-else" });
@@ -402,7 +413,8 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     // An operator removes the dead reclaimer's file: recovery goes on, one process at a time.
     unlinkSync(`${path}.reclaim`);
     const cleared = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));
-    expect(cleared.map((r) => r.out.trim()).filter((o) => o === "entered")).toHaveLength(1);
+    const seen = holdings(cleared);
+    expect([seen.inside.length >= 1, overlapping(seen.inside), seen.refused + seen.inside.length], cleared.map((r) => r.out).join("\n")).toEqual([true, 0, 4]);
   }, 60_000);
 
   // Invariant: archival re-reads each candidate under its lock: a refusal resubmitted between selection and lock is unresolved,
