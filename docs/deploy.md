@@ -1,12 +1,10 @@
 # Deploy the scope Worker
 
-This page says which settings and secrets the scope Worker takes, and in
-what order to set them so that a claim creates its repository on GitHub,
-the secondary host in the re-cut demo plan. The ARTIFACTS install path is
-the separate host-adapter delivery.
-Nothing in this repository deploys the Worker. The Worker's code is
-`packages/scope/src/worker.ts`; its configuration is
-`packages/scope/wrangler.jsonc`.
+`npm run deploy:scope` deploys the scope Worker from
+`packages/scope/wrangler.jsonc` with Wrangler 4.147.0. Follow
+[Run dap in 10 minutes](self-host.md) to deploy it on your own account,
+create a room, and invite another device. This page describes the service
+settings and the GitHub setup order.
 
 A deployment serves rooms of every definition version that its platform
 package has shipped, each by the version that its genesis pinned
