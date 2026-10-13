@@ -103,13 +103,18 @@ declares named rules, pass `RULE_PROFILES` from
 the validator calls for the room's lane definitions and their demo
 profiles, which declare no named rules.
 
+The validator imports below use the published SDK names. The lane demo
+definitions remain checkout-only source because the public SDK has no lanes
+package.
+
 From the repository root, with its workspace dependencies installed, this
-command validates both demo profiles:
+command validates both demo profiles. Unlike the standalone Counter tutorial,
+this mixed example requires the checkout for `issueDemo` and `changeDemo`:
 
 ```sh
 node --input-type=module <<'JS'
-import { PROPOSED_BOUNDS } from './packages/contract/src/bounds.ts';
-import { validateDefinition } from './packages/derive/src/validate/index.ts';
+import { PROPOSED_BOUNDS } from '@generalbusiness/dap-contract';
+import { validateDefinition } from '@generalbusiness/dap-derive';
 import { issueDemo, changeDemo } from './packages/lanes/src/demo.ts';
 for (const definition of [issueDemo, changeDemo]) {
 	const result = validateDefinition(definition, PROPOSED_BOUNDS);
@@ -123,8 +128,10 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-Run on 2026-10-12 at main `d309b6b9` with `node` v22.22.0, it exited 0
-and printed:
+This exact checkout command ran with Node.js 26.11.1 at Source
+`fdafc051ae2ddc384c5dea940fe469e677993dec` and exited 0. It uses the
+materialized repository workspace packages, separately from the Counter
+tutorial's public npm install. Its observed output was:
 
 ```
 issue: valid, sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e

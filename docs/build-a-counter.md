@@ -12,34 +12,44 @@ recorded. No service, deployment or browser is involved.
 
 ## Before you start
 
-You need a checkout of this repository with its dependencies installed,
-and the `node` command at version 22 or later. This page was run with
-`node` v22.22.0 at main `d309b6b9`.
-
-From the repository root, install the dependencies and make a directory
-for the tutorial:
+This page ran with Node.js 26.11.1, npm 11.20.0, and all six published SDK
+packages at `0.1.0-dev.2`.
+Create an empty directory outside a repository checkout:
 
 ```sh
-npm ci
 mkdir my-counter
+cd my-counter
+npm init -y
+npm pkg set type=module
+npm install --save-exact @generalbusiness/dap-contract@0.1.0-dev.2 @generalbusiness/dap-bytes@0.1.0-dev.2 @generalbusiness/dap-client@0.1.0-dev.2 @generalbusiness/dap-derive@0.1.0-dev.2 @generalbusiness/dap-platform@0.1.0-dev.2 @generalbusiness/dap-replay@0.1.0-dev.2
 ```
 
-The tutorial imports the framework packages by their paths in this
-checkout, so it needs no package install of its own. It also uses the
-in-memory scope from `packages/derive/test/fixtures.ts`. That fixture
-judges, seals and folds entries the way the runtime's commit does, and it
-allows every test key to take every action. So every refusal you see in
-this tutorial comes from the definition's own guards.
+We write two TypeScript files in this directory. Node runs them directly;
+the framework imports resolve to compiled JavaScript in the installed
+packages. Keep the generated lockfile to retain the exact dependencies.
+
+The tutorial uses `@generalbusiness/dap-derive/testing`, an in-memory test
+scope with fixed keys and manufactured grants. That fixture judges, seals,
+and folds entries, but allows every test key to take every action. Each
+refusal here comes from the definition's guards. This fixture does not
+establish native membership or hosted authority.
+
+The observed run installed the packages from npm in the fresh directory
+`/private/tmp/dap-counter-tutorial-82a401-one/my-counter`, outside any
+checkout. All five `node run.ts` commands exited 0. Output blocks in steps 1
+and 2 show the complete output. Steps 3 through 5 show the new trailing
+lines from those runs. The [delivery record](../notes/2026-10-13-public-sdk-counter-tutorial.md)
+retains each step's complete observed output.
 
 ## Step 1: declare the configuration and create the scope
 
 Every scope starts with a genesis act. Ours is `establish`. It opens the
 one `configuration` item, which holds the controller and the target.
 
-Create `my-counter/definition.ts`:
+Create `definition.ts`:
 
 ```ts
-import type { ActType, DeclaredDefinition, ItemType } from "../packages/contract/src/index.ts";
+import type { ActType, DeclaredDefinition, ItemType } from "@generalbusiness/dap-contract";
 
 const count = { type: "int", min: 1, max: 100 } as const;
 const person = { required: false, fixed: false, list: false, author: false };
@@ -84,15 +94,15 @@ party: it holds a member. The `fixed: true` flags mean that nothing can
 change those slots after the item opens. The act's two effects copy the
 signed fields into those slots.
 
-Now create `my-counter/run.ts`. It validates the definition, creates a
+Now create `run.ts`. It validates the definition, creates a
 scope with `@rita` as the controller and a target of 3, and prints the
 configuration item:
 
 ```ts
-import { PROPOSED_BOUNDS } from "../packages/contract/src/index.ts";
-import { prepareRules, validateDefinition } from "../packages/derive/src/index.ts";
-import { evaluateRules, RULE_PROFILES } from "../packages/derive/src/rule/index.ts";
-import { founded, keys, on, valid, type Actor, type Over } from "../packages/derive/test/fixtures.ts";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { prepareRules, validateDefinition } from "@generalbusiness/dap-derive";
+import { evaluateRules, RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
+import { founded, keys, on, valid, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
 import { counter } from "./definition.ts";
 
 const checked = validateDefinition(counter, PROPOSED_BOUNDS, RULE_PROFILES);
@@ -118,10 +128,10 @@ function show(id: number) {
 show(0);
 ```
 
-Run it from the repository root:
+Run it from your tutorial directory:
 
 ```sh
-node --experimental-transform-types --disable-warning=ExperimentalWarning my-counter/run.ts
+node run.ts
 ```
 
 You should see:
@@ -141,7 +151,7 @@ Next we add a `participant` item for each member who joins, and a `join`
 act. The act has two guards. The first allows at most eight participants.
 The second refuses a signer who has already joined.
 
-Add these declarations to `my-counter/definition.ts`, above
+Add these declarations to `definition.ts`, above
 `export const counter`:
 
 ```ts
@@ -173,7 +183,7 @@ Then add the new item type and act to `counter`:
 	acts: { establish, join },
 ```
 
-Add an `act` helper and three joins to the end of `my-counter/run.ts`.
+Add an `act` helper and three joins to the end of `run.ts`.
 The helper signs an intent, evaluates the act's rules, judges it, and
 writes the entry if the act takes effect:
 
@@ -269,7 +279,7 @@ Add the board and the act to `counter`:
 	acts: { establish, join, initialize },
 ```
 
-Add two attempts to initialize to the end of `my-counter/run.ts`, the
+Add two attempts to initialize to the end of `run.ts`, the
 first by `@vic`, who is not the controller:
 
 ```ts
@@ -305,11 +315,11 @@ number is one more than the last, the serial moves by one, and `next` is
 the participant whose place in the roster matches the number. A client
 cannot skip a participant, repeat a number or speak out of turn.
 
-Change the first line of `my-counter/definition.ts` to import two more
+Change the first line of `definition.ts` to import two more
 types:
 
 ```ts
-import type { ActType, DeclaredDefinition, EffectForm, Guard, ItemType } from "../packages/contract/src/index.ts";
+import type { ActType, DeclaredDefinition, EffectForm, Guard, ItemType } from "@generalbusiness/dap-contract";
 ```
 
 Add these declarations above `export const counter`:
@@ -405,7 +415,7 @@ Add the acts and the rules to `counter`:
 ```
 
 Add a first `start` by `@vic`, then one by `@rita`, to the end of
-`my-counter/run.ts`:
+`run.ts`:
 
 ```ts
 const roster = () => scope.state.page("participant", ["joined"], null, 8).items
@@ -433,7 +443,7 @@ turn and the number 1.
 
 ## Step 5: speak the numbers
 
-Add a `spoken` helper and four reports to the end of `my-counter/run.ts`.
+Add a `spoken` helper and four reports to the end of `run.ts`.
 The first report comes from `@vic`, out of turn. Then the three turns go
 `@una`, `@vic`, `@una`. Last, the script folds the record again from the
 start and compares the state:
@@ -479,68 +489,11 @@ the board becomes `finished` and its turn slots are cleared.
 The last line shows that folding the eight entries again gives the same
 state. That is what a verifier does with a real scope's history.
 
-## Step 6: compare with the full Counter
-
-The Counter in `examples/counting` uses the same parts and adds more:
-`leave`, `cancel-turn`, `pause` and `reset` acts, a `generation` that
-fences late reports after a reset, and a timed rule that pauses the board
-when a speaker takes longer than 15 seconds. Its definition is pinned in
-`examples/counting/pin.ts`.
-
-Create `my-counter/full.ts` to validate that definition and compare its
-digest with the pin:
-
-```ts
-import { PROPOSED_BOUNDS } from "../packages/contract/src/index.ts";
-import { validateDefinition } from "../packages/derive/src/index.ts";
-import { RULE_PROFILES } from "../packages/derive/src/rule/index.ts";
-import { counting } from "../examples/counting/definition.ts";
-import { COUNTING_DEFINITION } from "../examples/counting/pin.ts";
-
-const checked = validateDefinition(counting, PROPOSED_BOUNDS, RULE_PROFILES);
-console.log(checked.ok ? `valid: ${checked.definition.digest}` : checked.problems);
-console.log(`pinned: ${COUNTING_DEFINITION}`);
-console.log(`acts: ${Object.keys(counting.acts).join(", ")}`);
-```
-
-Run it:
-
-```sh
-node --experimental-transform-types --disable-warning=ExperimentalWarning my-counter/full.ts
-```
-
-You should see:
-
-```
-valid: sha256:435d9f5745048183d3cf0392ce909cd76909fd69ee368dfc57e142ba96af1d09
-pinned: sha256:435d9f5745048183d3cf0392ce909cd76909fd69ee368dfc57e142ba96af1d09
-acts: establish, initialize, join, leave, cancel-turn, start, pause, reset, spoken
-```
-
-The Counter's own tests run its acts against the same in-memory scope.
-Run them:
-
-```sh
-node node_modules/vitest/vitest.mjs run --project counting
-```
-
-You should see both test files pass:
-
-```
- Test Files  2 passed (2)
-      Tests  8 passed (8)
-```
-
-The second file tests the successor definition, `counting-commitments`,
-which the deployed Counter page uses. Not run here: the deployed page,
-its speech, and acts signed by enrolled keys against a hosted scope.
-[examples/counting/browser/startup.md](../examples/counting/browser/startup.md)
-describes that setup.
-
-When you are done, delete the `my-counter` directory.
-
 ## Where to go next
 
+- [The full Counter](../examples/counting) adds leave, pause, reset, and
+  timed turns. Its source and tests belong to a repository checkout, not
+  the published SDK packages.
 - [Write an application](write-an-application.md) shows how to declare,
   validate and pin a definition of your own.
 - [The architecture of a dap application](architecture.md) explains what
