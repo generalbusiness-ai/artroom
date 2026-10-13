@@ -1,0 +1,347 @@
+# Roadmap
+
+This page says what dap does today, what is not yet built, and which use
+cases need each missing part. It also says what the
+[dap-spike](https://github.com/generalbusiness-ai/dap-spike) contributed:
+the earlier experiment that tested several of these ideas, and recorded
+where they failed.
+
+The page gives states and an order, and no dates. The
+[use cases](use-cases.md) page holds the catalogue that the case numbers
+below refer to.
+
+## What runs today
+
+| What | Where to read and check it |
+|---|---|
+| A scope keeps an ordered record, pins one definition, judges each signed act, and answers with a receipt or a refusal. | [Scopes](scopes.md), [The life of an act](manual/life-of-an-act.md) |
+| Anyone with the record can replay it. The rehearsal of the repository story ends with fourteen scopes reported consistent. | [The record](manual/record.md), [Rehearse the demo](demo.md) |
+| Scopes compose by messages. The receiver reads the sender's entry, checks it, and judges the delivery in its own turn. Each request gets one result. | [Scopes: composition](scopes.md#composition) |
+| dap-room: membership, rules, issues, changes, reviews of an exact version, and publication to a Git host with a recorded outcome. Two changes on one base are settled by reservation and judgement. | [apps/room/docs](../apps/room/docs/first-change.md), [Rehearse the demo](demo.md) |
+| Two Git hosts: Cloudflare Artifacts and GitHub. | [Configure a Git host](hosts.md) |
+| A declared application: you write a definition as data, validate it, pin it, and create a scope under it in a room. Guards, grants, timed rules and detached texts are available to it. | [Write an application](write-an-application.md) |
+| dap-counter, a declared application in which people and agents take turns. | [The Counter source](../examples/counting/README.md) |
+| Published repositories served as pages. | [Pages](pages.md) |
+
+Each of those pages states its own evidence and limits. The table in
+[Scopes](scopes.md) under "What runs" is the most exact account.
+
+Three limits shape everything below:
+
+- **Every member of a room reads the whole record.** A read session is
+  bound to a repository, not to a participant's part of it.
+- **A definition is pinned when its scope is created.** A scope does not
+  change its rules afterwards.
+- **A declared application uses no capabilities.** It cannot yet declare
+  its own operation on an outside system.
+
+## What is not yet built
+
+In order, nearest first.
+
+| Capability | State | Use cases that need it |
+|---|---|---|
+| [An application's own messages between scopes](#an-applications-own-messages-between-scopes) | Can be declared; no application uses it yet | 25, 31, 32, 33 |
+| [Publication from a fold](#publication-from-a-fold) | Designed; in review | The lending library |
+| [Durability levels](#durability-levels) | Designed; in review | 36, 44, and the live part of every case |
+| [A fork for each hold](#a-fork-for-each-hold) | Planned; cost measurement requested | 34 |
+| [Offline work and propose from a branch](#offline-work-and-propose-from-a-branch) | Direction set; not designed | 34 |
+| [Private views in one record](#private-views-in-one-record) | Not designed in dap; tested in the dap-spike | 21, 32, 37, 39, 40, 41, 42, and parts of 08, 18, 19, 24, 25, 33 |
+| [Evidence capture and private custody](#evidence-capture-and-private-custody) | Not designed | 01, 02, 04 to 19, 23, 24, 27, 28, and the custody part of every case |
+| [Outside parties and systems](#outside-parties-and-systems) | Runs for Git publication only | 35, 37, 38, 39, 43, and all of group 4 |
+| [A personal account across records](#a-personal-account-across-records) | Not designed | All of group 4 |
+| [Rules that change after creation](#rules-that-change-after-creation) | Not designed in dap; tested in the dap-spike | 42; a sale that gains packages; a club that changes its policy |
+| [Rules that are algorithms](#rules-that-are-algorithms) | Not designed | Chess and other games with many rules; analytic pipelines such as Tailapps |
+| [Split and join](#split-and-join) | Not designed; a protocol is sketched in the dap-spike | A merger of two records |
+| [An authoring language](#an-authoring-language) | Not designed; one attempt in the dap-spike stopped | Every case, for its author |
+
+### An application's own messages between scopes
+
+**What it is.** An application made of several scopes, in which one scope
+owns each shared constraint and the others ask it. Examples: one scope
+owns a budget that two projects spend from; one allocator owns the
+capacity of a building with many rooms; an inspection runs in its own
+scope and returns a result to the sale.
+
+**Today.** The mechanism runs: dap-room's register, directory, membership,
+rules, destination and lanes all work by messages. A declared definition
+may also declare a send to a scope that one of its slots holds. No
+declared application does so yet: the Counter is one scope and sends
+nothing.
+
+**Not offered.** One act that takes effect in two scopes at once. A
+request, its result and the sender's result clause are the form.
+
+**The dap-spike's contribution.** Its design note gives the test for where
+a boundary may go: a right that only one party can exercise needs one
+owner
+([boundaries and composition](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-14-evolving-spaces-design.md)).
+It also separates three ways to cross a boundary: link to an outside act,
+admit a result from an exact position of another record, and join. The
+spike ran none of these across two records.
+
+**Next.** A two-scope declared application with one owner of a shared
+amount, with replay of both scopes.
+
+### Publication from a fold
+
+**What it is.** When an act takes effect in an application's scope, the
+same entry states "this text is the content of this path", and the room's
+destination commits and publishes that file.
+
+**Today.** dap-room's change lane publishes one file this way. The
+destination accepts that request only from a change lane, and an
+application scope does not hold a reference to its destination.
+
+**Use case.** The [lending library](use-cases.md#a-lending-library). Its
+first version writes each shelf page from the member's interface after
+the act, so a page can fall behind the record.
+
+**State.** A design note is in review on the branch
+`planner/fold-publication-design`.
+
+### Durability levels
+
+**What it is.** A scope's definition declares one of three levels.
+**Live**: no record is kept, and the scope can reset. **Recorded**: the
+scope keeps its journal, as every scope does today. **Archived**: the
+journal is also written to Git, so that it can be checked from a clone
+without the service.
+
+**Today.** Every scope is recorded. Only a publication's receipt reaches
+Git.
+
+**Use cases.** Practice counting that keeps no record (44); presence and
+hypotheses during an incident (36); the drafts and tentative options in
+every card of the catalogue.
+
+**State.** Designed in
+[the volatile acts note](../notes/2026-10-09-shared-language-volatile-acts.md);
+the sections on levels and the journal archive are in review on the
+branch `planner/journal-archive-design`.
+
+### A fork for each hold
+
+**What it is.** Each performer who takes a hold works in a separate fork
+of the destination's repository, with a token that reaches only that
+fork. The performer never holds a token to the destination.
+
+**Today.** Each destination has one repository
+([Configure a Git host](hosts.md)).
+
+**State.** [Plan 029](../plans/029-2026-10-11-artifacts-forks.md). The
+measurement of what a fork costs on Cloudflare Artifacts is requested and
+comes first.
+
+### Offline work and propose from a branch
+
+**What it is.** A participant works without a connection and proposes a
+change from a branch when they return. An application shows a local
+result at once and reconciles it with the record.
+
+**State.** The direction is set. No design note exists.
+
+### Private views in one record
+
+**What it is.** Participants read different parts of one record and still
+agree on every decision they share. Two buyers each see their own offer
+and the seller's one acceptance, and neither sees the other's price.
+
+**Today.** Every member of a room reads the whole record. An application
+can redact a detached text, and it can keep private material in another
+room. Neither gives two readers of one record different views with a
+checked agreement between them.
+
+**Use cases.** Group 3 of the [catalogue](use-cases.md#3-private-views):
+the guitar sale with private offers (32), community governance with
+private standing (42), childcare details (21), competing quotations (37),
+hiring (39), a school support plan (40) and research review (41).
+
+**The dap-spike's contribution.** This was the spike's main subject
+([visibility report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/REPORT.md),
+[One series, many views](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-14-one-series-many-views.md)).
+It wrote the conditions for failure before it ran.
+
+- Agreement held in the fixtures that ran. In the repaired Sale and
+  Booking models, participants with different views reached the same
+  verdict on every event that both could see.
+- Privacy held in those two models. Offer amounts stayed between bidder
+  and seller.
+- The Club model's original policy for admitting members fails, and that
+  result was kept
+  ([decision](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-16-club-admission-decision.md)).
+  The result is for two models, not three.
+- Writing such a model was costly. The budget was two repairs for each
+  model, and Sale needed six. Every repair was an error about who could
+  read what.
+
+**What that means here.** The property can hold, and a person or an agent
+is likely to get the audiences wrong by hand. Private views in dap should
+come with a check that the author cannot skip.
+
+### Evidence capture and private custody
+
+**What it is.** A participant brings in a bill, a photograph or a letter
+as unchanged bytes with a stated source. The record keeps three things
+apart: a person's own assertion, an imported document, and another
+party's signed act. The documents stay in private custody, and a later
+helper can be given them.
+
+**Today.** A detached text of up to a fixed size travels beside an act
+and is kept by digest. There is no capture with a stated source, no store
+for larger or binary evidence, and no custody that is private to some
+members.
+
+**Use cases.** Group 4 of the
+[catalogue](use-cases.md#4-episodes-across-organisations), and the
+custody part of every other card.
+
+**The dap-spike's contribution.** Its direction note names the three kinds
+of record and lists the account, the capture and the anchor as unfinished
+([direction and next steps](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-20-direction-and-next-steps.md)).
+
+### Outside parties and systems
+
+**What it is.** A scope sends an operation to a system outside dap,
+records the attempt before it is sent, and treats a lost answer as
+unknown until it is reconciled. A party in another organisation answers
+with its own signed act.
+
+**Today.** This model runs for one kind of operation: publication to a
+Git host, with its receipt and cleanup duties. A declared application
+cannot declare its own operation. A fact from outside can enter only as a
+participant's signed report.
+
+**Use cases.** Release and deployment (35); a payment attempt (38); a
+tool executor's work (43); every counterparty in group 4.
+
+**The dap-spike's contribution.** Its obligations experiment declared a
+duty with a role, a performing act and a deadline. The controls for late,
+missing and mismatched performance passed for Sale, and Club gave a
+counterexample
+([obligations report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/T3-OBLIGATIONS-REPORT.md)).
+
+### A personal account across records
+
+**What it is.** One person's view of an episode that spans several
+records: an insurer's answer, a contractor's undertaking and a family's
+arrangements. The view gathers their statuses and gains no authority over
+any of them. It is useful to one person before any other party joins.
+
+**Today.** A member reads the rooms they have joined, one at a time.
+
+**The dap-spike's contribution.** The design of a perspective and an
+anchor, and the plain statement that the anchor is implemented nowhere
+([the sale as experienced](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-15-sale-as-experienced.md)).
+
+### Rules that change after creation
+
+**What it is.** A running record gains a capability part-way through, or
+a later package narrows an earlier one's guard, and what already happened
+keeps its meaning.
+
+**Today.** A scope pins its definition for good. A room activates new
+definitions for new scopes. No scope moves to a new definition.
+
+**The dap-spike's contribution.** This was the spike's first goal, and it
+held for the fixtures that ran: a package attached to a live record,
+earlier outcomes replayed unchanged, and a client without the new package
+paused instead of guessing
+([visibility report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/REPORT.md),
+[ordering report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md)).
+It did not show a general change of a record's state, or two models
+composed freely.
+
+### Rules that are algorithms
+
+**What it is.** Rules that are a function, such as the legal moves of
+chess, in place of a list of guards.
+
+**Today.** A definition is data: guards, effects and the values they
+read. An author cannot supply a function.
+
+**Use cases.** Chess. Also analytic pipelines such as
+[Tailapps](https://github.com/generalbusiness-ai/tailapps), where an
+author writes expressions that turn a stream of telemetry into tables,
+and a reader asks questions in SQL. On dap today, the pipeline's life
+(create, validate, activate) and a router that signs each record as its
+own report are buildable. The expressions and the SQL tables are not: a
+scope's state is a bounded set of items, and its reads are pages of items
+and entries. An outside reader could fold the record into tables, as the
+replay reader folds it into state.
+
+**The dap-spike's contribution.** Its sweep names the need and one
+condition: a guard may call a pure helper only if the check on who reads
+what still sees everything the helper reads
+([authoring language directions](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-18-authoring-language-directions.md)).
+
+### Split and join
+
+**What it is.** One record becomes two, or two become one, with a stated
+rule for what each side keeps. The party that writes a record hands that
+duty to another.
+
+**Today.** A scope creates child scopes. Nothing else changes a boundary.
+
+**The dap-spike's contribution.** Protocols for split and join, with their
+known weakness stated: a join can block after one side releases and
+before the other activates
+([ordering note](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-14-ordering.md)).
+A planned handover of the writer ran in its fixture
+([ordering report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md)).
+
+### An authoring language
+
+**What it is.** A source form in which an author states roles, readers
+and rules once, and a compiler derives the audiences, the available acts
+and the checks.
+
+**Today.** An author writes a definition as data, and the validator
+bounds it.
+
+**The dap-spike's contribution.** Fifteen ranked directions for such a
+language
+([authoring language directions](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-18-authoring-language-directions.md)),
+and one attempt at a declaration layer that stopped with a
+counterexample: its accepted Sale declaration disclosed one person's
+refused terms to the wrong readers
+([stop report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/lang/REPORT.md)).
+
+## What the dap-spike contributed
+
+The dap-spike was a research experiment, not a product. It built three
+small models (a sale with private offers, a room booking with a clock,
+and a club that admits members by vote) on one foundation, and tried to
+break its own claims. Its results, in one table:
+
+| Question | Result | Report |
+|---|---|---|
+| Do people with different views of one record agree? | Yes, in the Sale and Booking fixtures that ran | [Visibility](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/REPORT.md) |
+| Does privacy survive? | Yes, in those two models | The same |
+| Can a record gain a capability part-way through? | Yes, in the fixtures that ran | The same, and [ordering](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md) |
+| Can an agent write a model within a small repair budget? | No. Sale needed six repairs against a budget of two | [Visibility](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/REPORT.md) |
+| Does Club's original policy for admitting members hold? | No. The failure was kept | [Decision](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-16-club-admission-decision.md) |
+| Does a declaration layer remove the authoring errors? | Not this one. It stopped with a counterexample | [Stop report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/lang/REPORT.md) |
+| Can a duty be declared and checked? | Yes for Sale; Club gave a counterexample | [Obligations](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/T3-OBLIGATIONS-REPORT.md) |
+| Can it run as one process with no outside service? | Yes, in its fixture | [Ordering](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md) |
+| Can a newcomer understand a record from the screen? | Not measured | |
+
+Where dap stands on each idea:
+
+| Idea in the dap-spike | In dap today |
+|---|---|
+| One signed record in one agreed order, with one writer | Each scope is that |
+| An exact retry returns the first receipt | Runs |
+| A result is read from an exact position of another record and is never read live | Runs, as delivery between scopes |
+| A shared constraint has one owner | The form of composition; no declared application shows it yet |
+| A duty with a deadline | Runs, as timed rules and pending duties |
+| Different readers of one record | Not built |
+| A package attached to a running record | Not built |
+| Split, join and handover of the writer | Not built |
+| A personal anchor across records | Not built |
+
+## Source
+
+Written 13 October 2026 against main `d1b845f8` and dap-spike main
+`9d738e2e`. The states come from reading the documentation, the
+definitions and the spike's reports. Nothing was run for this page.
