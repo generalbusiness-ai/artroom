@@ -179,7 +179,8 @@ a target, a field's name, a key or a tool's name, is repeated in the
 message for at most 128 characters, then an ellipsis and its length. The
 whole error result is at most 2 KiB, the smallest tool bound; if the
 message would pass it, only the message is cut, and says so. `error` and
-`next` are always whole.
+`next` stay whole: every next step the server writes is bounded. Only if
+a next step alone passed the bound would it be cut too, with its length.
 
 ### Custody
 
@@ -227,9 +228,12 @@ caller's `idempotencyKey`, in the config directory's
   an outcome. One process at a time breaks it, under a reclaim lock, after
   reading it again; a release removes only the releaser's own holding.
   A reclaim lock is never broken: if the process holding it died, every
-  call that needs that lock is refused as `locked`, naming the reclaim
-  file, until an operator removes it once no process of this
-  `ARTROOM_HOME` runs. Archival reads each record again under its lock and
+  call that needs that lock is refused as `locked` until an operator
+  removes the reclaim file once no process of this `ARTROOM_HOME` runs.
+  The refusal's next step names the file once, whole, relative to
+  `ARTROOM_HOME` (for example
+  `private/mcp-custody/capacity.lease.reclaim`), so its length does not
+  depend on the home's. Archival reads each record again under its lock and
   skips one that is no longer terminal.
 - **Steps with no act.** `prepare` without `kind` sends a capability step
   that has no act, such as hold@1's instance: the step's own intent, kept

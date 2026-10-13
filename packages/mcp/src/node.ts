@@ -24,7 +24,7 @@
 import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { canonicalize, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Signer, Fetch } from "@generalbusiness/artroom-client";
 import { CustodyError, TERMINAL, type CustodyRecord, type CustodyStore, type Outcome } from "./custody.ts";
@@ -118,6 +118,8 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
   const recordPath = (name: string) => join(records, `${id(name)}.json`);
   const lockPath = (name: string) => join(locks, `${id(name)}.lock`);
   const indexPath = join(archives, "index.json");
+  /** A file of this store as an error names it: relative to the store, never the absolute path, whose length the home sets. */
+  const shown = (path: string) => relative(dir, path).split(sep).join("/");
   /** Whole file, owner-only, through a temporary name; then read back and compared. */
   const atomic = (path: string, text: string) => {
     const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
@@ -221,7 +223,7 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
       const held = takeLock(path, { time: new Date(now()).toISOString(), notAfter });
       if (held) return async () => { releaseLock(held); };
       const stale = blockedBy(path);
-      if (stale) throw new CustodyError({ held: "locked", stale });
+      if (stale) throw new CustodyError({ held: "locked", stale: shown(stale) });
       return null;
     },
     exclusive: async <T>(work: () => Promise<T>): Promise<T> => {
@@ -231,7 +233,7 @@ export function fileStore(dir: string, bounds: FileStoreBounds = FILE_STORE_BOUN
       let held = takeLock(path, { time: new Date(now()).toISOString() });
       while (!held) {
         const stale = blockedBy(path);
-        if (stale) throw new CustodyError({ held: "locked", stale });
+        if (stale) throw new CustodyError({ held: "locked", stale: shown(stale) });
         if (Date.now() > until) throw new CustodyError({ held: "locked" });
         await new Promise((resolve) => setTimeout(resolve, 5));
         held = takeLock(path, { time: new Date(now()).toISOString() });

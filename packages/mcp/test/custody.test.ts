@@ -398,7 +398,7 @@ describe("custody keeps the exact envelope under the caller's key", () => {
     writeFileSync(lock, JSON.stringify({ pid: await deadPid(), token: "dead-owner" }));
     writeFileSync(`${lock}.reclaim`, JSON.stringify({ pid: await deadPid(), token: "dead-reclaimer" }));
     const refusal = await custody.keep(identity("blocked"), meaningOf("b"), build("blocked"), notAfter).catch((e: unknown) => e);
-    expect((refusal as CustodyError).why).toEqual({ held: "locked", stale: `${lock}.reclaim` });
+    expect((refusal as CustodyError).why).toEqual({ held: "locked", stale: `locks/${identityId(identity("blocked"))}.lock.reclaim` });
     // An operator removes the dead reclaimer's file: recovery goes on, one process at a time.
     unlinkSync(`${path}.reclaim`);
     const cleared = await Promise.all(Array.from({ length: 4 }, () => child({ op: "lease", dir, path }).done));

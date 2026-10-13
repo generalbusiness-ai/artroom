@@ -1,4 +1,5 @@
-import { mkdtempSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -351,6 +352,45 @@ describe("what a call costs, end to end", () => {
     expect(structured.next).toBe("Call room for the scopes and lanes of the room; give target as a scope ID or a number.");
     expect(structured.message).toMatch(/^Before signing, the server could not resolve the target: w+… \(the sentence is cut here; it had \d+ characters\)$/);
     expect(JSON.parse(got.content[0]!.text)).toEqual(structured);
+  });
+
+  // Invariant: a dead reclaimer under a long ARTROOM_HOME is reported within the error bound: the reclaim file is named once, in
+  // the next step, whole and relative to ARTROOM_HOME, and the absolute path is not in the result. Removing that file recovers.
+  test("a dead reclaimer under a long ARTROOM_HOME: the file named whole, relative, within the bound", async ({ annotate }) => {
+    const deadPid = () => new Promise<number>((resolve) => { const p = spawn(process.execPath, ["-e", ""]); p.on("exit", () => resolve(p.pid!)); });
+    // 24 components of 90 characters: a home of more than 2 KiB, lawful on Linux.
+    const home = join(mkdtempSync(join(tmpdir(), "mcp-home-")), ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}${"h".repeat(88)}`));
+    const custodyDir = join(home, "private", "mcp-custody");
+    mkdirSync(custodyDir, { recursive: true });
+    const lease = join(custodyDir, "capacity.lease");
+    writeFileSync(lease, JSON.stringify({ pid: await deadPid(), token: "dead-owner" }));
+    writeFileSync(`${lease}.reclaim`, JSON.stringify({ pid: await deadPid(), token: "dead-reclaimer" }));
+    const s = roomOf("admin", [issueDemo], { custody: fileStore(custodyDir) });
+    await s.service.page();
+    const got = await counted(s, () => s.service.call("issue.comment", { target: 1, fields: { body: "Blocked." }, idempotencyKey: "long-home" }));
+    const structured = got.result.structuredContent as { error: string; message: string; next: string };
+    expect([got.result.isError, structured.error]).toEqual([true, "custody"]);
+    expect(got.bytes).toBeLessThanOrEqual(Math.min(ERROR_BYTES, BOUNDS.act));
+    expect(structured.next).toBe("Once no process of this ARTROOM_HOME runs, remove the file private/mcp-custody/capacity.lease.reclaim, relative to ARTROOM_HOME, then call again with the same idempotencyKey.");
+    expect(structured.message).not.toContain("capacity.lease.reclaim");
+    expect(JSON.stringify(got.result)).not.toContain("h".repeat(88));
+    expect(got.requests.filter((r) => r.startsWith("POST"))).toEqual([]);
+    // The operator removes the file the next step names, under the home: the call goes on.
+    unlinkSync(join(home, "private", "mcp-custody", "capacity.lease.reclaim"));
+    const after = await s.service.call("issue.comment", { target: 1, fields: { body: "Recovered." }, idempotencyKey: "long-home" });
+    expect(after.structuredContent["answer"], JSON.stringify(after.structuredContent)).toBe("accepted");
+    await annotate(`a dead reclaimer under a home of ${home.length} characters: an error of ${got.bytes} bytes`);
+  });
+
+  // Invariant: were a finding's next step itself past the bound, the result still fits: the sentence is cut away, and the next
+  // step is cut to fit, with its length.
+  test("a next step past the bound is cut, and the result still fits", () => {
+    const got = failed({ error: "custody", state: "locked", key: "k", scope: "s", stale: "x".repeat(5000) });
+    const structured = got.structuredContent as { error: string; message: string; next: string };
+    expect(new TextEncoder().encode(JSON.stringify(got)).length).toBeLessThanOrEqual(ERROR_BYTES);
+    expect(structured.error).toBe("custody");
+    expect(structured.message).toMatch(/^… \(the sentence is cut here; it had \d+ characters\)$/);
+    expect(structured.next).toMatch(/^Once no process of this ARTROOM_HOME runs, remove the file private\/mcp-custody\/x+… \(the next step is cut here; it had \d+ characters\)$/);
   });
 
   // Invariant: nothing valid is dropped to fit a bound: a live item larger than a page is served alone and whole, a continuation

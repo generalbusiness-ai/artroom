@@ -103,17 +103,25 @@ const ok = (structured: Record<string, unknown>, bound: number = BOUNDS.act): Ca
 export const ERROR_BYTES = Math.min(...Object.values(BOUNDS));
 /**
  * An error result. Its whole serialized size is held within ERROR_BYTES: when the sentence would pass it, only the sentence
- * is cut, and says so; the error's kind and its next step are always whole.
+ * is cut, and says so; the error's kind and its next step stay whole. Every next step the server writes is bounded (a file it
+ * names is relative to ARTROOM_HOME), so the last check, on the result with no sentence at all, holds for each of them; were
+ * one ever longer, the next step would be cut to fit, with its length, rather than the result pass its bound.
  */
 export const failed = (f: Finding): CallResult => {
   const said = finding(f);
-  const result = (message: string): CallResult => { const structured = { error: said.error, message, next: said.next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
+  const result = (message: string, next: string = said.next): CallResult => { const structured = { error: said.error, message, next }; return { content: [{ type: "text", text: text(structured) }], structuredContent: structured, isError: true }; };
   const whole = result(said.sentence);
   if (bytesOf(whole) <= ERROR_BYTES) return whole;
-  const cut = (n: number) => { const end = /[\uD800-\uDBFF]/.test(said.sentence[n - 1] ?? "") ? n - 1 : n; return result(`${said.sentence.slice(0, end)}… (the sentence is cut here; it had ${said.sentence.length} characters)`); };
-  let lo = 0, hi = said.sentence.length;
-  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (bytesOf(cut(mid)) <= ERROR_BYTES) lo = mid; else hi = mid - 1; }
-  return cut(lo);
+  const fit = (full: string, make: (part: string) => CallResult, says: (length: number) => string): CallResult => {
+    const cut = (n: number) => { const end = /[\uD800-\uDBFF]/.test(full[n - 1] ?? "") ? n - 1 : n; return make(`${full.slice(0, end)}… ${says(full.length)}`); };
+    let lo = 0, hi = full.length;
+    while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (bytesOf(cut(mid)) <= ERROR_BYTES) lo = mid; else hi = mid - 1; }
+    return cut(lo);
+  };
+  const cutNote = (n: number) => `(the sentence is cut here; it had ${n} characters)`;
+  if (bytesOf(result("")) <= ERROR_BYTES) return fit(said.sentence, (m) => result(m), cutNote);
+  const message = `… ${cutNote(said.sentence.length)}`;
+  return fit(said.next, (n) => result(message, n), (n) => `(the next step is cut here; it had ${n} characters)`);
 };
 
 /**
