@@ -364,7 +364,7 @@ created scope; value `definition`, its digest).
 | Item of the request | What changed | Witness |
 |---|---|---|
 | 1. Hold the directory's applications | `inventory.ts` reads the directory's `application` items from the directory summary it already reads, and holds each one in state `created` whose `scope` is set, as place `application` under the directory's membership, as lanes are held. Its act tools derive from its pinned definition as from any held scope's | `counter.scope.test.ts`: after `application.create`, the list holds `counting.join`, `counting.start`, `counting.spoken` and `counting.leave`, with no configuration |
-| 2. `room` and `inspect` | `room` lists the applications beside the lanes, each with its definition name, digest, scope and state, paged with the other collections within 8 KiB; an application not yet created, or refused, is listed with no scope and holds no tools. `inspect` reads one by its scope ID. The `room` tool's description names the applications | `counter.scope.test.ts`: `room` lists `{ definition: "counting", digest, scope, state: "created" }`; `inspect` by scope ID. `budget.test.ts`: 60 lanes, 30 applications and 40 roots in 6 pages, each within 8 KiB (observed) |
+| 2. `room` and `inspect` | `room` lists the applications beside the lanes, each with its definition name, digest, scope and state, paged with the other collections within 8 KiB; an application still being created is listed as `creating`, with no scope and no tools, and a refused or conflicted creation, final, is not listed, because `room` reads only the directory's live items (corrected in review 2150a3ac). `inspect` reads one by its scope ID. The `room` tool's description names the applications | `counter.scope.test.ts`: `room` lists `{ definition: "counting", digest, scope, state: "created" }`; `inspect` by scope ID. `budget.test.ts`: 60 lanes, 30 applications and 40 roots in 6 pages (owner-observed; the test asserts more than one), each within 8 KiB. That case proves totals and the bound, not inter-page consistency; the continuation witness of review 2150a3ac does |
 | 3. `wait` sees a new application | Nothing to change: `wait` on the directory after `application.create` (the directory's `establish-application`) already reports the created scope with its definition, as it reports a created lane | `counter.scope.test.ts`: each story takes the Counter's scope from `wait`'s created list and from `room`, and they agree |
 | 4. Hand-configured roots | A root configured with `--scope` stays supported for scopes outside the repository. A root that is also one of the directory's applications is skipped as a root: held once, as the application, and listed once | `counter.scope.test.ts`: with the Counter also written as a root, `room` lists it once among the applications and not among the roots, and the list has one `counting.join`. Writing a root is a configuration change, which the generation counts, as for any root |
 | 5. The generation | `generationOf` includes the held applications, each as its scope and digest. An application is held only once created, so a new one changes the generation once | `counter.scope.test.ts`: a subscribed client is told once of a new application (observed: once), and the generation differs before and after |
@@ -375,14 +375,25 @@ initialized: in the default mode `room`, `counting.join`, `inspect`,
 `counting.start`, `inspect`, `counting.spoken`, `inspect`,
 `counting.leave`: 8 calls; in `--generic` mode `room`, `actions`, `act`,
 `inspect`, `act`, `inspect`, `act`, `inspect`, `act`: 9 calls. The story
-asserts the tools and the count against the docs' table in each mode. This
+asserts the tools and the count against the docs' table in each mode. The
+counts cover the operational window, from finding the Counter to leaving,
+after the room's setup and the board's initialization; the story's final
+reading of the steps is not counted. The `--generic` story's taker is a
+second connection that shares Rita's key and configuration, not an
+independently admitted member. This
 recipe has its own section, after the W1 inventory, because the W1 recipe
 test runs one room of the default cohort, and a Counter needs the
 application cohort; its witness is the Counter story.
 
-**Observed figures of this head.** Reads per tool are unchanged; the
-applications come from the directory summary that `room` and the list
-already read. `room`'s warm response is 3,874 bytes, 38 more than before
+**Observed figures of this head.** The warm reads per tool are unchanged
+in the measured context, a room with no applications: the application
+rows come from the directory summary that `room` and the list already
+read. That holds for the warm context only. The first time the server
+sees an application it reads that scope's summary for its pin, and its
+definition's bytes once per digest; both are kept. Matching roots and
+applications against the held scopes was a scan per row (on the order of
+R*S + A*(S+D) comparisons for R roots, A applications, S held scopes and
+D active definitions); since review 2150a3ac those lookups use maps. `room`'s warm response is 3,874 bytes, 38 more than before
 (the empty `applications` section, in the text and the structured
 content). The list is 58 bytes larger for every role (and 9 to 11 tokens
 more, proxy), from the `room` description: demo room, admin 146,531 bytes
@@ -404,6 +415,25 @@ main's version of every path this head does not change. `git diff
 `packages/mcp/test/support/catalogue.ts`, `docs/mcp.md`,
 `docs/mcp-tools.json` and this note.
 
+### Corrections of review 2150a3ac
+
+Main moved again after `765c4eb9`: the Start source, the self-host guide,
+the SDK Counter tutorial, the hosted MCP endpoint design note (Draft 5),
+the logo head and the 15:00 sprint report, 50 commits to `d3f5aa74`. It
+was merged with `git merge origin/main` at `580e05d5`, with no conflict,
+taking main's version of every path this head does not change. At this
+head `git diff --name-only origin/main...HEAD` lists the same 9 paths as
+above, all this head's own, and `git diff --name-only origin/main HEAD`
+lists no other path.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| P2. `room`'s continuation depended on the tool list's generation | `room`'s cursor holds a digest of its collections as laid out (every entry of lanes, applications including `creating` rows, roots, standing, active definitions, act tools not held and scopes not read, in order) and an index, and no longer the generation. A continuation whose layout no longer holds is answered with the first page and `restarted: "The room's collections changed since the cursor was made; this page restarts at the first entry."`. The tool list's generation, and its one change per created application, are unchanged; no `creating` or final row enters it | `budget.test.ts`, "room's continuation across a creating, a created and a refused application": a real continuation inside the roots; a `creating` application added with the generation unchanged (asserted); the continuation restarts, and the walk from the restart returns all 40 roots once, each page within 8 KiB; the same after the application is created, and after a second one is refused and leaves the live items; with nothing moved, a continuation goes on with no restart (observed). With the old cursor the first continuation did not restart (observed: `restarted` undefined) |
+| P3. Rows `room` lists | Creating rows are listed as such, with no scope; refused and conflicted rows are final, are not in the live summary, and are not listed. The note's item 2 and `docs/mcp.md` say so; no retained traversal is added | `budget.test.ts` above: the refused application is absent from the walk |
+| P3. "Reads per tool are unchanged" | Qualified as the warm, application-free context; first-seen pins and definition bytes stated. `room` looks held scopes and active names up in maps, and the inventory looks application scopes up in a set, in place of a scan per row | `docs/mcp.md` after the warm reads table; this note |
+| P3. The recipe's window and the `--generic` taker | The 8 and 9 calls cover finding the Counter to leaving, after setup and initialization, and exclude the final reading of the steps; the `--generic` taker shares Rita's key and configuration | `docs/mcp.md`, "Taking part in a Counter"; this note |
+| P3. "Six pages" | Stated as owner-observed; the test asserts more than one page | `docs/mcp.md`; this note |
+
 **What ran in this head.**
 
 | Command | Result |
@@ -413,6 +443,8 @@ main's version of every path this head does not change. `git diff
 | `npx vitest run --project mcp --reporter=verbose` | `Tests  73 passed (73)` |
 | `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Test Files  7 passed (7)`, `Tests  14 passed (14)` |
 | `node --test scripts/active-source.test.mjs` | `# pass 7`, `# fail 0` |
+| After the corrections of review 2150a3ac: `npx vitest run --project mcp packages/mcp/test/budget.test.ts -t "continuation across"`, with `service.ts` as before the fix | `Tests  1 failed \| 16 skipped (17)`: `creating: expected undefined to be 'The room's collections changed since…'` |
+| The same tree, with the fix: `npx vitest run --project mcp --reporter=verbose`; `npx vitest run --project scope packages/mcp/test --reporter=verbose` | `Tests  74 passed (74)`; `Test Files  7 passed (7)`, `Tests  14 passed (14)`. The figures above are unchanged in this run (observed) |
 | `npm run gate`, once, at `35d48657` on main `765c4eb9` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1126 passed \| 2 skipped (1132)`, `Test Files  2 failed \| 199 passed \| 1 skipped (202)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure described in "The T36 checkers failure in the cloud", all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. The long-`ARTROOM_HOME` witness runs here, on Linux (it passed in this head's verbose run of the mcp project), and is skipped on Darwin. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
 ## The SDK choice
