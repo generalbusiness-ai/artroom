@@ -95,3 +95,53 @@ test("optional prototype names left out stay out, through act", async () => {
     expect(((await rita.ok("inspect", { scope: root }))["items"] as { type: string }[]).filter((i) => i.type === "jar")).toEqual([]);
   } finally { room.done(); }
 }, 120_000);
+
+// Invariant: an act's subjects are resolved from the fields the scope will read, defaults applied, while the intent signs the
+// fields as given. Through act: a selector left out whose default selects the also item is accepted, with the field absent from
+// the intent and the alias's expected revision present; an envelope kept with that revision is refused revision-moved once the
+// selected item moves; an explicit selector overrides the default; and a selector left out with no default signs no alias.
+test("a defaulted selector: the alias's revision follows the default, the field stays unsigned", async () => {
+  const room = mcpRoom();
+  try {
+    const rita = await pantryRoom(room, "add");
+    const root = 1;
+    const viaAct = async (kind: string, args: Record<string, unknown>) => {
+      const acts = await rita.ok("actions", { scope: root });
+      return accepted(room, rita, "act", { target: root, kind, digest: acts["digest"], ...args });
+    };
+    const intentOf = async (done: Record<string, unknown>) => ((await rita.ok("step", { scope: root, seq: (done["fact"] as FactRef).seq }))["entry"] as { input: { signed: { intent: { fields: Record<string, unknown>; expected: Record<string, unknown> } } } }).input.signed.intent;
+    const live = async () => (await rita.ok("inspect", { scope: root }))["items"] as { id: number; type: string; revision: number }[];
+
+    await viaAct("fill", { fields: JSON.parse('{ "__proto__": "jam", "label": { "__proto__": "red" } }'), idempotencyKey: "fill-1" });
+    await viaAct("fill", { fields: JSON.parse('{ "__proto__": "honey", "label": { "__proto__": "gold" } }'), idempotencyKey: "fill-2" });
+    const before = await live();
+    const shelf = before.find((i) => i.type === "shelf")!;
+    const [first, second] = before.filter((i) => i.type === "jar");
+    expect(first!.id, "the definition's default selects the first jar").toBe(2);
+
+    // The selector left out: the default selects jar 2; the intent carries no jar, and expects jar 2's revision.
+    const omitted = await intentOf(await viaAct("recheck", { on: shelf.id, fields: { title: "Defaulted" }, idempotencyKey: "recheck-default" }));
+    expect([Object.hasOwn(omitted.fields, "jar"), own(omitted.expected, "__proto__"), Object.keys(omitted.expected).sort()]).toEqual([false, first!.revision, ["__proto__", "on"]]);
+
+    // An explicit selector overrides the default: jar `second` is expected.
+    const shelfNow = (await live()).find((i) => i.type === "shelf")!;
+    const overridden = await intentOf(await viaAct("recheck", { on: shelfNow.id, fields: { jar: second!.id, title: "Overridden" }, idempotencyKey: "recheck-override" }));
+    expect([own(overridden.fields, "jar"), own(overridden.expected, "__proto__")]).toEqual([second!.id, second!.revision]);
+
+    // An envelope kept with the default's revision, then the selected jar moves: the kept envelope is refused revision-moved.
+    const acts = await rita.ok("actions", { scope: root });
+    const kept = await rita.ok("prepare", { resource: root, capability: "hold@1", step: "stage", target: root, kind: "recheck", digest: acts["digest"], on: (await live()).find((i) => i.type === "shelf")!.id, fields: { title: "Kept" }, idempotencyKey: "recheck-moved" });
+    expect((kept["act"] as { phase: string }).phase).toBe("prepared");
+    const r0 = (await live()).find((i) => i.id === first!.id)!.revision;
+    await viaAct("shake", { on: first!.id, fields: { note: "shaken" }, idempotencyKey: "shake" });
+    expect((await live()).find((i) => i.id === first!.id)!.revision, "the jar's revision moved").toBe(r0 + 1);
+    const moved = await rita.ok("act", { target: root, kind: "recheck", digest: acts["digest"], on: (await live()).find((i) => i.type === "shelf")!.id, fields: { title: "Kept" }, idempotencyKey: "recheck-moved" });
+    expect([moved["answer"], moved["reason"]], JSON.stringify(moved)).toEqual(["refused", "revision-moved"]);
+
+    // A selector left out with no default: no alias is bound, and none is expected.
+    const glanced = await rita.ok("act", { target: root, kind: "glance", digest: acts["digest"], on: (await live()).find((i) => i.type === "shelf")!.id, fields: { title: "Glanced" }, idempotencyKey: "glance" });
+    expect(glanced["answer"], JSON.stringify(glanced)).toBe("accepted");
+    const glance = await intentOf(glanced);
+    expect([Object.hasOwn(glance.fields, "jar"), Object.keys(glance.expected)]).toEqual([false, ["on"]]);
+  } finally { room.done(); }
+}, 120_000);

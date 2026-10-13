@@ -23,7 +23,7 @@ import { answered, clip, finding, type Finding } from "./errors.ts";
 import { Kept, definitionOf, readInventory, type ConfigPort, type McpConfig, type Read_, type Root } from "./inventory.ts";
 import { KIB, bytesOf, cursorOf, fromCursor, pageBy, sliceText } from "./paging.ts";
 import { Reads } from "./reads.ts";
-import { Unshaped, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
+import { Unshaped, effectiveFields, expectedOf, needsOn, shapeFields, shapePresented, valuePlaces } from "./shape.ts";
 import { WORDS, type Words } from "./words.ts";
 
 export interface ServerPort {
@@ -405,7 +405,8 @@ export class McpService {
         if (values.some((v) => valueDigest(place.domain, v) === place.digest)) continue;
         values.push(await this.#valueBytes(s, place));
       }
-      const expected = expectedOf(act, items, on as number | null, shaped.fields);
+      // The subjects are resolved from the fields the scope will read, defaults applied; the intent signs the fields as given.
+      const expected = expectedOf(act, items, on as number | null, effectiveFields(act, shaped.fields));
       const signed = await signedIntent(this.#port.signer, { to: summary.scope, kind, on: on as number | null, fields: shaped.fields, expected }, { idempotencyKey: key as string, now: this.#now() });
       const beside: Beside = { ...(shaped.texts.length > 0 ? { texts: shaped.texts } : {}), ...(Object.keys(presented).length > 0 ? { presented } : {}), ...(values.length > 0 ? { values } : {}) };
       return { binding: { definition: definition.name, kind, declaration, pinned: summary.definition }, envelope: { signed, beside } };
@@ -840,7 +841,7 @@ export class McpService {
     const meaning = meaningOf({ join: textDigest(canonicalize(link as never)) });
     const build = async () => ({
       binding: { definition: "platform:membership", kind: "join", declaration: declarationDigest(membershipData!, "join", named), pinned: named },
-      envelope: { signed: await signedIntent(this.#port.signer, { to: M, kind: "join", fields, expected: expectedOf(act, [], null, fields) }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
+      envelope: { signed: await signedIntent(this.#port.signer, { to: M, kind: "join", fields, expected: expectedOf(act, [], null, effectiveFields(act, fields)) }, { idempotencyKey: key as string, now: this.#now() }), beside: {} } as Envelope,
     });
     const notAfter = timeOf(this.#now() + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     const kept = await this.custody.send(identity, meaning, build, async (envelope) => {

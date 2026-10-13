@@ -156,6 +156,20 @@ export function expectedOf(act: ActLike, items: readonly Item[], on: number | nu
   return expected;
 }
 
+/**
+ * The fields as the scope will read them, for resolving the act's subjects only: each declared field the caller gave, else its
+ * declared default, as derive's readFields reads them (an own value, else `default`; an absent optional with no default stays
+ * absent). It is never signed: the intent carries the fields as given, so the scope applies its defaults itself.
+ */
+export function effectiveFields(act: ActLike, fields: Readonly<Record<string, FieldValue>>): Record<string, FieldValue> {
+  const out: Record<string, FieldValue> = {};
+  for (const [name, type] of Object.entries(act.fields)) {
+    const value = Object.hasOwn(fields, name) ? ownValue(fields, name) : type["default"];
+    if (value !== undefined) put(out, name, value as FieldValue);
+  }
+  return out;
+}
+
 /** The fields of an act that name a value beside the intent, with the domain each states. */
 export function valuePlaces(act: ActLike, fields: Readonly<Record<string, FieldValue>>): { name: string; domain: string; digest: string }[] {
   const out: { name: string; domain: string; digest: string }[] = [];
