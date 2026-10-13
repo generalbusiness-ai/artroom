@@ -6,9 +6,6 @@ the repository's remote, and what is not built yet.
 
 ## How a register chooses its host
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 The operator names the host when installing the register:
 
 ```
@@ -54,8 +51,10 @@ What it needs:
   | `credentialIdentity` | `adapter-attempt`. |
 
   A missing, malformed or extra field turns the port off.
-  A namespace other than `artroom-demo` also turns it off before any service
-  call; the binding supplies that one namespace.
+  The namespace must match the independent `ARTIFACTS_NAMESPACE` deployment
+  variable and the namespace of the `ARTIFACTS` binding. If that variable is
+  absent, the original `artroom-demo` namespace remains the default. A mismatch
+  turns the port off before any service call. See [self-host.md](self-host.md).
 
 What it does:
 

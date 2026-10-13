@@ -1,8 +1,5 @@
 # The dap command
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 `dap` is a command-line client for the new model. Each command is a
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
@@ -132,7 +129,7 @@ and a deployed service that supports all six exact application pins:
 dap install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
 # Configure that host's registerScope with the printed planned ID.
 dap install --planned --cohort application
-dap claim <label> --handle @operator
+dap create <label> --handle @operator
 ```
 
 Keep the operator key and pending envelopes in that private directory;
@@ -184,9 +181,14 @@ retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
 independent Source review are still required for this successor.
 
-**`dap claim <name> [--handle @you] [--branch main] [--again]`**
-signs the register's `found` act. It then waits until the directory,
-membership, the rules scope and the destination are created and
+**`dap create <name> [--handle @you] [--branch main] [--again]`**
+
+`found` remains an alias for one release and prints `dap create` as the new
+command name. The existing `claim` command remains compatible with retained
+workflows. All three commands use the same creation and recovery code.
+
+The command signs the register's recorded `found` act. It waits until the
+directory, membership, the rules scope and the destination are created and
 confirmed. Then it takes the founder's seat and first key in membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
@@ -200,10 +202,10 @@ a later run keeps the same signature and deadline. An accepted marker is
 checked against the receipt for that exact envelope before reuse.
 
 ```
-Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
+Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `dap claim <name>` again to continue the saved claim. The command
+Run `dap create <name>` again to continue the saved claim. The command
 reads or retries the exact saved steps, then waits for their confirmed
 scopes. It checks child identities against the actual directory seed and
 full reference. It does not extend a saved deadline or invent a replacement
@@ -219,7 +221,7 @@ when deliberately starting another claim. An expired envelope stays saved
 until this explicit replacement.
 
 ```
-Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
+Created demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
 You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 ```
 
@@ -233,7 +235,7 @@ Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
 Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
 ```
 
-**`dap join <link>`** is membership's `join`, signed by a new key
+**`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
 is absent from public config. It saves the accepted fact and inbox progress
@@ -247,6 +249,28 @@ link stops the retry; it never signs a replacement automatically.
 Joined as @una on key key_H1bY2Hml....
 Your inbox: sc_zbtu7vax....
 ```
+
+**`dap join <artroom-agent-key:…>`** enrolls a genuine agent key with
+membership's `enrol`. A verified room controller first creates an agent
+member with `add-member`, then invites its key with `invite-key`. The private
+handoff carries that invitation and full native references. It carries no
+signing key. A person invitation with the role `agent` is still a person;
+it cannot substitute for this agent-key protocol.
+
+Use a separate empty owner-only `ARTROOM_HOME` for the receiving agent. The
+command generates and retains an independent key and saves the exact private
+enrollment envelope before delivery. After an unknown answer, use the same
+link with `--check` to settle and follow the original without submitting a
+mutation. Run the same command without `--check` only to Continue explicitly.
+It retains the original signature, idempotency key and deadline.
+
+The command saves a usable connection only after it verifies the accepted
+enrollment, genuine agent and key kinds, controller, recorded directory
+siblings, and active inbox incarnation. A missing private request, changed
+link, person/agent mismatch or definite native refusal keeps the original;
+it does not generate a replacement key or request. Existing `artroom-invite:`
+links and pending person joins retain their original behavior. Treat either
+invitation link as private.
 
 **`dap acts [<scope>]`** lists the acts of the scope's definition
 that the caller's role holds now, with each act's fields. The role and

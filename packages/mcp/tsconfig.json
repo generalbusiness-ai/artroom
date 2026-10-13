@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "resolveJsonModule": true,
+    // The server runs under Node and in the Workers runtime; `node.ts` is Node's alone.
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src", "src/words.json"]
+}

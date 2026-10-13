@@ -1,6 +1,6 @@
 # dap
 
-A programmable coordination fabric for people and agents.
+A durable action platform for people and agents.
 
 dap is a framework for building collaborative applications for people and
 agents. It is based on an event-sourced actor model. You write an
@@ -47,6 +47,9 @@ a room with an invitation link from one of its members, or with the
 configuration file and key of a member who has already joined.
 
 ## Where to read next
+
+- [Run dap in 10 minutes](docs/self-host.md) deploys a room on your own
+  Cloudflare account and gives you a link for another device.
 
 - [What is dap?](docs/what-is-dap.md) explains the framework, the actor
   model and the applications.
