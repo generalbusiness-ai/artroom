@@ -131,7 +131,8 @@ test("a defaulted selector: the alias's revision follows the default, the field 
     // An envelope kept with the default's revision, then the selected jar moves: the kept envelope is refused revision-moved.
     const acts = await rita.ok("actions", { scope: root });
     const kept = await rita.ok("prepare", { resource: root, capability: "hold@1", step: "stage", target: root, kind: "recheck", digest: acts["digest"], on: (await live()).find((i) => i.type === "shelf")!.id, fields: { title: "Kept" }, idempotencyKey: "recheck-moved" });
-    expect((kept["act"] as { phase: string }).phase).toBe("prepared");
+    // prepare keeps the envelope only: pantry declares no capability, so the step is refused and no hold stage is accepted.
+    expect([(kept["act"] as { phase: string }).phase, (kept["step"] as { answer: { answer: string; reason: string } }).answer]).toMatchObject(["prepared", { answer: "refused", reason: "bad-field" }]);
     const r0 = (await live()).find((i) => i.id === first!.id)!.revision;
     await viaAct("shake", { on: first!.id, fields: { note: "shaken" }, idempotencyKey: "shake" });
     expect((await live()).find((i) => i.id === first!.id)!.revision, "the jar's revision moved").toBe(r0 + 1);
@@ -174,7 +175,8 @@ test("a local fact selects the also item: the fact signed as given, the alias's 
     const acts = await rita.ok("actions", { scope: root });
     const args = { target: root, kind: "verify", digest: acts["digest"], on: await shelf(), fields: { jarFact: fill, title: "Kept" }, idempotencyKey: "verify-moved" };
     const kept = await rita.ok("prepare", { resource: root, capability: "hold@1", step: "stage", ...args });
-    expect((kept["act"] as { phase: string }).phase).toBe("prepared");
+    // prepare keeps the envelope only: pantry declares no capability, so the step is refused and no hold stage is accepted.
+    expect([(kept["act"] as { phase: string }).phase, (kept["step"] as { answer: { answer: string; reason: string } }).answer]).toMatchObject(["prepared", { answer: "refused", reason: "bad-field" }]);
     const before = (await live()).find((i) => i.id === jar.id)!.revision;
     await viaAct("shake", { on: jar.id, fields: { note: "shaken" }, idempotencyKey: "shake" });
     expect((await live()).find((i) => i.id === jar.id)!.revision, "the jar's revision moved").toBe(before + 1);

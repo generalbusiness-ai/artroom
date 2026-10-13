@@ -224,6 +224,31 @@ the items the act names with those defaults applied.
 While writing the witness, a transition with no effects was observed not
 to move its item's revision, so `shake` writes a value.
 
+## Corrections of review c790797b
+
+Main had not moved: `git fetch origin && git merge --no-edit origin/main`
+found it still at `b69ee8ef` and made no merge. At this round's head `git
+diff --name-only origin/main...HEAD` lists 61 paths, every one of them the
+branch's own (this round added `packages/mcp/test/shape.test.ts`), and `git
+diff --name-only origin/main HEAD` lists no other path. Both of the
+planner's amendments are kept.
+
+| Item | What changed | Witness |
+|---|---|---|
+| P2. A local fact selects its `also` item | `effectiveFields` takes the target scope and, after applying defaults, reads each local fact (one whose scope and incarnation are the target's) as its `seq`, in a declared fact field and in the lists and records that hold one, as derive's `readFacts` puts it in normal form. A foreign fact, of another scope or another incarnation, stays a fact, so its `seq` never names a local item. The server does not verify the fact's hash; the scope does, and refuses `fact-mismatch` for a wrong one. The intent still signs the fact as given, and the meaning's digest is still over the fields as given | `proto.scope.test.ts`, "a local fact selects the also item", on the real test Worker through the generic `act` tool, with `pantry`'s new `verify` (an `also` item `selected` by a required fact field `jarFact` of kind `fill`). Observed in this round: `verify` given the fill that opened jar 2 is accepted, with that exact fact in the signed fields and `expected` holding `on` and `selected` at the jar's revision; an envelope kept by `prepare`, sent after `shake` moved the jar, is refused `revision-moved`. With the old view, observed: `verify` refused `bad-intent`. `shape.test.ts`: a local fact read as its `seq` in a field and a list, a foreign fact with the same `seq` and a fact of another incarnation of the same scope left as facts and selecting nothing, and the given fields unchanged |
+
+**What the kept envelopes show.** In this witness and in the defaulted
+selector's of review 16fcc428, `prepare` is used only to keep an envelope
+signed with the selected item's revision at that moment. Its capability
+step is answered `refused` (`bad-field`), which both tests now assert:
+`pantry` declares no capability, and no hold stage is accepted. The witnesses cover the kept envelope and
+its later refusal as `revision-moved`, not an accepted native hold stage;
+the room story's accepted `hold@1` workflow is the witness of that.
+
+The defaults witness of review 16fcc428 is unchanged. `docs/mcp.md`'s
+paragraph on the act input now says a local fact is read as its entry's
+position when the server resolves the items an act names.
+
 **Paths that differ from main.** After the third merge, and at the head of
 the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
 60 files, all this branch's own: the 44 files of `packages/mcp` (this
@@ -279,6 +304,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| `npx vitest run --project mcp`, after the item of review c790797b | `Tests  73 passed (73)` |
+| `npx vitest run --project scope packages/mcp/test`, after the item of review c790797b, again with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  12 passed (12)` |
 | `npx vitest run --project mcp`, after the item of review 16fcc428 | `Tests  72 passed (72)` |
 | `npx vitest run --project scope packages/mcp/test`, after the item of review 16fcc428, again with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  11 passed (11)` |
 | `npx vitest run --project mcp`, after each item of review f7a8d2d4 | `Tests  72 passed (72)` after the P2 and P3(b), and again after P3(a) (the budget file alone: `Tests  16 passed (16)`) |
@@ -351,8 +378,8 @@ under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
 wording of `items` changed: 63 bytes more per list than before. The runs
-of the rounds of reviews ad2576fb, 6a86304e, f7a8d2d4 and 16fcc428 gave
-the same figures.
+of the rounds of reviews ad2576fb, 6a86304e, f7a8d2d4, 16fcc428 and
+c790797b gave the same figures.
 
 ### Reads per tool
 
@@ -389,10 +416,10 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in the round of review 16fcc428. The second member's request count
+Worker, in the round of review c790797b. The second member's request count
 varies between runs with the timing of `wait`'s polls: in the default mode
-286, 288, 288, 286 and 286, and in `--generic` 283, 283, 281, 283 and 281,
-in the runs of the last five rounds.
+286, 288, 288, 286, 286 and 286, and in `--generic` 283, 283, 281, 283, 281
+and 281, in the runs of the last six rounds.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|

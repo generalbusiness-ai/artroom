@@ -175,8 +175,10 @@ guard, the guard's sentence, and a next step.
 
 A field left out is left out of the intent: the scope applies the field's
 declared default itself. The server reads the revisions of the items the
-act names from the same fields with those defaults applied, so an item a
-default selects is expected like one the caller named.
+act names from the same fields with those defaults applied, and with a
+fact of the target scope read as its entry's position, as the scope reads
+it. So an item a default selects, or one a local fact selects, is expected
+like one the caller named by its ID. The intent carries the fact as given.
 
 An error the server finds itself (a shape, a target, custody, a read) is
 `error`, `message` and `next`. A fragment of what the caller gave, such as
