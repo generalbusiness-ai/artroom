@@ -1,11 +1,12 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Entry, type FieldValue, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/dap-derive";
+import { MemoryState, PROFILES, clockOf, judgeGenesis, judgeOutcome, validateDefinition } from "@generalbusiness/dap-derive";
 import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
-import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/dap-platform";
+import { DEMO_REGISTER, WEB_DEMO_REGISTER, DESTINATION, DIRECTORY, REGISTER, directoryIdOf, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../platform/test/support-founding.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
+import { outsideOf } from "../src/worker.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import { NO_OUTSIDE, type EffectRequest } from "../src/operations.ts";
 import { found } from "./support.ts";
@@ -22,12 +23,16 @@ const bindings = (registerScope: ScopeId): GitHubBindings => ({ GITHUB_APP_CONFI
 
 /** Real register judgments in memory, with real private SQLite supplied by a test Durable Object.
  * HTTP below is a STAND-IN; no GitHub App, repository or credential is created. */
-function registerFixture(installKey = "install") {
-  const register = new Ledger(registerDefinition, "platform:register");
+function registerFixture(installKey = "install", demo: typeof DEMO_REGISTER | typeof WEB_DEMO_REGISTER | false = false) {
+  const checked = demo ? validateDefinition(platform(demo)!.data, PROPOSED_BOUNDS, PROFILES, { platform: true }) : null;
+  if (checked && !checked.ok) throw new Error("Demo definition did not validate");
+  const definition = checked?.ok ? checked.definition : registerDefinition;
+  const rules = demo ? { named: demo, rules: platform(demo)!.rules } : registerPlatform;
+  const register = new Ledger(definition, "platform:register");
   const intent = installing(paul, "keys", [rita.key]).intent;
-  const install = signIntent({ ...intent, idempotencyKey: installKey, fields: { ...intent.fields, host: "github.com", namespace: ACCOUNT.login } }, paul.secret);
-  const seed: Seed = { v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
-  const genesis = judgeGenesis(register.state, registerDefinition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: registerPlatform });
+  const install = signIntent({ ...intent, idempotencyKey: installKey, fields: demo ? { host: "github.com", namespace: ACCOUNT.login, policy: "open", purpose: "demo-start" } : { ...intent.fields, host: "github.com", namespace: ACCOUNT.login } }, paul.secret);
+  const seed: Seed = { v: 1, kind: "register", definition: demo ? demo : REGISTER, creator: null, cause: intentDigest(install.intent), ordinal: 0 };
+  const genesis = judgeGenesis(register.state, definition, { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(7)), seed, founding: install }, { clock: clockOf(register.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: null, platform: rules });
   expect(genesis.result).toBe("write");
   if (genesis.result === "write") register.seal(genesis.draft);
   const given: OutsideGiven = {
@@ -36,7 +41,7 @@ function registerFixture(installKey = "install") {
     clock: { read: () => register.now }, random: { bytes: (length) => new Uint8Array(length) },
   };
   const claim = () => {
-    const found = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }, { platform: registerPlatform, grants: [] });
+    const found = register.act(rita, "found", { expected: { register: register.item(0).revision }, fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } }, { platform: rules, grants: [] });
     expect(found.result).toBe("write");
     const operation = register.state.operation("1:0")!;
     return { scope: register.at, operation: operation.id, attempt: 1, owner: operation.owner, kind: operation.kind, origin: register.own(1)! } satisfies EffectRequest;
@@ -155,6 +160,64 @@ test("absent, malformed or contradictory configuration disables effects, and abs
       expect(outside).toBe(NO_OUTSIDE);
       expect(await outside.send(request)).toBeNull();
     }
+    // The demo opt-in binds the real native demo pin AND this runtime identity.
+    // The original register remains bound when demo configuration is unusable.
+    const demo=registerFixture("TEST demo adapter",DEMO_REGISTER), demoRequest=demo.claim();
+    const deployment="TEST authorized demo deployment";
+    const demoConfig={v:1,origin:"https://artroom-rehearsal.inguz.workers.dev",deployment,register:demo.register.at,definition:DEMO_REGISTER};
+    const opted={...env,DEPLOYMENT:deployment,DEMO_START_CONFIG:canonicalize(demoConfig)};
+    const enabled=gitHubOutside(demo.given,state.storage.sql,opted,transport);
+    expect(enabled.accepts(DEMO_REGISTER,"create-repository")).toBe(true);
+    const unrelated=gitHubOutside(demo.given,state.storage.sql,{...opted,DEPLOYMENT:"TEST unrelated deployment"},transport);
+    expect(unrelated.accepts(DEMO_REGISTER,"create-repository")).toBe(false);
+    expect(await unrelated.send(demoRequest)).toBeNull();
+    expect(gitHubOutside(f.given,state.storage.sql,{...opted,DEPLOYMENT:"TEST unrelated deployment"},transport).accepts(REGISTER,"create-repository")).toBe(true);
+    const changedInc={...demoConfig,register:{...demo.register.at,inc:newIncarnation(new Uint8Array(16).fill(11))}};
+    expect(gitHubOutside(demo.given,state.storage.sql,{...opted,DEMO_START_CONFIG:canonicalize(changedInc)},transport).accepts(DEMO_REGISTER,"create-repository")).toBe(false);
+    const fresh=registerFixture("TEST fresh WebDemo adapter",WEB_DEMO_REGISTER);
+    const v2={...demoConfig,v:2,register:fresh.register.at,definition:WEB_DEMO_REGISTER,legacy:{register:demo.register.at,definition:DEMO_REGISTER}};
+    const twoRoots={...env,DEPLOYMENT:deployment,DEMO_START_CONFIG:canonicalize(v2)};
+    expect(gitHubOutside(fresh.given,state.storage.sql,twoRoots,transport).accepts(WEB_DEMO_REGISTER,"create-repository")).toBe(true);
+    expect(gitHubOutside(demo.given,state.storage.sql,twoRoots,transport).accepts(DEMO_REGISTER,"create-repository")).toBe(true);
+    expect(gitHubOutside(f.given,state.storage.sql,twoRoots,transport).accepts(REGISTER,"create-repository")).toBe(true);
+    const unlisted=registerFixture("TEST unlisted WebDemo adapter",WEB_DEMO_REGISTER);
+    expect(gitHubOutside(unlisted.given,state.storage.sql,twoRoots,transport).accepts(WEB_DEMO_REGISTER,"create-repository")).toBe(false);
+    expect(gitHubOutside(fresh.given,state.storage.sql,twoRoots,transport).accepts(DEMO_REGISTER,"create-repository")).toBe(false);
+    const wrongFresh={...v2,register:{...fresh.register.at,inc:newIncarnation(new Uint8Array(16).fill(12))}};
+    expect(gitHubOutside(fresh.given,state.storage.sql,{...twoRoots,DEMO_START_CONFIG:canonicalize(wrongFresh)},transport).accepts(WEB_DEMO_REGISTER,"create-repository")).toBe(false);
+    const wrongLegacy={...v2,legacy:{...v2.legacy,register:{...demo.register.at,inc:newIncarnation(new Uint8Array(16).fill(13))}}};
+    expect(gitHubOutside(demo.given,state.storage.sql,{...twoRoots,DEMO_START_CONFIG:canonicalize(wrongLegacy)},transport).accepts(DEMO_REGISTER,"create-repository")).toBe(false);
+    // The deployed same-object router must reread demo settings as well as
+    // GITHUB_*; no removed root may retain the earlier provider authority.
+    const live: GitHubBindings = { ...twoRoots };
+    const cachedFresh = outsideOf(fresh.given, state.storage.sql, live, transport);
+    const cachedLegacy = outsideOf(demo.given, state.storage.sql, live, transport);
+    const cachedOriginal = outsideOf(f.given, state.storage.sql, live, transport);
+    const freshRequest = fresh.claim();
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(true);
+    expect(cachedLegacy.accepts(DEMO_REGISTER, "create-repository")).toBe(true);
+    live.DEPLOYMENT = "TEST unrelated deployment";
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(false);
+    expect(await cachedFresh.send(freshRequest)).toBeNull();
+    expect(cachedLegacy.accepts(DEMO_REGISTER, "create-repository")).toBe(false);
+    expect(await cachedLegacy.send(demoRequest)).toBeNull();
+    expect(cachedOriginal.accepts(REGISTER, "create-repository")).toBe(true);
+    live.DEPLOYMENT = deployment;
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(true);
+    delete live.DEMO_START_CONFIG;
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(false);
+    expect(await cachedFresh.send(freshRequest)).toBeNull();
+    expect(cachedLegacy.accepts(DEMO_REGISTER, "create-repository")).toBe(false);
+    expect(await cachedLegacy.send(demoRequest)).toBeNull();
+    live.DEMO_START_CONFIG = canonicalize(v2);
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(true);
+    expect(cachedLegacy.accepts(DEMO_REGISTER, "create-repository")).toBe(true);
+    const { legacy: _legacy, ...currentOnly } = v2;
+    live.DEMO_START_CONFIG = canonicalize(currentOnly);
+    expect(cachedFresh.accepts(WEB_DEMO_REGISTER, "create-repository")).toBe(true);
+    expect(cachedLegacy.accepts(DEMO_REGISTER, "create-repository")).toBe(false);
+    expect(await cachedLegacy.send(demoRequest)).toBeNull();
+    expect(cachedOriginal.accepts(REGISTER, "create-repository")).toBe(true);
     const noCreation = bindings(f.register.at.scope);
     delete noCreation.GITHUB_CREATION_TOKEN;
     const outside = gitHubOutside(f.given, state.storage.sql, noCreation, transport);
