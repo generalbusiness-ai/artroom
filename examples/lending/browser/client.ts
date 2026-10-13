@@ -134,7 +134,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         open: (next, signal) => openHttpHeadStream(identity.origin, identity.scope, next, signal, options.headFetch ? { fetch: options.headFetch } : {}),
         emit: (state) => {
           if (!usable()) return;
-          if (state.status !== "current") { fresh = false; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
+          if (state.status !== "current") { readVersion++; fresh = false; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
           const snapshot: CompleteSnapshot<Summary> = state.snapshot;
           // One coherent view: the summary, its head, and the record up to that head.
           const version = ++readVersion;

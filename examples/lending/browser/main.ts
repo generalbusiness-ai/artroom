@@ -39,8 +39,9 @@ const field = (label: string, control: HTMLInputElement | HTMLTextAreaElement): 
 
 async function work(task: () => Promise<void>): Promise<void> {
   if (busy) return;
+  const at = epoch;
   busy = true; draw();
-  try { await task(); } catch (error) { notice = { kind: "plain", text: error instanceof Error ? error.message : "Something went wrong. Nothing was sent." }; }
+  try { await task(); } catch (error) { if (at === epoch) notice = { kind: "plain", text: error instanceof Error ? error.message : "Something went wrong. Nothing was sent." }; }
   finally { busy = false; draw(); }
 }
 
@@ -75,6 +76,7 @@ async function open(next: Remembered): Promise<void> {
   const at = epoch;
   gateway = lendingGateway(next.identity, deviceSigner(next.device), { current: () => at === epoch, lock: browserLock, store: actStore(next.identity) });
   await look();
+  if (at !== epoch) return;
   timer = window.setInterval(() => { if (!busy && document.visibilityState === "visible") void look(); }, 15_000);
 }
 async function seated(device: DeviceKey, seat: Seat, expectedEpoch = epoch): Promise<void> {
@@ -142,7 +144,7 @@ function drawKept(): Node | null {
   const settle = (ask: () => Promise<ActOutcome | null>) => () => void work(async () => { const at = epoch; const outcome = await ask(); if (at !== epoch) return; tell("kept", outcome); await look(); });
   const box = h("div", { class: "notice kept" }, h("p", {}, `An earlier request is kept in this browser: ${what}. ${kept.unsent ? "It was not sent." : "It may have been sent. Continue sends only that same request."}`),
     h("div", { class: "row" }, button("Check", settle(() => using.check())), button("Continue", settle(() => using.continueOriginal()), true),
-      button("Give up", () => void work(async () => { const gone = await using.abandon(); notice = { kind: "plain", text: gone ? "The kept request did not take effect and was given up." : "It cannot be given up yet: it may still take effect, or it already did. Check it." }; await look(); }), true)));
+      button("Give up", () => void work(async () => { const at = epoch, gone = await using.abandon(); if (at !== epoch || using !== gateway) return; notice = { kind: "plain", text: gone ? "The kept request did not take effect and was given up." : "It cannot be given up yet: it may still take effect, or it already did. Check it." }; await look(); }), true)));
   return box;
 }
 

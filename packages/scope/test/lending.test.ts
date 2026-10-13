@@ -245,7 +245,7 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     const released = new Promise<void>(resolve => { releaseSummary = resolve; });
     const delayed: Fetch = async (url, init) => {
       const response = await fetch(url, init);
-      if (holdSummary && new URL(url).pathname === `/v1/scopes/${L.name}`) {
+      if (holdSummary && new URL(url).pathname === `/v1/scopes/${encodeURIComponent(L.name)}`) {
         holdSummary = false; enteredSummary(); await released;
       }
       return response;
