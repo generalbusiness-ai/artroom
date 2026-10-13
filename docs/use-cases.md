@@ -8,7 +8,7 @@ built today. The [roadmap](roadmap.md) describes each missing capability
 that this page names.
 
 The cases are proposals. A case in the first group is buildable; only the
-three that say **Built** exist. No case claims that an institution has
+two that say **Built** exist. No case claims that an institution has
 adopted dap, that an outcome is fair or lawful, or that money is saved.
 Cases 01 to 10 extend ten examples from a public thread by Jim Prosser
 ([opening](https://x.com/jimprosser/status/2108279507660726766),
@@ -21,7 +21,7 @@ of those cards links the reply it extends.
 | [2. Nearly buildable](#2-nearly-buildable) | 25, 31, 33, 35 | An application's own messages between scopes, or an outside operation it declares |
 | [3. Private views](#3-private-views) | 21, 32, 37, 39, 40, 41, 42 | One record that participants read in part |
 | [4. Episodes across organisations](#4-episodes-across-organisations) | 01, 02, 04 to 19, 23, 24, 27, 28 | A personal account, captured evidence in private custody, and parties outside the room |
-| [5. Changing rules and boundaries](#5-changing-rules-and-boundaries) | From the dap-spike's sweep, and Tailapps | Rules that change, rules that are algorithms, and scopes that join |
+| [5. Changing rules and boundaries](#5-changing-rules-and-boundaries) | From the dap-spike's sweep, and Tailapps | Rules that change, expressions that compute effects, and scopes that join |
 
 ## What the cases share
 
@@ -360,9 +360,9 @@ the dap-spike's
 |---|---|
 | A sale that later gains inspection, negotiation, escrow and comment packages | [Rules that change after creation](roadmap.md#rules-that-change-after-creation): a package attached to a running record, and a later package that narrows an earlier one's guard |
 | A club that changes its admission policy | The same, with [private views in one record](roadmap.md#private-views-in-one-record) |
-| Chess and other games with many rules | [Rules that are algorithms](roadmap.md#rules-that-are-algorithms): the rules of the game are a function, not a list of guards |
+| Chess and other games with many rules | [Expressions that compute effects](roadmap.md#expressions-that-compute-effects): a rule can accept or refuse a proposed position, and nobody has yet written a game's rules in the rule language |
 | A merger of two organisations' records | [Split and join](roadmap.md#split-and-join) |
-| [Tailapps](https://github.com/generalbusiness-ai/tailapps): small analytic pipelines over agent telemetry, each written by a person or an agent and queried with SQL | [Rules that are algorithms](roadmap.md#rules-that-are-algorithms), for the pipeline's expressions and for tables that answer SQL; [durability levels](roadmap.md#durability-levels), because the telemetry itself should not be kept. Creating, validating and activating a pipeline, and a router that signs each record as its own report, are buildable today |
+| [Tailapps](https://github.com/generalbusiness-ai/tailapps): small analytic pipelines over agent telemetry, each written by a person or an agent and queried with SQL | [Expressions that compute effects](roadmap.md#expressions-that-compute-effects), so that one record updates several rows that the expression computes; tables that answer SQL; and [durability levels](roadmap.md#durability-levels), because the telemetry itself should not be kept. The rule language is close to the one Tailapps uses. A pipeline's life (create, validate, activate) is buildable today, and so is a running total, if the router proposes each new total and a rule checks it |
 
 ## Four longer journeys
 
@@ -387,4 +387,4 @@ Case 44 uses one turn rule in live practice or a retained session. Live acknowle
 Written from a draft of 9 October 2026 and regrouped on 13 October 2026
 against main `d1b845f8`. The grouping is a design judgement from reading
 the documentation and the definitions; no case in it was built or run for
-this page, except the three marked **Built**.
+this page, except the two marked **Built**.

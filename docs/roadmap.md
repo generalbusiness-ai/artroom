@@ -51,7 +51,7 @@ In order, nearest first.
 | [Outside parties and systems](#outside-parties-and-systems) | Runs for Git publication only | 35, 37, 38, 39, 43, and all of group 4 |
 | [A personal account across records](#a-personal-account-across-records) | Not designed | All of group 4 |
 | [Rules that change after creation](#rules-that-change-after-creation) | Not designed in dap; tested in the dap-spike | 42; a sale that gains packages; a club that changes its policy |
-| [Rules that are algorithms](#rules-that-are-algorithms) | Not designed | Chess and other games with many rules; analytic pipelines such as Tailapps |
+| [Expressions that compute effects](#expressions-that-compute-effects) | Not designed; a rule can check a proposed value today | Analytic pipelines such as Tailapps; chess and other games with many rules |
 | [Split and join](#split-and-join) | Not designed; a protocol is sketched in the dap-spike | A merger of two records |
 | [An authoring language](#an-authoring-language) | Not designed; one attempt in the dap-spike stopped | Every case, for its author |
 
@@ -252,23 +252,46 @@ paused instead of guessing
 It did not show a general change of a record's state, or two models
 composed freely.
 
-### Rules that are algorithms
+### Expressions that compute effects
 
-**What it is.** Rules that are a function, such as the legal moves of
-chess, in place of a list of guards.
+**What it is.** An expression that takes an event and the rows it reads,
+and gives back the new rows. One event can create a row or update it, and
+can change several rows.
 
-**Today.** A definition is data: guards, effects and the values they
-read. An author cannot supply a function.
+**Today.** A definition may carry up to 16 named rule expressions in a
+restricted JSONata, with arithmetic, conditionals, and functions such as
+`$sum`, `$count`, `$max`, `$lookup` and `$substring`. A rule reads the
+act's fields and the items the act names, and it answers true or false:
+it is a guard. An effect copies a value into a slot and computes nothing.
+So a computed value enters as a proposal. The signer sends the new value
+as a field, a rule checks it against the state, and an effect copies it.
+The Counter works this way: the signer proposes the next number and the
+next speaker, and
+[its rules](../examples/counting/definition.ts) check the arithmetic.
 
-**Use cases.** Chess. Also analytic pipelines such as
+**The gap.** Four things, none of them in the expression syntax:
+
+- A rule's answer is true or false. It cannot give the values to write,
+  so every writer must read the state, compute, and propose.
+- One act opens one item or changes items it names. It cannot create a
+  row when the key is new and update it otherwise, and it cannot write a
+  number of rows that the expression decides.
+- An act's fields are declared types: text, integer, boolean, time,
+  identifier, record, and a list of at most 64. An act cannot carry an
+  arbitrary nested record for an expression to normalize.
+- The function list has no `$string`, `$number`, `$boolean`,
+  `$lowercase` or `$uppercase`.
+
+**Use cases.** Analytic pipelines such as
 [Tailapps](https://github.com/generalbusiness-ai/tailapps), where an
 author writes expressions that turn a stream of telemetry into tables,
-and a reader asks questions in SQL. On dap today, the pipeline's life
-(create, validate, activate) and a router that signs each record as its
-own report are buildable. The expressions and the SQL tables are not: a
-scope's state is a bounded set of items, and its reads are pages of items
-and entries. An outside reader could fold the record into tables, as the
-replay reader folds it into state.
+and a reader asks questions in SQL. The pipeline's life (create,
+validate, activate) is buildable today. So is a running total for each
+session, by proposal and check. Tables that answer SQL are a separate
+gap: a scope's reads are pages of items and entries. Chess is the other
+case. A rule could accept or refuse a proposed position, and nobody has
+written a game's rules in the rule language to see whether its budgets
+allow it.
 
 **The dap-spike's contribution.** Its sweep names the need and one
 condition: a guard may call a pure helper only if the check on who reads
@@ -296,8 +319,8 @@ A planned handover of the writer ran in its fixture
 and rules once, and a compiler derives the audiences, the available acts
 and the checks.
 
-**Today.** An author writes a definition as data, and the validator
-bounds it.
+**Today.** An author writes a definition as data, with rule expressions
+for what guards cannot say, and the validator bounds it.
 
 **The dap-spike's contribution.** Fifteen ranked directions for such a
 language
