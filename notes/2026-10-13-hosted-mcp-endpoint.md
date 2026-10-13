@@ -1,8 +1,9 @@
 # The hosted MCP endpoint: plan 031, stage 2
 
-Date: 2026-10-13. Status: Draft 4, for checker review (Draft 1 was
-20e2344d, Draft 2 d69b46ba, Draft 3 d8324363; the checker's reviews
-6a262c93, 89ec44b0 and e1463db8 are answered in section 10).
+Date: 2026-10-13. Status: Draft 5, for checker review (Draft 1 was
+20e2344d, Draft 2 d69b46ba, Draft 3 d8324363, Draft 4 698df2d0; the
+checker's reviews 6a262c93, 89ec44b0, e1463db8 and 5688e533 are answered
+in section 10).
 Requested by Hugh on 2026-10-13 at 11:03 Eastern: "the hosted MCP
 endpoint should be prioritized", right after the discovery head (request
 f9ca5f96).
@@ -202,9 +203,14 @@ target, refuses `409`. Three lifetimes are distinct: the control
 request's own `notAfter` bounds when a **freshly signed** request with
 that `op` is accepted, so a replay is a new signature over the same
 fingerprint within the lifetime; the stored answer is retained for seven
-days past `notAfter`, after which the `op` refuses `409` as stale, stated
-in the error; and the native `enrol` envelope's own `notAfter` is the
-scope's rule and is unchanged by any of this. Current authority is
+days past the `notAfter` **recorded with the original reservation**, a
+deadline a replay's own `notAfter` neither extends nor shortens, after
+which the `op` refuses `409` as stale, stated in the error, from its
+tombstone; and the native `enrol` envelope's own `notAfter` is the
+scope's rule and is unchanged by any of this. Retention removes only the
+answer's body: the tombstone, the fingerprint of every `op` ever used
+and every unfinished reservation stay, so a stale or finished `op` can
+never be reused for a different request. Current authority is
 checked again on every attempt, including a resume: a controller or admin
 whose authority ended between attempts refuses `403`, and the
 reservation stays, so an admin can still `retire` the agent. Unfinished
@@ -275,43 +281,58 @@ transport and the 2025-11-25 transport:
   compare of the secret's digest, counted per connecting address with the
   join limiter's shape (ten failures per minute, then the limiter's
   refusal).
-- The revision is chosen by the request: a POST whose body carries
-  `_meta["io.modelcontextprotocol/protocolVersion"]` or an
-  `MCP-Protocol-Version` header of `2026-07-28` is modern; a POST that is
-  `initialize` or carries `Mcp-Session-Id` is legacy; anything else →
-  `400` with `-32600`.
-- Modern: `MCP-Protocol-Version` is required and must equal the `_meta`
-  version → else `400` with `-32020` (`HeaderMismatch`); a version the
-  server does not serve → `400` with `-32022` and `supported`;
+- **The revision is selected before the method is handled.** It comes
+  from the `MCP-Protocol-Version` header when the header is present, and
+  otherwise from the request's own content or from the recorded version
+  of the session the request names; the presence of `Mcp-Session-Id`
+  selects nothing by itself. The server serves exactly the two
+  commissioned revisions, `2025-11-25` and `2026-07-28`, and no other: a
+  header with any other value → `400` before dispatch, on every method
+  ("if the server receives a request with an invalid or unsupported
+  MCP-Protocol-Version, it MUST respond with 400 Bad Request"), with
+  `-32022` and `supported` when a frame was parsed and `-32600`
+  otherwise. Then one matrix decides every method; its rows are tried in
+  order and the first that applies governs:
+
+  | Version, as selected | `POST` | `GET` | `DELETE` |
+  |---|---|---|---|
+  | header `2026-07-28` | modern rules below; `_meta` must name the same version, else `-32020` | `405`: no session consulted, no stream opened | `405`: no session consulted, nothing ended |
+  | header `2025-11-25` | legacy rules below: `initialize` mints a session; any other request needs `Mcp-Session-Id` (`400` without it, `404` unknown or ended) | `Mcp-Session-Id` required: `400` without it, `404` unknown or ended, else the stream | `Mcp-Session-Id` required: `400` without it, `404` unknown or ended, else the session ends |
+  | header absent, body `_meta` names `2026-07-28` | `400` with `-32020`: that revision requires the header | (not a `POST` row) | (not a `POST` row) |
+  | header absent, `initialize` | legacy, negotiated from the request's own `protocolVersion` | (not a `POST` row) | (not a `POST` row) |
+  | header absent, `Mcp-Session-Id` names a live session | that session's recorded version, which is `2025-11-25`: legacy rules | the stream | the session ends |
+  | header absent, `Mcp-Session-Id` names an unknown or ended session | `404` | `404` | `404` |
+  | header absent, none of the above | `400` with `-32600` | `405` | `405` |
+
+  A `405` is decided from the header and the method alone: it opens no
+  stream, looks up no session and ends nothing, whatever `Mcp-Session-Id`
+  carries, so a July `GET` or `DELETE` that names a live November session
+  leaves that session exactly as it was. Every `405` carries
+  `Allow: POST`. The two refusals the matrix keeps apart: explicit
+  November without the session it requires is `400`; a July or
+  header-less `GET` or `DELETE` is `405`.
+- Modern (2026-07-28 transport): `MCP-Protocol-Version` must equal the
+  `_meta` version → else `400` with `-32020` (`HeaderMismatch`);
   `Mcp-Method` is required and must equal `method`; `Mcp-Name` is required
   on `tools/call` and must equal `params.name` after decoding the
   `=?base64?…?=` sentinel, and must contain only header-safe characters
   → else `400` with `-32020`; a method the server does not implement →
-  `404` with `-32601`; a notification → `202` with no body; `GET` and
-  `DELETE` without `Mcp-Session-Id` → `405`. No tool declares
-  `x-mcp-header`, so no `Mcp-Param-*` header is expected, and one that is
-  present is ignored as an intermediary would.
-- Legacy (2025-11-25 transport): `initialize` mints a session ID; a
-  request, `GET` or `DELETE` with an unknown or ended session → `404`; a
-  request other than `initialize` without `Mcp-Session-Id` → `400`; the
-  server serves exactly the two commissioned revisions, `2025-11-25` and
-  `2026-07-28`, and no other: an `MCP-Protocol-Version` header that is
-  present and is not one of them → `400` before dispatch, on `POST`, `GET`
-  and `DELETE` alike ("if the server receives a request with an invalid or
-  unsupported MCP-Protocol-Version, it MUST respond with 400 Bad
-  Request"), and an `initialize` whose `protocolVersion` is another
-  revision is answered as the 2025-11-25 negotiation says, with the
-  server's version, never by treating the request as that other revision;
-  an absent header uses the session's negotiated version, and for
-  `initialize` the request's own `protocolVersion`; an earlier revision
-  such as `2025-03-26`, whose transport permits batches, is not served and
-  not aliased, so a batch is refused on every request; `Mcp-Method` and
+  `404` with `-32601`; a notification → `202` with no body. No tool
+  declares `x-mcp-header`, so no `Mcp-Param-*` header is expected, and one
+  that is present is ignored as an intermediary would. A legacy
+  `Mcp-Session-Id` on a modern `POST` is ignored.
+- Legacy (2025-11-25 transport): `initialize` mints a session ID and
+  records the negotiated version with it; an `initialize` whose
+  `protocolVersion` is another revision is answered as the 2025-11-25
+  negotiation says, with the server's version, never by treating the
+  request as that other revision; an earlier revision such as
+  `2025-03-26`, whose transport permits batches, is not served and not
+  aliased, so a batch is refused on every request; `Mcp-Method` and
   `Mcp-Name`, which only the modern revision defines, are ignored on a
-  legacy request, and a legacy `Mcp-Session-Id` is ignored on a modern
-  one; a second `GET` for the same
-  session replaces the first, which closes without detaching its
-  replacement; a notification → `202`; `Last-Event-ID` is ignored, streams
-  are not resumable, stated in the response to `GET`.
+  legacy request; a second `GET` for the same session replaces the
+  first, which closes without detaching its replacement; a notification
+  → `202`; `Last-Event-ID` is ignored, streams are not resumable, stated
+  in the response to `GET`.
 - Both: a body over the bound → `413`; a batch → `400` with `-32600`; a
   frame that is not a request or notification → `400` with `-32600`.
 
@@ -419,6 +440,24 @@ file store's semantics:
   - **Replay needs no reservation.** Reading a terminal record's retained
     answer, inline or archived, is a read and dispatches nothing, so it
     is served when the budget is full.
+  - **Settle consumes what it holds.** A `settle` whose completion need
+    is covered by the identity's outstanding reservation proceeds when
+    the budget is full: its top-up is zero and the receipt's bytes are
+    taken from that reservation, never from fresh admission space.
+    Reading the receipt back after settlement is a read and needs no
+    admission and no reservation.
+  - **Net growth is what is reserved.** A top-up is computed from the net
+    serialized growth the dispatch can cause as stored: the record row
+    rewritten, the chunks that change, the segment rows one more outcome
+    can add and the segment index, less what the identity already holds
+    stored and reserved; so the counters follow the bytes as stored. The
+    64 MiB identity limit below is checked by the same top-up, before
+    dispatch.
+  - **Nothing outside the object frees it.** The custody budget is the
+    agent object's own. Retiring another agent, whose data is in another
+    object, changes nothing here; the harness raises the budget to
+    witness recovery, and in service the recovery is the owed `export`
+    control action or a new agent.
   - **Growing state is bounded.** Repeated uncertain or refused attempts
     add outcomes; each attempt's top-up pays for them in advance, and the
     outcome history of one identity is itself bounded at 64 MiB (stated
@@ -435,7 +474,15 @@ file store's semantics:
     before enrolment, so a key is never enrolled and then found to have no
     space for `create`'s answer; a control request that cannot reserve
     refuses `full` before any effectful step; unfinished reservations
-    remain resumable.
+    remain resumable. **Retirement is always possible:** of each
+    object's 16 MiB, the last 1 MiB is a reserve that only `retire` may
+    draw on, enough for its answer and tombstone many times over, so a
+    control budget that is full for `create` and `bearer` still admits
+    `retire`. If that reserve is ever exhausted too, which only a defect
+    could cause, the recovery is the native admin's `revoke-key`, which
+    ends the agent's authority in the scope regardless of the hosted
+    objects; `docs/mcp.md` states this as the operator's recovery, and
+    nothing in this head replaces or forgets an operation to make room.
   - **Storage failure is not settlement.** `SQLITE_FULL` or any other
     write failure rolls the transaction back and is reported as a
     recoverable storage failure, not as an outcome: a record whose answer
@@ -580,9 +627,13 @@ harness's instance reset; storage stays.
   while a new admission is refused `full` before signing; an archived
   refused identity, then the budget filled by other work, then an explicit
   resubmit: refused `full` before dispatch with the envelope and the
-  refusal unchanged, and served after the budget is freed by `retire` of
-  another agent's data in a fresh object (or by raising the budget in the
-  harness) with the same envelope; repeated uncertain attempts on one
+  refusal unchanged, still refused after another agent in the same
+  repository is retired (nothing outside the object frees its budget),
+  and served with the same envelope after the harness raises the budget;
+  a `settle` at full whose outstanding reservation covers its receipt
+  succeeds, and the receipt reads back with the budget still full; a
+  `retire` with the control budget full to its reserve succeeds while a
+  `create` and a `bearer` refuse `full`; repeated uncertain attempts on one
   identity each consume a top-up, with a reset and read-back between
   them, the envelope unchanged and one decisive result at the end; a
   `create` whose registry or agent control budget is full refuses `full`
@@ -618,7 +669,18 @@ harness's instance reset; storage stays.
   (session ignored, served modern), a legacy session request carrying
   `Mcp-Method` (ignored), an `MCP-Protocol-Version: 2026-07-28` header on
   a body with no `_meta` version (`-32020`), an `initialize` naming
-  `2025-03-26` (answered with the server's version). Every accepted
+  `2025-03-26` (answered with the server's version). Methods across
+  eras, with a live November session S: `GET` and `DELETE` carrying
+  `MCP-Protocol-Version: 2026-07-28` and `Mcp-Session-Id: S` answer `405`
+  with `Allow: POST`, no stream opens, S is not ended, and S then serves
+  a `POST`, a `GET` stream and a `DELETE` as before; the same two with an
+  unknown session ID answer `405`, not `404`, so no session was looked
+  up; `GET` and `DELETE` with `MCP-Protocol-Version: 2025-11-25` and no
+  session answer `400`, with S answer the stream and the ending; `GET`
+  and `DELETE` with no version header and no session answer `405`, with
+  S answer the stream and the ending, with an unknown ID `404`; a `POST`
+  with no header, no `_meta` version and `Mcp-Session-Id: S` is served
+  at S's recorded version. Every accepted
   response asserts its content type, `application/json` or
   `text/event-stream`, and every `202` asserts an empty body and no
   session header. The same cases run against the loopback server through
@@ -668,6 +730,17 @@ Owed after this head, in the same stage: OAuth; the pinned `diff` and
 full agent; the one-step `create` from the Start agent-key link.
 
 ## 10. Corrections of the reviews
+
+### Review 5688e533 (Draft 4 → Draft 5)
+
+| Finding | What Draft 5 does |
+|---|---|
+| P2. Select the revision before handling every HTTP method; a July `GET` or `DELETE` naming a November session must not open its stream or end it | Section 3.4: selection comes first, from the header, else the request's content or the named session's recorded version, never from the presence of `Mcp-Session-Id`; one method and version matrix with rows in precedence order; explicit July `GET` and `DELETE` are `405` with nothing consulted, opened or ended; explicit November applies the legacy session rules, `400` without the session it requires; a header-less `GET` or `DELETE` uses the named live session's recorded version and is `405` without one; exactly the two commissioned revisions; H8 adds the cross-era method cases with a live and an unknown session, no stream, no deletion, and S usable afterward |
+| Precision: `settle` at full consumes its outstanding reservation; a receipt readback needs no admission space | Section 3.6, "Settle consumes what it holds"; H6 witnesses both |
+| Precision: retiring another agent cannot free this object's quota | Section 3.6, "Nothing outside the object frees it"; H6 retires another agent and finds the refusal unchanged, then raises the budget in the harness |
+| Precision: reserve the net serialized row, chunk and index growth, within the 64 MiB identity limit, before dispatch | Section 3.6, "Net growth is what is reserved" |
+| Precision: anchor stored-answer expiry to the original operation's recorded deadline; retain tombstones and pending identities | Section 3.2: retention runs from the `notAfter` recorded with the original reservation; tombstones, used fingerprints and unfinished reservations are kept |
+| Precision: the fallback when a full control budget prevents a new retirement | Section 3.6, control budgets: a 1 MiB reserve per object that only `retire` may draw on, and the native admin's `revoke-key` as the stated operator recovery; no operation is replaced or forgotten |
 
 ### Review e1463db8 (Draft 3 → Draft 4)
 
