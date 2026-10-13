@@ -57,7 +57,7 @@ export class ListRestart extends Error { constructor() { super("The tool list ch
 export const SERVER_NAME = "dap";
 export const SERVER_VERSION = "0.1.0-dev.1";
 /** The server's instructions, at most 512 characters (section 3). */
-export const INSTRUCTIONS = "Start with room. Each act tool says what it does, who may sign it and what would refuse it. An answer is the scope's decision; a refusal that names a guard points at its sentence. After accepted, use wait to see what the entry created. After a lost reply, settle with the same idempotencyKey; do not sign again. credential is the only tool that returns a secret, for a read token you signed. Nothing here grants authority: you may sign what your role holds, and the list changes when that does.";
+export const INSTRUCTIONS = "Start with room. Each act tool says what it does, who may sign it and what would refuse it. An answer is the scope's decision; a refusal naming a guard points at its sentence. After accepted, use wait to see what the entry created. After a lost reply, settle with the same idempotencyKey; do not sign again. Only credential returns a credential by design; step and record can show a join's signed invitation. Nothing here grants authority: you may sign what your role holds, and the list changes when that does.";
 
 const LIST_PAGE_BYTES = 256 * KIB;
 const WATCH_MS = 30_000;

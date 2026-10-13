@@ -1396,7 +1396,8 @@ Other observed figures from the same run:
 
 ### The list, per role
 
-Observed run of `packages/mcp/test/budget.test.ts`. Bytes are the
+Observed run of `packages/mcp/test/budget.test.ts`, taken in the round of
+review ad2576fb. Bytes are the
 canonical JSON of each `tools/list` result as sent; every page is asserted
 to be at most 256 KiB. Tokens are counted by gpt-tokenizer 3.4.0 with the
 `o200k_base` encoding, a proxy: an agent host's own tokenizer gives other
@@ -1404,12 +1405,12 @@ counts.
 
 | Room and role | Tools | Pages | Bytes | Tokens |
 |---|---|---|---|---|
-| Demo room, admin | 71 | 1 | 146418 | 37722 |
-| Demo room, maintainer | 57 | 1 | 114502 | 29594 |
-| Demo room, member | 54 | 1 | 107927 | 27837 |
-| Demo room, agent | 52 | 1 | 102161 | 26398 |
-| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339044 | 88971 |
-| Demo room, admin, `--generic` | 16 | 1 | 15123 | 3558 |
+| Demo room, admin | 71 | 1 | 146481 | 37736 |
+| Demo room, maintainer | 57 | 1 | 114565 | 29608 |
+| Demo room, member | 54 | 1 | 107990 | 27851 |
+| Demo room, agent | 52 | 1 | 102224 | 26412 |
+| Full lane definitions (`issue`, `change`, `change3`), admin | 158 | 2 | 339107 | 88985 |
+| Demo room, admin, `--generic` | 16 | 1 | 15186 | 3572 |
 
 No cap applies to the whole list. `--tools` shortens it for an agent with
 one job; `--generic` replaces the act tools with the pair.
