@@ -185,11 +185,12 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     const savedRecovery = await lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready));
     expect(savedRecovery.trim() === files.key.trim()).toBe(true); // Native founder backup, not the internal CLI recovery key.
     await expect(lifetime.wait(() => saveFounderRecoveryOnce(origin, reload, binding, ready))).rejects.toThrow("already offered");
-    const creatorSent: SignedIntent[] = [], creatorReplies: { kind: string; answer: string; reason: string | null; name: string | null }[] = [];
+    const creatorSent: SignedIntent[] = [], creatorMutationPaths: string[] = [], creatorReplies: { kind: string; answer: string; reason: string | null; name: string | null }[] = [];
     let creatorSessions = 0;
     let loseCreator: "add-member" | "invite-key" | null = "add-member", creatorCheck = false;
     const creatorFetch: Fetch = async (url, init) => {
       const path = new URL(url).pathname;
+      if (init?.method === "POST" && (path.endsWith("/acts") || path.endsWith("/preparations") || path === "/v1/scopes")) creatorMutationPaths.push(path);
       const signed = typeof init?.body === "string" ? (JSON.parse(init.body) as { signed?: SignedIntent }).signed : undefined;
       if (path.endsWith("/acts") && signed) {
         const name = [...values.keys()].find(key => key.startsWith("artroom-page-connections:"))!, bytes = values.get(name)!;
@@ -221,9 +222,11 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     expect([begun.state, begun.link === undefined, creatorSent.map(s => s.intent.kind)]).toEqual(["unknown", true, ["add-member"]]);
     const opening = creatorSent[0]!;
     let connectionPauses = 0;
+    const beforeConnectionCheck = creatorMutationPaths.slice();
     creatorCheck = true;
     const checkedConnection = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "check", pause: async () => { connectionPauses++; } }));
     expect([checkedConnection.state, creatorSent.length, connectionPauses, checkedConnection.operation]).toEqual(["unknown", 1, 0, begun.operation]);
+    expect(creatorMutationPaths).toEqual(beforeConnectionCheck);
     creatorCheck = false; loseCreator = "invite-key";
     const next = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "continue" }));
     expect([next.state, creatorSent.map(s => s.intent.kind)]).toEqual(["unknown", ["add-member", "add-member", "invite-key"]]);
@@ -235,18 +238,21 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     await pause([M.name, agentInbox.name, O.name]);
     creatorCheck = true;
     const beforeKeyCheck = creatorSent.length;
+    const beforeKeyMutationPaths = creatorMutationPaths.slice();
     const keyChecked = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "check", pause: async () => { connectionPauses++; } }));
     expect([keyChecked.state, creatorSent.length, connectionPauses]).toEqual(["unknown", beforeKeyCheck, 0]);
+    expect(creatorMutationPaths).toEqual(beforeKeyMutationPaths);
     creatorCheck = false;
     const issued = await lifetime.wait(() => connectInvitation(origin, reload, binding, input, { ...ready, fetch: creatorFetch, mode: "continue" }));
     expect([issued.state, issued.reason ?? null, issued.operation === begun.operation, originalConnection(origin, reload, binding)?.kind, creatorReplies, creatorSessions < 64]).toEqual(["verified", null, true, "agent-key", ["add-member", "add-member", "invite-key", "invite-key"].map(kind => ({ kind, answer: "accepted", reason: null, name: null })), true]);
     expect(creatorSent.filter(s => s.intent.kind === "invite-key").every(s => canonicalize(s) === canonicalize(invitationEnvelope))).toBe(true);
     const agentLink = issued.link!, tagged = agentKeyInvitationOf(agentLink)!;
     expect([tagged.controller.member, canonicalize(tagged.controller.membership) === canonicalize(binding.membership), linkOf(agentLink)]).toEqual(["@founder", true, null]);
-    const receiver = memoryStore(), agentSent: SignedIntent[] = [];
+    const receiver = memoryStore(), agentSent: SignedIntent[] = [], agentMutationPaths: string[] = [];
     let loseAgent = true, agentCheck = false, crossRoomReads = 0, ownSessionRequests = 0;
     const agentFetch: Fetch = async (url, init) => {
       const path = new URL(url).pathname;
+      if (init?.method === "POST" && (path.endsWith("/acts") || path.endsWith("/preparations") || path === "/v1/scopes")) agentMutationPaths.push(path);
       const signed = path.endsWith("/acts") && typeof init?.body === "string" ? (JSON.parse(init.body) as { signed: SignedIntent }).signed : undefined;
       if (signed) {
         const config = (await receiver.config())!, raw = await receiver.private(config.join!.request);
@@ -264,9 +270,11 @@ test("fresh Page Start discovers native web register@8 and exact retained legacy
     const agentContext: Context = { store: receiver, fetch: agentFetch, now: lifetime.now };
     expect((await lifetime.wait(() => command(agentContext, ["join", agentLink]))).code).toBe(1);
     const agentOriginal = agentSent[0]!, beforeAgentCheck = agentSent.length;
+    const beforeAgentMutationPaths = agentMutationPaths.slice();
     agentCheck = true;
     expect((await lifetime.wait(() => command(agentContext, ["join", agentLink, "--check"]))).code).toBe(1);
     expect(agentSent.length).toBe(beforeAgentCheck); agentCheck = false;
+    expect(agentMutationPaths).toEqual(beforeAgentMutationPaths);
     expect((await lifetime.wait(() => enrolAgentKey(agentContext, agentLink))).code).toBe(0);
     expect(canonicalize(agentSent[1]) === canonicalize(agentOriginal)).toBe(true);
     expect((await lifetime.wait(() => M.entries())).filter(entry => entry.input.type === "act" && entry.input.signed.intent.kind === "enrol")).toHaveLength(1);
