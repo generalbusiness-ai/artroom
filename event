@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-fork-cost-measurement.md","body":{"commit":"bb817174d6f4b21c8dbc371bb187dff5bd61b80f","path":"notes/2026-10-13-fork-cost-measurement.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c430a4eefffe8f2b3812c23aa0b1604eb0dbc425","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-fork-cost-measurement.md."}
