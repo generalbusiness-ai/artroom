@@ -325,6 +325,16 @@
   .entry-form input, .entry-form textarea { display: block; width: 100%; min-height: 50px; margin-top: 9px; padding: 12px 14px; font: 17px/1.5 var(--font-sans); }
   .entry-form textarea { min-height: 136px; resize: vertical; }
   .entry-form .primary { width: 100%; min-height: 48px; font-family: var(--font-sans); font-size: 16px; }
+  .entry-content:has(> .entry-start) { max-width: 440px; }
+  .entry-start .start-room-title { font-size: 22px; margin: 0 0 30px; }
+  .entry-start pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .entry-start .start-open { width: 100%; min-height: 48px; font: 600 16px var(--font-sans); }
+  .entry-start .start-connections { margin-top: 40px; border-top: 1px solid var(--line); }
+  .entry-start .start-connection { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+  .entry-start .start-connection h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
+  .entry-start .start-connection p { margin: 0; font: 15px/1.5 var(--font-sans); color: var(--muted-ink); }
+  .entry-start .start-connection button { white-space: nowrap; font-size: 14px; }
+  @media (max-width: 650px) { .entry-start .start-connection { align-items: flex-start; flex-direction: column; gap: 12px; } }
   .entry-answer { font-family: var(--font-sans); min-height: 28px; margin-top: 20px; font-size: 16px; color: var(--muted-ink); }
   .entry-answer.bad { color: var(--error); }
   @media (max-width: 650px) {

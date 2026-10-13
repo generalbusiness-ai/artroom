@@ -5,8 +5,8 @@
  * No configuration, key, token or plaintext belongs in a scope's history.
  */
 import type { ScopeId } from "@generalbusiness/dap-contract";
-import { isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
-import { isOf } from "@generalbusiness/dap-platform";
+import { canonicalize, isFactRef, isScopeId, parseStrict, timeMs } from "@generalbusiness/artroom-bytes";
+import { destinationBranch, isOf } from "@generalbusiness/dap-platform";
 import type { GitHubAccount, GitHubInstallationToken } from "@generalbusiness/artroom-git/github";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type SnapshotReader } from "./destination-host.ts";
@@ -14,9 +14,10 @@ import { GitHubProvider } from "./github-host.ts";
 import { credentialHandle, exact, hostBound } from "./host-wiring.ts";
 import type { OutsideGiven } from "./object.ts";
 import { NO_OUTSIDE, type EffectRequest, type Outside } from "./operations.ts";
+import { demoFoundingConfig, type DemoFoundingBindings } from "./demo-founding.ts";
 import { RegisterHost } from "./register-host.ts";
 
-export interface GitHubBindings {
+export interface GitHubBindings extends DemoFoundingBindings {
   /** Nonsecret JSON; every field is explicit. Precompute the install's register scope ID and pin it here before deployment. */
   GITHUB_APP_CONFIG?: string;
   /** Deployment secrets; no default creation or private read authority. */
@@ -78,7 +79,14 @@ export function gitHubOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exec">
     const register = new RegisterHost(given, { host, namespace, provider });
     const custody = new CredentialStore(sql, () => given.scope()?.at ?? null);
     const destination = new DestinationHost(given, { host, namespace, provider, custody, ...(snapshotReader ? { snapshotReader } : {}) });
-    const bound = hostBound(given, config.registerScope, host, namespace);
+    const originalBound = hostBound(given, config.registerScope, host, namespace);
+    const demos = demoFoundingConfig(env.DEMO_START_CONFIG, env.DEPLOYMENT);
+    // The additional register requires the exact incarnation, pin and recorded demo marker.
+    // Destinations keep hostBound's retained actual-claim and directory-birth checks.
+    const demoBound = (demo: NonNullable<typeof demos>["current"], owner: string): boolean => hostBound(given, demo.register.scope, host, namespace)(owner) && (isOf(owner, "platform:register")
+      ? owner === demo.definition && given.scope()?.at.inc === demo.register.inc && given.state.page("register", ["open"], null, 1).items[0]?.values["purpose"] === "demo-start"
+      : (() => { const claim = destinationBranch(given.state)?.refs["claim"]; return isFactRef(claim) && canonicalize(claim.at) === canonicalize(demo.register); })());
+    const bound = (owner: string): boolean => originalBound(owner) || !!demos && (demoBound(demos.current, owner) || !!demos.legacy && demoBound(demos.legacy, owner));
     // accepts names a kind, not one operation. A nonempty cleanup map enables
     // that kind; a missing exact ID/name within it still yields no answer.
     // With no cleanup map, deletion stays recorded and unmarked.

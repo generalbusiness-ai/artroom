@@ -28,6 +28,7 @@
  * refusing one of `production()`.
  */
 
+import { demoFoundingOffer, type DemoFoundingConfig } from "./demo-founding.ts";
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
@@ -286,6 +287,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
   source(seq: number): Sourced | null { this.#first(); return sourced(this.#store, this.#scope.pinned(), seq); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
+  demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
   siteRoom() {
     if ((this.#store.storedBytes(0) ?? 0) > 1024 * 1024 || (this.#store.scopeBytes() ?? 0) > 1024 * 1024) throw new Error("publication-history-limit");
