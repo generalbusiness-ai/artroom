@@ -169,10 +169,10 @@ function shots(stage: Stage): Shot[] {
       expect: { code: 0, lines: () => ["Installed: register {register}, under {registerDefinition}, as planned.", INSTALL_ACKNOWLEDGEMENT] },
     },
     {
-      title: "Claim the room", scene: "3", who: "founder",
-      typed: () => ["dap", "claim", stage.name, "--handle", HANDLES.founder],
+      title: "Create the room", scene: "3", who: "founder",
+      typed: () => ["dap", "create", stage.name, "--handle", HANDLES.founder],
       expect: { code: 0, lines: () => [
-        `Claimed ${stage.name}: directory <directory>, membership <membership>, rules <rules>, destination <destination>; each created and confirmed.`,
+        `Created ${stage.name}: directory <directory>, membership <membership>, rules <rules>, destination <destination>; each created and confirmed.`,
         "Definitions: <...>.",
         `You are ${HANDLES.founder}, an admin, on key {operatorKey}; your inbox is <founderInbox>.`,
       ] },
