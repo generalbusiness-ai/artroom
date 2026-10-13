@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0b629f2891f07134fee165e83a75b95227a066b2","text":"Merge retired a covered predecessor; the successor is at docs/public-sdk-release.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0b8f2c09a8babf5afcc59cd46356d07994871128","text":"Merge retired a covered predecessor; the successor is at packages/lanes/test/checks.scope.test.ts."}
