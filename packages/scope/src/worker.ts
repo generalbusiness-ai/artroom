@@ -545,19 +545,22 @@ export class McpRegistry<E extends McpEnv = McpEnv> extends DurableObject<E> {
   }
   protected scopes(): Binding { return this.env.SCOPES; }
   protected now(): number { return Date.now(); }
-  #of(origin: string): HostedRegistry {
+  protected ports(): Partial<RegistryPorts> { return {}; }
+  /** Drop this instance's memory, as an eviction would. For a test's subclass. */
+  protected evict(): void { this.#registry = null; }
+  #of(): HostedRegistry {
     if (this.#registry) return this.#registry;
     const agents = this.env.AGENTS;
     this.#registry = new HostedRegistry(sqlOf(this.ctx), {
-      service: origin, now: () => this.now(), observe: observeThrough(this.scopes()),
+      now: () => this.now(), observe: observeThrough(this.scopes()), ...this.ports(),
       mintId: () => agents.newUniqueId().toString(),
       agent: (id) => agents.get(agents.idFromString(id)) as unknown as ReturnType<RegistryPorts["agent"]>,
     });
     return this.#registry;
   }
-  async create(signed: Parameters<HostedRegistry["create"]>[0], body: Uint8Array, origin: string): Promise<ControlAnswer> { return this.#of(origin).create(signed, body); }
-  agents(): ReturnType<HostedRegistry["agents"]> { return this.#of("").agents(); }
-  reservedAgent(op: string): string | null { return this.#of("").reservedAgent(op); }
+  async create(signed: Parameters<HostedRegistry["create"]>[0], body: Uint8Array, origin: string): Promise<ControlAnswer> { return this.#of().create(signed, body, origin); }
+  agents(): ReturnType<HostedRegistry["agents"]> { return this.#of().agents(); }
+  reservedAgent(op: string): string | null { return this.#of().reservedAgent(op); }
 }
 
 /** One hosted agent: its key, bearer, sessions, custody and control identities. */

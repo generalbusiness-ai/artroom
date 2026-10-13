@@ -158,6 +158,8 @@ export type HeldBack =
   | { held: "conflicting"; recorded: string }
   | { held: "full"; reason: "count"; keys: string[] }
   | { held: "full"; reason: "bytes"; bytes: number }
+  /** The store's own budget admits no completion capacity for another dispatch (the hosted store, section 3.6 of its design). */
+  | { held: "full"; reason: "budget"; bytes: number }
   | { held: "locked"; stale?: string }
   | { held: "unreadable" }
   | { held: "too-large" };

@@ -210,15 +210,11 @@ export class McpHttp {
     let session: LegacySession;
     let issued: string | null = null;
     if (m.method === "initialize" && !notification) {
+      // The new session is admitted first (its capabilities validated and its row kept) and only then does a 17th end the
+      // oldest: a refused initialize destroys nothing, and the limit holds once the newcomer is in.
       issued = this.port.mintSession();
       session = newSession(issued);
       session.created = this.port.now?.() ?? Date.now();
-      this.sessions.set(issued, session);
-      // A 17th session ends the oldest, gracefully.
-      while (this.sessions.size > SESSIONS_MOST) {
-        const oldest = this.sessions.keys().next().value!;
-        await this.#end(this.sessions.get(oldest)!, true);
-      }
     } else {
       if (sessionId === null) return json(400, rpcError(id, -32600, "Mcp-Session-Id is required."));
       const found = this.sessions.get(sessionId);
@@ -226,9 +222,17 @@ export class McpHttp {
       session = found;
     }
     const response = await this.port.wire.handle(m, session, (out) => session.stream?.send(out));
-    // An initialize that is refused issues no session: nothing of it stays in memory, and no session header is sent. A store
-    // that could not keep it answers 507.
-    if (issued && response?.error) { this.port.wire.endLegacy(session); this.sessions.delete(issued); return json(response.error.code === SESSION_FULL ? 507 : 200, response); }
+    if (issued) {
+      // Refused: no session was issued, nothing of it stays, and a row the hook may have kept is removed. A store that could
+      // not keep it answers 507.
+      if (response?.error) { this.port.wire.endLegacy(session); await this.port.remove?.(issued); return json(response.error.code === SESSION_FULL ? 507 : 200, response); }
+      this.sessions.set(issued, session);
+      while (this.sessions.size > SESSIONS_MOST) {
+        const oldest = this.sessions.keys().next().value!;
+        if (oldest === issued) break;
+        await this.#end(this.sessions.get(oldest)!, true);
+      }
+    }
     if (!response) return bare(202);
     return json(200, response, issued ? { "mcp-session-id": issued } : {});
   }

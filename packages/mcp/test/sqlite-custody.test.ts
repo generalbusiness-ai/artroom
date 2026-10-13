@@ -125,7 +125,7 @@ describe("the custody store over SQLite", () => {
     // A third identity cannot be armed: refused full before dispatch, nothing written, the two reservations intact.
     const error = await store.write("c", recordOf("c", "sent"), { dispatch: true }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CustodyError);
-    expect((error as CustodyError).why).toMatchObject({ held: "full", reason: "bytes" });
+    expect((error as CustodyError).why).toMatchObject({ held: "full", reason: "budget" });
     expect(await store.read("c")).toBeNull();
     expect(store.used() + store.reserved()).toBe(held);
     // A result for a consumes its reservation, never free space: a terminal write at full succeeds and its receipt reads back.

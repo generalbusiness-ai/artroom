@@ -11,10 +11,12 @@ import { b64url, canonicalize, digestBytes, keyIdOfSecret, newIncarnation, signC
 import { encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
 import { firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
+import { counting } from "../../../examples/counting/definition.ts";
+import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { mcpRoute } from "../../scope/src/worker.ts";
 import { hostedTest } from "../../scope/test/worker.ts";
-import { MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
+import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { founded } from "./support/story.ts";
@@ -143,7 +145,7 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
   expect((await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }))["answer"]).toBe("accepted");
   return { room, rita };
 }
-const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; room.done(); };
+const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; hostedTest.controlBudget = null; hostedTest.custodyBounds = null; hostedTest.failWrite = null; hostedTest.faultAt = null; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
 const mcp = async (bearer: string, method: string, headers: Record<string, string>, body?: unknown): Promise<Response> => {
   const response = await routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
@@ -347,19 +349,43 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     // A change while no stream is open is told once at the next stream; a second GET closes the first stream, the second keeps receiving.
     open3.stop();
     await settle();
-    await rita.ok("rules.activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue2" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue2" }).catch(() => undefined);
-    expect((await rita.ok("member.add", { fields: { handle: "@seen", kind: "checker" }, idempotencyKey: "add-seen" }))["answer"]).toBe("accepted");
+    // A change of the agent's list while no stream is open: a third definition activated changes the choices of a field.
+    expect((await rita.ok("rules.activate", { fields: { digest: COUNTING_DEFINITION, name: "counting" }, values: [canonicalize(counting)], idempotencyKey: "activate-counting" }))["answer"]).toBe("accepted");
     await stub.tick();
     const open4 = stream(bot.bearer, S);
     await settle();
-    const toldAtOpen = told(open4);
+    expect(told(open4), "a change while no stream was open is told once at the next stream").toBe(1);
     const open5 = stream(bot.bearer, S);
     await settle();
     expect(await open4.ended, "the first stream closed on replacement").toBe(200);
     expect(open5.text()).toContain(": stream");
     expect((await stub.counts()).streams).toBe(1);
-    void toldAtOpen;
+    expect(told(open5), "the replacement is told once more, because the session has still not listed").toBe(1);
+    // A later change reaches the replacement, not the closed stream: the session lists (listed = current), then a definition is
+    // activated under another name, which changes the choices again.
+    expect((await list(S)).status).toBe(200);
+    // A new lane is a new held scope of the agent's inventory.
+    const opened = await rita.ok("issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "a later lane", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "later-lane" });
+    expect(opened["answer"], JSON.stringify(opened)).toBe("accepted");
+    expect((await rita.ok("wait", { scope: "directory", entry: (opened["fact"] as FactRef).seq }))["timedOut"]).toBe(false);
+    await stub.tick();
+    await settle();
+    expect(told(open5), "the replacement receives the later change").toBe(2);
+    expect(told(open4), "the closed stream receives nothing").toBe(1);
     open5.stop();
+    await settle();
+    // A modern listen across a reset: the reset ends it abruptly with no event; a reopened listen is acknowledged with its ID
+    // and honored types and replays nothing.
+    const first = listen(bot.bearer);
+    expect(await until(() => first.text().includes("acknowledged"))).toBe(true);
+    await stub.reset();
+    expect(first.text()).not.toContain("resultType");
+    const reopened = listen(bot.bearer);
+    expect(await until(() => reopened.text().includes("acknowledged"))).toBe(true);
+    expect(reopened.text()).toContain('"io.modelcontextprotocol/subscriptionId":0');
+    expect(reopened.text()).toContain('"toolsListChanged":true');
+    expect(reopened.text(), "nothing from before the reopen is replayed").not.toContain("notifications/tools/list_changed");
+    first.stop(); reopened.stop();
     await settle();
     // H6. A reply lost on the way back leaves the record unknown; settle after a reset resolves it from the scope; a repeat under the
     // same key signs nothing and returns the retained answer.
@@ -401,6 +427,18 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     const envelope = utf8(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} })).length - 2;
     expect(overhead, "the JSON-RPC envelope and the modern result's added members").toBe(envelope + MODERN_RESULT_EXTRA);
     expect(framed.headers.get("content-type")).toBe("application/json");
+    // The plan 031 bounds hold through the endpoint: each response is its CallResult's bound plus the framing, observed.
+    const within = async (name: string, args: Record<string, unknown>, bound: number) => {
+      const r = await room.wait(() => modernCall(bot.bearer, name, args));
+      const body = await r.text();
+      expect(utf8(body).length - overhead, `${name} within its bound through the endpoint`).toBeLessThanOrEqual(bound);
+      return body;
+    };
+    await within("room", {}, BOUNDS.room);
+    await within("inspect", { scope: "directory" }, BOUNDS.inspect);
+    await within("issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "bounded", conditions: ["done"] }, idempotencyKey: "bounded" }, BOUNDS.act);
+    await within("steps", { scope: "directory" }, BOUNDS.large);
+    await within("settle", { idempotencyKey: "bounded", target: "directory" }, BOUNDS.act);
   } finally { done(room); }
 });
 
@@ -494,6 +532,26 @@ test("the control budget is one aggregate: operations, sessions and configuratio
     expect(withSession - afterCreate, "the session row's bytes are charged").toBeGreaterThan(8 * 1024);
     expect((await mcp(bot.bearer, "DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status).toBe(200);
     expect(await stub.used(), "and credited when the session ends").toBe(afterCreate);
+    // A session's capabilities are bounded in UTF-8 bytes: 6,000 three-byte characters are refused though they are 6,000 units.
+    const multibyte = await mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: { experimental: { pad: "\u20ac".repeat(6000) } }, clientInfo: { name: "h", version: "0" } } });
+    expect([(await multibyte.json() as { error?: { code: number } }).error?.code, multibyte.headers.get("mcp-session-id")]).toEqual([-32602, null]);
+    // Sixteen sessions, then a refused seventeenth: every one of the sixteen is still served; a valid seventeenth ends exactly the oldest.
+    const sixteen: string[] = [];
+    for (let n = 0; n < 16; n++) sixteen.push(await legacySession(bot.bearer));
+    const afterSixteen = await stub.used();
+    const list = (session: string) => mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": session }, { jsonrpc: "2.0", id: 2, method: "tools/list" });
+    const refusedSeventeenth = await mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: big, clientInfo: { name: "h", version: "0" } } });
+    expect([(await refusedSeventeenth.json() as { error?: { code: number } }).error?.code, refusedSeventeenth.headers.get("mcp-session-id")]).toEqual([-32602, null]);
+    for (const id of sixteen) expect((await list(id)).status, "every earlier session is still served after a refused seventeenth").toBe(200);
+    expect((await stub.counts()).sessions).toBe(16);
+    const afterLists = await stub.used();
+    const seventeenth = await legacySession(bot.bearer);
+    const afterSeventeenth = await stub.used();
+    expect((await list(sixteen[0]!)).status, "the oldest ended").toBe(404);
+    for (const id of [...sixteen.slice(1), seventeenth]) expect((await list(id)).status).toBe(200);
+    expect((await stub.counts()).sessions).toBe(16);
+    for (const id of [...sixteen.slice(1), seventeenth]) expect((await mcp(bot.bearer, "DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id })).status, id).toBe(200);
+    expect(await stub.used(), `the sessions' bytes are credited (create ${afterCreate}, sixteen ${afterSixteen}, lists ${afterLists}, seventeenth ${afterSeventeenth})`).toBe(afterCreate);
     // Rotations with distinct 128-byte ops fill the budget to its ceiling for create and bearer; the next is refused 507.
     let rotations = 0;
     let bearer = bot.bearer;
@@ -510,16 +568,107 @@ test("the control budget is one aggregate: operations, sessions and configuratio
     expect(rotations).toBeLessThan(40);
     const full = await stub.used();
     expect(full).toBeLessThanOrEqual(64 * 1024 - 8 * 1024);
-    // At the ceiling, a session cannot be kept either: initialize answers the session-full error and issues no session.
+    // At the ceiling, a session cannot be kept either: initialize answers the session-full error and issues no session, and a
+    // session admitted before the ceiling is untouched by that refusal.
+    const kept = await legacySession(bearer).catch(() => null);
     const noRoom = await mcp(bearer, "POST", { "mcp-protocol-version": LEGACY }, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: within, clientInfo: { name: "h", version: "0" } } });
     expect([noRoom.status, noRoom.headers.get("mcp-session-id")]).toEqual([507, null]);
-    expect((await stub.counts()).sessions).toBe(0);
+    if (kept) expect((await mcp(bearer, "POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": kept }, { jsonrpc: "2.0", id: 2, method: "tools/list" })).status, "the earlier session is still served").toBe(200);
+    expect((await stub.counts()).sessions).toBe(kept ? 1 : 0);
     // The counters are durable: after a reset the object sees the same used bytes, and the next rotation is still refused.
+    const beforeReset = await stub.used();
     await stub.reset();
-    expect(await stub.used()).toBe(full);
+    expect(await stub.used()).toBe(beforeReset);
     expect((await room.wait(() => post(`/mcp/agents/${bot.agent}/bearer`, control(room, rita.secret, "bearer", M, bot.agent, "", "rotate-after-reset"), ""))).status).toBe(507);
     // Retire draws on the reserve: it succeeds where create and bearer were refused.
     expect((await room.wait(() => post(`/mcp/agents/${bot.agent}`, control(room, rita.secret, "retire", M, bot.agent, "", "retire-at-full"), "", "DELETE"))).status).toBe(200);
     expect((await mcp(bearer, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/list" }, { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } })).status).toBe(401);
+  } finally { done(room); }
+});
+
+test("H1 fences: a reset at each adopted fence of a creation resumes with the same agent, key, envelope and bearer", async () => {
+  const { room, rita } = await roomWithIssues();
+  try {
+    const M = rita.config.repository!.membership;
+    const registry = registryStub(M.scope) as unknown as { reset(): Promise<void>; agents(): Promise<{ agent: string; handle: string; key: string | null; state: string }[]>; reservedAgent(op: string): Promise<string | null> };
+    const fences = ["reservation", "seed", "kept", "accepted", "complete"] as const;
+    for (const [i, fence] of fences.entries()) {
+      const handle = `@fence${i}`;
+      const op = `create-fence-${fence}`;
+      const { link } = await invite(room, rita, handle);
+      const body = JSON.stringify({ link });
+      hostedTest.faultAt = fence;
+      // The reset: the object throws at the fence and drops its memory; the request fails with no answer.
+      const failed = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, op), body)).then((r) => r.status, () => -1);
+      expect(failed, `${fence}: no answer`).not.toBe(201);
+      expect(hostedTest.faultAt, `${fence}: the fault fired`).toBeNull();
+      await registry.reset();
+      const reserved = await registry.reservedAgent(op);
+      expect(reserved, `${fence}: the reservation survived`).toMatch(/^[0-9a-f]{64}$/);
+      await agentStub(reserved!).reset();
+      // The retry with the same op resumes from the durable state and answers; a further retry answers the same.
+      const resumed = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, op), body));
+      const answer = await resumed.json() as { agent: string; key: string; bearer: string; member: FactRef };
+      expect([resumed.status, answer.agent], `${fence}: resumed ${JSON.stringify(answer)}`).toEqual([201, reserved]);
+      const again = await room.wait(() => post("/mcp/agents", control(room, rita.secret, "create", M, null, body, op), body));
+      expect(await again.json(), `${fence}: the same answer`).toEqual(answer);
+      // One key, one enrol entry signed by it: the envelope kept before the reset is the one admitted, never a second one.
+      const enrols = ((await rita.ok("steps", { scope: "membership" }))["steps"] as { kind: string | null; signer: string | null }[]).filter((e) => e.kind === "enrol" && e.signer === answer.key);
+      expect(enrols.length, `${fence}: exactly one enrol by the agent's key`).toBe(1);
+      expect((await registry.agents()).filter((a) => a.handle === handle).map((a) => [a.key, a.state])).toEqual([[answer.key, "enrolled"]]);
+      // The agent acts with that bearer.
+      const r = await room.wait(() => modernCall(answer.bearer, "room", {}));
+      expect(r.status, `${fence}: the bearer serves`).toBe(200);
+    }
+  } finally { done(room); }
+});
+
+test("H6 through the endpoint: a custody budget refuses full before signing, a storage failure settles nothing and the receipt follows", async () => {
+  const { room, rita } = await roomWithIssues();
+  // Room for two identities' completion needs and little more.
+  // Room for one identity's completion need beside the settled enrolment's record, and little more.
+  hostedTest.custodyBounds = { budget: COMPLETION_BYTES + 64 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const result = async (r: Response) => (await r.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    // The enrolment's record is terminal and holds no reservation. The first act's reply is lost, so it stays unresolved and
+    // holds its completion need; the next act is refused full before anything is signed, and the refusal names custody.
+    hostedTest.lose = `/${rita.config.repository!.directory.scope}/acts`;
+    const first = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "one", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "one" })));
+    expect(first["error"], JSON.stringify(first)).toBe("transport");
+    const refused = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "two", conditions: ["done"] }, idempotencyKey: "two" })));
+    expect(refused["error"], JSON.stringify(refused)).toBe("custody");
+    expect(String(refused["message"]), "the refusal names the budget, not the envelope's size").toContain("at its budget");
+    expect(((await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null }[]).filter((e) => e.kind === "open-issue").length, "nothing was sent for the refused act").toBe(1);
+    // settle resolves the first from the scope and consumes what it held; the second is admitted now; a repeat of the first
+    // signs nothing and returns the retained answer.
+    const settled = await result(await room.wait(() => modernCall(bot.bearer, "settle", { idempotencyKey: "one", target: "directory" })));
+    expect(settled["answer"], JSON.stringify(settled)).toBe("accepted");
+    const second = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "two", conditions: ["done"] }, idempotencyKey: "two" })));
+    expect(second["answer"], JSON.stringify(second)).toBe("accepted");
+    const repeat = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "one", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "one" })));
+    expect([repeat["answer"], repeat["retained"]], JSON.stringify(repeat)).toEqual(["accepted", true]);
+  } finally { done(room); }
+});
+
+test("H6 through the endpoint: a write that fails while a result is written leaves the record unknown, and settle writes the receipt", async () => {
+  const { room, rita } = await roomWithIssues();
+  hostedTest.custodyBounds = { budget: 1024 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const result = async (r: Response) => (await r.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    // The scope accepts the act; the store fails as the result is written: the tool reports a storage failure, not an outcome.
+    hostedTest.failWrite = "result";
+    const failed = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "written late", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "late" })));
+    expect(failed["answer"], JSON.stringify(failed)).not.toBe("accepted");
+    expect(failed["error"], JSON.stringify(failed)).toBe("custody");
+    const sent = ((await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[]).filter((e) => e.kind === "open-issue" && e.signer === bot.key);
+    expect(sent.length, "the act was admitted by the scope").toBe(1);
+    // settle reads the scope's receipt and writes it now that writes succeed; the record is accepted with the same entry.
+    const settled = await result(await room.wait(() => modernCall(bot.bearer, "settle", { idempotencyKey: "late", target: "directory" })));
+    expect([settled["answer"], (settled["fact"] as FactRef | undefined)?.seq], JSON.stringify(settled)).toEqual(["accepted", expect.any(Number)]);
+    const repeat = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "written late", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "late" })));
+    expect([repeat["answer"], repeat["retained"]], JSON.stringify(repeat)).toEqual(["accepted", true]);
+    expect(((await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[]).filter((e) => e.kind === "open-issue" && e.signer === bot.key).length, "never signed twice").toBe(1);
   } finally { done(room); }
 });

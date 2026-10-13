@@ -56,8 +56,8 @@ export interface SqliteCustodyBounds {
   identityMost: number;
   terminalMost: number;
   ageDays: number;
-  /** A test's stand-in for a storage failure: called inside each write transaction; throwing rolls the transaction back. */
-  fail?: () => void;
+  /** A test's stand-in for a storage failure: called inside each write transaction with what the write is; throwing rolls the transaction back. */
+  fail?: (point: "keep" | "dispatch" | "result" | "segment") => void;
 }
 export const SQLITE_CUSTODY_BOUNDS: SqliteCustodyBounds = { budget: CUSTODY_BUDGET, identityMost: IDENTITY_MOST, terminalMost: 1024, ageDays: 30 };
 
@@ -121,10 +121,10 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
     // The completion need is the net growth a dispatch can cause: the record up to its bound, and one more segment row.
     const need = Math.max(0, RECORD_BYTES - recordBytes) + SEGMENT_ROW_BYTES;
     const topUp = Math.max(0, need - me.reserved);
-    if (me.stored + need > bounds.identityMost) throw new CustodyError({ held: "full", reason: "bytes", bytes: me.stored + need });
+    if (me.stored + need > bounds.identityMost) throw new CustodyError({ held: "full", reason: "budget", bytes: me.stored + need });
     if (topUp === 0) return;
     const used = budget("used"), reserved = budget("reserved");
-    if (used + reserved + topUp > bounds.budget) throw new CustodyError({ held: "full", reason: "bytes", bytes: used + reserved + topUp });
+    if (used + reserved + topUp > bounds.budget) throw new CustodyError({ held: "full", reason: "budget", bytes: used + reserved + topUp });
     setBudget("reserved", reserved + topUp);
     setIdentity(id, me.stored, me.reserved + topUp);
   };
@@ -191,7 +191,7 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
         // Before a dispatch: the reservation, before anything is written, whatever the record's phase (a step on a terminal act
         // dispatches too). A result's write consumes what is held and reserves nothing.
         if (options.dispatch) arm(id, bytes.length);
-        bounds.fail?.();
+        bounds.fail?.(options.dispatch ? "dispatch" : record.phase === "prepared" ? "keep" : "result");
         const before = one(`SELECT size FROM record WHERE id = ?`, id);
         const was = before ? Number(before["size"]) : 0;
         // A record made live again takes its archived copy's place: one owner at a time.
@@ -237,7 +237,7 @@ export function sqliteStore(sql: Sql, bounds: SqliteCustodyBounds = SQLITE_CUSTO
           held -= cut;
           store(id, -cut);
         }
-        bounds.fail?.();
+        bounds.fail?.("segment");
         let added = 0;
         outcomes.forEach((outcome, i) => {
           const text = utf8(canonicalize(outcome));

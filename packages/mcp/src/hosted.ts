@@ -34,7 +34,7 @@ import { CustodyError, Lost, meaningOf, type Envelope, type Identity } from "./c
 import { McpHttp, SessionFull, type SessionRow } from "./http.ts";
 import type { McpConfig, Root } from "./inventory.ts";
 import { McpService } from "./service.ts";
-import { sqliteStore, type Sql } from "./sqlite-custody.ts";
+import { sqliteStore, type Sql, type SqliteCustodyBounds } from "./sqlite-custody.ts";
 import { Wire } from "./wire.ts";
 
 export const CONTROL_BUDGET = 16 * 1024 * 1024;
@@ -135,7 +135,7 @@ class ControlPlane {
   /** Reserve one operation's space before anything else: room for its row, its answer and its tombstone. */
   reserve(action: ControlAction): boolean { return this.charge(CONTROL_ROW_BYTES, action); }
   /** The bytes a control row holds as stored. */
-  static rowBytes(op: string, fingerprint: string, answer: ControlAnswer | null): number { return utf8(op).length + fingerprint.length + (answer ? JSON.stringify(answer).length : 0) + ROW_OVERHEAD; }
+  static rowBytes(op: string, fingerprint: string, answer: ControlAnswer | null): number { return utf8(op).length + utf8(fingerprint).length + (answer ? utf8(JSON.stringify(answer)).length : 0) + ROW_OVERHEAD; }
   row(op: string): { fingerprint: string; action: string; agent: string | null; state: string; answer: ControlAnswer | null; notAfter: string } | null {
     const r = this.sql.exec(`SELECT fingerprint, action, agent, state, answer, not_after FROM control WHERE op = ?`, op).toArray()[0];
     if (!r) return null;
@@ -166,7 +166,7 @@ class ControlPlane {
       .filter((r) => now > timeMs(String(r["not_after"]))! + ANSWER_RETENTION_MS);
     for (const r of due) {
       this.sql.exec(`UPDATE control SET answer = NULL WHERE op = ?`, String(r["op"]));
-      this.charge(-String(r["answer"]).length, "retire");   // the body's bytes are credited; the tombstone keeps its row
+      this.charge(-utf8(String(r["answer"])).length, "retire");   // the body's bytes are credited; the tombstone keeps its row
     }
     return due.map((r) => String(r["op"]));
   }
@@ -174,9 +174,13 @@ class ControlPlane {
 
 // ---------------------------------------------------------------- the registry
 
+/** The points of a creation where a witness may fail the object, as the design's H1 names them (section 6). */
+export type CreationFence = "reservation" | "seed" | "kept" | "accepted" | "complete";
+
 export interface RegistryPorts extends Authority {
-  service: string;
   now(): number;
+  /** A test's fault: called at the named fence; throwing there is the reset. */
+  fault?: (fence: CreationFence) => void;
   /** A fresh, unique agent object ID. */
   mintId(): string;
   /** The agent object by its ID: its `create`. */
@@ -199,9 +203,10 @@ export class HostedRegistry {
     return this.sql.exec(`SELECT agent, handle, key, state FROM agents ORDER BY created`).toArray().map((r) => ({ agent: String(r["agent"]), handle: String(r["handle"]), key: r["key"] === null ? null : String(r["key"]), state: String(r["state"]) }));
   }
 
-  async create(signed: SignedControl, body: Uint8Array): Promise<ControlAnswer> {
+  /** `service`: the origin the request arrived at, which the control request and the invitation must both name. */
+  async create(signed: SignedControl, body: Uint8Array, service: string): Promise<ControlAnswer> {
     const now = this.ports.now();
-    const refused = bound(signed, this.ports.service, "create", null, body, now);
+    const refused = bound(signed, service, "create", null, body, now);
     if (refused) return refused;
     const r = signed.request;
     let link: AgentKeyInvitation | null = null;
@@ -210,7 +215,7 @@ export class HostedRegistry {
       link = closed(given, ["link"]) && typeof given["link"] === "string" ? agentKeyInvitationOf(given["link"]) : null;
     } catch { link = null; }
     if (!link) return answer(400, { error: "link", rule: "agent-key-invitation" });
-    if (link.service !== this.ports.service) return answer(400, { error: "link", rule: "service" });
+    if (link.service !== service) return answer(400, { error: "link", rule: "service" });
     if (!same(link.repository.membership, r.membership)) return answer(400, { error: "link", rule: "membership" });
     // Authority now, before anything is reserved: the controller the invitation names, or an admin.
     const authority = await authorityOf(this.ports, r.membership, r.actor, link.handle as MemberId);
@@ -231,7 +236,9 @@ export class HostedRegistry {
       return { agent };
     });
     if ("status" in reserved) return reserved;
+    this.ports.fault?.("reservation");
     const result = await this.ports.agent(reserved.agent).create(r.op, r, link);
+    this.ports.fault?.("complete");
     // Unresolved: the reservation stays, and the next request with the same op resumes it.
     if (result.status === 503) return result;
     this.sql.transaction(() => {
@@ -256,6 +263,10 @@ export interface AgentPorts extends Authority {
   pause?: (waiting: readonly string[]) => Promise<void>;
   /** A test's control budget and retirement reserve in place of 16 MiB and 1 MiB. */
   controlBudget?: { budget: number; reserve: number };
+  /** A test's custody bounds in place of the store's own. */
+  custodyBounds?: SqliteCustodyBounds;
+  /** A test's fault: called at the named fence; throwing there is the reset. */
+  fault?: (fence: CreationFence) => void;
 }
 
 interface AgentRow { op: string; seed: Uint8Array; key: KeyId; state: "enrolling" | "enrolled" | "retired" | "refused"; membership: ScopeRef; handle: string; config: McpConfig; bearer: string | null; answer: ControlAnswer | null }
@@ -297,7 +308,7 @@ export class HostedAgent {
     const text = canonicalize(config as never);
     this.sql.transaction(() => {
       const before = this.sql.exec(`SELECT config FROM agent WHERE id = 1`).toArray()[0];
-      const delta = text.length - (before ? String(before["config"]).length : 0);
+      const delta = utf8(text).length - (before ? utf8(String(before["config"])).length : 0);
       if (!this.#control.charge(delta, "config")) throw new Error("The agent's control budget is full: the configuration cannot grow.");
       this.sql.exec(`UPDATE agent SET config = ?, updated = ? WHERE id = 1`, text, timeOf(this.ports.now()));
     });
@@ -308,7 +319,7 @@ export class HostedAgent {
     if (this.#service) return this.#service;
     const read = async (): Promise<McpConfig> => this.#row()?.config ?? row.config;
     this.#service = new McpService({
-      service: row.config.service, fetch: this.ports.fetch, signer: secretSigner(row.seed), custody: sqliteStore(this.sql, undefined, this.ports.now), now: this.ports.now,
+      service: row.config.service, fetch: this.ports.fetch, signer: secretSigner(row.seed), custody: sqliteStore(this.sql, this.ports.custodyBounds, this.ports.now), now: this.ports.now,
       ...(this.ports.every ? { every: this.ports.every } : {}), ...(this.ports.pause ? { pause: this.ports.pause } : {}),
       config: {
         read,
@@ -332,7 +343,7 @@ export class HostedAgent {
         const text = JSON.stringify(session);
         this.sql.transaction(() => {
           const before = this.sql.exec(`SELECT row FROM session WHERE id = ?`, session.id).toArray()[0];
-          const delta = text.length + ROW_OVERHEAD - (before ? String(before["row"]).length + ROW_OVERHEAD : 0);
+          const delta = utf8(text).length + ROW_OVERHEAD - (before ? utf8(String(before["row"])).length + ROW_OVERHEAD : 0);
           if (!this.#control.charge(delta, "session")) throw new SessionFull();
           this.sql.exec(`INSERT INTO session (id, row, created) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET row = excluded.row`, session.id, text, session.created);
         });
@@ -340,7 +351,7 @@ export class HostedAgent {
       remove: (id) => {
         this.sql.transaction(() => {
           const before = this.sql.exec(`SELECT row FROM session WHERE id = ?`, id).toArray()[0];
-          if (before) this.#control.charge(-(String(before["row"]).length + ROW_OVERHEAD), "retire");
+          if (before) this.#control.charge(-(utf8(String(before["row"])).length + ROW_OVERHEAD), "retire");
           this.sql.exec(`DELETE FROM session WHERE id = ?`, id);
         });
       },
@@ -374,7 +385,7 @@ export class HostedAgent {
         const seed = this.ports.random(32);
         const config: McpConfig = { service: link.service, repository: link.repository, handle: link.handle };
         const configText = canonicalize(config as never);
-        if (!this.#control.charge(configText.length + 256 + ROW_OVERHEAD, "create")) return answer(507, { error: "full", rule: "control-budget" });
+        if (!this.#control.charge(utf8(configText).length + 256 + ROW_OVERHEAD, "create")) return answer(507, { error: "full", rule: "control-budget" });
         this.sql.exec(`INSERT INTO agent (id, op, seed, key, state, membership, handle, config, bearer, answer, created, updated) VALUES (1, ?, ?, ?, 'enrolling', ?, ?, ?, NULL, NULL, ?, ?)`,
           op, seed, keyIdOfSecret(seed), canonicalize(link.repository.membership as never), link.handle, configText, timeOf(now), timeOf(now));
         this.#control.insert(op, fingerprintOf(request), "create", this.ports.id, "reserved", request.notAfter, timeOf(now));
@@ -382,6 +393,7 @@ export class HostedAgent {
       });
       if (made) return made;
       row = this.#row()!;
+      this.ports.fault?.("seed");
     }
     const service = this.#serviceOf(row);
     const M = link.repository.membership;
@@ -396,6 +408,9 @@ export class HostedAgent {
     const notAfter = timeOf(now + PROPOSED_BOUNDS.intentLifetimeSeconds * 1000);
     let kept: Awaited<ReturnType<typeof service.custody.send>>;
     try {
+      // The envelope is kept, and read back, before anything is sent; a reset here resumes with the same envelope.
+      await service.custody.keep(identity, meaning, build, notAfter, utf8(canonicalize(fields)).length);
+      this.ports.fault?.("kept");
       kept = await service.custody.send(identity, meaning, build, async (envelope) => {
         try { return await service.reads.transport.submit(M.scope, envelope.signed, [], envelope.beside); }
         catch (error) { if (error instanceof TransportError) throw new Lost(); throw error; }
@@ -421,6 +436,7 @@ export class HostedAgent {
     if (entry.value.hash !== fact.hash || input.type !== "act" || canonicalize(input.signed) !== canonicalize(kept.record.envelope.signed)) return answer(409, { error: "enrol", rule: "entry" });
     const standing = (await this.ports.observe(M, { key: signer.key })) as KeyStanding | null;
     if (!standing || standing.keyState !== "active") return answer(503, { error: "unresolved", op, rule: "key-not-active" });
+    this.ports.fault?.("accepted");
     const inbox = entry.value.entry.sends.flatMap((send) => ("creator" in send.to && send.to.kind === "inbox" ? [scopeIdOf(send.to as Seed)] : []))[0];
     const secret = b64url(this.ports.random(32));
     const bearer = `${this.ports.id}.${secret}`;
@@ -476,7 +492,7 @@ export class HostedAgent {
         : answer(200, { agent: this.ports.id, by: authority.by, retired: true });
       if (action === "bearer") this.sql.exec(`UPDATE agent SET bearer = ?, updated = ? WHERE id = 1`, digestBytes(utf8(secret!)), timeOf(now));
       else this.sql.exec(`UPDATE agent SET state = 'retired', bearer = NULL, updated = ? WHERE id = 1`, timeOf(now));
-      const held = this.sql.exec(`SELECT row FROM session`).toArray().reduce((n, s) => n + String(s["row"]).length + ROW_OVERHEAD, 0);
+      const held = this.sql.exec(`SELECT row FROM session`).toArray().reduce((n, s) => n + utf8(String(s["row"])).length + ROW_OVERHEAD, 0);
       this.sql.exec(`DELETE FROM session`);
       this.#control.charge(-held, "retire");
       this.#control.insert(r.op, fingerprint, action, this.ports.id, "complete", r.notAfter, timeOf(now));

@@ -25,6 +25,7 @@
  */
 
 import type { Digest } from "@generalbusiness/dap-contract";
+import { utf8 } from "@generalbusiness/artroom-bytes";
 import { INSTRUCTIONS, ListRestart, SERVER_NAME, SERVER_VERSION, type McpService } from "./service.ts";
 
 export const LEGACY = "2025-11-25";
@@ -202,7 +203,7 @@ export class Wire {
         session.version = asked === LEGACY ? LEGACY : LEGACY;
         const capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
         // The declared capabilities are kept with the session, so they are bounded: a session is bounded control state.
-        if (JSON.stringify(capabilities).length > CAPABILITIES_MOST) return error(id, -32602, `The client's capabilities exceed ${CAPABILITIES_MOST} bytes.`);
+        if (utf8(JSON.stringify(capabilities)).length > CAPABILITIES_MOST) return error(id, -32602, `The client's capabilities exceed ${CAPABILITIES_MOST} bytes.`);
         session.capabilities = capabilities;
         try { await this.hooks.changed?.(session); } catch (thrown) { if ((thrown as Error).name === "SessionFull" || /No room for another session/.test(String((thrown as Error).message))) return error(id, SESSION_FULL, "No room for another session."); throw thrown; }
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });

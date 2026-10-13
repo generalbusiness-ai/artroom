@@ -151,11 +151,27 @@ export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promi
  * fixture's clock, and the pause between two polls of `wait`, which drives
  * the fixture's operations as a deployment's alarms would.
  */
-export const hostedTest: { now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null; /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */ lose: string | null; /** A small control budget for an agent object made while it is set, in place of 16 MiB and 1 MiB. */ controlBudget: { budget: number; reserve: number } | null } = { now: null, pause: null, lose: null, controlBudget: null };
+export const hostedTest: {
+  now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null;
+  /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */
+  lose: string | null;
+  /** A small control budget for an agent object made while it is set, in place of 16 MiB and 1 MiB. */
+  controlBudget: { budget: number; reserve: number } | null;
+  /** Small custody bounds for an agent object made while it is set; `failWrite` makes its next custody write fail, as SQLITE_FULL would. */
+  custodyBounds: { budget: number; identityMost: number; terminalMost: number; ageDays: number } | null;
+  /** The next custody write of this kind fails, as SQLITE_FULL would. */
+  failWrite: "keep" | "dispatch" | "result" | "segment" | null;
+  /** The creation fence at which the next creation fails, as a reset would: the object throws there and drops its memory. */
+  faultAt: "reservation" | "seed" | "kept" | "accepted" | "complete" | null;
+} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null };
+/** The scripted reset: thrown at a fence, once. */
+export class ScriptedReset extends Error { constructor(fence: string) { super(`scripted reset at ${fence}`); } }
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
 export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
   protected override scopes() { return this.env.PLATFORM; }
   protected override now(): number { return hostedTest.now?.() ?? Date.now(); }
+  protected override ports() { return { fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } } }; }
+  reset(): void { this.evict(); }
   heldAnswers(): { op: string; answer: boolean }[] { return this.answers(); }
 }
 export class PlatformMcpAgent extends McpAgent<HostedEnv> {
@@ -172,6 +188,8 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
     const scopes = this.env.PLATFORM;
     return {
       ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}),
+      ...(hostedTest.custodyBounds ? { custodyBounds: { ...hostedTest.custodyBounds, fail: (point: "keep" | "dispatch" | "result" | "segment") => { if (hostedTest.failWrite === point) { hostedTest.failWrite = null; throw new Error("SQLITE_FULL: scripted"); } } } } : {}),
+      fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } },
       now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
       pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
       fetch: (async (url: string, init?: RequestInit) => {

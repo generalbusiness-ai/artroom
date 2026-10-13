@@ -1466,8 +1466,10 @@ session the request names. Then:
 
 A batch is refused on every request; a body over 1 MiB is `413`; an
 `Origin` header is `403`. At most 16 sessions per agent (a 17th
-`initialize` ends the oldest) and 4 open streams, legacy streams and
-listens together (a 5th is `409`). A session survives the object's
+`initialize` is admitted first and then ends the oldest; a refused
+`initialize` ends nothing) and 4 open streams, legacy streams and
+listens together (a 5th is `409`). Every byte bound here counts UTF-8
+bytes. A session survives the object's
 eviction; its open stream does not: when the stream reconnects, a list
 change the client has not listed is told once more.
 
