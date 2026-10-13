@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at docs/write-an-application.md","body":{"commit":"765c4eb9f7ef280e9f7b1ff245eb8736b35b4ffb","path":"docs/write-an-application.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:044011aaeff6f671ae38bed457ed522fb982a5e3","text":"Merge retired a covered predecessor; the successor is at apps/room/docs/lanes.md."}
