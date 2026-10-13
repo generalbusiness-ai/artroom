@@ -357,7 +357,9 @@ describe("what a call costs, end to end", () => {
 
   // Invariant: a dead reclaimer under a long ARTROOM_HOME is reported within the error bound: the reclaim file is named once, in
   // the next step, whole and relative to ARTROOM_HOME, and the absolute path is not in the result. Removing that file recovers.
-  test("a dead reclaimer under a long ARTROOM_HOME: the file named whole, relative, within the bound", async ({ annotate }) => {
+  // The home is longer than macOS's PATH_MAX of 1024 bytes and cannot be made there (ENAMETOOLONG), so the witness runs where a
+  // path may be that long, as on Linux; it is skipped, not passed, elsewhere.
+  test.skipIf(process.platform === "darwin")("a dead reclaimer under a long ARTROOM_HOME: the file named whole, relative, within the bound", async ({ annotate }) => {
     const deadPid = () => new Promise<number>((resolve) => { const p = spawn(process.execPath, ["-e", ""]); p.on("exit", () => resolve(p.pid!)); });
     // 24 components of 90 characters: a home of more than 2 KiB, lawful on Linux.
     const home = join(mkdtempSync(join(tmpdir(), "mcp-home-")), ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}${"h".repeat(88)}`));

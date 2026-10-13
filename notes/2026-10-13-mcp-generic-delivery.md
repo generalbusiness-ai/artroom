@@ -251,6 +251,16 @@ In this session, after the last change to what each covers:
 | `npm run gate` in the round of review b04a53c8, once, at `296166a7` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1112 passed \| 2 skipped (1118)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review ad2576fb, once, at `324af0e4` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1114 passed \| 2 skipped (1120)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
+## The planner's second amendment, after the merge
+
+The witness "a dead reclaimer under a long ARTROOM_HOME" builds a home of
+more than 2 KiB, lawful on Linux, where the cloud container ran it. macOS
+caps a path at 1024 bytes, so on the planner's machine its `mkdir` fails
+with `ENAMETOOLONG` before the witness begins. The planner marked it
+`skipIf` on `darwin`, with the reason in its comment, and changed nothing
+else; on this machine it is skipped, not passed, and the local gate counts
+it as a skip.
+
 ## The planner's amendment after the second cloud gate
 
 On the planner's machine, Node 26.11.1 prints a `DEP0205` deprecation
