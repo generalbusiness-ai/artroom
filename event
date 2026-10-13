@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"README.md at exact 28eb728964647041d24c402c33847a0e5ec519eb on planner/roadmap-and-use-cases, under promise git:sha1…d760edc on request git:sha1…e0f40f4","body":{"commit":"28eb728964647041d24c402c33847a0e5ec519eb","path":"README.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1a0b2e393b245ec8c0cdd3cb2b9f2100290b82f3","text":"Republished at c28193a5474ca58d5790b9c2f9108d8ae70ceb4f; the successor stands at scripts/active-source.test.mjs."}
