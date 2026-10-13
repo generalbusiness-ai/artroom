@@ -18,19 +18,24 @@ async function accepted(room: Room, agent: Agent, tool: string, args: Record<str
   }
 }
 
+/** A room whose directory has created the pantry as lane 1, with rita, its founder, in the given mode. */
+async function pantryRoom(room: Room, mode: "default" | "add"): Promise<Agent> {
+  const rita = room.agent("rita", { mode });
+  await founded(room, rita);
+  await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
+  expect((await rita.ok("rules.activate", { fields: { digest: definitionDigest(pantry), name: "pantry" }, values: [canonicalize(pantry)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
+  const opened = await rita.ok("issue.create", { fields: { definition: definitionDigest(pantry), title: "The pantry", conditions: ["it keeps"] }, idempotencyKey: "pantry" });
+  expect((await rita.ok("wait", { scope: "directory", entry: (opened["fact"] as FactRef).seq }))["timedOut"]).toBe(false);
+  return rita;
+}
+
 // Invariant: a name a definition lawfully chose is kept as an own property wherever the server holds it, even `__proto__`: a
 // required text field, a member of a record field, a presented fact and a bound `also` alias each reach the scope's entry, and
 // the native runtime accepts the act. A plain assignment would have dropped each one, and the scope would have refused.
 test("__proto__ as a field, a record member, a presented fact and an also alias, accepted natively", async () => {
   const room = mcpRoom();
   try {
-    const rita = room.agent("rita");
-    await founded(room, rita);
-    await rita.ok("rules.publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" });
-    expect((await rita.ok("rules.activate", { fields: { digest: definitionDigest(pantry), name: "pantry" }, values: [canonicalize(pantry)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
-    // The room's directory creates the pantry as lane 1, under the room's membership.
-    const opened = await rita.ok("issue.create", { fields: { definition: definitionDigest(pantry), title: "The pantry", conditions: ["it keeps"] }, idempotencyKey: "pantry" });
-    expect((await rita.ok("wait", { scope: "directory", entry: (opened["fact"] as FactRef).seq }))["timedOut"]).toBe(false);
+    const rita = await pantryRoom(room, "default");
     const root = 1;
 
     // A required text field and a record member, both named __proto__, as JSON brings them.
@@ -53,5 +58,40 @@ test("__proto__ as a field, a record member, a presented fact and an also alias,
     const sealed = await accepted(room, rita, "pantry.seal", { target: root, on: filledJar.id, presented: JSON.parse(`{ "__proto__": ${JSON.stringify(fill)} }`), idempotencyKey: "seal" });
     const sealEntry = (await rita.ok("step", { scope: root, seq: (sealed["fact"] as FactRef).seq }))["entry"] as { input: Record<string, unknown> };
     expect(own(sealEntry.input["presented"], "__proto__")).toEqual(fill);
+  } finally { room.done(); }
+}, 120_000);
+
+// Invariant: an optional name the caller left out stays out, even when an object's prototype has that name: omitted optional
+// fields named __proto__, constructor and toString, an empty nested record, and an optional presented fact named constructor
+// with presented absent or empty, each sent through the generic act tool, are accepted natively, with no such own name in the
+// intent. Given, the same names arrive as own properties with their values.
+test("optional prototype names left out stay out, through act", async () => {
+  const room = mcpRoom();
+  try {
+    const rita = await pantryRoom(room, "add");
+    const root = 1;
+    const viaAct = async (kind: string, args: Record<string, unknown>) => {
+      const acts = await rita.ok("actions", { scope: root });
+      return accepted(room, rita, "act", { target: root, kind, digest: acts["digest"], ...args });
+    };
+    const intentOf = async (done: Record<string, unknown>) => ((await rita.ok("step", { scope: root, seq: (done["fact"] as FactRef).seq }))["entry"] as { input: { presented?: Record<string, unknown>; signed: { intent: { fields: Record<string, unknown> } } } }).input;
+
+    // Every optional name left out, and the required record given empty.
+    const bare = await intentOf(await viaAct("stock", { fields: JSON.parse('{ "box": {} }'), idempotencyKey: "stock-bare" }));
+    expect([Object.keys(bare.signed.intent.fields), Object.keys(own(bare.signed.intent.fields, "box") as object)]).toEqual([["box"], []]);
+    // The same names given: each an own property, with its value.
+    const full = await intentOf(await viaAct("stock", { fields: JSON.parse('{ "__proto__": "a", "constructor": "b", "toString": { "__proto__": "c" }, "box": { "valueOf": "d" } }'), idempotencyKey: "stock-full" }));
+    const f = full.signed.intent.fields;
+    expect([own(f, "__proto__"), own(f, "constructor"), own(own(f, "toString"), "__proto__"), own(own(f, "box"), "valueOf"), own(own(f, "box"), "__proto__")]).toEqual(["a", "b", "c", "d", "(not own)"]);
+
+    // An optional presented fact named constructor, with presented left out, and with presented empty.
+    const jars = ((await rita.ok("inspect", { scope: root }))["items"] as { id: number; type: string; state: string }[]).filter((i) => i.type === "jar");
+    expect(jars).toHaveLength(2);
+    for (const [jar, presented] of [[jars[0]!, undefined], [jars[1]!, {}]] as const) {
+      const closed = await intentOf(await viaAct("close", { on: jar.id, ...(presented ? { presented } : {}), idempotencyKey: `close-${jar.id}` }));
+      expect(own(closed.presented ?? {}, "constructor"), JSON.stringify(presented)).toBe("(not own)");
+    }
+    // Both jars are sealed, a final state: neither is live any more.
+    expect(((await rita.ok("inspect", { scope: root }))["items"] as { type: string }[]).filter((i) => i.type === "jar")).toEqual([]);
   } finally { room.done(); }
 }, 120_000);

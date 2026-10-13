@@ -2,7 +2,8 @@
  * A definition whose names are `__proto__` wherever a definition may choose a name the server keeps in a dictionary: a required
  * text field, a member of a record field, a presented fact and an `also` alias. It is parsed from JSON, as a definition arrives,
  * so each `__proto__` is an own name of its record. The native validator admits each of them (sections 6.1 and 17.2). Its genesis
- * takes the fields the directory's `open-issue` sends, so the room's directory creates it as a lane.
+ * takes the fields the directory's `open-issue` sends, so the room's directory creates it as a lane. `stock` and `close` declare
+ * optional names that an object's prototype also has (`__proto__`, `constructor`, `toString`, `valueOf`), for omission.
  */
 import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
 
@@ -48,6 +49,22 @@ export const pantry = JSON.parse(`{
       "fields": { "jar": { "type": "item", "of": "jar", "required": true }, "title": { "type": "text", "max": 256, "required": true } },
       "guards": [{ "state": ["open"], "of": "also.__proto__" }],
       "effects": [{ "value": { "slot": "title", "from": { "field": "title" } } }],
+      "sends": [], "attention": []
+    },
+    "stock": {
+      "step": "open", "on": "jar", "grant": "issue.comment", "also": {},
+      "fields": {
+        "__proto__": { "type": "text", "max": 64, "required": false },
+        "constructor": { "type": "text", "max": 64, "required": false },
+        "toString": { "type": "record", "of": { "__proto__": { "type": "text", "max": 64, "required": false } }, "required": false },
+        "box": { "type": "record", "of": { "__proto__": { "type": "text", "max": 64, "required": false }, "valueOf": { "type": "text", "max": 64, "required": false } }, "required": true }
+      },
+      "guards": [], "effects": [], "sends": [], "attention": []
+    },
+    "close": {
+      "step": "transition", "on": "jar", "grant": "issue.comment", "also": {}, "fields": {},
+      "presents": { "constructor": { "kind": ["fill"], "under": "pantry", "required": false } },
+      "guards": [{ "state": ["open"] }], "effects": [{ "state": "sealed" }],
       "sends": [], "attention": []
     },
     "seal": {

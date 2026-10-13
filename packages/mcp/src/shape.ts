@@ -27,6 +27,15 @@ function put<T>(out: Record<string, T>, name: string, value: T): void {
   Object.defineProperty(out, name, { value, enumerable: true, writable: true, configurable: true });
 }
 
+/**
+ * A name's value only when it is an own property: an absent name is absent, never what the prototype holds. So an optional
+ * field, record member or presented fact named `__proto__`, `constructor` or `toString` that the caller left out stays out, and
+ * the scope applies its own default (derive's readFields reads the same way).
+ */
+function ownValue(record: Readonly<Record<string, unknown>> | undefined, name: string): unknown {
+  return record !== undefined && Object.hasOwn(record, name) ? record[name] : undefined;
+}
+
 interface Shaping { membership: ScopeRef | null; texts: Map<string, string> }
 
 function shaped(type: FieldLike, value: unknown, path: string, at: Shaping): FieldValue {
@@ -77,7 +86,7 @@ function named(types: Readonly<Record<string, FieldLike>>, given: Readonly<Recor
   for (const name of Object.keys(given)) if (!Object.hasOwn(types, name)) throw new Unshaped(`${path}.${clip(name)}`, "is not declared", "no such field");
   const out: Record<string, FieldValue> = {};
   for (const [name, type] of Object.entries(types)) {
-    const value = given[name];
+    const value = ownValue(given, name);
     if (value === undefined) { if (type.required) throw new Unshaped(`${path}.${name}`, "is required", declaredOf(type)); continue; }
     put(out, name, shaped(type, value, `${path}.${name}`, at));
   }
@@ -101,7 +110,7 @@ export function shapePresented(act: ActLike, presented: Readonly<Record<string, 
   const out: Record<string, FactRef> = {};
   for (const name of Object.keys(presented ?? {})) if (!Object.hasOwn(declared, name)) throw new Unshaped(`presented.${clip(name)}`, "is not declared", "no such presented fact");
   for (const [name, p] of Object.entries(declared)) {
-    const value = presented?.[name];
+    const value = ownValue(presented, name);
     if (value === undefined) { if (p.required) throw new Unshaped(`presented.${name}`, "is required", `a fact of kind ${p.kind.join(" or ")}`); continue; }
     if (!isFactRef(value)) throw new Unshaped(`presented.${name}`, "is not a fact: { at, seq, hash }", `a fact of kind ${p.kind.join(" or ")}`);
     put(out, name, value);
@@ -130,12 +139,12 @@ export function expectedOf(act: ActLike, items: readonly Item[], on: number | nu
   const subject = (name: string): Item | null => {
     if (bound.has(name)) return bound.get(name)!;
     if (name === "on") return items.find((item) => item.id === on) ?? null;
-    const rule = act.also[name.replace(/^also\./, "")] as { item?: string; one?: true; by?: string; code?: string; via?: { slot: string; of: string } } | undefined;
+    const rule = ownValue(act.also, name.replace(/^also\./, "")) as { item?: string; one?: true; by?: string; code?: string; via?: { slot: string; of: string } } | undefined;
     if (!rule || rule.code !== undefined) return null;
     bound.set(name, null);
     const via = rule.via ? subject(rule.via.of)?.refs[rule.via.slot] : undefined;
     const id = typeof via === "number" ? via : via && typeof via === "object" && "seq" in via ? (via as FactRef).seq : undefined;
-    const item = rule.one ? items.find((i) => i.type === rule.item) : rule.by !== undefined && typeof fields[rule.by] === "number" ? items.find((i) => i.id === fields[rule.by!]) : items.find((i) => i.id === id);
+    const item = rule.one ? items.find((i) => i.type === rule.item) : rule.by !== undefined && typeof ownValue(fields, rule.by) === "number" ? items.find((i) => i.id === ownValue(fields, rule.by!)) : items.find((i) => i.id === id);
     bound.set(name, item ?? null);
     return item ?? null;
   };
@@ -152,7 +161,7 @@ export function valuePlaces(act: ActLike, fields: Readonly<Record<string, FieldV
   const out: { name: string; domain: string; digest: string }[] = [];
   for (const [name, type] of Object.entries(act.fields)) {
     const value = type["value"];
-    const digest = fields[name];
+    const digest = ownValue(fields, name);
     if (type.type === "digest" && isRecord(value) && typeof value["domain"] === "string" && typeof digest === "string") out.push({ name, domain: value["domain"], digest });
   }
   return out;
