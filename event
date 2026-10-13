@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at vitest.config.ts","body":{"commit":"bd02ecffe47388069013ae50332b1f844ee8fd6f","path":"vitest.config.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:03f7c6dc8bca81f88ae1f3a5c8e2212a745c7220","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/counter.scope.test.ts."}
