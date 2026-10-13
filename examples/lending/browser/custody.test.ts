@@ -3,12 +3,13 @@ import type { Answer, Receipt } from "@generalbusiness/dap-contract";
 import { signIntent } from "@generalbusiness/artroom-bytes";
 import { keys, t } from "@generalbusiness/dap-derive/testing";
 import { LENDING_DEFINITION } from "../pin.ts";
-import { advance, validKept, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports } from "./custody.ts";
+import { advance, lendingBinding, validKept, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports } from "./custody.ts";
 
 // The scope is a STAND-IN here: `post`, `settle` and `recorded` are scripted. The signature is real.
 const scope = { scope: "sc_lending", inc: "in_one", kind: "lane" } as unknown as LendingIdentity["scope"];
-const identity: LendingIdentity = { origin: "https://scopes.test", deployment: "test", scope, definition: LENDING_DEFINITION,
+const who: LendingIdentity = { origin: "https://scopes.test", deployment: "test", scope, definition: LENDING_DEFINITION,
   membership: keys.una.member.membership, member: keys.una.member, publicKey: keys.una.key };
+const identity = lendingBinding(who);
 const envelope = (name = "Sieve", who = keys.una): Envelope => ({ grants: [], beside: {},
   signed: signIntent({ v: 1, to: scope, actor: who.key, kind: "donate", on: null, expected: {}, fields: { name, description: "Fine mesh." }, idempotencyKey: `k-${name}`, notAfter: t(60) }, who.secret) });
 const kept = (phase: Kept["phase"], e = envelope()): Kept => ({ v: 1, kind: "donate", envelope: e, phase, ...(phase === "refused" ? { refusal: "type-full" } : {}) });

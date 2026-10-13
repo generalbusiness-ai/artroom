@@ -1,13 +1,14 @@
 import { expect, onTestFinished, test } from "vitest";
 import type { Entry, Intent, Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, intentDigest, isSeed, scopeIdOf, seedDigest, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
-import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
+import { b64url, canonicalize, intentDigest, isSeed, scopeIdOf, seedDigest, textDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { INVITATION_LINK, requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { APPLICATION_COHORT, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { lendingGateway, SETTLED_AFTER_MS } from "../../../examples/lending/browser/client.ts";
 import type { Kept, KeptStore } from "../../../examples/lending/browser/custody.ts";
+import { findLending, joining, newDeviceKey, readInvitation, ROOM_MEMBERSHIP, type JoinStore, type KeptJoin } from "../../../examples/lending/browser/join.ts";
 import { lending } from "../../../examples/lending/definition.ts";
 import { LENDING_DEFINITION } from "../../../examples/lending/pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
@@ -229,13 +230,59 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     expect(await reloaded.pending()).toBeNull();
     reloaded.dispose(); g.dispose();
 
+    // A visitor joins from a browser with an invitation link, under the application cohort's
+    // membership, with a device key that WebCrypto holds. Then the visitor's own device finds
+    // the room's lending scope in the directory and donates. The reply to the join is lost.
+    expect(ROOM_MEMBERSHIP).toBe(APPLICATION_COHORT.membership);
+    const inviteSecret = "lending-visitor-invitation-secret-of-at-least-32-bytes";
+    const invited = await M.did(neighbour, "invite-member", { fields: { handle: "@visitor", role: "member", inviteHash: textDigest(inviteSecret), inviteEnds: soon(60) } });
+    const linkText = INVITATION_LINK + b64url(utf8(JSON.stringify({ v: 1, service: SERVICE, repository: { directory: await D.at(), membership, rules: Q.name, destination: G.name },
+      invitation: invited, secret: inviteSecret, handle: "@visitor", definition: APPLICATION_COHORT.membership })));
+    expect(readInvitation(linkText, "https://elsewhere.test")).toEqual({ ok: false, reason: "This invitation is for another service." });
+    expect(readInvitation("artroom-invite:AAAA", SERVICE)).toEqual({ ok: false, reason: "That is not an invitation link." });
+    const read = readInvitation(` ${linkText}\n`, SERVICE);
+    if (!read.ok) throw new Error(read.reason);
+    const device = await newDeviceKey(), clock = () => timeMs(soon(0))!;
+    let joinSlot: string | null = null, joinPosts = 0, loseJoin = true;
+    const joinStore: JoinStore = { load: async () => joinSlot === null ? null : JSON.parse(joinSlot) as KeptJoin, save: async (value) => { joinSlot = JSON.stringify(value); }, clear: async () => { joinSlot = null; } };
+    const serial = { run: <T>(work: () => Promise<T>): Promise<T> => work() };
+    const door = () => joining(device, { lock: serial, store: joinStore, now: clock, fetch,
+      actFetch: async (url, init) => { joinPosts++; const response = await fetch(url, init); if (loseJoin) throw new Error("the reply was lost"); return response; } });
+    const membersBefore = (await M.summary()).at;
+    expect(await door().join(read.link, read.seat)).toMatchObject({ status: "unknown", seat: { handle: "@visitor" } });
+    expect((await M.summary()).at.seq).toBe(membersBefore.seq + 1);
+    // The join is kept. A second use of the invitation signs nothing; after a reload, Check settles the original by a read.
+    expect(await door().join(read.link, read.seat)).toMatchObject({ status: "nothing-sent" });
+    loseJoin = false;
+    const reopened = door();
+    expect(await reopened.pending()).toMatchObject({ handle: "@visitor" });
+    expect(await reopened.check()).toEqual({ status: "joined", seat: read.seat });
+    const joinsOf = async (key: string) => (await M.entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "join" && entry.input.signed.intent.actor === key).length;
+    expect([joinPosts, joinSlot, await joinsOf(device.publicKey)]).toEqual([1, null, 1]);
+    // A used invitation is refused in plain words, and nothing stays kept.
+    const second = await newDeviceKey();
+    expect(await joining(second, { lock: serial, store: joinStore, now: clock, fetch }).join(read.link, read.seat)).toMatchObject({ status: "refused" });
+    expect([joinSlot, await joinsOf(second.publicKey)]).toEqual([null, 0]);
+    // The visitor's device finds the lending scope and acts as @visitor.
+    const found = await findLending(read.seat, device, { now: clock, fetch });
+    if (!found.ok) throw new Error(found.reason);
+    expect(found.identity).toMatchObject({ scope: scopeOfLending, member: { member: "@visitor" }, publicKey: device.publicKey });
+    let visitorSlot: string | null = null;
+    const visitor = lendingGateway(found.identity, (await import("../../../examples/lending/browser/join.ts")).deviceSigner(device), { current: () => true, lock: serial, now: clock, fetch,
+      store: { load: async () => visitorSlot === null ? null : JSON.parse(visitorSlot) as Kept, save: async (value) => { visitorSlot = JSON.stringify(value); }, clear: async () => { visitorSlot = null; } } });
+    expect((await visitor.look()).status).toBe("current");
+    expect(await visitor.act("donate", { name: "Whisk", description: "Balloon." })).toEqual({ status: "recorded" });
+    expect((await things()).find((thing) => thing.values["name"] === "Whisk")).toMatchObject({ parties: { donor: person("@visitor") } });
+    expect(await findLending(read.seat, second, { now: clock, fetch })).toMatchObject({ ok: false });
+    visitor.dispose();
+
     // The state and the record survive a restart.
     const before = await L.summary();
     await lifetime.wait(() => L.restart());
     expect((await L.summary()).value).toEqual(before.value);
 
     // 64 live things. The gone pot does not count; the 65th donation is refused until a thing is cancelled.
-    for (let n = 5; n <= 64; n++) await L.did(nasruddin, "donate", donation(`Thing ${n}`, "One of many."));
+    for (let n = 6; n <= 64; n++) await L.did(nasruddin, "donate", donation(`Thing ${n}`, "One of many."));
     expect(await things()).toHaveLength(64);
     await refused(L.act(nasruddin, "donate", donation("Thing 65", "One too many.")), "type-full");
     await L.did(neighbour, "cancel", { ...await on(fresh), fields: { reason: "Dented" } });

@@ -19,6 +19,9 @@ export interface LendingIdentity {
   readonly membership: ScopeRef; readonly member: MemberRef; readonly publicKey: KeyId;
 }
 export const LENDING_ACTS = ["donate", "borrow", "return", "cancel"] as const;
+/** What a kept request must be bound to: the scope it is addressed to, the key that signed it, and the act kinds allowed. */
+export interface Binding { readonly scope: ScopeRef; readonly publicKey: KeyId; readonly kinds: readonly string[] }
+export const lendingBinding = (identity: LendingIdentity): Binding => ({ scope: identity.scope, publicKey: identity.publicKey, kinds: LENDING_ACTS });
 export type Phase = "prepared" | "inflight" | "unknown" | "recorded" | "refused";
 export interface Envelope { readonly signed: SignedIntent; readonly grants: readonly Grant[]; readonly beside: Beside }
 /** One kept request. `refusal` is the scope's reason, kept with a refused phase. */
@@ -32,17 +35,17 @@ export const KEPT_BYTES = 64 * 1024;
 const PHASES: readonly string[] = ["prepared", "inflight", "unknown", "recorded", "refused"];
 export const envelopeKey = (envelope: Envelope): Digest => textDigest(canonicalize(envelope));
 
-/** A kept request that is whole, is this identity's, and is a lending act. Anything else stays in custody untouched. */
-export function validKept(value: unknown, identity: LendingIdentity): value is Kept {
+/** A kept request that is whole, is signed by this key, and is an allowed act to this scope. Anything else stays in custody untouched. */
+export function validKept(value: unknown, identity: Binding): value is Kept {
   try {
-    if (!isRecord(value) || value["v"] !== 1 || typeof value["kind"] !== "string" || !(LENDING_ACTS as readonly string[]).includes(value["kind"])) return false;
+    if (!isRecord(value) || value["v"] !== 1 || typeof value["kind"] !== "string" || !identity.kinds.includes(value["kind"])) return false;
     if (typeof value["phase"] !== "string" || !PHASES.includes(value["phase"])) return false;
     if (Object.keys(value).some((key) => !["v", "kind", "envelope", "phase", "refusal"].includes(key))) return false;
     if ((value["phase"] === "refused") !== (typeof value["refusal"] === "string")) return false;
     const envelope = value["envelope"];
     if (!isRecord(envelope) || Object.keys(envelope).sort().join() !== "beside,grants,signed") return false;
     const signed = envelope["signed"] as SignedIntent;
-    // The lending acts declare no detached text and no presented fact, and present no grant.
+    // The acts kept here declare no detached text and no presented fact, and present no grant.
     if (!Array.isArray(envelope["grants"]) || envelope["grants"].length !== 0 || !isRecord(envelope["beside"]) || Object.keys(envelope["beside"]).length !== 0) return false;
     if (!isRecord(signed) || !isRecord(signed.intent) || !verifySignedIntent(signed)) return false;
     return signed.intent.kind === value["kind"] && signed.intent.actor === identity.publicKey && canonicalize(signed.intent.to) === canonicalize(identity.scope)
@@ -66,7 +69,7 @@ export interface Ports {
  * `prepared`, nothing is sent: a read settles it or it stays unknown. The caller
  * holds the custody lock.
  */
-export async function advance(store: KeptStore, identity: LendingIdentity, ports: Ports, expected: Envelope, readOnly = false): Promise<Settled> {
+export async function advance(store: KeptStore, identity: Binding, ports: Ports, expected: Envelope, readOnly = false): Promise<Settled> {
   const current = () => { if (!ports.current()) throw new Error("This device context is no longer current."); };
   const load = async (): Promise<Kept> => {
     current(); const held = await store.load(); current();

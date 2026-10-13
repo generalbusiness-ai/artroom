@@ -12,7 +12,7 @@ import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHead
   type CompleteSnapshot, type Fetch, type HeadStreamFetch, type Observation, type Session, type Signer } from "@generalbusiness/artroom-client";
 import { lending } from "../definition.ts";
 import { LENDING_DEFINITION } from "../pin.ts";
-import { advance, envelopeKey, validKept, type CustodyLock, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports, type Settled } from "./custody.ts";
+import { advance, envelopeKey, lendingBinding, validKept, type CustodyLock, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports, type Settled } from "./custody.ts";
 import { lendingView, propose, refusalWords, type LendingAct, type LendingView } from "./model.ts";
 
 /** How long after an intent's deadline a "not found" is taken as final. */
@@ -57,7 +57,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
   if (origin.origin !== identity.origin || !["https:", "http:"].includes(origin.protocol)) throw new Error("The configured service must be an exact origin.");
   if (identity.definition !== LENDING_DEFINITION || signer.key !== identity.publicKey) throw new Error("This device does not match the configured lending identity.");
 
-  const now = options.now ?? (() => Date.now());
+  const now = options.now ?? (() => Date.now()), binding = lendingBinding(identity);
   const lifetime = new AbortController();
   let alive = true, session: Session | null = null, observer: Observation | undefined, view: LendingView | undefined, fresh = false;
   const usable = () => alive && options.current();
@@ -109,7 +109,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
   const conclude = async (held: Kept, settled: Settled): Promise<ActOutcome> => {
     if (settled.status === "unknown") return { status: "unknown", reason: "No answer came back that could be trusted. The original request is kept. Check it before doing anything else." };
     current(); const latest = await options.store.load(); current();
-    if (!validKept(latest, identity) || envelopeKey(latest.envelope) !== envelopeKey(held.envelope) || latest.phase !== settled.status)
+    if (!validKept(latest, binding) || envelopeKey(latest.envelope) !== envelopeKey(held.envelope) || latest.phase !== settled.status)
       return { status: "unknown", reason: "The original request is kept. Check it before doing anything else." };
     await options.store.clear(); current(); observer?.refresh();
     return settled.status === "recorded" ? { status: "recorded" } : { status: "refused", reason: refusalWords(held.kind as LendingAct, settled.reason) };
@@ -169,17 +169,17 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
           const shaped = shapeDeclaredAct(lending, kind, { on, fields } as never);
           const signed = await signedIntent(signer, { to: identity.scope, kind, on: shaped.on, fields: shaped.fields, expected }, { now: now() }); current();
           held = { v: 1, kind, envelope: { signed, grants: [], beside: shaped.beside }, phase: "prepared" };
-          if (!validKept(held, identity)) throw new Error("The signed request is not a lending request of this identity.");
+          if (!validKept(held, binding)) throw new Error("The signed request is not a lending request of this identity.");
           // Kept before anything is sent.
           await options.store.save(held); current();
         } catch { return { status: "nothing-sent", reason: "The request could not be signed and kept. Nothing was sent." }; }
-        return conclude(held, await advance(options.store, identity, ports, held.envelope));
+        return conclude(held, await advance(options.store, binding, ports, held.envelope));
       });
     },
     async pending() {
       const held = await options.store.load();
       if (held === null || held === undefined) return null;
-      if (!validKept(held, identity)) return { kind: "unknown", thing: null, name: null, notAfter: "", unsent: false };
+      if (!validKept(held, binding)) return { kind: "unknown", thing: null, name: null, notAfter: "", unsent: false };
       const { intent } = held.envelope.signed;
       return { kind: held.kind, thing: intent.on, name: typeof intent.fields["name"] === "string" ? intent.fields["name"] : null, notAfter: intent.notAfter, unsent: held.phase === "prepared" };
     },
@@ -187,24 +187,24 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
       return options.lock.run(async () => {
         current(); const held = await options.store.load(); current();
         if (held === null || held === undefined) return null;
-        if (!validKept(held, identity)) return { status: "unknown" as const, reason: "The kept request cannot be read. It stays in this browser." };
-        return conclude(held, await advance(options.store, identity, ports, held.envelope, true));
+        if (!validKept(held, binding)) return { status: "unknown" as const, reason: "The kept request cannot be read. It stays in this browser." };
+        return conclude(held, await advance(options.store, binding, ports, held.envelope, true));
       });
     },
     resume() {
       return options.lock.run(async () => {
         current(); const held = await options.store.load(); current();
         if (held === null || held === undefined) return null;
-        if (!validKept(held, identity) || held.phase !== "prepared")
+        if (!validKept(held, binding) || held.phase !== "prepared")
           return { status: "unknown" as const, reason: "This request may already have been sent. Check it; it will not be sent again." };
-        return conclude(held, await advance(options.store, identity, ports, held.envelope));
+        return conclude(held, await advance(options.store, binding, ports, held.envelope));
       });
     },
     abandon() {
       return options.lock.run(async () => {
         current(); const held = await options.store.load(); current();
         if (held === null || held === undefined) return true;
-        if (!validKept(held, identity)) return false;
+        if (!validKept(held, binding)) return false;
         const deadline = timeMs(held.envelope.signed.intent.notAfter);
         if (deadline === null || now() < deadline + SETTLED_AFTER_MS) return false;
         await ready();

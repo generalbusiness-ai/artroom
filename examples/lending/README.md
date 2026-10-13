@@ -6,10 +6,9 @@ definition. The design is
 
 This directory holds the parts of that design that need no deployment:
 the definition, the shelf page, and the member interface's model, request
-custody and gateway, each with tests. Not built yet: the interface's
-screens and its storage in the browser, joining with an invitation,
-publishing a shelf page from the browser, the room's runbook, the online
-room and the homepage page.
+custody, gateway and joining, each with tests. Not built yet: the
+interface's screens and its storage in the browser, publishing a shelf
+page, the room's runbook, the online room and the homepage page.
 
 ## What is here
 
@@ -23,6 +22,7 @@ room and the homepage page.
 | `browser/model.ts` | What the member interface shows and may ask for: the view of one read, the act to sign, and a refusal in plain words. |
 | `browser/custody.ts` | Custody of one lending request: kept before it is sent, sent at most once, settled afterwards only by a read. |
 | `browser/client.ts` | The gateway: one coherent read of the scope (summary, head and record), and `act`, `check`, `resume` and `abandon` over that custody. |
+| `browser/join.ts` | Joining with an invitation link under a device key that WebCrypto holds, with the same custody; and finding the room's lending scope in its directory. |
 | `demo-script.md` | The script for the recording. |
 | `definition.test.ts` | Plain-function tests: the bytes and the pin, the story of Nasruddin and the pot, and the bounds. Grants are scripted. |
 
@@ -38,6 +38,16 @@ lost reply the request is kept, no second act is signed, it is not sent
 again, and after a reload a read settles it as recorded. The library
 gains one thing, not two. The gateway's private store and lock are
 in-memory stand-ins for the browser's.
+
+The scenario also joins a visitor from an invitation link, under the
+application cohort's membership (`platform:membership@4`), with a device
+key that WebCrypto holds. The reply to the join is lost: the join is
+kept, a second use of the invitation signs nothing, and a read settles
+the original. The visitor's device then finds the lending scope in the
+directory and donates as `@visitor`. Two facts from this: a join can be
+settled with no session, but reading its recorded entry needs one, which
+the room gives the new member's key; and a read session is itself an
+entry in membership's record.
 
 The Counter's request journal could not be reused as it stands: it accepts
 only the counting definition's acts. `browser/custody.ts` is a smaller
