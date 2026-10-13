@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-13-lending-library.md","body":{"commit":"3ca421920f55076725f05f714296a8df32b752d0","path":"notes/2026-10-13-lending-library.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a20e34bee385bd3d89b10d77b0c217a65398d844","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-lending-library.md."}
