@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:45c324d6f25a9532c2ba410c868d5ca3fede1cfe","text":"Merge retired a covered predecessor; the successor is at docs/public-sdk-release.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:45d5d6180a82361a5a749acba2e201ea262f3e11","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/namespace.ts."}
