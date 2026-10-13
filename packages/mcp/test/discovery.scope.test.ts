@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
-import { firstExtents } from "@generalbusiness/artroom-platform";
-import { DEMO_DIGESTS, issueDemo } from "@generalbusiness/artroom-lanes";
+import { firstExtents } from "@generalbusiness/dap-platform";
+import { DEMO_DIGESTS, issueDemo } from "@generalbusiness/dap-lanes";
 import { ListRestart } from "../src/index.ts";
 import { garden } from "./support/garden.ts";
 import { mcpRoom } from "./support/room.ts";

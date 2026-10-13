@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import type { Answer, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { signedIntent } from "@generalbusiness/artroom-client";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, meaningOf, memoryStore, UNRESOLVED_MOST, type CustodyRecord, type Envelope } from "../src/index.ts";

@@ -13,7 +13,7 @@
  * row renders as "the platform rule <code> (row <row>) holds".
  */
 
-import { VERSIONS } from "@generalbusiness/artroom-platform";
+import { VERSIONS } from "@generalbusiness/dap-platform";
 
 const BY_NAME: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "platform:register": {

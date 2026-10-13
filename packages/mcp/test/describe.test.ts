@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { change, issueDemo } from "@generalbusiness/artroom-lanes";
-import { lane as deriveLane } from "@generalbusiness/artroom-derive/testing";
+import { change, issueDemo } from "@generalbusiness/dap-lanes";
+import { lane as deriveLane } from "@generalbusiness/dap-derive/testing";
 import { counting } from "../../../examples/counting/definition.ts";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, describedOf, generationOf, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Held, type Inventory } from "../src/index.ts";
 import { ACTIVE_DEMO, MEMBERSHIP, declared, demoInventory, heldOf, lane, standingOf } from "./support/catalogue.ts";
 

@@ -2,7 +2,7 @@
  * Custody fixtures shared by `custody.test.ts` and the child processes it starts (`custody-child.ts`). The scope's answers are
  * scripted: `deliver` and `settle` are STAND-INs for a scope's submit and settlement.
  */
-import type { Answer, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { intentDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import type { Envelope, Identity } from "../../src/index.ts";

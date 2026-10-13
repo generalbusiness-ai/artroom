@@ -57,7 +57,7 @@
  * and the file store of `node.ts` under `ARTROOM_HOME/private/mcp-custody/`.
  */
 
-import type { Answer, Beside, DeclaredDefinition, Digest, KeyId, PlatformDefinition, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, DeclaredDefinition, Digest, KeyId, PlatformDefinition, Receipt, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, intentDigest, utf8 } from "@generalbusiness/artroom-bytes";
 
 export const UNRESOLVED_MOST = 256;

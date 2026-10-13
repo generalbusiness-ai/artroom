@@ -1,10 +1,10 @@
-# @generalbusiness/artroom-mcp
+# @generalbusiness/dap-mcp
 
 One MCP service for every dap application (plan 031). It reads a room's
 definitions as data, derives one tool for each act declaration the room
 holds, signs with one key, keeps each signed envelope before it sends it,
 and serves the list and the calls over stdio and loopback HTTP, for both
-MCP wire revisions. `artroom mcp` runs it. [docs/mcp.md](../../docs/mcp.md)
+MCP wire revisions. `dap mcp` runs it. [docs/mcp.md](../../docs/mcp.md)
 says how to connect an agent host and what each tool does.
 
 The server imports the contract, the bytes, the client and the platform
@@ -30,7 +30,7 @@ service; `scripts/active-source.test.mjs` refuses one.
 ```
 npx vitest run --project mcp                       # derivation, custody, errors, wire, budgets, in Node
 npx vitest run --project scope packages/mcp/test   # the stories on the real test Worker
-npm run typecheck --workspace @generalbusiness/artroom-mcp
+npm run typecheck --workspace @generalbusiness/dap-mcp
 ```
 
 The Node tests use a stand-in scope service (`test/support/standin.ts`),

@@ -3,7 +3,7 @@
  * guard, a presented fact and a detached text. Its genesis takes the fields the directory's `open-issue` sends a lane it creates
  * (opener, title, number, body, conditions), so the room's own directory creates it under the room's membership.
  */
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 
 const slot = { fixed: false, required: false } as const;
 

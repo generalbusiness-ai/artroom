@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { FactRef, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, keyIdOfSecret } from "@generalbusiness/artroom-bytes";
-import { valueDigest } from "@generalbusiness/artroom-derive";
-import { APPLICATION_COHORT, CONFIGURATION_DOMAIN, FIRST_ACTIONS_OF } from "@generalbusiness/artroom-platform";
+import { valueDigest } from "@generalbusiness/dap-derive";
+import { APPLICATION_COHORT, CONFIGURATION_DOMAIN, FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
 import { mcpRoom } from "./support/room.ts";
@@ -45,7 +45,7 @@ test("the Counter under its cohort: join, start, spoken, leave", async () => {
     expect(created["timedOut"], JSON.stringify(created)).toBe(false);
     const counter = (created["created"] as { scope: ScopeId; definition: string }[]).find((c) => c.definition === COUNTING_DEFINITION)!.scope;
 
-    // Configured by hand, as `artroom mcp --scope <counter> --membership membership` records it.
+    // Configured by hand, as `dap mcp --scope <counter> --membership membership` records it.
     rita.config.roots = [...(rita.config.roots ?? []), { scope: counter, membership: rita.config.repository!.membership }];
     const names = await rita.names();
     expect(names).toEqual(expect.arrayContaining(["counting.initialize", "counting.join", "counting.start", "counting.spoken", "counting.leave"]));

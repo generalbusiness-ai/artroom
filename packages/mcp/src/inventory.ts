@@ -16,9 +16,9 @@
  * read once per process and kept by scope and by digest.
  */
 
-import type { DeclaredDefinition, Digest, Head, Item, PlatformDefinition, Read, ScopeId, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, Head, Item, PlatformDefinition, Read, ScopeId, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { definitionDigest, isDigest, isPlatformDefinition, parseStrict } from "@generalbusiness/artroom-bytes";
-import { ROLE_LISTS, SIBLINGS_OF, platform, type Role } from "@generalbusiness/artroom-platform";
+import { ROLE_LISTS, SIBLINGS_OF, platform, type Role } from "@generalbusiness/dap-platform";
 import type { Held, Inventory, Place, Standing } from "./catalogue.ts";
 import type { DefinitionLike } from "./describe.ts";
 import type { Reads } from "./reads.ts";
@@ -43,9 +43,9 @@ export interface Root { scope: ScopeId; membership: ScopeRef | null }
 export interface ConfigPort {
   read(): Promise<McpConfig>;
   addRoot(root: Root): Promise<void>;
-  /** Record the repository that the caller's own claim created, or the caller's inbox, as `artroom claim` and `join` record them. */
+  /** Record the repository that the caller's own claim created, or the caller's inbox, as `dap claim` and `join` record them. */
   setRepository?(repository: NonNullable<McpConfig["repository"]>): Promise<void>;
-  /** Record a room the caller joined, as `artroom join` records it: the service, the repository's scopes with the inbox, and the handle. */
+  /** Record a room the caller joined, as `dap join` records it: the service, the repository's scopes with the inbox, and the handle. */
   joined?(room: { service: string; repository: NonNullable<McpConfig["repository"]>; handle: string }): Promise<void>;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Answer, DeclaredDefinition, MismatchReason, ReadRefusal, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, MismatchReason, ReadRefusal, RefusalReason, UnavailableReason } from "@generalbusiness/dap-contract";
 import { REFUSAL_REASONS, READ_REFUSALS, b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { McpService, MISMATCH_NOTES, UNAVAILABLE_NOTES, answered, finding, guardSentences, memoryStore, type DefinitionLike, type Finding } from "../src/index.ts";

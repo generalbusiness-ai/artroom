@@ -7,7 +7,7 @@
  * scope judges those, and checks every field again with its own bounds.
  */
 
-import type { FactRef, FieldValue, Item, MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, Item, MemberRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { isDigest, isFactRef, isMemberRef, isRecord, isScopeRef, textDigest, timeMs, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import type { ActLike, FieldLike } from "./describe.ts";
 import { clip } from "./errors.ts";

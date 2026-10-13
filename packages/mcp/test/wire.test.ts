@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
@@ -143,9 +143,9 @@ describe("both MCP wire revisions, each by its own rules", () => {
     await expect(serveHttp(mcp, "localhost", 0, () => {})).rejects.toThrow(/not a loopback address/);
   });
 
-  // Invariant: over stdio, `artroom mcp` serves a client of either revision with the same structured content and the same native
+  // Invariant: over stdio, `dap mcp` serves a client of either revision with the same structured content and the same native
   // outcome under the one key; `--generic` lists actions and act, and the default does not.
-  test("stdio, through artroom mcp: both revisions, and --generic", async () => {
+  test("stdio, through dap mcp: both revisions, and --generic", async () => {
     const home = mkdtempSync(join(tmpdir(), "mcp-home-"));
     mkdirSync(join(home, "keys"), { recursive: true });
     writeFileSync(join(home, "keys", "device.key"), `${b64url(secret)}\n`, { mode: 0o600 });

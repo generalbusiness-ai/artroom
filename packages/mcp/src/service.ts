@@ -11,11 +11,11 @@
  * knows no application: it reads definitions as data.
  */
 
-import type { Answer, Beside, DeclaredDefinition, Digest, Entry, FieldValue, Item, PlatformDefinition, Read, Receipt, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, DeclaredDefinition, Digest, Entry, FieldValue, Item, PlatformDefinition, Read, Receipt, ScopeId, ScopeRef, Seed, Summary } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isPlatformDefinition, isScopeId, isScopeRef, parseStrict, scopeIdOf, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { TransportError, invitationOf, readCredential, signedIntent, wellFormedInvitation, type Fetch, type Signer } from "@generalbusiness/artroom-client";
-import { platform } from "@generalbusiness/artroom-platform";
+import { platform } from "@generalbusiness/dap-platform";
 import { ACT_OUTPUT, actTool, bindingsOf, declarationDigest, describedOf, generationOf, listed, selected, type Binding, type Held, type Inventory, type Mode, type Tool } from "./catalogue.ts";
 import { Custody, CustodyError, Lost, meaningOf, validKey, type CustodyRecord, type CustodyStore, type Envelope, type Identity } from "./custody.ts";
 import { describeAct, grantAction, onOf, schemaOf, type DefinitionLike } from "./describe.ts";
@@ -336,7 +336,7 @@ export class McpService {
 
   /**
    * The target of an act as its summary has it; or, where the caller may not read it yet and the configuration records its pin,
-   * that pin with no items: the act is signed with no expected revisions, as `artroom join` signs one, and the scope judges.
+   * that pin with no items: the act is signed with no expected revisions, as `dap join` signs one, and the scope judges.
    */
   async #target(scope: ScopeId, membership: ScopeRef | null): Promise<Pick<Summary, "scope" | "definition" | "items">> {
     const read = await this.#reads.read(membership, (t, r) => t.summary(scope, r));
@@ -476,7 +476,7 @@ export class McpService {
       tool("create", "Creates a scope with no existing target, and records it in your configuration so later connections list its tools. definition: a platform name such as platform:register@3, a definition's JSON, or its digest; kind: the definition's genesis act; fields; texts and definitions beside it; membership: the membership scope standing for the new scope is read from. Kept under custody like an act: the idempotencyKey is required.",
         { definition: { type: ["string", "object"] }, kind: { type: "string" }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, definitions: { type: "array", items: { type: "object" } }, membership: { type: ["string", "object"] }, idempotencyKey: keyArg, resubmit: { type: "boolean" } },
         ["definition", "kind", "idempotencyKey"], WRITE, (a) => this.#create(a), ACT_OUTPUT),
-      tool("join", "Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.",
+      tool("join", "Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.",
         { link: { type: "string", description: "The invitation link, artroom-invite:..." }, idempotencyKey: keyArg }, ["link", "idempotencyKey"], WRITE, (a) => this.#join(a), ACT_OUTPUT),
       tool("prepare", "Asks the scope that owns a resource for one step of a capability. With kind: for the intent an act will submit later under the same idempotencyKey; resource: the scope asked, which may differ from target; then the act's own target, kind, on, fields, texts, presented and values. Without kind: a step with no act, such as hold@1's instance, whose own intent (kind capability:step, with fields) goes to the resource. Returns the resource's answer for that step, never an act's receipt.",
         { resource: scopeArg, capability: { type: "string" }, step: { type: "string" }, target: scopeArg, kind: { type: "string" }, on: { type: "integer", minimum: 0 }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, presented: { type: "object" }, values: { type: "array", items: { type: "string" } }, idempotencyKey: keyArg },
@@ -827,7 +827,7 @@ export class McpService {
     const key = args["idempotencyKey"];
     if (!validKey(key)) return failed({ error: "shape", field: "idempotencyKey", what: "is missing, or not 1 to 128 bytes of UTF-8", declared: "a key you choose and keep" });
     const link = typeof args["link"] === "string" ? invitationOf(args["link"].trim()) : null;
-    if (!link || !wellFormedInvitation(link)) return failed({ error: "shape", field: "link", what: "is no invitation link from artroom invite, or its repository references are not well formed", declared: "artroom-invite:..." });
+    if (!link || !wellFormedInvitation(link)) return failed({ error: "shape", field: "link", what: "is no invitation link from dap invite, or its repository references are not well formed", declared: "artroom-invite:..." });
     const config = await this.#port.config.read();
     if (config.repository && config.repository.membership.scope !== link.repository.membership.scope) return failed({ error: "target", what: `this configuration has a room already (directory ${config.repository.directory.scope}); use another ARTROOM_HOME to join another` });
     if (this.#service !== "" && this.#service !== link.service) return failed({ error: "target", what: `the link names the service ${clip(link.service)}, and this server serves ${this.#service}` });
@@ -964,7 +964,7 @@ export class McpService {
   }
 
   /**
-   * A room the caller's own claim created, or the caller's own inbox, is recorded in the configuration, as `artroom claim` and
+   * A room the caller's own claim created, or the caller's own inbox, is recorded in the configuration, as `dap claim` and
    * `join` record them, so the next list holds the room's scopes. Only an entry the caller's key signed is followed.
    */
   async #remember(entry: Entry, children: readonly { ref: ScopeRef | null; kind: string }[]): Promise<void> {

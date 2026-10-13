@@ -1,11 +1,11 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import type { DeclaredDefinition, PlatformDefinition } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, PlatformDefinition } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { validateDefinition } from "@generalbusiness/artroom-derive";
-import { VERSIONS } from "@generalbusiness/artroom-platform";
-import { change, change3, changeDemo, changeDemo3, issue, issueDemo } from "@generalbusiness/artroom-lanes";
+import { validateDefinition } from "@generalbusiness/dap-derive";
+import { VERSIONS } from "@generalbusiness/dap-platform";
+import { change, change3, changeDemo, changeDemo3, issue, issueDemo } from "@generalbusiness/dap-lanes";
 import { USAGE } from "../../cli/src/line.ts";
 import { counting } from "../../../examples/counting/definition.ts";
 import { DESCRIPTION_CHARS, WORDS, actTool, bindingsOf, checkWords, describeAct, listed, surfaceOf, McpService, memoryStore, type DefinitionLike, type Words } from "../src/index.ts";
@@ -66,10 +66,10 @@ describe("every activity is reachable, and every act renders", () => {
   // Invariant: docs/mcp.md maps every command of the command line and every page action to tool calls in each launch mode, and
   // every tool a default recipe names is listed for an admin of the demo room (no recipe names a hidden tool).
   test("the W1 inventory in docs/mcp.md covers every command and page action, with listed tools only", async () => {
-    const commands = [...new Set(USAGE.split("\n").filter((l) => l.startsWith("  artroom ")).map((l) => l.trim().split(" ").slice(0, l.includes("artroom issue ") ? 3 : 2).join(" ")))];
+    const commands = [...new Set(USAGE.split("\n").filter((l) => l.startsWith("  artroom ")).map((l) => l.trim().split(" ").slice(0, l.includes("dap issue ") ? 3 : 2).join(" ")))];
     const table = DOC.slice(DOC.indexOf("## The W1 inventory"), DOC.indexOf("## ", DOC.indexOf("## The W1 inventory") + 5));
     const rows = table.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Activity") && !l.startsWith("|---"));
-    for (const command of commands.filter((c) => c !== "artroom mcp")) expect(rows.some((r) => r.includes(`\`${command}`)), command).toBe(true);
+    for (const command of commands.filter((c) => c !== "dap mcp")) expect(rows.some((r) => r.includes(`\`${command}`)), command).toBe(true);
     for (const action of ["Join with an invitation link", "Create issue", "Comment", "Review", "Merge", "Propose an edit", "Rules editor", "Create room", "Check status", "Record inspection"]) expect(rows.some((r) => r.includes(action)), action).toBe(true);
     const mcp = new McpService({ service: "https://x", signer: secretSigner(new Uint8Array(32)), config: { read: async () => ({ service: "https://x" }), addRoot: async () => {} }, custody: memoryStore(), mode: "add" });
     const generic = (await mcp.page()).tools.map((t) => t.name);

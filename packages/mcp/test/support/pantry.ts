@@ -8,7 +8,7 @@
  * an optional field with no default; `verify` binds it by a fact field, the fill that opened the jar; `shake` moves a jar's
  * revision.
  */
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 
 export const pantry = JSON.parse(`{
   "format": "artroom-definition-1", "name": "pantry", "profile": { "name": "restricted", "version": 1 }, "capabilities": [], "genesis": "start",

@@ -24,7 +24,7 @@
  * connection of one server is bound to the one key the process signs with.
  */
 
-import type { Digest } from "@generalbusiness/artroom-contract";
+import type { Digest } from "@generalbusiness/dap-contract";
 import { INSTRUCTIONS, ListRestart, SERVER_NAME, SERVER_VERSION, type McpService } from "./service.ts";
 
 export const LEGACY = "2025-11-25";

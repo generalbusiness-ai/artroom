@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { FactRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { effectiveFields, expectedOf, type ActLike } from "../src/index.ts";
 

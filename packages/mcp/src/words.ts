@@ -12,7 +12,7 @@
  */
 
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Digest } from "@generalbusiness/artroom-contract";
+import type { Digest } from "@generalbusiness/dap-contract";
 import seed from "./words.json" with { type: "json" };
 
 export interface Words {

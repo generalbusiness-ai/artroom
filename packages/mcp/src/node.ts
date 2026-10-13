@@ -1,10 +1,10 @@
 /**
  * The server under Node: the two transports and the custody store on files.
  *
- * - **stdio** (`artroom mcp`): one implicit connection. Each line is one
+ * - **stdio** (`dap mcp`): one implicit connection. Each line is one
  *   JSON-RPC message. The first request says which revision the client
  *   speaks.
- * - **streamable HTTP on loopback** (`artroom mcp --http 127.0.0.1:<port>`):
+ * - **streamable HTTP on loopback** (`dap mcp --http 127.0.0.1:<port>`):
  *   a signing boundary, guarded as one. It binds a loopback address only;
  *   refuses any request that carries an `Origin` header, since no browser
  *   origin is a client of a signing server; requires a per-launch bearer,
@@ -460,7 +460,7 @@ export async function serveHttp(service: McpService, host: string, port: number,
   const address = server.address();
   const actual = typeof address === "object" && address ? address.port : port;
   const url = `http://${host.includes(":") && !host.startsWith("[") ? `[${host}]` : host}:${actual}/mcp`;
-  announce(`artroom mcp: serving ${url}; bearer (shown once): ${bearer}`);
+  announce(`dap mcp: serving ${url}; bearer (shown once): ${bearer}`);
   return {
     server, url, bearer, wire,
     close: () => new Promise<void>((resolve) => {
@@ -486,7 +486,7 @@ export interface ServeOptions {
   fetch?: Fetch;
 }
 
-/** `artroom mcp`: serve over stdio, or over loopback HTTP. Resolves when stdio ends; an HTTP server serves until the process ends. */
+/** `dap mcp`: serve over stdio, or over loopback HTTP. Resolves when stdio ends; an HTTP server serves until the process ends. */
 export async function serve(options: ServeOptions): Promise<void> {
   const service = new McpService({
     service: options.service, signer: options.signer, config: options.config, custody: fileStore(join(options.home, "private", "mcp-custody")),

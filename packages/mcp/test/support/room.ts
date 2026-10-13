@@ -13,7 +13,7 @@
  * | The clock | The scripted clock of the namespaces. |
  */
 import { expect } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, keyIdOfSecret, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { secretSigner, type Fetch } from "@generalbusiness/artroom-client";
 import { ownHost } from "../../../scope/test/hosts.ts";

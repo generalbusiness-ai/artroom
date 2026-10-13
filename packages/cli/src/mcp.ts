@@ -1,18 +1,18 @@
 /**
- * `artroom mcp` under Node: the MCP server of `packages/mcp`, over stdio or loopback HTTP, signing with this config directory's
+ * `dap mcp` under Node: the MCP server of `packages/mcp`, over stdio or loopback HTTP, signing with this config directory's
  * key. The command line owns the config file: the server reads it, and appends a standalone scope after an accepted `create`.
  */
 
-import type { ScopeRef } from "@generalbusiness/artroom-contract";
+import type { ScopeRef } from "@generalbusiness/dap-contract";
 import { isScopeId } from "@generalbusiness/artroom-bytes";
 import { httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
-import { serve } from "@generalbusiness/artroom-mcp/node";
-import type { McpConfig, Root } from "@generalbusiness/artroom-mcp";
+import { serve } from "@generalbusiness/dap-mcp/node";
+import type { McpConfig, Root } from "@generalbusiness/dap-mcp";
 import type { Context, Outcome } from "./commands.ts";
 
 const usage = (...lines: string[]): Outcome => ({ code: 2, lines });
 
-/** The options of `artroom mcp`, read from its command line; a usage outcome when they cannot be read. */
+/** The options of `dap mcp`, read from its command line; a usage outcome when they cannot be read. */
 export interface McpOptions { mode: "default" | "generic" | "add"; tools: string[] | null; http: { host: string; port: number } | null; scope: string | null; membership: string | null }
 export function mcpOptions(argv: readonly string[]): McpOptions | Outcome {
   const options: McpOptions = { mode: "default", tools: null, http: null, scope: null, membership: null };
@@ -37,13 +37,13 @@ export function mcpOptions(argv: readonly string[]): McpOptions | Outcome {
 }
 
 /**
- * `artroom mcp --scope <scope> --membership <scope>`: append one standalone scope to the config, for the MCP server to list its
+ * `dap mcp --scope <scope> --membership <scope>`: append one standalone scope to the config, for the MCP server to list its
  * acts. The membership is the scope that standing for it is read from: `membership` for the room's own, or a scope ID, whose
  * incarnation is read from its summary by a signed read. The scope itself is not read here: the server reads it when it lists.
  */
 export async function mcpRoot(ctx: Context, scope: string, membership: string | undefined): Promise<Outcome> {
   const config = await ctx.store.config();
-  if (!config) return usage("No room is set up here. Run: artroom install <base-url>, or artroom join <link>.");
+  if (!config) return usage("No room is set up here. Run: dap install <base-url>, or dap join <link>.");
   if (!isScopeId(scope)) return usage(`--scope takes a scope ID, not ${scope}.`);
   let ref: ScopeRef | null = null;
   if (membership !== undefined) {
@@ -72,7 +72,7 @@ export async function mcp(ctx: Context, home: string, argv: readonly string[]): 
     process.stderr.write(`${added.lines.join("\n")}\n`);
     if (added.code !== 0) return added;
   }
-  // A configuration that has joined nothing yet is served too: its key is made and kept as `artroom join` makes it, and the
+  // A configuration that has joined nothing yet is served too: its key is made and kept as `dap join` makes it, and the
   // server's `join` records the room, the service and the handle when an invitation is accepted.
   const config = await ctx.store.config();
   const keyName = config?.key ?? "device";

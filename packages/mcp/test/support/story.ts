@@ -1,6 +1,6 @@
 /** The steps every MCP story shares: a W2 marker, one act as a recipe step in either mode, and the founding of a room. */
 import { expect } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret } from "@generalbusiness/artroom-bytes";
 import type { Agent, Room } from "./room.ts";
 

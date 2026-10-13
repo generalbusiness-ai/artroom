@@ -3,7 +3,7 @@
  * service, the repository's scopes, the invitation's number and secret, the handle, and the membership version the
  * invitation is in. The secret is the invitation's, presented once by `join`; it is no signing key.
  */
-import type { ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { isScopeId, isScopeRef, unb64url } from "@generalbusiness/artroom-bytes";
 
 /** The repository's scopes as a link names them: no inbox, which `join` creates. */

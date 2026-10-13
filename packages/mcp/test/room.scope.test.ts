@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, digestBytes, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
-import { firstExtents } from "@generalbusiness/artroom-platform";
-import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
+import { firstExtents } from "@generalbusiness/dap-platform";
+import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { GENERIC, mcpRoom, type Agent } from "./support/room.ts";
 import { exercises, founded, offers, step } from "./support/story.ts";
@@ -45,7 +45,7 @@ async function story(mode: "default" | "generic", lines: string[] = []): Promise
     const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const invited = await step(rita, mode, { tool: "member.invite", scope: "membership", kind: "invite-member" }, { fields: { handle: "@paul", role: "member", inviteHash: textDigest(secret), inviteEnds: timeOf(room.now() + 3_600_000) }, idempotencyKey: "invite-paul" });
     const invitation = (invited["fact"] as { seq: number }).seq;
-    // paul starts from an empty configuration: no service, no room, no pins. The link is the one artroom invite prints.
+    // paul starts from an empty configuration: no service, no room, no pins. The link is the one dap invite prints.
     const link = `${INVITATION_LINK}${b64url(utf8(JSON.stringify({ v: 1, service: rita.config.service, repository: (({ inbox: _inbox, ...shared }) => shared)(rita.config.repository!), invitation, secret, handle: "@paul", definition: "platform:membership@2" })))}`;
     const paul = room.agent("paul", { subscribe: true, mode, config: { service: "" } });
     const issueCreate = { tool: "issue.create", scope: "directory", kind: "open-issue" };

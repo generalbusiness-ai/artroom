@@ -11,7 +11,7 @@
  * beside the scope, is attributed to the server.
  */
 
-import type { Answer, Head, MismatchReason, ReadRefusal, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Answer, Head, MismatchReason, ReadRefusal, RefusalReason, UnavailableReason } from "@generalbusiness/dap-contract";
 import { inline, sentenceNamed, type Sentence } from "./describe.ts";
 
 /** What was asked, for the sentence. */

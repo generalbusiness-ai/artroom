@@ -1,6 +1,6 @@
 # The MCP service
 
-`artroom mcp` serves a room to an agent host over the Model Context
+`dap mcp` serves a room to an agent host over the Model Context
 Protocol (MCP). It is one server for every application the room holds. It
 reads the room's definitions as data and derives one tool for each act
 declaration, so an application it has never seen gets its tools the moment
@@ -8,17 +8,20 @@ the room holds it. The server signs with the key of the config directory it
 runs in; nothing it serves grants authority. Each scope judges each act, and
 the server reports that judgment as the scope gave it.
 
-The server is the package `packages/mcp`. Plan 031 is its design; the
+The server is the package `packages/mcp` (`@generalbusiness/dap-mcp`).
+For one release, `artroom mcp` runs the same server through the command
+line's `artroom` alias; the config directory is still `ARTROOM_HOME`. Plan
+031 is its design; the
 delivery note `notes/2026-10-13-mcp-generic-delivery.md` says what was built
 and what ran.
 
 ## Connect an agent host
 
 The server runs where the command line runs, with the same config
-directory (`ARTROOM_HOME`). Set the room up first with `artroom install`
-and `artroom claim`; or start the server with an empty config directory
+directory (`ARTROOM_HOME`). Set the room up first with `dap install`
+and `dap claim`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
-there as `artroom join` does. The link holds the invitation's secret.
+there as `dap join` does. The link holds the invitation's secret.
 `join`'s own result never repeats it. The join that membership admits
 holds it, as its signed input, so a history read of membership (`step`,
 `record`) returns it to whoever may read that history, as the native
@@ -30,7 +33,7 @@ The agent host starts the server as a child process and speaks MCP on its
 standard input and output:
 
 ```
-artroom mcp
+dap mcp
 ```
 
 An agent host's configuration names the command and its arguments, for
@@ -41,7 +44,7 @@ are one JSON object per line. Diagnostics go to standard error.
 ### Over loopback HTTP
 
 ```
-artroom mcp --http 127.0.0.1:8765
+dap mcp --http 127.0.0.1:8765
 ```
 
 The server binds a loopback address only (`127.0.0.1` or `::1`); it refuses
@@ -49,7 +52,7 @@ any other address. It prints its URL and a bearer token once, on standard
 error:
 
 ```
-artroom mcp: serving http://127.0.0.1:8765/mcp; bearer (shown once): <token>
+dap mcp: serving http://127.0.0.1:8765/mcp; bearer (shown once): <token>
 ```
 
 Give the agent host the URL and the header `Authorization: Bearer <token>`.
@@ -449,7 +452,7 @@ Creates a scope with no existing target, and records it in your configuration so
 
 ### `join`
 
-Joins a room with an invitation link from artroom invite (artroom-invite:...), as artroom join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.
+Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.
 
 ```json
 {
@@ -1278,34 +1281,34 @@ works; the count given is the default recipe's.
 
 | Activity | Default | --generic | --generic=add |
 |---|---|---|---|
-| `artroom install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and founder keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
-| `artroom claim <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
-| Page: Create room | the same calls as `artroom claim`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `artroom claim`: 7 | 5 |
-| `artroom invite <@member> --role <role>` | `member.invite` with the handle, the role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the link with the number and secret to the member: 1 | `actions` on membership, `act`: 2 | 1 |
-| `artroom join <link>` | `join` with the link, from an empty configuration, then `wait` for the inbox: 2 | `join`, `wait`: 2 | 2 |
+| `dap install <base-url>`, `--plan`, `--planned` | `create` with `platform:register@3` (or the cohort's register), kind install, the host, namespace, policy and founder keys: 1. The signed intent is kept before it is sent, which is what --plan keeps; after a lost reply, settle adds 1 | `create`: 1 | 1 |
+| `dap claim <name>` | `room.create` on the register with the branch, the founder's handle and a recovery key, `wait` with the entry for the created directory and its children, `room.seat`, `room.first-key` with the seat's entry, `wait` for the inbox: 5 | `actions` on the register, `act`, `wait`, `actions` on membership, `act` seat, `act` first-key, `wait`: 7 | 5 |
+| Page: Create room | the same calls as `dap claim`: `room.create`, `wait`, `room.seat`, `room.first-key`, `wait`: 5 | the same calls as `dap claim`: 7 | 5 |
+| `dap invite <@member> --role <role>` | `member.invite` with the handle, the role, the digest of a secret of at least 32 bytes that the inviter makes, and the end; the inviter passes the link with the number and secret to the member: 1 | `actions` on membership, `act`: 2 | 1 |
+| `dap join <link>` | `join` with the link, from an empty configuration, then `wait` for the inbox: 2 | `join`, `wait`: 2 | 2 |
 | Page: Join with an invitation link | `join`, `wait`: 2 | `join`, `wait`: 2 | 2 |
 | Page: Rules editor | `inspect` on the rules scope, `rules.publish` with the changed counts and the rest kept: 2 | `inspect`, `actions` on the rules scope, `act`: 3 | 2 |
-| `artroom act <kind> --on <scope>` | The act tool of that kind, such as `rules.activate` with the definition's digest, name and bytes: 1 | `actions`, `act`: 2 | 1 |
-| `artroom acts [<scope>]` | `room`, whose notHeld names the act tools the role does not hold; the list holds the rest: 1 | `actions` on the scope: 1 | 1 |
-| `artroom issue open --title <text>` | `issue.create` with the issue definition's digest (its bytes are read from the rules scope), the title, the body and the title as its condition, then `wait` for the issue's lane: 2 | `actions` on the directory, `act`, `wait`: 3 | 2 |
+| `dap act <kind> --on <scope>` | The act tool of that kind, such as `rules.activate` with the definition's digest, name and bytes: 1 | `actions`, `act`: 2 | 1 |
+| `dap acts [<scope>]` | `room`, whose notHeld names the act tools the role does not hold; the list holds the rest: 1 | `actions` on the scope: 1 | 1 |
+| `dap issue open --title <text>` | `issue.create` with the issue definition's digest (its bytes are read from the rules scope), the title, the body and the title as its condition, then `wait` for the issue's lane: 2 | `actions` on the directory, `act`, `wait`: 3 | 2 |
 | Page: Create issue | `issue.create`, `wait`: 2 | `actions`, `act`, `wait`: 3 | 2 |
-| `artroom issue comment <issue> <text>` | `issue.comment` with the issue's number and the body: 1 | `actions` on the lane, `act`: 2 | 1 |
-| `artroom issue assign <issue> <@member>` | `issue.assign` on the issue's intent item with the assignees: 1 | `actions`, `act`: 2 | 1 |
-| `artroom issue close <issue>` | `issue.close-own` when the caller opened it (issue.close-any otherwise), with the reason: 1 | `actions`, `act`: 2 | 1 |
-| `artroom issues` | `room` for the lanes (paged by bytes), then `inspect` for each issue's own state: 1 + n | `room`, then `inspect` for each issue: 1 + n | 1 + n |
-| `artroom log <scope>` | `steps`, one per page: 1 | `steps`: 1 | 1 |
-| `artroom show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
-| `artroom verify <scope>` | `record`, one per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as artroom verify itself: 1 | `record`: 1 | 1 |
-| `artroom verify --all` | `room`, then `record` for each scope it names: 1 + n | `room`, then `record` for each scope: 1 + n | 1 + n |
-| `artroom remote` | `inspect` on the destination, whose branch item names the host, namespace and name: 1 | `inspect`: 1 | 1 |
-| `artroom clone [<directory>]` | `repository.read-token` with the hours, `wait` for the outcome entry, `credential` with the act's entry, then Git: git clone with the credential as the header: 3 and Git | `actions` on the destination, `act`, `wait`, `credential`, then Git: 4 and Git | 3 and Git |
+| `dap issue comment <issue> <text>` | `issue.comment` with the issue's number and the body: 1 | `actions` on the lane, `act`: 2 | 1 |
+| `dap issue assign <issue> <@member>` | `issue.assign` on the issue's intent item with the assignees: 1 | `actions`, `act`: 2 | 1 |
+| `dap issue close <issue>` | `issue.close-own` when the caller opened it (issue.close-any otherwise), with the reason: 1 | `actions`, `act`: 2 | 1 |
+| `dap issues` | `room` for the lanes (paged by bytes), then `inspect` for each issue's own state: 1 + n | `room`, then `inspect` for each issue: 1 + n | 1 + n |
+| `dap log <scope>` | `steps`, one per page: 1 | `steps`: 1 | 1 |
+| `dap show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
+| `dap verify <scope>` | `record`, one per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as dap verify itself: 1 | `record`: 1 | 1 |
+| `dap verify --all` | `room`, then `record` for each scope it names: 1 + n | `room`, then `record` for each scope: 1 + n | 1 + n |
+| `dap remote` | `inspect` on the destination, whose branch item names the host, namespace and name: 1 | `inspect`: 1 | 1 |
+| `dap clone [<directory>]` | `repository.read-token` with the hours, `wait` for the outcome entry, `credential` with the act's entry, then Git: git clone with the credential as the header: 3 and Git | `actions` on the destination, `act`, `wait`, `credential`, then Git: 4 and Git | 3 and Git |
 | Page: Propose an edit | `change.create` with the change definition's digest and a title, `wait` for the lane, `change.ask-rules`, `wait` for the rules item, `inspect` on the destination for the head, `change.propose-file` with the base, path, digest, size and the text inline: 6 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`: 8 | 6 |
 | Page: Review | `inspect` on the change for its current version, `change.review` with the version and the verdict: 2 | `inspect`, `actions`, `act`: 3 | 2 |
 | Page: Comment | `change.comment` on a change (issue.comment on an issue), with the body: 1 | `actions`, `act`: 2 | 1 |
 | Page: Merge | `inspect` on the change for its current version, `change.merge` with the version and the reports it selects, `wait` for the merge to be published, refused or aborted: 3 | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
-| `artroom edit <path> --file <file>` | `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` with the text inline, then as artroom merge: `inspect` on the change, `change.link-own` with the issue for --closes, `change.merge`, `wait`; 9 without --closes: 10 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`, `inspect`, `act` link-own, `act` merge, `wait`: 12 | 10 |
-| `artroom merge <change>` | `inspect` on the change for its current version, `change.merge`, `wait`: 3; with --closes, change.link-own first | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
-| `artroom propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then, under the manifest-list change definition and a version 3 destination: `change.create`, `wait` for the lane, `change.ask-rules`, `wait` for the rules item, `inspect` on the destination for the head, `change.propose-file` once per path with the base, path, digest, size and text, `change.propose-version` with the base and each file's entry and digest, `change.merge` with that version, `wait` for the merge to be published: 8 + n | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act` per path, `act` propose-manifest, `act` merge, `wait`: 10 + n | 8 + n |
+| `dap edit <path> --file <file>` | `change.create`, `wait`, `change.ask-rules`, `wait`, `inspect` on the destination for the head, `change.propose-file` with the text inline, then as dap merge: `inspect` on the change, `change.link-own` with the issue for --closes, `change.merge`, `wait`; 9 without --closes: 10 | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act`, `inspect`, `act` link-own, `act` merge, `wait`: 12 | 10 |
+| `dap merge <change>` | `inspect` on the change for its current version, `change.merge`, `wait`: 3; with --closes, change.link-own first | `inspect`, `actions`, `act`, `wait`: 4 | 3 |
+| `dap propose <branch>` | Git first: the agent reads the committed files that differ from the room's head. Then, under the manifest-list change definition and a version 3 destination: `change.create`, `wait` for the lane, `change.ask-rules`, `wait` for the rules item, `inspect` on the destination for the head, `change.propose-file` once per path with the base, path, digest, size and text, `change.propose-version` with the base and each file's entry and digest, `change.merge` with that version, `wait` for the merge to be published: 8 + n | `actions` on the directory, `act`, `wait`, `actions` on the lane, `act`, `wait`, `inspect`, `act` per path, `act` propose-manifest, `act` merge, `wait`: 10 + n | 8 + n |
 | Page: Check status | `settle` with the target and the key: 1 | `settle`: 1 | 1 |
 | Page: Record inspection | `room` for the role and key, `record` on membership: 2 | `room`, `record`: 2 | 2 |
 | A capability step | `prepare` at the resource, with the act's own target, kind and fields, then the act tool under the same key, such as `issue.hand-in`: 2 | `prepare`, `actions`, `act`: 3 | 2 |

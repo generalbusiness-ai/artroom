@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import type { FactRef, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, definitionDigest, digestBytes, keyIdOfSecret, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
-import { firstExtents } from "@generalbusiness/artroom-platform";
-import { DEMO_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/artroom-lanes";
+import { firstExtents } from "@generalbusiness/dap-platform";
+import { DEMO_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/dap-lanes";
 import DOC from "../../../docs/mcp.md?raw";
 import { mcpRoom, type Agent } from "./support/room.ts";
 import { founded } from "./support/story.ts";
@@ -61,12 +61,12 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
 
     // install, claim (and Create room, the same calls).
     let register!: ScopeId;
-    await recipe("`artroom install", [rita], async () => {
+    await recipe("`dap install", [rita], async () => {
       const installed = accepted(await rita.ok("create", { definition: "platform:register@3", kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" }));
       register = installed["scope"] as ScopeId;
     });
     await room.wireRegister(register);
-    await recipe("`artroom claim", [rita], async () => {
+    await recipe("`dap claim", [rita], async () => {
       fresh(rita);
       const claimed = accepted(await act(rita, "room.create", register, "found", { fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" }));
       expect((await rita.ok("wait", { scope: register, entry: seqOf(claimed) }))["timedOut"]).toBe(false);
@@ -83,7 +83,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       expect(rules["items"]).toBeDefined();
       accepted(await act(rita, "rules.publish", "rules", "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }));
     });
-    await recipe("`artroom act <kind>", [rita], async () => {
+    await recipe("`dap act <kind>", [rita], async () => {
       fresh(rita);
       accepted(await act(rita, "rules.activate", "rules", "activate", { fields: { digest: DEMO_DIGESTS.issue, name: "issue" }, values: [canonicalize(issueDemo)], idempotencyKey: "activate-issue" }));
     });
@@ -98,14 +98,14 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       return linkFor(handle, seqOf(invited), secret);
     };
     let paulLink = "";
-    await recipe("`artroom invite", [rita], async () => { fresh(rita); paulLink = await invite("@paul", "invite-paul"); });
+    await recipe("`dap invite", [rita], async () => { fresh(rita); paulLink = await invite("@paul", "invite-paul"); });
     const paul = room.agent("paul", { mode, config: { service: "" } });
     const joins = async (agent: Agent, link: string) => {
       const joined = accepted(await agent.ok("join", { link, idempotencyKey: "join" }));
       expect(joined["handle"]).toBeDefined();
       expect((await agent.ok("wait", { scope: "inbox", seq: 0 }))["timedOut"]).toBe(false);
     };
-    await recipe("`artroom join", [paul], () => joins(paul, paulLink));
+    await recipe("`dap join", [paul], () => joins(paul, paulLink));
     fresh(rita);
     const quinnLink = await invite("@quinn", "invite-quinn");
     const quinn = room.agent("quinn", { mode, config: { service: "" } });
@@ -119,22 +119,22 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       return opened;
     };
     const issueOpened = { r: {} as Record<string, unknown> };
-    await recipe("`artroom issue open", [paul], async () => { issueOpened.r = await openIssue("The handbook is empty", "issue-1"); });
+    await recipe("`dap issue open", [paul], async () => { issueOpened.r = await openIssue("The handbook is empty", "issue-1"); });
     await recipe("Create issue", [paul], async () => { await openIssue("A typo on the front page", "issue-2"); });
-    await recipe("`artroom issue comment", [paul], async () => { fresh(paul); accepted(await act(paul, "issue.comment", 1, "comment", { fields: { body: "I will write it." }, idempotencyKey: "comment-1" })); });
-    await recipe("`artroom issue assign", [rita], async () => { fresh(rita); accepted(await act(rita, "issue.assign", 1, "assign", { on: 0, fields: { assignees: ["@paul"] }, idempotencyKey: "assign-1" })); });
-    await recipe("`artroom acts", [paul], async () => {
+    await recipe("`dap issue comment", [paul], async () => { fresh(paul); accepted(await act(paul, "issue.comment", 1, "comment", { fields: { body: "I will write it." }, idempotencyKey: "comment-1" })); });
+    await recipe("`dap issue assign", [rita], async () => { fresh(rita); accepted(await act(rita, "issue.assign", 1, "assign", { on: 0, fields: { assignees: ["@paul"] }, idempotencyKey: "assign-1" })); });
+    await recipe("`dap acts", [paul], async () => {
       if (mode === "default") expect((await paul.ok("room", {}))["notHeld"]).toBeDefined();
       else expect((await paul.ok("actions", { scope: 1 }))["acts"]).toBeDefined();
     });
-    await recipe("`artroom log", [paul], async () => { expect(((await paul.ok("steps", { scope: 1 }))["steps"] as unknown[]).length).toBeGreaterThan(1); });
-    await recipe("`artroom show", [paul], async () => { expect((await paul.ok("step", { scope: 1, seq: 0 }))["entry"]).toBeDefined(); });
-    await recipe("`artroom verify <scope>", [paul], async () => { expect(((await paul.ok("record", { scope: 1 }))["entries"] as unknown[]).length).toBeGreaterThan(1); });
-    await recipe("`artroom remote", [paul], async () => {
+    await recipe("`dap log", [paul], async () => { expect(((await paul.ok("steps", { scope: 1 }))["steps"] as unknown[]).length).toBeGreaterThan(1); });
+    await recipe("`dap show", [paul], async () => { expect((await paul.ok("step", { scope: 1, seq: 0 }))["entry"]).toBeDefined(); });
+    await recipe("`dap verify <scope>", [paul], async () => { expect(((await paul.ok("record", { scope: 1 }))["entries"] as unknown[]).length).toBeGreaterThan(1); });
+    await recipe("`dap remote", [paul], async () => {
       const destination = await paul.ok("inspect", { scope: "destination" });
       expect((destination["items"] as { type: string; values: Record<string, unknown> }[]).find((i) => i.type === "branch")!.values["repository"]).toMatchObject({ namespace: "artroom-demo" });
     });
-    await recipe("`artroom issues", [paul], async () => {
+    await recipe("`dap issues", [paul], async () => {
       const lanes = (await paul.ok("room", {}))["lanes"] as { number: number; kind: string }[];
       const issues = lanes.filter((l) => l.kind === "issue");
       for (const l of issues) expect((await paul.ok("inspect", { scope: l.number }))["items"]).toBeDefined();
@@ -155,7 +155,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       return { answers: [`stage ${JSON.stringify((staged["step"] as { answer: unknown }).answer)}`, `${String(handIn["answer"])} ${String(handIn["reason"] ?? "")} ${String(handIn["name"] ?? "")}`] };
     });
     // clone: a read token, its outcome, its credential, once; Git uses it outside the server.
-    await recipe("`artroom clone", [paul], async () => {
+    await recipe("`dap clone", [paul], async () => {
       fresh(paul);
       const token = accepted(await act(paul, "repository.read-token", "destination", "read-token", { on: 0, fields: { hours: 1 }, idempotencyKey: "token-1" }));
       expect((await paul.ok("wait", { scope: "destination", seq: seqOf(token) + 1 }))["timedOut"]).toBe(false);
@@ -193,14 +193,14 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
     await recipe("Comment", [rita], async () => { fresh(rita); accepted(await act(rita, "change.comment", paulChange.lane, "comment", { fields: { body: "Looks right." }, idempotencyKey: "change-comment-1" })); });
     await recipe("Merge", [rita], () => merge(rita, paulChange.lane, "merge-page"));
 
-    // edit: the whole of artroom edit, with --closes on the first issue; then artroom merge on another member's change.
+    // edit: the whole of dap edit, with --closes on the first issue; then dap merge on another member's change.
     const issueRef = (await rita.ok("inspect", { scope: 1 }))["ref"] as ScopeRef;
-    await recipe("`artroom edit", [rita], async () => {
+    await recipe("`dap edit", [rita], async () => {
       const edited = await proposeEdit(rita, "guide/start.md", "Start here.\n", "edit-cli");
       await merge(rita, edited.lane, "merge-edit", async () => { accepted(await act(rita, "change.link-own", edited.lane, "link-own", { fields: { issue: issueRef, how: "keyword" }, idempotencyKey: "link-edit" })); }, false);
     });
     const second = await proposeEdit(paul, "NOTES.md", "Notes.\n", "edit-paul-2");
-    await recipe("`artroom merge", [rita], () => merge(rita, second.lane, "merge-cli"));
+    await recipe("`dap merge", [rita], () => merge(rita, second.lane, "merge-cli"));
 
     // propose: the files, one propose-file each, then the version that names them. The demo change definition's propose-manifest
     // is the hold workflow's (a held hold, or a foreign hold with its pin): the lane refuses this version, by that guard's name.
@@ -222,7 +222,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       demoRefusal = `${String(version["answer"])} ${String(version["reason"])} ${String(version["name"])}`;
     })();
 
-    await recipe("`artroom issue close", [paul], async () => { fresh(paul); accepted(await act(paul, "issue.close-own", 2, "close-own", { on: 0, fields: { reason: "completed" }, idempotencyKey: "close-2" })); });
+    await recipe("`dap issue close", [paul], async () => { fresh(paul); accepted(await act(paul, "issue.close-own", 2, "close-own", { on: 0, fields: { reason: "completed" }, idempotencyKey: "close-2" })); });
     await recipe("Check status", [paul], async () => { expect((await paul.ok("settle", { target: 1, idempotencyKey: "comment-1" }))["answer"]).toBe("accepted"); });
     await recipe("Record inspection", [paul], async () => {
       expect(((await paul.ok("room", {}))["standing"] as { role: string }[])[0]!.role).toBe("member");
@@ -234,7 +234,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       expect(((await paul.ok("sends", { scope: "directory" }))["sends"] as unknown[]).length).toBeGreaterThan(0);
       expect((await paul.ok("wait", { scope: "directory", duty }))["timedOut"]).toBe(false);
     });
-    await recipe("`artroom verify --all", [paul], async () => {
+    await recipe("`dap verify --all", [paul], async () => {
       const view = await paul.ok("room", {});
       const scopes = [...Object.values(view["scopes"] as Record<string, { scope: string }>).map((s) => s.scope), ...(view["lanes"] as { scope: string }[]).map((l) => l.scope)];
       for (const scope of scopes) expect((await paul.ok("record", { scope }))["entries"]).toBeDefined();
@@ -250,7 +250,7 @@ async function recipes(mode: Mode): Promise<Map<string, Ran>> {
       accepted(await act(una, "rules.publish", "rules", "publish", { on: 0, fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }) }, idempotencyKey: "publish" }));
       fresh(una);
       accepted(await act(una, "rules.activate", "rules", "activate", { fields: { digest: definitionDigest(changeDemo3), name: "change" }, values: [canonicalize(changeDemo3)], idempotencyKey: "activate-change3" }));
-      await recipe("`artroom propose", [una], async () => {
+      await recipe("`dap propose", [una], async () => {
         fresh(una);
         const pr = accepted(await act(una, "change.create", "directory", "open-pr", { fields: { definition: definitionDigest(changeDemo3), title: "Two files", draft: false }, idempotencyKey: "propose-open" }));
         const lane = ((await una.ok("wait", { scope: "directory", entry: seqOf(pr) }))["created"] as { scope: string }[])[0]!.scope;

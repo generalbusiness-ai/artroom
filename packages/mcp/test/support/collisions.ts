@@ -8,8 +8,8 @@
  *   and another definition name: `room.join`, beside membership's. It also declares `propose-manifest`, the kind the change
  *   definitions declare, under another name.
  */
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
-import { platform } from "@generalbusiness/artroom-platform";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
+import { platform } from "@generalbusiness/dap-platform";
 
 const inbox = platform("platform:inbox@1")!.data;
 const start = {

@@ -2,10 +2,10 @@
  * Inventories built in memory from the real definitions, for the Node tests of the derivation and the list. No scope is read:
  * these are the inputs `readInventory` would give for a room whose scopes pin these definitions, with a standing the test states.
  */
-import type { DeclaredDefinition, Digest, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { FIRST_ACTIONS_OF, platform } from "@generalbusiness/artroom-platform";
-import { changeDemo, issueDemo } from "@generalbusiness/artroom-lanes";
+import { FIRST_ACTIONS_OF, platform } from "@generalbusiness/dap-platform";
+import { changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
 import type { DefinitionLike, Held, Inventory, Place, Standing } from "../../src/index.ts";
 
 export const MEMBERSHIP = "sc_membershipxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" as ScopeId;

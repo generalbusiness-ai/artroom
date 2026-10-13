@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
+import type { FactRef } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { pantry } from "./support/pantry.ts";
 import { mcpRoom, type Agent, type Room } from "./support/room.ts";
 import { founded } from "./support/story.ts";

@@ -7,7 +7,7 @@
  * anywhere: `Session` keeps it out of its JSON and text.
  */
 
-import type { Read, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Read, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { timeOf } from "@generalbusiness/artroom-bytes";
 import { TransportError, httpTransport, requestSession, signedReads, signerSessionRequest, type Fetch, type Session, type Signer, type Transport } from "@generalbusiness/artroom-client";
 
