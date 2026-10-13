@@ -16,6 +16,9 @@ are not built yet.
 | `definition.json` | Its canonical bytes. |
 | `pin.ts` | The digest of those bytes, `LENDING_DEFINITION`. |
 | `scripts/pin.mjs` | Writes `definition.json` and `pin.ts` from `definition.ts`. Run it after any change to the definition. |
+| `shelf.ts` | The shelf page of one thing as markdown, with members' text made literal; and every thing, live or gone, read from the record. |
+| `browser/model.ts` | What the member interface shows and may ask for: the view of one read, the act to sign, and a refusal in plain words. |
+| `demo-script.md` | The script for the recording. |
 | `definition.test.ts` | Plain-function tests: the bytes and the pin, the story of Nasruddin and the pot, and the bounds. Grants are scripted. |
 
 The scenario on real scopes is
