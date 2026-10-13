@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:db642917d0296cae38395bebb4d506ad3a1f89b6","text":"Merge retired a covered predecessor; the successor is at scripts/check-public-release.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:db90e204f87dfa2f429ea7aba52968acdb2a1c03","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/clone-outcome.ts."}
