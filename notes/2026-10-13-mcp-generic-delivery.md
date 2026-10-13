@@ -160,9 +160,21 @@ planner's amendment is kept.
 `docs/mcp.md` also gains a paragraph on the server's own errors: the
 128-character fragments and the 2 KiB bound.
 
-**Paths that differ from main.** After the third merge, and still at this round's head,
-`git diff --stat origin/main...HEAD` lists 58 files, all this branch's own:
-the 42 files of `packages/mcp`; `packages/cli/package.json`,
+## Corrections of review 6a86304e
+
+Origin's main had not moved, so no merge was made in this round. The
+planner's amendment is kept.
+
+| Item | What changed | Witness |
+|---|---|---|
+| 1. Names kept as own properties | `shape.ts` sets each field, record member, presented fact and `also` alias's expected revision with `defineProperty`, so a lawful name `__proto__` is an own, enumerable property and reaches the intent with its exact name and value. Before, a plain assignment hit the prototype setter: the value vanished, and the scope refused | `proto.scope.test.ts` on the real test Worker, with `support/pantry.ts`, a definition parsed from JSON and admitted by the native validator: a required text field and a record member named `__proto__` (`fill`), an `also` alias named `__proto__` bound by a field (`check`), and a presented fact named `__proto__` (`seal`), each accepted natively, with each name an own property of the entry's intent and of the item's values. With the old assignments, observed in this round: `fill` and `seal` refused with `bad-field`, `check` refused with `bad-intent` |
+| 2. A bounded locator for a dead reclaimer | The file store reports the reclaim file relative to itself. The error names it once, in the next step, whole, as `private/mcp-custody/<file>`, relative to `ARTROOM_HOME`; the sentence no longer repeats it, and the absolute path is not in the result. `failed` also checks the result with no sentence: were a next step alone past the bound, it would be cut to fit, with its length | `budget.test.ts`: under a home of 24 components of 90 characters (2204 characters in all), a dead reclaimer's refusal is 999 bytes, observed, and names `private/mcp-custody/capacity.lease.reclaim`; removing that file lets the same call be accepted. A 5,000-character next step is cut to fit within 2 KiB, with its length |
+| 3. The modern result's overhead | The bounds are stated to hold for the service's CallResult. What 2026-07-28 adds is one constant, `MODERN_RESULT_EXTRA`: 110 bytes | `wire.test.ts`: a real 2026-07-28 `tools/call` carries the CallResult and exactly those bytes more, `resultType` and the server's information; `docs/mcp.md` and the budget test say so |
+
+**Paths that differ from main.** After the third merge, and at the head of
+the round of review 6a86304e, `git diff --stat origin/main...HEAD` lists
+60 files, all this branch's own: the 44 files of `packages/mcp` (this
+round added `test/proto.scope.test.ts` and `test/support/pantry.ts`); `packages/cli/package.json`,
 `packages/cli/src/line.ts`, `packages/cli/src/main.ts`,
 `packages/cli/src/mcp.ts`, `packages/cli/src/store.ts` and
 `packages/cli/test/invitation-link.test.ts`;
@@ -214,6 +226,8 @@ In this session, after the last change to what each covers:
 
 | Command | Result |
 |---|---|
+| `npx vitest run --project mcp`, after each item of review 6a86304e | `Tests  68 passed (68)` after item 1, `70` after item 2, `71` after item 3 |
+| `npx vitest run --project scope packages/mcp/test`, after each item of review 6a86304e, the last time with `--reporter=verbose` | `Test Files  7 passed (7)`, `Tests  9 passed (9)` each time |
 | `npx vitest run --project mcp`, after each item of review ad2576fb | `Tests  68 passed (68)` after the P2 and after the P3 |
 | `npx vitest run --project scope packages/mcp/test`, after each item of review ad2576fb, the last time with `--reporter=verbose` | `Test Files  6 passed (6)`, `Tests  8 passed (8)` each time |
 | `npx vitest run --project mcp`, after each item of review b04a53c8 | `Tests  66 passed (66)` after items 5 and 6 |
@@ -265,8 +279,8 @@ The demo room is the six platform scopes on the default cohort, one lane
 under `issue-demo` and one under `change-demo`. No single descriptor
 exceeds a page. The counts are one more than the first round's: `join`.
 The bytes were taken again in the round of review b04a53c8, after the
-wording of `items` changed: 63 bytes more per list than before. The round
-of review ad2576fb's run gave the same figures.
+wording of `items` changed: 63 bytes more per list than before. The runs
+of the rounds of reviews ad2576fb and 6a86304e gave the same figures.
 
 ### Reads per tool
 
@@ -303,14 +317,15 @@ read 3 summaries.
 ### The room story
 
 Observed run of `packages/mcp/test/room.scope.test.ts` on the real test
-Worker, in the round of review ad2576fb. The second member's request count
-varies between runs with the timing of `wait`'s polls: 286 in the default
-mode in the previous round's run, 288 in this one.
+Worker, in the round of review 6a86304e. The second member's request count
+varies between runs with the timing of `wait`'s polls: in the default mode
+286, 288 and 288, and in `--generic` 283, 283 and 281, in the runs of the
+last three rounds.
 
 | Mode | List changes told, founder | of them while founding | List changes told, second member | Requests, founder | Requests, second member |
 |---|---|---|---|---|---|
 | Default | 7 | 3 | 4 | 229 | 288 |
-| `--generic` | 7 | 3 | 4 | 241 | 283 |
+| `--generic` | 7 | 3 | 4 | 241 | 281 |
 
 The second member joins from an empty configuration through `join`, after
 a reply lost on the way back. The founder reviews the member's version,
