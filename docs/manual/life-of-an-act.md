@@ -10,7 +10,7 @@ main, not the older parked Room API or an unlanded intent-v2 wire format.
 
 ## Choose the exact meaning and subject
 
-A scope pins its definition at founding. That definition declares each
+A scope pins its definition at its creation. That definition declares each
 act's target item type, fields, required authority, guards, changes and
 messages. A client discovers or reads that actual definition; a familiar
 action name is insufficient to choose its meaning.
@@ -41,8 +41,8 @@ flowchart TD
 ```
 
 A participant key need not already be enrolled for every action. Join checks
-the invitation and the fresh signing key; repository founding uses the
-register's founding policy. These specific rules do not grant ordinary member actions.
+the invitation and the fresh signing key; creating a repository uses the
+register's creation policy. These specific rules do not allow ordinary member actions.
 
 ## Read before committing; judge in the transaction
 
@@ -55,7 +55,7 @@ head has not moved, judges the input on the transaction's clock reading and
 either commits the derived entry or answers without accepting the act. If
 another input moved the head during preparation, it starts that judgment
 again within its restart budget. A missing authority read is unavailable,
-not a grant inferred from the client's view.
+not permission inferred from the client's view.
 
 Only the accepted entry, its retained inputs, sends and folded state share
 that local transaction. Other scopes do not join it. Their messages and
@@ -114,4 +114,4 @@ established. Sources: [intent](../../packages/contract/src/intent.ts),
 Existing [turn witnesses](../../packages/scope/test/turn.test.ts) show the
 native boundary under their fixture conditions; no new run is claimed.
 Independent review and the complete release acceptance remain in
-[the ledger](ledger.md).
+[the ledger](../../apps/room/docs/ledger.md).

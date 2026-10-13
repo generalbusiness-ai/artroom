@@ -1,6 +1,6 @@
 # The page
 
-The page uses the accepted [v2 design](../plans/027-artroom-usability/v2/design-review.md)
+The page uses the accepted [v2 design](../../../plans/027-artroom-usability/v2/design-review.md)
 for the demo story. It
 runs in a browser. It reads a room over the scope service's HTTP routes,
 and it signs acts with a key that the browser keeps. It judges nothing:
@@ -18,10 +18,13 @@ current delivery evidence is reported separately.
 
 ## Build it
 
+The package name in this command is the final dap name. To run it at this commit, read
+[Names in transition](../../../docs/README.md#names-in-transition).
+
 From the root of a checkout, after `npm ci`:
 
 ```
-npm run build --workspace @generalbusiness/artroom-page
+npm run build --workspace @generalbusiness/dap-room-page
 ```
 
 This bundles the page with esbuild and writes three files:
@@ -55,7 +58,7 @@ the same origin, run no script (their policy is `default-src 'none'`).
 Open `<base URL>/page/`. The existing-room chooser offers two paths:
 
 1. **Invitation link.** Choose this path and paste the complete link from
-   `artroom invite`. The page prepares a browser key and joins automatically.
+   `dap invite`. The page prepares a browser key and joins automatically.
    There is no key input or manual Join button. Before dispatch, it retains
    and reads back the key and exact signed enrollment request under the
    origin's Web Lock. After verification, it checks the loaded membership
@@ -102,7 +105,7 @@ membership.
 |---|---|
 | `#/` | Issues, with search and Open, Closed and All filters. Changes uses `#/?kind=change`. Each row keeps its lane's observed state. |
 | `#/issue/<scope>` | One issue: number, title, state and close reason, who opened it, assignees, conditions, body and comments. |
-| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `artroom edit`, its path, size and digest and any recorded publication commit; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. Immutable version rendering is unavailable. |
+| `#/change/<scope>` | One change: where it stands; the current version (base and authors; for a one-file version from `dap edit`, its path, size and digest and any recorded publication commit; otherwise the integration commit and tree); reviews by extent, against the extents of the rules the lane holds; review requests; checks; links to the issues it closes; each merge with the destination's publication and its outside operations; and comments. Immutable version rendering is unavailable. |
 | The site | Pages and **Open latest page** navigate to `/site/<directory>/HEAD/`. These show the latest branch, not an immutable rendered preview. Exact source preview verifies the selected retained signed proposal's subject, digest and size; rendered same-version links and assets remain separate work. |
 | `#/rules` | The rules of this room, as the rules scope holds them: the revision, the approvals the lanes count, the extents with their classes, approvals, approvers, checks and paths, whether the single-controller exception is declared, required checks, labels and the active definitions. It says who may change them: the members whose role holds `rules.publish`. |
 
@@ -122,7 +125,7 @@ uses the selected version and held extent choices. Merge uses that version's
 selected issue-report facts in their native order, not checker jobs. Missing
 technical facts make the task unavailable instead of asking for guessed IDs.
 
-The page computes offered actions with the same function as `artroom acts`;
+The page computes offered actions with the same function as `dap acts`;
 native guards remain decisive. Signing fences the visible controls locally
 and preserves the subject. The actual answer appears before the optional
 observation refresh. The page shows the
@@ -169,18 +172,18 @@ When an explicitly supplied command-line config contains a full register
 reference, the page can read whether its current key may claim there.
 Create room appears only for an eligible key with a known member handle,
 Web Locks and dialog support. It never installs a register. Its private
-claim record retains exact founding and enrollment envelopes plus a separate
+claim record retains exact creation and enrollment envelopes plus a separate
 recovery key before sending; Resume creation follows those same requests.
 Each logical creation has a separate retained operation. Another Create
 requires verified completion of the previous active operation; unresolved
 work is not replaced. Old operations remain resumable by their exact identity.
-The private journal admits at most 64 operations and evicts none to make room.
+The private journal holds at most 64 operations and evicts none to make room.
 Context is checked again after a queued lock and before each mutation POST.
 The typed name is a local intent label, saved with the exact room context
 and shown beside the native generated repository name. It does not replace
 the recorded name or travel to another selected room.
 
-A value is read as `artroom act --set` reads it: a list or a record as
+A value is read as `dap act --set` reads it: a list or a record as
 JSON, a number for an item, `true` or `false`, and `@handle` for a member.
 
 A field that takes a definition's bytes at a stated place, as the
@@ -213,7 +216,7 @@ that the room's records show, with the record it comes from:
   declaration pins remain unavailable.
 - **Activating a definition.** The rules scope's `activate` needs the
   definition's bytes, which no scope holds before the activation; use
-  `artroom act activate --value`.
+  `dap act activate --value`.
 - **The infrastructure effect of plan 016.** No definition opens a
   separate effect for an extent. The effect states are those of the Git
   publication's own outside operations.
@@ -223,7 +226,7 @@ that the room's records show, with the record it comes from:
 ## Tests
 
 `packages/page/test/story.scope.test.ts` runs the page's data functions
-against the Worker's routes on a room that the command line founds, with
+against the Worker's routes on a room that the command line creates, with
 the real read sessions, the edit command and the site route; the Git host
 and the scheduler are labelled stand-ins. `assets.test.ts` checks the
 Worker's page module, `states.test.ts` the states of a change, and

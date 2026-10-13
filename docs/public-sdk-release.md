@@ -1,4 +1,4 @@
-# Producing the public SDK
+# Produce the public SDK
 
 This is the active six-package producer boundary. It builds and inspects
 JavaScript and declarations for contract, bytes, client, derive, platform and replay. It does
@@ -40,8 +40,8 @@ their exact internal dependencies.
 The producer copies tracked inputs to an owned external build root and
 verifies their bytes. Every package compiles from its actual copied source
 ancestry. That root contains copied, pinned third-party dependencies and
-only the preceding completed Artroom JavaScript/declaration stages. There
-are no source-workspace aliases or Artroom fallback links. Compiler file
+only the preceding completed dap JavaScript/declaration stages. There
+are no source-workspace aliases or dap fallback links. Compiler file
 lists are confined to the owned inputs/stages/dependencies and the exact
 pinned compiler wrapper and native package directories, including the native
 package's standard libraries. No whole-cache root is allowed. Before each
@@ -206,7 +206,7 @@ onboarding or universal durable-outbox protocol.
 
 ## Module-reference Source repair
 
-Request `0c3828a0ca7b50dda540dc1c9023950c03b72668` rests on Artroom
+Request `0c3828a0ca7b50dda540dc1c9023950c03b72668` rests on dap
 promise `git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4291f1e6caa20c865f5c2c983418c408b9d65895`. The original one-run
 `5e1f` producer failed before compiler/pack; its generic diagnostic did not
 name the specific refusal. Static inspection and the retained lexical
@@ -261,7 +261,7 @@ passed the reader case and all four packages' resolution, emission and
 offline packing, and sealed its producer manifest. The checker passed its
 archive and emitted fixture ABI guards, then the compiled journey failed:
 the clone witness narrowed the text slot to 39 while write/edit fields
-still admitted 200. The actual validator refused both assignments. The
+still answered 200. The actual validator refused both assignments. The
 journey failed before any of the three strict consumer contexts were
 dispatched.
 
@@ -290,7 +290,7 @@ the second refused mismatched temporary config metadata before any phase;
 the third reached consistent native replay, then failed the retained input's
 mistaken bare definition-name assertion without exporting a capture. The
 corrected capture's handle 93455 passed the affected compiler and whole native
-founding case. Its public canonical capture is 96,949 bytes, SHA-256
+creation case. Its public canonical capture is 96,949 bytes, SHA-256
 `f01d6a82fb57f72bceb8160b9f0bf6f3a8b32a443bbf87a112b044efbd190833`:
 five complete prefixes, 18 entries, 12 retained inputs and 11 verified foreign
 facts, with no anchors, missing dependencies or redactions. The complete

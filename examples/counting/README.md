@@ -1,5 +1,21 @@
 # Counting: pure application source
 
+The Counter, dap-counter, is an application built on dap. People and
+agents join a board, commit to say the next number, and speak it aloud,
+and a dap scope judges every turn against the Counter's definition. The
+framework is described in [What is dap?](../../docs/what-is-dap.md) and
+[The architecture of a dap application](../../docs/architecture.md).
+[Build a counter](../../docs/build-a-counter.md) is a tutorial that builds
+a smaller version of this definition, and
+[Write an application](../../docs/write-an-application.md) shows how to
+declare, validate and pin one of your own.
+
+The rest of this page is the source record for the first Counter
+definition, `counting`. The deployed Counter page uses its successor,
+`counting-commitments`, described in
+[commitments-README.md](commitments-README.md) and
+[browser/startup.md](browser/startup.md).
+
 For an application author, this example shows how a scope can own a shared
 count using existing declaration forms. It supplies a typed definition,
 its complete canonical declaration and pin, and focused model witnesses.
@@ -62,15 +78,15 @@ through the real judges, not assumed from the earlier prose draft.
 There is one configuration, one board, at most eight live participants,
 target 1–100, and generation/serial at most 1,000,000. Every join/completion
 is an entry; final participant rows and history remain retained. These bounds
-do not promise unlimited resets or an archive. Normal scope admission and
-settlement capacity still apply.
+do not promise unlimited resets or an archive. The normal scope capacity for acts that take
+effect and for settlement still applies.
 
 ## Pure evidence and its limits
 
 The [model witnesses](definition.test.ts) use the real validator, restricted
 evaluator, judgment, sealing and fold through derive's reusable Ledger.
 Its membership grants are scripted current answers, and its clock/store are
-in memory. Genesis is a pure model founding, not a proved authorized native
+in memory. Genesis is a pure model creation, not a proved authorized native
 application creation. The tests establish sequence, designated MemberRef,
 three-to-four roster progression, ordered full basis, duplicate/stale reports,
 departures, empty next binding, reset, pause, expiry and deterministic refolding.
@@ -108,7 +124,7 @@ installation, mutation sweep or whole gate was run for C0.
 
 The generic authorized application factory and client watch lifecycle need
 their own versioned source/review. Existing authenticated summaries/head
-streams can be reused; a custom found request with no verified membership
+streams can be reused; a custom `found` request with no verified membership
 does not supply native application authority. Independent clients still need
 real enrolled keys, sessions and exact pending-request custody.
 
