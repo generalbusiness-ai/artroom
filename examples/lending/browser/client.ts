@@ -1,0 +1,219 @@
+/**
+ * The lending gateway: reads the lending scope, and signs, keeps and sends one
+ * lending act at a time. It follows notes/2026-10-13-lending-library.md, section 4.1.
+ *
+ * An act is signed once and kept (custody.ts) before anything is sent. After a
+ * lost reply or a reload the original is checked by a read; it is sent again only
+ * when its mark shows it was never sent. Nothing here signs a replacement.
+ */
+import type { Entry, Receipt, Summary } from "@generalbusiness/dap-contract";
+import { b64url, canonicalize, intentDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
+import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHeadStream, requestSession, shapeDeclaredAct, signedIntent, signerSessionRequest,
+  type CompleteSnapshot, type Fetch, type HeadStreamFetch, type Observation, type Session, type Signer } from "@generalbusiness/artroom-client";
+import { lending } from "../definition.ts";
+import { LENDING_DEFINITION } from "../pin.ts";
+import { advance, envelopeKey, validKept, type CustodyLock, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports, type Settled } from "./custody.ts";
+import { lendingView, propose, refusalWords, type LendingAct, type LendingView } from "./model.ts";
+
+/** How long after an intent's deadline a "not found" is taken as final. */
+export const SETTLED_AFTER_MS = 120_000;
+
+/** What the member is told about one lending act. `recorded` and `refused` are final; `unknown` keeps the original. */
+export type ActOutcome =
+  | { status: "recorded" }
+  | { status: "refused"; reason: string }
+  | { status: "unknown"; reason: string }
+  | { status: "nothing-sent"; reason: string };
+/** The original request that is kept, as the interface may show it. */
+export interface Pending { kind: string; thing: number | null; name: string | null; notAfter: string; unsent: boolean }
+export type LendingState =
+  | { status: "loading" }
+  | { status: "current"; view: LendingView; entries: readonly Entry[] }
+  | { status: "behind"; reason: string; view?: LendingView };
+
+export interface LendingGateway {
+  /** Follow the scope. Each `current` state is one coherent read: a summary, its head, and the record up to it. */
+  observe(emit: (state: LendingState) => void): Observation;
+  /** One coherent read, without following the scope: a session, the summary, and the record up to its head. */
+  look(): Promise<LendingState>;
+  /** Sign one act, keep it, then send it. Refused while another original is kept. */
+  act(kind: LendingAct, input?: { thing?: number; name?: string; description?: string; reason?: string }): Promise<ActOutcome>;
+  /** The kept original, or null. */
+  pending(): Promise<Pending | null>;
+  /** Check: a read that settles whether the kept original took effect. It sends nothing. */
+  check(): Promise<ActOutcome | null>;
+  /** Continue: send the kept original, only when the journal shows it was never sent. */
+  resume(): Promise<ActOutcome | null>;
+  /** Give up the kept original, only when a read shows it did not take effect and its deadline has passed. */
+  abandon(): Promise<boolean>;
+  dispose(): void;
+}
+
+export function lendingGateway(configured: LendingIdentity, signer: Signer, options: {
+  current(): boolean; lock: CustodyLock; store: KeptStore; /** The clock for deadlines. Date.now by default. */ now?: () => number; fetch?: Fetch; headFetch?: HeadStreamFetch; /** The fetch of the one send. It defaults to `fetch`. */ actFetch?: Fetch;
+}): LendingGateway {
+  const identity = JSON.parse(JSON.stringify(configured)) as LendingIdentity;
+  const origin = new URL(identity.origin);
+  if (origin.origin !== identity.origin || !["https:", "http:"].includes(origin.protocol)) throw new Error("The configured service must be an exact origin.");
+  if (identity.definition !== LENDING_DEFINITION || signer.key !== identity.publicKey) throw new Error("This device does not match the configured lending identity.");
+
+  const now = options.now ?? (() => Date.now());
+  const lifetime = new AbortController();
+  let alive = true, session: Session | null = null, observer: Observation | undefined, view: LendingView | undefined, fresh = false;
+  const usable = () => alive && options.current();
+  const current = () => { if (!usable()) throw new Error("This device context is no longer current."); };
+  const transport = httpTransport(identity.origin, { fetch: options.fetch ?? ((url, init) =>
+    fetch(url, { ...init, redirect: "error", signal: init?.signal ? AbortSignal.any([init.signal, lifetime.signal]) : lifetime.signal })) });
+  const handle = () => new ScopeHandle(transport, identity.scope.scope, session?.reader() ?? null);
+
+  /** A read session from the room's membership, signed by this device. Null with the refusal's reason when there is none. */
+  const signIn = async (): Promise<string | null> => {
+    const signed = await signerSessionRequest(identity.membership, signer, timeOf(now() + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))); current();
+    const answer = await requestSession(identity.origin, identity.membership.scope, signed, options.fetch ? { fetch: options.fetch } : {}); current();
+    if (!answer.ok) return answer.reason;
+    session = answer.session;
+    return null;
+  };
+  /** The reads that settle a kept request need a session; a reloaded page has none yet. */
+  const ready = async (): Promise<void> => { if (!session) await signIn(); };
+
+  /** The record up to `seq`, read page by page until the read is complete. */
+  const record = async (seq: number): Promise<Entry[]> => {
+    const entries: Entry[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await handle().history(cursor); current();
+      if (!page.ok) throw new Error(`The record could not be read: ${page.reason}.`);
+      for (const sealed of page.value) entries.push(sealed.entry);
+      if (page.complete || page.next === undefined) break;
+      cursor = page.next;
+    }
+    return entries.slice(0, seq + 1);
+  };
+
+  const send = options.actFetch ?? options.fetch ?? ((url: string, init?: Parameters<Fetch>[1]) =>
+    fetch(url, { ...init, redirect: "error", signal: init?.signal ? AbortSignal.any([init.signal, lifetime.signal]) : lifetime.signal }));
+  const ports: Ports = {
+    current: usable,
+    post: (envelope) => new ScopeHandle(httpTransport(identity.origin, { fetch: send as Fetch }), identity.scope.scope).submit(envelope.signed, envelope.grants, envelope.beside),
+    // An acceptance counts only when the scope's own record holds this exact signed request.
+    recorded: async (receipt: Receipt, envelope: Envelope) => {
+      if (receipt.definition !== identity.definition || receipt.intent !== intentDigest(envelope.signed.intent) || canonicalize(receipt.fact.at) !== canonicalize(identity.scope)) return false;
+      await ready();
+      const followed = await handle().followReceipt(receipt);
+      return followed.ok && followed.entry.input.type === "act" && canonicalize(followed.entry.input.signed) === canonicalize(envelope.signed);
+    },
+    settle: async (envelope) => { await ready(); const answer = await handle().settle(envelope.signed); return answer.ok ? answer.value : null; },
+  };
+  /** Tell the member what a step settled, and release custody only on a final result for this exact request. */
+  const conclude = async (held: Kept, settled: Settled): Promise<ActOutcome> => {
+    if (settled.status === "unknown") return { status: "unknown", reason: "No answer came back that could be trusted. The original request is kept. Check it before doing anything else." };
+    current(); const latest = await options.store.load(); current();
+    if (!validKept(latest, identity) || envelopeKey(latest.envelope) !== envelopeKey(held.envelope) || latest.phase !== settled.status)
+      return { status: "unknown", reason: "The original request is kept. Check it before doing anything else." };
+    await options.store.clear(); current(); observer?.refresh();
+    return settled.status === "recorded" ? { status: "recorded" } : { status: "refused", reason: refusalWords(held.kind as LendingAct, settled.reason) };
+  };
+
+  return {
+    observe(emit) {
+      observer = observeScope<Summary>({
+        context: { origin: identity.origin, deployment: identity.deployment, scope: identity.scope, definition: identity.definition, membership: identity.membership, member: identity.member.member, key: identity.publicKey },
+        current: usable,
+        authenticate: async () => options.lock.run(async () => {
+          current();
+          const signed = await signerSessionRequest(identity.membership, signer, timeOf(now() + 60_000), b64url(crypto.getRandomValues(new Uint8Array(16)))); current();
+          const answer = await requestSession(identity.origin, identity.membership.scope, signed, options.fetch ? { fetch: options.fetch } : {}); current();
+          if (answer.ok) session = answer.session;
+          return answer.ok ? { ok: true, session: answer.session } : answer;
+        }),
+        snapshot: async (next) => { session = next; return completeSummary(await handle().summary()); },
+        open: (next, signal) => openHttpHeadStream(identity.origin, identity.scope, next, signal, options.headFetch ? { fetch: options.headFetch } : {}),
+        emit: (state) => {
+          if (!usable()) return;
+          if (state.status !== "current") { fresh = false; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
+          const snapshot: CompleteSnapshot<Summary> = state.snapshot;
+          // One coherent view: the summary, its head, and the record up to that head.
+          void record(snapshot.at.seq).then((entries) => {
+            if (!usable()) return;
+            view = lendingView(snapshot.value, snapshot.at, entries); fresh = !view.behind;
+            emit(view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries });
+          }).catch((error: unknown) => { if (usable()) { fresh = false; emit({ status: "behind", reason: error instanceof Error ? error.message : "The record could not be read.", ...(view ? { view } : {}) }); } });
+        },
+      });
+      return observer;
+    },
+    async look() {
+      try {
+        current();
+        const refusal = await signIn();
+        if (refusal !== null) { fresh = false; return { status: "behind", reason: `The room refused a read session: ${refusal}.`, ...(view ? { view } : {}) }; }
+        const read = completeSummary(await handle().summary()); current();
+        if (!read.ok) { fresh = false; return { status: "behind", reason: `The library could not be read: ${read.reason}.`, ...(view ? { view } : {}) }; }
+        const entries = await record(read.value.at.seq);
+        view = lendingView(read.value.value, read.value.at, entries); fresh = !view.behind;
+        return view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries };
+      } catch (error) { fresh = false; return { status: "behind", reason: error instanceof Error ? error.message : "The library could not be read.", ...(view ? { view } : {}) }; }
+    },
+    act(kind, input = {}) {
+      return options.lock.run(async (): Promise<ActOutcome> => {
+        current();
+        if ((await options.store.load() ?? null) !== null) return { status: "nothing-sent", reason: "An earlier request is kept. Check it first." };
+        current();
+        if (!view || !fresh) return { status: "nothing-sent", reason: "The list is not current yet. Nothing was sent." };
+        const proposed = propose(view, kind, input);
+        if (!proposed.ok) return { status: "nothing-sent", reason: proposed.reason };
+        const { on, expected, fields } = proposed.proposal;
+        let held: Kept;
+        try {
+          const shaped = shapeDeclaredAct(lending, kind, { on, fields } as never);
+          const signed = await signedIntent(signer, { to: identity.scope, kind, on: shaped.on, fields: shaped.fields, expected }, { now: now() }); current();
+          held = { v: 1, kind, envelope: { signed, grants: [], beside: shaped.beside }, phase: "prepared" };
+          if (!validKept(held, identity)) throw new Error("The signed request is not a lending request of this identity.");
+          // Kept before anything is sent.
+          await options.store.save(held); current();
+        } catch { return { status: "nothing-sent", reason: "The request could not be signed and kept. Nothing was sent." }; }
+        return conclude(held, await advance(options.store, identity, ports, held.envelope));
+      });
+    },
+    async pending() {
+      const held = await options.store.load();
+      if (held === null || held === undefined) return null;
+      if (!validKept(held, identity)) return { kind: "unknown", thing: null, name: null, notAfter: "", unsent: false };
+      const { intent } = held.envelope.signed;
+      return { kind: held.kind, thing: intent.on, name: typeof intent.fields["name"] === "string" ? intent.fields["name"] : null, notAfter: intent.notAfter, unsent: held.phase === "prepared" };
+    },
+    check() {
+      return options.lock.run(async () => {
+        current(); const held = await options.store.load(); current();
+        if (held === null || held === undefined) return null;
+        if (!validKept(held, identity)) return { status: "unknown" as const, reason: "The kept request cannot be read. It stays in this browser." };
+        return conclude(held, await advance(options.store, identity, ports, held.envelope, true));
+      });
+    },
+    resume() {
+      return options.lock.run(async () => {
+        current(); const held = await options.store.load(); current();
+        if (held === null || held === undefined) return null;
+        if (!validKept(held, identity) || held.phase !== "prepared")
+          return { status: "unknown" as const, reason: "This request may already have been sent. Check it; it will not be sent again." };
+        return conclude(held, await advance(options.store, identity, ports, held.envelope));
+      });
+    },
+    abandon() {
+      return options.lock.run(async () => {
+        current(); const held = await options.store.load(); current();
+        if (held === null || held === undefined) return true;
+        if (!validKept(held, identity)) return false;
+        const deadline = timeMs(held.envelope.signed.intent.notAfter);
+        if (deadline === null || now() < deadline + SETTLED_AFTER_MS) return false;
+        await ready();
+        const answer = await handle().settle(held.envelope.signed); current();
+        if (answer.ok || answer.reason !== "not-found") return false;
+        await options.store.clear(); current(); observer?.refresh();
+        return true;
+      });
+    },
+    dispose() { alive = false; lifetime.abort(); observer?.cancel(); session = null; view = undefined; fresh = false; },
+  };
+}

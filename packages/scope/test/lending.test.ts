@@ -6,6 +6,8 @@ import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { APPLICATION_COHORT, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { lendingGateway, SETTLED_AFTER_MS } from "../../../examples/lending/browser/client.ts";
+import type { Kept, KeptStore } from "../../../examples/lending/browser/custody.ts";
 import { lending } from "../../../examples/lending/definition.ts";
 import { LENDING_DEFINITION } from "../../../examples/lending/pin.ts";
 import { NO_OUTSIDE } from "../src/index.ts";
@@ -171,13 +173,69 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     await L.did(passerby, "return", await on(small));
     expect(await L.item(small)).toMatchObject({ state: "available", parties: { borrower: null } });
 
+    // The member interface's gateway, on the same real scopes. The private store and the
+    // lock are in-memory STAND-INS for the browser's; the lost reply is made by the test.
+    const browser = (who: Actor, handle: `@${string}`, lose: { reply: boolean } = { reply: false }) => {
+      let slot: string | null = null, posts = 0;
+      const store: KeptStore = { load: async () => slot === null ? null : JSON.parse(slot) as Kept, save: async (value) => { slot = JSON.stringify(value); }, clear: async () => { slot = null; } };
+      let chain: Promise<unknown> = Promise.resolve();
+      const lock = { run: <T>(work: () => Promise<T>): Promise<T> => { const next = chain.then(work, work); chain = next.catch(() => undefined); return next; } };
+      const open = (): ReturnType<typeof lendingGateway> => lendingGateway(
+        { origin: SERVICE, deployment: "lending-fixture", scope: scopeOfLending, definition: LENDING_DEFINITION, membership, member: { membership, member: handle }, publicKey: who.key },
+        { key: who.key, sign: async (bytes: Uint8Array) => (await import("@generalbusiness/artroom-client")).secretSigner(who.secret).sign(bytes) },
+        { current: () => true, lock, store, fetch, now: () => timeMs(soon(0))! + skew.ms,
+          actFetch: async (url, init) => { posts++; const response = await fetch(url, init); if (lose.reply) throw new Error("the reply was lost"); return response as never; } });
+      return { open, store, posts: () => posts, kept: () => slot };
+    };
+    const scopeOfLending = await L.at(), skew = { ms: 0 };
+    const countThings = async () => (await things()).length;
+    const his = browser(nasruddin, "@nasruddin"), g = his.open();
+    { const seen = await g.look(); if (seen.status !== "current") throw new Error(`look: ${JSON.stringify(seen).slice(0, 300)}`); }
+    expect(await g.look()).toMatchObject({ status: "current", view: { things: [{ id: big, state: "gone", reason: "Nasruddin says the pot died", revision: null }, { id: small, state: "available" }, { id: fresh, state: "available" }] } });
+    // A proposal the view rules out signs and sends nothing.
+    expect(await g.act("return", { thing: small })).toEqual({ status: "nothing-sent", reason: "That thing is not lent." });
+    expect([his.posts(), his.kept()]).toEqual([0, null]);
+    // An act that takes effect: kept before it is sent, verified in the record, then released.
+    expect(await g.act("donate", { name: "Kettle", description: "Whistles." })).toEqual({ status: "recorded" });
+    expect([his.posts(), his.kept(), await countThings()]).toEqual([1, null, 3]);
+    // A refusal is final, in plain words with the scope's reason, and changes nothing.
+    await g.look();
+    const beforeRefusal = await head();
+    expect(await g.act("cancel", { thing: small, reason: "The pot died" })).toEqual({ status: "refused", reason: "Only staff can cancel a thing. (unauthorized)" });
+    expect([his.kept(), await head()]).toEqual([null, beforeRefusal]);
+
+    // A lost reply. The donation took effect, the browser does not know, and it keeps the original.
+    const lossy = { reply: true }, hers = browser(passerby, "@passerby", lossy), lost = hers.open();
+    await lost.look();
+    expect(await lost.act("donate", { name: "Sieve", description: "Fine mesh." })).toMatchObject({ status: "unknown" });
+    expect([hers.posts(), await countThings()]).toEqual([1, 4]);
+    expect(await lost.pending()).toMatchObject({ kind: "donate", name: "Sieve", unsent: false });
+    // No second act is signed while the original is kept, and Continue does not send it again.
+    expect(await lost.act("donate", { name: "Sieve", description: "Fine mesh." })).toMatchObject({ status: "nothing-sent" });
+    expect(await lost.resume()).toMatchObject({ status: "unknown" });
+    // Even long after its deadline it cannot be given up: a read finds that it took effect.
+    skew.ms = 10 * SETTLED_AFTER_MS;
+    expect(await lost.abandon()).toBe(false);
+    skew.ms = 0;
+    expect([hers.posts(), await countThings()]).toEqual([1, 4]);
+    // After a reload, a new gateway over the same private store finds the original, and Check settles it by a read.
+    lost.dispose();
+    lossy.reply = false;
+    const reloaded = hers.open();
+    expect(await reloaded.pending()).toMatchObject({ kind: "donate", name: "Sieve" });
+    expect(await reloaded.check()).toEqual({ status: "recorded" });
+    expect([hers.posts(), hers.kept(), await countThings()]).toEqual([1, null, 4]);
+    expect((await things()).filter((thing) => thing.values["name"] === "Sieve")).toHaveLength(1);
+    expect(await reloaded.pending()).toBeNull();
+    reloaded.dispose(); g.dispose();
+
     // The state and the record survive a restart.
     const before = await L.summary();
     await lifetime.wait(() => L.restart());
     expect((await L.summary()).value).toEqual(before.value);
 
     // 64 live things. The gone pot does not count; the 65th donation is refused until a thing is cancelled.
-    for (let n = 3; n <= 64; n++) await L.did(nasruddin, "donate", donation(`Thing ${n}`, "One of many."));
+    for (let n = 5; n <= 64; n++) await L.did(nasruddin, "donate", donation(`Thing ${n}`, "One of many."));
     expect(await things()).toHaveLength(64);
     await refused(L.act(nasruddin, "donate", donation("Thing 65", "One too many.")), "type-full");
     await L.did(neighbour, "cancel", { ...await on(fresh), fields: { reason: "Dented" } });
