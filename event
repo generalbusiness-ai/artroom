@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4214c632cf7e5fb606f9cc0c1e5c4f95327245eb","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-issue-rules-form-polish.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4231ee942cb04d25b28d0c04d6d4e820df3acc80","text":"Merge retired a covered predecessor; the successor is at packages/page/test/room-initialization.test.ts."}
