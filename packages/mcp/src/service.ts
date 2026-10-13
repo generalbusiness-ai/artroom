@@ -94,7 +94,7 @@ export const BOUNDS = { act: 4 * KIB, room: 8 * KIB, inspect: 8 * KIB, large: 64
 const PAGE_SPARE = 512;
 const pageOf = (bound: number): number => bound - PAGE_SPARE;
 /**
- * A result. The text repeats the structured content's JSON when the whole response fits its bound; otherwise the text says
+ * A result. The text repeats the structured content's JSON when the whole result fits its bound; otherwise the text says
  * where the result is, and the JSON is sent once. A single item larger than a page is the one result that exceeds its bound.
  */
 const ok = (structured: Record<string, unknown>, bound: number = BOUNDS.act): CallResult => {

@@ -47,7 +47,7 @@ function roomOf(role: "admin" | "maintainer" | "member" | "agent", lanes: readon
 /** The stand-in's scope of lane `number`. */
 const laneOf = (s: Served, number: number) => s.stand.scopes.get((s.stand.scopes.get(s.stand.directory.scope)!.items.find((i) => i.type === "lane" && i.values["number"] === number)!.refs["scope"] as ScopeRef).scope)!;
 
-/** The requests one call made, and the bytes of its whole response: structured content and text together. */
+/** The requests one call made, and the bytes of its whole result as the service makes it: structured content, text and isError. */
 async function counted(s: Served, run: () => Promise<CallResult>): Promise<{ requests: string[]; bytes: number; result: CallResult }> {
   const before = s.stand.requests.length;
   const result = await run();
@@ -76,7 +76,7 @@ async function listOf(service: McpService): Promise<{ tools: number; pages: numb
 }
 
 describe("what a call costs, end to end", () => {
-  // Invariant: each tool's reads, warm and cold, are within section 8's table, and its whole response within its bound: a cold
+  // Invariant: each tool's reads, warm and cold, are within section 8's table, and its whole result within its bound: a cold
   // call adds one session request, an expired session one more, a refused session one signed read per read, and a session the
   // scope refuses on a read one signed-read fallback for that read.
   test("reads per tool, warm and cold, with expired, refused and forbidden sessions", async ({ annotate }) => {

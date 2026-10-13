@@ -44,9 +44,12 @@ of steps, or a proxy.
   its process is gone. A step keeps its first answer and its latest 63.
 - **Reads** with one read session per membership, and signed reads where a
   session is refused.
-- **Whole-response budgets.** Each result is measured as the client
-  receives it, text and structured content together; the text repeats the
-  JSON only when that fits. `room` pages all its collections by bytes. The
+- **Whole-result budgets.** Each result is measured whole as the service
+  makes it: text, structured content and `isError` together; the text
+  repeats the JSON only when that fits. Over 2026-07-28 the wire adds
+  `resultType` and the server's information, 110 bytes measured
+  separately, which the bounds do not count (the correction of review
+  6a86304e, item 3). `room` pages all its collections by bytes. The
   searches of `wait` and `credential` keep their position and read at most
   16 entries, or 4 pages, a call.
 - **The wire**: JSON-RPC for the 2025-11-25 and 2026-07-28 revisions, over

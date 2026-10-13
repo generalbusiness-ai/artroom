@@ -1330,7 +1330,7 @@ act, `wait`, `settle` and `prepare`; 8 KiB for `room` and a page of
 `inspect`; 64 KiB for `items`, `steps`, `step`, `record`, `sends`, `text`,
 `actions` and the declaration or complete text of `inspect`; 2 KiB for
 `credential`). The text repeats the structured content's JSON only when
-the whole response still fits; otherwise the text says where the result
+the whole result still fits; otherwise the text says where the result
 is. Pages are sized for the whole result, and a text slice is measured
 after JSON escaping. Over 2026-07-28 each result also carries
 `resultType` and the server's information in `_meta`: 110 bytes more,
@@ -1351,8 +1351,8 @@ time, with no fixed window.
 Observed run of `packages/mcp/test/budget.test.ts`, on the stand-in scope
 service of the Node tests, which counts every request the server makes. A
 warm call holds a read session; a cold call adds one session request. The
-plan's bound is plan 031, section 8. Response bytes are the whole response
-of the warm call; the test asserts both calls' sizes against the bound.
+plan's bound is plan 031, section 8. Response bytes are the whole result
+of the warm call, as the service makes it; the test asserts both calls' sizes against the bound.
 
 | Tool | Reads, warm | Posts | Cold | Response bytes | Plan's bound, warm |
 |---|---|---|---|---|---|
