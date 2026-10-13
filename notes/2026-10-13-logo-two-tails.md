@@ -87,3 +87,41 @@ Root materialized the new private namespace once: original command 9574 exited 0
 The ordinary gate for this new union ran once at aadef. Original command 39256 exited 0, including the final Source, namespace and receiving-main guards. Whitespace, typecheck and test phases passed; installation was skipped. Vitest passed 1,141 cases with three retained skips, across 210 passed files and one skipped file. Node groups passed 10 and 55 cases. The measured gate wall time was 129.347838 seconds; its outer timer recorded 129.34 seconds real, 178.92 user and 34.18 system. These describe the same run, excluding wrapper guard work. This final delivery changes only the note relative to checked aadef; the external correspondence record binds its final commit and all other leaves. The 53 artifacts rest only on effective Source promise fbd2 under bounded request3dc428. Publish this reporting note last and read it first in review. No producer, check or gate was repeated for this prose.
 
 Hugh’s icon acceptance in amendment `fb1c9d66a2dbb32b42d01b160e91a6c642861346` remains effective: unchanged icon bytes need no further builder tab rendering or checker tab review. Full parent259e/8e4f remains open for actual workroom, Counter and homepage refresh/readbacks and served wordmark heights. No functionality or height duty is cut for the deadline; Jam-owned work stays deferred.
+
+## Hosted delivery and served wordmark measurements
+
+This final record covers full request `259e2eaba532bfe4ab0038f8d5ce47c83b3c1dc4` and promise `8e4f75181a509eb3c45ca428dbfe1ce8f49ba188`. It updates the historical outstanding-host statements above. The bounded Source child `3dc428daf40730e7fb9b48490820855bf2e5fcf9` and promise `fbd2e76ee66889389ba6463d85be47e659122645` were already satisfied and are not the basis for this hosted-delivery review.
+
+The reviewed Source remains `950ee6a85690a7ff5643a146bd69899077db11f9`, tree `40f349a34285ee069c3e2d9ced706bfb03d4e730`. Approval `0b4c76430215823cafc54dd4f0301e028b49514d`, ratification `3d2a21f3bca8b4531fdf55609e709dd3cc41b07d`, and normal landing receipt `fbedaa11f779801a2705c8719f5c0537e56b07ee` bind that Source. Hosted publication used main snapshot `d3f5aa74218cabd8200468616a4b9e60c8d6f8a6`, tree `fe870241e071387305e97efc70aca3af2028794d`, whose executable Source matches the approved candidate. This final candidate changes only this note from that snapshot; external correspondence records every other leaf unchanged.
+
+All three existing hosts now have matching served assets:
+
+| Host | Original command and version | Served result |
+|---|---|---|
+| Home | 1897; `62889daf-97c7-43d4-825b-3fcf1e9b21c8` | Exit 0; all 11 assets matched. |
+| Workroom Scope | 16087; `30e8be7e-7935-4fbd-a951-501da66321e4` | Exit 0; all 22 assets matched, nine protected bindings retained. |
+| Standalone Counter | Upload 61277; `4772f607-ff16-41af-962b-801f5a3cf663`; read-only completion 99603 | Completion exited 0; all 22 assets matched, six protected bindings retained. |
+
+Counter upload 61277 deployed successfully once but its wrapper exited 1. Its first `/page/` read returned 25,162 bytes instead of the expected 26,184; the other 21 reads were unrun. That failed result remains intact. Separate read-only command 99603 checked all failed or unrun assets and the protected resource projection before and after. The same version remained active at 100 percent throughout. No second upload occurred, and no cause is inferred for the earlier mismatch. Root read the complete host proofs and recorded served assertions `9cc61`, `683e5`, and `cc10`.
+
+Served geometry command 45787 exited 0. All ten desktop and mobile cases passed across Home marketing, Page, and Counter, with 74 allowed GET requests and no errors. Root read the complete measurement and request record and directly viewed all ten screenshots. Headers were clear and had no horizontal clipping. The intrinsic wordmark is 432 × 256.
+
+| Surface | Desktop height | Mobile height | Qualification |
+|---|---:|---:|---|
+| Home marketing | 123.625 px | 94.53125 px | Earlier served Home heights retained. |
+| Page | 41.875 px | 41.875 px | Current served measurement; prior app height baseline unproved. |
+| Counter | 51.1875 px | 41.875 px | Current served measurement; prior app height baseline unproved. |
+
+The Page and Counter widths implement the adopted height-preservation intent. Their measured heights establish current rendering, not a comparison with an unproved prior app baseline. Hugh’s served tab-icon acceptance in amendment `fb1c9d66a2dbb32b42d01b160e91a6c642861346` remains effective. No further tab rendering was required, and the icon bytes remain unchanged. Jam-owned application files, hosting, and audio remain outside this delivery.
+
+The five direct public proofs are:
+
+| Proof | SHA-256 |
+|---|---|
+| Home publication and readback | `9176d174245651ac28e575dfc816f01dcef2c5eb78e97977378be672fbe94cfb` |
+| Scope publication and readback | `9f2b5a2aec08c14f701bf31f302fb5ecc2c2533170dcfeb699adf13665c4a874` |
+| Original Counter failure | `1f2041d653fefb278b0b5dd86fb08d55ce0eedaa8db1e074ffb0766887775bb7` |
+| Separate Counter read-only completion | `1736a66de8d5f4544680ce8249276fe0ec76c145141560bc07563d4587198fc7` |
+| Served geometry and requests | `787eb65094da4e0aa49e8e2caaa61fb70766df4b0cd5fb69a0734ecc7d0ea0d7` |
+
+No producer, build, test, gate, provider command, or rendering was repeated for this note. Earlier checks retain their original head qualifications. Review and approval of this final full-request delivery remain pending.
