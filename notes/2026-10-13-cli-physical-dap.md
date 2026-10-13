@@ -56,3 +56,61 @@ cancellations or pending tests, and the final postguard passed. These
 separate completions qualify the earlier failed gate; they do not make it
 a passed gate or validate this new composition. The Counter command kept
 its normal temporary test compilation and produced no public assets.
+
+
+## Checked joint Source
+
+The preparation statements above describe earlier heads. The final executable
+Source is `2dab21e5ecfd531aa7fe68382ef7606908d6d148`, tree
+`6d90c282903acc7fc9ba0cb14673796676e88ee0`. It combines this launcher rename
+with the separately tracked invitation URL request on actual receiving main
+`27bb745f0012ce5994ea983ae1bd51e9e3ad17f8`. Receiving MCP discovery and the
+landed delivery notes remain intact. Each request keeps its own promise.
+
+Both aliases resolve to `packages/cli/bin/dap.js` in the fresh, private
+13-workspace dependency namespace. Its 5,498 files and 229 external lock
+entries were verified. No dependency was installed. The launcher contents,
+mode, protocol names, and parked release files remain unchanged.
+
+Every original stop remains recorded:
+
+| Source | Original run | Outcome and correction |
+| --- | --- | --- |
+| `8f221266` | 22781 | First CLI case failed because it imported `command` from the wrong module. Later phases were unrun. |
+| `c9f8a0a7` | 89172 | First CLI case expected exit 1 for a usage refusal whose existing contract is exit 2. Later phases were unrun. |
+| `ccf6ebf2` | 45776 | CLI and tagged-client cases passed. MCP expected an internal field in its public error response and failed. The control was unrun. |
+| `bbb858bb` | 81540 and 43997 | MCP baseline passed and its control failed by assertion as required. The gate then failed typecheck on an unused import and two incomplete test ports. All gate tests were unrun. |
+| `8646f800` | 80222 | Typecheck failed because the CLI fixture widened its literal types. All gate tests were unrun. |
+| `1840d3f9` | 12338 and 11523 | The selected CLI test compiler passed. The gate passed whitespace and typecheck, then reported 1,144 Vitest passes, one stale Page asset failure, and three skips. Downstream commands were unrun. |
+| `2dab21e5` | 56019 and 29384 | The generated asset successor passed its owning asset case, Node 10, Counter 55, and the final ordinary gate. |
+
+The normal Page producer ran once as 7424 on `1840d3f9`, before the generated
+successor was committed. Only `packages/scope/src/page-assets.ts` changed in
+that commit. The public script and embedded script match. HTML, inline CSS,
+Brand assets, and all other Source stayed unchanged. No public host was
+updated by this build.
+
+The final gate, 29384, exited zero with its postguard passing in 153.640
+seconds of measured wall time. Whitespace, typecheck, and test phases passed.
+Vitest reported 1,145 passed cases and three original skips across 210 passed
+files and one skipped file. The chained Node and Counter commands passed
+10 and 55 tests. Installation was skipped. These counts belong to this
+original gate, not a sum of earlier runs. The three skips remain unrun.
+
+The earlier rename-only gate 1467 remains failed: its Counter child was
+stopped with SIGTERM after the observed stall. The bounded diagnostic did
+not reproduce the stall, and the separate original client-file completion
+passed nine cases. Neither result establishes the stall's cause or turns
+that old gate green. The user's instruction to mark the issue-close refusal
+nrep remains unchanged; this work does not reopen it.
+
+Closed proof references are machine-independent basenames and hashes:
+`producer-one/public-result.json`, SHA-256
+`356747f755480ccc5391bdb4d7eb67bf2a4b726215dba401c9974b57911bf4f8`;
+`completion-one/public-result.json`, SHA-256
+`d13e53e7cbc62723b7e3740e0296b47e8cfd20cbcb494f69ce37cbc30ee80339`;
+and `gate-one/result.public.json`, SHA-256
+`f3cd1ed0fb40958960817f6ded9e2b55bfaf915040dd9cd3531323b83453e53c`.
+The checker packet lists the exact direct files for the complete lineage.
+These appended delivery records change prose only. Their final head retains
+the checked executable Source exactly. Review and normal landing are pending.
