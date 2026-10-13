@@ -495,7 +495,7 @@ export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, c
   const handle = (scope: string) => new ScopeHandle(transport, scope as never, session.session.reader());
   const run = async (args: string[], code: number, start: number, end: number) => {
     const result = await command(ctx, args);
-    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    lines.push(`$ dap ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
     return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
   };
   const definition = manifest ? MANIFEST_DIGESTS.demo : DEMO_DIGESTS.change;
@@ -536,7 +536,7 @@ export async function staleReproposal(ctx: Context, oldBase: string, newBase: st
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
   const run = async (args: string[], code: number, start: number, end: number) => {
     const result = await command(ctx, args);
-    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    lines.push(`$ dap ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
     return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
   };
   // Start immediately before the CLI invocation and stop immediately when it
