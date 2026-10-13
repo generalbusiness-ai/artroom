@@ -393,7 +393,11 @@ figures" holds the same). The room story: 229 and
 286 requests in the default mode, 241 and 283 in `--generic`, list
 changes told 7 (3 while founding) and 4 (observed).
 
-**Paths.** `git diff --name-only origin/main...HEAD` lists 9 paths:
+**Paths.** Main moved during this head, with documentation only
+(`765c4eb9`: current names and taglines in eighteen Markdown files, none
+of them this head's); it was merged at `acf481f5` with no conflict, taking
+main's version of every path this head does not change. `git diff
+--name-only origin/main...HEAD` then lists 9 paths:
 `packages/mcp/src/catalogue.ts`, `packages/mcp/src/inventory.ts`,
 `packages/mcp/src/service.ts`, `packages/mcp/test/budget.test.ts`,
 `packages/mcp/test/counter.scope.test.ts`,
