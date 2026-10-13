@@ -1,13 +1,23 @@
 import { expect, test } from "vitest";
+import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import type { MemberRef } from "@generalbusiness/artroom-contract";
 import { RoomOpening, ScopeSending, changeActions, issueActions, roomContext, routeOf } from "../src/shell.ts";
 
 test("closed issues offer one reopen and invalid changes offer no merge or review decision", () => {
+  const digest = digestBytes(new Uint8Array([54, 36]));
+  const requester: MemberRef = { membership: { scope: scopeIdOf({ v: 1, kind: "membership", definition: digest, creator: null, cause: digest, ordinal: 0 }), kind: "membership", inc: newIncarnation(new Uint8Array(16).fill(54)) }, member: "@requester" };
   const offered = ["comment", "close-own", "close-any", "reopen-own", "reopen-any", "edit-own"];
-  const closed = issueActions("closed", offered);
+  const closed = issueActions("closed", offered, requester, requester);
   expect(closed.primary).toEqual(["comment", "reopen-own"]);
   expect(closed.blockedKinds).toEqual(["close-own", "close-any"]);
-  expect(issueActions("open", offered).primary).toEqual(["comment", "close-own"]);
+  expect(issueActions("open", offered, requester, requester).primary).toEqual(["comment", "close-own"]);
   expect(issueActions("open", ["close-any"]).primary).toEqual(["comment", "close-any"]);
+  const otherIncarnation = { ...requester, membership: { ...requester.membership, inc: newIncarnation(new Uint8Array(16).fill(36)) } };
+  expect(issueActions("open", offered, requester, otherIncarnation).primary).toEqual(["comment", "close-any"]);
+  expect(issueActions("open", offered, requester, otherIncarnation).blockedKinds).toContain("close-own");
+  expect(issueActions("closed", offered, requester, otherIncarnation).primary).toEqual(["comment", "reopen-any"]);
+  expect(issueActions("open", ["close-own"], null, requester).primary).toEqual(["comment"]);
+  expect(issueActions("open", ["close-own"], requester, { ...requester, member: "@other" }).primary).toEqual(["comment"]);
   const invalid = changeActions("open", true);
   expect(invalid.primary).toEqual(["comment"]);
   expect(invalid.blockedKinds).toContain("merge");

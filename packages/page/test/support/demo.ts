@@ -46,6 +46,8 @@ export interface Demo {
   /** A required-session lease and the same fixture resource boundary for direct proof work. */
   wait<T>(action: () => Promise<T>): Promise<T>;
   active(): void;
+  /** Advance only this fixture's owned scripted clock, for native retry eligibility. */
+  advanceClock(milliseconds: number): void;
   run(who: Context, ...argv: string[]): Promise<Outcome>;
   rita: Context; paul: Context;
   /** rita's config, as `claim` saved it: what the planner's config.json holds. */
@@ -63,7 +65,7 @@ export interface Demo {
 
 const ok = (outcome: Outcome): Outcome => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
 /** The editor needs only change; its actual Una invitation stays enabled unless explicitly omitted. */
-export interface DemoSetup { editorOnly?: true; invitation?: false }
+export interface DemoSetup { editorOnly?: true; invitation?: false; holdIssueCreation?: () => boolean }
 /** Founds a fresh room. Full setup is the default; `wrap` may stand between the page and the routes. */
 export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = (f) => f, parent: SessionOwner | null = null, setup: DemoSetup = {}): Promise<Demo> {
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
@@ -103,7 +105,7 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     await R.restart();
     active();
     known.push(R);
-    lifetime.setHold((envelope) => { if ("definition" in envelope.to) wire(scopeIdOf(envelope.to)); return false; });
+    lifetime.setHold((envelope) => { if ("definition" in envelope.to) { wire(scopeIdOf(envelope.to)); return envelope.to.definition === DEMO_DIGESTS.issue && setup.holdIssueCreation?.() === true; } return false; });
     ok(await run(rita, "claim", "demo", "--handle", "@rita"));
     active();
     const config = (await rita.store.config())!;
@@ -137,7 +139,7 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     active();
 
     return {
-      at, fetch, pause, wait, active, run, rita, paul, config, D, G, M, rules, link, sessionOwner,
+      at, fetch, pause, wait, active, advanceClock: lifetime.advance, run, rita, paul, config, D, G, M, rules, link, sessionOwner,
       as: (secret, owner = sessionOwner) => {
         lifetime.activeFor(owner);
         return { service: SERVICE, secret, fetch: guarded(owner, wrapped), now: () => lifetime.nowFor(owner) };
