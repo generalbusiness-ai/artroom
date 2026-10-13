@@ -67,7 +67,7 @@
 
   .rail { background: var(--rail); padding: 18px; display: flex; flex-direction: column; min-width: 0; gap: 12px; }
   .wordmark { display: block; line-height: 1.4; padding: 0 2px; }
-  .wordmark img { display: block; width: 72px; height: auto; }
+  .wordmark img { display: block; width: calc(72px * 432 / 440); height: auto; }
   .wordmark .wordmark-dark { display: none; }
   :root[data-theme="dark"] .wordmark-light { display: none; }
   :root[data-theme="dark"] .wordmark-dark { display: block; }
@@ -309,7 +309,7 @@
   /* Accepted entry preview: one centered task before verified room navigation. */
   .artroom[data-entry="true"] { display: block; }
   .entry-header { grid-column: 1 / -1; padding: 20px 32px; min-height: 88px; border-bottom: 1px solid var(--line); }
-  .entry-header .wordmark { min-width: 72px; width: 72px; margin: 0; }
+  .entry-header .wordmark { min-width: calc(72px * 432 / 440); width: calc(72px * 432 / 440); margin: 0; }
   .entry-content { grid-column: 1 / -1; width: calc(100% - 48px); max-width: 620px; margin: 80px auto 64px; padding: 0; }
   .entry-content h1 { font-size: 36px; line-height: 1.2; letter-spacing: -1px; font-weight: 700; margin: 0 0 16px; }
   .entry-intro { font-family: var(--font-sans); font-size: 18px; line-height: 1.55; color: var(--muted-ink); margin-bottom: 34px; }
@@ -325,6 +325,16 @@
   .entry-form input, .entry-form textarea { display: block; width: 100%; min-height: 50px; margin-top: 9px; padding: 12px 14px; font: 17px/1.5 var(--font-sans); }
   .entry-form textarea { min-height: 136px; resize: vertical; }
   .entry-form .primary { width: 100%; min-height: 48px; font-family: var(--font-sans); font-size: 16px; }
+  .entry-content:has(> .entry-start) { max-width: 440px; }
+  .entry-start .start-room-title { font-size: 22px; margin: 0 0 30px; }
+  .entry-start pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .entry-start .start-open { width: 100%; min-height: 48px; font: 600 16px var(--font-sans); }
+  .entry-start .start-connections { margin-top: 40px; border-top: 1px solid var(--line); }
+  .entry-start .start-connection { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+  .entry-start .start-connection h2 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
+  .entry-start .start-connection p { margin: 0; font: 15px/1.5 var(--font-sans); color: var(--muted-ink); }
+  .entry-start .start-connection button { white-space: nowrap; font-size: 14px; }
+  @media (max-width: 650px) { .entry-start .start-connection { align-items: flex-start; flex-direction: column; gap: 12px; } }
   .entry-answer { font-family: var(--font-sans); min-height: 28px; margin-top: 20px; font-size: 16px; color: var(--muted-ink); }
   .entry-answer.bad { color: var(--error); }
   @media (max-width: 650px) {
