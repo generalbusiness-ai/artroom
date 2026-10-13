@@ -151,7 +151,7 @@ export async function allowedClaim(session: Session, register: ScopeRef): Promis
   const registers = read.value.items.filter((item) => item.type === "register" && item.state === "open");
   const policy = registers[0]?.values["policy"];
   const founders = registers[0]?.values["founders"];
-  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(founders) && founders.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's founding policy. Nothing was submitted.");
+  if (registers.length !== 1 || !(policy === "open" || policy === "keys" && Array.isArray(founders) && founders.includes(keyIdOfSecret(session.secret)))) throw new Error("This browser key is not eligible under the configured register's creation policy. Nothing was submitted.");
   return { register, definition: read.value.definition as PlatformDefinition };
 }
 

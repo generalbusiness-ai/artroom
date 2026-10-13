@@ -111,7 +111,7 @@ test("the shell fences the whole scope during a submit and keeps a lost reply re
     await drain(); expect(dataAct).not.toHaveBeenCalled();
     location.hash = "#/"; rendered = gate(); redraw(); await rendered.promise;
     initialization = "not-initialized";
-    const banner = "This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.";
+    const banner = "This room is not initialized yet. Its creator initializes it before issues, changes and rules can be used.";
     for (const route of ["#/", "#/?kind=change", "#/rules"]) {
       location.hash = route; rendered = gate(); redraw(); await rendered.promise;
       expect(root.all().filter(node => node.attrs["class"] === "answer room-initialization")).toHaveLength(1);
