@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6e43a2890b8e45df3a2b7f83dc1ffa08919fb151","text":"Merge retired a covered predecessor; the successor is at scripts/brand-dist.mjs."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:70968a732e1c6aaf387c34f44df0441c848c1422","text":"Merge retired a covered predecessor; the successor is at homepage/build.mjs."}
