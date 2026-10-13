@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/package.json","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"packages/checkers/package.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/checkers/src/configuration.ts","body":{"commit":"b5d153498879a8e3efc13c87404b9778654e235b","path":"packages/checkers/src/configuration.ts"}}
