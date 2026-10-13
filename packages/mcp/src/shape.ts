@@ -19,6 +19,14 @@ export class Unshaped extends Error {
 
 const declaredOf = (type: FieldLike): string => (typeof type["code"] === "string" && (type.type === undefined || type.type === "code") ? `the platform type ${type["code"]}` : String(type.type));
 
+/**
+ * Sets a name a definition chose as an own, enumerable property. A plain assignment would treat `__proto__` as the prototype
+ * setter, so a field, a record member, a presented fact or an `also` alias of that lawful name would vanish from the intent.
+ */
+function put<T>(out: Record<string, T>, name: string, value: T): void {
+  Object.defineProperty(out, name, { value, enumerable: true, writable: true, configurable: true });
+}
+
 interface Shaping { membership: ScopeRef | null; texts: Map<string, string> }
 
 function shaped(type: FieldLike, value: unknown, path: string, at: Shaping): FieldValue {
@@ -71,7 +79,7 @@ function named(types: Readonly<Record<string, FieldLike>>, given: Readonly<Recor
   for (const [name, type] of Object.entries(types)) {
     const value = given[name];
     if (value === undefined) { if (type.required) throw new Unshaped(`${path}.${name}`, "is required", declaredOf(type)); continue; }
-    out[name] = shaped(type, value, `${path}.${name}`, at);
+    put(out, name, shaped(type, value, `${path}.${name}`, at));
   }
   return out;
 }
@@ -96,7 +104,7 @@ export function shapePresented(act: ActLike, presented: Readonly<Record<string, 
     const value = presented?.[name];
     if (value === undefined) { if (p.required) throw new Unshaped(`presented.${name}`, "is required", `a fact of kind ${p.kind.join(" or ")}`); continue; }
     if (!isFactRef(value)) throw new Unshaped(`presented.${name}`, "is not a fact: { at, seq, hash }", `a fact of kind ${p.kind.join(" or ")}`);
-    out[name] = value;
+    put(out, name, value);
   }
   return out;
 }
@@ -134,7 +142,7 @@ export function expectedOf(act: ActLike, items: readonly Item[], on: number | nu
   for (const [name, rule] of Object.entries(act.also)) {
     if ((rule as { code?: string }).code !== undefined) continue;
     const item = subject(name);
-    if (item) expected[name] = item.revision;
+    if (item) put(expected, name, item.revision);
   }
   return expected;
 }
