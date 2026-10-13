@@ -1,6 +1,6 @@
 # Publication from a fold
 
-13 October 2026. **Proposed design, Draft 2. Design only: nothing here is
+13 October 2026. **Proposed design, Draft 3. Design only: nothing here is
 built.** One thing was run for this draft, a trial of the lending
 definition of section 5 against the validator and the judges in memory;
 section 5.4 says what it showed and what it did not. Baseline main
@@ -25,7 +25,10 @@ made from the browser. It adds section 5, the lending library's use,
 with three consequences that he accepted; it settles the open points of
 Draft 1 that reading the source could settle (section 9); and it
 proposes one act more than the approved lending design has (section
-5.3), which needs his word.
+5.3).
+
+Draft 3 records Hugh's decision of 13 October 2026, 15:57 Eastern, on
+section 5.3: the library gains the act `publish`. Nothing else changed.
 
 ## 1. The aim
 
@@ -185,7 +188,7 @@ Hugh accepted these on 13 October 2026.
    `shelf/<16 characters>.md`, at donation. The thing keeps it, and
    later acts cannot change it. A typed name is still never a path.
 
-### 5.3 A sixth act, to be decided
+### 5.3 A sixth act, `publish`
 
 The lending design's "refresh the shelf" rewrote any page that differed
 from the scope. With publication from a fold a page is written only when
@@ -193,14 +196,13 @@ an act takes effect, so a page that is wrong, or whose push was refused,
 stays so until the next act on that thing. A thing that is `gone` has no
 next act.
 
-This note proposes one act more: `publish`, on a thing in any state,
-with the field `content`, allowed to `lending.member`. It changes no
-state and tells the destination `publish-file` for the thing's page. It
-is the repair for a page that is behind or wrong.
+So the library gains one act: `publish`, on a thing in any state, with
+the field `content`, allowed to `lending.member`. It changes no state
+and tells the destination `publish-file` for the thing's page. It is the
+repair for a page that is behind or wrong.
 
-The approved design says "keep five acts". Hugh decides whether the
-library gains this one. Without it the repair is a change to the file
-made by hand, through the room's change lane.
+The approved lending design says "keep five acts". Hugh decided on
+13 October 2026 that the library gains this sixth one.
 
 Whether an act can be on an item in a final state was not checked. The
 trial of the lending definition met the refusal `final` for an act on a
