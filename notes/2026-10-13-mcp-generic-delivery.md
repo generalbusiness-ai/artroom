@@ -251,6 +251,8 @@ In this session, after the last change to what each covers:
 | `npm run gate` at `9feae202` (a second attempt was cut off when the cloud worker restarted, and was run again) | FAILED at the test step: `Tests  4 failed \| 1104 passed \| 2 skipped (1110)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, and no other. Because `vitest run` failed, `npm test` did not go on to its `node --test` steps; `scripts/active-source.test.mjs` passed when run alone: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review b04a53c8, once, at `296166a7` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1112 passed \| 2 skipped (1118)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 | `npm run gate` in the round of review ad2576fb, once, at `324af0e4` (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1114 passed \| 2 skipped (1120)`, `Test Files  2 failed \| 196 passed \| 1 skipped (199)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
+| `npm run gate` in the round of review 6a86304e, first at `80fe2ee9` | FAILED at the test step: `Tests  5 failed \| 1117 passed \| 2 skipped (1124)`: the four checkers failures below and the lease witness described in the section on review 6a86304e, which counted entries. |
+| `npm run gate` in that round, again at `ac4d5f01`, after the lease witnesses changed and the planner's merge of main was merged in (`time` was already installed) | FAILED at the test step: `Tests  4 failed \| 1119 passed \| 2 skipped (1125)`, `Test Files  2 failed \| 198 passed \| 1 skipped (201)`. Install was skipped (node_modules matched the lockfile); whitespace and typecheck passed. The four failures are the checkers failure below, all `checkout-failed`, three in `runner.test.ts` and one in `reservation-record.test.ts`, and no other. `scripts/active-source.test.mjs`, run alone afterwards: `# pass 7`, `# fail 0`. |
 
 ## The planner's second amendment, after the merge
 
@@ -392,7 +394,7 @@ only, the same steps end in the lane's refusal of the version as
 
 ## The T36 checkers failure in the cloud
 
-It recurred, in all five rounds. In each gate run, the same four tests of
+It recurred, in all six rounds. In each gate run, the same four tests of
 `packages/checkers` failed with `checkout-failed`: T36 in
 `test/runner.test.ts`, the two other checkout tests there, and the staging
 test in `test/reservation-record.test.ts`. This branch changes nothing in
