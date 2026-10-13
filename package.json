@@ -14,7 +14,9 @@
     "test:changed": "node scripts/test-changed.mjs",
     "gate": "bash scripts/gate.sh",
     "build:brand": "node scripts/brand-assets.mjs",
-    "build:home": "node homepage/build.mjs"
+    "build:home": "node homepage/build.mjs",
+    "deploy:scope": "cd packages/scope && npx -y wrangler@4.147.0 deploy",
+    "deploy:home": "cd homepage && npx -y wrangler@4.147.0 deploy"
   },
   "devDependencies": {
     "typescript": "7.0.2",
