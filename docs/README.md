@@ -1,6 +1,6 @@
 # Documentation
 
-A programmable coordination fabric for people and agents. These pages
+A durable action platform for people and agents. These pages
 cover the dap framework first, then the three applications built on it,
 then the guides for operating a deployment. Within each group, pages go
 from learning to understanding, then doing, then looking up.
