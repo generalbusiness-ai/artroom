@@ -19,7 +19,7 @@ authenticated replay required by Demo gate 1.
 ## How it is built
 
 The core is small: a log, a fold and a turn. Every decision is made by
-`@generalbusiness/artroom-derive`. Its `applyEntry` is the only code that
+`@generalbusiness/dap-derive`. Its `applyEntry` is the only code that
 changes folded state, and its judges are the only code that decides what an
 input writes. This package reads the clock, counts the budgets, and writes
 what a judge drafts, in one storage transaction for each entry.

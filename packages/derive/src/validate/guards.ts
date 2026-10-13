@@ -1,6 +1,6 @@
 /** Guard forms (scope contract, section 6.5). */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { isObject } from "../values.ts";
 import { capabilityGuard } from "./capability.ts";
 import { mark, marked, onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";

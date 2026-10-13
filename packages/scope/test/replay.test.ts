@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry } from "@generalbusiness/artroom-contract";
+import type { Entry } from "@generalbusiness/dap-contract";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import type { Checkpointed } from "../src/index.ts";
 import { HOLD, definition } from "./support.ts";

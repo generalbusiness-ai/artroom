@@ -3,7 +3,7 @@
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 as nobleSha256 } from "@noble/hashes/sha2.js";
 import { sha1 as nobleSha1 } from "@noble/hashes/legacy.js";
-import type { Digest } from "@generalbusiness/artroom-contract";
+import type { Digest } from "@generalbusiness/dap-contract";
 import { hex } from "./encode.ts";
 
 export function sha256(bytes: Uint8Array): Uint8Array {

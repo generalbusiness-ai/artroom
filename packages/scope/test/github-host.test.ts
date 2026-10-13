@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
-import { valueDigest } from "@generalbusiness/artroom-derive";
+import { valueDigest } from "@generalbusiness/dap-derive";
 import { Reader, idOf, snapshotCommit, type GitSource, type SnapshotFile } from "@generalbusiness/artroom-git";
-import { DESTINATION_CHANGED_SET, isJudgeChanges } from "@generalbusiness/artroom-platform";
+import { DESTINATION_CHANGED_SET, isJudgeChanges } from "@generalbusiness/dap-platform";
 import { GitHubProvider, inspectGit } from "../src/github-host.ts";
 import type { DestinationBinding, DestinationInspection } from "../src/destination-host.ts";
 

@@ -17,7 +17,7 @@
 import type {
   Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
   SignedIntent, Summary,
-} from "@generalbusiness/artroom-contract";
+} from "@generalbusiness/dap-contract";
 import { definitionDigest, entryHash, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
 
 /** How a handle reaches a scope service: the contract's `ScopeApi`. `http.ts` and `binding.ts` each make one. */

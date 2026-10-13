@@ -1,12 +1,12 @@
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, inject, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, platformName, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
-import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/artroom-derive";
-import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
-import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/artroom-platform";
+import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/dap-derive";
+import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
+import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
 import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
-import { validateDefinition } from "@generalbusiness/artroom-derive";
+import { validateDefinition } from "@generalbusiness/dap-derive";
 import { change3, changeDemo3, MANIFEST_DIGESTS, change, changeDemo } from "../src/index.ts";
 
 test("manifest-list successors validate whole and pin exact bytes; the legacy file input stays byte-identical and each successor has a distinct identity", () => {

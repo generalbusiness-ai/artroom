@@ -13,7 +13,7 @@
  * is its entry under Node.
  */
 
-import type { Head, Report } from "@generalbusiness/artroom-contract";
+import type { Head, Report } from "@generalbusiness/dap-contract";
 import { isDigest, isScopeId, positionOf } from "@generalbusiness/artroom-bytes";
 import { render } from "./report.ts";
 import { httpSource, type Fetch } from "./source.ts";

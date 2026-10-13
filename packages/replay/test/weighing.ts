@@ -17,11 +17,11 @@
  * that an observation names.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, FactUse, Input, KeyId, MemberId, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, FactUse, Input, KeyId, MemberId, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { clockOf, grantFrom, judgeDelivery, judgeGenesis, settleOutcome, valueDigest, type Fetched, type Observing, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, arriving, forged, keys, membership, otherLane, t, type Actor, type Context } from "@generalbusiness/artroom-derive/testing";
+import { clockOf, grantFrom, judgeDelivery, judgeGenesis, settleOutcome, valueDigest, type Fetched, type Observing, type RuleGiven } from "@generalbusiness/dap-derive";
+import { Ledger, T0, arriving, forged, keys, membership, otherLane, t, type Actor, type Context } from "@generalbusiness/dap-derive/testing";
 import { EXTENTS, RULEBOOK, STEP_ROWS, WEIGHER, holdersSeen, keySeen, memberSeen, rulebook, rulesSeen, signers, stating, weigherRules, weigherWith } from "../../derive/test/fixtures-observes.ts";
 import type { Anchor, Coded, MemoryScope } from "../src/index.ts";
 

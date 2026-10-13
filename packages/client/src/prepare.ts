@@ -14,7 +14,7 @@
  * capability and step with its first entry, and writes nothing.
  */
 
-import type { Answer, CapabilityName, Grant, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, CapabilityName, Grant, SignedIntent } from "@generalbusiness/dap-contract";
 import type { Transport } from "./handle.ts";
 import { signedIntent, type Asked, type Signer, type Signing } from "./intent.ts";
 

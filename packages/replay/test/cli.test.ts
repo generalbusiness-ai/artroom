@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import type { Digest, Entry, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, ScopeId } from "@generalbusiness/dap-contract";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { retainedReadArgument } from "@generalbusiness/artroom-bytes";

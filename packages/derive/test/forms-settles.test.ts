@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, PlatformData, PlatformDefinition, Subject } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, PlatformData, PlatformDefinition, Subject } from "@generalbusiness/dap-contract";
 import { canonicalBytes, entryHash, factRefOf, parseStrictBytes } from "@generalbusiness/artroom-bytes";
 import { PROFILES, applyEntry, clockOf, entryOf, fits, itemAwaits, judgeDelivery, markerAmounts, markerReservations, owed, validateDefinition } from "../src/index.ts";
 import type { Draft, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";

@@ -13,9 +13,9 @@
  * by an exception. Nothing here reads a scope, a store or a host.
  */
 
-import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, MemberId, MemberRef, Observation, RulesObservation, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, isDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { byteOrder } from "@generalbusiness/artroom-derive";
+import { byteOrder } from "@generalbusiness/dap-derive";
 import { editPath } from "./destination-objects.ts";
 import { LANDING, RULES_EXTENT, classify, judgeExtents, type Extent, type ExtentsAsked, type Review, type TreeLink } from "./extents.ts";
 

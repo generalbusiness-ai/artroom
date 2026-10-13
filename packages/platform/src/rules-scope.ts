@@ -52,12 +52,12 @@
  * entries EQ1 to EQ11 and FB1 to FB5.
  */
 
-import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { definitionClosure, definitionDependencies } from "./definition-input.ts";
-import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
-import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/dap-derive";
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
 import type { Extent } from "./extents.ts";
 

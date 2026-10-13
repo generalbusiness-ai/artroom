@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
 import { capable, graph, net, paul, rita, una, type Node } from "./support/graph.ts";
 import type { change, issue } from "../src/index.ts";

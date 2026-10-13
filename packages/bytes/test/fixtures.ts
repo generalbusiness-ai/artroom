@@ -1,6 +1,6 @@
 /** One small set of values for every test in this package. The names and digests are made up. */
 
-import type { DeclaredDefinition, DeliveryCause, Digest, Entry, Intent, Message, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, DeliveryCause, Digest, Entry, Intent, Message, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret } from "../src/index.ts";
 
 export const secret = new Uint8Array(32).fill(7);

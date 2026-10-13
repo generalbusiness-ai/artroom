@@ -9,7 +9,7 @@
  * clause, and the names that an act presents or a list form binds.
  */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { isObject } from "../values.ts";
 import { onSubject, subject, type Ctx, type Defining, type Type } from "./context.ts";

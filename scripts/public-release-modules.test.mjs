@@ -4,11 +4,13 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { PLAN, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
+import { PLAN, nameOf, sourceNameOf, rewritePublishedRefs, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
 import { browserRuntimeEdge } from "./check-public-release.mjs";
 
 const root = new URL("../", import.meta.url);
 test("SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules", () => {
+  assert.deepEqual(["contract", "derive", "lanes", "page", "platform", "cli", "bytes", "client", "replay", "scope", "git", "checkers"].map(sourceNameOf), ["@generalbusiness/dap-contract", "@generalbusiness/dap-derive", "@generalbusiness/dap-lanes", "@generalbusiness/dap-page", "@generalbusiness/dap-platform", "@generalbusiness/dap-cli", "@generalbusiness/artroom-bytes", "@generalbusiness/artroom-client", "@generalbusiness/artroom-replay", "@generalbusiness/artroom-scope", "@generalbusiness/artroom-git", "@generalbusiness/artroom-checkers"]);
+  assert.deepEqual(PLAN.packages.map(spec => nameOf(spec.dir)), ["@generalbusiness/dap-contract", "@generalbusiness/dap-bytes", "@generalbusiness/dap-client", "@generalbusiness/dap-derive", "@generalbusiness/dap-platform", "@generalbusiness/dap-replay"]);
   const capability = readFileSync(new URL("packages/contract/src/capability.ts", root), "utf8");
   assert.deepEqual(references(capability), []); // Actual three quoted 'from' rows.
   const source = [
@@ -37,6 +39,10 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     const changes = rewriteDeclarationRefs(dir);
     assert.equal(changes.length, 1);
     const rewritten = readFileSync(file, "utf8");
+    const publicSource = rewritePublishedRefs(source);
+    assert.deepEqual(references(publicSource), expected.map(value => value === "@generalbusiness/artroom-bytes" ? "@generalbusiness/dap-bytes" : value));
+    assert.equal(rewritePublishedRefs(publicSource), publicSource);
+    assert.equal(rewritePublishedRefs(`import type { Fetch } from '@generalbusiness/artroom-client'; export * from '@generalbusiness/artroom-replay'; const data = "@generalbusiness/artroom-bytes";`), `import type { Fetch } from '@generalbusiness/dap-client'; export * from '@generalbusiness/dap-replay'; const data = "@generalbusiness/artroom-bytes";`);
     assert.deepEqual(references(rewritten), expected.map(value => value.startsWith(".") ? value.slice(0, -3) + ".js" : value));
     for (const line of source.split("\n").slice(8)) assert.ok(rewritten.includes(line));
     assert.deepEqual(rewriteDeclarationRefs(dir), []);
@@ -45,12 +51,23 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     const replay = PLAN.packages.find(spec => spec.dir === "replay");
     const platformManifest = JSON.parse(readFileSync(new URL("packages/platform/package.json", root), "utf8"));
     const published = publishManifest(platform, platformManifest, "0.1.0-dev.2");
+    assert.equal(published.name, "@generalbusiness/dap-platform");
+    assert.deepEqual(published.repository, { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: "packages/platform" });
+    assert.equal(published.homepage, "https://dap.generalbusiness.ai/");
     assert.deepEqual(Object.keys(published.exports), ["."]);
+    assert.deepEqual(published.dependencies, { "@generalbusiness/dap-bytes": "0.1.0-dev.2", "@generalbusiness/dap-contract": "0.1.0-dev.2", "@generalbusiness/dap-derive": "0.1.0-dev.2" });
+    const bytes = PLAN.packages.find(spec => spec.dir === "bytes");
+    const bytesManifest = JSON.parse(readFileSync(new URL("packages/bytes/package.json", root), "utf8"));
+    const publicBytes = publishManifest(bytes, bytesManifest, "0.1.0-dev.2");
+    assert.equal(bytesManifest.name, "@generalbusiness/artroom-bytes");
+    assert.equal(publicBytes.name, "@generalbusiness/dap-bytes");
+    assert.equal(publicBytes.dependencies["@noble/curves"], "2.4.0");
+    assert.throws(() => publishManifest(platform, { ...platformManifest, name: "@generalbusiness/artroom-platform" }, "0.1.0-dev.2"), /unsupported-source-manifest/);
     assert.throws(() => publishManifest(platform, { ...platformManifest, exports: { ...platformManifest.exports, "./private": "./src/private.ts" } }, "0.1.0-dev.2"), /unsupported-source-manifest/);
     assert.deepEqual(productionInputs(replay, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), { names: ["packages/replay/src/index.ts"], omitted: ["packages/replay/src/bin.ts"] });
     assert.throws(() => productionInputs({ ...replay, excludedInputs: ["src/index.ts"] }, ["packages/replay/src/index.ts", "packages/replay/src/bin.ts"]), /source-input-exclusions/);
     const stage = join(dir, "production"); mkdirSync(join(stage, "dist/src"), { recursive: true });
-    writeFileSync(join(stage, "package.json"), JSON.stringify({ name: "@generalbusiness/artroom-replay", version: "0.1.0-dev.2", type: "module", exports: { ".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" } } }));
+    writeFileSync(join(stage, "package.json"), JSON.stringify({ name: "@generalbusiness/dap-replay", version: "0.1.0-dev.2", type: "module", exports: { ".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" } } }));
     writeFileSync(join(stage, "dist/src/index.js"), "export {};\n"); writeFileSync(join(stage, "dist/src/index.d.ts"), "export {};\n");
     assert.equal(outputClosure(stage, replay, "0.1.0-dev.2").length, 3);
     writeFileSync(join(stage, "dist/src/bin.js"), "process.exitCode = 0;\n");

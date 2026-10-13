@@ -4,7 +4,7 @@
  * 6.6).
  */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, isValue, own } from "../values.ts";
 import { stepKind } from "./capability.ts";

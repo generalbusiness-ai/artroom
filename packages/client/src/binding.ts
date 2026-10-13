@@ -7,7 +7,7 @@
  * what was recorded.
  */
 
-import type { ScopeApi } from "@generalbusiness/artroom-contract";
+import type { ScopeApi } from "@generalbusiness/dap-contract";
 import { ANSWERS } from "./answers.ts";
 import { TransportError, type Transport } from "./handle.ts";
 

@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Bounds, DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
-import { capabilitiesOf, counted, derivable, gitRead, holdCapability, validateDefinition, type ValidDefinition } from "@generalbusiness/artroom-derive";
+import { capabilitiesOf, counted, derivable, gitRead, holdCapability, validateDefinition, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { reference } from "../scripts/reference.mjs";
 import { DEMO_DIGESTS, DIGESTS, LANE_FORMS, change, changeDemo, definitions, issue, issueDemo } from "../src/index.ts";
 

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { DOMAINS } from "@generalbusiness/artroom-contract";
+import { DOMAINS } from "@generalbusiness/dap-contract";
 import { b64url, domainBytes, isScopeId, publicKeyOf, unb64url } from "@generalbusiness/artroom-bytes";
 import { DemoPreparationError, plan, postInstall, prepare } from "./demo-git-host.mjs";
 const script = fileURLToPath(new URL("./demo-git-host.mjs", import.meta.url));

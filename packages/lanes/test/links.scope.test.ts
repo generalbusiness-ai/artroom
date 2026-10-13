@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { Entry, Input, ScopeRef } from "@generalbusiness/artroom-contract";
-import type { Delivered } from "@generalbusiness/artroom-derive";
+import type { Entry, Input, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Delivered } from "@generalbusiness/dap-derive";
 import { graph, net, onCode, rita, una } from "./support/graph.ts";
 
 type Decided = Extract<Input, { type: "delivery"; decision: string }>;

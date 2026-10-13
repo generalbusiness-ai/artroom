@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { newIncarnation, parseStrictBytes, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
 import * as bytes from "@generalbusiness/artroom-bytes";
-import type { SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import type { SignedRead, SignedSessionRequest } from "@generalbusiness/dap-contract";
 import type { Fetch } from "@generalbusiness/artroom-client";
 const DESTINATION = "platform:destination@1" as const;
 import { command } from "../src/line.ts";

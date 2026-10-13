@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import { change3, changeDemo3, MANIFEST_DIGESTS } from "@generalbusiness/artroom-lanes";
+import { change3, changeDemo3, MANIFEST_DIGESTS } from "@generalbusiness/dap-lanes";
 import { knownLIST1 } from "../src/source-support.ts";
 
 // Invariant: LIST1 eligibility requires both an adopted exact pin and those

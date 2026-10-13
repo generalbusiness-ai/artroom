@@ -1,5 +1,5 @@
 /** A bounded, checked one-time credential read. No retry can recover a consumed plaintext. */
-import type { Read, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Read, ScopeId } from "@generalbusiness/dap-contract";
 import { LATE, isRead, isRecord, timeMs, takeBytes, within } from "@generalbusiness/artroom-bytes";
 import { TransportError } from "./handle.ts";
 import type { Fetch } from "./http.ts";

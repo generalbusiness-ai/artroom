@@ -3,7 +3,7 @@
  * dispatch and speech callbacks are stand-ins, never native/provider/audio proof. */
 import { keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { signedIntent } from "@generalbusiness/artroom-client";
-import type { ScopeRef } from "@generalbusiness/artroom-contract";
+import type { ScopeRef } from "@generalbusiness/dap-contract";
 import { COUNTING_COMMITMENTS_DEFINITION } from "../commitments-pin.ts";
 import { deviceSigner, importLegacyDevice, type SavedDevice } from "./device-key.ts";
 import { browserLock, privateDeviceStore, privateCommandStore, privatePendingStore } from "./storage.ts";

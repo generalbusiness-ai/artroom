@@ -1,4 +1,4 @@
-# @generalbusiness/artroom-cli
+# @generalbusiness/dap-cli
 
 The `artroom` command for the new model: thin functions over a scope
 service's HTTP routes and a signing key. [docs/cli.md](../../docs/cli.md)
@@ -21,5 +21,5 @@ not the current directory, and installs or downloads nothing at launch.
 ```
 npx vitest run --project cli            # the key files, in Node
 npx vitest run --project scope story    # the story on real scopes, in workerd
-npm run typecheck --workspace @generalbusiness/artroom-cli
+npm run typecheck --workspace @generalbusiness/dap-cli
 ```

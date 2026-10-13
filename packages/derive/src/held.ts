@@ -33,7 +33,7 @@
  * `cc570904`). These pure amounts are not five-dimensional admission.
  */
 
-import type { Held } from "@generalbusiness/artroom-contract";
+import type { Held } from "@generalbusiness/dap-contract";
 import { isObject, own } from "./values.ts";
 
 /** An amount in the five dimensions of section 17.1. `requests` is pending requests. */

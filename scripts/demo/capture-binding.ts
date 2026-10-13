@@ -1,5 +1,5 @@
 /** Capture identity checks over trusted home references and native returned facts. */
-import type { KeyId, ScopeId, ScopeRef, Sealed } from "@generalbusiness/artroom-contract";
+import type { KeyId, ScopeId, ScopeRef, Sealed } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, isEntry, isKeyId, isScopeId, isScopeRef, scopeIdOf, textDigest, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads } from "@generalbusiness/artroom-client";
 import type { Config } from "../../packages/cli/src/store.ts";

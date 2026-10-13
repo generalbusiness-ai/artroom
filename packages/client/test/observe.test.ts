@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import type { Head, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { base32, keyIdOfSecret, timeOf, utf8, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { Session } from "../src/session.ts";
 import { headLines, openHttpHeadStream } from "../src/head-stream.ts";

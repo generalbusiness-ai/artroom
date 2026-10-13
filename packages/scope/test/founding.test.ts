@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
-import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Entry, Intent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { definitionDigest, factRefOf, intentDigest, isIncarnation, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeOf, type Delivered } from "@generalbusiness/artroom-derive";
-import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusiness/artroom-derive/testing";
-import { inbox, platform } from "@generalbusiness/artroom-platform";
+import { timeOf, type Delivered } from "@generalbusiness/dap-derive";
+import { Scope, forged, grantOf, laneDefinition, variant } from "@generalbusiness/dap-derive/testing";
+import { inbox, platform } from "@generalbusiness/dap-platform";
 import { httpSource, platformCode, verify } from "@generalbusiness/artroom-replay";
 import { controls, scriptedCapability, type CapabilityScript } from "../src/testing.ts";
 import { Node, founding as foundingIn, net, routed, soon } from "./net.ts";

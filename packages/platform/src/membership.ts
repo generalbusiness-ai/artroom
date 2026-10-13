@@ -49,10 +49,10 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { HoldersObservation, KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { HoldersObservation, KeyId, MemberId, MemberObservation, Observation, ObservationRequest, PlatformData, PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { firstHolders } from "@generalbusiness/artroom-derive";
-import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { firstHolders } from "@generalbusiness/dap-derive";
+import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/dap-derive";
 import { pinnedBy } from "./versions.ts";
 
 /**

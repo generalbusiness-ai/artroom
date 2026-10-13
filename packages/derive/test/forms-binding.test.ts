@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { FactRef, FieldValue, Input, PlatformDefinition, ScopeKind, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { FactRef, FieldValue, Input, PlatformDefinition, ScopeKind, ScopeRef, Seed, Send } from "@generalbusiness/dap-contract";
 import { canonicalBytes, entryHash, factRefOf, newIncarnation, parseStrictBytes, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { MemoryState, PROFILES, applyEntry, clockOf, decisionCounts, entryOf, fits, indexItems, itemAwaits, judgeDelivery, keyOf, owed, validateDefinition } from "../src/index.ts";
 import type { Counts, Draft, Fetched, Indexed, Judgment, PlatformRule, PlatformRules, RuleEffect, ValidDefinition } from "../src/index.ts";
@@ -263,7 +263,7 @@ describe("18.53, at the validator: the index, the binding selector and `bound`",
 
 describe("18.53, in the judge: a bound request finds its item by a selector, at a full scope", () => {
   test("an early ill-typed field keeps the count, while a late coded bad-field guard refusal draws it without rerunning the guard in the fold", () => {
-    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.receives["stop"]!.fields["amount"] = { type: "int", min: 0, max: 1, required: true };
     data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
     data.receives["stop"]!.effects = [];
@@ -282,7 +282,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
   });
 
   test("a late effect refusal with the same unqualified bad-field code as an early field refusal still consumes its bound decision", () => {
-    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.items["job"]!.values["amount"] = { fixed: false, required: true, default: 0, of: { type: "int", min: 0, max: 1 } };
     data.receives["stop"]!.guards = [];
     data.receives["stop"]!.effects = [{ code: "invalid-value", row: "P15" }];
@@ -298,7 +298,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
 
   test("genuine pre-binding item, local-fact and alias failures keep their decisions and never run the later coded guard", () => {
     for (const failure of ["no-item", "fact-mismatch", "alias"]) {
-      const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+      const data = structuredClone(M51) as unknown as import("@generalbusiness/dap-contract").PlatformData;
       data.receives["stop"]!.effects = [];
       data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
       if (failure === "fact-mismatch") data.receives["stop"]!.fields = { job: { type: "fact", kind: ["start"], under: data.name, required: true } };
@@ -316,7 +316,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
 
   test("a clock-declaring type or guard refusal is not written with a clamped reading that would lose its pre-binding inputs", () => {
     for (const phase of ["type", "guard"]) {
-      const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+      const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
       data.receives["stop"]!.effects = [];
       data.receives["stop"]!.guards = [{ code: "decline", row: "P15" }];
       if (phase === "type") data.receives["stop"]!.fields["amount"] = { type: "code", code: "typed", row: "P15", required: true };
@@ -334,7 +334,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
   });
 
   test("dec(m) reserves the whole closure of an unheld operation that a bound handler's mark may open", () => {
-    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.outcomes["audit"] = { code: "audit", row: "P16", attempts: 1 };
     data.receives["stop"]!.effects = [{ code: "open-audit", row: "P16", most: { effects: 0, operations: ["audit"] } }];
     const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
@@ -343,7 +343,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
   });
 
   test("decision reservations are taken, added and drawn by the real ledger; a bound refusal uses its own room and a final holder releases unused decisions", () => {
-    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.items["job"]!.holds = { decisions: { stop: 2 } };
     data.acts["take"]!.adds = { decisions: { stop: 1 } };
     data.acts["finish"] = { ...M.acts.take, step: "transition", grant: "finish", guards: [{ state: ["taken"] }], effects: [{ state: "done" }] };
@@ -365,7 +365,7 @@ describe("18.53, in the judge: a bound request finds its item by a selector, at 
   });
 
   test("a request sent by a bound deciding entry draws on its holder's request count and preserves its account for its result", () => {
-    const data = structuredClone(M) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.items["job"]!.holds = { decisions: { stop: 1 }, requests: 1 };
     data.receives["stop"]!.sends = [{ tell: { to: { slot: "owner", of: "also.job" }, message: "notice", fields: {}, result: {} } }];
     const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
@@ -537,7 +537,7 @@ const M51 = {
 
 describe("18.51: a settlement by a mark, and a bound request, at a full scope", () => {
   test("the decision fold treats a bound subject named __proto__ as an own name", () => {
-    const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M51) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.receives["stop"] = JSON.parse(JSON.stringify(data.receives["stop"]).replaceAll("also.job", "also.__proto__"));
     data.receives["stop"]!.also = Object.fromEntries([["__proto__", { item: "job", by: "job" }]]);
     const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
@@ -551,7 +551,7 @@ describe("18.51: a settlement by a mark, and a bound request, at a full scope", 
   });
 
   test("a local fact field that names the holder's opening is normalized identically by the judge and decision fold", () => {
-    const data = structuredClone(M51) as unknown as import("@generalbusiness/artroom-contract").PlatformData;
+    const data = structuredClone(M51) as unknown as import("@generalbusiness/dap-contract").PlatformData;
     data.receives["stop"]!.fields = { job: { type: "fact", kind: ["start"], under: data.name, required: true } };
     const definition = valid(validateDefinition(data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
     const G = new Jobs(definition);

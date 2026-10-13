@@ -18,10 +18,10 @@
  * read of a membership scope.
  */
 
-import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
-import { isOf, platform } from "@generalbusiness/artroom-platform";
+import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/dap-derive";
+import { isOf, platform } from "@generalbusiness/dap-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";

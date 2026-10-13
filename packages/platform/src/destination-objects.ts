@@ -7,7 +7,7 @@
  * facts: the scope's own history, or facts retained in its entries.
  */
 
-import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefName, factText, hex, sha1, sha256, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 
 export type ObjectFormat = "sha1" | "sha256";

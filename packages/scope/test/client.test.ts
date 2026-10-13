@@ -3,8 +3,8 @@ import { SELF } from "cloudflare:test";
 import { expect, test } from "vitest";
 import { ScopeHandle, bindingTransport, found, httpTransport, secretSigner, signedIntent, type ServiceBinding, type Transport } from "@generalbusiness/artroom-client";
 import { newIncarnation } from "@generalbusiness/artroom-bytes";
-import { timeMs } from "@generalbusiness/artroom-derive";
-import { deskDefinition, grantOf, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
+import { timeMs } from "@generalbusiness/dap-derive";
+import { deskDefinition, grantOf, ticketDefinition } from "@generalbusiness/dap-derive/testing";
 import { net, rita } from "./net.ts";
 import { reader } from "./support.ts";
 

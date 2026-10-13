@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { ScopeHandle, httpTransport, type Fetch } from "@generalbusiness/artroom-client";
-import { command } from "@generalbusiness/artroom-cli";
+import { command } from "@generalbusiness/dap-cli";
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
+import { changeDemo3 } from "@generalbusiness/dap-lanes";
 import { act, joinRoom, listLanes, loadChange, openRoom, placeOf, type Room } from "../src/data.ts";
 import { checkEditRequest, continueEdit, editFields, prepareEdit, readEditSource } from "../src/retained-editor-data.ts";
 import { demo } from "./support/demo.ts";

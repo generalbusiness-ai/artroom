@@ -1,5 +1,5 @@
 /** Navigation and room identity shared by the browser shell and its tests. */
-import type { MemberRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
 export type Destination = "issues" | "changes" | "rules" | "join" | "invitation" | "config";
 export interface Route { destination: Destination; scope: string | null }

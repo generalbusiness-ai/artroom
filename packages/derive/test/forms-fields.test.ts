@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, FieldType } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, FieldType } from "@generalbusiness/dap-contract";
 import { isSealed } from "@generalbusiness/artroom-bytes";
 import { operand, validateDefinition, type Judging, type ProblemCode } from "../src/index.ts";
 import { equal } from "../src/operand.ts";

@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
+import type { FactRef } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { observationOf } from "@generalbusiness/artroom-derive";
-import { d, otherLane, t } from "@generalbusiness/artroom-derive/testing";
+import { observationOf } from "@generalbusiness/dap-derive";
+import { d, otherLane, t } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, standingOf } from "../src/membership.ts";
 import { judgeReservation, type Statement } from "../src/reservation.ts";
 import { FOUND, HEAD, NEXT, reading, rulesObserved } from "./support-destination.ts";

@@ -67,10 +67,10 @@
  */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, parseStrict, definitionDigest, intentDigest, isScopeId, positionOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { isObject, type Item } from "@generalbusiness/artroom-derive";
+import { isObject, type Item } from "@generalbusiness/dap-derive";
 import { foundedKind, type Founded } from "./core.ts";
 import { repositorySessionMembership, fixedMembership, repositoryAuthority } from "./authority.ts";
 import { membershipIn, namespace, type Binding } from "./namespace.ts";
@@ -101,7 +101,7 @@ export interface Env extends GitHubBindings, ArtifactsBindings { SCOPES: Durable
 
 /** A scope's surface as a caller over RPC has it. */
 interface Remote {
-  reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
+  reservationSnapshot(asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   found(founding: SignedIntent, definition: DeclaredDefinition | Digest | PlatformDefinition, definitions?: readonly DeclaredDefinition[], beside?: Beside): Promise<Founded>;
   submit(signed: SignedIntent, grants: readonly Grant[], beside?: Beside, address?: string | null): Promise<Answer>;
   prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer>;
@@ -126,7 +126,7 @@ const MISSING = { ok: false, reason: "not-found" } as const;
 
 /** The contract's operations, and the four that sessions and the operator's lists add. None of the four writes an entry. */
 export interface Api extends ScopeApi {
-  reservationSnapshot(scope: string, asked: SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
+  reservationSnapshot(scope: string, asked: SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   session(scope: string, asked: unknown): Promise<SessionAnswer>;
   /** The body is the reader's side of the stream (`relay`): cancelling it releases the scope's subscription at once. */
   stream(scope: string, reader: unknown): Promise<ReadableStream<Uint8Array> | StreamRefusal | typeof MISSING>;

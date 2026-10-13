@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type DeclaredDefinition, type DutyId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type DutyId, type Entry, type FactRef, type Item, type Receipt, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, factRefOf, intentDigest, newIncarnation, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { changeDemo3 } from "../src/index.ts";
-import { validateDefinition } from "@generalbusiness/artroom-derive";
+import { validateDefinition } from "@generalbusiness/dap-derive";
 import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 
 // CLI/HTTP boundary STAND-IN: summaries and accepted work are scripted, not
@@ -115,7 +115,7 @@ test.each(["link-summary", "link-request", "link-unavailable"] as const)("CLI li
   expect(result.code).toBe(1);
   expect(result.lines[0]).toBe(`Proposed one.md (${utf8(CONTENT).length} bytes) as change ${manifest.at.scope}, version ${manifest.seq}.`);
   expect(result.lines[1]).toMatch(category === "link-unavailable" ? /^Unavailable: busy\./ : /^Linking could not be confirmed: a required request or reply was unavailable\.$/);
-  expect(result.lines.at(-1)).toBe(`Inspect artroom show ${manifest.at.scope}:${manifest.seq} and artroom log ${manifest.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`);
+  expect(result.lines.at(-1)).toBe(`Inspect dap show ${manifest.at.scope}:${manifest.seq} and dap log ${manifest.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`);
   expect(f.posted.map(s => s.intent.kind)).toEqual(["open-pr", "ask-rules", "propose-file", "propose-manifest", ...(category === "link-summary" ? [] : ["link-own"])]);
   expect(f.accepted.map(a => a.kind)).toEqual(["open-pr", "ask-rules", "propose-file", "propose-manifest"]);
   expect(result.lines.join("\n")).not.toContain(PRIVATE);

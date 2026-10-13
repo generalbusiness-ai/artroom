@@ -7,30 +7,30 @@ import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAs
 
 export const USAGE = [
   "Usage:",
-  "  artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
-  "  artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
-  "  artroom install --planned [--cohort application|counting-commitments]",
-  "  artroom claim <name> [--handle @you] [--branch main] [--again]",
-  "  artroom invite <@member> --role <role> [--hours 24]",
-  "  artroom join <link>",
-  "  artroom acts [<scope>]",
-  "  artroom act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
-  "  artroom log <scope> [--limit n]",
-  "  artroom show <scope>:<seq>",
-  "  artroom verify <scope>",
-  "  artroom verify --all",
-  "  artroom remote",
-  "  artroom clone [<directory>] [--hours 1]",
-  "  artroom edit <path> --file <local file> [--title <text>] [--closes <issue>]",
-  "  artroom propose <branch> [--title <text>]",
-  "  artroom merge <change> [--closes <issue>]",
-  "  artroom issue open --title <text> [--body <text>]",
-  "  artroom issue comment <issue> <text>",
-  "  artroom issue assign <issue> <@member>",
-  "  artroom issue close <issue>",
-  "  artroom issues",
+  "  dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
+  "  dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
+  "  dap install --planned [--cohort application|counting-commitments]",
+  "  dap claim <name> [--handle @you] [--branch main] [--again]",
+  "  dap invite <@member> --role <role> [--hours 24]",
+  "  dap join <link>",
+  "  dap acts [<scope>]",
+  "  dap act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
+  "  dap log <scope> [--limit n]",
+  "  dap show <scope>:<seq>",
+  "  dap verify <scope>",
+  "  dap verify --all",
+  "  dap remote",
+  "  dap clone [<directory>] [--hours 1]",
+  "  dap edit <path> --file <local file> [--title <text>] [--closes <issue>]",
+  "  dap propose <branch> [--title <text>]",
+  "  dap merge <change> [--closes <issue>]",
+  "  dap issue open --title <text> [--body <text>]",
+  "  dap issue comment <issue> <text>",
+  "  dap issue assign <issue> <@member>",
+  "  dap issue close <issue>",
+  "  dap issues",
   "A scope is a scope ID, or one of: register, directory, membership, rules, destination, inbox.",
-  "An issue is its number, as artroom issues lists it, or its lane's scope ID.",
+  "An issue is its number, as dap issues lists it, or its lane's scope ID.",
 ].join("\n");
 
 /** The flags that take no value. */
@@ -100,7 +100,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
   }
 }
 
-/** `artroom issue open|comment|assign|close`: the words after `issue`, and its flags. Only `open` takes flags. */
+/** `dap issue open|comment|assign|close`: the words after `issue`, and its flags. Only `open` takes flags. */
 function issue(ctx: Context, sub: string | undefined, words: readonly string[], flags: Map<string, string[]>): Promise<Outcome> | Outcome {
   const wrong = (what: string): Outcome => ({ code: 2, lines: [what, USAGE] });
   const flag = (f: string) => flags.get(f)?.at(-1);

@@ -10,7 +10,7 @@
  * nothing and is judged by no rule.
  */
 
-import type { Condition, Effect, EffectForm, FieldType, FieldValue, Mark, MarkMost, MemberRef, Notify, Operand, PlatformData, RefusalReason, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Condition, Effect, EffectForm, FieldType, FieldValue, Mark, MarkMost, MemberRef, Notify, Operand, PlatformData, RefusalReason, UnavailableReason } from "@generalbusiness/dap-contract";
 import { attribution, byMember, historyOf } from "./attribution.ts";
 import { capabilityEffect } from "./capability.ts";
 import { isEntryOf, isLocalFact } from "./fields.ts";

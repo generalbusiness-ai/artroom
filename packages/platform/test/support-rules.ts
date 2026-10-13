@@ -22,11 +22,11 @@
  * are the platform package's, and derive's real judges run them.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/artroom-derive/testing";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
+import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/dap-derive";
+import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
 import { RULES_SCOPE, platform } from "../src/index.ts";
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {

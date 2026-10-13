@@ -23,9 +23,9 @@
  * authority's proposals, to be measured by the proof plan.
  */
 
-import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/dap-derive";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";

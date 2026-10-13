@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Effect, Entry, Input, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, Input, OperationId, ScopeRef } from "@generalbusiness/dap-contract";
 import { TokenDriver, type TokenAnswer, type TokenRequest } from "../src/host.ts";
 import { TokenHost, Vault, secret } from "./support/tokens.ts";
 

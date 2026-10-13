@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { SignedRead } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { SignedRead } from "@generalbusiness/dap-contract";
 import { canonicalize, keyIdOfSecret, parseStrict, retainedReadArgument, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
 import { httpTransport, secretSigner, signedIntent, signedLogReader, signedReader, signedReads, type Fetch, type Transport } from "../src/index.ts";
 

@@ -7,10 +7,10 @@
  * inspection of those objects. For its push it builds the same objects again, with
  * the time of the entry that reserved it, and sends them with the base's closure.
  * Every provider sends them the same way. */
-import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isOperationId, isFactRef, verifySignedIntent, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/artroom-derive";
-import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/artroom-platform";
+import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/dap-derive";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";

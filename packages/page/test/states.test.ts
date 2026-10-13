@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Answer, Entry } from "@generalbusiness/artroom-contract";
+import type { Answer, Entry } from "@generalbusiness/dap-contract";
 import { changeStates, operationsOf, type Merge, type ReviewRequest } from "../src/index.ts";
 
 // Invariant: each of plan 016's states of a change is named from one record or answer, and only from it. The story on real scopes

@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Item } from "@generalbusiness/artroom-contract";
-import { stateDigest } from "@generalbusiness/artroom-derive";
+import type { Item } from "@generalbusiness/dap-contract";
+import { stateDigest } from "@generalbusiness/dap-derive";
 import { SqliteStore } from "../src/sqlite.ts";
 import { objectOf } from "./support.ts";
 

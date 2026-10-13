@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
+import type { FactRef } from "@generalbusiness/dap-contract";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { canonicalize, definitionDigest, digestBytes, entryHash, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { changeDemo3 } from "@generalbusiness/artroom-lanes";
-import { command } from "@generalbusiness/artroom-cli";
+import { changeDemo3 } from "@generalbusiness/dap-lanes";
+import { command } from "@generalbusiness/dap-cli";
 import { act, fieldValue, listLanes, loadChange, openRoom, placeOf } from "../src/data.ts";
 import { demo } from "./support/demo.ts";
 
@@ -17,7 +17,7 @@ test("LIST1 preview authenticates the exact frozen source and rejects altered or
     if (fault === "missing") return Response.json({ ok: false, reason: "not-found" });
     const response = await fetch(url, init), bytes = response.body ? await takeBytes(response.body, 1024 * 1024, AbortSignal.timeout(30_000)) : null;
     if (!(bytes instanceof Uint8Array)) throw new Error("The source read returned no bounded whole reply.");
-    const read = JSON.parse(new TextDecoder().decode(bytes)) as { ok: boolean; value: { entry: import("@generalbusiness/artroom-contract").Entry; hash: string } };
+    const read = JSON.parse(new TextDecoder().decode(bytes)) as { ok: boolean; value: { entry: import("@generalbusiness/dap-contract").Entry; hash: string } };
     if (read.ok && read.value.entry.input.type === "act") { if (fault === "wrong-hash") read.value.hash = `sha256:${"f".repeat(64)}`; else if (fault === "wrong-incarnation") read.value.entry.at = { ...read.value.entry.at, inc: "in_aaaaaaaaaaaaaaaaaaaaaaaaaa" }; else read.value.entry.input.signed.intent.fields["content"] = "# Forged\n"; if (fault === "resealed" || fault === "wrong-incarnation") read.value.hash = entryHash(read.value.entry); }
     return Response.json(read);
   }) as Fetch);

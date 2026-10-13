@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, Evidence, OperationId } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Entry, Evidence, OperationId } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import { FoldError, applyEntry, checkpointOf, clockOf, operationId, operationOpening, operationStanding, owed, settleOutcome, tokenPast } from "../src/index.ts";
 import type { Opening, OperationRules, Owners } from "../src/index.ts";

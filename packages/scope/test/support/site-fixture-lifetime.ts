@@ -2,7 +2,7 @@ import { beginSessionFixture } from "../session-settings.ts";
 /** Site test settings only. Native objects keep the same clock reference. */
 import { onTestFinished } from "vitest";
 import { b64url, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { net } from "../../src/testing.ts";
 import { platformOutside } from "../worker.ts";
 

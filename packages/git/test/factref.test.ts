@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
+import type { FactRef } from "@generalbusiness/dap-contract";
 import { factOfRefName, factOfText, factRefName, factText } from "@generalbusiness/artroom-bytes";
 import { bare, blob, cleanup, git, tree } from "./support/repo.ts";
 

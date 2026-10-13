@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { DEMO_DIGESTS } from "@generalbusiness/dap-lanes";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { act, actsOn, issueCreation, createdIssue, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
 import { demo, type Demo } from "./support/demo.ts";
 import { ScopeHandle, httpTransport, secretSigner, signedReads, REPLY_BYTES, REPLY_SECONDS } from "@generalbusiness/artroom-client";
-import { PROPOSED_BOUNDS, type ScopeId, type FactRef } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type ScopeId, type FactRef } from "@generalbusiness/dap-contract";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { Platform } from "../../scope/test/repository.ts";
 import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";

@@ -11,7 +11,7 @@
  * or `deriveEffects`, and returns a `Draft`.
  */
 
-import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, PlatformTimedRule, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Effect, Entry, FactRef, FactUse, Grant, GrantMark, Head, Input, MismatchReason, ObservationUse, Prepared, PlatformTimedRule, RefusalReason, RoutingRefusal, ScopeRef, Send, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
 import { intentDigest, scopeIdOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { withinCounts } from "./draws.ts";

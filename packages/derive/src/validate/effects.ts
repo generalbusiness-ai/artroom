@@ -1,6 +1,6 @@
 /** Effect forms, their conditions, and the rule that no two effects of one list set one thing (scope contract, sections 6.3, 6.6 and 6.7). */
 
-import type { Bounds, EffectForm, FieldType } from "@generalbusiness/artroom-contract";
+import type { Bounds, EffectForm, FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { LAST_MS } from "../time.ts";
 import { isObject, isValue } from "../values.ts";

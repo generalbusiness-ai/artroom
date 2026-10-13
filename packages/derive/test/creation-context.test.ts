@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type DeclaredDefinition, type ScopeKind } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type ScopeKind } from "@generalbusiness/dap-contract";
 import { canonicalize, isSeed } from "@generalbusiness/artroom-bytes";
 import { clockOf, judgeGenesis, validateDefinition, type ValidDefinition } from "../src/index.ts";
 import { Ledger, T0, creation, deliver, founded, keys, valid } from "./fixtures.ts";

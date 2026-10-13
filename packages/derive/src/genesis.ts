@@ -11,7 +11,7 @@
  * kind `register` or under the register's definition.
  */
 
-import type { Entry, FactRef, FactUse, GrantMark, Incarnation, Prepared, Reason, Request, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, FactUse, GrantMark, Incarnation, Prepared, Reason, Request, ScopeId, ScopeRef, Seed, Send, SignedIntent } from "@generalbusiness/dap-contract";
 import { deliveryCauseDigest, intentDigest, isDigest, isIncarnation, isSeed, messageDigest, scopeIdOf, seedDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery, reasonOf, sentBy, type DeliveryContext } from "./delivery.ts";
 import { creationFields, isEntryOf, isIntent, readFacts, readFields, useOf } from "./fields.ts";
