@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import { b64url, newIncarnation, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { AGENT_KEY_LINK, INVITATION_LINK, agentKeyInvitationOf, invitationOf, wellFormedInvitation } from "@generalbusiness/artroom-client";
-import { LINK, command, linkOf } from "../src/commands.ts";
+import { LINK, linkOf } from "../src/commands.ts";
+import { command } from "../src/line.ts";
 import type { Store } from "../src/store.ts";
 
 // Invariant: the client's invitation parser, which the MCP server's join uses, reads every link as `artroom join` reads it, and
