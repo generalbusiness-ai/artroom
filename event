@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:af8ee95317d1794571544eaaae20dbf553cc8669","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-mcp-generic-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b76e4300b915f284b99fc18e970d98a3cb10e9d9","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/budget.test.ts."}
