@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f65bd452e879fe342bc2f6b58fc0e84a71844863","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/github-wiring.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f66014b9ea14b33fb33a44347985358eeda3a0af","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-dap-minimal-rename.md."}
