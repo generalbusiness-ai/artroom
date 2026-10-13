@@ -137,8 +137,12 @@ async function roomWithIssues(): Promise<{ room: Room; rita: Agent }> {
 }
 const done = (room: Room) => { hostedTest.now = null; hostedTest.pause = null; hostedTest.lose = null; room.done(); };
 /** A raw request to the agent's endpoint with a bearer. */
-const mcp = (bearer: string, method: string, headers: Record<string, string>, body?: unknown) =>
-  routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+const mcp = async (bearer: string, method: string, headers: Record<string, string>, body?: unknown): Promise<Response> => {
+  const response = await routed(`${SERVICE}/mcp`, { method, headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  // A stream a case opens only to see its status is cancelled here, so no body outlives its test.
+  if (method === "GET" && response.status === 200 && response.headers.get("content-type")?.startsWith("text/event-stream") && !headers["x-keep-open"]) await response.body?.cancel();
+  return response;
+};
 const META = { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} };
 const modernCall = (bearer: string, name: string, args: Record<string, unknown>, id = 1) =>
   mcp(bearer, "POST", { "mcp-protocol-version": MODERN, "mcp-method": "tools/call", "mcp-name": name }, { jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args, _meta: META } });
@@ -388,8 +392,10 @@ test("H8 through the route: the matrix, the modern headers, the legacy rules, an
     const open = stream(B, S);
     await settle();
     expect(open.text(), "S opens its stream after the July attempts").toContain(": stream");
-    expect((await mcp(B, "GET", { "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status, "a 2nd stream replaces the 1st").toBe(200);
+    const second = await mcp(B, "GET", { "mcp-protocol-version": LEGACY, "mcp-session-id": S });
+    expect(second.status, "a 2nd stream replaces the 1st").toBe(200);
     expect(await open.ended).toBe(200);
+    await settle();
     // A 17th session ends the oldest.
     for (let n = 1; n < 17; n++) await legacySession(B);
     expect((await agentStub(bot.agent).counts()).sessions).toBe(16);
