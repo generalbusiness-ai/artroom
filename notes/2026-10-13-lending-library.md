@@ -1,6 +1,6 @@
 # A lending library on dap
 
-13 October 2026. **Proposed design, Draft 3. Design only: no source, no
+13 October 2026. **Proposed design, Draft 4. Design only: no source, no
 test and no deployment was written or run for this note.** Baseline main
 `562357458b0b3f44873efc6c21429194b60a00f7`.
 
@@ -17,7 +17,9 @@ act through a browser interface built on the design system.
 Draft 2 changes the demo script only: Nasruddin's donation of the small
 pot carries the description "Baby born when the big pot was with me"
 (Hugh, 13 October 2026). The definition is unchanged. Draft 3 adds
-Nasruddin's spoken line at step 4 of the script.
+Nasruddin's spoken line at step 4 of the script. Draft 4 names the
+final deliverable, an online demo room linked from the homepage
+(section 9).
 
 ## 1. What the library does
 
@@ -259,6 +261,15 @@ none of it: the birth and the death are recorded the same way.
 3. **The room.** A provisioning runbook for section 7, run once against
    a deployed service, with what was observed.
 4. **The demo script**, as a document for the recording.
+5. **The online demo room.** This is the final deliverable (Hugh,
+   13 October 2026): the library running in a room on the deployed
+   service, with the Nasruddin script already played into it, so that a
+   visitor sees a shelf with a history.
+6. **The homepage link.** A `library` page on the homepage
+   (`homepage/src/library/`, beside the existing `room`, `counter` and
+   `jam` pages), linking to the member interface, the published shelf
+   and the record. The homepage's links run in this order: room,
+   library, counter, jam, documentation.
 
 ## 10. Open points
 
@@ -273,6 +284,10 @@ builder, not a design choice.
   read is assumed here and was not checked for a type with many items.
 - **Identifiers in a path.** Whether an item identifier is fit for a
   file name as it stands, or needs a stated encoding.
+- **What a visitor can do.** The published shelf is public, so anyone
+  can read it. Acting needs a seat in the room. Whether the online room
+  hands out member invitations to visitors, and how it is reset after
+  they act, is not designed here.
 - **Removing a page.** The one-file edit writes a file. This design
   never removes a page: a cancelled thing keeps its page, marked `gone`.
 
