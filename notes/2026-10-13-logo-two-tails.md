@@ -43,3 +43,21 @@ Brand embedding, Page and Counter asset producers, owning checks, the gate, revi
 | `brand/dist/maskable-512.png` | `53e80ae66a626f37086f5eed33fb03d285f1ba738976007011da09c804e81a47` |
 | `brand/dist/head-snippet.html` | `054c94be5f273ce6dc83ae2bde28983b2d182cad2ac55d148582023b3572b5eb` |
 | `brand/dist/site.webmanifest` | `007c4b24b5ce9abf4814fb1ef268945b2a76ece1a071cedea2702c09bf8e7afd` |
+
+## Checked code and generated assets
+
+The earlier unrun list describes the initial Source preparation. Root subsequently ran each public producer once at `939afad767dc26b5ffd5715447972a4822ad6302`, tree `c98ad9fb1b897a70118aa8c4ca87207c6647923c`: brand embedding, Page, Counter, and a local Home build. Each command exited 0 and its post-command guard passed. No distribution file was regenerated. Root independently matched all 17 embedded brand assets to the explicit public allowlist and the Page and Counter modules to their emitted files.
+
+The generated outputs were committed at `e12449e5d89c983622387a2ea657d8a89fdf973d`, tree `2add32d2f3841cb165baa484d8f629bf582aad1d`. That commit updates the Scope brand, Page, and Counter modules and the tracked Counter browser CSS. The local Home output is `/private/tmp/dap-logo-home-local-one/assets`; it is local evidence, not a deployment.
+
+Root ran the focused checks at that exact generated head. Original command 75329 exited 0: all three declared compiler roots passed, and exactly six owning cases passed with no added cases or coverage issues. The cases protect current brand, Page, and Counter asset bytes, the existing Page shell behaviour, and the public brand and Counter routes. Root also read the separate Home owning Node command’s original output: exit 0, one test passed.
+
+The ordinary gate ran once at the same generated head. Original command 8336 exited 0; whitespace, typecheck, and test phases passed. Installation was skipped. Vitest passed 1,042 cases and retained two original skips. The two Node groups passed 9 and 55 cases. The post-command guard passed. The gate command’s observed wall time was 126.588 seconds, excluding wrapper guard and report work. No check, gate, or producer was repeated to prepare this note.
+
+This appended delivery text changes only this note. Review must bind the final note-only head to the checked generated head and preserve its executable Source and tests. The earlier original PNG view remains provisional.
+
+## Remaining hosted delivery
+
+The full logo request remains open. A bounded Source child can cover review and landing of the code and generated assets before the existing hosted delivery continues. Actual host refresh and served asset readback are still owed, together with desktop and mobile wordmark-height comparisons on Home, Room, and Counter.
+
+Chrome acceptance requires four original normal-size tab-strip captures: Home in light and dark browser chrome, and Counter in light and dark browser chrome. Root must distinguish the upper-left and lower-right tails at the normal 16-pixel icon size. If either tail is indistinguishable, stop and report that screenshot before choosing another drawing. Page screenshots and the earlier PNG view do not establish this acceptance. Jam-owned files and any Jam host deployment remain deferred.
