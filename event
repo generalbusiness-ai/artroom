@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"package-lock.json at exact 3e3d016f6f2166be2b5a6089d01261b558faf301 on request/mcp-generic, under promise git:sha1…b686fac on request git:sha1…fd782a4","body":{"commit":"3e3d016f6f2166be2b5a6089d01261b558faf301","path":"package-lock.json"}}
+{"kind":"artifact","text":"packages/cli/package.json at exact 3e3d016f6f2166be2b5a6089d01261b558faf301 on request/mcp-generic, under promise git:sha1…b686fac on request git:sha1…fd782a4","body":{"commit":"3e3d016f6f2166be2b5a6089d01261b558faf301","path":"packages/cli/package.json"}}
