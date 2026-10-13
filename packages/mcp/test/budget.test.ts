@@ -185,25 +185,28 @@ describe("what a call costs, end to end", () => {
     await annotate(`room with 2 roots and a second membership: warm ${reads(warm.requests)} reads; cold ${reads(cold.requests)} reads and ${sessions(cold.requests)} sessions`);
   });
 
-  // Invariant: room pages every collection it returns (lanes, roots, standing, active definitions, act tools not held) by bytes,
-  // within its 8 KiB bound, with a continuation; every entry is reached once.
+  // Invariant: room pages every collection it returns (lanes, applications, roots, standing, active definitions, act tools not
+  // held) by bytes, within its 8 KiB bound, with a continuation; every entry is reached once.
   test("room pages its collections within its bound", async ({ annotate }) => {
     const lanes = Array.from({ length: 60 }, () => issueDemo);
     const s = roomOf("member", lanes);
     for (let i = 0; i < 40; i++) s.config.roots = [...(s.config.roots ?? []), { scope: s.stand.add("lane", issueDemo).scope, membership: s.config.repository!.membership }];
+    // 30 applications the directory's factory created, as directory items of type application.
+    const directory = s.stand.scopes.get(s.stand.directory.scope)!;
+    for (let i = 0; i < 30; i++) directory.items.push({ id: 10_000 + i, type: "application", state: "created", revision: 0, opened: null, parties: {}, refs: { scope: s.stand.add("lane", issueDemo) }, values: { definition: definitionDigest(issueDemo) }, attributed: [] } as unknown as Item);
     const seen: Record<string, number> = {};
     let cursor: string | undefined, pages = 0;
     do {
       const got = await counted(s, () => s.service.call("room", cursor ? { cursor } : {}));
       expect(got.bytes, `room page ${pages + 1}`).toBeLessThanOrEqual(BOUNDS.room);
-      for (const k of ["lanes", "roots", "standing", "active", "notHeld"]) seen[k] = (seen[k] ?? 0) + (got.result.structuredContent[k] as unknown[]).length;
+      for (const k of ["lanes", "applications", "roots", "standing", "active", "notHeld"]) seen[k] = (seen[k] ?? 0) + (got.result.structuredContent[k] as unknown[]).length;
       cursor = got.result.structuredContent["cursor"] as string | undefined;
       pages++;
     } while (cursor);
-    expect([seen["lanes"], seen["roots"], seen["standing"], seen["active"]]).toEqual([60, 40, 1, 1]);
+    expect([seen["lanes"], seen["applications"], seen["roots"], seen["standing"], seen["active"]]).toEqual([60, 30, 40, 1, 1]);
     expect(seen["notHeld"]).toBeGreaterThan(0);
     expect(pages).toBeGreaterThan(1);
-    await annotate(`room: 60 lanes, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
+    await annotate(`room: 60 lanes, 30 applications, 40 roots and the rest in ${pages} pages, each within 8 KiB`);
   });
 
   // Invariant: a history search goes on from where it stopped, with bounded work per poll or call and no fixed cutoff: a mint's

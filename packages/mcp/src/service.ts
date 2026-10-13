@@ -469,7 +469,7 @@ export class McpService {
     const tool = (name: string, description: string, properties: Record<string, unknown>, required: string[], annotations: Record<string, unknown>, run: Run, output?: Record<string, unknown>): [string, { tool: Tool; run: Run }] =>
       [name, { tool: { name, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, ...(output ? { outputSchema: output } : {}), annotations }, run }];
     return Object.fromEntries([
-      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
+      tool("room", "Orientation. The service, your key, the scopes of the room by name, the issues and changes the directory lists, the applications its factory created (such as a Counter), the standalone scopes, your standing on each membership, the active definitions, and the act tools your role does not hold; paged by bytes, with a cursor. Start here.",
         { cursor: { type: "string" } }, [], READ, (a) => this.#room(a)),
       tool("inspect", "One scope: its definition and digest, status, head, counts by item type and state, and its live items, paged by bytes at its head. With declaration: true, the definition's bytes, paged. With describe: <kind>, the complete derived text of one act, for an act whose tool description points here.",
         { scope: scopeArg, declaration: { type: "boolean" }, describe: { type: "string" }, cursor: { type: "string" }, offset: { type: "integer", minimum: 0 } }, ["scope"], READ, (a) => this.#inspect(a)),
@@ -508,7 +508,7 @@ export class McpService {
   }
 
   /**
-   * `room`: the header on every page, and the room's collections (lanes, roots, standing, active definitions, the act tools not
+   * `room`: the header on every page, and the room's collections (lanes, applications, roots, standing, active definitions, the act tools not
    * held, the scopes not read) paged together by bytes, in that order, with a cursor bound to the list's generation.
    */
   async #room(args: Args): Promise<CallResult> {
@@ -520,8 +520,13 @@ export class McpService {
     });
     const places = Object.fromEntries(SINGLETON_PLACES.map((p) => [p, s.read.inventory.scopes.find((h) => h.place === p) ?? null]).filter(([, h]) => h !== null).map(([p, h]) => [p, { scope: (h as Held).scope, definition: (h as Held).pinned }]));
     const standing = Object.entries(s.read.inventory.standing).map(([membership, st]) => (st.known ? { membership, handle: st.handle, role: st.role, key: st.key } : { membership, standing: "your standing here is unknown", why: st.reason }));
+    const named = (digest: string | null) => s.read.inventory.active.find((a) => a.digest === digest)?.name ?? null;
+    const applications = (room?.applications ?? []).map((a) => {
+      const held = a.ref ? s.read.inventory.scopes.find((h) => h.scope === a.ref!.scope) : undefined;
+      return { definition: held?.definition.name ?? named(a.digest), digest: a.digest, scope: a.ref?.scope ?? null, state: a.state };
+    });
     const roots = s.read.inventory.scopes.filter((h) => h.place === "root").map((h) => ({ scope: h.scope, definition: h.definition.name, digest: h.pinned, membership: h.membership }));
-    const sections = { lanes, roots, standing, active: s.read.inventory.active as unknown[], notHeld: s.hidden as unknown[], unread: s.read.unread as unknown[] };
+    const sections = { lanes, applications, roots, standing, active: s.read.inventory.active as unknown[], notHeld: s.hidden as unknown[], unread: s.read.unread as unknown[] };
     type Section = keyof typeof sections;
     const all = (Object.keys(sections) as Section[]).flatMap((section) => sections[section].map((value) => ({ section, value })));
     const header = { service: this.#service, key: this.#port.signer.key, mode: this.mode, generation: s.generation, scopes: places };
