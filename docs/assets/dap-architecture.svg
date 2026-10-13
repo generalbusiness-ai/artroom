@@ -24,21 +24,21 @@
     </style>
   </defs>
 
-  <rect y="-90" width="1400" height="740" rx="22" fill="#F3F1EA"/>
+  <rect y="-90" width="1400" height="740" fill="#F3F1EA"/>
 
   <!-- From other scopes: the definition and the grants -->
   <g>
-    <rect x="330" y="-70" width="270" height="56" rx="16" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="330" y="-70" width="270" height="56" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="354" y="-48" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">CREATOR SCOPE</text>
     <text x="354" y="-27" class="sans body" fill="#16180F" fill-opacity="0.7">gives the definition, once</text>
-    <rect x="640" y="-70" width="320" height="56" rx="16" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="640" y="-70" width="320" height="56" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="664" y="-48" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">MEMBERSHIP SCOPE</text>
     <text x="664" y="-27" class="sans body" fill="#16180F" fill-opacity="0.7">says who may act, read before each turn</text>
   </g>
 
   <!-- Signer -->
   <g class="sans">
-    <rect x="38" y="172" width="184" height="176" rx="18" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="38" y="172" width="184" height="176" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="130" y="208" text-anchor="middle" class="eyebrow" fill="#123F2B">SIGNER</text>
     <text x="130" y="242" text-anchor="middle" class="title" fill="#16180F">Signed act</text>
     <text x="130" y="270" text-anchor="middle" class="body" fill="#16180F" fill-opacity="0.7">people · agents</text>
@@ -47,7 +47,7 @@
   </g>
 
   <!-- One scope -->
-  <rect x="300" y="62" width="800" height="426" rx="24" fill="#FFFFFF" fill-opacity="0.55" stroke="#D8D5CB" stroke-width="1.4"/>
+  <rect x="300" y="62" width="800" height="426" fill="#FFFFFF" fill-opacity="0.55" stroke="#D8D5CB" stroke-width="1.4"/>
   <text x="1076" y="470" text-anchor="end" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">ONE SCOPE · ONE DURABLE OBJECT · ONE PINNED DEFINITION</text>
 
   <path d="M222 244H322" class="flow"/>
@@ -59,19 +59,19 @@
 
   <g>
     <!-- Judge -->
-    <rect x="330" y="210" width="170" height="104" rx="16" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
-    <rect x="330" y="210" width="6" height="104" rx="3" fill="#123F2B"/>
+    <rect x="330" y="210" width="170" height="104" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
+    <rect x="330" y="210" width="6" height="104" fill="#123F2B"/>
     <text x="356" y="244" class="sans eyebrow" fill="#123F2B">JUDGE</text>
     <text x="356" y="278" class="sans title" fill="#16180F">check the act</text>
     <text x="356" y="300" class="sans body" fill="#16180F" fill-opacity="0.7">guards · rules · grants</text>
 
     <!-- Entry -->
-    <rect x="536" y="234" width="114" height="56" rx="28" fill="#123F2B" fill-opacity="0.08" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
+    <rect x="536" y="234" width="114" height="56" fill="#123F2B" fill-opacity="0.08" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
     <text x="593" y="268" text-anchor="middle" class="mono body" fill="#123F2B">entry</text>
 
     <!-- Fold -->
-    <rect x="686" y="210" width="156" height="104" rx="16" fill="#FFFFFF" stroke="#16180F" stroke-opacity="0.4" stroke-width="1.4"/>
-    <rect x="686" y="210" width="6" height="104" rx="3" fill="#16180F"/>
+    <rect x="686" y="210" width="156" height="104" fill="#FFFFFF" stroke="#16180F" stroke-opacity="0.4" stroke-width="1.4"/>
+    <rect x="686" y="210" width="6" height="104" fill="#16180F"/>
     <text x="712" y="244" class="sans eyebrow" fill="#16180F">FOLD</text>
     <text x="712" y="278" class="sans title" fill="#16180F">apply effects</text>
     <text x="712" y="300" class="sans body" fill="#16180F" fill-opacity="0.7">states · slots</text>
@@ -86,10 +86,10 @@
 
   <!-- Definition sources: what is declared -->
   <g>
-    <rect x="330" y="90" width="320" height="60" rx="12" fill="#16180F"/>
+    <rect x="330" y="90" width="320" height="60" fill="#16180F"/>
     <text x="350" y="112" class="mono code" fill="#F3F1EA" fill-opacity="0.6">definition.json · acts</text>
     <text x="350" y="137" class="mono code" fill="#F3F1EA"><tspan fill="#FFFFFF">act</tspan> fields, guards, effects, sends</text>
-    <rect x="686" y="90" width="386" height="60" rx="12" fill="#16180F"/>
+    <rect x="686" y="90" width="386" height="60" fill="#16180F"/>
     <text x="706" y="112" class="mono code" fill="#F3F1EA" fill-opacity="0.6">definition.json · items</text>
     <text x="706" y="137" class="mono code" fill="#F3F1EA"><tspan fill="#FFFFFF">item</tspan> states, parties, references, values</text>
   </g>
@@ -98,7 +98,7 @@
 
   <!-- Rule expressions -->
   <g>
-    <rect x="330" y="348" width="170" height="64" rx="10" fill="#16180F"/>
+    <rect x="330" y="348" width="170" height="64" fill="#16180F"/>
     <text x="415" y="373" text-anchor="middle" class="mono code" fill="#FFFFFF">rules</text>
     <text x="415" y="397" text-anchor="middle" class="mono code" fill="#F3F1EA" fill-opacity="0.6">restricted JSONata</text>
   </g>
@@ -107,14 +107,14 @@
   <!-- Journal -->
   <path d="M593 290V340" class="flow"/>
   <g>
-    <rect x="520" y="348" width="150" height="64" rx="16" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
+    <rect x="520" y="348" width="150" height="64" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
     <text x="544" y="374" class="sans eyebrow" fill="#123F2B">JOURNAL</text>
     <text x="544" y="398" class="sans body" fill="#16180F" fill-opacity="0.7">ordered · hashed</text>
   </g>
 
   <!-- Effects are declared -->
   <g>
-    <rect x="686" y="348" width="156" height="64" rx="10" fill="#16180F"/>
+    <rect x="686" y="348" width="156" height="64" fill="#16180F"/>
     <text x="764" y="373" text-anchor="middle" class="mono code" fill="#FFFFFF">effects</text>
     <text x="764" y="397" text-anchor="middle" class="mono code" fill="#F3F1EA" fill-opacity="0.6">declared · no code</text>
   </g>
@@ -123,8 +123,8 @@
   <!-- Items -->
   <path d="M842 262H867" class="flow"/>
   <g>
-    <rect x="874" y="188" width="198" height="148" rx="18" fill="#FFFFFF" stroke="#16180F" stroke-opacity="0.4" stroke-width="1.4"/>
-    <rect x="886" y="214" width="174" height="90" rx="9" fill="#F3F1EA" stroke="#D8D5CB"/>
+    <rect x="874" y="188" width="198" height="148" fill="#FFFFFF" stroke="#16180F" stroke-opacity="0.4" stroke-width="1.4"/>
+    <rect x="886" y="214" width="174" height="90" fill="#F3F1EA" stroke="#D8D5CB"/>
     <path d="M886 244H1060M886 274H1060" stroke="#D8D5CB"/>
     <text x="973" y="234" text-anchor="middle" class="sans eyebrow" fill="#16180F">ITEMS</text>
     <text x="973" y="265" text-anchor="middle" class="mono code" fill="#16180F">thing · count · lent</text>
@@ -135,7 +135,7 @@
   <!-- Replay -->
   <path d="M540 412V508" fill="none" stroke="#123F2B" stroke-width="2" stroke-dasharray="4 5" marker-end="url(#arrow-green)"/>
   <g>
-    <rect x="330" y="516" width="250" height="64" rx="16" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
+    <rect x="330" y="516" width="250" height="64" fill="#FFFFFF" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
     <text x="354" y="542" class="sans eyebrow" fill="#123F2B">REPLAY · VERIFY</text>
     <text x="354" y="566" class="sans body" fill="#16180F" fill-opacity="0.7">anyone can fold it again</text>
   </g>
@@ -144,7 +144,7 @@
   <path d="M600 412V548H858" class="flow"/>
   <text x="726" y="538" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">sends</text>
   <g>
-    <rect x="866" y="516" width="296" height="64" rx="16" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="866" y="516" width="296" height="64" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="890" y="542" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">ANOTHER SCOPE</text>
     <text x="890" y="566" class="sans body" fill="#16180F" fill-opacity="0.7">judges the delivery in its own turn</text>
   </g>
@@ -156,11 +156,11 @@
   <text x="1124" y="250" text-anchor="middle" class="mono code" fill="#16180F">planned</text>
   <path d="M1270 220V196" class="flow"/>
   <g class="sans">
-    <rect x="1178" y="220" width="184" height="124" rx="18" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="1178" y="220" width="184" height="124" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="1270" y="254" text-anchor="middle" class="eyebrow" fill="#123F2B">GIT REPOSITORY</text>
     <text x="1270" y="288" text-anchor="middle" style="font-size:17px;font-weight:700" fill="#16180F">Cloudflare Artifacts</text>
     <text x="1270" y="318" text-anchor="middle" style="font-size:17px;font-weight:700" fill="#16180F">GitHub</text>
-    <rect x="1178" y="132" width="184" height="56" rx="16" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="1178" y="132" width="184" height="56" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="1270" y="156" text-anchor="middle" class="eyebrow" fill="#16180F" fill-opacity="0.6">PAGES</text>
     <text x="1270" y="176" text-anchor="middle" class="body" fill="#16180F" fill-opacity="0.7">served from the repository</text>
   </g>

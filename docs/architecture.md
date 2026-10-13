@@ -31,7 +31,7 @@ A definition is a JSON value, not code. It declares:
 - named rules, which a guard evaluates. A rule is an expression in a
   restricted JSONata. It reads the act's fields and the items the act
   names, and answers true or false. It cannot write: only declared
-  effects change an item, and an effect copies a value.
+  effects change states and slots.
 
 Because the definition is data, one runtime runs every application. The
 room's issue lane and the Counter's board differ only in the definitions
