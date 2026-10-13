@@ -115,7 +115,7 @@ test("join validates its service before signing or changing an empty configurati
   const write = custody.write.bind(custody);
   custody.write = async (id, record) => { custodyWrites++; await write(id, record); };
   const empty = { service: "", roots: [] };
-  const mcp = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url, init); }, config: { read: async () => { configReads++; return empty; }, joined: async () => { configWrites++; } }, custody, now: () => Date.parse("2099-01-01T00:00:00Z") });
+  const mcp = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url, init); }, config: { read: async () => { configReads++; return empty; }, addRoot: async () => { configWrites++; throw Error("Unexpected root write"); }, joined: async () => { configWrites++; } }, custody, now: () => Date.parse("2099-01-01T00:00:00Z") });
   for (const service of invalid) {
     const answer = await mcp.call("join", { link: link(service), idempotencyKey: "invalid-join" });
     expect(answer.isError, service).toBe(true);
@@ -126,7 +126,7 @@ test("join validates its service before signing or changing an empty configurati
   // Each accepted form passes the real signing boundary once. A scripted native refusal stops before enrollment reads.
   standIn.answers.set("join", () => ({ answer: "refused", reason: "guard-failed", judgedAt: { seq: 0, hash: `sha256:${"c".repeat(64)}` } }));
   for (const [i, service] of ["https://scopes.test", "https://scopes.test/base/", "https://scopes.test:8443", "http://127.0.0.1:7781", "http://127.2.3.4", "http://[::1]:7781"].entries()) {
-    const client = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url.replace("/base/v1/", "/v1/"), init); }, config: { read: async () => empty, joined: async () => { configWrites++; } }, custody: memoryStore(), now: () => Date.parse("2099-01-01T00:00:00Z") });
+    const client = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url.replace("/base/v1/", "/v1/"), init); }, config: { read: async () => empty, addRoot: async () => { configWrites++; throw Error("Unexpected root write"); }, joined: async () => { configWrites++; } }, custody: memoryStore(), now: () => Date.parse("2099-01-01T00:00:00Z") });
     const answer = await client.call("join", { link: link(service), idempotencyKey: `permitted-${i}` });
     expect(answer.isError, service).toBe(false);
     expect(answer.structuredContent, service).toMatchObject({ answer: "refused", reason: "guard-failed" });
