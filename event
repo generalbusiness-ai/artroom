@@ -1,1 +1,1 @@
-{"kind":"promise","text":"Accept request git:sha1…e0f40f4: Docs: a roadmap page and a use-case catalogue. Direction from Hugh, 13 October 2026: present what dap has and what is not yet built, the contributions of the da…","body":{"branch":"planner/roadmap-and-use-cases"}}
+{"kind":"artifact","text":"packages/cli/src/main.ts at exact c28193a5474ca58d5790b9c2f9108d8ae70ceb4f on request/mcp-generic, under promise git:sha1…b686fac on request git:sha1…fd782a4","body":{"commit":"c28193a5474ca58d5790b9c2f9108d8ae70ceb4f","path":"packages/cli/src/main.ts"}}
