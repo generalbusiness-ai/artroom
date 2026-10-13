@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/wrangler.jsonc","body":{"commit":"862ac59ee4acb781264c1709dd28be85313fa5d1","path":"packages/scope/wrangler.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00b9b7c16fc98c33a0fd552e3e37443dce50d7c5","text":"Merge retired a covered predecessor; the successor is at homepage/test/home.test.mjs."}
