@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3078617e87766331db5366833f80272e055e89e3","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/page-assets.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:33b20f4d9eb7e817b1f01fd55b6e1944858ec1aa","text":"Merge retired a covered predecessor; the successor is at packages/page/test/join-ui.test.ts."}
