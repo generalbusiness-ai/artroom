@@ -4,10 +4,10 @@
  * handle. They read the scope's own history only. No configuration, key,
  * token or plaintext is read or written here.
  */
-import type { Entry, FieldValue, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Entry, FieldValue, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isDigest, isFactRef, isOperationId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, valueDigest } from "@generalbusiness/artroom-derive";
-import { DESTINATION_KINDS, destinationBranch, destinationWrite, directoryIdOf, isOf } from "@generalbusiness/artroom-platform";
+import { isEntryOf, valueDigest } from "@generalbusiness/dap-derive";
+import { DESTINATION_KINDS, destinationBranch, destinationWrite, directoryIdOf, isOf } from "@generalbusiness/dap-platform";
 import type { DestinationBinding, DestinationRepository } from "./destination-host.ts";
 import type { OutsideGiven } from "./object.ts";
 

@@ -56,7 +56,7 @@
  * only for a token that its sealed outcome entry made `live` (section 5.7).
  */
 
-import type { FactRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { Gateway, type GatewayOptions, type GrantRecord, type GrantRequest, type LiveToken } from "@generalbusiness/artroom-git";
 
 /** The purpose of a job's read token, as its record states it (`derive/src/capability/gitread.ts`, `CHECK_READ`). */

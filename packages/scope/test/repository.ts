@@ -16,13 +16,14 @@
  */
 
 import { env } from "cloudflare:workers";
-import { evictDurableObject } from "cloudflare:test";
-import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
-import { canonicalize, entryHash, intentDigest, isDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
+import { evictDurableObject, runInDurableObject } from "cloudflare:test";
+import type { Answer, Beside, Digest, Entry, FactRef, FieldValue, Grant, Intent, Read, RetainedInput, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
+import { canonicalize, entryHash, factRefOf, intentDigest, isDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { hashOfBytes, type MemoryScope } from "@generalbusiness/artroom-replay";
-import type { Delivered, Item } from "@generalbusiness/artroom-derive";
-import { d, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
-import { officeDefinition } from "@generalbusiness/artroom-platform/testing";
+import type { Delivered, Item } from "@generalbusiness/dap-derive";
+import { d, keys, type Actor } from "@generalbusiness/dap-derive/testing";
+import { platform } from "@generalbusiness/dap-platform";
+import { officeDefinition } from "@generalbusiness/dap-platform/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";
@@ -125,21 +126,103 @@ export async function office(hold: ((envelope: Delivered) => boolean) | null = n
 
 export interface Repository { O: Platform; M: Platform; ritasInbox: Platform; unasInbox: Platform; ritasKey: number; una: number; unasKey: number }
 
+/** Metadata of this fixture's retained creation protocol, never message bodies. */
+export async function inboxConfirmation(repository: Repository) {
+  const membership = await repository.M.at(), parent = await repository.M.sealed();
+  const retries: { scope: ScopeRef; inbox: ScopeRef; genesis: FactRef; duty: string; class: Duty["class"]; next: number; alarm: number | null; attempts: Duty["attempts"] }[] = [];
+  const inboxes = await Promise.all([repository.ritasInbox, repository.unasInbox].map(async inbox => {
+    const sealed = await inbox.sealed(), first = sealed[0];
+    if (!first || first.entry.input.type !== "genesis") throw new Error("Inbox creation has no retained genesis");
+    const born = first.entry.input, genesis = factRefOf(first.entry);
+    if (born.seed.kind !== "inbox" || scopeIdOf(born.seed) !== genesis.at.scope || born.inc !== genesis.at.inc || genesis.at.kind !== "inbox") throw new Error("Inbox genesis has another full seed/incarnation");
+    if (!born.source || born.n === null || canonicalize(born.source.at) !== canonicalize(membership)) throw new Error("Inbox belongs to another creator");
+    const creation = parent[born.source.seq];
+    if (!creation || creation.hash !== born.source.hash || !creation.entry.sends.some(send => send.n === born.n && canonicalize(send.to) === canonicalize(born.seed) && canonicalize(send.message) === canonicalize(born.message))) throw new Error("Inbox genesis lacks its exact recorded creation");
+    const controls = sealed.filter(row => row.entry.input.type === "delivery" && row.entry.input.message.class === "control" && canonicalize(row.entry.input.from.at) === canonicalize(membership) && canonicalize(row.entry.input.message.genesis) === canonicalize(genesis));
+    for (const control of controls) {
+      const input = control.entry.input;
+      if (input.type !== "delivery") throw new Error("Confirmation is no retained delivery");
+      const sender = (await repository.M.sealed())[input.from.seq];
+      if (!sender || sender.hash !== input.from.hash || !sender.entry.sends.some(send => send.n === input.n && canonicalize(send.to) === canonicalize(first.entry.at) && canonicalize(send.message) === canonicalize(input.message))) throw new Error("Confirmation lacks its exact retained Native creator send");
+    }
+    const pairs: [Platform, string][] = [[repository.M, `${born.source.seq}.${born.n}`]];
+    for (const send of first.entry.sends) if (send.message.class === "result" && canonicalize(send.to) === canonicalize(membership)) pairs.push([inbox, `0.${send.n}`]);
+    for (const row of parent) for (const send of row.entry.sends) if (send.message.class === "control" && canonicalize(send.message.genesis) === canonicalize(genesis) && canonicalize(send.to) === canonicalize(first.entry.at)) pairs.push([repository.M, `${row.entry.seq}.${send.n}`]);
+    for (const [sender, id] of pairs) {
+      const read = await sender.stub.outbox(reader);
+      if (!read.ok) throw new Error("Creation protocol outbox unavailable");
+      const duty = read.value.find(d => d.duty === id);
+      if (!duty || duty.acknowledged || duty.result || duty.diagnosis || duty.held) continue;
+      const [seq, n] = id.split(".").map(Number);
+      const timing = await runInDurableObject(sender.object, async (_instance, state) => ({ next: state.storage.sql.exec<{ next: number }>("SELECT next FROM outbox WHERE seq = ? AND n = ?", seq!, n!).toArray()[0]?.next ?? null, alarm: await state.storage.getAlarm() }));
+      if (timing.next !== null) retries.push({ scope: await sender.at(), inbox: genesis.at, genesis, duty: id, class: duty.class, next: timing.next, alarm: timing.alarm, attempts: duty.attempts.slice(-4) });
+    }
+    const summary = await inbox.summary();
+    if (canonicalize(summary.value.scope) !== canonicalize(genesis.at)) throw new Error("Inbox view has another full incarnation");
+    return { scope: summary.value.scope, status: summary.value.status, genesis, controls: controls.map(row => factRefOf(row.entry)) };
+  }));
+  return { clock: timeMs(net.clock.now)!, inboxes, retries };
+}
+
+/** Complete only these inbox creation duties, with bounded real retry times. */
+export async function completeInboxConfirmation(repository: Repository): Promise<void> {
+  const began = timeMs(net.clock.now)!;
+  for (let round = 0; round < 4; round++) {
+    await settle(repository.O, repository.M, repository.ritasInbox, repository.unasInbox);
+    const current = await inboxConfirmation(repository);
+    if (current.inboxes.every(inbox => inbox.status === "active" && inbox.controls.length === 1)) return;
+    if (current.inboxes.some(inbox => inbox.status === "refused")) throw new Error("Native inbox creation refused");
+    const retry = current.retries.filter(row => row.next > current.clock && row.alarm === row.next).sort((a, b) => a.next - b.next)[0];
+    if (!retry || retry.next - began > 8000 || round === 3) throw new Error("Inbox confirmation did not complete within its retained protocol budget");
+    net.clock.now = timeOf(retry.next);
+  }
+}
+
+interface RepositoryOptions {
+  withholdUnaConfirmationOnce?: true;
+  beforeInboxCompletion?: (repository: Repository) => Promise<void>;
+}
+
 /**
  * A membership scope with two members, each with one device key and an
  * inbox: rita, the founder and an admin, seated on the founding key; and
  * una, a member, who joined by an invitation of rita's. Each inbox is
  * created by the entry that made its member active, and confirmed.
  */
-export async function repository(): Promise<Repository> {
-  const { O, M } = await office();
-  const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
-  const ritasKey = await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
-  const invitation = await M.did(rita, "invite-member", { fields: { handle: "@una", role: "member", inviteHash: textDigest("the secret of una's invitation, of 32 bytes or more"), inviteEnds: soon(3600) } });
-  const unasKey = await M.did(una, "join", { fields: { invitation, secret: "the secret of una's invitation, of 32 bytes or more" } });
-  const [ritasInbox, unasInbox] = [await M.created(seat), await M.created(unasKey)];
-  await settle(O, M, ritasInbox, unasInbox);
-  return { O, M, ritasInbox, unasInbox, ritasKey, una: invitation, unasKey };
+export async function repository(options: RepositoryOptions = {}): Promise<Repository> {
+  let predicted: ScopeId | null = null, withheld = false;
+  const hold = options.withholdUnaConfirmationOnce ? (envelope: Delivered): boolean => {
+    if (!withheld && envelope.message.class === "control" && isScopeRef(envelope.to) && envelope.to.scope === predicted
+      && canonicalize(envelope.message.genesis.at) === canonicalize(envelope.to)) { withheld = true; return true; }
+    return false;
+  } : null;
+  const { O, M } = await office(hold);
+  try {
+    const seat = await M.did(rita, "seat", { expected: { roster: 1 } });
+    const ritasKey = await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    const invitation = await M.did(rita, "invite-member", { fields: { handle: "@una", role: "member", inviteHash: textDigest("the secret of una's invitation, of 32 bytes or more"), inviteEnds: soon(3600) } });
+    const joining = await M.intent(una, "join", { fields: { invitation, secret: "the secret of una's invitation, of 32 bytes or more" } });
+    // Read the actual pinned join create form; the seed cause is this exact
+    // signed input, as derive/sends.ts creates it, never a guessed child name.
+    const membership = (await M.summary()).value.definition;
+    const creates = platform(membership)?.data.acts["join"]?.sends.filter(form => "create" in form) ?? [];
+    const create = creates[0];
+    if (creates.length !== 1 || !create || !("create" in create) || create.create.kind !== "inbox" || create.create.definition === "self") throw new Error("Native join has no unique pinned inbox creation");
+    const predictedSeed: Seed = { v: 1, kind: "inbox", definition: create.create.definition, creator: await M.at(), cause: intentDigest(joining.intent), ordinal: 0 };
+    predicted = scopeIdOf(predictedSeed);
+    const joined = await M.stub.submit(joining, []);
+    if (joined.answer !== "accepted") throw new Error("Native join was not accepted");
+    const unasKey = joined.receipt.fact.seq;
+    const actual = (await M.entries())[unasKey]!.sends.filter(send => send.message.class === "request" && send.message.type === "create");
+    if (actual.length !== 1 || canonicalize(actual[0]!.to) !== canonicalize(predictedSeed)) throw new Error("Native join recorded another inbox seed");
+    const [ritasInbox, unasInbox] = [await M.created(seat), await M.created(unasKey)];
+    await settle(O, M, ritasInbox, unasInbox);
+    const made = { O, M, ritasInbox, unasInbox, ritasKey, una: invitation, unasKey };
+    if ((await unasInbox.at()).scope !== predicted) throw new Error("Native inbox has another actual scope");
+    if (options.beforeInboxCompletion) await options.beforeInboxCompletion(made);
+    await completeInboxConfirmation(made);
+    return made;
+  } finally { if (net.hold === hold) net.hold = null; }
 }
 
 let lanes = 0;

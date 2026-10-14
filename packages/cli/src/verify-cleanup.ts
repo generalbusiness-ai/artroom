@@ -1,5 +1,5 @@
 /** Read-only cleanup observation, separate from the historical replay result. */
-import type { FactRef, Head, Item, Read, Summary } from "@generalbusiness/artroom-contract";
+import type { FactRef, Head, Item, Read, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 
 interface CleanupReader {

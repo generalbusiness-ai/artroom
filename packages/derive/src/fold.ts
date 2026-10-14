@@ -11,7 +11,7 @@
  * using the pinned selector rule where the definition states one.
  */
 
-import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@generalbusiness/artroom-contract";
+import type { Digest, Effect, Entry, ItemType, MemberRef, OperationId } from "@generalbusiness/dap-contract";
 import { intentDigest, seedDigest } from "@generalbusiness/artroom-bytes";
 import { UNDER, historyOf, withActing, withMembers, withPrincipal, type Signer } from "./attribution.ts";
 import { drawsOf, released, type DrawOptions } from "./draws.ts";

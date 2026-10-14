@@ -23,7 +23,7 @@
  * their amounts.
  */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { INDEXED_TYPES, INDEXES_MOST } from "../binding.ts";
 import { isObject, own } from "../values.ts";

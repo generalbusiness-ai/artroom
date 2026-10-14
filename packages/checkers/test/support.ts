@@ -19,7 +19,7 @@
  * file holds a secret.
  */
 
-import type { Answer, Digest, Effect, Entry, FactRef, Grant, Input, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Digest, Effect, Entry, FactRef, Grant, Input, ScopeRef, Sealed, SignedIntent } from "@generalbusiness/dap-contract";
 import { base32, canonicalize, entryHash, isEntry, keyIdOfSecret, sign, signIntent, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { configurationDigest, type Configuration, type Durable, type Notice, type Outcome, type ResultSigner, type RunAsk, type Runner, type RunReport, type Scopes } from "../src/index.ts";
 

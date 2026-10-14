@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, OperationId } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { entryHash, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { d } from "@generalbusiness/artroom-derive/testing";
-import { repositoryName } from "@generalbusiness/artroom-platform";
+import { d } from "@generalbusiness/dap-derive/testing";
+import { repositoryName } from "@generalbusiness/dap-platform";
 import { Register, rita } from "../../platform/test/support-founding.ts";
 import type { OutsideGiven } from "../src/object.ts";
 import type { EffectRequest } from "../src/operations.ts";

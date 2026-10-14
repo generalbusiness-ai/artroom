@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { Answer, Head, Intent, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, Head, Intent, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { d } from "@generalbusiness/artroom-derive/testing";
+import { d } from "@generalbusiness/dap-derive/testing";
 import { JoinLimits, addressKey, isJoin, type LimitConfig } from "../src/index.ts";
 import { soon } from "./net.ts";
 import { office, rita, routed, settle, una, vic, type Platform } from "./repository.ts";

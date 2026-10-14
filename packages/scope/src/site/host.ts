@@ -15,9 +15,9 @@
  * revoked after; on GitHub with the deployment's `GITHUB_READ_TOKEN`, or
  * with none when the setting says reads are public.
  */
-import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Entry, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { isOf } from "@generalbusiness/artroom-platform";
+import { isOf } from "@generalbusiness/dap-platform";
 import { READ_BOUNDS, type GitSource } from "@generalbusiness/artroom-git";
 import { githubRepository, type GitHubAccount } from "@generalbusiness/artroom-git/github";
 import { requireGitHubRepositoryIdentity } from "../github-host.ts";

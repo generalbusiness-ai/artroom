@@ -64,7 +64,7 @@
  */
 
 import { isFactRef, timeMs } from "@generalbusiness/artroom-bytes";
-import type { DecisiveEvidence, Digest, Effect, Entry, FactRef, OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { DecisiveEvidence, Digest, Effect, Entry, FactRef, OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 
 /** The owner and the two kinds of operation that this driver sends: the names that the code of `hold@1` states (`derive/src/capability/hold.ts`, `HOLD_KINDS`). */
 export const TOKEN_OWNER = "hold@1";

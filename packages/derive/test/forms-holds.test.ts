@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalBytes, entryHash, parseStrictBytes } from "@generalbusiness/artroom-bytes";
 import { FoldError, MemoryState, NOTHING, applyEntry, evidenceValues, outcomeValueDomains, closure, drawsOf, heldEntries, itemOf, one, outcomes, owed, pendingOf, requestOf, retainedBytes, starts, stateDigest, validateDefinition } from "../src/index.ts";
 import type { Amount, Counting, KindStated, Starts, Rules, OutcomeRule, RuleEffect } from "../src/index.ts";

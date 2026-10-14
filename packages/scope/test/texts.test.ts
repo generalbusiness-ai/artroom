@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { DeclaredDefinition, Digest, Entry, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, Entry, Seed } from "@generalbusiness/dap-contract";
 import { scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
-import { timeMs } from "@generalbusiness/artroom-derive";
-import { grantOf, variant } from "@generalbusiness/artroom-derive/testing";
+import { timeMs } from "@generalbusiness/dap-derive";
+import { grantOf, variant } from "@generalbusiness/dap-derive/testing";
 import { found, httpTransport, secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import { Node, founding, later, net, rita, routed, settle } from "./net.ts";

@@ -30,8 +30,8 @@
 // I3 merge: the register and the directory state no `attempts` and no `most` on their kinds (the contract's rows I3-22 and I3-23,
 // which wait for the authority note's rows). Their kinds are counted by the closure that their rules declare, as on main.
 
-import { RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
-import type { FieldType, Held } from "@generalbusiness/artroom-contract";
+import { RETAINED_INPUT_BYTES } from "@generalbusiness/dap-contract";
+import type { FieldType, Held } from "@generalbusiness/dap-contract";
 import { NOTHING, closure, holding, itemOf, largest, one, requestOf, retainedBytes, starts, sum, type Amount, type ClauseStarts, type Counting, type KindStated, type Starts, STARTS_NOTHING } from "../held.ts";
 import { markerReservations } from "../markers.ts";
 import { isObject, own } from "../values.ts";

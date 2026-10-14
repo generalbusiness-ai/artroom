@@ -1,6 +1,6 @@
-# The artroom command
+# The dap command
 
-`artroom` is a command-line client for the new model. Each command is a
+`dap` is a command-line client for the new model. Each command is a
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
 It judges nothing: whether an act takes effect is the scope's decision,
@@ -11,14 +11,14 @@ mutation. Recovery needs the original signed envelope; repeating a generic
 command signs a new request.
 
 The source is `packages/cli`. In this repository it runs as
-`packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
+`packages/cli/bin/dap.js` under Node 22.0.0 or later, using the CLI's
 installed `tsx` 4.21.0 dependency. The launcher resolves that loader beside
 the package, so it works from another directory and fetches no tool when
 it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is
 published to a registry. A scope Worker is deployed at
 <https://artroom-scope.inguz.workers.dev>; its routes start at `/v1/scopes`.
 The root URL returns 404 because it has no application page. This endpoint
-does not establish a completed live founding, publication, clone or
+does not establish a completed live creation, publication, clone or
 authenticated replay.
 
 ## What it needs
@@ -34,7 +34,7 @@ authenticated replay.
 A scope is named by its ID (`sc_...`) or by one of the names `claim` or
 `join` learned: `register`, `directory`, `membership`, `rules`,
 `destination`, `inbox`. An entry is named `<scope>:<seq>`. An issue is
-named by its number, `3` or `#3`, as `artroom issues` lists it, or by its
+named by its number, `3` or `#3`, as `dap issues` lists it, or by its
 lane's scope ID.
 
 An install receipt does not enable GitHub effects by itself. The deployment
@@ -47,8 +47,8 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`artroom install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
-founds the register with an `install` intent, signed by a new operator
+**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
 service, use `--host artifacts --namespace artroom-demo`;
@@ -59,12 +59,12 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`artroom install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
-signs the same `install` intent and founds nothing. A register's ID is a
+**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
-version alone, so the command prints the ID that the install will found,
+version alone, so the command prints the ID that the install will create,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
-which it can be founded. It keeps the signed intent, the version and the
+which it can be created. It keeps the signed intent, the version and the
 ID in the config. An intent and its signature are no secret; the
 register's genesis records both. Only a definitely unsent legacy plan may
 be replaced. A selected application or Counting plan always retains its
@@ -73,10 +73,10 @@ is repeated.
 
 ```
 Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, namespace artroom-demo. The seed's time is 2026-10-08T09:14:00Z.
-Set registerScope to sc_4kq2v7... in the Worker's host setting, then run artroom install --planned before 2026-10-08T09:14:00Z.
+Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`artroom install --planned [--cohort application|counting-commitments]`** founds the planned register, with the kept
+**`dap install --planned [--cohort application|counting-commitments]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -90,17 +90,17 @@ new directory for every later command, and configure the host's
 or delete the original config or keys.
 
 For example, set `ARTROOM_HOME` to a new private directory, then run
-`artroom install --plan <base-url> --cohort <cohort> --host <host>
+`dap install --plan <base-url> --cohort <cohort> --host <host>
 --namespace <namespace>`, using `application` or `counting-commitments`
 for `<cohort>`. After configuring the new register ID,
-run `artroom install --planned --cohort <cohort>` with the same
+run `dap install --planned --cohort <cohort>` with the same
 `ARTROOM_HOME`. This creates separate custody and a new operator key; it
 does not renew or replace the expired original.
 
 An attempted or acknowledged original must instead be reconciled from its
 original directory with `install --planned`. Expiry does not prove that a
 request was never accepted and does not authorize a replacement. After
-founding, the receipt must match the original planned register, definition
+creation, the receipt must match the original planned register, definition
 and intent. Its acceptance is a service acknowledgement; independent
 history verification remains separate.
 
@@ -126,10 +126,10 @@ For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
 and a deployed service that supports all six exact application pins:
 
 ```sh
-artroom install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
+dap install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
 # Configure that host's registerScope with the printed planned ID.
-artroom install --planned --cohort application
-artroom claim <label> --handle @operator
+dap install --planned --cohort application
+dap create <label> --handle @operator
 ```
 
 Keep the operator key and pending envelopes in that private directory;
@@ -181,15 +181,20 @@ retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
 independent Source review are still required for this successor.
 
-**`artroom claim <name> [--handle @you] [--branch main] [--again]`**
-signs the register's `found` act. It then waits until the directory,
-membership, the rules scope and the destination are created and
+**`dap create <name> [--handle @you] [--branch main] [--again]`**
+
+`found` remains an alias for one release and prints `dap create` as the new
+command name. The existing `claim` command remains compatible with retained
+workflows. All three commands use the same creation and recovery code.
+
+The command signs the register's recorded `found` act. It waits until the
+directory, membership, the rules scope and the destination are created and
 confirmed. Then it takes the founder's seat and first key in membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
-Before each founding step, the command saves its exact signed envelope:
+Before each creation step, the command saves its exact signed envelope:
 `found`, then `seat`, then `first-key`. It saves accepted fact references
 as each step completes. These records contain no private signing key.
 A refusal, unavailable reply or lost answer leaves the request pending;
@@ -197,15 +202,15 @@ a later run keeps the same signature and deadline. An accepted marker is
 checked against the receipt for that exact envelope before reuse.
 
 ```
-Gave up waiting for the directory after 120 reads. What was asked may still take effect; run artroom claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
+Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `artroom claim <name>` again to continue the saved claim. The command
+Run `dap create <name>` again to continue the saved claim. The command
 reads or retries the exact saved steps, then waits for their confirmed
 scopes. It checks child identities against the actual directory seed and
 full reference. It does not extend a saved deadline or invent a replacement
 request. `--handle` is ignored on resume: the handle is the one already
-signed. Older digest-only state resumes only when the retained founding
+signed. Older digest-only state resumes only when the retained creation
 and enrollment records prove the exact signed steps; otherwise it stops
 without a new submission.
 
@@ -216,11 +221,11 @@ when deliberately starting another claim. An expired envelope stays saved
 until this explicit replacement.
 
 ```
-Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
+Created demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
 You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 ```
 
-**`artroom invite <@member> --role <role> [--hours 24]`** is
+**`dap invite <@member> --role <role> [--hours 24]`** is
 membership's `invite-member`. It prints a link that holds the
 invitation's number and its secret. The secret is a one-time invitation
 secret, not a signing key; pass the link only to that member.
@@ -230,12 +235,27 @@ Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
 Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
 ```
 
-**`artroom join <link>`** is membership's `join`, signed by a new key
+With `--keep`, the invitation is kept before it is sent: the command
+makes the secret, signs `invite-member`, and saves both in an owner-only
+private file first. The link names the membership's exact definition,
+for example `platform:membership@4` in a room of the application cohort.
+If the answer is lost, run `dap invite --check`, which reads the outcome
+and sends nothing, or `dap invite --continue`, which resumes the exact
+original request. While one kept invitation is unresolved, a new one is
+refused, so a lost answer is never replaced by a second invitation. A
+verified or refused invitation is released, and its link is printed once.
+
+```
+Invited @una: the invitation is recorded and verified.
+Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
+```
+
+**`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
 is absent from public config. It saves the accepted fact and inbox progress
 before waiting for the member's inbox. After a lost reply or an interrupted
-wait, run `artroom join` with the original link again. This reuses the same
+wait, run `dap join` with the original link again. This reuses the same
 key, request and deadline. An accepted request is confirmed by a read-only
 settlement, even after its deadline. A missing private request or a different
 link stops the retry; it never signs a replacement automatically.
@@ -245,7 +265,29 @@ Joined as @una on key key_H1bY2Hml....
 Your inbox: sc_zbtu7vax....
 ```
 
-**`artroom acts [<scope>]`** lists the acts of the scope's definition
+**`dap join <artroom-agent-key:…>`** enrolls a genuine agent key with
+membership's `enrol`. A verified room controller first creates an agent
+member with `add-member`, then invites its key with `invite-key`. The private
+handoff carries that invitation and full native references. It carries no
+signing key. A person invitation with the role `agent` is still a person;
+it cannot substitute for this agent-key protocol.
+
+Use a separate empty owner-only `ARTROOM_HOME` for the receiving agent. The
+command generates and retains an independent key and saves the exact private
+enrollment envelope before delivery. After an unknown answer, use the same
+link with `--check` to settle and follow the original without submitting a
+mutation. Run the same command without `--check` only to Continue explicitly.
+It retains the original signature, idempotency key and deadline.
+
+The command saves a usable connection only after it verifies the accepted
+enrollment, genuine agent and key kinds, controller, recorded directory
+siblings, and active inbox incarnation. A missing private request, changed
+link, person/agent mismatch or definite native refusal keeps the original;
+it does not generate a replacement key or request. Existing `artroom-invite:`
+links and pending person joins retain their original behavior. Treat either
+invitation link as private.
+
+**`dap acts [<scope>]`** lists the acts of the scope's definition
 that the caller's role holds now, with each act's fields. The role and
 its actions are read from membership. An act that a rule decides, such
 as `join`, is always listed. The scope can still refuse an act on its
@@ -259,7 +301,7 @@ Acts on sc_hs5f27fz... (platform:directory@1) for @una (member):
 Not shown: 1 that need an action your role does not hold.
 ```
 
-**`artroom act <kind> --on <scope> [--target <item>] [--set name=value ...]`**
+**`dap act <kind> --on <scope> [--target <item>] [--set name=value ...]`**
 signs and sends one act. A value is read by its field's type; a list or a
 record is JSON, and `@handle` is a member of this repository. The command
 fills in the current revision of each item the act names, from the
@@ -275,11 +317,11 @@ intent as a value. The scope reads a value only at a place that its
 definition states, by its digest: the bytes of a definition for the rules
 scope's `activate` and the directory's `open-issue` and `open-pr`. For
 example, an admin activates the demo profile's change definition with
-`artroom act activate --on rules --set digest=<digest> --set name=change
+`dap act activate --on rules --set digest=<digest> --set name=change
 --value packages/lanes/definitions/change-demo.json`, whose digest is in
 `packages/lanes/src/digests.ts`.
 
-**`artroom log <scope> [--limit n]`** and **`artroom show <entry>`**
+**`dap log <scope> [--limit n]`** and **`dap show <entry>`**
 read the history and one entry over the read routes.
 
 ```
@@ -288,7 +330,7 @@ sc_p6xp2lmd...:9  2099-01-01T00:00:00Z  delivery result from inbox:0; 0 effects,
 10 entries in all.
 ```
 
-**`artroom verify <scope>`** runs the replay verifier over the read
+**`dap verify <scope>`** runs the replay verifier over the read
 routes, with the platform package's rules and the code of the two lane
 capabilities, `hold@1` and `git-read@1`, so it replays a lane too. It reads with the caller's
 session, and a read that the session is refused goes again as a signed
@@ -302,10 +344,10 @@ Result: consistent, for the mode, target, coverage and trusts stated below.
 Mode: replay. Within the coverage stated below, the history was folded from its genesis, ...
 ```
 
-**`artroom verify --all`** runs the same replay for every scope of the
+**`dap verify --all`** runs the same replay for every scope of the
 room: the register, the directory, and every scope that the directory
 created and each of those created (membership, the rules scope, the
-destination, each lane, each inbox), found by the creations in their
+destination, each lane, each inbox), reached by the creations in their
 histories. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
 scopes.`, or the first finding, and then the command exits 1. A history
@@ -329,7 +371,7 @@ inbox sc_3a6xxtoj..., entry 1: consistent.
 All consistent: 12 scopes.
 ```
 
-**`artroom remote`** prints the repository's host, namespace, name and
+**`dap remote`** prints the repository's host, namespace, name and
 remote URL, from the destination's branch item. On GitHub the URL is
 `https://github.com/<namespace>/<name>.git`. On the hosting's own Git
 service it is `https://<host>/git/<namespace>/<name>.git`, where `<host>`
@@ -341,10 +383,10 @@ learned it, the command marks that part. The examples are from
 Host: artifacts
 Namespace: artroom-demo
 Name: 5kywbv2y...-1
-Remote URL: https://<service host>/git/artroom-demo/5kywbv2y...-1.git (the service host is the deployment's setting; artroom clone prints it whole)
+Remote URL: https://<service host>/git/artroom-demo/5kywbv2y...-1.git (the service host is the deployment's setting; dap clone prints it whole)
 ```
 
-**`artroom clone [<directory>] [--hours 1]`** clones the repository with
+**`dap clone [<directory>] [--hours 1]`** clones the repository with
 a read token of the caller's own:
 
 1. If there is no `git` program, it signs nothing and prints the clone
@@ -380,15 +422,15 @@ Cloned into here.
 Without git:
 
 ```
-git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:
+git is not installed here, so nothing was signed. With git installed, run dap clone again; it runs:
 git -c http.extraHeader="Authorization: Bearer <read token>" clone -- https://<service host>/git/artroom-demo/5kywbv2y...-1.git here
 ```
 
 The token is for the clone. A later `git fetch` in the clone needs a new
-token; run `artroom clone` again for one. A token that is never read ends
+token; run `dap clone` again for one. A token that is never read ends
 at its end.
 
-**`artroom propose <branch> [--title <text>]`** submits the committed files
+**`dap propose <branch> [--title <text>]`** submits the committed files
 that differ between the room's published head and a local branch tip. It
 reads committed objects, so uncommitted files and the index remain untouched.
 The room's head must be an ancestor of that tip. The room creates and
@@ -448,7 +490,7 @@ remove another writer’s replacement ref. Expiry currently retains `cleanup-abo
 Binary content, deletion and rename support remain in the later R5 work.
 The demonstration uses two text files.
 
-**`artroom edit <path> --file <local file> [--title <text>]`** writes one
+**`dap edit <path> --file <local file> [--title <text>]`** writes one
 file of the repository through the room. The person never writes the
 repository: the room judges the change and its destination writes it. The
 examples have the form that `packages/lanes/test/edit.scope.test.ts`
@@ -465,8 +507,8 @@ asserts, with IDs cut short; the numbers in them are illustrative.
 5. It signs `propose-file` on the destination's head: the path, the digest
    and size of the bytes, and the bytes. This is the change's only version.
 6. With `--closes <issue>`, it signs the lane's `link-own` to that issue,
-   as `artroom merge --closes` does.
-7. It merges the change as `artroom merge` does.
+   as `dap merge --closes` does.
+7. It merges the change as `dap merge` does.
 
 ```
 Proposed README.md (37 bytes) as change sc_q3xk...., version 6.
@@ -480,12 +522,12 @@ extent, such as `AGENTS.md`, waits for the rules scope's controller:
 
 ```
 Proposed AGENTS.md (31 bytes) as change sc_ab12..., version 6.
-Not published: the merge sc_ab12...:7 is refused, rules-not-met:rules. The change sc_ab12... stays open at version 6. When it may be merged, run: artroom merge sc_ab12...
+Not published: the merge sc_ab12...:7 is refused, rules-not-met:rules. The change sc_ab12... stays open at version 6. When it may be merged, run: dap merge sc_ab12...
 ```
 
-The controller approves it for that extent with `artroom act review-verdict
+The controller approves it for that extent with `dap act review-verdict
 --on <change> --set manifest=<version> --set verdict=approve --set
-extent=rules`, and a member who holds `change.merge` runs `artroom merge`.
+extent=rules`, and a member who holds `change.merge` runs `dap merge`.
 A second `edit` of the same path replaces the file. A path that no
 published tree may hold (an empty, `.`, `..` or `.git` segment, a control
 character, more than 1,024 bytes) is refused by the destination as
@@ -493,12 +535,12 @@ character, more than 1,024 bytes) is refused by the destination as
 a folder, a symbolic link or a submodule, or a file on the way, is refused
 as `integration-invalid`.
 
-**`artroom merge <change>`** signs `merge` of the change's current version,
+**`dap merge <change>`** signs `merge` of the change's current version,
 naming the reports it selects, and waits until the merge is published,
 refused or aborted. It needs `change.merge`, which admins and maintainers
 hold. Published: it prints the commit, and for a one-file version the
 page's address. Refused by the lane, it prints the refusal; refused by the
-destination, the reason. Either way the change stays open, and `artroom
+destination, the reason. Either way the change stays open, and `dap
 merge` may be run again.
 
 With **`--closes <issue>`**, `merge` first signs the change lane's
@@ -516,17 +558,17 @@ short; the numbers and hashes in them are illustrative.
 Proposed guide/start.md (53 bytes) as change sc_q3xk..., version 6.
 Linked: when it is published, the change sc_q3xk... closes issue #1 (sc_4bbo...).
 Refused: unauthorized, judged at entry sc_q3xk...:7. The request was refused.
-The change sc_q3xk... waits, at version 6. When it may be merged, run: artroom merge sc_q3xk...
+The change sc_q3xk... waits, at version 6. When it may be merged, run: dap merge sc_q3xk...
 ```
 
-Then, as the admin, `artroom merge sc_q3xk...`:
+Then, as the admin, `dap merge sc_q3xk...`:
 
 ```
 Published: commit 5d0c1e6b..., by the merge sc_q3xk...:8.
 Page: https://scopes.test/site/sc_hs5f27fz.../HEAD/guide/start.md
 ```
 
-**`artroom issue open --title <text> [--body <text>]`** signs the
+**`dap issue open --title <text> [--body <text>]`** signs the
 directory's `open-issue` under the issue definition that the rules scope
 holds active, with its bytes beside the act, and waits for the issue's
 lane. The body is a detached text: the act holds its digest. The issue's
@@ -540,14 +582,14 @@ packages/lanes/definitions/issue-demo.json`.
 Opened issue #1: The handbook has no start page. Its lane is sc_4bbosp5k....
 ```
 
-**`artroom issue comment <issue> <text>`** is the issue lane's `comment`.
+**`dap issue comment <issue> <text>`** is the issue lane's `comment`.
 Any member may comment.
 
-**`artroom issue assign <issue> <@member>`** is the lane's `assign`. It
+**`dap issue assign <issue> <@member>`** is the lane's `assign`. It
 sets the assignee, and needs `issue.triage`, which admins and maintainers
 hold. Assignment is optional; no rule of the demo profile needs it.
 
-**`artroom issue close <issue>`** signs `close-own` when the caller opened
+**`dap issue close <issue>`** signs `close-own` when the caller opened
 the issue, and `close-any` otherwise, which needs `issue.triage`. The
 reason is `completed`. The demo profile has no rule that lets an assignee
 close an issue. A member who did not open it is refused:
@@ -557,7 +599,7 @@ Commented: entry sc_4bbosp5k...:1, hash sha256:3b1f0c2d9e8a.
 Refused: unauthorized, judged at entry sc_yx6ty22i...:1. The request was refused.
 ```
 
-**`artroom issues`** lists every issue, oldest first: its number, its
+**`dap issues`** lists every issue, oldest first: its number, its
 state and close reason, its title, its assignees and its lane. Each issue
 is read in its own lane. The directory's row for an issue is an index that
 the lane's own acts update, and a merge that closes the issue does not
@@ -580,7 +622,7 @@ no session secret, or a key that is no active member's), the command
 reads by signed reads of its key, and the scope decides. Under a real
 session a member can read the scopes that record their membership, and,
 at the register, its genesis and the entries that come from the claim
-that founded the repository. A signed read reads the entries that the
+that created the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
 it (the intent window), and the retained inputs those entries carry. History and log pages can
 be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-history trust.

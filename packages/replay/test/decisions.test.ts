@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, FieldValue, PlatformData, PlatformDefinition, Request, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, ownersOf, stateDigest, validateDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, arriving, forged, keys, otherLane, t, valid } from "@generalbusiness/artroom-derive/testing";
+import { MemoryState, applyEntry, checkpointOf, clockOf, judgeCheckpoint, judgeDelivery, judgeGenesis, owed, ownersOf, stateDigest, validateDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, T0, arriving, forged, keys, otherLane, t, valid } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, verify } from "../src/index.ts";
-import type { Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Rules, StateView } from "@generalbusiness/dap-derive";
 import type { MemoryScope } from "../src/index.ts";
 import { register, registerRules } from "../../platform/src/index.ts";
 import { Register, registerPlatform } from "../../platform/test/support-founding.ts";

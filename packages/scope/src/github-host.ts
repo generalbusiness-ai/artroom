@@ -5,10 +5,10 @@
  * mapping require owner-approved configuration. A local handle is not a
  * GitHub-issued token ID. No plaintext is recorded in an outside answer.
  */
-import type { RetainedInput, Timestamp } from "@generalbusiness/artroom-contract";
+import type { RetainedInput, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, hex, utf8 } from "@generalbusiness/artroom-bytes";
-import { byteOrder, valueDigest } from "@generalbusiness/artroom-derive";
-import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/artroom-platform";
+import { byteOrder, valueDigest } from "@generalbusiness/dap-derive";
+import { DESTINATION_CHANGED_SET, type DestinationObject, type JudgeChanges, type RecordedJudgeEvidence, type TreeLink } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, SNAPSHOT_BOUNDS, Reader, objectId, refName, type GitSource, type ReadBounds, type StoredObject } from "@generalbusiness/artroom-git";
 import { GitHubApp, type GitHubAppOptions, type GitHubInstallationToken, type GitHubRepository } from "@generalbusiness/artroom-git/github";
 import { SmartHttpGit, type RawGitObject, type SmartHttpOptions } from "@generalbusiness/artroom-git/http";

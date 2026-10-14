@@ -1,6 +1,6 @@
 /** Bounded reads for one already accepted mint-read operation. This waiter
  * never submits an act or retrieves a plaintext, including after cancellation. */
-import type { Entry, Input, OperationId, Read, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Entry, Input, OperationId, Read, ScopeId } from "@generalbusiness/dap-contract";
 import { TransportError, type Fetch } from "@generalbusiness/artroom-client";
 
 export const CLONE_ENTRIES_PER_POLL = 64;
@@ -95,5 +95,5 @@ export async function waitOutcome(operation: OperationId, first: number, readEnt
 /** The same accepted-request guidance applies to typed and exceptional stops. */
 export function outcomeWaitLines(scope: ScopeId, seq: number, operation: OperationId, waited: Extract<OutcomeWait, { ok: false }>): string[] {
   const reason = waited.reason === "read-refused" ? `entry read refused: ${waited.refusal}` : waited.reason;
-  return [`Stopped waiting for read token at ${scope}:${seq} (${operation}): ${reason}; ${waited.scanned} entries in ${waited.polls} polls, next entry ${scope}:${waited.next}.`, `The accepted mint may still finish. Inspect artroom show ${scope}:${seq} and artroom log destination; no credential was retrieved and nothing was cloned. An unread token remains subject to its reported expiry.`];
+  return [`Stopped waiting for read token at ${scope}:${seq} (${operation}): ${reason}; ${waited.scanned} entries in ${waited.polls} polls, next entry ${scope}:${waited.next}.`, `The accepted mint may still finish. Inspect dap show ${scope}:${seq} and dap log destination; no credential was retrieved and nothing was cloned. An unread token remains subject to its reported expiry.`];
 }

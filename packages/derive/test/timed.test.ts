@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { clockOf, fits, judgeTimed, nextDue, owed, validateDefinition } from "../src/index.ts";
 import { Scope, fields, keys, laneDefinition, on, t, valid } from "./fixtures.ts";
 import { board } from "./fixtures-f.ts";

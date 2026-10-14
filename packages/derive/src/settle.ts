@@ -6,7 +6,7 @@
  * is offered again, or is not an input the scope can write.
  */
 
-import type { Attempt, Digest, Entry, FactUse, ObservationUse, PlatformData } from "@generalbusiness/artroom-contract";
+import type { Attempt, Digest, Entry, FactUse, ObservationUse, PlatformData } from "@generalbusiness/dap-contract";
 import { evidenceValues } from "./evidence-values.ts";
 import { useOf, type Reading } from "./fields.ts";
 import type { Fetched } from "./guards.ts";

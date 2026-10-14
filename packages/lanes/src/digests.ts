@@ -6,7 +6,7 @@
  * scope that pinned the earlier one keeps it.
  */
 
-import type { Digest } from "@generalbusiness/artroom-contract";
+import type { Digest } from "@generalbusiness/dap-contract";
 
 /** Lane forms and browser flow: the revision and the commit whose sections 3, 4 and 8.1 the rows were written from. */
 export const LANE_FORMS = { revision: 14, commit: "4b3bf5da" } as const;

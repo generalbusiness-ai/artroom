@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import type { MemberId } from "@generalbusiness/artroom-contract";
-import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches } from "../src/index.ts";
+import type { MemberId } from "@generalbusiness/dap-contract";
+import { RULES_PATTERNS, actionsIn, classify as touchedBy, firstExtents, holdsRulesExtent, isExtents, judgeExtents, matches, platform } from "../src/index.ts";
 import type { Extent, ExtentsAsked, Holder, Review, Role, TreeLink } from "../src/index.ts";
 
 // Judgments over data that each test writes by hand (authority note, revision 26, section 12.1.4a; the planner's request `42de9e34`).
@@ -95,9 +95,13 @@ test("a change to the rules extent is not met by its author's review, whatever `
   // The author is the only controller, and the only reviewer.
   const own = { authors: [ada.member], reviews: each(ada), merger: ada, controllers: [ada.member] };
   expect(said(own)).toEqual([false, ["rules", "infrastructure", "source"], { rules: [[], ["approvals"]], infrastructure: [[], ["approvals"]], source: [[], ["approvals"]] }]);
+  const prospective = platform("platform:rules@4")!.data.items["rules"]!.values["ownerMayReview"]!.default;
+  expect(prospective).toBe(true);
+  if (typeof prospective !== "boolean") throw new Error("The prospective default must be a boolean.");
+  expect(said({ ...own, ownerMayReview: prospective })).toEqual(said(own)); // A human author's own review still counts nowhere.
   // The controller of an agent among the authors: `ownerMayReview` lets that review count for the other extents, and never for rules.
   const agent = { authors: [bot], controllersOfAuthors: [ada.member], reviews: each(ada), controllers: [ada.member] };
-  expect([said({ ...agent, ownerMayReview: true })[1], said({ ...agent, ownerMayReview: false })[1]]).toEqual([["rules"], ["rules", "infrastructure", "source"]]);
+  expect([said({ ...agent, ownerMayReview: prospective })[1], said({ ...agent, ownerMayReview: false })[1]]).toEqual([["rules"], ["rules", "infrastructure", "source"]]);
   // A second controller, independent of the authors, meets it.
   expect(said({ ...own, reviews: each(ada, ann), controllers: [ada.member, ann.member] })[0]).toBe(true);
 });

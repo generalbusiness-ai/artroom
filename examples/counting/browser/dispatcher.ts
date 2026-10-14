@@ -1,5 +1,5 @@
 /** One serialized attempt. Caller holds the identity lock; no public first-attempt flag. */
-import type { Answer, Receipt } from "@generalbusiness/artroom-contract";
+import type { Answer, Receipt } from "@generalbusiness/dap-contract";
 import { canonicalize, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { httpTransport, ScopeHandle } from "@generalbusiness/artroom-client";
 import { activeAttempt, actURL, contextKey, envelopeKey, fitsPending, legacyUnknown, markActive, requestBody, validEnvelope, validJournal, type AttemptJournal, type RefusalJudgment } from "./journal.ts";

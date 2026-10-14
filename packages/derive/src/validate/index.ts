@@ -16,7 +16,7 @@
  * and `sizes` the byte bounds.
  */
 
-import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/artroom-contract";
+import type { Bounds, DeclaredDefinition, Digest } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { capabilities, type Underived } from "./capability.ts";
@@ -124,7 +124,7 @@ export type Validation = { ok: true; definition: ValidDefinition } | { ok: false
 /**
  * An evaluator profile, by `name@version` (section 6.1). `admit` says why the
  * profile does not admit a rule's text, or null. It is synchronous. The
- * evaluator's own entry point, `@generalbusiness/artroom-derive/rule`, exports
+ * evaluator's own entry point, `@generalbusiness/dap-derive/rule`, exports
  * the table that checks each rule; this one checks names and shapes only, so
  * that the judges never load the engine.
  */

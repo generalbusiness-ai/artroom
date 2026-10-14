@@ -23,8 +23,8 @@
  * opens, other than the holder itself.
  */
 
-import type { Bounds, Effect, Entry, Held } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { Bounds, Effect, Entry, Held } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { operationSettled } from "./ledger.ts";
 import { decisionBinding } from "./handlers.ts";

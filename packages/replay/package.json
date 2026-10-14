@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
-    "@generalbusiness/artroom-derive": "0.1.0-dev.1"
+    "@generalbusiness/dap-contract": "0.1.0-dev.1",
+    "@generalbusiness/dap-derive": "0.1.0-dev.1"
   },
   "devDependencies": {
     "@types/node": "26.6.3",

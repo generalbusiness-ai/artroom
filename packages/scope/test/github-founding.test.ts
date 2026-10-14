@@ -1,10 +1,10 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
-import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, Intent, ScopeId, Seed } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
-import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/artroom-platform";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { DIRECTORY, REGISTER, destinationMembership, destinationReceipt, destinationTarget, foundingObjects } from "@generalbusiness/dap-platform";
 import { ZERO_ID } from "@generalbusiness/artroom-git";
 import { decodePack, type DecodedObject } from "@generalbusiness/artroom-git/http-read";
 import { SqliteStore, mintSession, readerOf, sessionsOf } from "../src/index.ts";

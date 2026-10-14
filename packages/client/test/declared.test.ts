@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { DeclaredDefinition, FactRef, Grant, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, FactRef, Grant, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { definitionDigest, textDigest, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, ShapeError, declaredHandle, shapeDeclaredAct, secretSigner, type Signer, type Transport } from "../src/index.ts";
 

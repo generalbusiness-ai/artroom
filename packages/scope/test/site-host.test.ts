@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { otherLane } from "@generalbusiness/artroom-derive/testing";
+import { otherLane } from "@generalbusiness/dap-derive/testing";
 import { readerOf, type Room, type SiteEnv } from "../src/site/host.ts";
 import type { Binding } from "../src/namespace.ts";
 

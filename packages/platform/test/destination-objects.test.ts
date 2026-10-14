@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { expect, test } from "vitest";
-import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/artroom-contract";
+import type { FactRef, ScopeId, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
 import { foundingObjects, importRef, readmeText, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat, type Readme } from "../src/destination-objects.ts";
 

@@ -1,5 +1,5 @@
 /** Verify the readonly object overlay before giving it to a runner. */
-import type { ReservationSnapshot } from "@generalbusiness/artroom-contract";
+import type { ReservationSnapshot } from "@generalbusiness/dap-contract";
 import { utf8 } from "@generalbusiness/artroom-bytes";
 import { Reader, READ_BOUNDS, idOf, snapshotFiles } from "@generalbusiness/artroom-git";
 

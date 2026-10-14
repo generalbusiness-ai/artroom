@@ -1,5 +1,5 @@
-import type { OperationId } from "@generalbusiness/artroom-contract";
-import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/artroom-derive";
+import type { OperationId } from "@generalbusiness/dap-contract";
+import { checkpointOf, operationId, operationOpening, timeMs, type Opening } from "@generalbusiness/dap-derive";
 import { SqliteStore, Turns, Wakes, production } from "../src/index.ts";
 import { owners } from "./outside.ts";
 import { type Lane, definition } from "./support.ts";

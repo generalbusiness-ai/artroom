@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Effect, MemberRef, RefusalReason } from "@generalbusiness/dap-contract";
 import { canonicalBytes, digestBytes, intentDigest } from "@generalbusiness/artroom-bytes";
 import { LAST_MS, type ActJudgment } from "../src/index.ts";
 import { Scope, d, directory, fields, grantOf, keys, lane, laneDefinition, on, otherLane, small, smallDefinition, t, variant, type Actor } from "./fixtures.ts";

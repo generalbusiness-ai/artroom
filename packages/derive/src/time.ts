@@ -3,7 +3,7 @@
  * reads a clock: the caller supplies the one reading of a commit.
  */
 
-import type { Timestamp } from "@generalbusiness/artroom-contract";
+import type { Timestamp } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import type { StateView } from "./state.ts";
 

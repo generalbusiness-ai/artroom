@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { DOMAINS } from "@generalbusiness/artroom-contract";
-import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import { DOMAINS } from "@generalbusiness/dap-contract";
+import type { Digest, Message, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import {
   b64url, canonicalBytes, canonicalize, definitionDigest, deliveryCauseDigest, digestBytes, domainBytes, entryHash, factRefOf, intentDigest,
   isDutyId, isIncarnation, isKeyId, isMemberId, isOperationId, isPlatformDefinition, isRetainedInput, isScopeId, isScopeKind, keyIdOfSecret, messageDigest, newIncarnation, scopeIdOf, seedDigest, sign, signIntent, textDigest, unb64url, utf8, verifySignedIntent,

@@ -1,6 +1,6 @@
 > **Inactive.** This page describes the release of the earlier model's six packages. Its scripts and files are parked, unedited, in `parked/release/`; none of them runs. Releasing the new packages is a later delivery (I6). See [`parked/README.md`](../parked/README.md).
 
-# Releasing the installable packages
+# Release the packages
 
 Six packages can be installed outside this repository:
 
@@ -31,14 +31,15 @@ release script writes the tarball's manifest itself:
 
 1. `npm run build` in the package compiles `src` to `dist` with
    `tsconfig.build.json`: JavaScript and declarations, with each relative
-   `.ts` import rewritten to `.js`. The CLI's build bundles `dist/artroom.js`
-   as before.
+   `.ts` import rewritten to `.js`. The parked CLI's build bundles
+   `dist/artroom.js`. This inactive release tooling retains its original
+   bundle name.
 2. The script copies `dist` (and `bin` for the CLI), the package's README,
    and `LICENSE` and `NOTICE` from the repository root into a staging
    directory outside the repository. For the CLI it also writes
    `THIRD-PARTY-NOTICES.txt` there (see "Third-party code in the command").
 3. It writes the staged `package.json` from the workspace manifest
-   (`publishManifest` in [scripts/release-lib.mjs](../scripts/release-lib.mjs)).
+   (`publishManifest` in [scripts/release-lib.mjs](../parked/release/release-lib.mjs)).
    Each `./src/x.ts` export becomes `{ "types": "./dist/x.d.ts", "default":
    "./dist/x.js" }`, each `./src/x.ts` bin becomes `./dist/x.js`, and
    `scripts` and `devDependencies` are left out. The subpaths, version,
@@ -58,22 +59,22 @@ together, and in `packages/ui/package.json`, then run
 `npm install --package-lock-only`. The gate fails if the six disagree.
 
 The CLI's bundle holds everything it runs, so its manifest lists no runtime
-dependency. Its Artroom packages are development dependencies.
+dependency. Its dap packages are development dependencies.
 
 ## Third-party code in the command
 
 The five libraries are compiled, not bundled. Their tarballs hold only
-Artroom code, and npm installs what they depend on as separate packages
+dap code, and npm installs what they depend on as separate packages
 with their own licence files.
 
-The command is different. `dist/artroom.js` is one bundled file that
+The parked command is different. `dist/artroom.js` is one bundled file that
 contains code from other packages, and nothing else is installed with it.
 So its tarball carries `THIRD-PARTY-NOTICES.txt`: for each such package,
 its name, version, declared licence and the complete text of the licence
 file it ships. That text holds the package's copyright and permission
 notices.
 
-The record is [release/third-party](../release/third-party):
+The record is [release/third-party](../parked/release/third-party):
 `packages.json` lists each package with the SHA-256 of its licence file,
 and `licenses/` holds the files, copied unchanged from the published
 packages. Two kinds of package are listed:
@@ -111,7 +112,7 @@ npm run release:pack -- <output directory>
 npm run release:check -- <output directory>
 ```
 
-`release:pack` ([scripts/pack-release.mjs](../scripts/pack-release.mjs))
+`release:pack` ([scripts/pack-release.mjs](../parked/release/pack-release.mjs))
 builds and packs the six packages and writes
 `<output directory>/release-manifest.json`: the source commit and tree,
 whether the working tree was clean, and each tarball's package name,
@@ -119,7 +120,7 @@ version, file name, byte length and SHA-256. Packing the same source again
 gives the same bytes. If the tree was not clean the manifest says so, and
 the tarballs do not identify a commit.
 
-`release:check` ([scripts/check-release.mjs](../scripts/check-release.mjs))
+`release:check` ([scripts/check-release.mjs](../parked/release/check-release.mjs))
 checks that release from outside the repository:
 
 - each tarball has the bytes and SHA-256 the manifest records;
@@ -131,7 +132,7 @@ checks that release from outside the repository:
   content against `release/third-party` and the installed packages, so run
   the check in a checkout of the release's commit, after `npm ci`;
 - all six tarballs install together into a copy of
-  [release/consumer](../release/consumer) in a fresh temporary directory.
+  [release/consumer](../parked/release/consumer) in a fresh temporary directory.
   The lock file is saved as `<output directory>/consumer-package-lock.json`.
   It names each tarball by file and integrity, with no link;
 - plain Node imports every export subpath of every library, and runs the
@@ -158,7 +159,7 @@ npm install --save-exact ./vendor/artroom/generalbusiness-artroom-contract-0.1.0
   ./vendor/artroom/generalbusiness-artroom-client-0.1.0-dev.1.tgz
 ```
 
-Name every Artroom package that the chosen ones depend on, because no
+Name every dap package that the chosen ones depend on, because no
 registry holds them: `policy` needs `contract`; `client` needs `contract`
 and `policy`; `log` needs `contract` and `policy`; `mcp` needs `client`,
 `contract` and `policy`. The CLI needs none. Commit the tarballs and the
@@ -168,7 +169,7 @@ A TypeScript application needs `Disposable` and `Symbol.dispose` in its
 library types, because the contract's subscriptions are disposable. Node's
 types (`@types/node` 22) supply them. Without Node's types, add
 `"ESNext.Disposable"` to `lib`, as
-[release/consumer/tsconfig.bundler.json](../release/consumer/tsconfig.bundler.json)
+[release/consumer/tsconfig.bundler.json](../parked/release/consumer/tsconfig.bundler.json)
 does.
 
 ## Where each entry point runs

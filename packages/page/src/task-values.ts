@@ -1,7 +1,7 @@
 import type { ChangeView, Offered, ReviewRequest, Room } from "./data.ts";
 import { canonicalize, isMemberRef, isScopeRef } from "@generalbusiness/artroom-bytes";
-import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
-import { classify, editPath, type Extent } from "@generalbusiness/artroom-platform";
+import type { MemberRef, ScopeRef } from "@generalbusiness/dap-contract";
+import { classify, editPath, type Extent } from "@generalbusiness/dap-platform";
 interface TaskContext {
   defaults: Record<string, { on?: number; fields?: Record<string, string> }>;
   choices: Record<string, Record<string, readonly { label: string; value: string }[]>>;

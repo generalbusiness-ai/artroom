@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { canonicalize, definitionDigest, digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
-import type { ScopeRef } from "@generalbusiness/artroom-contract";
-import { changeDemo } from "@generalbusiness/artroom-lanes";
+import type { ScopeRef } from "@generalbusiness/dap-contract";
+import { changeDemo } from "@generalbusiness/dap-lanes";
 import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { actAssociation, type ChangeView, type Room } from "../src/data.ts";
 import { retainedEditor } from "../src/retained-editor.ts";

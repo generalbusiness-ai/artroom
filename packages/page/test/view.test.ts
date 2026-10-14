@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
-import type { Answer } from "@generalbusiness/artroom-contract";
+import type { Answer } from "@generalbusiness/dap-contract";
 import type { ChangeView, Room } from "../src/data.ts";
-import { answerLine, changeCondition, changeScreen, issueScreen, roomScreen, rulesScreen } from "../src/view.ts";
+import { answerLine, changeCondition, changeScreen, issueScreen, whoLine, roomScreen, rulesScreen } from "../src/view.ts";
 import type { ListState } from "../src/list-context.ts";
 
 // A DOM-construction stand-in, not a browser. It witnesses the facts the view
@@ -50,7 +50,7 @@ test("list handlers restore query and filter through detail/back while literal q
   expect(returned.textContent).toContain("<script>Guide</script>");
   expect(returned.all("script")).toEqual([]);
   kept = { query: "", filter: "open" };
-  expect(show().textContent).toContain("No matches.");
+  expect(show().textContent).toContain("Clear the search or choose another filter to find an issue.");
 });
 
 test("one current condition follows the selected version, never an internally confirmed operation or an older version", () => {
@@ -76,14 +76,30 @@ test("ordinary screens omit empty record panels while inspection preserves full 
 
 test("issue and rules keep their subject once and move authority detail into inspection", () => {
   vi.stubGlobal("document", document);
-  const issue = issueScreen(room, { scope: "sc_issue", definition: "sha256:issue-definition", head, title: "<script>unsafe</script>", number: 5, body: null, state: "open", requester: "@author", assignees: [], conditions: [], comments: [], closeReason: null } as never) as unknown as Element;
+  const issue = issueScreen(room, { scope: "sc_issue", definition: "sha256:issue-definition", head, title: "<script>unsafe</script>", number: 5, body: null, state: "open", requester: "@author", assignees: [], conditions: [], comments: [], closeReason: null, createdAt: "2026-10-12T14:03:00Z", modifiedAt: "2026-10-12T14:05:00Z" } as never) as unknown as Element;
   expect(issue.all("h1")[0]!.textContent).toBe("<script>unsafe</script> #5");
   expect(issue.all("script")).toEqual([]);
   expect(issue.all("h2")).toEqual([]);
+  expect(issue.all("time").map(node => node.attributes["datetime"])).toEqual(["2026-10-12T14:03:00Z", "2026-10-12T14:05:00Z"]);
+  const expectedLocal = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date("2026-10-12T14:03:00Z"));
+  expect(issue.all("time")[0]!.textContent).toBe(expectedLocal);
+  expect(issue.textContent).toContain("Created:"); expect(issue.textContent).toContain("Modified:");
+  for (const reading of [room, { ...room, reader: null, unsessioned: "sessions-unavailable" }]) {
+    const identity = whoLine(reading) as unknown as Element;
+    expect(identity.textContent).toContain("@member (controller)"); expect(identity.textContent).toContain(room.key);
+    expect(identity.textContent).not.toContain("read session"); expect(identity.textContent).not.toContain("each read is signed");
+  }
   expect(issue.all("details")[0]!.textContent).toContain("sha256:issue-definition");
   const rules = rulesScreen(room, { scope: "sc_rules", head, revision: 3, approvals: 1, ownerMayReview: false, singleControllerException: false, checks: [], labels: [], extents: [{ name: "protected", class: "rules", approvals: 1, approver: "rules.publish", checks: [], patterns: ["AGENTS.md"] }], definitions: [], controllers: ["@controller"] } as never) as unknown as Element;
   expect(rules.children.filter((child) => typeof child === "string" || child.tagName !== "details").map((child) => typeof child === "string" ? child : child.textContent).join("").match(/AGENTS.md/g)).toHaveLength(1);
   expect(rules.all("details")[0]!.textContent).toContain("rules.publish");
+  const roomList = roomScreen(room, { issues: [], changes: [] }, "issue") as unknown as Element;
+  const change = render(view());
+  for (const screen of [roomList, issue, change, rules]) {
+    const row = screen.all("div").filter(node => node.attributes["class"] === "toolbar-actions");
+    expect(row).toHaveLength(1);
+    expect(row[0]!.attributes["data-action-slot"]).toBe(screen === roomList ? "create" : "next");
+  }
 });
 
 // A refused or unsettled comment is request evidence, not the lifecycle of a merge.
@@ -191,11 +207,16 @@ test("an empty change list explains the first recorded source once in its list c
   vi.stubGlobal("document", document);
   try {
     const empty = roomScreen(room, { issues: [], changes: [] }, "change") as unknown as Element;
-    const text = "No changes yet. The page proposes a text change from a change already recorded here; the first change in a room comes from a connected device or agent.";
-    expect(empty.all("div").find(node => node.attributes["data-list"] !== undefined)?.textContent).toBe(text);
+    const text = "Propose the first change from a connected device.";
+    expect(empty.all("div").find(node => node.attributes["data-list"] !== undefined)?.all("p")[0]!.textContent).toBe(text);
     expect(empty.textContent.split(text)).toHaveLength(2);
+    const emptyIssues = roomScreen(room, { issues: [], changes: [] }, "issue") as unknown as Element;
+    expect(emptyIssues.textContent).toContain("Create the first issue when the room offers it.");
+    expect(emptyIssues.all("a").some(link => link.textContent === "How to propose a change")).toBe(false);
+    expect(empty.all("a").find(link => link.textContent === "How to propose a change")?.attributes["href"]).toBe("https://github.com/generalbusiness-ai/dap/blob/main/apps/room/docs/first-change.md");
     const changed = roomScreen(room, { issues: [], changes: [{ scope: "sc_change", number: 1, kind: "pr", title: "Recorded source", state: "merged", draft: false }] } as never, "change", { state: { filter: "open", query: "" }, changed: () => {} }) as unknown as Element;
-    expect(changed.textContent).toContain("No matches.");
-    expect(changed.textContent).not.toContain("first change in a room");
+    expect(changed.textContent).toContain("Clear the search or choose another filter to find a change.");
+    expect(changed.textContent).not.toContain(text);
+    expect(changed.all("a").some(link => link.textContent === "How to propose a change")).toBe(false);
   } finally { vi.unstubAllGlobals(); }
 });

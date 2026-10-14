@@ -23,12 +23,12 @@
  *   nothing foreign on it, written by hand.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, ObservationUse, OperationId, PlatformDefinition, RetainedInput, RulesObservation, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, Evidence, FieldValue, Grant, MemberId, MemberObservation, Observation, ObservationUse, OperationId, PlatformDefinition, RetainedInput, RulesObservation, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome, valueDigest } from "@generalbusiness/artroom-derive";
-import type { OutcomeRule, PlatformRules, Source } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, d, directory, keys, membership, t, type Actor, type Context } from "@generalbusiness/artroom-derive/testing";
+import { RETIRE_ACTION, actionOf, clockOf, grantFrom, judgeDelivery, judgeGenesis, judgePreparation, settleOutcome, valueDigest } from "@generalbusiness/dap-derive";
+import type { OutcomeRule, PlatformRules, Source } from "@generalbusiness/dap-derive";
+import { Ledger, T0, d, directory, keys, membership, t, type Actor, type Context } from "@generalbusiness/dap-derive/testing";
 import { cap, snapshots, staging } from "../../derive/test/fixtures-hold.ts";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import type { Anchor, Coded, MemoryScope } from "../src/index.ts";

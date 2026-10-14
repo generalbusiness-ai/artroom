@@ -22,11 +22,11 @@
  * are the platform package's, and derive's real judges run them.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/artroom-derive/testing";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, MemberId, MemberRef, ObservationUse, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
+import { PROFILES, clockOf, judgeDelivery, judgeGenesis, validateDefinition } from "@generalbusiness/dap-derive";
+import type { Judgment, PlatformRules, ValidDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, Scope, T0, arriving, creation, d, founded, keys, membership, sent } from "@generalbusiness/dap-derive/testing";
 import { RULES_SCOPE, platform } from "../src/index.ts";
 
 const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition => {
@@ -115,30 +115,39 @@ export const BRANCH = "refs/heads/main";
 export class Rulebook extends Ledger {
   readonly registrar: Ledger;
 
-  constructor(confirmed = true, of: ScopeId = membership.scope) {
-    super(rulesScopeDefinition, "platform:rules");
-    this.registrar = founded(registrarDefinition, { branch: BRANCH, membership: of });
+  readonly #platform: PlatformRules;
+
+  constructor(confirmed = true, of: ScopeId = membership.scope, named: PlatformDefinition = RULES_SCOPE) {
+    const supplied = platform(named);
+    if (!supplied || supplied.data.name !== "platform:rules") throw new Error("The fixture needs an explicitly supported rules version.");
+    const definition = named === RULES_SCOPE ? rulesScopeDefinition : checked(validateDefinition(JSON.parse(JSON.stringify(supplied.data)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    super(definition, "platform:rules");
+    this.#platform = { named, rules: supplied.rules };
+    const creator = named === RULES_SCOPE ? registrarDefinition : checked(validateDefinition({
+      ...registrar, acts: { ...registrar.acts, open: { ...registrar.acts["open"]!, sends: registrar.acts["open"]!.sends.map(send => "create" in send ? { create: { ...send.create, definition: named } } : send) } },
+    }, PROPOSED_BOUNDS));
+    this.registrar = founded(creator, { branch: BRANCH, membership: of });
     const { asked, source } = creation(this.registrar, 0);
-    this.take(judgeGenesis(this.state, rulesScopeDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: rules }));
+    this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.#platform }));
     if (!confirmed) return;
-    // The registrar records the `applied` result and sends the confirmation, which makes the rules scope active.
+    // The registrar records the applied result and confirms this exact pinned child.
     const result = sent(this, 0);
-    this.registrar.seal(written(judgeDelivery(this.registrar.state, registrarDefinition, result.delivered, { ...arriving(this.registrar, result.delivered, result.source) })));
+    this.registrar.seal(written(judgeDelivery(this.registrar.state, creator, result.delivered, { ...arriving(this.registrar, result.delivered, result.source) })));
     const confirm = sent(this.registrar, 1);
-    this.take(judgeDelivery(this.state, rulesScopeDefinition, confirm.delivered, { ...arriving(this, confirm.delivered, confirm.source), platform: rules }));
+    this.take(judgeDelivery(this.state, definition, confirm.delivered, { ...arriving(this, confirm.delivered, confirm.source), platform: this.#platform }));
   }
 
   take(judgment: Judgment): void { this.seal(written(judgment)); }
 
   /** An act, judged with the rules scope's rules. `context`: what is at hand beside the intent, as `observed` and `values`. */
   override act(...[who, kind, over = {}, context = {}]: Parameters<Ledger["act"]>): ReturnType<Ledger["act"]> {
-    return super.act(who, kind, over, { platform: rules, membership, ...context });
+    return super.act(who, kind, over, { platform: this.#platform, membership, ...context });
   }
 
   /** The delivery of send `n` of entry `seq` of another scope, judged with the rules scope's rules, and written if it is to be. */
   receive(from: Ledger, seq: number, n = 0): Judgment {
     const { delivered, source } = sent(from, seq, n);
-    const judgment = judgeDelivery(this.state, rulesScopeDefinition, delivered, { ...arriving(this, delivered, source), platform: rules });
+    const judgment = judgeDelivery(this.state, this.definition, delivered, { ...arriving(this, delivered, source), platform: this.#platform });
     if (judgment.result === "write") this.seal(judgment.draft);
     return judgment;
   }

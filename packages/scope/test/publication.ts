@@ -14,9 +14,9 @@
  */
 
 import { runInDurableObject } from "cloudflare:test";
-import type { Entry, OperationId } from "@generalbusiness/artroom-contract";
+import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/artroom-platform";
+import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";

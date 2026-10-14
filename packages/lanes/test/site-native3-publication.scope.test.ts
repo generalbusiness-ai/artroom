@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Entry, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Entry, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
 import { changeDemo3 } from "../src/index.ts";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { net } from "../../scope/src/testing.ts";
 import { siteFixtureLifetime } from "../../scope/test/support/site-fixture-lifetime.ts";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
@@ -77,7 +77,7 @@ test("native @3 cleaned publication retains immutable Site eligibility while tim
     const checker = ok(await lifetime.wait(() => run("act", "add-member", "--on", "membership", "--set", "handle=@check", "--set", "kind=checker")));
     expect(checker.code).toBe(0);
     const configText = new TextDecoder().decode(files["check.json"]);
-    const { valueDigest } = await lifetime.wait(() => import("@generalbusiness/artroom-derive"));
+    const { valueDigest } = await lifetime.wait(() => import("@generalbusiness/dap-derive"));
     const digest = valueDigest("artroom-check-configuration-1", JSON.parse(configText));
     ok(await lifetime.wait(() => run("act", "keep-configuration", "--on", "rules", "--set", `digest=${digest}`, "--set", "name=unit", "--value", "check.json")));
     const checks = [{ name: "unit", configuration: digest, required: true, checker: { membership: config.repository!.membership, member: "@check" } }];

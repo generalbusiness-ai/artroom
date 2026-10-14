@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { isSealed } from "@generalbusiness/artroom-bytes";
 import { isValue, validateDefinition, type Fetched, type ProblemCode } from "../src/index.ts";
 import { Scope, d, keys, laneDefinition, notes, on, small, variant } from "./fixtures.ts";

@@ -1,7 +1,7 @@
 /** The manifest-list successor commissioned by d9e4baa4 and 73ac78ad.
  * Existing lanes retain the earlier digest. A file entry is source data;
  * the final manifest freezes its collection before merge and reservation. */
-import type { DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { change } from "./change.ts";
 import { changeDemo } from "./demo.ts";
 

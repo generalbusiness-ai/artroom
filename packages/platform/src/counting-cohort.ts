@@ -1,5 +1,5 @@
 /** Explicit bounded room for Counting; no default or domain grant changes. */
-import type { PlatformData } from "@generalbusiness/artroom-contract";
+import type { PlatformData } from "@generalbusiness/dap-contract";
 import { directory5, directoryRules5 } from "./application.ts";
 
 export const COUNTING_COHORT = {

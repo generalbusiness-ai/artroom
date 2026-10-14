@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
-import type { Entry, Input, ScopeRef } from "@generalbusiness/artroom-contract";
-import type { Delivered } from "@generalbusiness/artroom-derive";
-import { graph, net, onCode, rita, una } from "./support/graph.ts";
+import type { Entry, Input, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Delivered } from "@generalbusiness/dap-derive";
+import { Peer, net, rita, soon, una } from "./support/graph.ts";
+import { room } from "./support/room.ts";
+import { DIGESTS, change, issue } from "../src/index.ts";
 
 type Decided = Extract<Input, { type: "delivery"; decision: string }>;
 type Recorded = Extract<Input, { type: "delivery"; clause: string }>;
@@ -15,21 +17,25 @@ const update = (state: string) => (e: Delivered) => e.message.class === "request
 const oid = (c: string) => c.repeat(40);
 
 test("T5a, a link is the change lane's and the issue keeps a copy of it: set then removed, and removed then set, end the same; the older update that arrives late is recorded superseded, each request has one result, and the issue does not move", async () => {
-  // Real scopes: one issue lane and two change lanes, one for each order, with real delivery between them, and transport held to swap the order. No peer is
-  // used and no capability guard is asked: the scripted test capability, a STAND-IN, is present only because no scope runs under a
-  // lane definition without one. Not proved: anything about a merge. That is T5b.
-  const g = await graph();
-  const G = await g.goal();
+  // Native Directory creation and membership authority establish the lanes'
+  // actual roles. Deliveries are real; transport is held to swap their order.
+  // No peer or capability guard is used. The founding Git host and clock
+  // remain STAND-INs. This proves no merge; that is T5b.
+  const r = await room({ roster: [] });
+  await r.activate(issue, DIGESTS.issue);
+  await r.activate(change, DIGESTS.change);
+  const G = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "A goal", conditions: ["it works"] });
   for (const late of [false, true]) {
-    const C = await g.change();
+    const C = await r.lane(rita, "open-pr", change, DIGESTS.change, { title: "A change", draft: false });
     // Late: the update "set" is held back until the update "removed" has arrived.
     net.hold = late ? update("set") : null;
     const set = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "manual" } })).fact.seq;
-    await g.settle();
+    await r.settle();
     const removed = (await C.did(rita, "unlink-own", { on: set })).fact.seq;
-    await g.settle();
+    await r.settle();
     net.hold = null;
-    await g.later(1);
+    net.clock.now = soon(1);
+    await r.settle();
     // In the issue: one deciding entry for each update, in the order of arrival. The copy is the link at its higher revision.
     expect(decided(await G.entries(), C.at)).toEqual(late ? [[removed, "removed", "applied"], [set, "set", "superseded"]] : [[set, "set", "applied"], [removed, "removed", "applied"]]);
     expect([(await G.state()).relation(C.at, "closes", set), (await G.item(0)).state]).toEqual([{ owner: C.at, name: "closes", item: set, state: "removed", revision: removed }, "open"]);
@@ -45,14 +51,22 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   // of a Git host. So this shows what the lanes do once a publication is recorded, and that the publication releases the pin of
   // the manifest that it merged, on the lane's own records. It shows nothing about a real destination: its reservation, its
   // commit, or when and whether it publishes. Nor about a real host.
-  const g = await graph();
-  onCode();
-  const [G, H, C] = [await g.goal(), await g.goal(), await g.change()];
-  const peer = (e: Delivered) => "scope" in e.to && (e.to.scope === g.destination.at.scope || e.to.scope === g.rules.at.scope);
-  // Nothing reaches a peer: it has no object. And the update "set" to G is held back, so that "merged" arrives there first.
+  const r = await room({ roster: ["@una"] });
+  await r.activate(issue, DIGESTS.issue);
+  await r.activate(change, DIGESTS.change);
+  const G = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "First goal", conditions: ["it works"] });
+  const H = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "Second goal", conditions: ["it works"] });
+  const C = await r.lane(rita, "open-pr", change, DIGESTS.change, { title: "A change", draft: false });
+  // Actual native factory and member authority; only these two peer entries
+  // are scripted. They are not admitted histories of the native objects.
+  const rulesPeer = new Peer("rules", "platform:rules", await r.rules.at());
+  const destinationPeer = new Peer("destination", "platform:destination", await r.G.at());
+  const peer = (e: Delivered) => "scope" in e.to && (e.to.scope === destinationPeer.at.scope || e.to.scope === rulesPeer.at.scope);
+  // Native destination/rules deliveries are held. The update "set" to G is
+  // also held, so the scripted publication's "merged" update arrives first.
   net.hold = (e) => peer(e) || (update("set")(e) && "scope" in e.to && e.to.scope === G.name);
-  expect(await C.stub.deliver(g.rules.relate(C.at, "rules", "published", { approvals: 0, checks: [], ownerMayReview: true }))).toMatchObject({ answer: "recorded" });
-  const offer = (await C.did(rita, "offer", { fields: { offeree: una.member, terms: "Integrate." } })).fact;
+  expect(await C.stub.deliver(rulesPeer.relate(C.at, "rules", "published", { approvals: 0, checks: [], ownerMayReview: true }))).toMatchObject({ answer: "recorded" });
+  const offer = (await C.did(rita, "offer", { fields: { offeree: await r.member("@una"), terms: "Integrate." } })).fact;
   await C.did(una, "accept", { on: offer.seq, fields: { terms: offer } });
   const hold = (await C.did(una, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
   await C.instance(una, hold, "i-1");
@@ -62,24 +76,24 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   expect(await pins()).toEqual([["held", oid("c"), manifest, null]]);
   const toG = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "keyword" } })).fact.seq;
   const toH = (await C.did(rita, "link-own", { fields: { issue: H.at, how: "manual" } })).fact.seq;
-  await g.settle();
+  await r.settle();
   // H is closed by hand before the merge.
   const hand = (await H.did(rita, "close-own", { on: 0, fields: { reason: "not-planned" } })).fact.seq;
   const merge = (await C.did(rita, "merge", { fields: { manifest, reports: [] } })).fact;
-  await g.settle();
+  await r.settle();
 
   // SCRIPTED: the destination publishes. The change lane records it once, and tells each issue whose link is set.
-  const publication = g.destination.relate(C.at, "publication", "published", { operation: merge, outcome: "published", commit: oid("9") });
+  const publication = destinationPeer.relate(C.at, "publication", "published", { operation: merge, outcome: "published", commit: oid("9") });
   const recorded = await C.stub.deliver(publication);
   if (recorded.answer !== "recorded") expect.fail(`the publication was not recorded: ${JSON.stringify(recorded)}`);
   const published = recorded.fact.seq;
-  await g.settle();
+  await r.settle();
   expect([(await C.item(merge.seq)).state, (await C.item(merge.seq)).values["commit"], (await C.item(0)).state]).toEqual(["published", oid("9"), "merged"]);
   // The entry that records the publication releases the pin of the manifest that it merged. The row names the commit alone, and
   // the pin is found by the manifest's item: the entry that admitted it (authority note, section 5.7).
   expect(await pins()).toEqual([["released", oid("c"), manifest, published]]);
   expect((await C.entry(published)).sends.map((s) => [s.to, s.message.class, (s.message as { body?: { state?: string } }).body?.state])).toEqual([
-    [G.at, "request", "merged"], [H.at, "request", "merged"], [g.office.at, "advisory", undefined], [g.destination.at, "result", undefined],
+    [G.at, "request", "merged"], [H.at, "request", "merged"], [await r.D.at(), "advisory", undefined], [destinationPeer.at, "result", undefined],
   ]);
 
   // G: "merged" is the first update it sees for this link. It closes, and what closed it is its own entry that decided the update.
@@ -96,11 +110,12 @@ test("T5b, a merge closes a linked issue once: the issue closes by its own decid
   const before = await heads();
   const merged = await C.envelope(published, 0);
   expect([await C.stub.deliver(publication), await G.stub.deliver(merged)]).toEqual([recorded, { answer: "recorded", fact: await G.fact(closing) }]);
-  await g.settle();
+  await r.settle();
   expect(await heads()).toEqual(before);
   // The older update "set" now arrives at G. It is recorded superseded, and the issue is as it was. A close by hand is refused.
   net.hold = peer;
-  await g.later(1);
+  net.clock.now = soon(1);
+  await r.settle();
   expect([decided(await G.entries()).at(-1), (await G.item(0)).refs["closedBy"], await G.asks(rita, "close-own", { on: 0, fields: {} })]).toEqual([[toG, "set", "superseded"], closing, "guard-failed"]);
   // The requester reopens the issue. The same update again changes nothing: the issue stays open.
   await G.did(rita, "reopen-own", { on: 0 });

@@ -1,11 +1,11 @@
 /**
- * `@generalbusiness/artroom-derive/rule`: evaluation of `rule` guards, in
+ * `@generalbusiness/dap-derive/rule`: evaluation of `rule` guards, in
  * preparation (scope contract, section 5.2, step 5). It is a separate entry
  * point because it is asynchronous and loads the engine. The package's main
  * entry stays synchronous: its judges take the results as `Prepared` records.
  */
 
-import type { Prepared } from "@generalbusiness/artroom-contract";
+import type { Prepared } from "@generalbusiness/dap-contract";
 import { canonicalBytes, digestBytes } from "@generalbusiness/artroom-bytes";
 import type { Profile, RuleInput } from "../index.ts";
 import { RuleEvalError } from "./errors.ts";

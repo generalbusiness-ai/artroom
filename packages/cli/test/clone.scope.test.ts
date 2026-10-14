@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import type { Digest, Item, OperationId, Read } from "@generalbusiness/artroom-contract";
+import type { Digest, Item, OperationId, Read } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { repositoryName } from "@generalbusiness/artroom-platform";
+import { repositoryName } from "@generalbusiness/dap-platform";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { nativeFixtureLifetime, driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import type { ArtifactsNamespace } from "../../scope/src/artifacts-host.ts";
@@ -39,8 +39,8 @@ function recordingGit(lifetime: ReturnType<typeof nativeFixtureLifetime>): Git &
   return { runs, run: async (args, env) => { lifetime.active(); runs.push({ args: [...args], env: { ...env } }); return 0; } };
 }
 
-// Invariant: `artroom clone` signs `read-token`, reads the token once, and gives it to git only as the header configuration in
-// git's environment: never in an argument and never in a printed line. Without git it signs nothing. `artroom remote` prints the
+// Invariant: `dap clone` signs `read-token`, reads the token once, and gives it to git only as the header configuration in
+// git's environment: never in an argument and never in a printed line. Without git it signs nothing. `dap remote` prints the
 // repository's host, namespace, name and remote URL in each host's form.
 //
 // | Part | Is |
@@ -51,7 +51,7 @@ function recordingGit(lifetime: ReturnType<typeof nativeFixtureLifetime>): Git &
 // | The destination's Git host | The real `artifacts-wiring.ts` port over a STAND-IN binding that the test scripts. Only `mint-read` reaches it. |
 // | git | A STAND-IN: a function that records its arguments and environment. Node's runner over a stand-in `git` script on the PATH is `git.test.ts`. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations driver and the dispatchers, as a deployment's alarms would. |
-describe("artroom clone and artroom remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
+describe("dap clone and dap remote on real scopes. The Git hosts, git and the scheduler are STAND-INs", () => {
   test("remote prints the host's form; a member reads the destination with her session before any act there and after the claim window; clone without git signs nothing; clone signs read-token, reads the token once and gives it to git only in its environment's header configuration; a member clones with her own token; GitHub's remote is whole, and is read with the founder's session after the signed-read window", async () => {
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
     const lifetime = nativeFixtureLifetime(owner);
@@ -110,7 +110,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   lifetime.advance(16 * 60_000);
   try {
     // remote: the branch item's record. The service's hostname is the deployment's setting, which no scope records: it is marked.
-    expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, `Remote URL: https://<service host>/git/${NAMESPACE}/${name.name}.git (the service host is the deployment's setting; artroom clone prints it whole)`] });
+    expect(await run(rita, "remote")).toEqual({ code: 0, lines: ["Host: artifacts", `Namespace: ${NAMESPACE}`, `Name: ${name.name}`, `Remote URL: https://<service host>/git/${NAMESPACE}/${name.name}.git (the service host is the deployment's setting; dap clone prints it whole)`] });
 
     // A member who joined before any act at the destination reads it with her session: the destination knows membership's scope ID
     // from its genesis, though no entry of it retains an observation yet (the planner's decision ca8ad1cf). Her key signed nothing
@@ -123,7 +123,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
     // head does not move.
     const head = (await G.summary()).at;
     const without = await run({ ...rita, git: { run: async () => null } }, "clone", "here");
-    expect(without).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: Bearer <read token>" clone -- https://<service host>/git/${NAMESPACE}/${name.name}.git here`] });
+    expect(without).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run dap clone again; it runs:", `git -c http.extraHeader="Authorization: Bearer <read token>" clone -- https://<service host>/git/${NAMESPACE}/${name.name}.git here`] });
     expect([(await G.summary()).at, service.minted, git.runs]).toEqual([head, [], []]);
 
     // clone: one read token of 2 hours, read once, and one run of git whose arguments hold the remote and the directory and no token.
@@ -171,7 +171,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
     // items 1 and 2, recorded).
     lifetime.advance(16 * 60_000);
     expect(await run(vic, "remote")).toEqual({ code: 0, lines: ["Host: github.com", "Namespace: generalbusiness-ai", `Name: ${hub.name}`, `Remote URL: https://github.com/generalbusiness-ai/${hub.name}.git`] });
-    expect(await run({ ...vic, git: { run: async () => null } }, "clone")).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: Basic <x-access-token:read token, base64>" clone -- https://github.com/generalbusiness-ai/${hub.name}.git`] });
+    expect(await run({ ...vic, git: { run: async () => null } }, "clone")).toEqual({ code: 1, lines: ["git is not installed here, so nothing was signed. With git installed, run dap clone again; it runs:", `git -c http.extraHeader="Authorization: Basic <x-access-token:read token, base64>" clone -- https://github.com/generalbusiness-ai/${hub.name}.git`] });
   } finally {
     lifetime.unWire(H.name);
   }

@@ -6,7 +6,7 @@
  * that the rest of an enumeration could overturn.
  */
 
-import type { FieldType, Guard, Operand, Range, Subject, Where } from "@generalbusiness/artroom-contract";
+import type { FieldType, Guard, Operand, Range, Subject, Where } from "@generalbusiness/dap-contract";
 import type { GuardResult, Judging } from "./guards.ts";
 import { equal, operand } from "./operand.ts";
 import type { Item } from "./state.ts";

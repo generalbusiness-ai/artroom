@@ -1,7 +1,7 @@
 // Actual SDK/W1/signing over FAKE service/session/history/memory custody; no native admission or speech.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Entry, Item, MemberRef, Receipt, ScopeRef, Summary } from "@generalbusiness/artroom-contract";
+import type { Entry, Item, MemberRef, Receipt, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { secretSigner, type Fetch, type HeadStreamFetch } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION } from "../commitments-pin.ts";

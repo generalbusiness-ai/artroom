@@ -1,11 +1,11 @@
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Answer, Digest, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Answer, Digest, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeMs, timeOf, valueDigest } from "@generalbusiness/artroom-derive";
-import { d, keys, membership, otherLane, type Actor } from "@generalbusiness/artroom-derive/testing";
+import { timeMs, timeOf, valueDigest } from "@generalbusiness/dap-derive";
+import { d, keys, membership, otherLane, type Actor } from "@generalbusiness/dap-derive/testing";
 import { EXTENTS, RULEBOOK, STEP_ROWS, rulebook, signers, weigherRules, weigherWith, type Seen } from "../../derive/test/fixtures-observes.ts";
-import { MEMBERSHIP, platform } from "@generalbusiness/artroom-platform";
+import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
 import { MemorySource, TRUSTS, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivery } from "../src/index.ts";
 import { controls, type Controls } from "../src/testing.ts";

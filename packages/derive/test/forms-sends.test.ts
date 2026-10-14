@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { ActType, DeclaredDefinition, Input, Request, Result, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { ActType, DeclaredDefinition, Input, Request, Result, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { validateDefinition, type ProblemCode } from "../src/index.ts";
 import { Scope, arrive, born, decided, deliver, desk, directory, fields, founded, keys, on, ticketDefinition, valid, variant } from "./fixtures.ts";

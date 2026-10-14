@@ -9,9 +9,9 @@
  * original mint reply metadata remains, even after expiry or revocation,
  * so a restarted outside port can recover that attempt's own evidence.
  */
-import type { OperationId, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { OperationId, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { timeMs } from "@generalbusiness/artroom-derive";
+import { timeMs } from "@generalbusiness/dap-derive";
 
 export interface CredentialReply { id: string; ends: Timestamp }
 export interface CredentialPosition { mint: OperationId; attempt: number }

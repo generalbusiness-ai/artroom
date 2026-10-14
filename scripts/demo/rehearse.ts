@@ -8,14 +8,14 @@
  * `packages/lanes/test/demo.scope.test.ts` gives it the test Worker's routes on real scopes, with the stand-ins that test names.
  *
  * A secret is never in what it records: an invitation link is cut to its first letters wherever a line or a typed command holds
- * one, and nothing else that it prints holds a secret (a read token is never printed by `artroom clone`; a key is printed by its ID).
+ * one, and nothing else that it prints holds a secret (a read token is never printed by `dap clone`; a key is printed by its ID).
  */
 
 import { b64url, digestBytes, entryHash, canonicalize, intentDigest, isPlatformDefinition, isReceipt, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, platformName, scopeIdOf, timeOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads } from "@generalbusiness/artroom-client";
-import { command, type Context, type Outcome } from "@generalbusiness/artroom-cli";
-import { DEMO_DIGESTS, MANIFEST_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/artroom-lanes";
-import { firstExtents, platform } from "@generalbusiness/artroom-platform";
+import { command, type Context, type Outcome } from "@generalbusiness/dap-cli";
+import { DEMO_DIGESTS, MANIFEST_DIGESTS, changeDemo, changeDemo3, issueDemo } from "@generalbusiness/dap-lanes";
+import { firstExtents, platform } from "@generalbusiness/dap-platform";
 
 /** The three people of the script, each with a fresh config directory. Hardware identity is not verified. */
 export type Person = "founder" | "member" | "maintainer";
@@ -36,7 +36,7 @@ export interface Fetched { status: number; type: string; body: string }
 
 /** What the rehearsal runs on. A deployment's is `demo-run.ts`; the test Worker's is the test's. */
 export interface Stage {
-  /** The scope service's base URL, the Git host and the namespace, as `artroom install` takes them. */
+  /** The scope service's base URL, the Git host and the namespace, as `dap install` takes them. */
   service: string;
   host: string;
   namespace: string;
@@ -129,7 +129,7 @@ interface Shot {
   title: string;
   scene: string;
   who: Person;
-  /** The command as typed: an `artroom` command line, `git ...`, or `GET <url>`. */
+  /** The command as typed: a `dap` command line, `git ...`, or `GET <url>`. */
   typed(v: Found): string[];
   expect: { code: number; lines: (v: Found) => string[] };
   /** After the shot ends: what the stage does that no command prints. */
@@ -156,65 +156,65 @@ function shots(stage: Stage): Shot[] {
   const list: Shot[] = [
     {
       title: "Plan the install", scene: "3", who: "founder",
-      typed: () => ["artroom", "install", "--plan", stage.service, "--host", stage.host, "--namespace", stage.namespace],
+      typed: () => ["dap", "install", "--plan", stage.service, "--host", stage.host, "--namespace", stage.namespace],
       expect: { code: 0, lines: () => [
         `Planned: register <register>, under <registerDefinition>, on host ${stage.host}, namespace ${stage.namespace}. The seed's time is <until>.`,
-        "Set registerScope to {register} in the Worker's host setting, then run artroom install --planned before {until}.",
+        "Set registerScope to {register} in the Worker's host setting, then run dap install --planned before {until}.",
       ] },
       after: (v, s) => s.pin(v["register"]!),
     },
     {
       title: "Install as planned", scene: "3", who: "founder",
-      typed: () => ["artroom", "install", "--planned"],
+      typed: () => ["dap", "install", "--planned"],
       expect: { code: 0, lines: () => ["Installed: register {register}, under {registerDefinition}, as planned.", INSTALL_ACKNOWLEDGEMENT] },
     },
     {
-      title: "Claim the room", scene: "3", who: "founder",
-      typed: () => ["artroom", "claim", stage.name, "--handle", HANDLES.founder],
+      title: "Create the room", scene: "3", who: "founder",
+      typed: () => ["dap", "create", stage.name, "--handle", HANDLES.founder],
       expect: { code: 0, lines: () => [
-        `Claimed ${stage.name}: directory <directory>, membership <membership>, rules <rules>, destination <destination>; each created and confirmed.`,
+        `Created ${stage.name}: directory <directory>, membership <membership>, rules <rules>, destination <destination>; each created and confirmed.`,
         "Definitions: <...>.",
         `You are ${HANDLES.founder}, an admin, on key {operatorKey}; your inbox is <founderInbox>.`,
       ] },
     },
     {
       title: "Publish the rules", scene: "6, recording-day checklist", who: "founder",
-      typed: () => ["artroom", "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`],
+      typed: () => ["dap", "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`],
       expect: { code: 0, lines: () => [took("rules")] },
     },
     {
       title: "Activate the issue definition", scene: "6, recording-day checklist", who: "founder",
-      typed: () => ["artroom", "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"],
+      typed: () => ["dap", "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"],
       expect: { code: 0, lines: () => [took("rules")] },
     },
     {
       title: "Activate the change definition", scene: "6, recording-day checklist", who: "founder",
-      typed: () => ["artroom", "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"],
+      typed: () => ["dap", "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"],
       expect: { code: 0, lines: () => [took("rules")] },
     },
     {
       title: "Invite a member", scene: "4", who: "founder",
-      typed: () => ["artroom", "invite", HANDLES.member, "--role", "member"],
+      typed: () => ["dap", "invite", HANDLES.member, "--role", "member"],
       expect: { code: 0, lines: () => [`Invited ${HANDLES.member} as member: invitation {membership}:<seq>, until <until>.`, `Link for ${HANDLES.member} only (it holds the invitation's secret): <memberLink>`] },
     },
     {
       title: "The member joins", scene: "5", who: "member",
-      typed: (v) => ["artroom", "join", need(v, "memberLink")],
+      typed: (v) => ["dap", "join", need(v, "memberLink")],
       expect: { code: 0, lines: () => [`Joined as ${HANDLES.member} on key <memberKey>.`, "Your inbox: <memberInbox>."] },
     },
     {
       title: "Invite a maintainer", scene: "4", who: "founder",
-      typed: () => ["artroom", "invite", HANDLES.maintainer, "--role", "maintainer"],
+      typed: () => ["dap", "invite", HANDLES.maintainer, "--role", "maintainer"],
       expect: { code: 0, lines: () => [`Invited ${HANDLES.maintainer} as maintainer: invitation {membership}:<seq>, until <until>.`, `Link for ${HANDLES.maintainer} only (it holds the invitation's secret): <maintainerLink>`] },
     },
     {
       title: "The maintainer joins", scene: "5", who: "maintainer",
-      typed: (v) => ["artroom", "join", need(v, "maintainerLink")],
+      typed: (v) => ["dap", "join", need(v, "maintainerLink")],
       expect: { code: 0, lines: () => [`Joined as ${HANDLES.maintainer} on key <maintainerKey>.`, "Your inbox: <maintainerInbox>."] },
     },
     {
       title: "Clone by the room's token", scene: "6", who: "member",
-      typed: () => ["artroom", "clone", "site"],
+      typed: () => ["dap", "clone", "site"],
       expect: { code: 0, lines: () => ["Read token: {destination}:<seq>, until <until>.", "Remote URL: <remote>", "Cloned into site."] },
     },
     {
@@ -224,22 +224,22 @@ function shots(stage: Stage): Shot[] {
     },
     {
       title: "Open an issue", scene: "8 (the issue it closes)", who: "member",
-      typed: () => ["artroom", "issue", "open", "--title", "Add a getting-started page", "--body", "A page that says how to clone and edit."],
+      typed: () => ["dap", "issue", "open", "--title", "Add a getting-started page", "--body", "A page that says how to clone and edit."],
       expect: { code: 0, lines: () => ["Opened issue #1: Add a getting-started page. Its lane is <issue>."] },
     },
     {
       title: "Comment on it", scene: "8", who: "maintainer",
-      typed: () => ["artroom", "issue", "comment", "1", "I will take this."],
+      typed: () => ["dap", "issue", "comment", "1", "I will take this."],
       expect: { code: 0, lines: () => ["Commented: entry {issue}:<seq>, hash <hash>."] },
     },
     {
       title: "Assign it", scene: "8", who: "founder",
-      typed: () => ["artroom", "issue", "assign", "1", HANDLES.maintainer],
+      typed: () => ["dap", "issue", "assign", "1", HANDLES.maintainer],
       expect: { code: 0, lines: () => ["Assigned: entry {issue}:<seq>, hash <hash>."] },
     },
     {
       title: "Edit a page in an open folder, closing the issue", scene: "8", who: "maintainer",
-      typed: () => ["artroom", "edit", "guide/start.md", "--file", "start.md", "--closes", "1"],
+      typed: () => ["dap", "edit", "guide/start.md", "--file", "start.md", "--closes", "1"],
       expect: { code: 0, lines: () => [
         `Proposed guide/start.md (${bytes("start.md")} bytes) as change <published>, version <publishedVersion>.`,
         "Linked: when it is published, the change {published} closes issue #1 ({issue}).",
@@ -249,15 +249,15 @@ function shots(stage: Stage): Shot[] {
     },
     {
       title: "Edit in a controlled folder: refused by name", scene: "10", who: "maintainer",
-      typed: () => ["artroom", "edit", "AGENTS.md", "--file", "agents.md"],
+      typed: () => ["dap", "edit", "AGENTS.md", "--file", "agents.md"],
       expect: { code: 1, lines: () => [
         `Proposed AGENTS.md (${bytes("agents.md")} bytes) as change <controlled>, version <controlledVersion>.`,
-        "Not published: the merge {controlled}:<seq> is refused, rules-not-met:rules. The change {controlled} stays open at version {controlledVersion}. When it may be merged, run: artroom merge {controlled}",
+        "Not published: the merge {controlled}:<seq> is refused, rules-not-met:rules. The change {controlled} stays open at version {controlledVersion}. When it may be merged, run: dap merge {controlled}",
       ] },
     },
     {
       title: "The rules scope's controller approves", scene: "11", who: "founder",
-      typed: (v) => ["artroom", "act", "review-verdict", "--on", need(v, "controlled"), "--set", `manifest=${need(v, "controlledVersion")}`, "--set", "verdict=approve", "--set", "extent=rules"],
+      typed: (v) => ["dap", "act", "review-verdict", "--on", need(v, "controlled"), "--set", `manifest=${need(v, "controlledVersion")}`, "--set", "verdict=approve", "--set", "extent=rules"],
       expect: { code: 0, lines: () => [took("controlled")] },
     },
     {
@@ -265,11 +265,11 @@ function shots(stage: Stage): Shot[] {
       typed: (v) => ["prepare-concurrent-and-merge", need(v, "publishedCommit"), need(v, "controlled")],
       expect: { code: 0, lines: () => [
         "Proposal base: {publishedCommit}.",
-        "$ artroom act open-pr <...>", "Took effect: entry {directory}:<staleOpening>, hash <staleOpeningHash>.", "Exit 0.",
+        "$ dap act open-pr <...>", "Took effect: entry {directory}:<staleOpening>, hash <staleOpeningHash>.", "Exit 0.",
         "Opened change: <stale>.",
-        "$ artroom act ask-rules <...>", "Took effect: entry {stale}:<seq>, hash <hash>.", "Exit 0.",
-        "$ artroom act propose-file <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.",
-        "$ artroom merge {controlled}", "Published: commit <controlledCommit>, by the merge {controlled}:<seq>.",
+        "$ dap act ask-rules <...>", "Took effect: entry {stale}:<seq>, hash <hash>.", "Exit 0.",
+        "$ dap act propose-file <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.",
+        "$ dap merge {controlled}", "Published: commit <controlledCommit>, by the merge {controlled}:<seq>.",
         `Page: ${site("AGENTS.md")}`, "Exit 0.",
       ] },
     },
@@ -280,9 +280,9 @@ function shots(stage: Stage): Shot[] {
       // observation remains required before these lines are filed as observed.
       expect: { code: 0, lines: () => [
         "Old base: {publishedCommit}; new base: {controlledCommit}.",
-        "$ artroom merge {stale}",
-        "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: artroom merge {stale}", "Exit 1.",
-        "$ artroom edit guide/concurrent.md --file concurrent.md",
+        "$ dap merge {stale}",
+        "Not published: the merge {stale}:<seq> is refused, out-of-date. The change {stale} stays open at version {staleVersion}. When it may be merged, run: dap merge {stale}", "Exit 1.",
+        "$ dap edit guide/concurrent.md --file concurrent.md",
         `Proposed guide/concurrent.md (${bytes("concurrent.md")} bytes) as change <reproposed>, version <reproposedVersion>.`,
         "Published: commit <reproposedCommit>, by the merge {reproposed}:<seq>.",
         `Page: ${site("guide/concurrent.md")}`, "Exit 0.",
@@ -290,20 +290,20 @@ function shots(stage: Stage): Shot[] {
     },
     {
       title: "The bad path: refused by name", scene: "10 (the bad path of the 19:50 run)", who: "maintainer",
-      typed: () => ["artroom", "edit", "../outside.md", "--file", "start.md"],
+      typed: () => ["dap", "edit", "../outside.md", "--file", "start.md"],
       expect: { code: 1, lines: () => [
         `Proposed ../outside.md (${bytes("start.md")} bytes) as change <refused>, version <refusedVersion>.`,
-        "Not published: the merge {refused}:<seq> is refused, path-invalid. The change {refused} stays open at version {refusedVersion}. When it may be merged, run: artroom merge {refused}",
+        "Not published: the merge {refused}:<seq> is refused, path-invalid. The change {refused} stays open at version {refusedVersion}. When it may be merged, run: dap merge {refused}",
       ] },
     },
     {
       title: "The issues: closed by the merge", scene: "8", who: "member",
-      typed: () => ["artroom", "issues"],
+      typed: () => ["dap", "issues"],
       expect: { code: 0, lines: () => [`#1  closed (completed)  Add a getting-started page; assigned to ${HANDLES.maintainer}; lane {issue}`, "1 issues, 0 open."] },
     },
     {
       title: "The verifier, every scope", scene: "12", who: "member",
-      typed: () => ["artroom", "verify", "--all"],
+      typed: () => ["dap", "verify", "--all"],
       expect: { code: 0, lines: (v) => [
         ...[["register", "register"], ["directory", "directory"], ["membership", "membership"], ["rules", "rules"], ["destination", "destination"], ["lane", "issue"], ["lane", "published"], ["lane", "controlled"], ["lane", "stale"], ["lane", "reproposed"], ["lane", "refused"], ["inbox", "founderInbox"], ["inbox", "memberInbox"], ["inbox", "maintainerInbox"]]
           .flatMap(([kind, name]) => [`${kind} {${name}}, entry <seq>: consistent.`, ...(kind === "destination" && v["registerDefinition"] === "platform:register@3" ? ["Cleanup status: destination {destination}, entry <seq>: no reservation is recorded as cleanup-owed."] : [])]),
@@ -335,7 +335,7 @@ function shots(stage: Stage): Shot[] {
     const activate: Shot = ({
       title: "Activate the manifest-list change definition",
       scene: "after 16, manifest extension", who: "founder",
-      typed: () => ["artroom", "act", "activate", "--on", "rules", "--set", `digest=${MANIFEST_DIGESTS.demo}`, "--set", "name=change", "--value", "change-demo3.json"],
+      typed: () => ["dap", "act", "activate", "--on", "rules", "--set", `digest=${MANIFEST_DIGESTS.demo}`, "--set", "name=change", "--value", "change-demo3.json"],
       expect: { code: 0, lines: () => [took("rules")] },
     });
     const prepare = (branch: string): Shot => ({
@@ -344,13 +344,13 @@ function shots(stage: Stage): Shot[] {
       expect: { code: 0, lines: () => [`Prepared local Git branch ${branch} with 2 text files.`, "<...>"] },
     });
     list.splice(16, 0, activate, prepare("two-pages"), {
-      title: "Propose a two-text-file branch: published", scene: "after 16, artroom propose", who: "maintainer",
-      typed: () => ["artroom", "propose", "two-pages"],
+      title: "Propose a two-text-file branch: published", scene: "after 16, dap propose", who: "maintainer",
+      typed: () => ["dap", "propose", "two-pages"],
       expect: { code: 0, lines: () => ["Proposed 2 files as change <manifestPublished>, version <manifestVersion>.", "Published: commit <manifestCommit>, by the merge {manifestPublished}:<seq>."] },
     }, prepare("two-controlled"), {
-      title: "Propose a controlled two-text-file branch: refused by name", scene: "after 16, artroom propose control", who: "maintainer",
-      typed: () => ["artroom", "propose", "two-controlled"],
-      expect: { code: 1, lines: () => ["Proposed 2 files as change <manifestRefused>, version <manifestRefusedVersion>.", "Not published: the merge {manifestRefused}:<seq> is refused, rules-not-met:rules. The change {manifestRefused} stays open at version {manifestRefusedVersion}. When it may be merged, run: artroom merge {manifestRefused}"] },
+      title: "Propose a controlled two-text-file branch: refused by name", scene: "after 16, dap propose control", who: "maintainer",
+      typed: () => ["dap", "propose", "two-controlled"],
+      expect: { code: 1, lines: () => ["Proposed 2 files as change <manifestRefused>, version <manifestRefusedVersion>.", "Not published: the merge {manifestRefused}:<seq> is refused, rules-not-met:rules. The change {manifestRefused} stays open at version {manifestRefusedVersion}. When it may be merged, run: dap merge {manifestRefused}"] },
     });
     const merged = list.find((shot) => shot.title === "Merge: it publishes")!;
     merged.typed = (v) => ["prepare-concurrent-and-merge", need(v, "manifestCommit"), need(v, "controlled")];
@@ -362,7 +362,7 @@ function shots(stage: Stage): Shot[] {
     merged.expect.lines = (v) => {
       const lines = mergeLines(v).map(line => line.replace("{publishedCommit}", "{manifestCommit}"));
       lines[9] = "Took effect: entry {stale}:<staleSource>, hash <hash>.";
-      lines.splice(11, 0, "$ artroom act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
+      lines.splice(11, 0, "$ dap act propose-manifest <...>", "Took effect: entry {stale}:<staleVersion>, hash <hash>.", "Exit 0.");
       lines.splice(lines.length - 2, 1); // The manifest-list merge has no legacy Page line.
       return lines;
     };
@@ -495,7 +495,7 @@ export async function prepareConcurrentAndMerge(ctx: Context, oldBase: string, c
   const handle = (scope: string) => new ScopeHandle(transport, scope as never, session.session.reader());
   const run = async (args: string[], code: number, start: number, end: number) => {
     const result = await command(ctx, args);
-    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    lines.push(`$ dap ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
     return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
   };
   const definition = manifest ? MANIFEST_DIGESTS.demo : DEMO_DIGESTS.change;
@@ -536,7 +536,7 @@ export async function staleReproposal(ctx: Context, oldBase: string, newBase: st
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(oldBase) || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(newBase) || oldBase === newBase || !isScopeId(v["stale"])) return failure();
   const run = async (args: string[], code: number, start: number, end: number) => {
     const result = await command(ctx, args);
-    lines.push(`$ artroom ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
+    lines.push(`$ dap ${args.map(quoted).join(" ")}`, ...result.lines, `Exit ${result.code}.`);
     return judged({ code, lines: expected.lines.slice(start, end) }, result, v) === null;
   };
   // Start immediately before the CLI invocation and stop immediately when it
@@ -545,7 +545,7 @@ export async function staleReproposal(ctx: Context, oldBase: string, newBase: st
   const started = monotonic();
   const refused = await command(ctx, ["merge", v["stale"]]);
   const milliseconds = monotonic() - started;
-  lines.push(`$ artroom merge ${v["stale"]}`, ...refused.lines, `Exit ${refused.code}.`);
+  lines.push(`$ dap merge ${v["stale"]}`, ...refused.lines, `Exit ${refused.code}.`);
   if (judged({ code: 1, lines: expected.lines.slice(2, 3) }, refused, v) !== null) return failure();
   measured(milliseconds, at);
   if (!await run(["edit", "guide/concurrent.md", "--file", "concurrent.md"], 0, 5, expected.lines.length - 1)) return failure();

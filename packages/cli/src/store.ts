@@ -9,7 +9,7 @@
  * the user. `memoryStore` keeps them in memory, for a test.
  */
 
-import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, PlatformDefinition, Receipt, ScopeId, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 
 /** The scopes of one repository, as `claim` or `join` learned them. */
 export interface Repository {
@@ -47,7 +47,13 @@ export interface PendingJoin {
   repository: Repository;
   handle: string;
   accepted?: FactRef;
+  /** Absent is the legacy person join. Agent enrolment is explicitly tagged. */
+  kind?: "enrol";
+  /** A definite terminal native refusal is retained for agent enrollment. */
+  refused?: Extract<import("@generalbusiness/dap-contract").Answer, { answer: "refused" }>;
 }
+
+export interface PendingInvitationIssue { operation: string; request: string; digest: Digest; membership: ScopeRef; actor: import("@generalbusiness/dap-contract").KeyId }
 
 /**
  * An install that `install --plan` prepared and `install --planned` has not founded yet: the signed `install` intent, the version
@@ -82,6 +88,13 @@ export interface Config {
   remote?: string;
   /** Exact pending enrollment; retry the same invitation link to continue. */
   join?: PendingJoin;
+  /**
+   * Standalone scopes the MCP server lists acts for: each a scope outside the repository, and the membership scope that standing
+   * for it is read from, or null when none is known. `artroom mcp --scope` and the server's `create` append one.
+   */
+  roots?: { scope: ScopeId; membership: ScopeRef | null }[];
+  /** Public pointer only; invitation secrets and envelopes stay in Store.private. */
+  invitationIssue?: PendingInvitationIssue;
 }
 
 export interface Store {

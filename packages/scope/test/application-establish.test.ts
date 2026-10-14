@@ -1,11 +1,11 @@
 import { runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished, test } from "vitest";
-import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, intentDigest, isSeed, scopeIdOf, seedDigest, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
 import { command, memoryStore, type Context } from "../../cli/src/index.ts";
-import { keys } from "@generalbusiness/artroom-derive/testing";
-import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/artroom-platform";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";

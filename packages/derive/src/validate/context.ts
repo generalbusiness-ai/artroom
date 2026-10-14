@@ -5,7 +5,7 @@
  * subject is resolved.
  */
 
-import type { Bounds, CapabilityName, FieldType } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, FieldType } from "@generalbusiness/dap-contract";
 import { isObject } from "../values.ts";
 import type { Underived } from "./capability.ts";
 import type { Shapes } from "./shape.ts";

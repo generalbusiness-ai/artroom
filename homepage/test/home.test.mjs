@@ -11,12 +11,13 @@ const HOME = "https://dap.generalbusiness.ai/", DOCS = "https://github.com/gener
 const words = html => html.replace(/<br\s*\/?\s*>/g, " ").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const anchors = html => [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map(match => ({ attributes: Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(part => [part[1], part[2]])), content: match[2] }));
 const expected = {
-  "index.html": { title: "dap", copy: "A programmable coordination fabric for people and agents. Room Shared work, governed by your rules. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [GITHUB, DOCS, HOME, "/room/", "/counter/", "/jam/", DOCS] },
-  "room/index.html": { title: "dap - room", copy: "A room for shared work. Raise issues, propose changes and publish when the room’s rules are met. Open room Raise an issue Propose a change Publish under the rules The room records who did what, and why.", targets: [HOME, "https://artroom-scope.inguz.workers.dev/page/"] },
-  "counter/index.html": { title: "dap - counter", copy: "Agents that count. Three agents take turns counting aloud, with each completed turn added to the record. Open counter A Ada → B Beau → C Cleo One turn at a time. Choose an identity and join. The turns follow automatically.", targets: [HOME, "https://artroom-counting.inguz.workers.dev/counting/"] },
-  "jam/index.html": { title: "dap - jam", copy: "A little music. Explore a procedural music demo. Open jam Synth Percussion Lead Sound starts when you press Play.", targets: [HOME, "https://artroom-jam.inguz.workers.dev/"] },
+  "index.html": { title: "dap", copy: "Durable action platform for people and agents. Room Shared work, governed by your rules. → Library Kitchenware and tools, shared by members. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [HOME, GITHUB, DOCS, "/room/", "/library/", "/counter/", "/jam/", "https://github.com/generalbusiness-ai/dap/blob/main/docs/self-host.md"] },
+  "room/index.html": { title: "dap - room", copy: "A room for shared work. Raise issues, propose changes and publish when the room’s rules are met. Open room Raise an issue Propose a change Publish under the rules The room records who did what, and why.", targets: [HOME, GITHUB, DOCS, "https://artroom-scope.inguz.workers.dev/page/"] },
+  "library/index.html": { title: "dap - library", copy: "A lending library. Donate kitchenware and tools. Borrow what is available, return what is lent, and keep the story in the record. Open library Donate a thing Borrow and return Keep its story Member interface : join with the invitation link the library’s staff gave you, then donate, borrow and return. Published shelf: not available yet. Members’ record: in the member interface, after you join. It lists every act that took effect, with who signed it. Membership is by invitation. Published shelf pages will be public. The lending record is for members. Only staff can cancel a thing.", targets: [HOME, GITHUB, DOCS, "https://dap-lending.inguz.workers.dev/lending/", "https://dap-lending.inguz.workers.dev/lending/"] },
+  "counter/index.html": { title: "dap - counter", copy: "Agents that count. Three agents take turns counting aloud, with each completed turn added to the record. Open counter A Ada → B Beau → C Cleo One turn at a time. Choose an identity and join. The turns follow automatically.", targets: [HOME, GITHUB, DOCS, "https://artroom-counting.inguz.workers.dev/counting/"] },
+  "jam/index.html": { title: "dap - jam", copy: "A little music. Explore a procedural music demo. Open jam Synth Percussion Lead Sound starts when you press Play.", targets: [HOME, GITHUB, DOCS, "https://artroom-jam.inguz.workers.dev/"] },
 };
-test("four built homepages preserve the approved copy, every link, child headers and shared supporting rule", async () => {
+test("five built homepages preserve the approved copy, every link, child headers and shared supporting rule", async () => {
   const temporary = await mkdtemp(resolve(tmpdir(), "dap-home-test-"));
   try {
     const built = await buildHome(resolve(temporary, "assets")), pages = {};
@@ -30,12 +31,15 @@ test("four built homepages preserve the approved copy, every link, child headers
       assert.deepEqual([logos[0].attributes.href, logos[0].attributes["aria-label"]], [HOME, "dap homepage"]);
       assert.match(logos[0].content, /<img src="\/brand\/dap\.svg"/);
       if (file !== "index.html") {
-        const header = html.match(/<header>([\s\S]*?)<\/header>/)?.[1]; assert.ok(header);
-        assert.equal(anchors(header).length, 1); assert.ok(!/<nav\b|role="tab|class=".*tabs/.test(header), "children have only their home wordmark in the header");
+        const header = html.match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1]; assert.ok(header);
+        assert.deepEqual(anchors(header).map(link => link.attributes.href), [HOME, GITHUB, DOCS]); assert.ok(!/<nav\b|role="tab|class=".*tabs/.test(header), "children share the utility header without navigation tabs");
       }
     }
+    const utility = pages["index.html"].match(/<div class="utility">([\s\S]*?)<\/div>/)?.[1]; assert.ok(utility);
+    assert.match(utility, /^<a class="brand-link" data-home /, "the homepage wordmark is the utility row’s first child");
+    for (const file of ["room/index.html", "library/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], file === "jam/index.html" ? utility.replace('width="432"', 'width="440"') : utility, "all five pages share header links and labels; Jam retains its deferred intrinsic width");
     const rows = anchors(pages["index.html"]).filter(link => link.attributes.class === "destination");
-    assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Counter", "Jam", "Documentation"]);
+    assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Library", "Counter", "Jam", "Documentation"]);
     const icons = anchors(pages["index.html"]).filter(link => link.attributes.class === "icon-link");
     assert.deepEqual(icons.map(icon => [icon.attributes["aria-label"], icon.attributes.href]), [["GitHub repository", GITHUB], ["Documentation", DOCS]]);
     const support = html => html.match(/<p class="([^"]+)">(?:The room records who did what, and why\.|Sound starts when you press Play\.)<\/p>/)?.[1];
@@ -43,6 +47,6 @@ test("four built homepages preserve the approved copy, every link, child headers
     assert.equal(await readFile(resolve(built, "_headers"), "utf8"), "/*\n  Cache-Control: public, max-age=0, must-revalidate, no-transform\n", "the built serving metadata preserves cache policy and forbids HTML transforms");
     const css = await readFile(resolve(built, "style.css"), "utf8");
     assert.match(css, /\.support\{[^}]*font-family:OpenRunde,system-ui,sans-serif;[^}]*font-size:20px;[^}]*font-weight:400;[^}]*line-height:1\.5/);
-    for (const [master, asset] of [["dap-wordmark-green.svg", "dap.svg"], ["dap-symbol-small.svg", "favicon.svg"], ...["Regular", "Semibold", "Bold"].map(weight => [`fonts/OpenRunde-${weight}.woff2`, `fonts/OpenRunde-${weight}.woff2`])]) assert.deepEqual(await readFile(resolve(built, "brand", asset)), await readFile(resolve(root, "brand", master)));
+    for (const [master, asset] of [["dap-wordmark-green.svg", "dap.svg"], ["dist/favicon.svg", "favicon.svg"], ["dist/favicon.ico", "favicon.ico"], ...["Regular", "Semibold", "Bold"].map(weight => [`fonts/OpenRunde-${weight}.woff2`, `fonts/OpenRunde-${weight}.woff2`])]) assert.deepEqual(await readFile(resolve(built, "brand", asset)), await readFile(resolve(root, "brand", master)));
   } finally { await rm(temporary, { recursive: true, force: true }); }
 });

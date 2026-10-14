@@ -1,5 +1,5 @@
 import { expect, test, onTestFinished } from "vitest";
-import type { SignedIntent } from "@generalbusiness/artroom-contract";
+import type { SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, factRefOf, textDigest, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { secretSigner, signedIntent, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";

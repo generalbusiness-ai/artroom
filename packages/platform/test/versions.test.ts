@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, PlatformDefinition, Seed } from "@generalbusiness/dap-contract";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
-import type { PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
-import { d } from "@generalbusiness/artroom-derive/testing";
-import { APPLICATION_COHORT, COUNTING_COHORT, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
+import type { PlatformRule, RuleGiven } from "@generalbusiness/dap-derive";
+import { d } from "@generalbusiness/dap-derive/testing";
+import { APPLICATION_COHORT, COUNTING_COHORT, DEMO_REGISTER, FIRST_ACTIONS_OF, NEWEST, ROLE_LISTS, ROLE_TABLE_OF, VERSIONS, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, directorySeed, platform, versionOf, type Role } from "../src/index.ts";
 import { rita } from "./support-founding.ts";
 
 // The planner's decision of 2026-10-07: a changed definition carries a new version; a scope pins its version at its genesis and is
@@ -13,13 +13,23 @@ import { rita } from "./support-founding.ts";
 // D6/M5 digests were validated from the complete actual catalog at f1455d940.
 // Evidence: /tmp/artroom-m1-f145-generation-execution/complete-catalog-validation.json
 // SHA-256: 47545c46bbc0b5fd6c577aa8635d518b76a8416a020fe988d30755eb6a5a950c. Generation is not a test or gate pass.
+// Rules4 was generated and validated from the actual catalog at 15a922de916a28c3062775acef4ba8673708f458; its tests remained held.
+// Evidence: /tmp/artroom-rules4-generation-one/result.json
+// SHA-256: 41f71c59e0b534042ccfc5b9bed61f4bb4cfc753809db6fabfec4acc4ebe3761.
+// Demo register versions 7 and 8 and directory version 7 were generated and validated at a1153d28b3e8f5b73af0440b894b217f351709d0.
+// Evidence: /tmp/artroom-cohort25-generation-one/result.json
+// SHA-256: e2a2052d23705690ec4b884786f453718875f6505d515fdda88a20191eb64269.
 const DIGESTS: Readonly<Record<string, string>> = {
+  "platform:register@7": "sha256:1363aa547f314eb9c598c33415a1e9e3c90b4e5afce351233abf9b3f757069b5",
+  "platform:register@8": "sha256:1363aa547f314eb9c598c33415a1e9e3c90b4e5afce351233abf9b3f757069b5",
+  "platform:directory@7": "sha256:053ec528406d1de077992d80f405f846940fb3c2c44f9206263e18329e1d58f6",
   "platform:directory@6": "sha256:1490af0c962eb382a2befe76139b0f2387b16071c27288d65effc9fc7a037ca7",
   "platform:membership@5": "sha256:6a1ea346fa6ae237fe53f85551fe621b56d1a91be0117178c829958d0f5f0155",
   "platform:register@6": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:register@5": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@5": "sha256:db86423258d5de0df43956187460d5ade0d3e878371c24d89c33ecd51c2b1bd5",
   "platform:membership@4": "sha256:78b3f59009f78030f88d3444187c0c7deb40c296b7f07b18d5e86a161222f831",
+  "platform:rules@4": "sha256:e3fa2a716deb5580674095272973c2830d8259bf089390b5a753db6d29b65454",
   "platform:rules@3": "sha256:e9ed7ebe04bf66f1dd7c2b39a43d55b5e3b71317d5e3e3cf1a96dd16b2804ed5",
   "platform:inbox@1": "sha256:2d4fb56155ddc0cf02bfc75ac89a261c35aeb3069771e4a51429319ccd204748",
   "platform:register@1": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
@@ -38,11 +48,18 @@ const DIGESTS: Readonly<Record<string, string>> = {
 };
 
 test("every shipped version resolves to its own data, pinned by digest, and version 1 of each is the data that main shipped; no other version resolves; default founding keeps the existing cohort", () => {
-  expect(Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]))).toEqual(DIGESTS);
+  const digests = Object.fromEntries(Object.entries(VERSIONS).map(([named, supplied]) => [named, definitionDigest(supplied.data as unknown as DeclaredDefinition)]));
+  expect(digests).toEqual(DIGESTS); // Every supported version has its exact observed golden literal.
+  const next = platform("platform:rules@4")!;
+  expect(next).toBe(VERSIONS["platform:rules@4"]);
+  expect(next.data.items["rules"]!.values["ownerMayReview"]!.default).toBe(true);
+  expect(next.rules).toBe(platform("platform:rules@3")!.rules);
+  expect(digests["platform:rules@4"]).not.toBe(DIGESTS["platform:rules@3"]);
+  expect(["platform:rules@1", "platform:rules@2", "platform:rules@3"].map(named => platform(named)!.data.items["rules"]!.values["ownerMayReview"]!.default)).toEqual([false, false, false]);
   for (const named of Object.keys(DIGESTS)) expect(platform(named)).toBe(VERSIONS[named]);
   expect(["platform:destination@4", "platform:destination@0", "platform:destination@02", "platform:destination", "platform:task@1", "toString"].map(platform)).toEqual(Array(6).fill(null));
-  // The explicit application pins do not replace the existing default cohort.
-  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership]);
+  // Explicit application and demo pins do not replace the existing default cohort.
+  const supporting = new Set<string>([APPLICATION_COHORT.register, APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, COUNTING_COHORT.register, COUNTING_COHORT.directory, COUNTING_COHORT.membership, "platform:rules@4", DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT.directory]);
   const highest = Object.keys(VERSIONS).filter((named) => !supporting.has(named)).reduce<Record<string, number>>((most, named) => ({ ...most, [named.slice(0, named.lastIndexOf("@"))]: Math.max(most[named.slice(0, named.lastIndexOf("@"))] ?? 0, versionOf(named as PlatformDefinition)) }), {});
   expect(Object.fromEntries(Object.entries(NEWEST).map(([name, named]) => [name, versionOf(named)]))).toEqual(highest);
   // Version 2 adds the act `read-token` and its operation `mint-read` to the destination, and nothing to version 1.
@@ -60,6 +77,7 @@ test("a rule reads its own version from the scope's genesis: the register of eac
   const at = { kind: "register", scope: `sc_${"r".repeat(51)}a`, inc: `in_${"r".repeat(25)}a` };
   const found = (definition: PlatformDefinition) => ({ input: { type: "act", signed }, own: (seq: number) => (seq === 0 ? { entry: { input: { type: "genesis", seed: genesisOf(definition) } } } : null), resolved: { at } }) as unknown as RuleGiven;
   expect((["platform:register@1", "platform:register@2", "platform:register@3"] as const).map((named) => directorySeed(found(named)).definition)).toEqual(["platform:directory@1", "platform:directory@2", "platform:directory@3"]);
+  expect([DEMO_REGISTER, WEB_DEMO_REGISTER].map(named => directorySeed(found(named)).definition)).toEqual(["platform:directory@3", WEB_DEMO_COHORT.directory]);
 
   const roleTable = (platform("platform:membership@1")!.rules["role-table"] as Extract<PlatformRule, { place: "effect" }>);
   const lists = (named: PlatformDefinition) => Object.fromEntries((roleTable.run(inGenesis(named)) as unknown as readonly { slot: string; value: string[] }[]).map((effect) => [effect.slot, effect.value]));

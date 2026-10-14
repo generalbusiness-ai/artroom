@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "../src/index.ts";
 import { answered } from "./support/graph.ts";
 import { merged, oid, paul, proposed, publicationOf, rita, room, una, vic } from "./support/room.ts";

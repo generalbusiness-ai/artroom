@@ -23,9 +23,9 @@
  * authority's proposals, to be measured by the proof plan.
  */
 
-import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId } from "@generalbusiness/artroom-contract";
+import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
-import type { Item, Opening, Operation, Own, PlatformRule, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/artroom-derive";
+import type { Item, Opening, Operation, Own, PlatformRule, PublicationOrigin, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/dap-derive";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";
@@ -2077,9 +2077,59 @@ const WRITTEN_2: Rules = {
  * reader. The production rules are `destinationRules` and
  * `destinationRules2`, below.
  */
+/**
+ * Runtime admission metadata for future, recovered and late publication
+ * work. It changes neither platform data nor recorded outcome effects.
+ * Cleanup and founding return null; malformed target provenance returns false.
+ */
+export function publicationOrigin(state: StateView, operation: Operation, own: Own): PublicationOrigin | false | null {
+  if (!["judge", "check-judge", "reservation-stage", "push", "mint", "read", "receipt"].includes(operation.kind)) return null;
+  try {
+    const publicationFor = (target: Item | null): Item | false | null => {
+      if (!target) return false;
+      if (target.type === "publication") return target;
+      if (target.type === "receipt") return target.refs["publication"] == null ? null : publicationAt(state, target.refs["publication"]) ?? false;
+      return target.type === "branch" ? null : false;
+    };
+    let publication: Item | false | null;
+    if (operation.kind === "mint") {
+      const served = servedBy(state, own, operation);
+      if (!served) return false;
+      if (["first-head", "reservation-delete"].includes(served.write.kind)) return null;
+      publication = publicationFor(targetOf(state, own, served.write));
+    } else if (operation.kind === "receipt" || operation.kind === "push") {
+      publication = publicationFor(targetOf(state, own, operation));
+    } else if (operation.kind === "read") {
+      const target = readFor(state, own, operation);
+      if (target === "first-head") return null;
+      if (target === "receipt") {
+        const input = ownEntry(own, seqOf(operation.id)).input;
+        const write = input.type === "outcome" ? state.operation(input.operation) : null;
+        if (!write || write.kind !== "receipt") return false;
+        publication = publicationFor(targetOf(state, own, write));
+      } else publication = publicationFor(target);
+    } else publication = typeof operation.for === "number" ? publicationAt(state, operation.for) ?? false : false;
+    if (publication === null || publication === false) return publication;
+    const from = publication.refs["operation"], lane = publication.refs["lane"];
+    const directory = branchOf(state)?.refs["directory"], destination = state.scope()?.at;
+    if (!isFactRef(from) || !isScopeRef(lane) || !sameRef(lane, from.at)
+      || !isScopeRef(directory) || directory.kind !== "directory" || !destination || destination.kind !== "destination") return false;
+    return { from, directory, destination };
+  } catch { return false; }
+}
+
+const sameRef = (a: ScopeRef, b: ScopeRef): boolean => canonicalize(a) === canonicalize(b);
+
+/** Metadata only: all recorded judgment callbacks remain the original functions. */
+function withPublicationOrigin(rules: Rules): Rules {
+  return Object.fromEntries(Object.entries(rules).map(([name, rule]) => [name, rule.place !== "outcome" ? rule : {
+    ...rule, rules: { ...rule.rules, publicationOrigin },
+  }]));
+}
+
 export function destinationRulesWith(reads: Reads, version: 1 | 2 = 2): Rules {
   const judge = judgeDecides(reads);
-  return { ...WRITTEN, ...(version === 1 ? {} : WRITTEN_2), judge: judgeRule(judge), "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }) };
+  return withPublicationOrigin({ ...WRITTEN, ...(version === 1 ? {} : WRITTEN_2), judge: judgeRule(judge), "publication-update": updateRule({ ...DECIDES, [DESTINATION_KINDS.judge]: judge }) });
 }
 
 /** The rules of `platform:destination@1` that this package holds: what a runtime and a verifier run. */
@@ -2296,7 +2346,7 @@ export const destinationRules3: Rules = (() => {
   } } };
   const judgeRule3 = rules["judge"] as Extract<PlatformRule, { place: "outcome" }>;
   const checked = rules["checked-result"]!;
-  return { ...rules,
+  return withPublicationOrigin({ ...rules,
     push: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["push"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 20, requests: 1, operations: 6 } } },
     "deciding-read": { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>), rules: { ...(rules["deciding-read"] as Extract<PlatformRule, { place: "outcome" }>).rules, most: { effects: 17, requests: 1, operations: 5 } } },
     receipt: receiptCleanup,
@@ -2416,5 +2466,5 @@ export const destinationRules3: Rules = (() => {
 
       },
     } },
-  };
+  });
 })();

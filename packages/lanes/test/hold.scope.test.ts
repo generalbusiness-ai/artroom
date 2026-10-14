@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { timeMs } from "@generalbusiness/artroom-derive";
+import { timeMs } from "@generalbusiness/dap-derive";
 import { graph, net, onCode, rita, soon, una, vic } from "./support/graph.ts";
 
 /** A commit and a tree, as a report names them. Nothing reads a repository here. */

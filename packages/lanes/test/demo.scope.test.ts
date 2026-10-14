@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, inject, test, onTestFinished } from "vitest";
-import type { ScopeId, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { ScopeId, SignedIntent } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, keyIdOfSecret, scopeIdOf, textDigest, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionRequest, signedReads, type Fetch } from "@generalbusiness/artroom-client";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -32,7 +32,7 @@ declare module "vitest" {
 // | The scopes, the routes and the readers | Real, as in `issues.scope.test.ts`: the namespace `PLATFORM`, the Worker's HTTP routes, and the real read sessions under a TEST SECRET. The lanes are created by the real directory under the demo profile's digests, which the real rules scope activated. |
 // | The Git host | The production wiring of `artifacts-wiring.ts` over STAND-IN `OwnGit`, or `github-wiring.ts` over STAND-IN `Hub`, of `packages/scope/test/hosts.ts`. The operator's setting that pins the planned register is the test wiring the stand-in to that register's ID before the planned install. No live provider runs. |
 // | The site route and the page | Real: `site` of the scope package over the same stand-in, and the Worker's entry for `/page/`, called as the Worker calls them. Their answers are read as text; no browser runs. |
-// | `git` | A STAND-IN: `clone` asks the stand-in host for its refs with the header that `artroom clone` put in git's environment, and keeps the head; `log --oneline` reads the commits from that head in the stand-in's objects. |
+// | `git` | A STAND-IN: `clone` asks the stand-in host for its refs with the header that `dap clone` put in git's environment, and keeps the head; `log --oneline` reads the commits from that head in the stand-in's objects. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of every scope that a command has waited on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces signs the intents; the wall clock times the shots. |
 describe("the demo runner's rehearsal on real scopes. The Git host, git and the scheduler are STAND-INs", () => {
@@ -478,7 +478,7 @@ async function concurrencyWitness(founder: Context, rehearsal: Rehearsal, pushed
   const winnerPublication = beforeWinner.findIndex(line => line.startsWith("Published:"));
   expect(loserAdmission).toBeGreaterThanOrEqual(0);
   expect(winnerPublication).toBeGreaterThan(loserAdmission);
-  expect(beforeWinner.slice(loserAdmission + 1, winnerPublication)).toContain(`$ artroom merge ${controlled.scope}`);
+  expect(beforeWinner.slice(loserAdmission + 1, winnerPublication)).toContain(`$ dap merge ${controlled.scope}`);
 
   expect(fields(newProposal[0]!)["base"]).toBe(pushed.at(-2));
   expect(fields(newProposal[0]!)["base"]).not.toBe(fields(staleProposal[0]!)["base"]);

@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import type { OperationId, Request, Result } from "@generalbusiness/artroom-contract";
+import type { OperationId, Request, Result } from "@generalbusiness/dap-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { destinationReceipt, firstHeadCommit } from "../src/destination.ts";
 import { Branch, HEAD, NEXT, OTHER, handMade, said } from "./support-destination.ts";
-import { t } from "@generalbusiness/artroom-derive/testing";
+import { t } from "@generalbusiness/dap-derive/testing";
 
 // Real destination rules and derive judges, in memory. The bureau, claim
 // and host answers are hand-written; no host, port or founding is reached.

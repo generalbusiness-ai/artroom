@@ -9,10 +9,10 @@
  * are the platform package's, which is code of this runtime.
  */
 
-import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/artroom-contract";
-import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/artroom-derive";
-import { evaluateRules } from "@generalbusiness/artroom-derive/rule";
-import { platform, type Platform } from "@generalbusiness/artroom-platform";
+import type { Digest, Entry, FactRef, Grant, KeyId, ObservationUse, PlatformDefinition, Prepared, RoutingRefusal, ScopeRef, SignedIntent, Timestamp, UnavailableReason } from "@generalbusiness/dap-contract";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability, timeOf, type Capabilities, type HoldOptions, type Clock as Reading, type Delivered, type Fetched, type Owners, type Presented, type RuleInput, type StateView, type Needed, type Observing, type Window } from "@generalbusiness/dap-derive";
+import { evaluateRules } from "@generalbusiness/dap-derive/rule";
+import { platform, type Platform } from "@generalbusiness/dap-platform";
 import { toConsole, type DiagnosisSink } from "./diag.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
 
@@ -140,8 +140,8 @@ export interface Further {
  * or it has no entry there. The core also stops waiting after `seconds`,
  * and checks the entry against the fact's hash itself.
  */
-export type Foreign = { entry: Entry; under: string } | { absent: true } | null;
-export interface Resolver { read(fact: FactRef, seconds: number): Promise<Foreign> }
+export type Foreign = { entry: Entry; under: string; origin?: readonly Fetched[] } | { absent: true } | null;
+export interface Resolver { read(fact: FactRef, seconds: number, origin?: boolean): Promise<Foreign> }
 
 /**
  * How transport answers one delivery (section 7.4). None of these is an

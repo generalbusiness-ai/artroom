@@ -2,7 +2,7 @@ import { expect, inject, test } from "vitest";
 import { b64url } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { ScopeHandle, httpTransport, secretSigner, signedReads } from "@generalbusiness/artroom-client";
-import { DEMO_DIGESTS } from "@generalbusiness/artroom-lanes";
+import { DEMO_DIGESTS } from "@generalbusiness/dap-lanes";
 import worker, { type Env } from "../../scope/src/worker.ts";
 import { act, actsOn, joinRoom, listLanes, loadChange, loadIssue, loadRules, loadSite, openRoom, placeOf, type Room } from "../src/index.ts";
 import { prepareEdit } from "../src/retained-editor-data.ts";

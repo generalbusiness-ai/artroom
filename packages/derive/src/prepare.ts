@@ -25,8 +25,8 @@
  * charged (section 17.3).
  */
 
-import { CAPABILITIES } from "@generalbusiness/artroom-contract";
-import type { Capability, CapabilityName, Digest, Effect, FactRef, FieldValue, Grant, Head, Intent, KeyId, OperationId, RefusalReason, ScopeRef, SignedIntent, UnavailableReason } from "@generalbusiness/artroom-contract";
+import { CAPABILITIES } from "@generalbusiness/dap-contract";
+import type { Capability, CapabilityName, Digest, Effect, FactRef, FieldValue, Grant, Head, Intent, KeyId, OperationId, RefusalReason, ScopeRef, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
 import { intentDigest, isScopeRef, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import { maximumOf, type Capabilities, type Maximum, type Recorded } from "./capability.ts";

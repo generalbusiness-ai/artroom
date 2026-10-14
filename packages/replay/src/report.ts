@@ -6,7 +6,7 @@
  * all four.
  */
 
-import type { FactRef, Report, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { FactRef, Report, ScopeRef } from "@generalbusiness/dap-contract";
 
 export type { Report };
 

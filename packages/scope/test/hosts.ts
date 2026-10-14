@@ -7,7 +7,7 @@
  * It lives here, in the scope package, which may name the git package; a lane scenario reaches it by path.
  */
 import { expect } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, timeMs, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { READ_BOUNDS, Reader, ZERO_ID, type GitSource } from "@generalbusiness/artroom-git";
 import { buildPack } from "@generalbusiness/artroom-git/http";

@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import type { Entry, Input, OperationId, Read } from "@generalbusiness/artroom-contract";
+import type { Entry, Input, OperationId, Read } from "@generalbusiness/dap-contract";
 import { httpTransport, TransportError, type Fetch } from "@generalbusiness/artroom-client";
 import { CLONE_ENTRIES_PER_POLL, outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome } from "../src/clone-outcome.ts";
 
@@ -96,7 +96,7 @@ test("exceptional outcome stops retain actionable progress without exposing tran
   if (!("ok" in readFailure) || readFailure.ok) return expect.fail("read failure must be a contextual stop");
   const readLines = outcomeWaitLines(scope, 1, operation, readFailure);
   expect(readLines[0]).toContain(`${scope}:1 (${operation}): read-failed; 1 entries in 1 polls, next entry ${scope}:3`);
-  expect(readLines[1]).toContain(`artroom show ${scope}:1 and artroom log destination`);
+  expect(readLines[1]).toContain(`dap show ${scope}:1 and dap log destination`);
   expect(readLines.join(" ")).not.toContain(secret);
 
   reads = pauses = 0;

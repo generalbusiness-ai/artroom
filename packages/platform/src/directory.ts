@@ -61,10 +61,10 @@
  * plan owns. They are written as the note has them.
  */
 
-import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, PlatformDefinition, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, FieldValue, Grant, MemberObservation, MemberRef, PlatformData, PlatformDefinition, RulesObservation, ScopeId, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { intentDigest, isDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
-import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/artroom-derive";
+import { PROFILES, isObject, isScopeRef, same, validateDefinition, type Item, type Operation, type RuleEffect, type RuleGiven, type Rules, type StateView } from "@generalbusiness/dap-derive";
 import { CREATION_ATTEMPTS, DIRECTORY, REPOSITORY } from "./register.ts";
 import { isOf, pinnedBy } from "./versions.ts";
 
@@ -82,6 +82,7 @@ export const SIBLINGS_OF: Readonly<Record<string, { membership: PlatformDefiniti
   "platform:directory@3": { membership: "platform:membership@2", rules: "platform:rules@2", destination: "platform:destination@3" },
   "platform:directory@5": { membership: "platform:membership@4", rules: "platform:rules@3", destination: "platform:destination@2" },
   "platform:directory@6": { membership: "platform:membership@5", rules: "platform:rules@3", destination: "platform:destination@2" },
+  "platform:directory@7": { membership: "platform:membership@2", rules: "platform:rules@4", destination: "platform:destination@3" },
 };
 
 /** The bound on the attempts of the import that a founding opens (section 12.1.2, the row `establish`; U9). */
@@ -388,6 +389,9 @@ export const directory2: PlatformData = {
 };
 
 export const directory3: PlatformData = directory2;
+
+/** Explicit future web cohort: the same membership creation data, with named Rules4 siblings. */
+export const directory7: PlatformData = { ...directory3 };
 
 // ---------------------------------------------------------------- reading the directory's state
 

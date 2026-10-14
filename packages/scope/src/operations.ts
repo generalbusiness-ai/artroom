@@ -35,13 +35,14 @@
  * commit and from the object's alarm.
  */
 
-import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/artroom-derive";
+import { clockOf, recordedOutcome, evidenceValues, isEntryOf, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type Operation, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
+import { publishingLaneOrigin } from "@generalbusiness/dap-platform";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
-import type { Clock, Ports } from "./ports.ts";
+import type { Clock, Ports, Resolver } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
 
@@ -113,7 +114,7 @@ export type LateAnswers = (operation: OperationId, attempt: number, answer: Effe
  * releases or drops it here, on what the sealed entry says.
  */
 export interface Outside {
-  snapshot?(asked: import("@generalbusiness/artroom-contract").SignedIntent): Promise<import("@generalbusiness/artroom-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
+  snapshot?(asked: import("@generalbusiness/dap-contract").SignedIntent): Promise<import("@generalbusiness/dap-contract").ReservationSnapshot | { refused: "reservation-stage-missing" | "reservation-stage-mismatch" } | null>;
   accepts(owner: CapabilityName | PlatformDefinition, kind: string): boolean;
   send(request: EffectRequest): Promise<EffectAnswer | null>;
   late?(deliver: LateAnswers): void;
@@ -191,6 +192,7 @@ export class Operations {
   readonly #scope: Scope;
   readonly #store: Store;
   readonly #outside: Outside;
+  readonly #resolver: Resolver;
   readonly #owners: Owners | undefined;
   readonly #clock: Clock;
   readonly #wakes: Wakes;
@@ -201,8 +203,8 @@ export class Operations {
    * says that it is not ready (`OperationRules.ready`): the request of an
    * attempt of a staging waits for its tokens (authority note, section 5.7).
    * It has no time to be looked at next, so it costs no wake-up (rule 7).
-   * The next outcome entry that this driver writes may be what it waits
-   * for, so that entry starts the walk again, which looks at every such
+   * The next committed entry may be what it waits for, so the commit
+   * starts the walk again, which looks at every such
    * attempt once more. In memory only: a restart begins the walk in any case.
    */
   #waiting = false;
@@ -246,11 +248,12 @@ export class Operations {
   readonly #conflict: ((operation: OperationId, attempt: number, seq: number) => void) | undefined;
 
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses" | "resolver">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
     this.#conflict = conflict;
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;
+    this.#resolver = ports.resolver;
     this.#owners = ports.owners ?? undefined;
     this.#clock = ports.clock;
     this.#wakes = wakes;
@@ -264,6 +267,28 @@ export class Operations {
    * it asks about at most one batch of them, and writes nothing. A pass that finds one starts the walk again (`#pass`).
    */
   reaccepted(): boolean { return this.#accepted(false); }
+
+  /** A committed entry may make a parked attempt ready. */
+  committed(): void {
+    if (!this.#waiting) return;
+    this.#waiting = false;
+    this.#walk = { after: null };
+    this.#again = true;
+  }
+
+  /** Forward security check only: it changes neither old entries nor their derivation. */
+  async #publicationReady(operation: Operation): Promise<boolean> {
+    const rules = this.#scope.owners()?.rules(operation.owner, operation.kind);
+    const asked = rules?.publicationOrigin?.(this.#store, operation, ownOf(this.#store));
+    if (asked === undefined || asked === null) return true;
+    if (asked === false) return false;
+    try {
+      const read = await within(() => this.#resolver.read(asked.from, this.#bounds.fetchSeconds, true), this.#bounds.fetchSeconds);
+      return read !== LATE && read !== null && "entry" in read && read.under === "change"
+        && isEntryOf(read.entry, asked.from)
+        && publishingLaneOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []);
+    } catch { return false; }
+  }
 
   /** Bounded rotating inspection of the in-memory refused queue. A read
    * leaves an accepted entry first, so its following pass sees that same
@@ -346,6 +371,12 @@ export class Operations {
         continue;
       }
       if (row.sent !== null) {
+        const operation = store.operation(id);
+        if (operation && !await this.#publicationReady(operation)) {
+          if (row.next !== null) store.postpone(id, attempt, null);
+          this.#waiting = true;
+          continue;
+        }
         // The request may have left: its durable mark has no outcome. An answer in hand wins; otherwise only an accepted safe
         // recovery read may obtain one. With neither, unknown is offered. The original mutation is never sent again.
         const input = this.#held.get(keyOf(id, attempt));
@@ -367,8 +398,8 @@ export class Operations {
       }
       this.#refused.delete(keyOf(id, attempt));
       // The owner's rule on when the request may leave, such as the tokens of an attempt of a staging. Not ready: recorded and not
-      // sent, with no wake-up, until an outcome entry is written and the walk looks again.
-      if (rules.ready && !rules.ready(store, operation, attempt)) {
+      // sent, with no wake-up, until a committed entry starts the walk again.
+      if (!await this.#publicationReady(operation) || rules.ready && !rules.ready(store, operation, attempt)) {
         if (row.next !== null) store.postpone(id, attempt, null);
         this.#waiting = true;
         continue;
@@ -584,6 +615,10 @@ export class Operations {
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
     const rules = operation && this.#scope.owners()?.rules(operation.owner, operation.kind);
+    if (operation && !await this.#publicationReady(operation)) {
+      this.#waiting = true;
+      return { recorded: "unavailable" };
+    }
     if (rules?.values !== undefined && rules.valueDomains === undefined) return { recorded: "unavailable" };
     const named = rules?.retains?.(input.evidence) ?? [];
     let values: ReturnType<typeof evidenceValues>;
@@ -647,11 +682,7 @@ export class Operations {
     const recorded: OutcomeRecorded = end.end === "answer" ? end.answer : { recorded: "unavailable" };
     // The turn has ended, so an entry that it wrote is committed. An outcome entry may be what an attempt that is not ready waits
     // for: the walk looks at each of them again.
-    if (recorded.recorded === "written" && this.#waiting) {
-      this.#waiting = false;
-      this.#walk = { after: null };
-      this.#again = true;
-    }
+    if (recorded.recorded === "written") this.committed();
     // The port is told of each decisive answer that the scope has judged, with the entry that it wrote, if it wrote one.
     if (input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
     // An incident (authority note, section 12, G13): nothing is written for it, so it is kept in the operator's record alone. It is told

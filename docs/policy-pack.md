@@ -2,9 +2,9 @@
 
 # The default policy pack
 
-Artroom's default policy pack is twelve rules. Each one replaces something a
+dap's default policy pack is twelve rules. Each one replaces something a
 team sets up today in a Git hook, branch protection, a `CODEOWNERS` file,
-required CI checks or a review assistant's instructions. In Artroom they are
+required CI checks or a review assistant's instructions. In dap they are
 one file, `.artroom/policy.json`. It is versioned with the code and changed
 only by an admin-approved proposal.
 
@@ -234,7 +234,7 @@ failed checks.
 These protections are platform rules. Policy cannot turn them off, so the
 pack does not repeat them.
 
-| Today | In Artroom | The user sees |
+| Today | In dap | The user sees |
 |---|---|---|
 | A hook that blocks commits touching other teams' files | A proposal that changes paths outside its claim is refused (R-PROP-4) | `outside-claim`. Fix: *extend the claim* |
 | A secret-scanning pre-commit hook | Every act body, including notes, is scanned before it is recorded (R-SEC-1 to 3) | `secret-detected`, naming the field and the detector, never the secret. Fix: *remove the secret; rotate it if it was shared elsewhere* |

@@ -27,15 +27,17 @@
  * | `issue`, `issues` | `open` is the directory's `open-issue`; `comment`, `assign` and `close` are the issue lane's own acts. `issues` lists each issue as its lane has it. |
  */
 
-import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/artroom-contract";
-import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
+import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
-  type Fetch, type ReadSigning, type Signing, type Transport,
+  ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/artroom-derive";
-import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/artroom-platform";
+import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
+import { APPLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/dap-platform";
 import { SourceError, httpSource, render, verify as replay, type HistorySource } from "@generalbusiness/artroom-replay";
+import { enrolAgentKey } from "./invitations.ts";
+import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
 const NEW_REGISTER = NEWEST["platform:register"]!;
 
 import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repository, Store } from "./store.ts";
@@ -50,6 +52,9 @@ export interface Context {
   /** Internal configured-service trust for this exact injected founding
    * transport. It authenticates no independent remote history. */
   trustedFoundingService?: { service: string; fetch: Fetch };
+  /** Explicit fixed-origin demo projection for fresh claim preflight only.
+   * It grants no authority and is never used to resume/check an original. */
+  foundingOffer?: (register: ScopeRef) => Promise<FoundingOffer>;
   /** The clock that intents are signed by, in milliseconds. The default is the runtime's. */
   now?: () => number;
   /**
@@ -115,7 +120,7 @@ const short = (text: string): string => (text.length > 16 ? `${text.slice(0, 12)
 
 async function configOf(ctx: Context): Promise<Config> {
   const config = await ctx.store.config();
-  return config ?? stop(usage("No room is set up here. Run: artroom install <base-url>, or artroom join <link>."));
+  return config ?? stop(usage("No room is set up here. Run: dap install <base-url>, or dap join <link>."));
 }
 
 /** The named key, made and kept when it does not exist yet. */
@@ -277,13 +282,13 @@ export function valueOf(config: Pick<Config, "repository">, field: { type?: stri
 }
 
 /** The answer to an act, in one or two lines. A refusal names its reason and, when the failed guard has one, its name. */
-const inspectBeforeMutation = (scope: ScopeId | null): string => scope === null ? "the configured service's history" : `artroom log ${scope}`;
+const inspectBeforeMutation = (scope: ScopeId | null): string => scope === null ? "the configured service's history" : `dap log ${scope}`;
 const unavailableAnswer = (reason: string, scope: ScopeId | null): Outcome => failed(`Unavailable: ${reason}. Outcome unknown; no acceptance is confirmed. Inspect ${inspectBeforeMutation(scope)} before another mutation. Recovery requires the same original signed envelope; repeating a generic command signs a new request.`);
 const mismatchAnswer = (reason: string, scope: ScopeId | null): Outcome => failed(`Mismatch: ${reason}. The idempotency key names another recorded intent. Inspect ${inspectBeforeMutation(scope)} and the original request before another mutation.`);
 function answered(scope: ScopeId, answer: Answer, took: string): Outcome {
   switch (answer.answer) {
     case "accepted": return done(`${took}: entry ${scope}:${answer.receipt.fact.seq}, hash ${answer.receipt.fact.hash.slice(0, 19)}.`);
-    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. The request was refused.`);
+    case "refused": return failed(`Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name === "founding-policy" ? "creation-policy" : answer.name === "founding-key" ? "initial-key" : answer.name})` : ""}, judged at entry ${scope}:${answer.judgedAt.seq}. The request was refused.`);
     case "unavailable": return unavailableAnswer(answer.reason, scope);
     case "mismatch": return mismatchAnswer(answer.reason, scope);
   }
@@ -358,7 +363,7 @@ export function install(ctx: Context, service: string, options: InstallOptions =
       return executePlannedInstall(ctx, options.cohort, plan);
     }
     if (before?.plan && selectedPlan(before.plan.definition)) return failed("Refused: install-pending. The retained selected plan must use its original cohort and request; run install --planned.");
-    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
+    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry dap install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed, key } = await installing(ctx, options, signing(ctx));
     const { answer } = await found(transportOf(ctx, service), signed, NEW_REGISTER);
     const receipt = accepted(answer, null, "Installed").receipt;
@@ -444,12 +449,12 @@ function plannedLines(plan: PlannedInstall): Outcome {
   const { host, namespace } = plan.founding.intent.fields;
   return done(
     `Planned: register ${plan.register}, under ${plan.definition}, on host ${String(host)}, namespace ${String(namespace)}. The seed's time is ${plan.founding.intent.notAfter}.`,
-    `Set registerScope to ${plan.register} in the Worker's host setting, then run artroom install --planned before ${plan.founding.intent.notAfter}.`,
+    `Set registerScope to ${plan.register} in the Worker's host setting, then run dap install --planned before ${plan.founding.intent.notAfter}.`,
   );
 }
 
 /**
- * `artroom install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
+ * `dap install --plan <base-url>`: sign the `install` intent and print the ID of the register that it will found, and found
  * nothing. The intent lives as long as an intent may, so it can be founded until its `notAfter`, the time printed. The plan is
  * kept in the config, so that the operator can pin that ID in the Worker's host setting before the register exists, and then
  * run `install --planned`. Only a definitely-unsent legacy plan may be replaced; a selected cohort plan stays exact.
@@ -461,20 +466,20 @@ export function planInstall(ctx: Context, service: string, options: InstallOptio
     if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
     if (selected) return plannedLines(await cohortPlan(ctx, service, options, before, selected));
     if (before?.plan && selectedPlan(before.plan.definition)) return failed("Refused: install-pending. The retained selected plan must use its original cohort and request; run install --planned.");
-    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry artroom install --planned with the original plan; an attempted install cannot be replaced silently.");
+    if (before?.plan?.attempted !== undefined) return failed("Refused: install-pending. Retry dap install --planned with the original plan; an attempted install cannot be replaced silently.");
     const { signed } = await installing(ctx, options, { ...signing(ctx), lifetimeSeconds: PROPOSED_BOUNDS.intentLifetimeSeconds - 60 });
     const register = registerIdOf(signed, NEW_REGISTER);
     await ctx.store.save({ v: 1, service, key: "operator", plan: { service, definition: NEW_REGISTER, founding: signed, register } });
     const { host, namespace } = signed.intent.fields as { host: string; namespace: string };
     return done(
       `Planned: register ${register}, under ${NEW_REGISTER}, on host ${host}, namespace ${namespace}. The seed's time is ${signed.intent.notAfter}.`,
-      `Set registerScope to ${register} in the Worker's host setting, then run artroom install --planned before ${signed.intent.notAfter}.`,
+      `Set registerScope to ${register} in the Worker's host setting, then run dap install --planned before ${signed.intent.notAfter}.`,
     );
   });
 }
 
 /**
- * `artroom install --planned`: found the register that `install --plan` planned, with the intent it kept. Before anything is
+ * `dap install --planned`: found the register that `install --plan` planned, with the intent it kept. Before anything is
  * sent, the plan is checked: the register ID that its intent and version make must be the one it printed, and the version must be
  * a supported exact pinned version. A durable attempted marker precedes any
  * submission. Exact attempted late recovery retains the original plan and
@@ -487,7 +492,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   const selected = selectedRegister(cohort);
   const before = await ctx.store.config();
   if (before?.register) return usage(`This config directory has a register already: ${before.register.scope}.`);
-  const kept = before?.plan ?? stop(usage("No install is planned here. Run: artroom install --plan <base-url>."));
+  const kept = before?.plan ?? stop(usage("No install is planned here. Run: dap install --plan <base-url>."));
   if (selected && kept.definition !== selected) return failed("Refused: plan-mismatch. The selected cohort conflicts with the original install plan. Nothing was sent; the plan is kept.");
   if (expected && canonicalize(kept) !== canonicalize(expected)) return failed("Held: the selected install plan changed before delivery. Nothing was sent; restore the original request.");
   const strictCustody = selectedPlan(kept.definition);
@@ -509,7 +514,7 @@ async function executePlannedInstall(ctx: Context, cohort?: InstallCohort, expec
   if (plan.attempted !== undefined && plan.attempted !== attempt) return failed("Refused: plan-mismatch. The attempted marker belongs to another service, operator, envelope, version or register. The pending plan is kept; nothing was sent.");
   if (plan.attempted === undefined && now >= timeMs(plan.founding.intent.notAfter)!) {
     const label = plan.definition === APPLICATION_COHORT.register ? "application" : "Counting";
-    return failed(`Refused: plan-expired. The planned install could be founded until ${plan.founding.intent.notAfter}. ${strictCustody
+    return failed(`Refused: plan-expired. The planned install could be created until ${plan.founding.intent.notAfter}. ${strictCustody
       ? `No request was sent by this run. Keep this original config directory unchanged. For a new ${label} plan, use a separate empty ARTROOM_HOME directory; configure the host with that new plan's register ID before installing.`
       : "Nothing was sent. Plan again, and set the new register ID."}`);
   }
@@ -584,7 +589,7 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
 }
 
 /**
- * `artroom claim <name>`: the register's `found` act, signed by the founder
+ * `dap create <name>`: the register's `found` act, signed by the founder
  * key. The register fixes the directory's seed, so its ID is known from the
  * signed intent; the directory, once it exists, creates membership, the
  * rules scope and the destination. Then the founder takes the seat and the
@@ -604,10 +609,20 @@ async function recordedStep(handle: ScopeHandle, seq: number, at: ScopeRef, key:
  * invents its missing signature. No signing key is in config.
  */
 export function claim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean } = {}): Promise<Outcome> {
+  return walkClaim(ctx, name, options, false);
+}
+/** Settle and follow only retained original stages. No new act is prepared or submitted. */
+export function checkClaim(ctx: Context, name: string): Promise<Outcome> {
+  return walkClaim(ctx, name, {}, true);
+}
+function walkClaim(ctx: Context, name: string, options: { handle?: string; branch?: string; again?: boolean }, readOnly: boolean): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    const register = config.register ?? stop(usage("No register is known here. Run: artroom install <base-url>."));
+    const register = config.register ?? stop(usage("No register is known here. Run: dap install <base-url>."));
     if (config.repository) return usage(`A repository is claimed here already: directory ${config.repository.directory.scope}.`);
+    if (readOnly && !config.claim) return failed("No original claim is retained. Check prepares and submits nothing.");
+    // A status check reads once and invokes no injected scheduler/pause hook.
+    const waiting = readOnly ? { ...ctx, tries: 1, pause: async () => {} } : ctx;
     const secret = await signerOf(ctx, config);
     const signer = secretSigner(secret);
     const R = await handleOf(ctx, config, register.scope, null);
@@ -621,15 +636,33 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       if (pending.register !== register.scope || !isDigest(pending.intent) || typeof pending.handle !== "string") return failed("The pending claim does not identify this register and a valid recorded intent; nothing was submitted.");
       if (pending.found && (!validStep(pending.found, register, signer.key, "found") || intentDigest(pending.found.signed.intent) !== pending.intent || pending.found.signed.intent.fields["founderHandle"] !== pending.handle)) return failed("The pending claim does not match this register, signing key and recorded intent; nothing was submitted.");
     } else {
+      let offered: FoundingOffer | undefined;
+      if (ctx.foundingOffer) {
+        const value = await ctx.foundingOffer(structuredClone(register));
+        if (!isFoundingOffer(value, config.service, register)) return failed("The demo offer does not match the configured origin, full register reference, pin and purpose. Nothing was prepared or submitted.");
+        // Own the projection before asynchronous recovery-key preparation.
+        offered = JSON.parse(canonicalize(value)) as FoundingOffer;
+        if (!DIRECTORY_OF[offered.definition] || !platform(offered.definition)) return failed("The demo register version is unsupported here. Nothing was prepared or submitted.");
+      }
       const recovery = keyIdOfSecret(await keyOf(ctx, "recovery"));
       const handle = options.handle ?? "@founder";
-      const registered = await summaryOf(R);
-      if (canonicalize(registered.scope) !== canonicalize(register)) return failed("The register read does not match the saved register reference; nothing was submitted.");
-      if (!DIRECTORY_OF[registered.definition]) return failed(`The register ${register.scope} is under ${registered.definition}, which this command does not know.`);
-      registerDefinition = registered.definition;
-      const shape = platform(registered.definition)!.data as unknown as DefinitionShape;
+      let definition: Digest | PlatformDefinition;
+      let items: readonly Item[];
+      if (offered) {
+        definition = offered.definition;
+        // Revision selector only: never present this projection as a Summary,
+        // an authenticated roster or authority for the native found judgment.
+        items = [{ id: offered.registerItem.id, revision: offered.registerItem.revision, type: "register", state: "open", opened: null, parties: {}, refs: {}, attributed: [], values: { host: offered.registerItem.host, namespace: offered.registerItem.namespace, policy: "open", purpose: "demo-start" } }];
+      } else {
+        const registered = await summaryOf(R);
+        if (canonicalize(registered.scope) !== canonicalize(register)) return failed("The register read does not match the saved register reference; nothing was submitted.");
+        definition = registered.definition; items = registered.items;
+      }
+      if (!DIRECTORY_OF[definition]) return failed(`The register ${register.scope} is under ${definition}, which this command does not know.`);
+      registerDefinition = definition;
+      const shape = platform(definition)!.data as unknown as DefinitionShape;
       const fields = { branch: options.branch ?? "main", founderHandle: handle, recoveryKey: recovery };
-      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, registered.items, null, fields) }, signing(ctx));
+      const signed = await signedIntent(signer, { to: register, kind: "found", fields, expected: expectedOf(shape.acts["found"]!, items, null, fields) }, signing(ctx));
       pending = { register: register.scope, intent: intentDigest(signed.intent), handle, found: { signed } };
       await ctx.store.save({ ...base, claim: pending });
     }
@@ -663,16 +696,26 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
           } catch { /* Not a checked copy of this legacy claim. */ }
         }
       }
-      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact found signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
+      if (!found) return failed(`This pending claim has only a digest and no readable admitted directory with its exact creation signature (${unread}). Nothing was submitted. Retry the reads later, recover it manually, or use --again to sign a new claim, which may create another repository.`);
       await keep({ ...pending, found });
     }
     const submitted = async (step: ClaimStep, at: ScopeRef, handle: ScopeHandle, took: string): Promise<FactRef> => {
       const digest = intentDigest(step.signed.intent);
+      if (readOnly) {
+        const settled = await handle.settle(step.signed);
+        if (!settled.ok) return stop(failed(`The original ${step.signed.intent.kind === "found" ? "create" : step.signed.intent.kind} is not confirmed: ${settled.reason}. It remains pending; Check submitted nothing.`));
+        const receipt = settled.value;
+        if (!isFactRef(receipt.fact) || canonicalize(receipt.fact.at) !== canonicalize(at) || receipt.intent !== digest || step.accepted && canonicalize(receipt.fact) !== canonicalize(step.accepted)) return stop(failed("The checked receipt does not match the exact original stage. It remains pending; nothing was submitted."));
+        const followed = await handle.followReceipt(receipt);
+        if (!followed.ok || followed.entry.input.type !== "act" || canonicalize(followed.entry.input.signed) !== canonicalize(step.signed)) return stop(failed("The original accepted stage could not be followed exactly. It remains pending; nothing was submitted."));
+        if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) registerDefinition = receipt.definition;
+        return receipt.fact;
+      }
       if (step.accepted) {
         // Settlement admits nothing and is bound to the exact envelope. A
         // saved marker alone cannot stand for some other accepted request.
         const settled = await handle.settle(step.signed);
-        if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
+        if (!settled.ok) return stop(failed(`Cannot confirm the saved ${step.signed.intent.kind === "found" ? "create" : step.signed.intent.kind} step: ${settled.reason}. The exact request remains pending; nothing was submitted.`));
         if (settled.value.intent !== digest || canonicalize(settled.value.fact) !== canonicalize(step.accepted)) return stop(failed("The saved accepted fact does not match this exact claim step; nothing was submitted."));
         if (step.signed.intent.kind === "found" && canonicalize(at) === canonicalize(register)) registerDefinition = settled.value.definition;
         return step.accepted;
@@ -685,7 +728,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       }
       return receipt.fact;
     };
-    const foundFact = await submitted(pending.found!, register, R, "Claimed");
+    const foundFact = await submitted(pending.found!, register, R, "Created");
     if (!pending.found!.accepted) {
       // An unavailable answer also requires the same request on retry. Even
       // an expired/refused envelope remains saved: only --again replaces it.
@@ -695,7 +738,7 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
       // settle the found or change its already accepted request bytes.
       await R.summary();
     }
-    const resume = `run artroom claim ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
+    const resume = `run dap create ${name} again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.`;
 
     // The checked register receipt selects the exact directory/sibling tuple.
     const directoryDefinition = registerDefinition === null ? undefined : DIRECTORY_OF[registerDefinition];
@@ -708,12 +751,12 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     if (!repository) {
       const D = await handleOf(ctx, config, scopeIdOf(seed), null);
       const children: ScopeId[] = [];
-      const directory = await waitFor(ctx, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
+      const directory = await waitFor(waiting, () => [register.scope, D.scope, ...children], () => active(D), "the directory", resume);
       const made = await createdBy(D, 0);
       const kind = (k: string) => made.find((m) => m.seed.kind === k)?.scope ?? stop(failed(`The directory's genesis creates no ${k}.`));
       children.push(kind("membership"), kind("rules"), kind("destination"));
       const handles = await Promise.all(children.map((scope) => handleOf(ctx, config, scope, null)));
-      const summaries = await waitFor(ctx, () => [register.scope, D.scope, ...children], async () => {
+      const summaries = await waitFor(waiting, () => [register.scope, D.scope, ...children], async () => {
         const all = await Promise.all(handles.map(active));
         return all.every((s) => s !== null) ? (all as Summary[]) : null;
       }, "membership, the rules scope and the destination", resume);
@@ -728,9 +771,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const enrollment = { ...base, repository };
     const M = await handleOf(ctx, enrollment, repository.membership.scope);
     const mShape = platform(siblings.membership)!.data as unknown as DefinitionShape;
+    if (!pending.seat && readOnly) return failed("The creation and its children are confirmed, but no original seat request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.seat) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const members = summary.items.filter((item) => item.type === "member");
       const own = members.filter((item) => item.values["handle"] === pending.handle);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, seat: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "seat") });
@@ -744,9 +788,10 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const seat = await submitted(pending.seat!, repository.membership, M, "Seated");
     if (!pending.seat!.accepted) await keep({ ...pending, seat: { signed: pending.seat!.signed, accepted: seat } });
     const keyFields = { member: seat.seq };
+    if (!pending.firstKey && readOnly) return failed("The original seat is confirmed, but no original first-key request is retained. Use explicit Continue to prepare that next stage; Check submitted nothing.");
     if (!pending.firstKey) {
       const summary = await summaryOf(M);
-      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this claim's founding key and handle; nothing was submitted.");
+      if (!foundingMembership(summary, repository.membership, signer.key, pending.handle, siblings.membership)) return failed("Membership does not record this creation's initial key and handle; nothing was submitted.");
       const keys = summary.items.filter((item) => item.type === "key");
       const own = keys.filter((item) => item.values["id"] === signer.key && item.refs["member"] === seat.seq);
       if (own.length === 1 && own[0]!.state === "active") await keep({ ...pending, firstKey: await recordedStep(M, own[0]!.id, repository.membership, signer.key, "first-key") });
@@ -762,12 +807,12 @@ export function claim(ctx: Context, name: string, options: { handle?: string; br
     const inbox = (await createdBy(M, seat.seq)).find((m) => m.seed.kind === "inbox")?.scope;
     if (inbox) {
       const I = await handleOf(ctx, enrollment, inbox);
-      await waitFor(ctx, () => [M.scope, inbox], () => active(I), "the founder's inbox");
+      await waitFor(waiting, () => [M.scope, inbox], () => active(I), "your inbox");
       repository.inbox = inbox;
     }
     await ctx.store.save({ ...base, repository, handle });
     return done(
-      `Claimed ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+      `Created ${name}: directory ${repository.directory.scope}, membership ${repository.membership.scope}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
       `Definitions: ${directoryDefinition}, ${[siblings.membership, siblings.rules, siblings.destination].join(", ")}.`,
       `You are ${handle}, an admin, on key ${signer.key}${inbox ? `; your inbox is ${inbox}` : ""}.`,
     );
@@ -781,7 +826,7 @@ export interface Link { v: 1; service: string; repository: Omit<Repository, "inb
 export const LINK = "artroom-invite:";
 
 /**
- * `artroom invite <member> --role <role>`: membership's `invite-member`. The
+ * `dap invite <member> --role <role>`: membership's `invite-member`. The
  * invitation holds the digest of a new secret; the link holds the secret,
  * and is printed once, for the inviter to pass to the member.
  */
@@ -792,7 +837,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
     }
     if (!options.role || !(options.role in ROLE_LISTS)) return usage(`Name a role with --role: one of ${Object.keys(ROLE_LISTS).join(", ")}.`);
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const M = await handleOf(ctx, config, repository.membership.scope);
     const summary = await summaryOf(M);
@@ -811,7 +856,7 @@ export function invite(ctx: Context, member: string, options: { role?: string; a
   });
 }
 
-/** The invitation that a link from `artroom invite` holds, or null when the text is no such link. */
+/** The invitation that a link from `dap invite` holds, or null when the text is no such link. */
 export function linkOf(text: string): Link | null {
   if (!text.startsWith(LINK)) return null;
   try {
@@ -823,15 +868,14 @@ export function linkOf(text: string): Link | null {
   }
 }
 
-/** `artroom join <link>` resumes the exact enrollment kept before delivery. */
+/** `dap join <link>` resumes the exact enrollment kept before delivery. */
 export function join(ctx: Context, text: string): Promise<Outcome> {
+  if (text.startsWith(AGENT_KEY_LINK)) return enrolAgentKey(ctx, text);
   return run(async () => {
-    const link = linkOf(text) ?? stop(usage("That is not an invitation link from artroom invite."));
-    if (typeof link.service !== "string" || typeof link.handle !== "string" || link.invitation < 1
-      || !isScopeRef(link.repository?.directory) || link.repository.directory.kind !== "directory"
-      || !isScopeRef(link.repository?.membership) || link.repository.membership.kind !== "membership"
-      || !isScopeId(link.repository?.rules) || !isScopeId(link.repository?.destination)) return usage("That invitation link has invalid repository references.");
+    const link = linkOf(text) ?? stop(usage("That is not an invitation link from dap invite."));
+    if (!wellFormedInvitation(link)) return usage("That invitation link has invalid repository references.");
     const before = await ctx.store.config();
+    if (before?.join?.kind === "enrol") return failed("An original agent enrollment is retained; a person invitation cannot replace it.");
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
     if (before && !before.join) return usage("This config directory is set up already; use another config directory to join.");
     const linkDigest = textDigest(canonicalize(link));
@@ -891,7 +935,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
     if (pending!.repository.inbox && pending!.repository.inbox !== inbox) return failed("The saved inbox does not match this join; nothing was submitted.");
     await keep({ ...pending!, repository: { ...link.repository, inbox } });
     const I = await handleOf(ctx, config, inbox, null);
-    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox", "retry the original artroom join invitation link to continue this enrollment.");
+    await waitFor(ctx, () => [M.scope, inbox], () => active(I), "your inbox", "retry the original dap join invitation link to continue this enrollment.");
     await ctx.store.save({ ...config, repository: { ...link.repository, inbox }, handle: link.handle });
     return done(`Joined as ${link.handle} on key ${signer.key}.`, `Your inbox: ${inbox}.`);
   });
@@ -930,7 +974,7 @@ export function heldActs(shape: DefinitionShape, held: Standing | null): { acts:
 }
 
 /**
- * `artroom acts [<scope>]`: the acts of the scope's definition that the
+ * `dap acts [<scope>]`: the acts of the scope's definition that the
  * caller's role holds now, and those a rule decides, each with its fields.
  * What the scope will answer still depends on its guards and its state.
  */
@@ -951,7 +995,7 @@ export function acts(ctx: Context, named?: string): Promise<Outcome> {
 }
 
 /**
- * `artroom act <kind> --on <scope> [--target <item>] [--set name=value ...]`:
+ * `dap act <kind> --on <scope> [--target <item>] [--set name=value ...]`:
  * one act. A declared definition's act goes through the client's declared
  * handle, which checks each field's shape before it signs; a platform
  * definition's is signed as given. The scope judges both.
@@ -970,7 +1014,7 @@ export function act(ctx: Context, kind: string, options: { on?: string; target?:
     const summary = await summaryOf(handle);
     const { shape, declared } = await definitionOf(handle, summary);
     const declaration = shape.acts[kind];
-    if (!declaration || kind === shape.genesis) return usage(`${kind} is not an act of ${shape.name}. Run: artroom acts ${options.on ?? ""}`.trim());
+    if (!declaration || kind === shape.genesis) return usage(`${kind} is not an act of ${shape.name}. Run: dap acts ${options.on ?? ""}`.trim());
     const fields: Record<string, FieldValue> = {};
     for (const pair of options.set ?? []) {
       const at = pair.indexOf("=");
@@ -1001,7 +1045,7 @@ function entryLine(scope: ScopeId, entry: Entry): string {
   return `${scope}:${entry.seq}  ${entry.time}  ${what}; ${entry.effects.length} effects, ${entry.sends.length} sends`;
 }
 
-/** `artroom log <scope> [--limit n]`: the last entries of the scope's history, oldest first. */
+/** `dap log <scope> [--limit n]`: the last entries of the scope's history, oldest first. */
 export function log(ctx: Context, named: string | undefined, options: { limit?: number } = {}): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
@@ -1020,7 +1064,7 @@ export function log(ctx: Context, named: string | undefined, options: { limit?: 
   });
 }
 
-/** `artroom show <scope>:<seq>`: one entry, with its hash computed by the client from the entry's bytes. */
+/** `dap show <scope>:<seq>`: one entry, with its hash computed by the client from the entry's bytes. */
 export function show(ctx: Context, named: string): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
@@ -1037,7 +1081,7 @@ export function show(ctx: Context, named: string): Promise<Outcome> {
 }
 
 /**
- * `artroom verify <scope>`: the replay verifier over the read routes, with
+ * `dap verify <scope>`: the replay verifier over the read routes, with
  * the platform package's data and rules for a platform definition. It
  * prints the report: what it checked, and what it took on trust.
  */
@@ -1114,14 +1158,14 @@ async function roomScopes(ctx: Context, config: Config, reader: string | null): 
 }
 
 /**
- * `artroom verify --all`: the replay of the register and of every scope of the room, one line for each: its kind, its ID, the
+ * `dap verify --all`: the replay of the register and of every scope of the room, one line for each: its kind, its ID, the
  * entry the replay reached and the result. The last line is "All consistent" or the first finding. A history that cannot be read
  * is a finding.
  */
 function verifyAll(ctx: Context): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    if (!config.repository) return usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>.");
+    if (!config.repository) return usage("No repository is known here. Run: dap create <name>, or dap join <link>.");
     const reader = await readerOf(ctx, config);
     const lines: string[] = [];
     let first: string | null = null;
@@ -1174,7 +1218,7 @@ function remoteOf(config: Config, repository: Recorded): string | null {
 }
 /** The remote URL as the person is told it: whole, or in its host's form with the part the room does not record marked. */
 const remoteLine = (config: Config, repository: Recorded): string =>
-  remoteOf(config, repository) ?? (repository.host === OWN_HOST ? `https://<service host>/git/${repository.namespace}/${repository.name}.git (the service host is the deployment's setting; artroom clone prints it whole)` : `not known for the host ${repository.host}`);
+  remoteOf(config, repository) ?? (repository.host === OWN_HOST ? `https://<service host>/git/${repository.namespace}/${repository.name}.git (the service host is the deployment's setting; dap clone prints it whole)` : `not known for the host ${repository.host}`);
 
 /**
  * The destination's summary. The caller's session is presented first; the destination accepts a session of the membership its
@@ -1182,7 +1226,7 @@ const remoteLine = (config: Config, repository: Recorded): string =>
  * destination answers where the key's claim caused it, within the intent window.
  */
 async function destinationOf(ctx: Context, config: Config): Promise<{ summary: Summary; reader: string | null; repository: Recorded }> {
-  const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+  const scope = config.repository?.destination ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
   const reader = await readerOf(ctx, config);
   let read = await (await handleOf(ctx, config, scope, reader)).summary();
   if (!read.ok && read.reason === "forbidden" && reader !== null) read = await (await handleOf(ctx, config, scope, null)).summary();
@@ -1194,7 +1238,7 @@ async function destinationOf(ctx: Context, config: Config): Promise<{ summary: S
   return { summary: read.value, reader, repository };
 }
 
-/** `artroom remote`: the repository's host, namespace, name and remote URL, as the destination's branch item records them. */
+/** `dap remote`: the repository's host, namespace, name and remote URL, as the destination's branch item records them. */
 export function remote(ctx: Context): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
@@ -1211,7 +1255,7 @@ const b64 = (text: string): string => btoa(String.fromCharCode(...utf8(text)));
 const headerEnv = (value: string): Record<string, string> => ({ GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: `Authorization: ${value}` });
 
 /**
- * `artroom clone [directory] [--hours n]`: a clone of the room's repository, with a read token of its own.
+ * `dap clone [directory] [--hours n]`: a clone of the room's repository, with a read token of its own.
  *
  * 1. Without `git` here, it signs nothing: it prints the clone command, with the token's place marked.
  * 2. It signs the destination's `read-token` for `hours` (default 1, from 1 to 24), and waits for the outcome of its `mint-read`.
@@ -1229,7 +1273,7 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     const args = (url: string) => ["clone", "--", url, ...(directory === undefined ? [] : [directory])];
     if (!ctx.git || (await ctx.git.run(["--version"], {})) === null) {
       const url = remoteOf(config, repository) ?? `https://<service host>/git/${repository.namespace}/${repository.name}.git`;
-      return failed("git is not installed here, so nothing was signed. With git installed, run artroom clone again; it runs:", `git -c http.extraHeader="Authorization: ${repository.host === "github.com" ? "Basic <x-access-token:read token, base64>" : "Bearer <read token>"}" ${args(url).join(" ")}`);
+      return failed("git is not installed here, so nothing was signed. With git installed, run dap clone again; it runs:", `git -c http.extraHeader="Authorization: ${repository.host === "github.com" ? "Basic <x-access-token:read token, base64>" : "Bearer <read token>"}" ${args(url).join(" ")}`);
     }
     if (!platform(summary.definition as PlatformDefinition)?.data.acts["read-token"]) return failed(`The destination definition ${summary.definition} does not support read-token. An explicitly versioned destination and membership integration is required.`);
     // The act: `read-token` on the branch, at the revision the summary has now. The scope judges the grant and the field.
@@ -1239,7 +1283,7 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
     const signed = await signedIntent(signer, { to: summary.scope, kind: "read-token", on: branch.id, fields: { hours }, expected: { on: branch.revision } }, signing(ctx));
     const receipt = accepted(await (await handleOf(ctx, config, scope, null)).submit(signed), scope, "Read token").receipt;
     const proof = readTokenReceipt(receipt, summary, signed);
-    if (!proof) return failed(`The accepted reply does not match this destination, definition and exact read-token request. It may still have been recorded at ${scope}; inspect artroom log destination. No credential was retrieved and nothing was cloned.`);
+    if (!proof) return failed(`The accepted reply does not match this destination, definition and exact read-token request. It may still have been recorded at ${scope}; inspect dap log destination. No credential was retrieved and nothing was cloned.`);
     const seq = proof.receipt.fact.seq;
     // The outcome of its `mint-read`, which the host's answer writes: read with the caller's session, which the destination now accepts.
     const operation = proof.operation;
@@ -1251,17 +1295,17 @@ export function clone(ctx: Context, directory: string | undefined, options: { ho
       D ??= await handleOf({ ...ctx, fetch: outcomeFetch(send, signal) }, config, scope, reader);
       if (!openingChecked) {
         const opening = await D.entry(seq);
-        if (!opening.ok || !readTokenOpening(opening.value, proof)) return stop(failed(`Cannot confirm the exact accepted read-token act and its mint-read opening at ${scope}:${seq}; inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`));
+        if (!opening.ok || !readTokenOpening(opening.value, proof)) return stop(failed(`Cannot confirm the exact accepted read-token act and its mint-read opening at ${scope}:${seq}; inspect dap show ${scope}:${seq} and dap log destination. No credential was retrieved and nothing was cloned.`));
         openingChecked = true;
       }
       const got = await D.entry(next);
-      if (got.ok && (!readTokenEntry(got.value, proof.to, next) || (got.value.entry.input.type === "outcome" && got.value.entry.input.operation === operation && !readTokenOutcome(got.value, next, proof)))) return stop(failed(`The entry at ${scope}:${next} does not match this destination's recorded mint-read (${operation}); inspect artroom log destination. No credential was retrieved and nothing was cloned.`));
+      if (got.ok && (!readTokenEntry(got.value, proof.to, next) || (got.value.entry.input.type === "outcome" && got.value.entry.input.operation === operation && !readTokenOutcome(got.value, next, proof)))) return stop(failed(`The entry at ${scope}:${next} does not match this destination's recorded mint-read (${operation}); inspect dap log destination. No credential was retrieved and nothing was cloned.`));
       return got;
     }, (signal) => ctx.pause ? ctx.pause([scope]) : pauseOutcome(signal), ctx.tries ?? 120, ctx.cloneWait, (error) => error instanceof Stop);
     if (!waited.ok) return failed(...outcomeWaitLines(scope, seq, operation, waited));
     const outcome = waited.outcome;
     const next = waited.next;
-    if (outcome.result === "unknown") return failed(`The read-token mint at ${scope}:${seq} is unknown (outcome ${scope}:${next - 1}). The host may have minted a token; no automatic mint retry was made. Inspect artroom show ${scope}:${seq} and artroom log destination. No credential was retrieved and nothing was cloned.`);
+    if (outcome.result === "unknown") return failed(`The read-token mint at ${scope}:${seq} is unknown (outcome ${scope}:${next - 1}). The host may have minted a token; no automatic mint retry was made. Inspect dap show ${scope}:${seq} and dap log destination. No credential was retrieved and nothing was cloned.`);
     if (outcome.result === "refused") return failed(`The host refused the read-token mint at ${scope}:${seq} (outcome ${scope}:${next - 1}). No credential was retrieved and nothing was cloned.`);
     const handle = (outcome.evidence.body as { token?: unknown }).token;
     if (typeof handle !== "string") return failed(`The outcome at ${scope}:${next - 1} names no token.`);
@@ -1307,7 +1351,7 @@ async function activeDefinition(ctx: Context, config: Config, reader: string | n
   const R = await handleOf(ctx, config, repository.rules, reader);
   const active = (await summaryOf(R)).items.filter((item) => item.type === "definition" && item.state === "active" && item.values["name"] === name).sort((a, b) => b.id - a.id)[0];
   const digest = active?.values["digest"] as Digest | undefined;
-  if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no ${name} definition active. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=${name} --value <definition file>.`));
+  if (!digest) return stop(failed(`The rules scope ${repository.rules} holds no ${name} definition active. An admin activates one: dap act activate --on rules --set digest=<digest> --set name=${name} --value <definition file>.`));
   const transport = await readTransportOf(ctx, config, reader);
   // A value in the domain of a definition is kept as a definition (`core.ts`), and read by that kind.
   const kept = await transport.retained(repository.rules, reader, "definition", digest);
@@ -1387,15 +1431,15 @@ function supportsEdit(declared: DeclaredDefinition, path: string, content: strin
 
 
 /**
- * `artroom edit <path> --file <local file> [--title <text>]`: one file, proposed as a change and published by the room.
+ * `dap edit <path> --file <local file> [--title <text>]`: one file, proposed as a change and published by the room.
  *
  * 1. The file is read here, as UTF-8 text of at most 65,536 bytes; nothing is signed for a file that cannot be carried.
  * 2. The directory's `open-pr` opens a change lane under the change definition that the rules scope holds active, whose bytes go
  *    beside the act. The command waits for the lane.
  * 3. The lane's `ask-rules`, and the wait for the rules scope's answer: a merge is judged on the lane's copy of the rules.
  * 4. `propose-file`, on the destination's head: the path, the digest and size of the bytes, and the bytes.
- * 5. With `--closes <issue>`, the lane's `link-own` to that issue, as `artroom merge --closes` signs it.
- * 6. `merge`, and the wait for the room's answer, as `artroom merge` does.
+ * 5. With `--closes <issue>`, the lane's `link-own` to that issue, as `dap merge --closes` signs it.
+ * 6. `merge`, and the wait for the room's answer, as `dap merge` does.
  *
  * The command judges nothing: the lane, the rules and the destination do. A refusal is printed as it came, with what was written
  * before it, so that the change can be merged later.
@@ -1407,7 +1451,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     if (bytes.length > EDIT_BYTES) return usage(`${options.file} has ${bytes.length} bytes; a change carries at most ${EDIT_BYTES}.`);
     const content = textOf(bytes, options.file);
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
     // The issue that the change closes is found before anything is signed.
@@ -1461,7 +1505,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
         }
       });
       if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
-        `Inspect artroom show ${lane}:${version.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+        `Inspect dap show ${lane}:${version.receipt.fact.seq} and dap log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
       ] };
       lines.push(...linked.lines);
     }
@@ -1525,7 +1569,7 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
     ...known.map(({ label, fact }) => `Recorded ${label.toLowerCase()}: ${fact.at.scope}:${fact.seq}, hash ${fact.hash}.`),
     ...(knownLane ? [`Known change lane: ${knownLane}.`] : []),
     `Interrupted while ${phase}. ${currentRequest ? `${currentRequest.kind} request ${currentRequest.digest}: ${currentRequest.status}.` : "No current mutation request was submitted in this phase."}`,
-    `Inspect artroom show ${opening.at.scope}:${opening.seq}${knownLane ? ` and artroom log ${knownLane}` : ` and artroom log ${opening.at.scope}`} before another mutation. A fresh propose or edit opens another change lane and signs new requests. No mutation was retried; recovery requires any uncertain request's original signed envelope, which this command does not retain.`,
+    `Inspect dap show ${opening.at.scope}:${opening.seq}${knownLane ? ` and dap log ${knownLane}` : ` and dap log ${opening.at.scope}`} before another mutation. A fresh propose or edit opens another change lane and signs new requests. No mutation was retried; recovery requires any uncertain request's original signed envelope, which this command does not retain.`,
   ] };
   try {
     const lane = (await createdBy(D, opened)).find((made) => made.seed.kind === "lane")?.scope ?? stop(failed("The directory opened no change lane."));
@@ -1572,7 +1616,7 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
         }
       });
       if (linked.code !== 0) return { ...linked, lines: [...lines, ...linked.lines,
-        `Inspect artroom show ${lane}:${answer.receipt.fact.seq} and artroom log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+        `Inspect dap show ${lane}:${answer.receipt.fact.seq} and dap log ${lane} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
       ] };
       lines.push(...linked.lines);
     }
@@ -1589,7 +1633,7 @@ async function proposingFiles(ctx: Context, config: Config, base: string, files:
 }
 
 /**
- * `artroom merge <change> [--closes <issue>]`: `merge` of the change's current version, and the wait for the room's answer. With
+ * `dap merge <change> [--closes <issue>]`: `merge` of the change's current version, and the wait for the room's answer. With
  * `--closes`, the lane's `link-own` to that issue first: the merge that publishes the change then closes the issue.
  */
 export function merge(ctx: Context, named: string, options: { closes?: string } = {}): Promise<Outcome> {
@@ -1613,7 +1657,7 @@ export function merge(ctx: Context, named: string, options: { closes?: string } 
  * commit, and the page's address for a one-file version. Refused, by the lane or by the destination: the reason, and how to go on.
  */
 async function merging(ctx: Context, config: Config, lane: ScopeId, reader: string | null, declared: DeclaredDefinition): Promise<Outcome> {
-  const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+  const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
   const signer = secretSigner(await signerOf(ctx, config));
   const L = await handleOf(ctx, config, lane, reader);
   const items = (await summaryOf(L)).items;
@@ -1623,7 +1667,7 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   const C = await laneOf(ctx, config, lane, reader, declared);
   const { signed, beside } = await C.intent(signer, "merge" as never, { on: null, fields, expected: expectedOf(declared.acts["merge"] as unknown as ActShape, items, null, fields) } as never, signing(ctx));
   const answer = await C.submit(signed, [], beside);
-  const again = `When it may be merged, run: artroom merge ${lane}`;
+  const again = `When it may be merged, run: dap merge ${lane}`;
   if (answer.answer !== "accepted") {
     const result = answered(lane, answer, "Merged");
     return answer.answer === "refused" ? { ...result, lines: [...result.lines, `The change ${lane} waits, at version ${version.id}. ${again}`] } : result;
@@ -1632,7 +1676,7 @@ async function merging(ctx: Context, config: Config, lane: ScopeId, reader: stri
   let next = seq + 1;
   const unknown = (reason: string): Outcome => failed(
     `Accepted merge: ${lane}:${seq}, version ${version.id}, fact ${canonicalize(answer.receipt.fact)}.`,
-    `Observation unknown: ${reason}. Inspect artroom show ${lane}:${seq} and artroom log ${lane} before requesting another merge; do not resubmit this merge to recover observation.`,
+    `Observation unknown: ${reason}. Inspect dap show ${lane}:${seq} and dap log ${lane} before requesting another merge; do not resubmit this merge to recover observation.`,
   );
   let ended: { state: string; effects: Effects; reservationTree?: string };
   try {
@@ -1717,7 +1761,7 @@ async function issueNamed(ctx: Context, config: Config, reader: string | null, n
   const issues = await issuesOf(ctx, config, reader);
   const number = /^#?(\d+)$/.exec(named);
   const found = number ? issues.find((issue) => issue.number === Number(number[1])) : issues.find((issue) => issue.lane === named);
-  return found ?? stop(usage(`No issue ${named} is listed in the directory ${config.repository!.directory.scope}. Run: artroom issues`));
+  return found ?? stop(usage(`No issue ${named} is listed in the directory ${config.repository!.directory.scope}. Run: dap issues`));
 }
 
 /**
@@ -1727,7 +1771,7 @@ async function issueNamed(ctx: Context, config: Config, reader: string | null, n
 function issueAct(ctx: Context, named: string, choose: (issue: Issue, handle: string | undefined, membership: ScopeRef) => { kind: string; on: number | null; fields: Record<string, unknown> }, took: string): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const reader = await readerOf(ctx, config);
     const issue = await issueNamed(ctx, config, reader, named);
     const L = await handleOf(ctx, config, issue.lane, reader);
@@ -1744,7 +1788,7 @@ function issueAct(ctx: Context, named: string, choose: (issue: Issue, handle: st
 }
 
 /**
- * `artroom issue open --title <text> [--body <text>]`: the directory's `open-issue`, under the issue definition that the rules
+ * `dap issue open --title <text> [--body <text>]`: the directory's `open-issue`, under the issue definition that the rules
  * scope holds active, whose bytes go beside the act; the directory creates the issue's lane, and the command waits for it. The
  * issue's one condition is its title: the lane's genesis refuses an empty list of conditions, `required-unset`, and the command
  * has no flag for them (the delivery note's gap 1).
@@ -1753,7 +1797,7 @@ export function issueOpen(ctx: Context, options: { title?: string; body?: string
   return run(async () => {
     if (options.title === undefined) return usage("issue open needs --title <text>.");
     const config = await configOf(ctx);
-    const repository = config.repository ?? stop(usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>."));
+    const repository = config.repository ?? stop(usage("No repository is known here. Run: dap create <name>, or dap join <link>."));
     const signer = secretSigner(await signerOf(ctx, config));
     const reader = await readerOf(ctx, config);
     const issue = await activeDefinition(ctx, config, reader, "issue");
@@ -1772,29 +1816,29 @@ export function issueOpen(ctx: Context, options: { title?: string; body?: string
   });
 }
 
-/** `artroom issue comment <issue> <text>`: the issue lane's `comment`. Any member may comment. */
+/** `dap issue comment <issue> <text>`: the issue lane's `comment`. Any member may comment. */
 export function issueComment(ctx: Context, named: string, text: string): Promise<Outcome> {
   return issueAct(ctx, named, () => ({ kind: "comment", on: null, fields: { body: text } }), "Commented");
 }
 
-/** `artroom issue assign <issue> <@member>`: the issue lane's `assign`, which sets the one assignee. It needs `issue.triage`. */
+/** `dap issue assign <issue> <@member>`: the issue lane's `assign`, which sets the one assignee. It needs `issue.triage`. */
 export function issueAssign(ctx: Context, named: string, member: string): Promise<Outcome> {
   return issueAct(ctx, named, (_, __, membership) => ({ kind: "assign", on: 0, fields: { assignees: [{ membership, member }] } }), "Assigned");
 }
 
 /**
- * `artroom issue close <issue>`: `close-own` when the caller opened the issue, and otherwise `close-any`, which needs
+ * `dap issue close <issue>`: `close-own` when the caller opened the issue, and otherwise `close-any`, which needs
  * `issue.triage`. The reason is `completed`. The demo profile has no rule that lets an assignee close an issue.
  */
 export function issueClose(ctx: Context, named: string): Promise<Outcome> {
   return issueAct(ctx, named, (issue, handle) => ({ kind: issue.opener !== null && issue.opener === handle ? "close-own" : "close-any", on: 0, fields: { reason: "completed" } }), "Closed");
 }
 
-/** `artroom issues`: every issue of the room, oldest first, with its number, state, title, assignees and lane. */
+/** `dap issues`: every issue of the room, oldest first, with its number, state, title, assignees and lane. */
 export function issues(ctx: Context): Promise<Outcome> {
   return run(async () => {
     const config = await configOf(ctx);
-    if (!config.repository) return usage("No repository is known here. Run: artroom claim <name>, or artroom join <link>.");
+    if (!config.repository) return usage("No repository is known here. Run: dap create <name>, or dap join <link>.");
     const all = await issuesOf(ctx, config, await readerOf(ctx, config));
     if (all.length === 0) return done("No issues.");
     const lines = all.map((issue) => `#${issue.number ?? "?"}  ${issue.state}${issue.reason ? ` (${issue.reason})` : ""}  ${issue.title}${issue.assignees.length > 0 ? `; assigned to ${issue.assignees.join(", ")}` : ""}; lane ${issue.lane}`);

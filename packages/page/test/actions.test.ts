@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { actsPanel } from "../src/actions.ts";
 import { changeTaskContext, createIssue, issueDialogOutcome, nextChangeAction, requestedReviewCandidates, reviewSelectionProblem, taskForm } from "../src/tasks.ts";
 import { digestBytes, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import type { MemberRef, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef, ScopeRef } from "@generalbusiness/dap-contract";
 import type { ChangeView, Offered, Room } from "../src/data.ts";
 
 // A minimal DOM stand-in at the form boundary, not a browser or authority test.
@@ -12,16 +12,19 @@ class Element {
   attrs = new Map<string, string>();
   listeners = new Map<string, ((event: { preventDefault(): void }) => void)[]>();
   closed = false;
+  parent: Element | null = null;
   constructor(readonly tag: string) {}
   setAttribute(name: string, value: string) { this.attrs.set(name, value); }
   getAttribute(name: string) { return this.attrs.get(name) ?? null; }
   removeAttribute(name: string) { this.attrs.delete(name); }
-  showModal() { this.closed = false; } close() { this.closed = true; } remove() {} focus() {}
+  showModal() { this.closed = false; } close() { this.closed = true; }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; }
+  focus() {}
   querySelectorAll(selector: string): Element[] {
     return this.all().filter(node => selector.split(",").some(part => {
       const simple = part.trim(), attribute = /^\[([^=\]]+)\]$/.exec(simple)?.[1];
       if (attribute) return node.hasAttribute(attribute);
-      if (simple === 'button[type=submit]') return node.tag === "button" && node.attrs.get("type") === "submit";
+      if (simple === 'button[type=submit]' || simple === 'button[type="submit"]') return node.tag === "button" && node.attrs.get("type") === "submit";
       return node.tag === simple;
     }));
   }
@@ -30,7 +33,8 @@ class Element {
     return (name ? this.all().find((node) => node.name === name) : this.querySelectorAll(selector)[0]) as T ?? null;
   }
   hasAttribute(name: string) { return this.attrs.has(name); }
-  append(...children: (Element | string)[]) { this.children.push(...children); }
+  append(...children: (Element | string)[]) { for (const child of children) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.push(child); } }
+  prepend(...children: (Element | string)[]) { for (const child of [...children].reverse()) { if (child instanceof Element) { child.remove(); child.parent = this; } this.children.unshift(child); } }
   addEventListener(name: string, listener: (event: { preventDefault(): void }) => void) {
     this.listeners.set(name, [...this.listeners.get(name) ?? [], listener]);
   }
@@ -62,11 +66,14 @@ const review: Offered = { kind: "review-verdict", step: "open", on: "review", li
 
 test("review submits the exact observed version and typed controls once; unsupported acts remain inspectable", () => {
   const sent: unknown[] = [];
-  const panel = asElement(actsPanel({ acts: [review, { kind: "custom-act", step: "open", on: "record", line: "Custom", fields: [] }], hidden: 2 }, (...args) => sent.push(args), null, {
+  // An additional scripted bool declaration checks generic labels, not native review authority.
+  const withBoolean: Offered = { ...review, fields: [...review.fields, { name: "notify", type: "bool", required: false }] };
+  const panel = asElement(actsPanel({ acts: [withBoolean, { kind: "custom-act", step: "open", on: "record", line: "Custom", fields: [] }], hidden: 2 }, (...args) => sent.push(args), null, {
     primary: ["review-verdict", "merge"], defaults: { "review-verdict": { fields: { manifest: "17" } } },
     choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }, { label: "Request changes", value: "changes" }] } },
   }));
   const nodes = panel.all();
+  expect(nodes.filter(node => node.tag === "label").map(node => node.children[0])).toEqual(["Decision", "Review comment", "notify?"]);
   expect(nodes.filter((node) => node.tag === "summary").map((node) => node.textContent)).toEqual(["Review change", "Advanced", "custom-act"]);
   expect(nodes.find((node) => node.name === "field:manifest")?.attrs.get("type")).toBe("hidden");
   nodes.find((node) => node.name === "field:verdict")!.value = "changes";
@@ -100,8 +107,9 @@ test("an uncertain subject keeps one status home while its known request remains
 });
 
 test("a single eligible choice is fixed and drafts stay with their room, member and exact version", () => {
-  const offered = { acts: [review], hidden: 0 };
-  const context = { primary: ["review-verdict"], draftKey: "room-A/member-A/scope", defaults: { "review-verdict": { fields: { manifest: "9" } } }, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }] } } };
+  const withRequest: Offered = { ...review, fields: [...review.fields, { name: "request", type: "item", required: false }] };
+  const offered = { acts: [withRequest], hidden: 0 };
+  const context = { primary: ["review-verdict"], draftKey: "room-A/member-A/scope", defaults: { "review-verdict": { fields: { manifest: "9", request: "6" } } }, choices: { "review-verdict": { verdict: [{ label: "Approve", value: "approve" }], request: [{ label: "Request 6", value: "6" }] } } };
   const first = asElement(actsPanel(offered, () => {}, null, context));
   const body = first.all().find((node) => node.name === "field:body")!;
   body.value = "Unsent review";
@@ -109,6 +117,32 @@ test("a single eligible choice is fixed and drafts stay with their room, member 
   expect(first.all().filter((node) => node.tag === "select")).toHaveLength(0);
   const saved = (extra = {}) => asElement(actsPanel(offered, () => {}, null, { ...context, ...extra })).all().find((node) => node.name === "field:body")!.value;
   expect(saved()).toBe("Unsent review");
+  const current = (requests: readonly { label: string; value: string }[], fixed?: string) => asElement(actsPanel(offered, (...args) => sent.push(args), null, {
+    ...context, defaults: { "review-verdict": { fields: { manifest: "9", ...(fixed !== undefined ? { request: fixed } : {}) } } },
+    choices: { "review-verdict": { ...context.choices["review-verdict"], request: requests } },
+  })).all().find(node => node.tag === "form")!;
+  const sent: unknown[] = [];
+  const many = current([{ label: "Request 6", value: "6" }, { label: "Request 9", value: "9" }]);
+  expect(many.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
+  expect(many.all().find(node => node.name === "field:request")!.value).toBe("6");
+  const replaced = current([{ label: "Request 9", value: "9" }], "9");
+  const request = replaced.all().find(node => node.name === "field:request")!;
+  expect(request.tag).toBe("select");expect(request.value).not.toBe("9");
+  expect(replaced.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
+  expect(replaced.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  replaced.event("submit");expect(sent).toEqual([]);
+  request.value = "9";replaced.event("change");
+  expect(replaced.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  replaced.event("submit");expect(sent).toEqual([["review-verdict", "", { manifest: "9", request: "9", verdict: "approve", body: "Unsent review" }]]);
+  // An explicit voluntary selection remains a draft choice when a new sole request arrives.
+  const voluntary = current([{ label: "Voluntary review", value: "" }], "");
+  const voluntaryRequest = voluntary.all().find(node => node.name === "field:request")!;
+  expect(voluntary.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  voluntaryRequest.value = "";voluntary.event("change");
+  expect(voluntary.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  const newSole = current([{ label: "Request 10", value: "10" }], "10");
+  expect(newSole.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(true);
+  expect(newSole.all().find(node => node.name === "field:body")!.value).toBe("Unsent review");
   expect(saved({ draftKey: "room-B/member-A/scope" })).toBe("");
   expect(saved({ draftKey: "room-A/member-B/scope" })).toBe("");
   expect(saved({ defaults: { "review-verdict": { fields: { manifest: "10" } } } })).toBe("");
@@ -137,10 +171,40 @@ test("ordinary declared inherited names remain own fields with their exact text,
   expect(Object.keys(fields)).toEqual(names);
   for (const name of names) expect([Object.hasOwn(fields, name), fields[name]]).toEqual([true, `text for ${name}`]);
   expect(Object.getPrototypeOf(fields)).toBeNull();
+  // A custom declaration may use this kind/name for ordinary text. No task choices are asserted.
+  const custom: Offered = { kind: "review-verdict", step: "open", on: "record", line: "Custom review", fields: [{ name: "manifest", type: "item", required: true }, { name: "request", type: "text", required: true }] };
+  const ordinary = { acts: [custom], hidden: 0 };
+  const customContext = { draftKey: "ordinary-custom-review", defaults: { "review-verdict": { fields: { manifest: "17" } } } };
+  const customSent: unknown[] = [];
+  const show = () => asElement(actsPanel(ordinary, (...args) => customSent.push(args), null, customContext)).all().find(node => node.tag === "form")!;
+  const unsent = show();unsent.all().find(node => node.name === "field:request")!.value = "An ordinary request value";unsent.event("input");
+  const reopened = show(), request = reopened.all().find(node => node.name === "field:request")!;
+  expect(request.tag).toBe("input");expect(request.value).toBe("An ordinary request value");
+  expect(reopened.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  request.value = "An edited ordinary value";reopened.event("input");reopened.event("submit");
+  expect(customSent).toEqual([["review-verdict", "", { manifest: "17", request: "An edited ordinary value" }]]);
 });
 
 test("a final subject can retain its declared action for inspection without offering another merge", () => {
   let sends = 0;
+  const close: Offered = { kind: "close-own", step: "transition", on: "intent", line: "Close", fields: [{ name: "reason", type: "enum", required: false, choices: [{ label: "Completed", value: "completed" }, { label: "Not planned", value: "not-planned" }] }] };
+  const values: unknown[] = [];
+  const closeContext = { primary: ["close-own"], draftKey: "close/reason/original", defaults: { "close-own": { on: 0 } } };
+  const closing = () => asElement(actsPanel({ acts: [close], hidden: 0 }, (...args) => values.push(args), null, closeContext)).all().find(node => node.tag === "form")!;
+  const held = closing(), reason = held.all().find(node => node.name === "field:reason")!, submit = held.all().find(node => node.tag === "button")!;
+  expect(reason.hasAttribute("required")).toBe(true);
+  expect(submit.hasAttribute("disabled")).toBe(true);
+  held.event("submit"); expect(values).toEqual([]);
+  reason.value = "completed"; held.event("change"); expect(submit.hasAttribute("disabled")).toBe(false);
+  reason.value = ""; held.event("input"); expect(submit.hasAttribute("disabled")).toBe(true);
+  reason.value = "not-a-declared-choice"; held.event("change"); held.event("submit"); expect(values).toEqual([]);
+  reason.value = "completed"; held.event("change");
+  const restored = closing(); expect(restored.all().find(node => node.name === "field:reason")!.value).toBe("completed");
+  expect(restored.all().find(node => node.tag === "button")!.hasAttribute("disabled")).toBe(false);
+  restored.event("submit"); restored.event("change"); restored.event("submit");
+  expect(values).toEqual([["close-own", "0", { reason: "completed" }]]);
+  const blockedClose = asElement(actsPanel({ acts: [close], hidden: 0 }, () => expect.fail("unknown close must not send"), null, { ...closeContext, uncertain: true }));
+  expect(blockedClose.all().find(node => node.tag === "button" && node.attrs.get("type") === "submit")!.hasAttribute("disabled")).toBe(true);
   const merge: Offered = { kind: "merge", step: "open", on: "merge", line: "Merge", fields: [] };
   const panel = asElement(actsPanel({ acts: [merge], hidden: 0 }, () => sends++, null, { blockedKinds: ["merge"] }));
   const form = panel.all().find((node) => node.tag === "form")!;
@@ -318,6 +382,9 @@ test("a refused creation keeps its draft editable; unknown creation offers a rea
   creator.event("click");
   const dialog = body.all().find(node => node.tag === "dialog")!;
   const form = dialog.all().find(node => node.tag === "form")!;
+  const footer = form.all().find(node => node.attrs.get("class") === "form-footer dialog-controls")!;
+  expect(footer.children.map(node => typeof node === "string" ? node : node.textContent)).toEqual(["Create issue", "Cancel"]);
+  expect(form.all().filter(node => node.tag === "button" && node.attrs.get("type") === "submit")).toHaveLength(1);
   form.all().find(node => node.name === "field:title")!.value = "Keep these words";
   form.event("input"); form.event("submit");
   issueDialogOutcome("creation-original-context", "editable", "The native request was refused.");

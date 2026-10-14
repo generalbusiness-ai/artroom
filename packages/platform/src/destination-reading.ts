@@ -1,7 +1,7 @@
 /** The destination's reading of the pinned change lane's retained entries (authority revision 28, sections 3.3 and 6.5). */
-import type { Entry, FactRef, KeyId, MemberId, RulesObservation } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, KeyId, MemberId, RulesObservation } from "@generalbusiness/dap-contract";
 import { canonicalize, isFactRef, isMemberRef } from "@generalbusiness/artroom-bytes";
-import type { RuleGiven } from "@generalbusiness/artroom-derive";
+import type { RuleGiven } from "@generalbusiness/dap-derive";
 import type { LaneRead } from "./destination.ts";
 import type { EditFile, Statement } from "./reservation.ts";
 

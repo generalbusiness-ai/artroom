@@ -9,8 +9,8 @@
  * A signed read is built the same way under its own tag, `artroom-read-1`.
  */
 
-import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
-import type { Digest, ReadRequest, RetainedInput, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import { SESSION_DOMAINS } from "@generalbusiness/dap-contract";
+import type { Digest, ReadRequest, RetainedInput, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/dap-contract";
 import { canonicalBytes, utf8 } from "./canonical.ts";
 import { sign, verify } from "./sign.ts";
 import { digestBytes } from "./hash.ts";

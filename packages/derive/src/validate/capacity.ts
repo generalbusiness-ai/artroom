@@ -9,7 +9,7 @@
  * whatever is free, so the room for what it starts exists before it.
  */
 
-import type { ScopeKind } from "@generalbusiness/artroom-contract";
+import type { ScopeKind } from "@generalbusiness/dap-contract";
 import { NOTHING, largest, requestEntries, sum, times, type Amount } from "../held.ts";
 import type { Markers } from "../markers.ts";
 import type { ClauseSet, Defining, Duties } from "./context.ts";

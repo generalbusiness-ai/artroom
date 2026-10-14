@@ -1,5 +1,5 @@
 /** Actual SDK adapter. Bootstrap/enrollment belongs to F1/C4, never this stage. */
-import type { Receipt, Summary } from "@generalbusiness/artroom-contract";
+import type { Receipt, Summary } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, intentDigest, isRecord, timeOf } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHeadStream, requestSession, signerSessionRequest, shapeDeclaredAct, signedIntent, type Fetch, type HeadStreamFetch, type Observation, type ObservationState, type Session, type Signer } from "@generalbusiness/artroom-client";
 import { countingCommitments as counting } from "../commitments.ts";

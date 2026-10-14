@@ -1,6 +1,6 @@
 /** FAKE transport/auth/scope/speech/clock for rendered source QA only. No audio or provider. */
 import "./style.css";
-import type { Entry, Item, MemberRef, Receipt, ScopeRef, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Entry, Item, MemberRef, Receipt, ScopeRef, SignedIntent, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { secretSigner, type Fetch, type HeadStreamFetch } from "@generalbusiness/artroom-client";
 import { COUNTING_COMMITMENTS_DEFINITION as COUNTING_DEFINITION } from "../commitments-pin.ts";

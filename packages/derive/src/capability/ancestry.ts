@@ -39,7 +39,7 @@
  * read in all. It is the caller's own limit and no number of the texts.
  */
 
-import type { Digest, FactRef, RetainedInput, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef, RetainedInput, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isFactRef, isLocalId, isRecord, isScopeRef, parseStrict, snapshotDigest } from "@generalbusiness/artroom-bytes";
 import { byteOrder } from "../values.ts";
 

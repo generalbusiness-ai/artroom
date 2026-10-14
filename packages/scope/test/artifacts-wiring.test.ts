@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type Entry, type FieldValue, type OperationId, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type Entry, type FieldValue, type OperationId, type ScopeId, type ScopeRef, type Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, scopeIdOf, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/artroom-derive";
-import { Ledger, T0, d } from "@generalbusiness/artroom-derive/testing";
-import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/artroom-platform";
+import { MemoryState, clockOf, judgeGenesis, judgeOutcome } from "@generalbusiness/dap-derive";
+import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
+import { DESTINATION, DIRECTORY, REGISTER, directoryIdOf, repositoryName } from "@generalbusiness/dap-platform";
 import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../platform/test/support-founding.ts";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside, type ArtifactsBindings } from "../src/artifacts-wiring.ts";
@@ -29,10 +29,10 @@ const gitHubEnv = (registerScope: ScopeId): GitHubBindings => ({
 });
 
 /** A scripted binding: each call is logged, each answer is the test's. */
-function service() {
+function service(namespace = NAMESPACE) {
   const calls: string[] = [];
   const script = {
-    create: (name: string): unknown => ({ name, remote: `https://${SERVICE}/git/${NAMESPACE}/${name}.git`, token: "creation-plaintext" }),
+    create: (name: string): unknown => ({ name, remote: `https://${SERVICE}/git/${namespace}/${name}.git`, token: "creation-plaintext" }),
     revoke: (_token: string): unknown => true,
   };
   const call = <T>(text: string, answer: () => T): Promise<T> => { calls.push(text); try { return Promise.resolve(answer()); } catch (e) { return Promise.reject(e); } };
@@ -40,7 +40,7 @@ function service() {
     get: (name) => call(`get ${name}`, () => ({
       createToken: (scope, ttl) => call(`createToken ${name} ${scope} ${ttl}`, () => ({ id: "tok", plaintext: `${scope}-plaintext`, scope, expiresAt: "2026-10-07T13:15:00Z" })),
       revokeToken: (token) => call(`revokeToken ${name} ${token}`, () => script.revoke(token)),
-      info: () => call(`info ${name}`, () => ({ name, remote: `https://${SERVICE}/git/${NAMESPACE}/${name}.git` })),
+      info: () => call(`info ${name}`, () => ({ name, remote: `https://${SERVICE}/git/${namespace}/${name}.git` })),
     })),
     create: (name) => call(`create ${name}`, () => script.create(name)),
     delete: (name) => call(`delete ${name}`, () => true),
@@ -235,6 +235,20 @@ test("absent or malformed configuration, or a missing binding, gives NO_OUTSIDE 
     expect(await wrongNamespace.send(other.claim())).toBeNull();
     expect(s.calls).toEqual([]);
     expect(wrongNamespace).toBe(NO_OUTSIDE);
+    // A separately configured binding namespace permits a fresh deployment,
+    // while a changed namespace immediately removes that authority.
+    const custom = service("other");
+    const customEnv = {
+      ARTIFACTS: custom.ns, ARTIFACTS_NAMESPACE: "other",
+      ARTIFACTS_CONFIG: canonicalize({ ...CONFIG, registerScope: other.register.at.scope, namespace: "other" }),
+    };
+    const customOutside = outsideOf(other.given, state.storage.sql, customEnv);
+    expect(customOutside.accepts(REGISTER, "create-repository")).toBe(true);
+    expect((await customOutside.send(other.request("1:0")))?.result).toBe("confirmed");
+    expect(custom.calls).toHaveLength(3);
+    customEnv.ARTIFACTS_NAMESPACE = NAMESPACE;
+    expect(customOutside.accepts(REGISTER, "create-repository")).toBe(false);
+    expect(custom.calls).toHaveLength(3);
   });
 });
 

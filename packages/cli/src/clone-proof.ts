@@ -1,6 +1,6 @@
 /** Check read-token receipt and entry evidence before any private handoff.
  * This is the client's exact-envelope/full-fact check, not history replay. */
-import type { Input, OperationId, PlatformDefinition, Receipt, ScopeRef, Sealed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Input, OperationId, PlatformDefinition, Receipt, ScopeRef, Sealed, SignedIntent, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, isPlatformDefinition, isReceipt, isRecord, isSealed, timeMs, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 
 export interface ReadTokenProof { to: ScopeRef; definition: PlatformDefinition; signed: SignedIntent; receipt: Receipt; operation: OperationId }

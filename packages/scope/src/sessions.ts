@@ -66,12 +66,12 @@
  * token or a part of one.
  */
 
-import { SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
-import type { Head, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SignedSessionRequest } from "@generalbusiness/artroom-contract";
+import { SESSION_DOMAINS } from "@generalbusiness/dap-contract";
+import type { Head, ScopeRef, SessionAnswer, SessionClaims, SessionRefusal, SignedSessionRequest } from "@generalbusiness/dap-contract";
 import { hex } from "@generalbusiness/artroom-bytes";
 import { b64url, canonicalBytes, canonicalize, hmacSha256, isKeyId, isMemberId, isSignature, parseStrict, taggedBytes, unb64url, utf8, verifySessionRequest } from "@generalbusiness/artroom-bytes";
-import { isObject, isScopeRef, same, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/artroom-derive";
-import { platform, standingOf } from "@generalbusiness/artroom-platform";
+import { isObject, isScopeRef, same, timeMs, timeOf, type RecordedRef, type ScopeState, type StateView } from "@generalbusiness/dap-derive";
+import { platform, standingOf } from "@generalbusiness/dap-platform";
 import type { Clock, ReadName, Readers } from "./ports.ts";
 
 // ---------------------------------------------------------------- the secret

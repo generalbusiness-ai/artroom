@@ -1,9 +1,9 @@
 /** One loaded-Page text proposal task. No automatic merge, durable outbox or replacement signature. */
-import type { Answer, Beside, DeclaredDefinition, Digest, FactRef, FieldValue, Grant, Head, KeyId, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/artroom-contract";
+import type { Answer, Beside, DeclaredDefinition, Digest, FactRef, FieldValue, Grant, Head, KeyId, ScopeId, ScopeRef, Seed, SignedIntent, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, digestBytes, entryHash, isFactRef, scopeIdOf, utf8, verifySignedIntent, wellFormed } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, httpTransport, secretSigner, shapeDeclaredAct, signedIntent, signedReads } from "@generalbusiness/artroom-client";
-import { expectedOf, heldActs, type DefinitionShape } from "@generalbusiness/artroom-cli";
-import { editPath, fileSound, platform } from "@generalbusiness/artroom-platform";
+import { expectedOf, heldActs, type DefinitionShape } from "@generalbusiness/dap-cli";
+import { editPath, fileSound, platform } from "@generalbusiness/dap-platform";
 import { knownLIST1 } from "./source-support.ts";
 import { actAssociation, openRoom, Unreadable, type ChangeView, type Room } from "./data.ts";
 

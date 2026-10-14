@@ -1,8 +1,8 @@
 /** Explicit supporting application cohort; legacy room pins and defaults stay unchanged. */
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Bounds, DeclaredDefinition, Digest, FieldType, MemberRef, PlatformData, RulesObservation, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Bounds, DeclaredDefinition, Digest, FieldType, MemberRef, PlatformData, RulesObservation, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { isObject, readFields, same, type Rules } from "@generalbusiness/artroom-derive";
+import { isObject, readFields, same, type Rules } from "@generalbusiness/dap-derive";
 import { definitionClosure, definitionDependencies } from "./definition-input.ts";
 import { DEFINITION_DOMAIN, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 
@@ -34,7 +34,7 @@ function preparedType(type: FieldType): boolean {
 }
 
 /** Raw input is bounded before parsing; final canonical values include the trusted opener. */
-export function applicationValues(raw: unknown, declared: DeclaredDefinition, opener: MemberRef, bounds: Bounds): Record<string, import("@generalbusiness/artroom-contract").FieldValue> | null {
+export function applicationValues(raw: unknown, declared: DeclaredDefinition, opener: MemberRef, bounds: Bounds): Record<string, import("@generalbusiness/dap-contract").FieldValue> | null {
   if (typeof raw !== "string" || !rawFits(raw)) return null;
   let value: unknown;
   try { value = parseStrict(raw); } catch { return null; }

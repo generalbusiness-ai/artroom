@@ -5,7 +5,7 @@
  * reports every problem it can.
  */
 
-import type { Bounds } from "@generalbusiness/artroom-contract";
+import type { Bounds } from "@generalbusiness/dap-contract";
 import { isObject } from "../values.ts";
 
 export type ProblemCode =

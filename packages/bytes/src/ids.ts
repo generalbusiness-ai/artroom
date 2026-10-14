@@ -6,7 +6,7 @@
  * A timestamp's one guard is `timeMs`, below; the clock rules are derive's.
  */
 
-import type { Base64Url, DutyId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Base64Url, DutyId, KeyId, MemberId, OperationId, PlatformDefinition, ScopeKind, Timestamp } from "@generalbusiness/dap-contract";
 import { wellFormed } from "./canonical.ts";
 import { unb64url } from "./encode.ts";
 import { publicKeyOf } from "./sign.ts";

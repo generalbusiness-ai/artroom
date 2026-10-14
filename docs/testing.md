@@ -1,4 +1,4 @@
-# Testing Artroom
+# Test dap
 
 This page says what a test in this repository is for, where it belongs, how
 to run tests while you work, and what to run before a review. It replaces
@@ -49,7 +49,7 @@ Put each test at the cheapest boundary that can show its property.
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
 | What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
 
-A stand-in proves only the boundary it exposes. A retry, an ordering or a
+A stand-in proves only the boundary it exposes. A retry, an order of events or a
 restart is shown against the thing that really retries, orders or restarts.
 
 The scripted capability of `@generalbusiness/artroom-scope/testing` is a
@@ -80,12 +80,12 @@ it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
 Membership has two stand-ins of its own, in
-`@generalbusiness/artroom-platform/testing`. `office` is a made-up
+`@generalbusiness/dap-platform/testing`. `office` is a made-up
 directory that creates one membership scope: it stands for the real
 directory and the register. `Roster` is a membership scope in memory
 below such an office. A test that uses one says so. It shows
 membership's rows and its ten rules, which are all the platform
-package's, and nothing about a founding. `lacking`, of the same module,
+package's, and nothing about a creation. `lacking`, of the same module,
 is a control and no stand-in: membership's version less one rule, for
 the rule that a version with a mark and no rule runs nothing.
 `PlatformScope`, of the scope package's test Worker, is the deployed
@@ -96,18 +96,18 @@ rules: a test of real authority runs there, in the namespace `PLATFORM`
 The register and the directory have no stand-in rule: every mark of the
 data of each has its rule in the platform package. Two fixtures are in
 `packages/platform/test/support-founding.ts`. `Register` is a register in
-memory, founded by an install intent. `Directory` is a directory in memory
+memory, created by an install intent. `Directory` is a directory in memory
 that such a register created by its own rules: the claim, the selecting
 outcome with its `create`, the directory's genesis and the register's
 record of the result are all judged. The genesis of each child and each
 lane's entry are scripted, made by hand. A test that uses one says so. It
 shows the rows and the rules of the two definitions as judgments in
-memory. A founding on scope objects is
+memory. A creation on scope objects is
 `packages/scope/test/founding-real.test.ts`, in the namespace `PLATFORM`:
 the deployed class, the production authority and the package's own rules,
 with a labelled stand-in for the Git host. The destination has a rule for
 every mark, including `first-head` and `receipt`; its creation no longer needs substitute rules. The real-scope
-founding and publication witness is described below.
+creation and publication witness is described below.
 
 The rules scope has four stand-ins, in
 `packages/platform/test/support-rules.ts`. `registrar` is a made-up
@@ -153,17 +153,17 @@ deployed class and the platform package's rules. The directory creates
 and confirms all three children. The destination records its first head
 and receipt, reads the real rules and membership scopes, and uses its
 production reader over retained lane bytes to reserve and publish the
-first change with a required passed check. Membership admits the checker member
+first change with a required passed check. Membership accepts the checker member
 and its active key. The rules scope retains the actual configuration bytes and
 publishes its digest, required status and checker. The destination retains the
-job opening and decision, reads the checker's current standing, and admits their
+job opening and decision, reads the checker's current standing, and accepts their
 pass against those rules. Its receipt becomes written and its tokens are cleaned up.
 The publication's holder counts are read from SQLite, including its
 `withdraw` decision before publication and its release on the final item.
 
 The source change lane's manifest, job opening, passed decision and merge
-entries are written by hand and anchored; no real lane admits them and no checker
-runner runs. The decision uses the admitted checker key and a fresh
+entries are written by hand and anchored; no real lane accepts them and no checker
+runner runs. The decision uses the accepted checker key and a fresh
 `change.check` grant built from a real membership answer. The test supplies the
 source read metadata and the passed outcome. The Git host is `OutsideDouble`,
 a scripted port whose replies name the package's computed target IDs;
@@ -171,11 +171,11 @@ no host runs. Reads use the test readers except for the separate real
 read-session witness. All five runtime histories replay `consistent` over
 HTTP, with their authority derived from membership history and only the
 four scripted source facts anchored. Publication updates to that scripted
-lane remain pending. This shows the founding and destination's first
+lane remain pending. This shows the creation and destination's first
 publication through these boundaries. It proves no deployment, production
 host or complete lane journey, and does not close full I3. Full capacity
-admission for items, records, retained bytes and pending requests remains
-request `cc570904`; the current admission checks entries.
+checks for items, records, retained bytes and pending requests remain
+request `cc570904`. The current judge checks entries.
 
 The bound-request tests in `packages/derive/test/forms-binding.test.ts`
 use the real holder ledger: counts are taken and added, a bound deciding
@@ -185,14 +185,14 @@ counts. The platform data and rules remain made up. The replay witness in
 `packages/replay/test/decisions.test.ts` runs the real verifier on a judged
 receiver history, with the sender's entries written by hand and anchored.
 It checks that the taking entry fits its decision reservation. These tests
-show no behavior of an Artroom platform definition. The marker-duty tests
+show no behavior of a dap platform definition. The marker-duty tests
 in `forms-settles.test.ts` also use made-up platform data and rules.
 
 The rows of `observes` have a made-up definition and two scripted scopes.
 `weigher`, in `packages/derive/test/fixtures-observes.ts`, is made-up
 platform data whose acts, one kind of `outcomes` and one clause of a
 result state rows, with a stand-in rule for each of its marks. It is no
-definition of Artroom. The destination, membership and task platform data
+definition of dap. The destination, membership and task platform data
 now state their own rows, separately from these fixtures. Each
 observation of that file is written by hand. A test that uses it says so.
 It shows where a subject comes from, what the judges retain and what a verifier derives,
@@ -268,7 +268,7 @@ host. What a real change lane does with the service's signed results is
 one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
-`packages/lanes/test/edit.scope.test.ts` runs `artroom edit` as the
+`packages/lanes/test/edit.scope.test.ts` runs `dap edit` as the
 command-line story runs its commands, on each host through the production
 wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
 labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
@@ -286,7 +286,7 @@ tree before a required check, refuses a wrong source digest and wrong job
 tree, and publishes only after a configured checker member signs a pass.
 The destination replays from its retained inputs. The actual CheckerService
 reads a signed, job-bound reservation read over the Worker route, validates the recorded reservation and its object closure,
-and signs the result that the lane admits. Its durable storage and runner
+and signs the result that the lane accepts. Its durable storage and runner
 are stand-ins. `packages/checkers/test/runner.test.ts` separately checks
 both object-overlay verification and exact reservation-ref fetching with
 actual private Git checkout and a
@@ -297,7 +297,7 @@ current-job read finished first. Other cases preserve an unresolved push
 when its retry is refused, cancel a pre-push reservation, drain its recorded
 deadline, and refuse a final membership read that exceeded its window.
 
-`packages/lanes/test/issues.scope.test.ts` runs `artroom issue`,
+`packages/lanes/test/issues.scope.test.ts` runs `dap issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
 `packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
@@ -307,7 +307,7 @@ that reads the stand-in host. Its second test is the recorder for
 `scripts/demo-captures.ts --recorded`, and runs only with `DEMO_RECORD=1`
 ([demo.md](demo.md)).
 
-`packages/lanes/test/support/room.ts` founds a repository on the real
+`packages/lanes/test/support/room.ts` creates a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
 its real directory creates lanes under the digests that its real rules
 scope activated. The lane scenarios on it, `wiring.scope.test.ts` and
@@ -329,7 +329,7 @@ answers, and nothing about a real host, a real tree or a runner.
   parameter, and at the real limit once.
 - Tests that only read may share one scope or one fixture per file. Tests
   that write get their own. The packages share one fixture set, exported by
-  `@generalbusiness/artroom-derive/testing`.
+  `@generalbusiness/dap-derive/testing`.
 
 ## While you work
 
@@ -342,13 +342,17 @@ keeping native introspection and RPC behavior. It changes no pool settings.
 Before a direct package or Vitest invocation, run this same script from the
 repository root. Unknown package versions or bytes stop preparation.
 
+The names on this page match the repository workspace manifests. Internal
+workspace test exports are not the public six-package SDK. In particular,
+`@generalbusiness/dap-platform/testing` is available only in this checkout.
+
 Run the tests of what you changed, not the repository.
 
 ```
 npm run test:changed                 # what you changed and have not committed
 npm run test:changed -- origin/main  # everything that differs from origin/main
 npx vitest run --project scope turn   # one project, files whose name matches
-npm test --workspace @generalbusiness/artroom-derive   # one package
+npm test --workspace @generalbusiness/dap-derive   # one package
 ```
 
 `npm run test:changed` runs the root vitest run
@@ -471,7 +475,7 @@ story is run by hand: change the line, run
 
 The page's story, `packages/page/test/story.scope.test.ts`, runs from the
 root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
-founded by the command line over the Worker's HTTP routes, with the real
+created by the command line over the Worker's HTTP routes, with the real
 read sessions under a TEST SECRET, and the site route for addresses under
 `/site/`; the Git host (`OwnGit` under the production wiring of the hosting
 own Git service) and the scheduler are labelled stand-ins there. Its reads
@@ -503,7 +507,7 @@ made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
 The Node `lanes` project checks the definitions and the scripted CLI proposal
 outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
-witness has no native admission or authority; its native counterparts stay in
+witness has no native judgment or authority; its native counterparts stay in
 `manifest-tree.scope.test.ts`. The four definition tests read the four byte files
 under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those

@@ -1,8 +1,8 @@
 > **Inactive.** This is the specification of the earlier model. Nothing in the active packages implements it. It is kept, unedited, as source material for the deliveries that replace its parts (I2, I3 and I5). What is built now is described in [`docs/scopes.md`](scopes.md).
 
-# Artroom protocol, version 1
+# dap protocol, version 1
 
-This document is the normative contract for Artroom. It goes with the
+This document is the normative contract for dap. It goes with the
 types in `packages/contract`. It implements the approved plan,
 [notes/2026-10-01-artroom-plan.md](../notes/2026-10-01-artroom-plan.md),
 sections 4 to 11 and 13.
@@ -1504,7 +1504,7 @@ admitted.
 | One intermediate result | 1 MiB |
 | Cumulative inspected bytes | 16 MiB |
 
-Added for Artroom, across all evaluations for one act (R-EVAL-9):
+Added for dap, across all evaluations for one act (R-EVAL-9):
 
 | Bound | Value |
 |---|---|
@@ -1932,7 +1932,7 @@ bindings as amendment 6 requires.
 - `attention` returns `RoomApi.attention`'s page unchanged. The page
   carries `publishedThrough` from the same read as its items
   (`AttentionPage`), so the tool makes no second read;
-- Artroom chooses object-shaped not-found results for these MCP reads:
+- dap chooses object-shaped not-found results for these MCP reads:
   `explain` returns
   `ExplainNotFound`, `{ act, outcome: "not-found" }`; `lane`, `proposal`
   and `operation` return `McpNotFound`, `{ outcome: "not-found", what }`.
@@ -1945,7 +1945,7 @@ bindings as amendment 6 requires.
 
 The [MCP structured-content specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools#structured-content)
 permits any JSON value conforming to an advertised output schema, including
-`null`. Artroom's object-shaped results are its own consistent interface
+`null`. dap's object-shaped results are its own consistent interface
 choice, not an upstream object-only restriction.
 
 There is no named `check` or `roster` tool. A generic declared check follows
@@ -4594,7 +4594,7 @@ use `D(s)`, and a generic bound check may use the MCP endpoint.
 |---|---|
 | R-API-3 | One more read route, `GET /v1/rooms/:room/declarations`, with the same credential as every read. With no query it answers with the active policy version's declarations. `?at=<seq>` answers with the version in force for the entry at that seq. `?policy=<version>` answers with that version. Both together, a seq that is not a whole number from 0, or a malformed version, is `bad-request`. A version the room does not retain is `not-found`. `POST /v1/rooms/:room/acts` takes a signed envelope of either version (`AnySignedEnvelope`). It takes nothing else: a bearer token on that route gives no authority, and a bearer act sent there is `bad-request` |
 | R-API-5 and the reads | `ReadQuery` gains `{ q: "acts", at?, policy? }`, answered with a `Catalogue` or `null` (`ReadResults.acts`). `RoomApi` gains `acts()`, `actsAt()` and `act()`. `Explanation.kind` and `EntrySummary.kind` may be any kind name, and `Explanation` gains `meaning` |
-| R-API-9 | The MCP tool `acts` takes an optional `at` (a seq) or `policy` (a version), never both, and returns the `Catalogue`; for a version the room does not retain it returns `{ outcome: "not-found" }` (`ActsNotFound`), the object-shaped not-found result Artroom chooses for its MCP reads (R-API-9). The MCP tool `act` takes `kind`, `target`, `body`, `binding` and `idempotencyKey`, all required, and calls `RoomApi.act` with them unchanged. It never reads a binding for the agent. A `binding-stale` refusal is an ordinary tool result; its text names the active binding and policy version and says that nothing was done. `explain` returns the `Explanation`, whose `meaning` is the kind's meaning at the entry's own seq. The ten named tools of amendment 2 are unchanged. Section 34 adds four named reads, so the core has fourteen named tools beside `act` and `acts`. The descriptor shape (titles, output schemas, annotations), the toolsets that list `act` and `acts`, their fixed hints, the required key and the wait limit are section 34's (R-API-13 to R-API-15), not this section's |
+| R-API-9 | The MCP tool `acts` takes an optional `at` (a seq) or `policy` (a version), never both, and returns the `Catalogue`; for a version the room does not retain it returns `{ outcome: "not-found" }` (`ActsNotFound`), the object-shaped not-found result dap chooses for its MCP reads (R-API-9). The MCP tool `act` takes `kind`, `target`, `body`, `binding` and `idempotencyKey`, all required, and calls `RoomApi.act` with them unchanged. It never reads a binding for the agent. A `binding-stale` refusal is an ordinary tool result; its text names the active binding and policy version and says that nothing was done. `explain` returns the `Explanation`, whose `meaning` is the kind's meaning at the entry's own seq. The ten named tools of amendment 2 are unchanged. Section 34 adds four named reads, so the core has fourteen named tools beside `act` and `acts`. The descriptor shape (titles, output schemas, annotations), the toolsets that list `act` and `acts`, their fixed hints, the required key and the wait limit are section 34's (R-API-13 to R-API-15), not this section's |
 | R-CRED-10 | As below, "Bearer sessions and the generic act" |
 | R-DECL-16 | In a client: as below, "The generic act in a client" |
 | R-DECL-17 | A grantor's client builds a `delegate` op or an invitation `session` from the active catalogue: `*`, or a list of kinds, becomes the delegable platform kinds and a map from each declared kind to its active binding. A kind the grantor's role may not grant, or that the document does not declare, stops the build with an error that names it; nothing is signed with a smaller grant than was asked for. In a `v1` room the legacy shape is built, with the kinds as given |

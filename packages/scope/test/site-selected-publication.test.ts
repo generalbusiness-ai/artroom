@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import type { Entry, Intent, Seed, ScopeId } from "@generalbusiness/artroom-contract";
+import type { Entry, Intent, Seed, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
-import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, destinationReceipt, foundingOf, repositoryName } from "@generalbusiness/artroom-platform";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { DIRECTORY, REGISTER, destinationReceipt, foundingOf, repositoryName } from "@generalbusiness/dap-platform";
 import { buildPack, type RawGitObject } from "@generalbusiness/artroom-git/http";
 import { SqliteStore } from "../src/index.ts";
 import { site } from "../src/site/route.ts";

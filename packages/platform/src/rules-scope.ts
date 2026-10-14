@@ -52,12 +52,12 @@
  * entries EQ1 to EQ11 and FB1 to FB5.
  */
 
-import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { DeclaredDefinition, Digest, MemberId, MemberObservation, ObservationRequest, PlatformData, PlatformDefinition, RulesObservation, ScopeId } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isMemberRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { definitionClosure, definitionDependencies } from "./definition-input.ts";
-import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
-import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/artroom-derive";
+import { byteOrder, validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import type { GuardRule, Item, RecordedRef, RuleGiven, Rules, StateView } from "@generalbusiness/dap-derive";
 import { firstExtents, holdsRulesExtent, isExtents } from "./extents.ts";
 import type { Extent } from "./extents.ts";
 
@@ -680,3 +680,18 @@ export const rulesScopeRules3: Rules = {
 
 /** Version 3 adds explicit closure places; versions 1 and 2 retain their exact data. */
 export const rulesScope3: PlatformData = { ...rulesScope2, acts: { ...rulesScope2.acts, activate: { ...rulesScope2.acts["activate"]!, fields: { ...rulesScope2.acts["activate"]!.fields, ...definitionDependencies } } } };
+
+/** Prospective version 4 defaults to agent-controller review; older pinned data stays unchanged. */
+export const rulesScope4: PlatformData = {
+  ...rulesScope3,
+  items: {
+    ...rulesScope3.items,
+    rules: {
+      ...rulesScope3.items["rules"]!,
+      values: {
+        ...rulesScope3.items["rules"]!.values,
+        ownerMayReview: { ...rulesScope3.items["rules"]!.values["ownerMayReview"]!, default: true },
+      },
+    },
+  },
+};

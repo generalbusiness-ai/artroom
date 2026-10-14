@@ -234,7 +234,7 @@ test("Config and key select a room only after matching standing and exact storag
       .fire("submit");
   try {
     await import("../src/main.ts");
-    expect(root.textContent).toContain("How would you like to join?");
+    expect(root.all().find(e => e.tag === "h1")?.textContent).toBe("Join or create a room");
     expect(root.textContent).not.toMatch(
       /Save settings|Create key|Your key|Issues|Changes|Rules/,
     );

@@ -25,8 +25,8 @@
  * its one argument, until its `notAfter`.
  */
 
-import { PROPOSED_BOUNDS, SESSION_DOMAINS } from "@generalbusiness/artroom-contract";
-import type { ReadRequest, ScopeId, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, SESSION_DOMAINS } from "@generalbusiness/dap-contract";
+import type { ReadRequest, ScopeId, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/dap-contract";
 import { b64url, canonicalBytes, parseStrictBytes, retainedReadArgument, taggedBytes } from "@generalbusiness/artroom-bytes";
 import type { Transport } from "./handle.ts";
 import type { Signer } from "./intent.ts";

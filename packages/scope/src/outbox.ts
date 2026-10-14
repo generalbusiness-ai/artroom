@@ -26,8 +26,8 @@
  * commit and from the object's alarm.
  */
 
-import type { Attempt, Bounds, Entry, Timestamp } from "@generalbusiness/artroom-contract";
-import { judgeDiagnosis, timeMs, timeOf, type Capabilities } from "@generalbusiness/artroom-derive";
+import type { Attempt, Bounds, Entry, Timestamp } from "@generalbusiness/dap-contract";
+import { judgeDiagnosis, timeMs, timeOf, type Capabilities } from "@generalbusiness/dap-derive";
 import { ownOf, retainedFacts, used, type Scope } from "./core.ts";
 import type { Alarm, Clock, Transport } from "./ports.ts";
 import type { Dispatched, Outgoing, Store } from "./store.ts";

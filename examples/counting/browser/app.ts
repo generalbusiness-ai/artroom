@@ -1,5 +1,5 @@
 /** One independently enrolled device owns this mounted stage. No shared Settings identity. */
-import type { Summary, MemberRef } from "@generalbusiness/artroom-contract";
+import type { Summary, MemberRef } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Observation, ObservationState } from "@generalbusiness/artroom-client";
 import { countingView, assignedTurn, canCommit, ownedParticipant, same, type CountingView, type Control, type ProposalOptions } from "./model.ts";

@@ -1,6 +1,6 @@
-# Git hosts
+# Configure a Git host
 
-Artroom keeps each claimed repository at a Git host. This page says which
+dap keeps each claimed repository at a Git host. This page says which
 hosts the scope Worker can use, what each one needs, what a person sees as
 the repository's remote, and what is not built yet.
 
@@ -9,8 +9,8 @@ the repository's remote, and what is not built yet.
 The operator names the host when installing the register:
 
 ```
-artroom install <base-url> --host artifacts --namespace artroom-demo
-artroom install <base-url> --host github.com --namespace <organization>
+dap install <base-url> --host artifacts --namespace artroom-demo
+dap install <base-url> --host github.com --namespace <organization>
 ```
 
 The register records `host` and `namespace` and never changes them. Every
@@ -31,7 +31,7 @@ gets nothing.
 
 ## The hosting's own Git service (host `artifacts`)
 
-This is the host of the demo: "creation only on Artroom". The Worker
+This is the host of the demo: "creation only on dap". The Worker
 reaches the hosting's own Git service through its binding, and needs no
 outside credential.
 
@@ -44,15 +44,17 @@ What it needs:
 
   | Field | Value |
   |---|---|
-  | `registerScope` | The register's scope ID, from `artroom install --plan` before the install (see [deploy.md](deploy.md)), or from `artroom install` after it. |
+  | `registerScope` | The register's scope ID, from `dap install --plan` before the install (see [deploy.md](deploy.md)), or from `dap install` after it. |
   | `namespace` | `artroom-demo`, the binding's namespace. |
   | `host` | The service's hostname, as it appears in its remote URLs. |
   | `maxBytes` | The most bytes one Git transfer may hold, at least 32. |
   | `credentialIdentity` | `adapter-attempt`. |
 
   A missing, malformed or extra field turns the port off.
-  A namespace other than `artroom-demo` also turns it off before any service
-  call; the binding supplies that one namespace.
+  The namespace must match the independent `ARTIFACTS_NAMESPACE` deployment
+  variable and the namespace of the `ARTIFACTS` binding. If that variable is
+  absent, the original `artroom-demo` namespace remains the default. A mismatch
+  turns the port off before any service call. See [self-host.md](self-host.md).
 
 What it does:
 
@@ -64,7 +66,8 @@ What it does:
   operation. The token's plaintext is kept privately in the register's
   storage until that revocation is confirmed. It is never in a history.
   A cleanup handle is reported only when that exact plaintext is durably
-  held. If custody and immediate revocation both fail, the result is unknown.
+  held. Deleting a token's plaintext does not prove that the provider
+  revoked the token. Only a confirmed revocation shows that. If custody and immediate revocation both fail, the result is unknown.
   The creation's reported remote must match the configured host, namespace
   and name before any creation metadata is confirmed.
 - **Refusals.** A taken name is a refusal with `nameExists: true`. Other
@@ -93,12 +96,12 @@ https://<host>/git/artroom-demo/<name>.git
 `<host>` is the setting's `host`. `<name>` is the repository's name. The
 register's `create-repository` outcome entry, the directory's genesis and
 the destination's branch item each record it as `{ host: "artifacts",
-namespace: "artroom-demo", name, id }`. `artroom show <scope>:<seq>`
+namespace: "artroom-demo", name, id }`. `dap show <scope>:<seq>`
 prints an entry's effects, where the reader is allowed to read that
 entry. The name is 52 lowercase base32 letters, a hyphen, and the attempt
 number, which is 1 unless an earlier attempt failed.
 
-The repository is private: a clone needs a read token. `artroom clone`
+The repository is private: a clone needs a read token. `dap clone`
 gets one for the member who runs it (below).
 
 ## GitHub (host `github.com`)
@@ -121,7 +124,7 @@ The remote is `https://github.com/<organization>/<name>.git`.
 
 ## How a member reads the repository
 
-On either host a member runs `artroom clone`. It signs the destination's
+On either host a member runs `dap clone`. It signs the destination's
 `read-token` act, which any active member may sign, with a lifetime from
 1 to 24 hours. The destination opens one host operation, `mint-read`. On
 the hosting's own Git service the port mints a read token for the
@@ -133,13 +136,13 @@ token goes to the destination's private custody, as a write token does,
 and the credential route gives it once to the session of the key that
 signed the act, before its end. The command then runs `git clone` with
 the token in an `Authorization` header that git reads from its
-environment. `artroom remote` prints the repository's remote URL in the
+environment. `dap remote` prints the repository's remote URL in the
 host's form.
 
 ## What is not built
 
 - A command that gives `git fetch` or `git pull` a token in an existing
-  clone. Each `artroom clone` gets a new token.
+  clone. Each `dap clone` gets a new token.
 - A sweep of read tokens that were minted and never read. Each ends at
   its end; its plaintext stays in custody until it is read or the read is
   refused at its end.

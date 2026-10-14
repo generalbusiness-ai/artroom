@@ -11,7 +11,7 @@
  * and another text.
  */
 
-import type { Digest, FactRef } from "@generalbusiness/artroom-contract";
+import type { Digest, FactRef } from "@generalbusiness/dap-contract";
 import { CanonicalError, canonicalize, parseStrict } from "./canonical.ts";
 import { isDigest } from "./hash.ts";
 import { isFactRef } from "./records.ts";

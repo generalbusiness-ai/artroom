@@ -84,9 +84,9 @@
  * else. It travels in a header, never in a URL.
  */
 
-import type { Entry, FactUse, KeyId, ScopeId, Seed, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/artroom-contract";
+import type { Entry, FactUse, KeyId, ScopeId, Seed, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStrict, scopeIdOf, seedDigest, unb64url, verifySignedRead } from "@generalbusiness/artroom-bytes";
-import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/artroom-derive";
+import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/dap-derive";
 import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
 

@@ -7,14 +7,16 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p examples/counting/tsconfig.json && tsc -p examples/counting/browser/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p examples/counting/tsconfig.json && tsc -p examples/lending/tsconfig.json && tsc -p examples/lending/browser/tsconfig.json && tsc -p examples/counting/browser/tsconfig.json",
     "pretest": "node scripts/cloudflare-pool-compat.mjs",
     "test": "vitest run && node --test scripts/active-source.test.mjs scripts/cloudflare-pool-compat.test.mjs homepage/test/home.test.mjs && node examples/counting/scripts/test-browser.mjs",
     "pretest:changed": "node scripts/cloudflare-pool-compat.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gate": "bash scripts/gate.sh",
     "build:brand": "node scripts/brand-assets.mjs",
-    "build:home": "node homepage/build.mjs"
+    "build:home": "node homepage/build.mjs",
+    "deploy:scope": "cd packages/scope && npx -y wrangler@4.147.0 deploy",
+    "deploy:home": "cd homepage && npx -y wrangler@4.147.0 deploy"
   },
   "devDependencies": {
     "typescript": "7.0.2",

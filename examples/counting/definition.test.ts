@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { readFileSync } from "node:fs";
-import type { FieldValue, SignedIntent } from "@generalbusiness/artroom-contract";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
+import type { FieldValue, SignedIntent } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
-import { prepareRules, validateDefinition } from "@generalbusiness/artroom-derive";
-import { evaluateRules, RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
-import { founded, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/artroom-derive/testing";
+import { prepareRules, validateDefinition } from "@generalbusiness/dap-derive";
+import { evaluateRules, RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
+import { founded, keys, Ledger, on, t, valid, type Actor } from "@generalbusiness/dap-derive/testing";
 import { counting, countingClosure } from "./definition.ts";
 import { COUNTING_DEFINITION } from "./pin.ts";
 

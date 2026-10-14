@@ -13,8 +13,8 @@
  * section 5.7, "What a step reads of its signed intent").
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Effect, Entry, Evidence, FieldValue, OperationId, ScopeRef } from "@generalbusiness/dap-contract";
 import { RETIRE_ACTION, capabilitiesOf, checkpointOf, clockOf, gitRead, holdCapability, judgePreparation, owed, settleOutcome, snapshotInput, snapshotOf, stagedRefName, workspaceEffects } from "../src/index.ts";
 import type { AncestryCheck, CapabilityGiven, StagedRef, ValidDefinition } from "../src/index.ts";
 import { Scope, grantOf, keys, lane, variant, type Actor, type Context } from "./fixtures.ts";

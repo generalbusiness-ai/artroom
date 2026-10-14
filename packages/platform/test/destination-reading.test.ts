@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { Entry, FactRef, Grant, RulesObservation } from "@generalbusiness/artroom-contract";
+import type { Entry, FactRef, Grant, RulesObservation } from "@generalbusiness/dap-contract";
 import { factRefOf, isFactRef } from "@generalbusiness/artroom-bytes";
-import type { RuleGiven, StateView } from "@generalbusiness/artroom-derive";
-import { d, keys, otherLane, t } from "@generalbusiness/artroom-derive/testing";
+import type { RuleGiven, StateView } from "@generalbusiness/dap-derive";
+import { d, keys, otherLane, t } from "@generalbusiness/dap-derive/testing";
 import { decidingKeys, manifestAuthors, readLane } from "../src/destination-reading.ts";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, type Statement } from "../src/reservation.ts";
 import { RULES_SCOPE, rulesAnswer } from "../src/rules-scope.ts";

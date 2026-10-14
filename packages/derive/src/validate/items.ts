@@ -1,6 +1,6 @@
 /** Item types: their states and their party, reference and value slots (scope contract, section 6.3). */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { isValue } from "../values.ts";
 import { held, indexes } from "./binding.ts";
 import type { Defining, Slot } from "./context.ts";

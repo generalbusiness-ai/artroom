@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { ObservationUse, Send } from "@generalbusiness/artroom-contract";
+import type { ObservationUse, Send } from "@generalbusiness/dap-contract";
 import { factRefOf } from "@generalbusiness/artroom-bytes";
 import { judgeDelivery } from "../src/index.ts";
 import { Scope, arriving, forged, keys, membership, otherLane, t, valid } from "./fixtures.ts";

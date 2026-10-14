@@ -30,8 +30,8 @@
  * of a package that runs its own definitions on real scopes.
  */
 
-import { platform } from "@generalbusiness/artroom-platform";
-import { lacking } from "@generalbusiness/artroom-platform/testing";
+import { platform } from "@generalbusiness/dap-platform";
+import { lacking } from "@generalbusiness/dap-platform/testing";
 import { ScopeObject, type Outside, type OutsideGiven, type Wiring } from "../src/index.ts";
 import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
@@ -98,6 +98,37 @@ export const TEST_DEPLOYMENT = "artroom-scope-test";
 type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
 
 export class PlatformScope extends DeployedScope<PlatformEnv> {
+  readonly #scheduledCallbacks: Promise<unknown>[];
+
+  constructor(ctx: DurableObjectState, env: PlatformEnv) {
+    // Retain the actual context and delegate each exact original promise.
+    // This test-only registry neither replaces a callback nor changes its scheduling.
+    const scheduled: Promise<unknown>[] = [];
+    const originalWaitUntil = ctx.waitUntil.bind(ctx);
+    ctx.waitUntil = promise => {
+      scheduled.push(promise);
+      try { originalWaitUntil(promise); }
+      catch (error) { scheduled.splice(scheduled.lastIndexOf(promise), 1); throw error; }
+    };
+    super(ctx, env);
+    this.#scheduledCallbacks = scheduled;
+  }
+
+  /** Join only this actual object's scheduled callbacks; no driver, clock advance or read retry. */
+  async awaitScheduledCallbacks(): Promise<{ batches: number; callbacks: number }> {
+    let callbacks = 0;
+    for (let batches = 0; batches < 64; batches++) {
+      if (this.#scheduledCallbacks.length === 0) return { batches, callbacks };
+      if (this.#scheduledCallbacks.length > 4096) throw new Error("Native fixture scheduled callback batch exceeded 4096 promises");
+      const batch = this.#scheduledCallbacks.splice(0);
+      callbacks += batch.length;
+      const settled = await Promise.allSettled(batch);
+      const failures = settled.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+      if (failures.length) throw new AggregateError(failures, "Native fixture scheduled callback failed");
+    }
+    throw new Error("Native fixture scheduled callbacks exceeded 64 batches");
+  }
+
   protected override scopes() { return this.env.PLATFORM; }
   protected override wiring(name: string | undefined): Wiring {
     const deployed = super.wiring(name);
@@ -110,6 +141,8 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const signedReadObserver = signedDiagnosticFor(name);
     return {
       ...(ports?.outside ? rest : deployed),
+      // Explicit per-name fixture bounds only; deployed defaults are unchanged.
+      ...(net.sized.has(name ?? "") ? { bounds: net.sized.get(name ?? "")! } : {}),
       ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
       sessions: session.sessions,
       ...(signedReadObserver ? { signedReadObserver } : {}),
@@ -128,7 +161,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
         // Transport that a test can hold: a send that `net.hold` matches is not delivered, and its attempt gets no answer.
         transport: { send: (envelope) => (net.hold?.(envelope) ? Promise.resolve(null) : transport!.send(envelope)) },
         // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
-        resolver: { read: (fact, seconds) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } },
+        resolver: { read: (fact, seconds, origin) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds, origin); } },
         definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.without === null ? platform(named) : lacking(named, platformNet.without)) },
         // The ports that one test wired for this name: the STAND-IN host of `outside.ts`, for a register, whose one outside effect is
         // the creation of a repository at the Git host. With none wired the outside port is the production one, which sends nothing.

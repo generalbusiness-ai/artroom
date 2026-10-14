@@ -13,7 +13,7 @@
  * | effect queued, unknown, confirmed, refused | Each outside operation of the latest merge's publication, by the result of its last attempt: none yet, or only opened, is queued. |
  */
 
-import type { Answer } from "@generalbusiness/artroom-contract";
+import type { Answer } from "@generalbusiness/dap-contract";
 import type { ChangeView } from "./data.ts";
 
 export type ChangeStateName =

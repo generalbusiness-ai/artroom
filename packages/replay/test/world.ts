@@ -11,9 +11,9 @@
  *   I: 0 genesis, 1 confirmation, 2 P's update
  */
 
-import type { Entry, RetainedInput } from "@generalbusiness/artroom-contract";
+import type { Entry, RetainedInput } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { born, deliver, fields, founded, keys, type Ledger } from "@generalbusiness/artroom-derive/testing";
+import { born, deliver, fields, founded, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, hashOfBytes, type MemoryScope } from "../src/index.ts";
 
 function written(judgment: { result: string }): void {

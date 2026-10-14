@@ -1,5 +1,5 @@
 /** One bounded origin-private enrollment slot. Page's existing raw-key policy remains. */
-import type { Answer, KeyId, Receipt } from "@generalbusiness/artroom-contract";
+import type { Answer, KeyId, Receipt } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, intentDigest, isHead, isReceipt, isRecord, isScopeId, isScopeRef, isSignedIntentShape, keyIdOfSecret, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { invitationTarget, prepareJoin, settleJoin, submitJoin, verifyJoinReceipt, type Place, type PreparedJoin, type Session } from "./data.ts";

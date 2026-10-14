@@ -1,5 +1,5 @@
 /** Existing native head stream over HTTP. Notices invalidate reads; they are neither entries nor command outcomes. */
-import type { Head, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { isHead, isScopeRef, parseStrictBytes, takeBytes, type ByteStream, type Expiry } from "@generalbusiness/artroom-bytes";
 import type { Session } from "./session.ts";
 /** Stream fetch requires response identity/media metadata and redirect:error.

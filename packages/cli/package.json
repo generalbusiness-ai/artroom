@@ -1,13 +1,14 @@
 {
-  "name": "@generalbusiness/artroom-cli",
+  "name": "@generalbusiness/dap-cli",
   "version": "0.1.0-dev.1",
-  "description": "The artroom command for the new model: install, claim, invite, join, acts, act, log, show, verify, remote, clone, edit, merge, issue and issues, as thin functions over a scope service's HTTP routes and a signing key.",
+  "description": "The dap command: install, claim, invite, join, acts, act, log, show, verify, remote, clone, edit, merge, issue and issues, mcp, as thin functions over a scope service's HTTP routes and a signing key.",
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
   "sideEffects": false,
   "bin": {
-    "artroom": "./bin/artroom.js"
+    "dap": "./bin/dap.js",
+    "artroom": "./bin/dap.js"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -19,10 +20,11 @@
   "dependencies": {
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
     "@generalbusiness/artroom-client": "0.1.0-dev.1",
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
-    "@generalbusiness/artroom-derive": "0.1.0-dev.1",
-    "@generalbusiness/artroom-platform": "0.1.0-dev.1",
     "@generalbusiness/artroom-replay": "0.1.0-dev.1",
+    "@generalbusiness/dap-contract": "0.1.0-dev.1",
+    "@generalbusiness/dap-derive": "0.1.0-dev.1",
+    "@generalbusiness/dap-mcp": "0.1.0-dev.1",
+    "@generalbusiness/dap-platform": "0.1.0-dev.1",
     "tsx": "4.21.0"
   },
   "devDependencies": {
@@ -34,5 +36,11 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generalbusiness-ai/dap.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://dap.generalbusiness.ai/"
 }

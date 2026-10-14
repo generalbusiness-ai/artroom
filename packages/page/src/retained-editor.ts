@@ -1,7 +1,7 @@
 /** Task-specific retained-text editor. All names/source are inert DOM text. Loaded-Page memory only. */
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { editPath } from "@generalbusiness/artroom-platform";
+import { editPath } from "@generalbusiness/dap-platform";
 import { actAssociation, type ChangeView, type Room } from "./data.ts";
 import { h } from "./view.ts";
 import { checkEditRequest, continueEdit, editFields, prepareEdit, type EditDraft, type EditTask } from "./retained-editor-data.ts";

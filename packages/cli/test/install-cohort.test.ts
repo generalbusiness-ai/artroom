@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { APPLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/artroom-platform";
+import { APPLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/dap-platform";
 import { command, install, installPlanned, memoryStore, planInstall, type Config, type Context, type Store } from "../src/index.ts";
 
 const SERVICE = "https://cohort.test";

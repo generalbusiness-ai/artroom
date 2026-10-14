@@ -14,7 +14,7 @@
  * and it computes the hash itself.
  */
 
-import type { Answer, DeliveryRefusal, Founded, MismatchReason, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/artroom-contract";
+import type { Answer, DeliveryRefusal, Founded, MismatchReason, RefusalReason, ScopeApi, UnavailableReason } from "@generalbusiness/dap-contract";
 import { REFUSAL_REASONS, among, isDuty, isHead, isItem, isListOf, isLogPage, isRead, isReceipt, isRecord, isRetainedInput, isSealed, isSummary } from "@generalbusiness/artroom-bytes";
 
 // Each table has every member of its union, and the compiler says so when the contract gains or loses one.

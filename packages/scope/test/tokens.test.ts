@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { OperationId } from "@generalbusiness/artroom-contract";
-import { timeMs } from "@generalbusiness/artroom-derive";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { OperationId } from "@generalbusiness/dap-contract";
+import { timeMs } from "@generalbusiness/dap-derive";
 import { C, hosted } from "./hosted.ts";
 import { HOLD, at } from "./support.ts";
 

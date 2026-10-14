@@ -31,7 +31,7 @@
  * written beside its data, in the definition's own file.
  */
 
-import type { Rules } from "@generalbusiness/artroom-derive";
+import type { Rules } from "@generalbusiness/dap-derive";
 import { destinationRules2 } from "./destination.ts";
 import { inboxRules } from "./inbox.ts";
 import { membershipRules } from "./membership.ts";

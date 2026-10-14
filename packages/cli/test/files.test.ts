@@ -97,8 +97,10 @@ test("install keeps its operator key owner-only under the config directory, refu
 
   // Launch the actual JavaScript bin through this Node, from outside the
   // checkout. Its pinned loader must resolve from the installed CLI package.
-  const launched = spawnSync(process.execPath, [fileURLToPath(new URL("../bin/artroom.js", import.meta.url))], { cwd: tmpdir(), encoding: "utf8" });
-  expect([launched.status, launched.stdout, launched.stderr]).toEqual([2, "", expect.stringMatching(/^Usage:\n  artroom install /)]);
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  expect(manifest.bin).toEqual({ dap: "./bin/dap.js", artroom: "./bin/dap.js" });
+  const launched = spawnSync(process.execPath, [fileURLToPath(new URL(`../${manifest.bin.dap}`, import.meta.url))], { cwd: tmpdir(), encoding: "utf8" });
+  expect([launched.status, launched.stdout, launched.stderr]).toEqual([2, "", expect.stringMatching(/^Usage:\n  dap install /)]);
   expect(launched.stdout + launched.stderr).not.toContain(b64url(secret));
 });
 

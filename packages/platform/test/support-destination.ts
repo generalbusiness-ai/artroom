@@ -31,12 +31,12 @@
  * stand-in reader of a lane's entries.
  */
 
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, MemberObservation, HoldersObservation, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, Entry, Evidence, FactRef, FieldValue, Input, MemberObservation, HoldersObservation, Observation, ObservationUse, OperationId, Request, RulesObservation, ScopeRef, Seed, Send, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/artroom-derive";
-import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/artroom-derive/testing";
+import { PROFILES, clockOf, contentStates, valueDigest, outcomeValueDomains, judgeDelivery, judgeGenesis, settleOutcome, validateDefinition } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Fetched, Judgment, OutcomeJudgment, Observing, PlatformRules, Source, ValidDefinition } from "@generalbusiness/dap-derive";
+import { Ledger, Scope, T0, creation, d, keys, laneDefinition, sent, t, type Actor, type Context, type Over } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION, DESTINATION_KINDS, destination2, destinationReceipt, destinationRules2, destinationRulesWith, type LaneRead } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";
 import { rulesScope } from "../src/rules-scope.ts";

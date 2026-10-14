@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry } from "@generalbusiness/artroom-contract";
+import type { Entry } from "@generalbusiness/dap-contract";
 import { entryHash } from "@generalbusiness/artroom-bytes";
 import { FoldError, applyEntry, drawsOf, stateDigest } from "../src/index.ts";
 import { on, valid } from "./fixtures.ts";

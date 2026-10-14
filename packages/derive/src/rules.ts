@@ -2,12 +2,12 @@
  * Preparation of `rule` guards (scope contract, section 5.2, step 5, and
  * section 6.5). This file builds what each rule reads. It evaluates nothing:
  * evaluation is asynchronous and is exported from
- * `@generalbusiness/artroom-derive/rule`. A judge takes the results as
+ * `@generalbusiness/dap-derive/rule`. A judge takes the results as
  * `Prepared` records and reuses one only when its input digest is the digest
  * of what the rule would read in the commit.
  */
 
-import type { SignedIntent } from "@generalbusiness/artroom-contract";
+import type { SignedIntent } from "@generalbusiness/dap-contract";
 import { judgeDelivery, type Delivered, type DeliveryContext } from "./delivery.ts";
 import { judgeGenesis, type Creation, type Founding } from "./genesis.ts";
 import type { RuleInput } from "./guards.ts";

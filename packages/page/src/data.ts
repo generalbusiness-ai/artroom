@@ -33,14 +33,14 @@
  * is shown as its reason.
  */
 
-import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt } from "@generalbusiness/artroom-contract";
-import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
+import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
-import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/artroom-cli";
-import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/artroom-platform";
-import type { Extent as PolicyExtent } from "@generalbusiness/artroom-platform";
+import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/dap-cli";
+import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/dap-platform";
+import type { Extent as PolicyExtent } from "@generalbusiness/dap-platform";
 import { knownLIST1 } from "./source-support.ts";
 import { currentStanding, reviewCandidates } from "./membership-projection.ts";
 
@@ -345,9 +345,27 @@ const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Prom
 export interface IssueView {
   /** The actual intent item used by transitions. */
   intent?: number;
-  scope: ScopeId; definition: string; head: Head;
+  scope: ScopeId; ref: ScopeRef; definition: string; head: Head;
   number: number | null; title: string | null; body: string | null; state: string; closeReason: string | null;
-  requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
+  createdAt: string | null; modifiedAt: string | null;
+  requesterRef: MemberRef | null; requester: string | null; assignees: string[]; conditions: string[]; comments: Comment[];
+}
+
+/** Times are native genesis/latest-entry times at this full authenticated read frontier. */
+async function issueTimes(handle: ScopeHandle, summary: Summary, at: Head): Promise<{ createdAt: string | null; modifiedAt: string | null }> {
+  const unavailable = { createdAt: null, modifiedAt: null };
+  try {
+    const first = await handle.entry(0), last = at.seq === 0 ? first : await handle.entry(at.seq);
+    if (!first.ok || !last.ok || !first.complete || !last.complete || first.next !== undefined || last.next !== undefined) return unavailable;
+    const genesis = first.value.entry, latest = last.value.entry;
+    if (genesis.seq !== 0 || genesis.prev !== null || latest.seq !== at.seq
+      || canonicalize(genesis.at) !== canonicalize(summary.scope) || canonicalize(latest.at) !== canonicalize(summary.scope)
+      || entryHash(genesis) !== first.value.hash || entryHash(latest) !== last.value.hash || last.value.hash !== at.hash
+      || timeMs(genesis.time) === null || timeMs(latest.time) === null) return unavailable;
+    const final = await summaryOf(handle);
+    if (canonicalize(final.summary.scope) !== canonicalize(summary.scope) || canonicalize(final.at) !== canonicalize(at)) return unavailable;
+    return { createdAt: genesis.time, modifiedAt: latest.time };
+  } catch { return unavailable; } // A denied or changed read supplies no substitute clock.
 }
 
 /** An issue lane: its intent item, its comments, and the head it was read at. */
@@ -360,9 +378,10 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
-    scope, definition: summary.definition, head: at, intent: intent.id,
+    scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, intent: intent.id,
+    ...await issueTimes(handle, summary, at),
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
-    state: intent.state, closeReason: text(intent.values["closeReason"]), requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
+    state: intent.state, closeReason: text(intent.values["closeReason"]), requesterRef: isMemberRef(intent.parties["requester"]) ? structuredClone(intent.parties["requester"]) : null, requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
     conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
   };
 }
@@ -423,7 +442,7 @@ async function reviewPolicyOf(room: Room, change: ScopeRef, proposal: Item, held
     const handle = handleOf(room, source.at.scope);
     const { summary, at } = await summaryOf(handle);
     if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(source.at) || at.seq < source.seq
-      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return null;
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return null;
     const rules = summary.items.find(item => item.type === "rules" && item.state === "current");
     if (!rules) return null;
     const published = rules.refs["published"] ?? 0;
@@ -720,7 +739,7 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
       || canonicalize(repository?.refs["membership"]) !== canonicalize(room.membership)) return unavailable;
     const handle = handleOf(room, room.rules), { summary, at } = await summaryOf(handle);
     if (summary.status !== "active" || canonicalize(summary.scope) !== canonicalize(named)
-      || !["platform:rules@1", "platform:rules@2", "platform:rules@3"].includes(summary.definition)) return unavailable;
+      || !["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"].includes(summary.definition)) return unavailable;
     const rules = summary.items.filter(item => item.type === "rules");
     if (rules.length !== 1) return unavailable;
     const current = rules[0]!;
@@ -733,10 +752,10 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
     // a retired definition also proves that this room has been configured.
     const definitions = await itemsOf(handle, summary, "definition", at);
     if (definitions.length > 0) return { state: "configured" };
-    // Known rules1–3 initial item, not merely a missing/failed policy read.
+    // Known rules1–4 initial item; only the explicit rules4 pin defaults owner review to true.
     if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
       || current.values["membership"] !== room.membership.scope || typeof current.values["branch"] !== "string"
-      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== false || current.values["singleControllerException"] !== false
+      || current.values["approvals"] !== 1 || current.values["ownerMayReview"] !== (summary.definition === "platform:rules@4") || current.values["singleControllerException"] !== false
       || ["checks", "labels", "extents"].some(name => current.values[name] !== undefined && current.values[name] !== null)) return unavailable;
     const after = await summaryOf(handle);
     const latestDirectory = await summaryOf(handleOf(room, room.directory));
@@ -880,6 +899,68 @@ export interface Acted {
   service: string; directory: ScopeId; membership: ScopeRef; key: KeyId; scope: ScopeId; kind: string; on: number | null;
   answer: Answer; before: Head; after: Head | null; observation: string | null;
 }
+export type IssueCreation = { state: "confirmed"; child: ScopeRef } | { state: "pending" } | { state: "unavailable" };
+/** Read only the original accepted creation; missing proof is never a pending outcome. */
+export async function issueCreation(room: Room, result: Acted, current: () => boolean = () => true): Promise<IssueCreation> {
+  const unavailable: IssueCreation = { state: "unavailable" };
+  if (!current() || result.kind !== "open-issue" || result.scope !== room.directory || result.answer.answer !== "accepted" || result.observation !== null
+    || actAssociation(room, room.directory) !== JSON.stringify([result.service.replace(/\/+$/, ""), result.directory, result.membership, result.key, result.scope])) return unavailable;
+  try {
+    await fresh(room);
+    if (!current()) return unavailable;
+    const receipt = result.answer.receipt, handle = handleOf(room, room.directory);
+    const source = await handle.entry(receipt.fact.seq);
+    if (!current()) return unavailable;
+    if (!source.ok || !source.complete || source.next !== undefined) return unavailable;
+    const entry = source.value.entry;
+    if (entry.seq !== receipt.fact.seq || canonicalize(entry.at) !== canonicalize(receipt.fact.at) || entryHash(entry) !== receipt.fact.hash || source.value.hash !== receipt.fact.hash
+      || entry.input.type !== "act" || entry.input.signed.intent.kind !== "open-issue" || !verifySignedIntent(entry.input.signed)
+      || canonicalize(entry.input.signed.intent.to) !== canonicalize(receipt.fact.at) || entry.input.signed.intent.actor !== room.key || intentDigest(entry.input.signed.intent) !== receipt.intent) return unavailable;
+    const creates = entry.sends.filter(send => send.message.class === "request" && send.message.type === "create" && isSeed(send.to));
+    if (creates.length !== 1) return unavailable;
+    const seed = creates[0]!.to;
+    if (!isSeed(seed) || seed.kind !== "lane" || canonicalize(seed.creator) !== canonicalize(receipt.fact.at) || seed.cause !== receipt.intent) return unavailable;
+    const { summary, at } = await summaryOf(handle);
+    if (!current()) return unavailable;
+    if (canonicalize(summary.scope) !== canonicalize(receipt.fact.at) || summary.definition !== receipt.definition) return unavailable;
+    const row = summary.items.find(item => item.id === receipt.fact.seq && item.type === "lane" && item.values["kind"] === "issue");
+    const child = row?.refs["scope"];
+    if (!row || row.state !== "listed") return unavailable;
+    const pending = async (provisional: boolean): Promise<IssueCreation> => {
+      const dutyId: DutyId = `${receipt.fact.seq}.${creates[0]!.n}`;
+      if (!receipt.sends.includes(dutyId)) return unavailable;
+      if (!current()) return unavailable;
+      const read = await handle.followDuty(dutyId);
+      if (!current()) return unavailable;
+      if (!read.ok || !read.complete || read.next !== undefined || read.at.seq < receipt.fact.seq) return unavailable;
+      const duty = read.value;
+      if (duty.duty !== dutyId || duty.class !== "request" || duty.held || canonicalize(duty.to) !== canonicalize(seed) || duty.diagnosis !== null) return unavailable;
+      const final = await summaryOf(handle);
+      if (!current()) return unavailable;
+      if (canonicalize(final.summary.scope) !== canonicalize(receipt.fact.at)) return unavailable;
+      // A normal listed row has no child reference until create.applied.
+      // An applied result can precede the earlier projection or child confirmation.
+      if ((!provisional && duty.result === null) || (duty.result?.clause === "applied" && (provisional || duty.result.seq > at.seq))) return { state: "pending" };
+      return unavailable;
+    };
+    if (child === undefined || child === null) return await pending(false);
+    if (!fullScopeRef(child) || child.kind !== "lane" || child.scope !== scopeIdOf(seed)) return unavailable;
+    if (!current()) return unavailable;
+    const read = await summaryOf(handleOf(room, child.scope));
+    if (!current()) return unavailable;
+    if (canonicalize(read.summary.scope) !== canonicalize(child) || !read.summary.items.some(item => item.type === "intent")) return unavailable;
+    if (read.summary.status === "provisional") return await pending(true);
+    if (read.summary.status !== "active") return unavailable;
+    return { state: "confirmed", child: structuredClone(child) };
+  } catch { return unavailable; }
+}
+
+/** Immediate selection only; callers needing later native confirmation use issueCreation. */
+export async function createdIssue(room: Room, result: Acted): Promise<ScopeRef | null> {
+  const read = await issueCreation(room, result);
+  return read.state === "confirmed" ? read.child : null;
+}
+
 /** Memory-only association; contains no signing key or current permission. */
 export function actAssociation(room: Pick<Room, "session" | "directory" | "membership">, scope: ScopeId): string {
   return JSON.stringify([room.session.service.replace(/\/+$/, ""), room.directory, room.membership, keyIdOfSecret(room.session.secret), scope]);

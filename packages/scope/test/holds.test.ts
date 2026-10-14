@@ -1,10 +1,10 @@
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Intent, PlatformDefinition, Seed } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Answer, Intent, PlatformDefinition, Seed } from "@generalbusiness/dap-contract";
 import { intentDigest, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry, owed, stateDigest, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { grantOf } from "@generalbusiness/artroom-derive/testing";
+import { MemoryState, applyEntry, owed, stateDigest, type RuleGiven } from "@generalbusiness/dap-derive";
+import { grantOf } from "@generalbusiness/dap-derive/testing";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import { SqliteStore } from "../src/index.ts";
 import { controls } from "../src/testing.ts";

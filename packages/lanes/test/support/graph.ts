@@ -23,12 +23,12 @@
 import { env } from "cloudflare:workers";
 import { SELF, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { expect, onTestFinished } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Answer, Bounds, DeclaredDefinition, Digest, Duty, Entry, FactRef, FieldValue, Grant, Input, Message, Receipt, ScopeId, ScopeRef, Sealed, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, entryHash, intentDigest, isScopeRef, newIncarnation, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle, found, httpTransport, secretSigner, signedIntent, type AskedOf, type DeclaredHandle, type Kind, type Signed, type Transport } from "@generalbusiness/artroom-client";
-import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/artroom-derive";
-import { grantOf, keys, type Actor } from "@generalbusiness/artroom-derive/testing";
+import { MemoryState, alsoItems, applyEntry, isFactRef, snapshotInput, stagedRefName, timeMs, timeOf, validateDefinition, type AncestryCheck, type Delivered, type Item, type StagedRef, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { grantOf, keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import type { Checkpointed, Delivery, EffectAnswer, EffectRequest } from "@generalbusiness/artroom-scope";
 import { CODE, net, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
 import { api, route } from "@generalbusiness/artroom-scope/worker";
@@ -366,9 +366,12 @@ export class Peer {
   #seq = 0;
   #first: FactRef | null = null;
 
-  constructor(kind: "rules" | "destination" | "task", readonly under: string) {
+  /** An explicit reference still labels a scripted peer entry, never an
+   * admitted history of the real object that owns that reference. */
+  constructor(kind: "rules" | "destination" | "task", readonly under: string, at?: ScopeRef) {
+    if (at && at.kind !== kind) throw new Error("the scripted peer reference has another kind");
     const seed: Seed = { v: 1, kind, definition: `platform:${kind}@1`, creator: null, cause: textDigest(`a scripted peer ${crypto.randomUUID()}`), ordinal: 0 };
-    this.at = { scope: scopeIdOf(seed), inc: newIncarnation(crypto.getRandomValues(new Uint8Array(16))), kind };
+    this.at = at ?? { scope: scopeIdOf(seed), inc: newIncarnation(crypto.getRandomValues(new Uint8Array(16))), kind };
   }
 
   /** One entry with one send to `to`, as an act of kind `kind` would have written it. The envelope is returned, to be delivered. */

@@ -1,7 +1,7 @@
 /** Tab-local list preferences. The context contains public room and key IDs,
  * never a signing secret, invitation, config blob or URL query parameter. */
 import { isKeyId, isScopeId, isScopeRef } from "@generalbusiness/artroom-bytes";
-import type { KeyId, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import type { KeyId, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 
 export interface ListContext { origin: string; directory: ScopeId; membership: ScopeRef; key: KeyId }
 export type ListKind = "issue" | "change";

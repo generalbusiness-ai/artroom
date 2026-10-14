@@ -11,10 +11,10 @@
  * makes about a scope against the scope's own entries.
  */
 
-import { DOMAINS, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, RETAINED_INPUT_BYTES } from "@generalbusiness/artroom-contract";
-import type { Digest, Head, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
+import { DOMAINS, HISTORY_PAGE_BYTES, HISTORY_PAGE_ENTRIES, RETAINED_INPUT_BYTES } from "@generalbusiness/dap-contract";
+import type { Digest, Head, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { LATE, digestOfHash, positionOf, retainedReadArgument, sha256, takeBytes, utf8, within, type ByteStream, type Expiry } from "@generalbusiness/artroom-bytes";
-import { isLocalId, isObject, isScopeRef } from "@generalbusiness/artroom-derive";
+import { isLocalId, isObject, isScopeRef } from "@generalbusiness/dap-derive";
 
 /** One entry as stored: its canonical JSON text, and the hash the source gives for it. */
 export interface Stored { seq: number; hash: Digest; bytes: string }

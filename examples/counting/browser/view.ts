@@ -1,6 +1,6 @@
 /** All data is literal text. The stage never displays private requests or keys. */
 import { controllerOf, label, ownedParticipant, same, type Control, type ProposalOptions, type CountingView, type Participant } from "./model.ts";
-import type { MemberRef } from "@generalbusiness/artroom-contract";
+import type { MemberRef } from "@generalbusiness/dap-contract";
 import type { CommandOutcome } from "./client.ts";
 import type { ActorIdentity, SpeechPort, VoiceState } from "./voice-controller.ts";
 export interface StagePresentation {

@@ -1,9 +1,9 @@
 import { expect, inject, onTestFinished, test } from "vitest";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, timeMs, timeOf } from "@generalbusiness/artroom-bytes";
-import type { Intent, Seed } from "@generalbusiness/artroom-contract";
-import { keys } from "@generalbusiness/artroom-derive/testing";
+import type { Intent, Seed } from "@generalbusiness/dap-contract";
+import { keys } from "@generalbusiness/dap-derive/testing";
 import { readCredential, requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
-import { platform, repositoryName } from "@generalbusiness/artroom-platform";
+import { platform, repositoryName } from "@generalbusiness/dap-platform";
 // Test-only orchestration import; the scope production package has no CLI dependency.
 import { command, memoryStore, type Context } from "../../cli/src/index.ts";
 import { net } from "../src/testing.ts";

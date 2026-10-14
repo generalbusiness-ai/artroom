@@ -33,8 +33,9 @@ test("joined room/account clicks disclose identity without leaving the room, and
     set value(value: string) { this.attrs["value"] = value; }
     focus() {}
     all(): Element[] { return [this, ...this.children.flatMap(c => c instanceof Element ? c.all() : [])]; }
-    querySelectorAll() { return []; }
-    querySelector() { return null; }
+    contains(node: Element) { return this.all().includes(node); }
+    querySelectorAll(selector: string) { return this.all().slice(1).filter(node => selector === "details.shell-disclosure" ? node.tag === "details" && (node.attrs["class"] ?? "").split(" ").includes("shell-disclosure") : node.tag === selector); }
+    querySelector(selector: string) { return this.querySelectorAll(selector)[0] ?? null; }
     get textContent(): string { return this.children.map(c => typeof c === "string" ? c : c.textContent).join(" "); }
   }
   const root = new Element("div"), secret = new Uint8Array(32).fill(71);
@@ -57,10 +58,16 @@ test("joined room/account clicks disclose identity without leaving the room, and
     await import("../src/main.ts"); await drain();
     const controls = root.all().filter(e => ["room-switch", "account"].includes(e.attrs["class"] ?? ""));
     expect(controls).toHaveLength(4); // Desktop and mobile presentations.
+    let prior: Element | null = null;
     for (const control of controls) {
       expect(control.tag).toBe("summary"); expect(control.hasAttribute("href")).toBe(false);
       control.click(); expect(location.hash).toBe("#/"); expect(control.parent?.hasAttribute("open")).toBe(true);
+      if (prior) expect(prior.hasAttribute("open")).toBe(false);
+      prior = control.parent;
+      expect(root.all().filter(node => node.tag === "details" && node.hasAttribute("open"))).toHaveLength(1);
     }
+    root.handlers.get("click")!({ target: root } as never);
+    expect(root.all().filter(node => node.tag === "details" && node.hasAttribute("open"))).toHaveLength(0);
     expect(root.all().filter(e => e.attrs["class"] === "avatar").map(e => e.textContent)).toEqual(["H", "H"]);
     expect(root.all().filter(e => e.attrs["class"] === "account-label").map(e => e.textContent)).toEqual(["@hugh-web", "@hugh-web"]);
     const roomDisclosure = controls.find(e => e.attrs["class"] === "room-switch")!.parent!;
@@ -73,10 +80,14 @@ test("joined room/account clicks disclose identity without leaving the room, and
     }
     roomDisclosure.all().find(e => e.tag === "a")!.click(); expect(location.hash).toBe("#/join"); redraw(); await drain();
     expect(root.all().find(e => e.tag === "h1")?.textContent).toBe("Join another room");
-    expect(root.textContent).toContain("You are in Hugh's room as @hugh-web");
+    expect(root.all().filter(e => e.attrs["class"] === "entry-intro")).toHaveLength(0);
     const back = root.all().find(e => e.tag === "a" && e.textContent.includes("Back to Hugh's room"))!;
     expect(back.attrs["href"]).toBe("#/");
-    expect(root.all().filter(e => e.attrs["class"] === "entry-choice").map(e => e.attrs["href"])).toEqual(["#/invitation", "#/config"]);
+    expect(root.all().filter(e => e.attrs["class"] === "entry-choice").map(e => [e.attrs["href"], e.all().find(child => child.tag === "h2")?.textContent, e.all().find(child => child.tag === "p")?.textContent])).toEqual([
+      ["#/start", "Create a new room", "Start a new room for shared work"],
+      ["#/invitation", "Join with an invitation link", "Paste a link. We create your key and join the room."],
+      ["#/config", "Join with a config and key", "Use config.json and its matching device key."],
+    ]);
     back.click(); expect(location.hash).toBe("#/");
     expect(setItem).not.toHaveBeenCalled(); expect(root.textContent).not.toContain("Settings");
   } finally { await drain(); vi.unstubAllGlobals(); vi.doUnmock("../src/data.ts"); vi.resetModules(); }

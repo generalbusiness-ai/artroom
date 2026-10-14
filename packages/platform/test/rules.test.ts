@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Grant, SignedIntent } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Grant, SignedIntent } from "@generalbusiness/dap-contract";
 import { keyIdOfSecret, textDigest } from "@generalbusiness/artroom-bytes";
-import type { ActJudgment, Item, PlatformRule, RuleGiven } from "@generalbusiness/artroom-derive";
-import { d, t } from "@generalbusiness/artroom-derive/testing";
+import type { ActJudgment, Item, PlatformRule, RuleGiven } from "@generalbusiness/dap-derive";
+import { d, t } from "@generalbusiness/dap-derive/testing";
 import { definitions } from "../src/index.ts";
 import { FIRST_ACTIONS, MEMBERSHIP, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, actionsIn, isActions, membershipRules, standingOf, type Role } from "../src/membership.ts";
 import { Roster, paul, rita, sam, una, vic } from "./support.ts";

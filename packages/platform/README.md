@@ -1,4 +1,4 @@
-# @generalbusiness/artroom-platform
+# @generalbusiness/dap-platform
 
 The production data and rule code for Artroom's platform definitions. The
 library reads no clock, storage or network. Its rules receive the state and
@@ -12,7 +12,7 @@ membership and rules-reference functions. A missing version returns `null`.
 scope's genesis pin or selects a version for an existing history.
 
 ```js
-import { platform } from "@generalbusiness/artroom-platform";
+import { platform } from "@generalbusiness/dap-platform";
 
 const coded = platform("platform:membership@2");
 // Pass the matching catalog lookup to the independent replay's platform option.

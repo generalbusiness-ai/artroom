@@ -22,9 +22,9 @@
  * | `judgeExtents` | "How the rule `judge` judges extents", steps 2 to 7; "Which reviews count for an extent"; "The exception, in the planner's words" | The extents of the observed rules: the contract owes `RulesContent.extents`. The count of controllers: the missing form 11; null, no exception. The controllers of the authoring agents: the missing form 15; null, no exception by the second clause, and no review where a controller's is refused |
  */
 
-import type { MemberId } from "@generalbusiness/artroom-contract";
+import type { MemberId } from "@generalbusiness/dap-contract";
 import { utf8 } from "@generalbusiness/artroom-bytes";
-import { byteOrder } from "@generalbusiness/artroom-derive";
+import { byteOrder } from "@generalbusiness/dap-derive";
 
 /** What a change to an extent does when it is published. The order is from the lowest to the highest ("How a change is judged", step 5). */
 export const EXTENT_CLASSES = ["content", "deployment", "authority"] as const;

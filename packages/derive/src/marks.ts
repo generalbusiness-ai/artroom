@@ -16,7 +16,7 @@
  * and nothing in an entry says that a rule ran.
  */
 
-import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/artroom-contract";
+import type { ActType, AlsoMark, Attempt, Bounds, CapabilityName, Digest, DomainTag, Effect, Evidence, FactRef, FieldType, FieldValue, Grant, GrantMark, Guard, KeyId, Mark, MemberId, MemberRef, Message, ObservationUse, OperationId, PlatformDefinition, Request, ScopeRef, Seed, SignedIntent, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, digestBytes, domainBytes, isDigest, isFieldValue, isMemberRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Signer } from "./attribution.ts";
 import type { BindingSelect } from "./binding.ts";
@@ -354,6 +354,8 @@ export interface OutcomeRule {
   most?: Most;
   /** Whether the request of that attempt may be sent now (`OperationRules.ready`). It reads the folded state alone. Absent: it may. */
   ready?(state: StateView, operation: Operation, attempt: number): boolean;
+  /** Runtime provenance admission metadata, independent of recorded judgments. */
+  publicationOrigin?(state: StateView, operation: Operation, own: Own): import("./ledger.ts").PublicationOrigin | false | null;
   retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;

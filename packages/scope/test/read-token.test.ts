@@ -1,11 +1,11 @@
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, onTestFinished, test } from "vitest";
-import type { Intent, ScopeRef, Seed } from "@generalbusiness/artroom-contract";
+import type { Intent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, intentDigest, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedLogReader, type Fetch } from "@generalbusiness/artroom-client";
-import { timeMs } from "@generalbusiness/artroom-derive";
-import { keys } from "@generalbusiness/artroom-derive/testing";
-import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/artroom-platform";
+import { timeMs } from "@generalbusiness/dap-derive";
+import { keys } from "@generalbusiness/dap-derive/testing";
+import { DIRECTORY, REGISTER, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, render, verify, type HistorySource } from "@generalbusiness/artroom-replay";
 import type { ArtifactsNamespace } from "../src/artifacts-host.ts";
 import { artifactsOutside } from "../src/artifacts-wiring.ts";

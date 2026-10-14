@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { FactRef } from "@generalbusiness/artroom-contract";
+import type { FactRef } from "@generalbusiness/dap-contract";
 import { FACT_TEXT_MOST, SCOPE_KINDS, factHex, factOfRefName, factOfText, factRefName, factText, isFactRefParts, utf8 } from "../src/index.ts";
 
 // Witness 18.48, cases 1 to 3 and 5 (scope contract, section 3). F is the fact of an entry of a lane at position 41. Made up.

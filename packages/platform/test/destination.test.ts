@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import type { Entry, FieldValue, OperationId, Request } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, parseStrict } from "@generalbusiness/artroom-bytes";
-import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { t } from "@generalbusiness/artroom-derive/testing";
+import { derivable, operationSettled, runnable, type Item, type JudgedInput, type PlatformRule, type RuleGiven } from "@generalbusiness/dap-derive";
+import { t } from "@generalbusiness/dap-derive/testing";
 // The data and the rules of the newest version, `platform:destination@2`, which every test here founds on.
 import { COLLECT_MOST, DESTINATION, DESTINATION_KINDS, NAMED_MOST, RECEIPTS_OWED, REPORTS_MOST, destination2 as destination, destinationRules2 as destinationRules, revokedToken, writeSends } from "../src/destination.ts";
 import { firstExtents } from "../src/extents.ts";

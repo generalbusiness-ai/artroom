@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { Answer, Digest, Intent, PlatformDefinition, Seed, RetainedInput, OperationId, Read } from "@generalbusiness/artroom-contract";
+import type { Answer, Digest, Intent, PlatformDefinition, Seed, RetainedInput, OperationId, Read } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, scopeIdOf, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
-import { PROPOSED_BOUNDS } from "@generalbusiness/artroom-contract";
-import { clockOf, settleOutcome, validateDefinition, valueDigest, type OutcomeRule } from "@generalbusiness/artroom-derive";
-import { grantOf } from "@generalbusiness/artroom-derive/testing";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { clockOf, settleOutcome, validateDefinition, valueDigest, type OutcomeRule } from "@generalbusiness/dap-derive";
+import { grantOf } from "@generalbusiness/dap-derive/testing";
 import { gateRules, gateWith } from "../../derive/test/fixtures-marks.ts";
 import { controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";

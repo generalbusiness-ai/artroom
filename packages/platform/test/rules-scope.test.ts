@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/artroom-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, isObservationUse, newIncarnation } from "@generalbusiness/artroom-bytes";
-import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/artroom-derive";
-import type { ActJudgment, Judgment } from "@generalbusiness/artroom-derive";
-import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/artroom-derive/testing";
+import { PROFILES, derivable, runnable, validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import type { ActJudgment, Judgment } from "@generalbusiness/dap-derive";
+import { d, desk, deskDefinition, directory, keys, membership, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
 import { CONFIGURATION_BYTES, CONFIGURATION_DOMAIN, DEFINITION_DOMAIN, PUBLISH, RULES_EXTENTS_VALUE, RULES_SCOPE, extentsOf, firstExtents, membershipId, platform, revisionOf, rulesScope } from "../src/index.ts";
 import type { Extent } from "../src/index.ts";
 import { rulesScope2, rulesScopeRules } from "../src/rules-scope.ts";
@@ -75,8 +75,8 @@ test("the rules definition validates whole with the platform option; its marks a
   // The whole-scope rule (the contract's section 6.1): the package's own rules run the version, with no stand-in. Without any one of
   // the three, or with a rule of another place under a name, it is not runnable.
   const supplied = platform(RULES_SCOPE)!;
-  // F1 explicitly supports rules@3; the next unshipped version remains unsupported.
-  expect([supplied.data, supplied.rules, platform("platform:rules@4")]).toEqual([rulesScope2, rulesScopeRules, null]);
+  // Prospective Rules4 is explicitly supported; the next unshipped version remains unsupported.
+  expect([supplied.data, supplied.rules, platform("platform:rules@5")]).toEqual([rulesScope2, rulesScopeRules, null]);
   expect([runnable(checked.definition, supplied.rules), ...Object.keys(rulesScopeRules).map((lost) => runnable(checked.definition, { ...supplied.rules, [lost]: undefined as never })), runnable(checked.definition, { ...supplied.rules, checkers: { place: "send", run: () => null } })])
     .toEqual([true, ...Object.keys(rulesScopeRules).map(() => false), false]);
 });
@@ -89,6 +89,25 @@ test("the genesis opens the rules with the branch, the directory and membership'
   expect([membershipId(r.state), membershipId(r.registrar.state)]).toEqual([membership.scope, null]);
   // The creation's fields hold the ID as a text, which fits the slot: a scope ID is at most 64 bytes.
   expect(membership.scope.length).toBeLessThanOrEqual(64);
+  // The native memory judge derives the new default only for the explicitly pinned version4.
+  // Registrar, membership authority and clock remain the labelled fixture stand-ins above.
+  const named = ["platform:rules@1", "platform:rules@2", "platform:rules@3", "platform:rules@4"] as const;
+  const pinned = named.map(version => new Rulebook(true, membership.scope, version));
+  expect(pinned.map(book => book.item(0).values["ownerMayReview"])).toEqual([false, false, false, true]);
+  expect(pinned.map(book => book.state.scope()?.status)).toEqual(["active", "active", "active", "active"]);
+  expect(pinned.map(book => book.entries[0]!.entry.input.type === "genesis" ? book.entries[0]!.entry.input.seed.definition : null)).toEqual(named);
+  // Each catalog reader answers from this confirmed scope's actual folded head.
+  const observed = pinned.map((book, index) => platform(named[index]!)!.observed!(book.state, { of: book.at, asked: "rules" }));
+  expect(observed).toMatchObject(pinned.map((book, index) => ({
+    subject: "rules", of: book.at, head: book.head, definition: named[index], revision: 0,
+    content: { asked: "rules", ownerMayReview: [false, false, false, true][index] },
+  })));
+  // Rules4's observation names the bytes served beside it at that same head.
+  const prospective = pinned[3]!;
+  const values = platform(named[3])!.observedValues!(prospective.state, { of: prospective.at, asked: "rules" });
+  expect(values).toHaveLength(1);
+  expect(values[0]!.domain).toBe(RULES_EXTENTS_VALUE.domain);
+  expect(observed[3]).toMatchObject({ content: { extents: valueDigest(values[0]!.domain, JSON.parse(values[0]!.bytes)) } });
   const provisional = new Rulebook(false);
   expect([provisional.state.scope()?.status, said(keep(provisional, unit))[0] === "write"]).toEqual(["provisional", false]);
 });

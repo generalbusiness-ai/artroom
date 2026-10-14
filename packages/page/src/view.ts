@@ -1,6 +1,7 @@
 /** Native screens built only from the room's recorded observations. */
-import { editPath, matches } from "@generalbusiness/artroom-platform";
-import type { Answer } from "@generalbusiness/artroom-contract";
+import { timeMs } from "@generalbusiness/artroom-bytes";
+import { editPath, matches } from "@generalbusiness/dap-platform";
+import type { Answer } from "@generalbusiness/dap-contract";
 import { siteAddress, Unreadable, type Acted, type ChangeView, type IssueView, type LaneRow, type Room, type RulesView } from "./data.ts";
 import { changeStates } from "./states.ts";
 import { LIST_QUERY_LIMIT, type ListState } from "./list-context.ts";
@@ -39,10 +40,9 @@ const commentsRecord = (comments: IssueView["comments"]): HTMLElement | null => 
 const back = (kind: "issue" | "change"): HTMLElement => h("a", { class: "icon-button back", href: kind === "issue" ? "#/" : "#/?kind=change", "aria-label": `Back to ${kind} list` }, "←");
 const title = (text: string | null, number: number | null): HTMLElement => h("h1", {}, or(text, "Untitled"), " ", h("span", { class: "number" }, `#${or(number, "?")}`));
 
-/** Membership and read-session evidence is available in record inspection. */
+/** Keep member/key identity without narrating successful reads. */
 export function whoLine(room: Room): HTMLElement {
-  const how = room.reader ? "Reads present a read session from membership." : `Membership gave no read session (${room.unsessioned ?? "not recorded"}): each read is signed by your key, and a scope answers only where your key signed an entry in the last few minutes.`;
-  return h("p", { class: "who" }, room.me ? `Signed in as ${room.me.handle} (${room.me.role}), key ${room.key}. ` : `Key ${room.key} is no active member's key in this room; the scopes will refuse your acts. `, h("span", { class: "muted" }, how));
+  return h("p", { class: "who" }, room.me ? `Signed in as ${room.me.handle} (${room.me.role}), key ${room.key}.` : "Reconnect with an active room member's key before sending an action.");
 }
 
 /** One list destination, without repeating room identity from the switcher. */
@@ -60,7 +60,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
       h("span", { class: `entry-marker${["closed", "published", "merged"].includes(row.state ?? "") ? " recorded" : ""}`, "aria-hidden": "true" }),
       h("div", { class: "work-copy" }, h("a", { class: "work-title", href: `#/${kind}/${row.scope}` }, h("span", {}, or(row.title, "Untitled")), h("span", { class: "work-meta" }, `#${or(row.number, "?")}${row.draft ? " · Draft" : ""}`))),
       h("div", { class: "row-end" }, state(row.state === "closed" ? "Closed" : row.state === "published" || row.state === "merged" ? "Merged" : or(row.state, "Unknown"))),
-    ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? kind === "change" ? "No changes yet. The page proposes a text change from a change already recorded here; the first change in a room comes from a connected device or agent." : "No issues yet." : "No matches.")));
+    ))) : h("div", { class: "blank" }, h("p", {}, all.length === 0 ? kind === "change" ? "Propose the first change from a connected device." : "Create the first issue when the room offers it." : `Clear the search or choose another filter to find ${kind === "change" ? "a change" : "an issue"}.`), all.length === 0 && kind === "change" ? h("a", { href: "https://github.com/generalbusiness-ai/dap/blob/main/apps/room/docs/first-change.md" }, "How to propose a change") : null));
   };
   for (const value of ["open", kind === "issue" ? "closed" : "merged", "all"]) {
     const button = h("button", { type: "button", class: "filter", "data-filter": value, ...(context?.focusKey ? { "data-focus-key": controlKey(context.focusKey, `filter:${kind}:${value}`) } : {}) }, value[0]!.toUpperCase() + value.slice(1));
@@ -69,7 +69,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   }
   query.addEventListener("input", () => { context?.changed({ query: query.value, filter }); render(); });
   render();
-  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { "data-action-slot": "create" })), content,
+  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { class: "toolbar-actions", "data-action-slot": "create" })), content,
     inspect("Inspect room record", whoLine(room), h("dl", {}, field("Directory", h("code", {}, room.directory)))),
   );
 }
@@ -80,9 +80,16 @@ const discussion = (body: string | null, comments: IssueView["comments"]): HTMLE
   h("div", { "data-action-slot": "comment" }),
 );
 
+/** Render only a native timestamp, in this browser's local time zone. */
+function issueTime(label: string, value: string | null): HTMLElement {
+  const ms = timeMs(value);
+  return h("p", { class: "record-meta" }, `${label}: `, ms === null ? "Unavailable" : h("time", { datetime: value! }, new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date(ms))));
+}
+
 export function issueScreen(room: Room, issue: IssueView): HTMLElement {
   return h("main", { class: "screen" }, back("issue"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null)), h("div", { "data-action-slot": "next" })),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(issue.title, issue.number), h("div", { class: "detail-meta" }, state(issue.state === "closed" ? "Closed" : issue.state === "open" ? "Open" : issue.state), issue.requester ? h("span", {}, `· ${issue.requester}`) : null)), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
+    issueTime("Created", issue.createdAt), issueTime("Modified", issue.modifiedAt),
     issue.assignees.length ? h("p", { class: "record-meta" }, `Assigned to ${list(issue.assignees)}`) : null,
     issue.conditions.length ? section("Conditions", h("ul", {}, issue.conditions.map((c) => h("li", {}, c)))) : null,
     discussion(issue.body, issue.comments),
@@ -134,7 +141,7 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
     typeof current.file.content === "string" ? h("div", { "data-action-slot": "edit" }) : null,
   ) : h("p", { class: "muted" }, "This version records a Git tree. File preview is not available yet.")) : h("p", { class: "muted" }, "No version proposed yet.");
   return h("main", { class: "screen" }, back("change"),
-    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { "data-action-slot": "next" })),
+    h("div", { class: "detail-top" }, h("div", { class: "detail-heading" }, title(change.title, change.number), h("div", { class: "detail-meta" }, state(changeCondition(change, last, lastActKind)), change.author ? h("span", {}, `· ${change.author}`) : null, current ? h("span", {}, `· Version ${current.id}`) : null)), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
     version,
     !published && requiredReviews.length ? section("Review requirements", requiredReviews.map((extent) => {
       const approving = change.reviews.filter((review) => review.manifest === current?.id && review.state === "submitted" && review.verdict === "approve" && review.extent === extent.name);
@@ -170,20 +177,20 @@ export function changeScreen(room: Room, change: ChangeView, last: Answer | null
 }
 
 export function rulesScreen(room: Room, rules: RulesView, editable = false): HTMLElement {
-  return h("main", { class: "screen form-layout" }, h("h1", { class: "rules-title" }, "Rules"),
+  return h("main", { class: "screen form-layout" }, h("div", { class: "detail-top" }, h("h1", { class: "rules-title" }, "Rules"), h("div", { class: "toolbar-actions", "data-action-slot": "next" })),
     !editable ? rules.extents?.length ? section("Review requirements", rules.extents.map((e) => h("div", { class: "rule-row" },
-      h("div", {}, h("strong", { class: "rule-label" }, e.name), h("span", { class: "rule-path" }, list(e.patterns ?? [], "Paths unmatched by another extent"))),
+      h("div", {}, h("strong", { class: "rule-label" }, e.name), h("span", { class: "rule-path" }, list(e.patterns ?? [], "Any other file paths"))),
       h("span", {}, `${e.approvals} approval${e.approvals === 1 ? "" : "s"}`),
       e.checks.length ? h("p", { class: "muted" }, `Required checks: ${list(e.checks)}`) : null,
     ))) : h("p", { class: "muted" }, "No review requirements published yet.") : null,
     !editable && rules.checks.some((c) => c.required) ? section("Required checks", h("ul", {}, rules.checks.filter((c) => c.required).map((c) => h("li", {}, c.name)))) : null,
     inspect("Inspect rules record", whoLine(room), h("dl", {},
       field("Rules scope", h("code", {}, rules.scope)), field("Read at", `${rules.head.seq}, ${rules.head.hash}`), field("Revision", rules.revision === null ? "No rules published yet" : String(rules.revision)),
-      field("Lanes' approval count", or(rules.approvals)), field("Author's agent controller may review", rules.ownerMayReview === null ? "Not stated" : rules.ownerMayReview ? "Yes" : "No"),
+      field("Lanes' approval count", or(rules.approvals)), field("Agent controllers can review their own agents", rules.ownerMayReview === null ? "Not stated" : rules.ownerMayReview ? "Yes" : "No"),
       field("Single-controller exception", rules.singleControllerException ? "Declared" : "Not declared"), field("Controllers", list(rules.controllers, "No eligible controller")),
       rules.labels.length ? field("Labels", list(rules.labels)) : null,
     ),
-      rules.extents?.length ? section("Extent authority", table(["Extent", "Class", "Role", "Approvals", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, e.approver, String(e.approvals), list(e.checks, "No required checks"), list(e.patterns ?? [], "Paths unmatched by another extent")]))) : null,
+      rules.extents?.length ? section("Extent authority", table(["Extent", "Class", "Role", "Approvals", "Required checks", "Paths"], rules.extents.map((e) => [e.name, e.class, e.approver, String(e.approvals), list(e.checks, "No required checks"), list(e.patterns ?? [], "Any other file paths")]))) : null,
       rules.checks.length ? section("Check configuration", table(["Name", "Required", "Checker"], rules.checks.map((check) => [check.name, check.required ? "Yes" : "No", check.checker === undefined ? "Not configured" : JSON.stringify(check.checker)]))) : null,
       rules.definitions.length ? section("Active definitions", table(["Name", "Digest", "State"], rules.definitions.map((d) => [d.name, h("code", {}, d.digest), d.state]))) : null,
     ),
@@ -195,7 +202,7 @@ export function rulesScreen(room: Room, rules: RulesView, editable = false): HTM
 /** Actual nonaccepted category; no claim that a timed drain wrote nothing. */
 export function nonacceptedAnswerText(answer: Exclude<Answer, { answer: "accepted" }>): string {
   switch (answer.answer) {
-    case "refused": return `Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name})` : ""}. The request was refused.`;
+    case "refused": return `Refused: ${answer.reason}${"name" in answer && answer.name ? ` (${answer.name === "founding-policy" ? "creation-policy" : answer.name === "founding-key" ? "initial-key" : answer.name})` : ""}. The request was refused.`;
     case "unavailable": return `Unavailable: ${answer.reason}. Outcome unknown; no acceptance is confirmed.`;
     case "mismatch": return `Mismatch: ${answer.reason}. The idempotency key names another recorded intent.`;
   }

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { OperationId } from "@generalbusiness/artroom-contract";
+import type { OperationId } from "@generalbusiness/dap-contract";
 import { CredentialStore, type ExpectedRevocation, type MintedCredential } from "../src/credential-store.ts";
 import { START, at, found, reader } from "./support.ts";
 

@@ -7,9 +7,9 @@
  * configuration leaves every outside effect unsent. No configuration, token
  * or plaintext belongs in a scope's history.
  */
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeId, parseStrict } from "@generalbusiness/artroom-bytes";
-import { destinationBranch, isOf } from "@generalbusiness/artroom-platform";
+import { destinationBranch, isOf } from "@generalbusiness/dap-platform";
 import { ArtifactsProvider, type ArtifactsNamespace, type CreationCustody } from "./artifacts-host.ts";
 import { CredentialStore } from "./credential-store.ts";
 import { DestinationHost, type SnapshotReader, type DestinationRepository } from "./destination-host.ts";
@@ -26,6 +26,8 @@ export const ARTIFACTS_NAMESPACE = "artroom-demo";
 export interface ArtifactsBindings {
   /** Nonsecret JSON; every field is explicit: `{ registerScope, namespace, host, maxBytes, credentialIdentity: "adapter-attempt" }`. Precompute the install's register scope ID and pin it here. */
   ARTIFACTS_CONFIG?: string;
+  /** Namespace of the ARTIFACTS binding; absent preserves the original deployment. */
+  ARTIFACTS_NAMESPACE?: string;
   /** The Worker's binding to one namespace of the service. */
   ARTIFACTS?: unknown;
 }
@@ -78,7 +80,7 @@ export function artifactsOutside(given: OutsideGiven, sql: Pick<SqlStorage, "exe
   try {
     const config = configuration(env.ARTIFACTS_CONFIG);
     const namespaceBinding = binding(env.ARTIFACTS);
-    if (!config || config.namespace !== ARTIFACTS_NAMESPACE || !namespaceBinding) return NO_OUTSIDE;
+    if (!config || config.namespace !== (env.ARTIFACTS_NAMESPACE ?? ARTIFACTS_NAMESPACE) || !namespaceBinding) return NO_OUTSIDE;
     const host = ARTIFACTS_HOST;
     const namespace = config.namespace;
     const current = () => { const scope = given.scope()?.at; return scope ? canonicalize(scope) : null; };

@@ -1,6 +1,6 @@
 /** Values of the field types of section 6.2, as they appear in an intent, a slot and an effect. */
 
-import type { Bounds, FieldType, MemberRef } from "@generalbusiness/artroom-contract";
+import type { Bounds, FieldType, MemberRef } from "@generalbusiness/dap-contract";
 import { SCOPE_KINDS, canonicalize, isDigest, isFactRef, isLocalId, isMemberRef, isRecord, isScopeRef, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "./time.ts";
 

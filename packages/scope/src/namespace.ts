@@ -18,22 +18,22 @@
  * read of a membership scope.
  */
 
-import type { Digest, Entry, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/artroom-contract";
-import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { isObject, isScopeRef, type Delivered, type ScopeState } from "@generalbusiness/artroom-derive";
-import { isOf, platform } from "@generalbusiness/artroom-platform";
+import type { Digest, Entry, FactRef, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
+import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { isEntryOf, isObject, isScopeRef, type Delivered, type Fetched, type ScopeState } from "@generalbusiness/dap-derive";
+import { isOf, platform, sourceName } from "@generalbusiness/dap-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import type { Store } from "./store.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
-export interface Sourced { at: ScopeRef; under: string; bytes: string | null }
+export interface Sourced { at: ScopeRef; under: string; bytes: string | null; origin?: readonly { fact: FactRef; under: string; bytes: string }[] }
 
 /** The five calls one scope's object takes from another's. `observe` is asked of a membership scope or of a rules scope. */
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
-  source(seq: number): Promise<Sourced | null>;
+  source(seq: number, origin?: boolean): Promise<Sourced | null>;
   declared(digest: Digest): Promise<string | null>;
   text(seq: number, digest: Digest): Promise<string | null>;
   observe(asked: ObservationRequest): Promise<unknown>;
@@ -85,8 +85,28 @@ export function routed(name: ScopeId | null, scope: ScopeState | null, delivered
  * version. Null: the scope pins a declaration that it cannot read now, so
  * it cannot say.
  */
-export function nameUnder(pinned: Pinned): string | null {
-  return isPlatformDefinition(pinned.named) ? platformName(pinned.named) : (pinned.definition?.declared.name ?? null);
+export function nameUnder(pinned: Pinned, origin: readonly Fetched[] = []): string | null {
+  if (isPlatformDefinition(pinned.named)) return sourceName(pinned.named, "");
+  const name = pinned.definition?.declared.name;
+  if (name === undefined) return null;
+  // A declaration may use these words without acquiring the native identity
+  // that privileged handlers and fact types select. Existing lane bytes stay
+  // exact; authenticated native factory facts establish the role.
+  return sourceName(pinned.named, name, origin);
+}
+
+/** Immutable copies only; a historical retained name is not an authenticated identity. */
+export function sourceOrigin(store: Store, pinned: Pinned): readonly Fetched[] {
+  const at = store.scope()?.at;
+  if (!at) return [];
+  const first = store.stored(0);
+  if (!first) return [];
+  const genesis = parseStrict(first.bytes) as Entry;
+  const source = genesis.input.type === "genesis" ? genesis.input.source : null;
+  const use = source ? genesis.uses.find(row => canonicalize(row.fact) === canonicalize(source)) : undefined;
+  const creation = use ? store.retained("entry", use.content) : null;
+  const own: Fetched = { fact: { at, seq: 0, hash: first.hash }, entry: genesis, under: pinned.definition?.declared.name ?? "" };
+  return source && creation ? [own, { fact: source, entry: parseStrict(creation.bytes) as Entry, under: creation.under ?? "" }] : [own];
 }
 
 /**
@@ -94,12 +114,17 @@ export function nameUnder(pinned: Pinned): string | null {
  * definition this scope pins. A scope that cannot state that name gives no
  * answer: the call fails, and the reader's entry cannot be read now.
  */
-export function sourced(store: Store, pinned: Pinned | null, seq: number): Sourced | null {
+export function sourced(store: Store, pinned: Pinned | null, seq: number, origin = false, authenticatedOrigin?: readonly Fetched[]): Sourced | null {
   const scope = store.scope();
   if (!scope || !pinned) return null;
-  const under = nameUnder(pinned);
-  if (under === null) throw new Error("the pinned definition cannot be read, so its name cannot be stated");
-  return { at: scope.at, under, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
+  const proof = authenticatedOrigin ?? [];
+  const under = nameUnder(pinned, proof);
+  if (under === null) throw new Error("the pinned definition or native origin cannot be read, so its identity cannot be stated");
+  const answer: Sourced = { at: scope.at, under, bytes: (Number.isSafeInteger(seq) ? store.stored(seq) : null)?.bytes ?? null };
+  if (origin) {
+    answer.origin = proof.map((copy, index) => ({ fact: copy.fact, under: index === 0 ? under : copy.under, bytes: canonicalize(copy.entry) }));
+  }
+  return answer;
 }
 
 /**
@@ -181,17 +206,26 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
     resolver: {
-      async read(fact) {
+      async read(fact, _seconds, origin = false) {
         let answer: Sourced | null;
         try {
-          answer = await peer(fact.at.scope).source(fact.seq);
+          answer = await peer(fact.at.scope).source(fact.seq, origin);
         } catch {
           return null;
         }
         // Section 7.4: the incarnation in the answer is checked against the one the fact names.
         if (!answer || answer.at.inc !== fact.at.inc || answer.bytes === null) return { absent: true };
         try {
-          return { entry: parseStrict(answer.bytes) as Entry, under: answer.under };
+          const proof: Fetched[] = [];
+          if (origin && answer.origin) {
+            if (!Array.isArray(answer.origin) || answer.origin.length > 3) return { absent: true };
+            for (const row of answer.origin) {
+              const entry = parseStrict(row.bytes) as Entry;
+              if (!isEntryOf(entry, row.fact) || typeof row.under !== "string") return { absent: true };
+              proof.push({ fact: row.fact, entry, under: row.under });
+            }
+          }
+          return { entry: parseStrict(answer.bytes) as Entry, under: answer.under, ...(origin ? { origin: proof } : {}) };
         } catch {
           return { absent: true };
         }

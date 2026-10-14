@@ -17,10 +17,10 @@
  * items of a state itself, so a build is of the order of an answer.
  */
 
-import type { Digest, Entry, KeyId } from "@generalbusiness/artroom-contract";
+import type { Digest, Entry, KeyId } from "@generalbusiness/dap-contract";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, applyEntry } from "@generalbusiness/artroom-derive";
-import type { DrawOptions, StateView, ValidDefinition } from "@generalbusiness/artroom-derive";
+import { MemoryState, applyEntry } from "@generalbusiness/dap-derive";
+import type { DrawOptions, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 
 /** One write of one record: the position of the entry that made it, and the write, to make again on another state. */
 interface Write { from: number; again: (state: MemoryState) => void }

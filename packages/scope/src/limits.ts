@@ -32,9 +32,9 @@
  * `notes/2026-10-05-i3-limits-review.md`.
  */
 
-import type { Answer, Head } from "@generalbusiness/artroom-contract";
+import type { Answer, Head } from "@generalbusiness/dap-contract";
 import { canonicalBytes, isSignedIntentShape, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { isObject } from "@generalbusiness/artroom-derive";
+import { isObject } from "@generalbusiness/dap-derive";
 
 /**
  * The window, the two bounds, the limit of one address and the most bytes of

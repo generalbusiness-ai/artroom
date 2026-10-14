@@ -13,7 +13,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { editPath } from "@generalbusiness/artroom-platform";
+import { editPath } from "@generalbusiness/dap-platform";
 import type { Git } from "./commands.ts";
 
 export type GitFiles = { ok: true; tip: string; files: readonly { path: string; bytes: Uint8Array }[] } | { ok: false; reason: string };

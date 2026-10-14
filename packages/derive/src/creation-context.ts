@@ -1,5 +1,5 @@
 /** Reserved native create metadata. Domain fields do not select this protocol. */
-import type { ScopeRef } from "@generalbusiness/artroom-contract";
+import type { ScopeRef } from "@generalbusiness/dap-contract";
 import { isObject, isScopeRef } from "./values.ts";
 
 export type CreationContext = { kind: "legacy" } | { kind: "invalid" } | { kind: "marked"; membership: ScopeRef };

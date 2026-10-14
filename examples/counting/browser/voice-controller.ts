@@ -1,6 +1,6 @@
 /** Local media custody only. Observations and media callbacks do not decide a count. */
 import { b64url, canonicalize } from "@generalbusiness/artroom-bytes";
-import type { Beside, Digest, Grant, KeyId, MemberRef, ScopeRef, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Beside, Digest, Grant, KeyId, MemberRef, ScopeRef, SignedIntent } from "@generalbusiness/dap-contract";
 import { activeAttempt, appendPrepared, envelopeKey, resumableJournal, knownRefusal as validatedRefusal, terminalJournal, validEnvelope, validAudioStart, validReport as validatedReport, MAX_ATTEMPTS, type AttemptJournal } from "./journal.ts";
 
 export interface ActorIdentity {

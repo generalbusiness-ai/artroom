@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { Entry, Input, Seed } from "@generalbusiness/artroom-contract";
+import type { Entry, Input, Seed } from "@generalbusiness/dap-contract";
 import { messageDigest, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { timeMs } from "@generalbusiness/artroom-derive";
+import { timeMs } from "@generalbusiness/dap-derive";
 import { reader } from "./support.ts";
 import { Node, desk, later, net, rita, settle, ticket, una } from "./net.ts";
 

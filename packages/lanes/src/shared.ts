@@ -16,7 +16,7 @@
  * lines.
  */
 
-import type { ActType, AdoptedReceiveType, DeclaredDefinition, ItemType, TimedRule } from "@generalbusiness/artroom-contract";
+import type { ActType, AdoptedReceiveType, DeclaredDefinition, ItemType, TimedRule } from "@generalbusiness/dap-contract";
 
 /** A lane definition: a declared definition whose handlers are all in the adopted form. */
 export type LaneDefinition = Omit<DeclaredDefinition, "receives"> & { receives: Record<string, AdoptedReceiveType> };

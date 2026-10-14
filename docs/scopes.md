@@ -3,7 +3,7 @@
 This guide describes what the scope substrate delivers: the nine packages
 under `packages/` that hold the substrate, the platform definitions, the
 Git code and the checker service. A tenth package, `lanes`, holds the two lane
-definitions as data, and [lanes.md](lanes.md) describes it. This guide is
+definitions as data, and [lanes.md](../apps/room/docs/lanes.md) describes it. This guide is
 for a technical reader who has not read the design notes. It says what a scope is, how a change to one takes effect,
 how scopes work together, how a history is checked, and what is not built
 yet.
@@ -17,15 +17,15 @@ why. Nothing in either note is adopted by being built.
 
 | Package | Holds | Imports |
 |---|---|---|
-| `@generalbusiness/artroom-contract` | Types and constant tables. No logic. | Nothing |
-| `@generalbusiness/artroom-bytes` | Canonical JSON, SHA-256, SHA-1 for Git object names, encodings, Ed25519, the eight byte domains, and the guard of each identifier. | contract |
-| `@generalbusiness/artroom-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
-| `@generalbusiness/artroom-platform` | Six platform definitions, each with its whole data and every rule: register, directory, membership, rules, destination and inbox. The destination includes the exact first-head and receipt commit rules, its reservation reader, and the held operations and observation rows of the adopted authority revision 28 and scope contract revision 23. A missing version or a version with any missing rule is still `unsupported-definition`; `platform:task@1` is not supplied. | contract, bytes, derive |
-| `@generalbusiness/artroom-git` | The Git object reader, commands, push evidence, token gateway and snapshot builder, with separate Web API modules for smart HTTP and GitHub App requests. It runs outside a scope's commit. Scope and checkers import it. | contract, bytes |
-| `@generalbusiness/artroom-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
-| `@generalbusiness/artroom-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, the Worker's routes and opt-in wiring for two Git hosts, GitHub and the hosting's own Git service ([hosts.md](hosts.md)). | contract, bytes, derive, platform, git |
-| `@generalbusiness/artroom-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
-| `@generalbusiness/artroom-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
+| `@generalbusiness/dap-contract` | Types and constant tables. No logic. | Nothing |
+| `@generalbusiness/dap-bytes` | Canonical JSON, SHA-256, SHA-1 for Git object names, encodings, Ed25519, the eight byte domains, and the guard of each identifier. | contract |
+| `@generalbusiness/dap-derive` | The definition validator, the fold, the judges and the rule evaluator. Pure functions. | contract, bytes |
+| `@generalbusiness/dap-room` | Six platform definitions, each with its whole data and every rule: register, directory, membership, rules, destination and inbox. The destination includes the exact first-head and receipt commit rules, its reservation reader, and the held operations and observation rows of the adopted authority revision 28 and scope contract revision 23. A missing version or a version with any missing rule is still `unsupported-definition`; `platform:task@1` is not supplied. | contract, bytes, derive |
+| `@generalbusiness/dap-git` | The Git object reader, commands, push evidence, token gateway and snapshot builder, with separate Web API modules for smart HTTP and GitHub App requests. It runs outside a scope's commit. Scope and checkers import it. | contract, bytes |
+| `@generalbusiness/dap-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
+| `@generalbusiness/dap-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, the Worker's routes and opt-in wiring for two Git hosts, GitHub and the hosting's own Git service ([hosts.md](hosts.md)). | contract, bytes, derive, platform, git |
+| `@generalbusiness/dap-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
+| `@generalbusiness/dap-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
 
 The packages' guides and exported modules describe their parts. The
 runtime and the verifier share `derive` and nothing else. The client
@@ -47,29 +47,29 @@ share no storage and no transaction.
 
 A scope has a **kind**, which is one of `register`, `directory`, `membership`,
 `rules`, `destination`, `inbox`, `task` and `lane`. The substrate treats every
-kind alike. A person founds a scope with no creator in one of two ways. Under
-a version of `platform:register`, an `install` intent founds a register, of the kind
-`register`. Under any other definition, a `found` intent founds a directory
-with no creator, a path that stays until a repository's founding by its
-register is whole. Every other scope is created by another scope: a
-register's founding of a repository creates its directory, and the directory
+kind alike. A person creates a scope with no creator in one of two ways. Under
+a version of `platform:register`, an `install` intent creates a register, of the kind
+`register`. Under any other definition, a `found` intent creates a directory
+with no creator, a path that stays until a register's creation of a
+repository is whole. Every other scope is created by another scope: a
+register's creation of a repository creates its directory, and the directory
 creates membership, the rules scope and the destination. Three limits stand.
 Nothing yet checks the installation's authority to install. The Git host in
-the founding witness is a stand-in. A scope Worker is deployed at
+the creation witness is a stand-in. A scope Worker is deployed at
 <https://artroom-scope.inguz.workers.dev>; its API starts at `/v1/scopes`,
 and its root URL returns 404. The destination now
 carries every rule needed to answer its creation; a missing rule is still
 refused for the whole pinned
 version. The initial GitHub adapter checkpoint owed a live run; later
-component records observe real founding publications and clones on GitHub
+component records observe real first publications and clones on GitHub
 and the hosting service. Those observations are bound to their recorded
 source versions. The [expanded live witness](../notes/2026-10-07-expanded-gate1-live-witness.md)
 records a separate isolated own-host run of source `6621284d7`, deployed
 through notes-only successor `3c5b11791`, with final configured Worker
-version `8694dade-1530-4d49-a80a-bfab114b3e08`. It records the founding
+version `8694dade-1530-4d49-a80a-bfab114b3e08`. It records the first
 head and receipt, real operator-token clones, and six authenticated replays
 that reported consistent for their stated coverage and trusts, with no
-anchors or missing foreign facts. This empty-tree founding run is separate
+anchors or missing foreign facts. This empty-tree creation run is separate
 from the planner's room-issued CLI clone flow. It establishes no native
 lane hold, content-change publication, fresh-person signoff or complete I3
 journey. A responding URL alone establishes none of those results.
@@ -88,14 +88,14 @@ operation that it opens or the definition of a scope that it creates,
 reads it from the scope's genesis. So a room's versions follow from its
 register: version 1 of the register creates version 1 of the directory,
 which creates membership, the rules scope and the destination at version
-1, and version 2 does the same at version 2. `artroom install` founds a
-register at the newest version, and `artroom claim` founds the room at the
+1, and version 2 does the same at version 2. `dap install` creates a
+register at the newest version, and `dap claim` creates the room at the
 version that the register creates; both print the versions. A register
-founded before version 2 keeps creating rooms at version 1.
+created before version 2 keeps creating rooms at version 1.
 
 The table describes this candidate's supported declarations. Every @1
 declaration preserves actual main `1eed91aa`, including its definition-byte
-places. It does not establish the executable or admission source of older
+places. It does not establish the executable or judging source of older
 histories; that historical correspondence remains owed.
 
 | Definition | Version 1 | Version 2 |
@@ -104,7 +104,7 @@ histories; that historical correspondence remains owed.
 | `platform:directory` | Main's definition-byte places on `open-issue` and `open-pr`; missing bytes are `bad-field`. | Preserves those places and creates its three scopes at version 2, carrying the founder handle for the README. |
 | `platform:membership` | Main's declaration and version 1 standing. | The same declaration, with version 2 standing. |
 | `platform:rules` | Main's definition-byte place on `activate.digest`. | The same declaration, with version 2 cohort and observation identity. |
-| `platform:destination` | Main's declaration: no `read-token`, and a founding commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the founding commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
+| `platform:destination` | Main's declaration: no `read-token`, and a first commit with the empty tree. | The act `read-token` and its operation `mint-read`. The genesis keeps the founder's handle, and the first commit holds one file, `README.md`: the repository's name as a heading and the sentence "Founded by <handle> through the room <directory id>." |
 | `platform:inbox` | Main's declaration. | None. |
 
 ## Identity and incarnation
@@ -137,7 +137,7 @@ canonical JSON of one value. The eight tags are in `DOMAINS`, including
 Sessions have their separate `SESSION_DOMAINS` tags. No value
 contains its own digest: an entry has no field for its own hash.
 
-`@generalbusiness/artroom-bytes` has the one implementation of each:
+`@generalbusiness/dap-bytes` has the one implementation of each:
 `canonicalize` and `parseStrict`; `scopeIdOf`, `entryHash`, `intentDigest`,
 `definitionDigest`, `textDigest` and the other digests; `signIntent` and `verifySignedIntent`; and the
 guards `isDigest`, `isScopeId`, `isIncarnation`, `isKeyId`, `isMemberId`,
@@ -161,13 +161,13 @@ There are eight inputs (`Input`, in `packages/contract/src/entry.ts`):
 
 | Input | What it is |
 |---|---|
-| `genesis` | The first entry. It records the seed, the kind of its genesis act, and a founding intent or a creation request. |
+| `genesis` | The first entry. It records the seed, the kind of its genesis act, and a `found` intent or a creation request. |
 | `act` | An intent that an actor signed, with the grant it was judged under and the facts that were presented beside it. |
 | `delivery` | A message from another scope. |
 | `timed` | A deadline that an item held and that has passed. |
 | `diagnosis` | The scope's finding that a request it sent could not be delivered. |
 | `preparation` | A request for one step of a capability, such as a step of `hold@1`: the signed intent that the step prepares for, the one grant that was judged, the capability and the step (`PreparationInput`). Its entry holds what the step's code derives: records, and the operations that it opens outside the service. |
-| `outcome` | The result of an attempt to write outside the service. A preparation entry opens such an operation under a capability's code. The production ports hold that code. A scope with only the production defaults admits no step, so it opens none. |
+| `outcome` | The result of an attempt to write outside the service. A preparation entry opens such an operation under a capability's code. The production ports hold that code. A scope with only the production defaults lets no step take effect, so it opens none. |
 | `checkpoint` | The digest of the whole folded state through a position. |
 
 A preparation input is not the evaluation of rules before a commit. In
@@ -202,7 +202,7 @@ derived, and a duty ID for each message it sent.
 
 The idempotency key belongs to the first intent that was accepted under
 it, for the life of the scope. Exact replay can return the accepted receipt
-without admitting the act again. A timed drain can run first and return
+without judging the act again. A timed drain can run first and return
 unavailable before that receipt. Keep the original signed envelope and inspect
 the history rather than signing a new request to recover a lost reply.
 
@@ -243,7 +243,7 @@ declares with `settles` needs that act's or handler's entry. Before an
 entry that is new work is kept, the
 scope counts the entries its pending duties still need, and one for a
 closing checkpoint. If they do not all fit, nothing is written and an act
-is refused `scope-full`. So a duty that was admitted can always be
+is refused `scope-full`. So a duty that took effect can always be
 recorded as ended. `owed` and `fits`, in `derive`, do the count.
 
 An entry that takes an item or a copy out of the states its form's
@@ -503,12 +503,12 @@ that passes lists each such form in `ValidDefinition.underived`. The derive
 package has the rules of `hold@1` over its records and the guard
 `ancestry` of `git-read@1`, with the judge of a preparation. The
 production ports hold them, so the production runtime can pin such a
-definition. A runtime that lacks the code of one form founds and creates
+definition. A runtime that lacks the code of one form creates
 no scope under a definition that uses it,
 and answers `unsupported-definition`. A verifier with no such code answers the same. The
 item form of `hold@1`, with its `hold` effect, needs no such code and
 runs. A test may use `scriptedCapability`, from
-`@generalbusiness/artroom-scope/testing`. It is a stand-in: it answers
+`@generalbusiness/dap-scope/testing`. It is a stand-in: it answers
 from a table that the test supplies, and shows nothing about a real hold
 or a Git read. The same module has `net.peers`, for scripted peers: entries
 that a test writes by hand in place of a platform scope that is not
@@ -561,7 +561,7 @@ There are four classes of message:
 send is addressed by the child's seed, so the child's ID is fixed before
 it exists. The child reads its definition's bytes from its creator, checks
 their digest, and writes its genesis. It is then **provisional**: it
-admits nothing but a repeat of its creation. Its genesis sends the result
+accepts nothing but a repeat of its creation. Its genesis sends the result
 back. The creator records that result and sends a `confirm`. When the
 child records the confirmation it is **active**. If the child's genesis
 act is refused, the genesis is still written, the result is `refused`, and
@@ -713,7 +713,7 @@ One credential route answers a read token once to the authorized session of the 
 
 ## Replay, and what a report means
 
-`@generalbusiness/artroom-replay` checks a history without running the
+`@generalbusiness/dap-replay` checks a history without running the
 runtime. `verify(source, options)` reads a scope's stored bytes through a
 `HistorySource` and returns a report. There are two modes.
 
@@ -767,10 +767,10 @@ was not understood or the target could not be read.
 
 ## The client handle
 
-`@generalbusiness/artroom-client` is what an application or an agent uses.
+`@generalbusiness/dap-client` is what an application or an agent uses.
 
 ```ts
-import { ScopeHandle, httpTransport, signedIntent, webCryptoSigner } from "@generalbusiness/artroom-client";
+import { ScopeHandle, httpTransport, signedIntent, webCryptoSigner } from "@generalbusiness/dap-client";
 
 const signer = await webCryptoSigner();
 const scope = new ScopeHandle(httpTransport("https://scopes.example"), scopeId, reader);
@@ -785,7 +785,7 @@ if (answer.answer === "accepted") await scope.followReceipt(answer.receipt);
   a key ID and signatures, never a private key. The value returned is the
   value signed: keep it, and retry with it.
 - `ScopeHandle` has `submit`, `settle`, the reads, `definition`, `text`,
-  `followReceipt` and `followDuty`. `found` founds a directory, or, under a version of `platform:register`, a register by an `install`. `submit`
+  `followReceipt` and `followDuty`. `found` sends the `found` intent, which creates a directory, or, under a version of `platform:register`, sends an `install`, which creates a register. `submit`
   and `found` take, as one more argument, what travels beside the intent:
   the detached texts, the declared named values and, for an act, the
   presented facts.
@@ -815,16 +815,16 @@ bindings; they grant no source approval, receipt or request closure.
 
 | Boundary | Owner | Current source, evidence and limits |
 |---|---|---|
-| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Membership is runnable under its eleven rules. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The deployed class, `DeployedScope`, has a real authority (`repositoryAuthority`, in `packages/scope/src/authority.ts`): a membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records. A scope that records none reads nothing, and an act that needs a grant is answered `authority-unavailable`. `packages/scope/test/membership.test.ts` shows it on real scopes, for membership and an inbox. Most other tests use a test authority that is named as one. The expanded live witness above includes founding membership and authenticated replay; it establishes no complete live lane-authority journey. |
+| Grants and membership: who may act, how a grant is shown to be current, revocation | The authority design, then the authority and publication delivery | The `Grant` shape and the check that a grant names the action, the key and the scope. Membership is runnable under its eleven rules. Whether a grant is current is asked of a port, `Authority`, in two phases: a read before the turn, and a decision in the commit on what was read. The production default reads no grant, so none is current. The deployed class, `DeployedScope`, has a real authority (`repositoryAuthority`, in `packages/scope/src/authority.ts`): a membership scope judges its own acts on its own head, and every other scope reads the membership scope that it records. A scope that records none reads nothing, and an act that needs a grant is answered `authority-unavailable`. `packages/scope/test/membership.test.ts` shows it on real scopes, for membership and an inbox. Most other tests use a test authority that is named as one. The expanded live witness above includes the creation of membership and authenticated replay; it establishes no complete live lane-authority journey. |
 | Who may read, and sessions | The same | Read sessions bound to one repository, in `packages/scope/src/sessions.ts`, with the client's side in `packages/client/src/session.ts`. The form of a token and of a session request are source choices (I3 deltas, entries ES1 to ES9). |
-| Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | `packages/platform` supplies six runnable definitions: register, directory, membership, rules, destination and inbox. Each carries every rule of its marks. `platform:task@1` is not supplied, and a runtime or replay that lacks any rule of a pinned version answers `unsupported-definition` for the whole scope. The rules scope answers observations with its revision, the digest of its extents, and the separately retained canonical value. Platform data now states the subjects that acts, outcomes and result clauses observe; the runtime reads them before the turn and retains what the declared rows require. It also reads named values in declared byte domains. The destination reads its reservation evidence from the retained lane entries, observes membership and the rules, judges the touched extents, and counts its work under the branch and publication holders. Its first-head, receipt and deciding-read rules are tested with the real judges in memory (`packages/platform/test/destination-creates.test.ts`); its computed objects and public ref names are checked with real local Git in both object formats (`destination-objects.test.ts`). These witnesses use a made-up bureau or host answers where labelled. The initial GitHub adapter checkpoint owed a deployed run; the [GitHub component witness](../notes/2026-10-07-demo-git-host-live-witness.md) later recorded a real founding publication and public clone at source `dfaa5395`, while its authenticated replay probes failed. The separately bound expanded own-host witness above records six consistent authenticated replays. Neither closes full I3 or supplies the task definition. |
+| Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | `packages/platform` supplies six runnable definitions: register, directory, membership, rules, destination and inbox. Each carries every rule of its marks. `platform:task@1` is not supplied, and a runtime or replay that lacks any rule of a pinned version answers `unsupported-definition` for the whole scope. The rules scope answers observations with its revision, the digest of its extents, and the separately retained canonical value. Platform data now states the subjects that acts, outcomes and result clauses observe; the runtime reads them before the turn and retains what the declared rows require. It also reads named values in declared byte domains. The destination reads its reservation evidence from the retained lane entries, observes membership and the rules, judges the touched extents, and counts its work under the branch and publication holders. Its first-head, receipt and deciding-read rules are tested with the real judges in memory (`packages/platform/test/destination-creates.test.ts`); its computed objects and public ref names are checked with real local Git in both object formats (`destination-objects.test.ts`). These witnesses use a made-up bureau or host answers where labelled. The initial GitHub adapter checkpoint owed a deployed run; the [GitHub component witness](../notes/2026-10-07-demo-git-host-live-witness.md) later recorded a real first publication and public clone at source `dfaa5395`, while its authenticated replay probes failed. The separately bound expanded own-host witness above records six consistent authenticated replays. Neither closes full I3 or supplies the task definition. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch and its timed end. `workspaceEffects` in `packages/derive` derives its workspace records when the judge has the code of `hold@1`; the production ports supply that code. The production authority reads the membership scope that a lane records. The directory now declares observations of active definitions for `open-issue` and `open-pr`, and of the worker for `open-task`; the runtime can read those subjects before a turn. Native lane hold-token minting and revocation have a driver, but no production adapter reaches a real Git host for those operations. |
 | The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). With only the production defaults no grant is read and nothing is sent outside, so every act and step is refused `unauthorized` and no attempt is sent. A verifier runs them when its caller gives them (`Options.capabilities` and `Options.owners`, in `packages/replay`). The replay command gives none, and answers `unsupported-definition` for a history that needs them. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
-| Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and cleanup duties after it becomes final, and releases the remaining reservation when those duties settle. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The founding and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. The ARTIFACTS binding and ARTIFACTS_CONFIG enable the hosting service adapter; the Worker selects the recorded host, and the demo namespace is pinned to artroom-demo ([hosts.md](hosts.md)). Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated. The expanded live witness records the own-host founding first head and receipt, their recorded token cleanup answers, and a real clone that advertised both refs. Replay accepts those outside answers as recorded; it does not independently verify provider revocation. That founding publication contains an empty tree and establishes no native content-change publication. Native lane hold and Git-read operations still have no production host adapter. |
-| Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, whose code the production ports hold, so a scope can be founded or created under either. With only the production defaults it admits no act and no step, because no grant is read. W1 to W5 and the demo story run real lanes created by the real directory with production membership authority; their Git host and changed set are stand-ins, and W5 signs the checker answer in the test with no runner. The separate graph fixture uses a made-up directory and test authority. [lanes.md](lanes.md) states the remaining native host and live journey limits. |
+| Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and cleanup duties after it becomes final, and releases the remaining reservation when those duties settle. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The first-commit and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. The ARTIFACTS binding and ARTIFACTS_CONFIG enable the hosting service adapter; the Worker selects the recorded host, and the demo namespace is pinned to artroom-demo ([hosts.md](hosts.md)). Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated. The expanded live witness records the own-host first head and receipt, their recorded token cleanup answers, and a real clone that advertised both refs. Replay accepts those outside answers as recorded; it does not independently verify provider revocation. That first publication contains an empty tree and establishes no native content-change publication. Native lane hold and Git-read operations still have no production host adapter. |
+| Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, whose code the production ports hold, so a scope can be created under either. With only the production defaults no act and no step takes effect, because no grant is read. W1 to W5 and the demo story run real lanes created by the real directory with production membership authority; their Git host and changed set are stand-ins, and W5 signs the checker answer in the test with no runner. The separate graph fixture uses a made-up directory and test authority. [lanes.md](../apps/room/docs/lanes.md) states the remaining native host and live journey limits. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle and the command in `packages/cli`, described in [cli.md](cli.md). Its story fixture uses real authority, signed reads and sessions, a stand-in Git host and test-driven dispatchers. It establishes no complete deployed journey. |
-| Deployment and live journey | Demo gate 1, request `225da894` | `packages/scope/wrangler.jsonc` supplies the Worker configuration. The initial checkpoint owed live evidence; the exact isolated expanded run above now records own-host founding, an empty-tree first head and receipt, operator-token clones and six consistent authenticated replays. Its operator token is a labelled stand-in for the separate room-issued CLI credential flow, and its operator is builder rather than a fresh person. Native lane hold and content-change publication, browser obligations, fresh-person signoff and the rest of I3 remain open. These producer observations grant no source approval or request closure. |
-| Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | Admission and replay check the budget of entries, including the reservations of holders, observations, evidence values and bound decisions. The holder amounts are computed in all five dimensions, but admission against the other four budgets is still outstanding. The numbers remain temporary examples; the capacity proof is not complete. |
+| Deployment and live journey | Demo gate 1, request `225da894` | `packages/scope/wrangler.jsonc` supplies the Worker configuration. The initial checkpoint owed live evidence; the exact isolated expanded run above now records own-host creation, an empty-tree first head and receipt, operator-token clones and six consistent authenticated replays. Its operator token is a labelled stand-in for the separate room-issued CLI credential flow, and its operator is builder rather than a fresh person. Native lane hold and content-change publication, browser obligations, fresh-person signoff and the rest of I3 remain open. These producer observations grant no source approval or request closure. |
+| Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | The judge and replay check the budget of entries, including the reservations of holders, observations, evidence values and bound decisions. The holder amounts are computed in all five dimensions, but judging against the other four budgets is still outstanding. The numbers remain temporary examples; the capacity proof is not complete. |
 
 The earlier model's source that a later delivery still replaces is in
 `parked/`, and `parked/README.md` is its ledger. `docs/protocol.md` and

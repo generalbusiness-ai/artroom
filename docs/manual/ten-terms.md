@@ -1,146 +1,111 @@
 # The ten terms
 
-For a new participant in the code-work application, these ten terms help
-you read its work views and outcomes. The names preserve the approved
-beginner vocabulary; their current meanings below do not restore old APIs.
-Other applications may use different words for their work.
+These ten terms are the word list for the dap documentation. Every other
+page uses them with the meanings below. Each entry says what the term is
+in the source and where it lives. Terms that belong to the room, such as
+issue, change, review and land, are on the room's page
+[The room's terms](../../apps/room/docs/room-terms.md).
 
-## 1. Room
+## 1. Scope
 
-A **room** brings a repository's membership, rules, work scopes and
-publication destination together.
+A **scope** is an actor with its own record. It holds a history of
+entries numbered from 0, the items those entries fold into, and one
+pinned definition. Its ID is the digest of its seed, and a `ScopeRef`
+adds the incarnation and the kind. Two scopes share no storage and no
+transaction. The types are in
+[scope.ts](../../packages/contract/src/scope.ts).
 
-```mermaid
-flowchart LR
-  R[Room] --- M[Members]
-  R --- W[Work]
-  R --- P[Rules and publication]
-```
+## 2. Definition
 
-## 2. Member
+A **definition** is the data that a scope pins at genesis: its item
+types, acts, handlers, timed rules and named rule expressions. It is a
+JSON value of the type `DeclaredDefinition`, and it is identified by its
+digest. `validateDefinition` in `dap-derive` checks it before a scope
+pins it. A changed definition is a new definition with a new digest. The
+forms are in [definition.ts](../../packages/contract/src/definition.ts).
 
-A **member** is a participant whose enrolled keys may perform the actions
-their current room role permits.
+## 3. Act
 
-```mermaid
-flowchart LR
-  K[Enrolled device key] --> M[Member] --> A[Permitted actions]
-```
+An **act** is an action that a definition declares. A participant signs
+an intent for one act, on one scope, with its fields and the item
+revision the signer expects. The scope judges it against the definition,
+its state and what the signer is allowed to do. An act either takes
+effect, and the scope writes an entry, or the scope refuses it and names
+the reason. The intent is in
+[intent.ts](../../packages/contract/src/intent.ts).
 
-A person or an agent can be a member; a job such as “builder” is separate
-from the role that grants authority.
+## 4. Entry
 
-## 3. Claim
+An **entry** records one input and what followed from it: its effects on
+items, its sends, the foreign entries it read and the rules it
+evaluated. Each entry names the hash of the one before it. An act that
+takes effect returns a receipt that names its entry by scope, position
+and hash. The entry and its eight kinds of input are in
+[entry.ts](../../packages/contract/src/entry.ts).
 
-A **claim**, in the current CLI, requests a new repository-backed room;
-committing to work inside an existing room is a separate application act.
+## 5. Commitment
 
-```mermaid
-flowchart LR
-  C[Repository claim] --> R[Register judges founding] --> D[New room]
-```
+A **commitment** is a promise to do one piece of work. In the contract, a
+`Commitment` names one exact operation that its issuer has promised to
+complete ([scope.ts](../../packages/contract/src/scope.ts)). In a
+definition, a commitment is an item that moves from `offered` to
+`accepted` to `fulfilled`. The room's issue definition declares that
+item, with a requester, an offeree and a performer, and with other final
+states for a commitment that is declined, withdrawn or cancelled.
 
-The earlier plan also used this word for taking work. Do not infer a
-work-taking command or workspace from the repository `claim` command.
+## 6. Hold
 
-## 4. Lane
+A **hold** is a time-limited claim, taken under one accepted commitment
+by its performer. A hold item has a holder, a fixed reference `under` to
+the commitment, an end time and an `epoch`. Only a `hold` effect opens,
+renews or ends it. A timed rule ends it when its time passes, and it also
+ends in the entry that takes its commitment to a final state. The
+validator checks this shape, and the `hold@1` capability in
+[hold.ts](../../packages/derive/src/capability/hold.ts) derives the
+records of a hold's workspace.
 
-A **lane** is a work scope whose pinned application definition governs
-its items and actions.
+## 7. Plan and concern
 
-```mermaid
-flowchart LR
-  D[Pinned definition] --> L[Lane] --> E[Ordered entries]
-```
+A **plan** is one way to split a goal into parts, and a **concern** is
+one part of a plan. Both are items of the room's issue definition, in
+[issue.ts](../../packages/lanes/src/issue.ts). A plan is `open` while
+concerns are added, then `sealed` as the goal's current plan. Adding a
+concern sends a `create` for a new lane under the same definition, and
+the concern's state follows that request: `creating`, then `created`,
+`refused` or `conflict`.
 
-Issue lanes and change lanes have different definitions. The name alone
-does not tell you which acts are supported or which host adapters exist.
+## 8. Rules
 
-## 5. Proposal
+The **rules** scope holds a room's published configuration: which
+reviews and checks each part of a repository needs, and which
+definitions are active. Its revisions are recorded, and other scopes
+observe a revision when they judge against it. A definition's own named
+expressions, which a `rule` guard evaluates, are rule guards, not this
+scope. The rules scope is in
+[rules-scope.ts](../../packages/platform/src/rules-scope.ts).
 
-A **proposal** records a change offered for judgment, with a version
-identifying the work to review.
+## 9. Destination
 
-```mermaid
-flowchart LR
-  W[Work] --> V[Recorded version] --> J[Review and publication judgment]
-```
+The **destination** is the scope that judges publication to a Git host
+and records the outcome. It reads the change's evidence, observes
+membership and the rules, and writes outside-operation duties for the
+host. For each publication it also writes a receipt commit. It is in
+[destination.ts](../../packages/platform/src/destination.ts).
 
-A newer version does not silently replace evidence about an older one.
+## 10. Replay
 
-## 6. Review
-
-A **review** is an authorized verdict about an exact proposed version
-and the part of the repository it concerns.
-
-```mermaid
-flowchart LR
-  V[Exact version] --> R[Eligible independent reviewer] --> D[Recorded verdict]
-```
-
-The room judges whether a verdict counts; an author's approval does not
-automatically supply an independent review.
-
-## 7. Check
-
-A **check** records a declared checker result for identified inputs,
-under the checker and rules that make it eligible.
-
-```mermaid
-flowchart LR
-  I[Bound inputs] --> C[Checker job] --> E[Recorded evidence]
-```
-
-“Tests passed” in a note does not by itself establish the required check.
-
-## 8. Land
-
-To **land** is to complete the room's authorized publication workflow;
-the current change application requests it with `merge` and records the
-proposal as Merged after a published outcome.
-
-```mermaid
-flowchart LR
-  M[Merge request accepted] --> P[Destination publication] --> L[Merged]
-```
-
-An accepted merge request, a local Git commit and Merged are distinct states.
-No old `land` command is promised here.
-
-## 9. Policy
-
-**Policy** is the set of rules that determines which actions and
-outcomes a room accepts, including review requirements for repository extents.
-
-```mermaid
-flowchart LR
-  A[Requested action] --> P[Rules and authority] --> J[Judgment]
-```
-
-Current definitions and the rules scope supply those judgments. The parked
-older policy package is not an alternative current execution path.
-
-## 10. Attention queue
-
-An **attention queue** shows recorded notifications directed to a member,
-with the reason the application supplied.
-
-```mermaid
-flowchart LR
-  E[Recorded action] --> N[Notification and reason] --> M[Named member]
-```
-
-A notification helps you find work; it neither grants authority nor proves
-that every task needing human judgment has been discovered.
+**Replay** checks a recorded history without the runtime. It folds the
+entries from genesis with the same judges the runtime uses and compares
+each result with the stored entry, byte for byte. Its report states the
+head it reached, its coverage and what it took on trust. "Consistent"
+holds for that coverage and those trusts. It is in
+[packages/replay](../../packages/replay/README.md).
 
 ## Source and acceptance
 
-Draft complete explanation, inspected 2026-10-09 against main
-`9d7e4c2777ea8d35441b4a9d79b407cd701065fa`; no tested public release is
-established. Vocabulary comes from the approved plan's beginner list.
-Current meanings follow [CLI help](../../packages/cli/src/line.ts),
-[membership](../../packages/platform/src/membership.ts),
-[issue](../../packages/lanes/src/issue.ts),
-[change](../../packages/lanes/src/change.ts), and
-[entry effects](../../packages/contract/src/entry.ts).
-See [the ledger](ledger.md) for the independent review and acceptance owed.
+Written against main `d309b6b9` from the types in `packages/contract`,
+the judges and capability code in `packages/derive`, and the room's
+definitions in `packages/lanes` and `packages/platform`. This page
+claims no run. The earlier version of this page held the room's beginner
+vocabulary. Its review history stays in
+[the ledger](../../apps/room/docs/ledger.md).

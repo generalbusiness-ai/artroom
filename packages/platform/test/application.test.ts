@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
-import { PROPOSED_BOUNDS, type DeclaredDefinition, type MemberRef } from "@generalbusiness/artroom-contract";
-import { runnable, validateDefinition, type RuleGiven } from "@generalbusiness/artroom-derive";
-import { RULE_PROFILES } from "@generalbusiness/artroom-derive/rule";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type MemberRef } from "@generalbusiness/dap-contract";
+import { runnable, validateDefinition, type RuleGiven } from "@generalbusiness/dap-derive";
+import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
 import { definitionClosure } from "../src/definition-input.ts";
 import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, NEWEST, applicationValues, platform } from "../src/index.ts";
 

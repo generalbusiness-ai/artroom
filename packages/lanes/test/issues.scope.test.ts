@@ -1,8 +1,8 @@
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { ScopeId } from "@generalbusiness/artroom-contract";
+import type { ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, scopeIdOf, textDigest, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { firstExtents } from "@generalbusiness/artroom-platform";
+import { firstExtents } from "@generalbusiness/dap-platform";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
@@ -17,7 +17,7 @@ const reader = "a test reader";
 
 // Invariant: from the command line, an issue is opened, commented on and assigned through the issue lane's own acts under the demo
 // profile; a member's one-file change that says it closes the issue is published by the room's merge, and the merge closes the
-// issue; `artroom issues` lists the issue closed; and `artroom verify --all` replays every scope of the room consistent, one line
+// issue; `dap issues` lists the issue closed; and `dap verify --all` replays every scope of the room consistent, one line
 // for each. An act the lane reserves to others is refused by name, and nothing is written.
 // An accepted edit proposal keeps its original lane/version when optional
 // linking loses a required read; no proposal, link or merge is automatically retried.
@@ -29,7 +29,7 @@ const reader = "a test reader";
 // | The Git host | The production wiring of the ports of the hosting's own Git service, `artifacts-wiring.ts`, over the STAND-IN `OwnGit` of `packages/scope/test/hosts.ts`. Refs and objects are maps; every write is a real push of a pack that the stand-in decodes. GitHub's provider is not run here: `edit.scope.test.ts` runs the same publication on both. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of the scopes it waits on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces. |
-describe("artroom issue and issues, edit --closes and verify --all on real scopes. The Git host and the scheduler are STAND-INs", () => {
+describe("dap issue and issues, edit --closes and verify --all on real scopes. The Git host and the scheduler are STAND-INs", () => {
   test("an issue opened by a member, commented on by another and assigned by the admin; a member's edit with --closes is linked and waits for a merger, the admin's merge publishes it and closes the issue; merge --closes links a waiting change the same way; a member who did not open an issue and holds no issue.triage is refused close and assign by name, with nothing written; issues lists both closed; verify --all prints one line for each scope of the room and all consistent", async () => {
     net.hold = net.deaf = null;
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
@@ -99,7 +99,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   ok(await run(rita, "act", "publish", "--on", "rules", "--target", "0", "--set", "approvals=0", "--set", "ownerMayReview=false", "--set", "checks=[]", "--set", "labels=[]", "--set", `extents=${JSON.stringify(firstExtents({ approvals: 0, checks: [] }))}`));
   const atDirectory = (await D.summary()).at;
   const none = await run(una, "issue", "open", "--title", "Too early");
-  expect([none.code, none.lines[0], (await D.summary()).at]).toEqual([1, expect.stringMatching(/^The rules scope sc_\S+ holds no issue definition active\. An admin activates one: artroom act activate --on rules --set digest=<digest> --set name=issue/), atDirectory]);
+  expect([none.code, none.lines[0], (await D.summary()).at]).toEqual([1, expect.stringMatching(/^The rules scope sc_\S+ holds no issue definition active\. An admin activates one: dap act activate --on rules --set digest=<digest> --set name=issue/), atDirectory]);
   ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.issue}`, "--set", "name=issue", "--value", "issue-demo.json"));
   ok(await run(rita, "act", "activate", "--on", "rules", "--set", `digest=${DEMO_DIGESTS.change}`, "--set", "name=change", "--value", "change-demo.json"));
   expect(await run(una, "issues")).toEqual({ code: 0, lines: ["No issues."] });
@@ -138,14 +138,14 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   const head0 = host.refs.get("refs/heads/main")!;
   // An issue that is not listed is found before anything is signed: no change is opened.
   const beforeEdit = (await D.summary()).at;
-  expect([await run(una, "edit", "guide/start.md", "--file", "start.md", "--closes", "9"), (await D.summary()).at]).toEqual([{ code: 2, lines: [`No issue 9 is listed in the directory ${D.name}. Run: artroom issues`] }, beforeEdit]);
+  expect([await run(una, "edit", "guide/start.md", "--file", "start.md", "--closes", "9"), (await D.summary()).at]).toEqual([{ code: 2, lines: [`No issue 9 is listed in the directory ${D.name}. Run: dap issues`] }, beforeEdit]);
   const edited = await run(una, "edit", "guide/start.md", "--file", "start.md", "--closes", "1");
   const lane = /as change (sc_\S+), version (\d+)\./.exec(edited.lines[0]!)!;
   expect(edited).toEqual({ code: 1, lines: [
     `Proposed guide/start.md (${files["start.md"]!.length} bytes) as change ${lane[1]}, version ${lane[2]}.`,
     `Linked: when it is published, the change ${lane[1]} closes issue #1 (${I.name}).`,
     expect.stringMatching(new RegExp(`^Refused: unauthorized, judged at entry ${lane[1]}:\\d+\\. The request was refused\\.$`)),
-    `The change ${lane[1]} waits, at version ${lane[2]}. When it may be merged, run: artroom merge ${lane[1]}`,
+    `The change ${lane[1]} waits, at version ${lane[2]}. When it may be merged, run: dap merge ${lane[1]}`,
   ] });
   expect([host.refs.get("refs/heads/main"), (await I.item(0)).state]).toEqual([head0, "open"]);
 
@@ -219,7 +219,7 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   expect([stopped.code, stopped.lines, proposals, links, merges]).toEqual([1, [
     `Proposed guide/start.md (${files["start.md"]!.length} bytes) as change ${original.at.scope}, version ${original.seq}.`,
     "Linking could not be confirmed: a required request or reply was unavailable.",
-    `Inspect artroom show ${original.at.scope}:${original.seq} and artroom log ${original.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
+    `Inspect dap show ${original.at.scope}:${original.seq} and dap log ${original.at.scope} before another edit, link or merge. The proposal is recorded; linking was not confirmed and no mutation was retried.`,
   ], 1, 0, 0]);
   expect(stopped.lines.join("\n")).not.toContain("TEST private linking transport detail");
   const recorded = await new Platform(original.at.scope).entries();

@@ -8,10 +8,10 @@
 
 import { env } from "cloudflare:workers";
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
-import type { Answer, DeclaredDefinition, Entry, Grant, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Answer, DeclaredDefinition, Entry, Grant, Intent, Read, Receipt, ScopeId, ScopeRef, Seed, SignedIntent } from "@generalbusiness/dap-contract";
 import { intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
-import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/artroom-derive";
-import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/artroom-derive/testing";
+import { timeMs, timeOf, type Delivered, type ValidDefinition } from "@generalbusiness/dap-derive";
+import { deskDefinition, grantOf, keys, ticketDefinition, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
 import type { Delivery, Duty, Sealed, Summary } from "../src/index.ts";
 import { route } from "../src/worker.ts";
 import { net } from "../src/testing.ts";

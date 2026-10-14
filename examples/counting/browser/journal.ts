@@ -1,5 +1,5 @@
 /** Private attempt history; service judgments are not signed native receipts. */
-import type { Answer, Digest } from "@generalbusiness/artroom-contract";
+import type { Answer, Digest } from "@generalbusiness/dap-contract";
 import { canonicalize, isGrant, isHead, isRecord, isSignedIntentShape, REFUSAL_REASONS, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { countingCommitments as counting } from "../commitments.ts";
 import type { ActorIdentity, AudioStart, PendingReport, PreparedEnvelope } from "./voice-controller.ts";

@@ -15,10 +15,10 @@
  * history is retained.
  */
 
-import type { DeclaredDefinition, Digest } from "@generalbusiness/artroom-contract";
-import { byteOrder } from "@generalbusiness/artroom-derive";
+import type { DeclaredDefinition, Digest } from "@generalbusiness/dap-contract";
+import { byteOrder } from "@generalbusiness/dap-derive";
 import { canonicalize, isDigest, parseStrict } from "@generalbusiness/artroom-bytes";
-import type { ValidDefinition } from "@generalbusiness/artroom-derive";
+import type { ValidDefinition } from "@generalbusiness/dap-derive";
 import type { DefinitionRead } from "./ports.ts";
 import type { Retained } from "./store.ts";
 

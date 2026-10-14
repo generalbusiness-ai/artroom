@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { Entry, Receipt, Sealed, SignedIntent } from "@generalbusiness/artroom-contract";
+import type { Entry, Receipt, Sealed, SignedIntent } from "@generalbusiness/dap-contract";
 import { entryHash, factRefOf, intentDigest, keyIdOfSecret, newIncarnation, signIntent } from "@generalbusiness/artroom-bytes";
 import { waitOutcome } from "../src/clone-outcome.ts";
 import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "../src/clone-proof.ts";

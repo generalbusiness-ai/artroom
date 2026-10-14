@@ -1,7 +1,7 @@
 {
-  "name": "@generalbusiness/artroom-page",
+  "name": "@generalbusiness/dap-page",
   "version": "0.1.0-dev.1",
-  "description": "The minimal page for the demo story: a room's issues and changes, one issue, one change with its states, the rules, and the acts the signed-in member may do now, over a scope service's HTTP routes and a key kept in the browser.",
+  "description": "The dap room page: issues, changes, rules and signed member actions over a scope service's HTTP routes, with a signing key kept in the browser.",
   "license": "Apache-2.0",
   "type": "module",
   "private": true,
@@ -16,20 +16,26 @@
   },
   "dependencies": {
     "@generalbusiness/artroom-bytes": "0.1.0-dev.1",
-    "@generalbusiness/artroom-cli": "0.1.0-dev.1",
+    "@generalbusiness/dap-cli": "0.1.0-dev.1",
     "@generalbusiness/artroom-client": "0.1.0-dev.1",
-    "@generalbusiness/artroom-contract": "0.1.0-dev.1",
-    "@generalbusiness/artroom-platform": "0.1.0-dev.1"
+    "@generalbusiness/dap-contract": "0.1.0-dev.1",
+    "@generalbusiness/dap-platform": "0.1.0-dev.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.22.0",
     "@cloudflare/workers-types": "5.20260815.1",
-    "@generalbusiness/artroom-lanes": "0.1.0-dev.1",
+    "@generalbusiness/dap-lanes": "0.1.0-dev.1",
     "@generalbusiness/artroom-scope": "0.1.0-dev.1",
     "esbuild": "0.28.1",
     "vitest": "4.1.11"
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generalbusiness-ai/dap.git",
+    "directory": "packages/page"
+  },
+  "homepage": "https://dap.generalbusiness.ai/"
 }

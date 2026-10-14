@@ -1,4 +1,4 @@
-# @generalbusiness/artroom-lanes
+# @generalbusiness/dap-lanes
 
 Artroom's two lane definitions, `issue` and `change`, as data. A lane is a
 definition: this package holds no rule and no code that judges.
@@ -91,6 +91,6 @@ the rows that cannot run yet.
 ## How to test
 
 ```
-npm test --workspace @generalbusiness/artroom-lanes
-npm run typecheck --workspace @generalbusiness/artroom-lanes
+npm test --workspace @generalbusiness/dap-lanes
+npm run typecheck --workspace @generalbusiness/dap-lanes
 ```

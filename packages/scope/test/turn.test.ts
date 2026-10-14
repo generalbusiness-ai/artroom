@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/artroom-contract";
-import { MemoryState, applyEntry, checkpointOf, stateDigest, timeMs } from "@generalbusiness/artroom-derive";
+import { PROPOSED_BOUNDS, type Receipt } from "@generalbusiness/dap-contract";
+import { MemoryState, applyEntry, checkpointOf, stateDigest, timeMs } from "@generalbusiness/dap-derive";
 import { SqliteStore, Turns, Wakes, production } from "../src/index.ts";
-import { variant } from "@generalbusiness/artroom-derive/testing";
+import { variant } from "@generalbusiness/dap-derive/testing";
 import { HOLD, at, definition, found, rita, una, vic } from "./support.ts";
 
 describe("the head check (section 5.2, steps 4 to 6)", () => {

@@ -1,6 +1,7 @@
 /** Task controls use actual offered declarations; the shell owns signing and custody. */
 import type { Offered } from "./data.ts";
 import { actionForm, type ActionContext, type Send } from "./actions.ts";
+import { openDialog, releaseDialog } from "./popups.ts";
 import { h, icon } from "./view.ts";
 import { issueTaskValues } from "./task-values.ts";
 import { controlKey } from "./focus.ts";
@@ -87,13 +88,16 @@ export function createIssue(act: Offered, send: Send, context: ActionContext): H
     const form = taskForm(taskAct, submit, context, fields, "Create issue");
     const close = h("button", { type: "button" }, "Cancel");
     const message = h("p", { role: "status", "aria-live": "polite", hidden: "" });
-    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, message, close) as HTMLDialogElement;
+    const submitButton = form.querySelector<HTMLElement>('button[type="submit"]');
+    const footer = h("div", { class: "form-footer dialog-controls" }, close);
+    if (submitButton) { submitButton.remove(); footer.prepend(submitButton); form.append(footer); }
+    dialog = h("dialog", { class: "room-dialog", "aria-labelledby": "create-issue-title" }, h("h1", { id: "create-issue-title" }, "Create issue"), form, message, ...(submitButton ? [] : [footer])) as HTMLDialogElement;
     const returnFocus = () => { [...document.querySelectorAll<HTMLElement>("[data-focus-key]")].find(node => node.getAttribute("data-focus-key") === openerKey)?.focus(); };
-    const closeDialog = (restore = true) => { dialog.close(); dialog.remove(); if (context.draftKey && issueDialogs.get(context.draftKey)?.dialog === dialog) issueDialogs.delete(context.draftKey); if (restore && context.current?.() !== false) returnFocus(); };
+    const closeDialog = (restore = true) => { releaseDialog(dialog); dialog.close(); dialog.remove(); if (context.draftKey && issueDialogs.get(context.draftKey)?.dialog === dialog) issueDialogs.delete(context.draftKey); if (restore && context.current?.() !== false) returnFocus(); };
     close.addEventListener("click", () => closeDialog());
     dialog.addEventListener("cancel", (event) => { event.preventDefault(); closeDialog(); });
     if (context.draftKey) issueDialogs.set(context.draftKey, { dialog, form, message, context, close: closeDialog, initialDisabled: new Set([...form.querySelectorAll<HTMLElement>("[disabled]")]) });
-    document.body.append(dialog); dialog.showModal(); dialog.querySelector<HTMLElement>("input, textarea, button")?.focus();
+    document.body.append(dialog); openDialog(dialog, restore => closeDialog(restore)); dialog.querySelector<HTMLElement>("input, textarea, button")?.focus();
   });
   return button;
 }

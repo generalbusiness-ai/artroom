@@ -4,7 +4,7 @@
  * are read by their own families.
  */
 
-import type { FieldType } from "@generalbusiness/artroom-contract";
+import type { FieldType } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeKind } from "@generalbusiness/artroom-bytes";
 import { isObject, own } from "../values.ts";
 import { alsoMark, bound, type Selecting } from "./binding.ts";

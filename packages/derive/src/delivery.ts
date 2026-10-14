@@ -4,7 +4,7 @@
  * advisory.
  */
 
-import type { Advisory, CapabilityName, Control, Effect, Entry, FactRef, FactUse, Message, ObservationUse, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/artroom-contract";
+import type { Advisory, CapabilityName, Control, Effect, Entry, FactRef, FactUse, Message, ObservationUse, Prepared, Reason, Request, Result, RoutingRefusal, ScopeRef, Seed, Send } from "@generalbusiness/dap-contract";
 import { deliveryCauseDigest, messageDigest, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
 import { declaredBy, type Recorded } from "./capability.ts";
 import { isEntryOf, updateOf, useOf, type Reading } from "./fields.ts";
