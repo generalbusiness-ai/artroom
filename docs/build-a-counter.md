@@ -6,41 +6,6 @@ participants who join, and a board that hands the turn from one
 participant to the next until the count reaches its target. It is a
 smaller version of the Counter in [examples/counting](../examples/counting).
 
-The diagram shows the acts that each participant can attempt. A box is an
-act, grouped by who may sign it. The speaker is the participant who has
-the turn. A rounded shape is an item in a state. A solid arrow into an act
-shows the state that the act needs. A dotted arrow shows that the act must
-list every joined participant.
-
-```mermaid
-flowchart TD
-  subgraph controller[Controller]
-    establish[establish]
-    initialize[initialize]
-    start[start]
-  end
-  subgraph member[Any member]
-    join[join]
-  end
-  subgraph speaker[Speaker]
-    spoken[spoken]
-  end
-  establish --> ready([configuration: ready])
-  ready --> initialize
-  initialize --> paused([board: paused])
-  paused --> start
-  start -->|Turn goes to the first participant| running([board: running])
-  running --> spoken
-  spoken -->|Number is below the target: turn passes| running
-  spoken -->|Number is the target| finished([board: finished])
-  join -->|Once each, eight at most| joined([participant: joined])
-  joined -.->|Roster| start
-  joined -.->|Roster| spoken
-```
-
-Any other attempt is refused: an act signed by someone else, an act on a
-board in another state, or any act on a finished board.
-
 We write the definition in four steps. After each step we run it in a
 scope held in memory, sign acts as test members, and print what the scope
 recorded. No service, deployment or browser is involved.
@@ -523,6 +488,73 @@ the board becomes `finished` and its turn slots are cleared.
 
 The last line shows that folding the eight entries again gives the same
 state. That is what a verifier does with a real scope's history.
+
+## The full Counter
+
+The deployed Counter runs a larger definition, `counting-commitments`, in
+[examples/counting/commitments.ts](../examples/counting/commitments.ts).
+In place of `spoken`, a participant first commits to say the next number
+and then reports that they said it. The two diagrams show the acts that
+each participant can attempt. A box is an act, labelled with who may sign
+it. A rounded shape is an item in a state. An arrow into an act shows the
+state that the act needs.
+
+The first diagram covers setting up the scope and its participants:
+
+```mermaid
+flowchart TD
+  establish["Opener: establish"] --> ready([configuration: ready])
+  ready --> initialize["Controller: initialize"]
+  initialize --> paused([board: paused])
+  participate["Any member: participate"] --> inactive([participant: inactive])
+  inactive --> activate["Participant: activate"]
+  activate --> active([participant: active])
+  active --> deactivate["Participant: deactivate"]
+  active --> force["Controller: force-deactivate"]
+  deactivate --> inactive
+  force --> inactive
+  inactive --> remove["Controller: remove-participant"]
+  remove --> removed([participant: removed])
+```
+
+A member can hold one participant item that is inactive or active, and
+the scope holds at most 16 of them. The controller can force-deactivate
+another participant, but not themselves. A removed item is final; that
+member can participate again, which opens a new item. A participant who
+holds a pledged promise cannot be deactivated or removed.
+
+The second diagram covers the turns:
+
+```mermaid
+flowchart TD
+  paused([board: paused]) --> start["Controller: start"]
+  start --> open([board: open])
+  open --> pause["Controller: pause"]
+  open --> commit["Active participant: commit"]
+  commit --> pledged([promise: pledged])
+  pledged --> fulfill["Holder: fulfill"]
+  pledged --> fail["Holder: fail"]
+  pledged --> cancel["Controller: cancel"]
+  pledged -.-> expiry["Clock: 30 seconds pass"]
+  fulfill -->|Below the target| open
+  fulfill -->|At the target| finished([board: finished])
+  pause --> stopped([board: paused])
+  fail --> stopped
+  cancel --> stopped
+  expiry -.-> stopped
+  stopped --> reset["Controller: reset"]
+  finished --> reset
+  reset --> fresh([board: paused, count at 0])
+```
+
+Start needs a count below the target. Any active participant can commit
+while the board is open and no promise is pledged. When more than one
+participant is active, the last speaker cannot commit next. The holder is
+the participant who made the promise. Fulfill must take effect within 30
+seconds of the commitment. After that the clock pauses the board and
+expires the promise; no participant signs that step. From a paused board
+the controller can start again or reset. Start, pause and reset are
+refused while a promise is pledged.
 
 ## Where to go next
 
