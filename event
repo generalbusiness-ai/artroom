@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at homepage/test/home.test.mjs","body":{"commit":"dedcb14b1d9483bfde3064f5bc09756b34b99f8d","path":"homepage/test/home.test.mjs"}}
+{"kind":"artifact","text":"packages/scope/src/object.ts at exact 38b2aec6c202720367924544e980cc38e828ebd8 on request/security-origin-compatible-2a, under promise git:sha1…8d8b253 on request git:sha1…2e3fe6e","body":{"commit":"38b2aec6c202720367924544e980cc38e828ebd8","path":"packages/scope/src/object.ts"}}
