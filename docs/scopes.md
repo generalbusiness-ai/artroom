@@ -827,5 +827,5 @@ bindings; they grant no source approval, receipt or request closure.
 | Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | The judge and replay check the budget of entries, including the reservations of holders, observations, evidence values and bound decisions. The holder amounts are computed in all five dimensions, but judging against the other four budgets is still outstanding. The numbers remain temporary examples; the capacity proof is not complete. |
 
 The earlier model's source that a later delivery still replaces is in
-`parked/`, and `parked/README.md` is its ledger. `docs/protocol.md` and
+`spikes/parked/`, and `spikes/parked/README.md` is its ledger. `docs/protocol.md` and
 `docs/policy-pack.md` describe the earlier model and are marked inactive.

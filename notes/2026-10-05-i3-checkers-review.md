@@ -8,7 +8,7 @@ the earlier contract's checker types, in the pattern of
 `notes/2026-10-05-i3-git-review.md`.
 
 "The authority note" is revision 24 at `d5616522b`, adopted. "The deltas" is
-`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `parked/`,
+`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
 as they were at `e87645962`. Line numbers are each file's own.
 
 No file moved as it was. The successor is the package

@@ -221,7 +221,7 @@ flowchart LR
   first paragraph). Planner's account: the contract's revision 14 adoption
   leaves 23 must-change rows, of which 20 are owed. The note's own list is
   W1 to W5 (section 4) and its section 10.
-- **The spike was not redeployed, by decision.** `parked/README.md` keeps
+- **The spike was not redeployed, by decision.** `spikes/parked/README.md` keeps
   the earlier product until a separately authorized retirement; no deploy
   configuration builds the seven packages (delivery note, section 6).
 - **Direction taken, acceptance written, not yet built.** Planner's

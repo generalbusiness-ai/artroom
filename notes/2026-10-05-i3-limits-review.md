@@ -12,7 +12,7 @@ replaces.
 scope contract at revision 16, `54420b41`. "The proof plan" is revision 9
 at `85be9f0b`. "The dispositions" is
 `notes/2026-10-05-review-dispositions.md`. Parked paths are under
-`parked/room/src/`, as they were at `4f771d901`. New paths are under
+`spikes/parked/room/src/`, as they were at `4f771d901`. New paths are under
 `packages/`.
 
 Both parked files were read in full before anything was written:

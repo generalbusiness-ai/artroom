@@ -433,7 +433,7 @@ the repository (`vitest.config.ts` at the root, one project for each of
 checks in `scripts/active-source.test.mjs` and `scripts/cloudflare-pool-compat.test.mjs`.
 The compatibility witness uses the guarded actual pool factory and private-copy
 workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
-active file imports from `parked/` or names a removed format, and that no
+active file imports from `spikes/parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
 what the branch changed. `npm run gate -- --ci` reinstalls first.
@@ -518,8 +518,8 @@ Two sets of generated files follow the lane definitions:
 by `packages/lanes/scripts/reference.mjs`. The pins test fails while
 either is stale.
 
-Nothing under `parked/` is installed, typechecked or tested.
-[parked/README.md](../parked/README.md) says what is there.
+Nothing under `spikes/parked/` is installed, typechecked or tested.
+[spikes/parked/README.md](../spikes/parked/README.md) says what is there.
 
 Do not run it again for a commit that changes only documents; say that the
 source and tests are unchanged, and give the two tree hashes.

@@ -279,7 +279,7 @@ count into invented token or push charges.
 
 | ID | Reproducible evidence and current interpretation | Result / owner |
 |---|---|---|
-| COST-01 | Historical `room/core.ts:1517-1524,1599,1713` and `notes/deploy-spike.md:267` show checkpoint publication feedback; current `core.ts:1660-1704` ignores a checkpoint-only suffix | 3da landed; retain independent verification; teardown remains in `14edad4c` |
+| COST-01 | Historical `room/core.ts:1517-1524,1599,1713` and `notes/2026-10-01-deploy-spike.md:267` show checkpoint publication feedback; current `core.ts:1660-1704` ignores a checkpoint-only suffix | 3da landed; retain independent verification; teardown remains in `14edad4c` |
 | COST-02 | Current founding routes/name/registry paths in SEC-03/06; first commit is direct smart HTTP | Full D1-dependent gate in `214ddbfe`; quantify actual exposure |
 | COST-03 | Current `git/publisher/container.ts:147-153` starts without explicit runtime instance; checker `sandbox.ts:136` already chooses standard-1 | Explicit supported Publisher lite/timeout in `d687ef51` |
 | COST-04 | Current `room/jobs.ts:477-486` marks a returned refusal done, but thrown error catch re-owes at 30 s; `checker.ts:93-99,201-205` throws retryable=false for oversized output | Typed retry policy/cap/backoff/attention in `ea7716c0` |
@@ -287,7 +287,7 @@ count into invented token or push charges.
 | COST-06 | Historical `room/core.ts:1258-1304` refreshes previews; `:1303-1304` and `jobs.ts:102-118` issue only qualifying clean/unlanded, unmet, bound, deduplicated obligations | Owner D3; no universal every-check rerun claim |
 | COST-07 | Historical `core.ts:1704-1712` pending 5 s wakes; current `:1986-2025` keeps per-kind capped backoff, `:2085-2110` uses due times | Credit 3da; finish missing scheduling/escalation in `b70595d0` |
 | COST-08 | Historical `git/workspace/workspaces.ts:218-307,664-670` retains fork ownership; `room/registry.ts:67-79` keeps bindings; snapshot repos do have retirement | Owner D4 for canonical/fork/room lifecycle; not a claim all repositories are never deleted |
-| COST-09 | Historical `deploy-spike.md:272-274`; pending cohorts could wake 5 s, not universally 60 s; current `core.ts:1682-1739` recognizes gone canonical repo and once-attention | 3da landed; complete teardown without losing unknown cleanup |
+| COST-09 | Historical `2026-10-01-deploy-spike.md:272-274`; pending cohorts could wake 5 s, not universally 60 s; current `core.ts:1682-1739` recognizes gone canonical repo and once-attention | 3da landed; complete teardown without losing unknown cleanup |
 | COST-10 | Historical swallowed step errors; current diag/report source, Wrangler obs=true, `room.ts:178-185` duties/tick RPCs | Finish documented operator HTTPS/RPC reads and telemetry in `d687ef51` |
 | COST-11 | Historical `room.ts:122-165,284` long polls/subscriptions versus hibernatable watch | Bounded waits/stream lifetime and watch guidance in `d687ef51`; model one object duration |
 | COST-12 | Historical `git/landing/core.ts:61-64` forward retries and `room/jobs.ts:186-229` lost mint observation; current durable remote-effect ledgers retain unknown ownership | Escalate/back off in `b70595d0`; never settle unknown by deadline |
@@ -359,7 +359,7 @@ a symbol/file is dead; no item is deleted merely because its old count grew.
 | CRUFT-08 | Historical package README total 4,372 lines, Room 1,719 with 23 delta sections;27 review-ID test files | Current-state references + changelogs, behavior test names retaining review IDs |
 | CRUFT-09 | Historical 68 tracked result files; two logbig fixtures consumed at `git/test/push-outcome.test.ts:41-42` | Move fixtures to their consumer; enumerate and reproducibly archive only unreferenced results, preserving audit/provider/history inputs |
 | CRUFT-10 | `spikes/room-core`, `spikes/sandbox-git`, `spikes/pi-durable` READMEs/locks/pins | Superseded status+archive tags, re-pin or explicitly freeze pi spike; production pi-durable remains separate full scope |
-| CRUFT-11 | Historical notes links in `notes/mcp-stage0.md:3`, `2026-10-01-pi-durable.md:9`, plan runtime-profile reference, carry delivery notes | Status index/link check, current main destinations and preserved history |
+| CRUFT-11 | Historical notes links in `notes/2026-10-02-mcp-stage0.md:3`, `2026-10-01-pi-durable.md:9`, plan runtime-profile reference, carry delivery notes | Status index/link check, current main destinations and preserved history |
 | CRUFT-12 | Current `git/package.json:14-17`: test only node test/*.test.ts, workers/log suites separate | Root test gate actually runs git DO and pushlog suites |
 
 `166e80e3` keeps all six original hygiene groups, current protocol rules,

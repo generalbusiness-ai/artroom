@@ -121,7 +121,7 @@ the order of the steps is [inferred].
 
    `host` is the hostname in the remote URLs that the binding's `info()`
    reports: the same value as `ARTIFACTS_HOST` in
-   `parked/room/wrangler.jsonc` when the account is the same. A remote URL
+   `spikes/parked/room/wrangler.jsonc` when the account is the same. A remote URL
    that is not `https://<host>/git/artroom-demo/<name>.git` makes every read
    fail, by design. `maxBytes` is the most bytes one Git transfer may hold;
    8 MiB is a suggestion, not a measured need. An object reads its setting
@@ -152,7 +152,7 @@ What to look for:
   `git -c http.extraHeader="Authorization: Bearer <token>" ls-remote
   https://<host>/git/artroom-demo/<name>.git` should list
   `refs/heads/main` [inferred: the header form is the parked room's,
-  `parked/git/src/first-commit.ts`].
+  `spikes/parked/git/src/first-commit.ts`].
 - Signs of trouble: the claim waits and the register's operation stays
   `pending` with nothing sent (the setting is missing or malformed, or the
   register ID is not the pinned one); a `refused` with `nameExists: true`
@@ -171,7 +171,7 @@ What to look for:
 - Error shape: a refusal is an error with a `code` among `ALREADY_EXISTS`,
   `INVALID_INPUT`, `INVALID_REPO_NAME`, `INVALID_TTL` and `NOT_FOUND`, and
   a numeric `numericCode`. This is the parked rule
-  (`parked/git/src/safe-errors.ts`) [code]; the current service was not
+  (`spikes/parked/git/src/safe-errors.ts`) [code]; the current service was not
   asked [inferred].
 - `ttl` is in seconds [inferred, from the parked in-memory double]. Write
   tokens are asked for 900 seconds, read tokens for 120.
@@ -181,7 +181,7 @@ What to look for:
   `2026-10-07T13:15:00Z`). [code]
 - The remote URL form `https://<host>/git/<namespace>/<name>.git` is from
   earlier live output recorded in `notes/2026-10-04-23-spike-journey.md`
-  [code]. The `Bearer` header is from `parked/git/src/first-commit.ts`
+  [code]. The `Bearer` header is from `spikes/parked/git/src/first-commit.ts`
   [code]; whether the service accepts it today is [inferred].
 - The repository's ID is its name: the binding's create answer gives
   `name`, `remote` and `token`, and no other identifier. [code, parked
