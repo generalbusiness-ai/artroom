@@ -90,6 +90,7 @@ import { NO_OUTSIDE, type Outside } from "./operations.ts";
 import { isSite, site } from "./site/route.ts";
 import { isPage, page } from "./page.ts";
 import { isCounting, countingPage } from "./counting.ts";
+import { isLending, lendingPage } from "./lending.ts";
 import { isBrand, brand } from "./brand.ts";
 
 /**
@@ -445,7 +446,7 @@ export default {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
     const hosted = await mcpRoute(request, env);
     if (hosted) return hosted;
-    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
   },
 };
 

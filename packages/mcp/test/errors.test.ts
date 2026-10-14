@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Answer, DeclaredDefinition, MismatchReason, ReadRefusal, RefusalReason, UnavailableReason } from "@generalbusiness/dap-contract";
-import { REFUSAL_REASONS, READ_REFUSALS, b64url } from "@generalbusiness/artroom-bytes";
+import { REFUSAL_REASONS, READ_REFUSALS, b64url, utf8 } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { McpService, MISMATCH_NOTES, UNAVAILABLE_NOTES, answered, finding, guardSentences, memoryStore, type DefinitionLike, type Finding } from "../src/index.ts";
 import { READ_CREDENTIAL, SERVICE, SESSION_TOKEN, StandIn } from "./support/standin.ts";
@@ -100,4 +100,36 @@ describe("errors say who said what, from what the judge returned", () => {
     // intent, secret and all, and record returns it as stored. No sentence, answer or other read carries it.
     expect(byTool.filter(([, out]) => out.includes(invitationSecret)).map(([asked]) => asked)).toEqual(['record {"scope":"membership"}']);
   });
+});
+
+// Invariant: invitation URL refusals happen before signing, transport, config or custody writes.
+test("join validates its service before signing or changing an empty configuration (STAND-IN transport)", async () => {
+  const real = secretSigner(new Uint8Array(32).fill(19));
+  const standIn = new StandIn(real.key);
+  const repository = standIn.config().repository!;
+  const { inbox: _inbox, ...shared } = repository;
+  const link = (service: string) => "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service, repository: shared, invitation: 5, secret: "SCRIPTED invitation secret for URL boundary", handle: "@helper", definition: "platform:membership@2" })));
+  const invalid = ["not a URL", "http://scopes.test", "http://localhost:7781", "http://127.example.test", "https://user:pass@scopes.test", "https://scopes.test?x=1", "https://scopes.test#x", "https://scopes.test?", "https://scopes.test#"];
+  let signed = 0, fetched = 0, configReads = 0, configWrites = 0, custodyWrites = 0;
+  const custody = memoryStore();
+  const write = custody.write.bind(custody);
+  custody.write = async (id, record) => { custodyWrites++; await write(id, record); };
+  const empty = { service: "", roots: [] };
+  const mcp = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url, init); }, config: { read: async () => { configReads++; return empty; }, addRoot: async () => { configWrites++; throw Error("Unexpected root write"); }, joined: async () => { configWrites++; } }, custody, now: () => Date.parse("2099-01-01T00:00:00Z") });
+  for (const service of invalid) {
+    const answer = await mcp.call("join", { link: link(service), idempotencyKey: "invalid-join" });
+    expect(answer.isError, service).toBe(true);
+    expect(answer.structuredContent, service).toMatchObject({ error: "shape", message: expect.stringContaining("link"), next: expect.any(String) });
+  }
+  expect([signed, fetched, configReads, configWrites, custodyWrites]).toEqual([0, 0, 0, 0, 0]);
+  expect(empty).toEqual({ service: "", roots: [] });
+  // Each accepted form passes the real signing boundary once. A scripted native refusal stops before enrollment reads.
+  standIn.answers.set("join", () => ({ answer: "refused", reason: "guard-failed", judgedAt: { seq: 0, hash: `sha256:${"c".repeat(64)}` } }));
+  for (const [i, service] of ["https://scopes.test", "https://scopes.test/base/", "https://scopes.test:8443", "http://127.0.0.1:7781", "http://127.2.3.4", "http://[::1]:7781"].entries()) {
+    const client = new McpService({ service: "", signer: { key: real.key, sign: bytes => { signed++; return real.sign(bytes); } }, fetch: (url, init) => { fetched++; return standIn.fetch(url.replace("/base/v1/", "/v1/"), init); }, config: { read: async () => empty, addRoot: async () => { configWrites++; throw Error("Unexpected root write"); }, joined: async () => { configWrites++; } }, custody: memoryStore(), now: () => Date.parse("2099-01-01T00:00:00Z") });
+    const answer = await client.call("join", { link: link(service), idempotencyKey: `permitted-${i}` });
+    expect(answer.isError, service).toBe(false);
+    expect(answer.structuredContent, service).toMatchObject({ answer: "refused", reason: "guard-failed" });
+  }
+  expect([signed, fetched, configWrites]).toEqual([6, 6, 0]);
 });

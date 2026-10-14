@@ -11,7 +11,7 @@ mutation. Recovery needs the original signed envelope; repeating a generic
 command signs a new request.
 
 The source is `packages/cli`. In this repository it runs as
-`packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
+`packages/cli/bin/dap.js` under Node 22.0.0 or later, using the CLI's
 installed `tsx` 4.21.0 dependency. The launcher resolves that loader beside
 the package, so it works from another directory and fetches no tool when
 it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is

@@ -3,6 +3,7 @@
  * service, the repository's scopes, the invitation's number and secret, the handle, and the membership version the
  * invitation is in. The secret is the invitation's, presented once by `join`; it is no signing key.
  */
+import { invitationServiceUrl } from "./invitation-service.ts";
 import type { ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
 import { isScopeId, isScopeRef, unb64url } from "@generalbusiness/artroom-bytes";
 
@@ -28,7 +29,7 @@ export function invitationOf(text: string): InvitationLink | null {
 
 /** Whether a link's service, handle, invitation and repository references have their shapes: a directory, a membership, two scope IDs. */
 export function wellFormedInvitation(link: InvitationLink): boolean {
-  return typeof link.service === "string" && typeof link.handle === "string" && link.invitation >= 1
+  return invitationServiceUrl(link.service) !== null && typeof link.handle === "string" && link.invitation >= 1
     && isScopeRef(link.repository?.directory) && link.repository.directory.kind === "directory"
     && isScopeRef(link.repository?.membership) && link.repository.membership.kind === "membership"
     && isScopeId(link.repository?.rules) && isScopeId(link.repository?.destination);
