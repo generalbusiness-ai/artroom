@@ -1,0 +1,9 @@
+{
+  "name": "artroom-jam",
+  "compatibility_date": "2026-10-11",
+  "assets": {
+    "directory": "./deploy/assets",
+    "not_found_handling": "none",
+    "run_worker_first": false
+  }
+}
