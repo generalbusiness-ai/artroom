@@ -23,7 +23,8 @@
  */
 
 import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
-import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict, platformName } from "@generalbusiness/artroom-bytes";
+import { publishingLaneAffiliation } from "@generalbusiness/dap-platform";
 import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { NO_INCARNATION, Observes, Received, ownOf, retainedFacts, snapshotsOf, used, valuesOf, type Scope } from "./core.ts";
@@ -128,7 +129,10 @@ export class Deliveries {
     const { from, message } = delivered;
     // Section 7.4, "What the receiver trusts at run time". The source scope is reached by its scope ID in the one namespace, the
     // answer's incarnation is checked against the envelope, and the entry's bytes against the hash. Nothing has been recorded.
-    const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds), bounds.fetchSeconds);
+    const receiving = this.#scope.pinned();
+    const reserve = receiving && isPlatformDefinition(receiving.named) && platformName(receiving.named) === "platform:destination"
+      && message.class === "request" && message.type === "tell" && isObject(message.body) && message.body["message"] === "reserve";
+    const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds, !!reserve), bounds.fetchSeconds);
     if (read === LATE || read === null) return retry("dependency-unavailable");
     if (!("entry" in read) || !isEntryOf(read.entry, from)) return UNVERIFIED;
     const source: Fetched = { fact: from, entry: read.entry, under: read.under };
@@ -154,6 +158,16 @@ export class Deliveries {
     // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
     // which reads a creation's texts, is not taken.
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
+    // A legitimate activated extension may choose an arbitrary send target.
+    // Verify its immutable room before new reserve admission. This is a source
+    // check, not a changed historical judgment or a manufactured refusal entry.
+    // An already recorded decision remains recorded and answers its repeat.
+    if (reserve && !known && source.under === "change") {
+      const directory = store.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
+      const destination = store.scope()?.at;
+      if (!isScopeRef(directory) || !destination || !read.origin) return retry("dependency-unavailable");
+      if (!publishingLaneAffiliation(from, directory, destination, read.origin)) return UNVERIFIED;
+    }
     if (!pinned && founding) {
       const act = own(founding.valid.declared.acts, founding.valid.declared.genesis)!;
       const given = creationFields(message.class === "request" ? message : null, from, act.fields);

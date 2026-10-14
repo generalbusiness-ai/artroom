@@ -15,6 +15,8 @@ import { beginSessionFixture, beginSessionChild, type SessionOwner } from "../..
  */
 import { env } from "cloudflare:workers";
 import { expect } from "vitest";
+import { getCurrentTest } from "@vitest/runner";
+import { runInDurableObject } from "cloudflare:test";
 import type { ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
@@ -79,11 +81,52 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     const bindings = () => at.bindings(R!.name);
     const wire = (name: ScopeId) => lifetime.outside(name, (given, sql) => at.outside(given, sql, bindings()));
     const known: Platform[] = [];
+    const createdLanes = new Map<ScopeId, Platform>();
+    // Read-only fixture diagnostics: heads and selected entry-kind metadata only.
+    const frontier = (node: Platform, after?: number) => wait(() => runInDurableObject(node.object, (_instance, state) => {
+      const scopeRow = state.storage.sql.exec("SELECT v FROM meta WHERE k = 'scope'").toArray()[0];
+      const scope = scopeRow ? JSON.parse(scopeRow["v"] as string) as { head: { seq: number; hash: string } } : null;
+      const rows = after === undefined || !scope ? [] : state.storage.sql.exec(
+        "SELECT seq, json_extract(bytes, '$.input.type') AS type, json_extract(bytes, '$.input.signed.intent.kind') AS act, json_extract(bytes, '$.input.message.class') AS messageClass, json_extract(bytes, '$.input.message.type') AS messageType, json_extract(bytes, '$.input.message.body.name') AS relationship, json_extract(bytes, '$.input.message.body.state') AS state FROM entry WHERE seq > ? ORDER BY seq LIMIT 65", after,
+      ).toArray();
+      if (rows.length > 64) throw new Error("Native pause diagnostic exceeded 64 intervening entries");
+      return { scope: node.name, head: scope?.head ?? null, entries: rows };
+    }));
+    const callbacks = async (nodes: readonly Platform[]) => {
+      let joined = 0;
+      for (const node of nodes) {
+        const read = await wait(() => (node.stub as unknown as { awaitScheduledCallbacks(): Promise<{ callbacks: number }> }).awaitScheduledCallbacks());
+        if (!Number.isSafeInteger(read.callbacks) || read.callbacks < 0) throw new Error("Native callback barrier returned invalid work");
+        joined += read.callbacks;
+      }
+      return joined;
+    };
     // STAND-IN scheduler: actual effects, then dispatch, with the shared finite work budget.
     const pause = async (waiting: readonly string[] = []) => {
       active();
-      const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => lifetime.platform(scope as ScopeId))];
-      await driveFixture(nodes, wait);
+      const projectedNodes = () => [...new Map([...known, ...createdLanes.values(), ...waiting.map(scope => lifetime.platform(scope as ScopeId))].map(node => [node.name, node])).values()];
+      let nodes = projectedNodes();
+      const task = getCurrentTest();
+      const diagnose = task?.name.startsWith("the page's data functions against the Worker's routes as deployed") && waiting.length > 0;
+      const before = diagnose ? await Promise.all(nodes.map(node => frontier(node))) : [];
+      let settled = false, joined = 0;
+      // Await real callbacks before/after the existing finite driver. Continue
+      // only for callbacks actually joined, never a sleep or a read-head retry.
+      for (let pass = 0; pass < 64; pass++) {
+        joined += await callbacks(nodes);
+        await driveFixture(nodes, wait);
+        const previousNames = new Set(nodes.map(node => node.name));
+        nodes = projectedNodes();
+        const addedScopes = nodes.some(node => !previousNames.has(node.name));
+        const afterCallbacks = await callbacks(nodes);
+        joined += afterCallbacks;
+        if (afterCallbacks === 0 && !addedScopes) { settled = true; break; }
+      }
+      if (!settled) throw new Error("Native Page pause exceeded 64 callback/driver rounds");
+      if (diagnose && task) {
+        const after = await Promise.all(nodes.map(node => frontier(node, before.find(row => row.scope === node.name)?.head?.seq ?? -1)));
+        Object.assign(task.meta, { lastNativePause: { waiting: [...waiting], before, after, joinedCallbacks: joined, qualification: "Actual test-object callbacks and read-only SQLite heads/entry kinds; no client read retry, production guard change or clock advance" } });
+      }
     };
     const routes = (async (url: string, init?: RequestInit) =>
       (siteEnv && new URL(url).pathname.startsWith("/site/") ? site(new Request(url, init), siteEnv, at.stand.fetch) : routed(url, init))) as unknown as Fetch;
@@ -105,14 +148,14 @@ export async function demo(wrap: (fetch: Fetch, owner: SessionOwner) => Fetch = 
     await R.restart();
     active();
     known.push(R);
-    lifetime.setHold((envelope) => { if ("definition" in envelope.to) { wire(scopeIdOf(envelope.to)); return envelope.to.definition === DEMO_DIGESTS.issue && setup.holdIssueCreation?.() === true; } return false; });
+    lifetime.setHold((envelope) => { if ("definition" in envelope.to) { const name = scopeIdOf(envelope.to); wire(name); if (envelope.to.kind === "lane") createdLanes.set(name, lifetime.platform(name)); return envelope.to.definition === DEMO_DIGESTS.issue && setup.holdIssueCreation?.() === true; } return false; });
     ok(await run(rita, "claim", "demo", "--handle", "@rita"));
     active();
     const config = (await rita.store.config())!;
     active();
     const repository = config.repository!;
     const [D, G, M, rules] = [lifetime.platform(repository.directory.scope), lifetime.platform(repository.destination), lifetime.platform(repository.membership.scope), lifetime.platform(repository.rules)];
-    known.push(G);
+    known.push(D, M, rules, G);
     await pause();
     active();
     siteEnv = { SCOPES: env.PLATFORM, ...bindings() };

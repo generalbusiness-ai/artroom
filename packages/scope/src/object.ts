@@ -33,18 +33,19 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, type Item } from "@generalbusiness/dap-derive";
+import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
 import type { Delivered, StateView } from "@generalbusiness/dap-derive";
 import { Scope, type Checkpointed, type Founded } from "./core.ts";
 import { Deliveries } from "./delivery.ts";
-import { declaredBy, observedAt, routed, sentText, sourced, type Sourced } from "./namespace.ts";
+import { declaredBy, observedAt, routed, sentText, sourced, sourceOrigin, type Sourced } from "./namespace.ts";
 import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
-import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Transport } from "./ports.ts";
+import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
 import { Chains, checkLocalSignedRead, checkSignedReadRequest, presentsSignedRead, signerOf, type SignedReading, type SignedReadObserver } from "./signed-reads.ts";
@@ -106,6 +107,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #clock: Clock;
   readonly #transport: Transport | null;
   readonly #seconds: number;
+  readonly #fetchSeconds: number;
+  readonly #resolver: Resolver;
   readonly #record: OperatorRecord;
   readonly #streams: Streams;
   readonly #limits: JoinLimits;
@@ -192,11 +195,16 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#outside = ports.outside;
     this.#transport = given.transport;
     this.#seconds = bounds.dispatchSeconds;
+    this.#fetchSeconds = bounds.fetchSeconds;
+    this.#resolver = ports.resolver;
     this.#record = record;
     this.#streams = new Streams(ports.readers, () => store.scope()?.head ?? null);
     // Every commit that seals an entry is followed at once, whoever asked for its turn: a pass in the background and a late answer
     // of an outside operation write their entries in no caller's request, and nothing guarantees an alarm after the last of them.
-    this.#scope.turns.onSealed(() => this.#followed());
+    this.#scope.turns.onSealed(() => {
+      this.#operations.committed();
+      this.#followed();
+    });
     this.#limits = new JoinLimits(wiring.limits);
     this.#sessions = wiring.sessions ?? (() => null);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
@@ -285,7 +293,30 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return this.#sent(await this.#deliveries.deliver(envelope));
   }
   /** One entry of this scope, for a scope that received a send of it and checks its source (section 7.4). */
-  source(seq: number): Sourced | null { this.#first(); return sourced(this.#store, this.#scope.pinned(), seq); }
+  async source(seq: number, origin = false): Promise<Sourced | null> {
+    this.#first();
+    const pinned = this.#scope.pinned();
+    if (!pinned) return null;
+    let proof = sourceOrigin(this.#store, pinned);
+    const name = pinned.definition?.declared.name;
+    // A retained historical name is not authority. Authenticate the creator
+    // through its current native pin before exposing a reserved lane identity.
+    if (name !== undefined && sourceName(pinned.named, name) === null && proof[1]) {
+      const creator = proof[1];
+      if (creator.fact.at.scope === this.#name) return null;
+      try {
+        const read = await within(() => this.#resolver.read(creator.fact, this.#fetchSeconds, true), this.#fetchSeconds);
+        if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, creator.fact)) return null;
+        proof = [proof[0]!, { ...creator, under: read.under }];
+        if (read.under === "issue") {
+          const parent = read.origin?.find(copy => copy.fact.seq === 0 && canonicalize(copy.fact.at) === canonicalize(creator.fact.at));
+          if (!parent || !isEntryOf(parent.entry, parent.fact) || parent.entry.input.type !== "genesis") return null;
+          proof = [...proof, { ...parent, under: read.under }];
+        }
+      } catch { return null; }
+    }
+    return sourced(this.#store, pinned, seq, origin, proof);
+  }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
   demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }

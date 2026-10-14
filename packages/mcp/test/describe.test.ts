@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { definitionDigest } from "@generalbusiness/artroom-bytes";
 import { change, issueDemo } from "@generalbusiness/dap-lanes";
 import { lane as deriveLane } from "@generalbusiness/dap-derive/testing";
+import { countingCommitments } from "../../../examples/counting/commitments.ts";
 import { counting } from "../../../examples/counting/definition.ts";
 import type { ScopeId } from "@generalbusiness/dap-contract";
 import { DESCRIPTION_CHARS, actTool, bindingsOf, describeAct, describedOf, generationOf, guardSentences, inline, listed, WORDS, type ActLike, type DefinitionLike, type Held, type Inventory } from "../src/index.ts";
@@ -22,27 +23,28 @@ const room = (extra: Parameters<typeof heldOf>[], role: string, more: string[] =
   return { ...base, scopes: [...base.scopes, ...extra.map((args) => heldOf(...args))], standing: { [MEMBERSHIP]: { ...standing, actions: [...standing.actions, ...more] } } };
 };
 
-// The five worked examples of plan 031, section 4, as tools/list sends them. docs/mcp.md shows each, verbatim.
+// Five worked examples, as tools/list sends them: the first three are plan 031's, section 4; the last two are the Counter's
+// participate and commit under counting-commitments, the definition the Counter page runs. docs/mcp.md shows each, verbatim.
 export const EXAMPLES: Record<string, () => string> = {
   "issue.comment": () => sent(demoInventory("member"), "issue", "comment"),
   "lane.take-hold": () => sent(room([["sc_fixture", "root", definitionDigest(deriveLane), declared(deriveLane)]], "member", ["hold"]), "lane", "take-hold"),
   "issue.create": () => sent(demoInventory("admin"), "platform:directory", "open-issue"),
-  "counting.join": () => sent(room([["sc_counter", "root", definitionDigest(counting), declared(counting)]], "member", ["counting.join"]), "counting", "join"),
-  "counting.spoken": () => sent(room([["sc_counter", "root", definitionDigest(counting), declared(counting)]], "member", ["counting.spoken"]), "counting", "spoken"),
+  "counting-commitments.participate": () => sent(room([["sc_counter", "root", definitionDigest(countingCommitments), declared(countingCommitments)]], "member", ["counting.participate"]), "counting-commitments", "participate"),
+  "counting-commitments.commit": () => sent(room([["sc_counter", "root", definitionDigest(countingCommitments), declared(countingCommitments)]], "member", ["counting.commit"]), "counting-commitments", "commit"),
 };
 
 describe("descriptions are derived from the whole declaration", () => {
-  // Invariant: each worked example of section 4 is the description tools/list sends, and docs/mcp.md shows it exactly as sent.
+  // Invariant: each worked example is the description tools/list sends, and docs/mcp.md shows it exactly as sent.
   test("the five worked examples, as sent and as docs/mcp.md shows them", () => {
     expect(EXAMPLES["issue.comment"]!()).toBe("comment: opens a comment; needs issue.comment, which your role (member) holds. Fields: body (required): text up to 65536 bytes, kept apart from the entry: give the text itself, or its digest with the text in texts. replyTo: the ID of a comment item on this scope. mentions: a list of up to 16, each a member, as @handle. No guards.");
     expect(EXAMPLES["lane.take-hold"]!()).toBe("take-hold: opens a hold; needs hold, which your role (member) holds. Fields: commitment (required): the ID of a commitment item on this scope. Guards: the commitment is accepted; you are the commitment's performer; no hold is held where the hold's under equals the act's commitment.");
     expect(EXAMPLES["issue.create"]!()).toBe(`open-issue: opens a lane; needs issue.open, which your role (admin) holds. Fields: definition (required): the digest of a value in the definition domain, up to 262144 bytes, with its bytes in values or read from the rules scope; choices from the rules scope: change ${ACTIVE_DEMO[0]!.digest}, issue ${ACTIVE_DEMO[1]!.digest}. title (required): text up to 256 bytes. body: text up to 65536 bytes, kept apart from the entry: give the text itself, or its digest with the text in texts. conditions (required): a list of up to 16, each text up to 4096 bytes. Guards: the definition is active in the rules scope, and its bytes and the definitions it names are at hand (not-activated, unsupported-definition).`);
-    expect(EXAMPLES["counting.join"]!()).toBe("join: opens a participant; needs counting.join, which your role (member) holds. Fields: none. Guards: between 0 and 7 participants are joined; no participant is joined where the participant's agent equals you.");
+    expect(EXAMPLES["counting-commitments.participate"]!()).toBe("participate: opens a participant; needs counting.participate, which your role (member) holds. Fields: none. Guards: no participant is inactive or active where the participant's agent equals you.");
     // The rule guard does not fit in the description: the pointer names it, and the complete text holds the expression verbatim.
-    expect(EXAMPLES["counting.spoken"]!()).toMatch(/Guards 6 to 6 of 6 are left out; see inspect with describe: "spoken"\.$/);
-    const spoken = declared(counting).acts["spoken"]!;
-    expect(describeAct(declared(counting), "spoken", spoken, { standing: "unknown" }, { pinned: definitionDigest(counting) }, { definition: "counting", kind: "spoken", declaration: "sha256:x", digests: [] }, "").complete)
-      .toContain(`- the rule spoken-plan holds: ${counting.rules["spoken-plan"]}`);
+    expect(EXAMPLES["counting-commitments.commit"]!()).toMatch(/Guards 8 to 8 of 8 are left out; see inspect with describe: "commit"\.$/);
+    const commit = declared(countingCommitments).acts["commit"]!;
+    expect(describeAct(declared(countingCommitments), "commit", commit, { standing: "unknown" }, { pinned: definitionDigest(countingCommitments) }, { definition: "counting-commitments", kind: "commit", declaration: "sha256:x", digests: [] }, "").complete)
+      .toContain(`- the rule commit-plan holds: ${countingCommitments.rules["commit-plan"]}`);
     for (const [name, render] of Object.entries(EXAMPLES)) expect(DOC, `docs/mcp.md shows ${name} as sent`).toContain(render());
   });
 

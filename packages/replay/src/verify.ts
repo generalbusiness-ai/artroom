@@ -106,6 +106,14 @@ export interface Options {
    */
   platform?: ((named: PlatformDefinition) => Coded | null) | undefined;
   /**
+   * The explicit identity policy of the supplied native catalog, also for
+   * histories that contain only declared definitions. It classifies checked
+   * source and creator histories; it supplies no foreign fact or anchor.
+   * A native version that supplies its policy must use this same function.
+   * With none, a reserved declared source remains incomplete.
+   */
+  sourceName?: Coded["sourceName"];
+  /**
    * How a recorded grant that holds no freshness proof is read. Such a
    * grant is no grant, and an entry that holds one is no entry (section
    * 15.6n, on the I3 delta E8): `proven`, a `mismatch` at that entry. The
@@ -131,6 +139,10 @@ export interface Coded {
   data: PlatformData;
   rules: Rules;
   observed?: ((state: StateView, asked: ObservationRequest) => unknown) | undefined;
+  /** The shared source-identity policy, using checked genesis and creator facts.
+   * Null means that required origin proof is missing; anchored copies remain
+   * explicitly trusted. This metadata changes no pinned data or judgment. */
+  sourceName?: ((named: Digest | PlatformDefinition, declaredName: string, origin?: readonly Fetched[]) => string | null) | undefined;
   /**
    * Where a scope under this version records its membership reference,
    * when that is not its genesis entry (authority note, section 3.3, "Where
@@ -386,6 +398,7 @@ class Verifier {
   readonly #capabilities: Capabilities | undefined;
   readonly #owners: Owners | undefined;
   readonly #platform: Options["platform"];
+  #sourceName: Coded["sourceName"];
   readonly #grants: "proven" | "as-recorded";
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
@@ -424,6 +437,7 @@ class Verifier {
     this.#capabilities = options.capabilities;
     this.#owners = options.owners;
     this.#platform = options.platform;
+    this.#sourceName = options.sourceName;
     this.#grants = options.grants ?? "proven";
   }
 
@@ -759,6 +773,10 @@ class Verifier {
     if (needs) throw new Stop("unsupported-definition", `the pinned definition needs ${needs.capability}, which this replay has no code for: ${needs.form} ${needs.name} at ${needs.path}`, where);
     const lacks = checked.definition.marks.find((mark) => ruleAt(supplied.rules, mark.code, mark.kind) === null);
     if (lacks) throw new Stop("unsupported-definition", `the pinned definition ${named} has the mark ${lacks.code} at ${lacks.path}, and this replay has no rule of that name for that place`, where);
+    if (supplied.sourceName) {
+      if (this.#sourceName && this.#sourceName !== supplied.sourceName) throw new Stop("unsupported-definition", "the supplied native versions disagree on their source-identity policy", where);
+      this.#sourceName = supplied.sourceName;
+    }
     run.platform = { named, rules: supplied.rules };
     run.observed = supplied.observed;
     run.membership = supplied.membership;
@@ -1109,6 +1127,39 @@ class Verifier {
     this.#unwalked.push(where);
   }
 
+  /** Classify a proved sender from its checked histories, never from a retained alias alone. */
+  #sourceIdentity(source: Run, where: FactRef): string {
+    const named = source.named, declared = source.definition?.declared.name;
+    if (named === null || declared === undefined) throw new Stop("incomplete", "the proved source has no checked definition for its identity", where);
+    if (!this.#sourceName) {
+      if (!isPlatformDefinition(named) && (declared === "change" || declared === "issue" || declared.startsWith("platform:"))) throw new Stop("incomplete", "the replay has no supplied source-identity policy for a reserved declared name", where);
+      return declared;
+    }
+    // Ordinary names and identities established without origin proof need
+    // no creator recursion. Null still requires actual checked birth facts.
+    const direct = this.#sourceName(named, declared);
+    if (direct !== null) return direct;
+    const genesis = source.sealed[0];
+    const origin: Fetched[] = [];
+    if (genesis?.entry.input.type === "genesis") {
+      origin.push({ fact: { at: genesis.entry.at, seq: 0, hash: genesis.hash }, entry: genesis.entry, under: declared });
+      const from = genesis.entry.input.source;
+      const creator = from && this.#runs.get(from.at.scope);
+      const made = from && creator?.sealed[from.seq];
+      if (from && creator?.at && sameScope(creator.at, from.at) && made?.hash === from.hash && creator.definition) {
+        const creatorUnder = this.#sourceIdentity(creator, where);
+        origin.push({ fact: from, entry: made.entry, under: creatorUnder });
+        const parentGenesis = creator.sealed[0];
+        if (creatorUnder === "issue" && parentGenesis?.entry.input.type === "genesis") origin.push({
+          fact: { at: parentGenesis.entry.at, seq: 0, hash: parentGenesis.hash }, entry: parentGenesis.entry, under: creatorUnder,
+        });
+      }
+    }
+    const identity = this.#sourceName(named, declared, origin);
+    if (identity === null) throw new Stop("incomplete", "the source's required native genesis or creator proof is missing", where);
+    return identity;
+  }
+
   async #replay(run: Run, entry: Entry, hash: Digest, bytes: string, where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     const input = entry.input;
@@ -1138,10 +1189,14 @@ class Verifier {
     for (const fact of foreign) {
       if (!isFactRef(fact)) throw mismatch("a reference is not a fact reference");
       const how = await this.#prove(fact, where, depth);
-      // The name of the definition the source pins, which a `fact` field and a handler may read, is the source's own genesis's to say:
-      // the name that the declaration its seed names states (section 6.1). A source that was replayed has that declaration pinned.
-      const pinned = this.#runs.get(fact.at.scope)?.definition?.declared.name;
-      for (const copy of facts) if (copy.fact.hash === fact.hash && how === "replayed" && copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
+      // Historical judgments keep their original facts and effects. Authenticate
+      // retained aliases from already checked sender/creator histories; do not
+      // add origin facts to the judgment. An anchor keeps its explicit trust.
+      if (how === "replayed") {
+        const source = this.#runs.get(fact.at.scope)!;
+        const pinned = this.#sourceIdentity(source, where);
+        for (const copy of facts) if (copy.fact.hash === fact.hash && copy.under !== pinned) throw mismatch(`the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`);
+      }
     }
 
     // Section 9.3, for every entry: before one that is not timed, no deadline at or before its time is unapplied.

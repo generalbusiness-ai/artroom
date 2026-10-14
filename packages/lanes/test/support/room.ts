@@ -19,14 +19,14 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { expect } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Answer, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/dap-contract";
+import type { Answer, Bounds, DeclaredDefinition, Entry, FactRef, Intent, MemberRef, OperationId, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, intentDigest, keyIdOfSecret, scopeIdOf, seedDigest, signIntent, textDigest } from "@generalbusiness/artroom-bytes";
 import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
 import { targetOf } from "../../../platform/src/destination.ts";
-import { SqliteStore } from "../../../scope/src/index.ts";
+import { SqliteStore, type Transport as NativeTransport } from "../../../scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
 import { outsideOf, wired } from "../../../scope/test/outside.ts";
 import { Platform, copied, rewritten, routed, settle } from "../../../scope/test/repository.ts";
@@ -62,6 +62,8 @@ export class Room {
   changes: { paths: string[]; links: []; unreadable: number } = { paths: ["src/a.ts"], links: [], unreadable: 0 };
   /** The lanes that the directory created for this room, by name: their dispatchers run with the room's. */
   #lanes = new Map<string, Node<DeclaredDefinition>>();
+  /** Actual prebirth Git stand-ins, retained so witnesses inspect their original requests. */
+  readonly hosts = new Map<string, Host>();
   #driving = "none";
 
   constructor(
@@ -160,15 +162,21 @@ export class Room {
    * A lane that the real directory creates by `open-issue` or `open-pr`, for
    * `who`, under the digest that the rules scope holds `active`. The
    * definition's bytes travel beside the act. Returns the lane's node, on
-   * the namespace `PLATFORM`.
+   * the namespace `PLATFORM`. `bounds` selects this child's test bound only.
+   * `testTransport` installs an explicit test routing boundary before birth;
+   * omitted uses the normal Native namespace transport.
    */
-  async lane<const D extends DeclaredDefinition>(who: Actor, kind: "open-issue" | "open-pr", definition: D, digest: string, fields: Record<string, unknown>): Promise<Node<D>> {
+  async lane<const D extends DeclaredDefinition>(who: Actor, kind: "open-issue" | "open-pr", definition: D, digest: string, fields: Record<string, unknown>, bounds?: Bounds, testTransport?: NativeTransport): Promise<Node<D>> {
     const signed = await this.D.intent(who, kind, { expected: await this.D.expected({ repository: 0 }), fields: { definition: digest, ...fields } as never });
     const seed: Seed = { v: 1, kind: "lane", definition: digest as never, creator: await this.D.at(), cause: intentDigest(signed.intent), ordinal: 0 };
     const name = scopeIdOf(seed);
+    // A selected test bound is wired before the actual child object exists.
+    // It changes no deployed default and never rewrites SQLite state.
+    if (bounds) net.sized.set(name, bounds);
     // STAND-IN: the lane's Git host, for the attempts that the code of `hold@1` opens. Wired before the object first runs.
     const host = new Host();
-    wired.set(name, () => ({ outside: { accepts: (owner, kind) => host.accepts(owner, kind), send: (request) => Promise.resolve(host.send(request)) } }));
+    this.hosts.set(name, host);
+    wired.set(name, () => ({ ...(testTransport ? { transport: testTransport } : {}), outside: { accepts: (owner, kind) => host.accepts(owner, kind), send: (request) => Promise.resolve(host.send(request)) } }));
     this.#lanes.set(name, null as never);
     const answer = await this.D.stub.submit(signed, [], { values: [canonicalize(definition)] });
     if (answer.answer !== "accepted") expect.fail(`${kind} was not accepted: ${JSON.stringify(answer)}`);

@@ -1,7 +1,8 @@
 # Provision and run the lending library
 
-**Run status: unrun.** This is the operator runbook for the full lending
-request. It records no deployed outcome, browser result, online room, or
+**Run status: a rehearsal ran on 14 October 2026, without publication;
+see [the rehearsal run](#the-rehearsal-run-14-october-2026).** This is
+the operator runbook for the full lending request. It records no deployed outcome, browser result, online room, or
 published page. Fill the observation ledger from the original run before
 calling those outputs delivered.
 
@@ -67,8 +68,9 @@ run's evidence. The current baseline pin is
 These commands describe that baseline, not a future publishing definition:
 
 ```sh
-node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set name=lending --value examples/lending/definition.json
-node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set 'values={}' --set execution=recorded-do --value examples/lending/definition.json
+node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$ARTROOM_HOME/lending.json"
+node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set name=lending --value "$ARTROOM_HOME/lending.json"
+node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set 'values={}' --set execution=recorded-do --value "$ARTROOM_HOME/lending.json"
 ```
 
 Keep the exact signed establishment request before submission. Reconcile an
@@ -197,6 +199,41 @@ verified URLs in the final Source, then run its owning Home check and one
 final gate through the Root-owned validation procedure. Publish the homepage
 normally only after Source approval and landing. Retain its original build,
 deployment version, and byte, MIME, cache, and link readbacks.
+
+## The rehearsal run, 14 October 2026
+
+Hugh asked on 14 October 2026 for the member interface first: deploy,
+provision and play the story without publication, link the member
+interface from the homepage, and add the published shelf when publication
+is built. This room is that rehearsal. It is not the final online shelf:
+the final room is provisioned after the publication design is approved and
+built, under the pins it then needs.
+
+| Step | Observed |
+|---|---|
+| Source | Main `dedcb14b`. |
+| Service | Worker `dap-lending`, `https://dap-lending.inguz.workers.dev`, its own Durable Object namespace and Artifacts namespace `dap-lending`. Version `4b289327-c1c8-47fa-b108-ce84cad6975a` carries `ARTIFACTS_CONFIG`. `DEPLOYMENT` and `SESSION_SECRET` were set through stdin. |
+| Room | `install --plan --cohort application`, then `install --planned`, then `create lending-library --handle @neighbour`: register `sc_c67lq575…`, directory `sc_sgj2favz…` (`platform:directory@5`), membership `sc_x6lr4msi…` (`@4`), rules `sc_xeeasdyw…` (`@3`), destination `sc_kkehgsll…` (`@2`); each created and confirmed. |
+| Definition | `activate` took effect at rules entry 2; `establish-application` at directory entry 5. The lending scope is `sc_vsleihvx…`, under the pin `sha256:439cd20e…`. |
+| Roles | The founding lists were read from the membership's genesis. `set-actions` took effect at membership entries 5 and 6: admin 36 actions plus `lending.member` and `lending.staff`; member 23 plus `lending.member`. The first lending act took effect 124 seconds after the grants, with no wait. |
+| Invitation | `@nasruddin`, role member, issued with `dap invite --keep` from head `9356257c` of request `53850986` (under review, not yet landed), at membership entry 7. |
+| Browser join | Chrome, its own profile, driven by Playwright. The answer to the join was dropped after the scope received it. The page said "No answer came back that could be trusted. The original join is kept." After a reload, **Check the join** read the original: "You joined as @nasruddin." One join, membership entry 8. |
+| Story | Seven acts in the script's order, lending entries 2 to 8: donate Big pot (@neighbour, command line); borrow, return, donate Small pot, borrow (@nasruddin, browser); cancel "Nasruddin says the pot died" and donate New big pot (@neighbour, command line). |
+| Interrupted donation | The answer to the Small pot donation was dropped after the scope received it. After a reload the page offered **Check**, **Continue** and **Give up**; **Check** said "The kept request took effect." One donation, entry 5. |
+| Refusals | The neighbour's borrow of the lent big pot: `guard-failed`. Nasruddin's cancel, reason "The pot died": the page offers **Cancel this thing** to a member too, and shows "Only staff can cancel a thing. (unauthorized)". Neither is in the record. |
+| Verify | `dap verify` on the lending scope: consistent, replay mode, entries 0 to 8 with the directory, register, membership, rules, destination and inboxes it names. |
+
+Corrections found in the run:
+
+- `examples/lending/definition.json` ends with a newline, and the pin is
+  the digest of the bytes without it. `--value` sends a file as it is, so
+  the runbook's first commands were refused `bad-field`. The commands
+  above now send a copy without the newline.
+- The demo script's shot 8a says not to claim that the member interface
+  offers a cancel button to a member. It does; the scope refuses it.
+
+Not done in this run: publication, the published shelf, the public
+history witness, and a second physical device.
 
 ## Observation ledger
 

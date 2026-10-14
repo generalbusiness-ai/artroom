@@ -1,8 +1,9 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
-import { capable, graph, net, paul, rita, una, type Node } from "./support/graph.ts";
-import type { change, issue } from "../src/index.ts";
+import { capable, graph, net, paul, rita, soon, una, type Node } from "./support/graph.ts";
+import { DIGESTS, change, issue } from "../src/index.ts";
+import { room } from "./support/room.ts";
 
 /** A Git object ID. Nothing reads a repository here. */
 const oid = (c: string) => c.repeat(40);
@@ -17,26 +18,31 @@ async function fill(lane: Node<typeof issue> | Node<typeof change>): Promise<[nu
 test("T7, pending settlement at full capacity, for a copy: an issue lane that is full for new work still records the end of a link it holds a copy of; a link it holds no copy of waits; and its closing checkpoint still fits (entries only)", async () => {
   // Real scopes: an issue lane with a bound of 12 entries, and a change lane that links to it. No peer is used and no capability
   // guard is asked. The count is of entries only: items, records, bytes and pending requests are not counted yet. Not proved: any
-  // of those dimensions, or the bound a deployment would configure.
-  const g = await graph();
-  const G = await g.goal({ ...PROPOSED_BOUNDS, scopeEntries: 12 });
-  const C = await g.change();
+  // of those dimensions, or the bound a deployment would configure. Actual
+  // Native Directory creation establishes the sender's change role; membership
+  // authority is real. The founding Git host, clock and selected bound are fixtures.
+  const r = await room({ roster: [] });
+  await r.activate(issue, DIGESTS.issue);
+  await r.activate(change, DIGESTS.change);
+  const G = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "A goal", conditions: ["it works"] }, { ...PROPOSED_BOUNDS, scopeEntries: 12 });
+  const C = await r.lane(rita, "open-pr", change, DIGESTS.change, { title: "A change", draft: false });
   const set = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "manual" } })).fact.seq;
-  await g.settle();
+  await r.settle();
   // Three entries are written: the genesis, its confirmation and the link. Two are reserved: one for the update that ends the
   // copy's wait, and one for the closing checkpoint. So seven comments fit, and the eighth is new work with no room.
   expect([await fill(G), (await G.entries()).length]).toEqual([[7, "scope-full"], 10]);
 
   // The link is removed. That update takes the copy out of `set`, so it is written against the copy's own reservation.
   const removed = (await C.did(rita, "unlink-own", { on: set })).fact.seq;
-  await g.settle();
+  await r.settle();
   expect([(await G.entries()).length, (await G.entries()).at(-1)!.input, (await G.state()).relation(C.at, "closes", set)]).toMatchObject([11, { type: "delivery", decision: "applied", from: { seq: removed } }, { state: "removed" }]);
   // It freed nothing for new work: the entry it used was the one reserved. A comment is still refused.
   expect(await G.asks(rita, "comment", { fields: { body: "one more" } })).toBe("scope-full");
   // A first update for a link that the lane holds no copy of is new work. It is not decided: the sender keeps the duty and offers it again.
   const again = (await C.did(rita, "link-own", { fields: { issue: G.at, how: "manual" } })).fact.seq;
-  await g.settle();
-  await g.later(1);
+  await r.settle();
+  net.clock.now = soon(1);
+  await r.settle();
   expect([(await C.duties()).find((d) => d.duty === `${again}.0`), (await G.entries()).length]).toMatchObject([{ attempts: [{ answer: "retry" }, { answer: "retry" }], acknowledged: null, result: null }, 11]);
   // Nothing else is pending in the issue lane, so its last entry is the closing checkpoint, and it fits.
   expect([await G.stub.checkpoint(), (await G.entries()).length]).toMatchObject([{ answer: "written", fact: { seq: 11 } }, 12]);
