@@ -63,7 +63,7 @@ function changeReceipt(ledger: Ledger) {
   if (rules.content.asked !== "rules") throw Error("Scripted rules observation");
   const extents = firstExtents(rules.content);
   const observed = [retained({ ...rules, content: { ...rules.content, extents: valueDigest("artroom-rules-extents-1", extents), singleControllerException: false } }, 1), retained(keyObserved(keys.rita, T0), 2),
-    retained({ subject: "holders", of: MEMBERSHIP, head: { seq: 412, hash: d("4") }, action: "rules.publish", count: 2, holders: [], definition: "platform:membership@1", at: T0 }, 3)];
+    retained({ subject: "holders", of: MEMBERSHIP, head: { seq: 412, hash: d("4") }, action: "rules.publish", count: 2, holders: [keys.rita.member.member], definition: "platform:membership@1", at: T0 }, 3)];
   const changes = { paths: ["change.md"], links: [], unreadable: 0 };
   answer(ledger, judge, { head: HEAD, present: true, tree: "d".repeat(40), firstParent: HEAD, ancestors: [], changes: valueDigest("artroom-changed-set-1", changes) }, { facts, observed, values: [canonicalize(extents), canonicalize(changes)], observing: { membership: { ...MEMBERSHIP, inc: null }, rules: { ...RULES, inc: null }, content: () => contentStates(rulesScope) } });
   const publication = ledger.state.page("publication", ["reserved"], null, 1).items[0]!;
@@ -85,7 +85,7 @@ test("change and file receipts share the 64/65 admission boundary while final fi
   const before = ledger.state.snapshot(), rejected = file(ledger);
   expect(rejected.result).toBe("write");
   if (rejected.result !== "write") throw Error("Refusal is recorded");
-  expect(rejected.draft.input).toMatchObject({ type: "delivery", decision: "refused", reason: { reason: "guard-failed", name: "receipts-owed" } });
+  expect(rejected.draft.input).toMatchObject({ type: "delivery", decision: "refused", reason: { code: "guard-failed", name: "receipts-owed" } });
   expect(ledger.state.count("receipt", "owed")).toBe(65);
   expect(ledger.state.count("file-publication", "queued")).toBe(0);
   expect(ledger.state.snapshot()).not.toBe(before); // Only the refusal advances the record.
@@ -98,6 +98,6 @@ test("publish-file accepts 65536 UTF-8 bytes and rejects the next byte before op
   const rejected = file(ledger, "x".repeat(65537));
   expect(rejected.result).toBe("write");
   if (rejected.result !== "write") throw Error("Refusal is recorded");
-  expect(rejected.draft.input).toMatchObject({ type: "delivery", decision: "refused", reason: { reason: "bad-field" } });
+  expect(rejected.draft.input).toMatchObject({ type: "delivery", decision: "refused", reason: { code: "bad-field" } });
   expect(ledger.state.count("file-publication", "queued")).toBe(1);
 });
