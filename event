@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/operation-recovery-origin.test.ts","body":{"commit":"5e11ca0300cc0a538f7c59b36d490f5cf14be15f","path":"packages/scope/test/operation-recovery-origin.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00d56cea9730b8dcf4cfac2309b916b2e7d5edc4","text":"Merge retired a covered predecessor; the successor is at packages/cli/src/invitations.ts."}
