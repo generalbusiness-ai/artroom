@@ -6,6 +6,41 @@ participants who join, and a board that hands the turn from one
 participant to the next until the count reaches its target. It is a
 smaller version of the Counter in [examples/counting](../examples/counting).
 
+The diagram shows the acts that each participant can attempt. A box is an
+act, grouped by who may sign it. The speaker is the participant who has
+the turn. A rounded shape is an item in a state. A solid arrow into an act
+shows the state that the act needs. A dotted arrow shows that the act must
+list every joined participant.
+
+```mermaid
+flowchart TD
+  subgraph controller[Controller]
+    establish[establish]
+    initialize[initialize]
+    start[start]
+  end
+  subgraph member[Any member]
+    join[join]
+  end
+  subgraph speaker[Speaker]
+    spoken[spoken]
+  end
+  establish --> ready([configuration: ready])
+  ready --> initialize
+  initialize --> paused([board: paused])
+  paused --> start
+  start -->|Turn goes to the first participant| running([board: running])
+  running --> spoken
+  spoken -->|Number is below the target: turn passes| running
+  spoken -->|Number is the target| finished([board: finished])
+  join -->|Once each, eight at most| joined([participant: joined])
+  joined -.->|Roster| start
+  joined -.->|Roster| spoken
+```
+
+Any other attempt is refused: an act signed by someone else, an act on a
+board in another state, or any act on a finished board.
+
 We write the definition in four steps. After each step we run it in a
 scope held in memory, sign acts as test members, and print what the scope
 recorded. No service, deployment or browser is involved.
