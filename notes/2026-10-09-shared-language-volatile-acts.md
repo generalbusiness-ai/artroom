@@ -1361,7 +1361,11 @@ Draft 4 was read against main `70729eac`, merged into this branch. Draft 5
 answers report `f4066bc5` on Draft 4: the dependency inventory of a pass
 is the replay's, exhaustive by input variant (15.3), and the Mark row's
 rebuild reads only named, immutable dependencies under a missing-data
-contract (15.5), with the witnesses of A2 and A3 extended.
+contract (15.5), with the witnesses of A2 and A3 extended. Draft 6
+answers report `36a2aba0` on Draft 5: the inventory's outcome row gains
+the snapshots an outcome names and the delivery row the values an
+observing delivery names, with their cutoff witnesses, and the ancestry
+trust limit is kept as it is.
 
 ### 15.1 The decision
 
@@ -1498,10 +1502,11 @@ by input variant so that the archiver and the verifier share one list:
 | Any | The declaration the genesis seed names (`seed.definition`), read once per history by `#pin`; and every declaration a declaration or a field names in the definition domain, followed to closure | `definition` |
 | Any that records `uses` | Each foreign entry a use cites, by its content digest | `entry` |
 | Any that records `prepared` | The input of each rule evaluated | `rule` |
-| `act` | The snapshot of staged refs, when the act records one; the value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains | `snapshot`, `value`, `definition` |
+| `act` | The value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains (`#hand`, line 1048) | `value`, `definition` |
 | `timed` | As `prepared` above | `rule` |
-| `outcome` | The values the outcome's evidence names under its owner declaration, by domain and digest; and the values its recorded observations name | `value` |
-| `delivery`, `checkpoint` | None beyond `uses` and `prepared` | |
+| `outcome` | The snapshots of staged refs its evidence names under its owner's `retains`, and the snapshot its ancestry record names (`#snapshots`, lines 1094 to 1127, called at 1372): each is retained before the entry that names it, and a later act's `ancestry` guard reads it; the values its evidence names under its owner declaration, by domain and digest (line 1388); and the values its recorded observations name (`#hand`) | `snapshot`, `value` |
+| `delivery` | The values the observations of a result's clause name, under the definition's retained domains (`#hand`, called at line 1322 for an observing definition) | `value` |
+| `checkpoint` | None beyond `uses` and `prepared` | |
 | Any | A detached text | `text`: never archived (15.1, point 4) |
 
 The closure is transitive: a declaration that names another declaration
@@ -1513,8 +1518,20 @@ to an entry past the cutoff and is not in the set. The kinds and domains
 left out (`text`, and any domain J2 excludes) are listed in the pass's
 manifest as omissions by kind, domain and digest, so a reader of the
 archive can tell "left out by rule" from "missing". A1 keeps this table
-and the verifier's reads in step: a `#retained` call the table does not
-cover fails the slice.
+and the verifier's reads in step by consumer: for each input variant,
+each kind and domain the verifier reads is a row here, and a read the
+table does not cover, for that variant, fails the slice. Listing a call
+somewhere is not coverage.
+
+**What the archive does not change.** A replay from the service already
+reads an ancestry snapshot's bytes and never walks the commits it names,
+so it ends `incomplete` for that entry and says so (`#snapshots`, "the
+walk is not derived again"). A replay from the clone has the same bytes
+and the same limit: the snapshot is in the archive, the walk is not
+derived, and the report is `incomplete` for the same reason. The archive
+turns that neither into `missing-input`, which is for a named dependency
+the store cannot read, nor into a claim of consistency the service's own
+report would not make.
 
 The archive is in the room's own repository at its destination's host.
 Whoever can fetch that repository's refs can read the archive. Reads of
@@ -1778,7 +1795,7 @@ judgment, a receipt or a publication.
 |---|---|---|
 | A0. Declaration | The `level` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
 | A1. Layout | A pure function from a manifest (15.3) to the objects and commit of 15.4, for both object formats; the path encoding and its decoder. | The same manifest on the same parent gives the same commit ID, built twice. Segment and fan-out boundaries at their limits. A text is never written; an omitted input is listed. Every domain name the platform defines and an adversarial name (`../x`, a slash, a NUL, 300 bytes) round-trip through the encoding or are refused. The ref name is the native `sc_` spelling. Real local Git reads the tree back byte for byte. |
-| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. Two histories replay in replay mode from the clone alone, with no service and no anchor: a scope whose only entry is a declared genesis (its declaration is in the archive), and a scope whose pass first introduces a value named by outcome evidence (that value is in the archive). A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, after the clone's own integrity and continuity are checked, or reported `mismatch` or `behind`. |
+| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. Four histories replay in replay mode from the clone alone, with no service and no anchor, each a pass whose cutoff ends at the entry that first needs the dependency: a scope whose only entry is a declared genesis (its declaration is in the archive); a pass ending at an outcome that first introduces a value named by its evidence (that value is in the archive); a pass ending at an outcome that first names a snapshot of staged refs, with no later act (that snapshot is in the archive, and the report is `incomplete` for the unwalked ancestry exactly as the service's report is, not `missing-input`); and a pass ending at an observing delivery that first requires a retained value (that value is in the archive). A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, after the clone's own integrity and continuity are checked, or reported `mismatch` or `behind`. |
 | A3. Archiver | Target resolution, the manifest and the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. A reset after Mark and before any object reached the host, then a turn that retains a new input, then a restart: the archiver rebuilds the original commit, byte for byte, reading only the dependencies the row names (the store is instrumented to refuse any read the manifest does not name), and sends it; the next pass archives the new entry on top. A named dependency made unreadable stops as `missing-input` with no substitution. A rebuild that differs stops as `rebuild-mismatch`. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
 | A4. Read and client | `Summary.archive` and `followArchived`. | Each row of 15.6: `n` equal to `through` and `n` below it are `archived` when the service's entry `n` carries the receipt's hash; a receipt of another incarnation is `not-this-history`; a differing hash is `mismatch`, not waited on; no archive is `not-archived`; a stopped or conflicting archive reports its state; a receipt past `through` waits. `through` is shown to be the last read-back, not a fresh remote read. |
 | A5. Live run | One deployed room on the hosting service: archive, clone, replay offline. | A recorded run, bound to its source and deployment, with measured lag and push duration. |
