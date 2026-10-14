@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a097f058d56ab1ea7cef1b56432aedea57d57961","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a0ca8878cf78ce2cf56978b3fcd84a4dc7637efc","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-02-canonical-mint-ownership.md."}
