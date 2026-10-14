@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Hugh reported manual terminal pickup done. Stopped OBS recording; UI confirms saved /Users/hughpyle/Movies/2026-10-14 00-46-50.mov and Start Recording. Prior full take preserved. Manual run included stale dap alias troubleshooting; corrected ~/.zshrc to current dap.js and instructed unalias for active terminal. Clip metadata checked with ffprobe.","body":{"no_git_artifact":"true"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b854160025e989d8f71fcdf178ae2eb24fc6fe1d"}
