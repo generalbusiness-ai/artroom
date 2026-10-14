@@ -28,9 +28,9 @@
  */
 
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
-import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, isScopeRef, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, ShapeError, TransportError, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
+  ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
@@ -873,10 +873,7 @@ export function join(ctx: Context, text: string): Promise<Outcome> {
   if (text.startsWith(AGENT_KEY_LINK)) return enrolAgentKey(ctx, text);
   return run(async () => {
     const link = linkOf(text) ?? stop(usage("That is not an invitation link from dap invite."));
-    if (typeof link.service !== "string" || typeof link.handle !== "string" || link.invitation < 1
-      || !isScopeRef(link.repository?.directory) || link.repository.directory.kind !== "directory"
-      || !isScopeRef(link.repository?.membership) || link.repository.membership.kind !== "membership"
-      || !isScopeId(link.repository?.rules) || !isScopeId(link.repository?.destination)) return usage("That invitation link has invalid repository references.");
+    if (!wellFormedInvitation(link)) return usage("That invitation link has invalid repository references.");
     const before = await ctx.store.config();
     if (before?.join?.kind === "enrol") return failed("An original agent enrollment is retained; a person invitation cannot replace it.");
     if (before?.repository) return usage(`This config directory has a repository already: directory ${before.repository.directory.scope}.`);
