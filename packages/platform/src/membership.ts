@@ -54,6 +54,8 @@ import { textDigest } from "@generalbusiness/artroom-bytes";
 import { firstHolders } from "@generalbusiness/dap-derive";
 import type { Item, PlatformRule, RuleGiven, Rules, StateView } from "@generalbusiness/dap-derive";
 import { pinnedBy } from "./versions.ts";
+import { ROLE_LISTS, isActions, type Role } from "./membership-actions.ts";
+export { ACTIONS_MOST, ROLE_LISTS, isActions, type Role } from "./membership-actions.ts";
 
 /**
  * The versions of membership that this package serves. The data of both is
@@ -78,20 +80,6 @@ const HANDLE = { type: "text", max: 256 } as const;
  * `action-list`, below.
  */
 const ACTIONS = { code: "action-list", row: "P27", type: "code" } as const;
-/** The most names of one list of actions, and the most bytes of one name (section 3.2). */
-export const ACTIONS_MOST = 64;
-const ACTION_BYTES = 64;
-
-/**
- * A list of actions (section 3.2; section 12.1.8, row aa): at most 64
- * names, with no name twice, each of 1 to 64 bytes, and each byte a
- * lower-case ASCII letter, a digit, a hyphen or a full stop. It is the rule
- * that an extent's `approver` has (section 12.1.4). Every byte of such a
- * name is one character, so the length of the text is its bytes.
- */
-export const isActions = (value: unknown): value is readonly string[] =>
-  Array.isArray(value) && value.length <= ACTIONS_MOST && new Set(value).size === value.length
-  && value.every((name) => typeof name === "string" && name.length >= 1 && name.length <= ACTION_BYTES && /^[a-z0-9.-]+$/.test(name));
 const ROLE = { type: "enum", of: ["admin", "maintainer", "member", "agent", "checker"] } as const;
 const INVITATION = { inviteHash: { fixed: true, required: false, of: { type: "digest" } }, inviteEnds: { fixed: true, required: false, of: { type: "time" } } } as const;
 const ROSTER = { roster: { item: "roster", one: true } } as const;
@@ -99,10 +87,6 @@ const ROSTER = { roster: { item: "roster", one: true } } as const;
 const HANDLE_HELD = ["invited", "active", "removed"] as const;
 /** The states in which a key item holds the ID of a key that is, or was, a member's key. An invited key and a lapsed one hold none. */
 const KEY_ENROLLED = ["active", "retired", "compromised"] as const;
-
-/** The five roles, and the value slot of the roster that holds the actions of each (section 12.1.3, the item `roster`). */
-export const ROLE_LISTS = { admin: "adminActions", maintainer: "maintainerActions", member: "memberActions", agent: "agentActions", checker: "checkerActions" } as const;
-export type Role = keyof typeof ROLE_LISTS;
 
 /**
  * The role table of the authority note's section 3.2, "a proposed first

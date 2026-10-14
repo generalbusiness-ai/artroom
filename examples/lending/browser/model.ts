@@ -4,7 +4,7 @@
  */
 import type { Entry, FieldValue, Item, KeyId, MemberRef, Summary } from "@generalbusiness/dap-contract";
 import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
-import { ROLE_LISTS, isActions, type Role } from "@generalbusiness/dap-platform";
+import { ROLE_LISTS, isActions, type Role } from "@generalbusiness/dap-platform/membership-actions";
 import { shelfPage, shelfPath, thingsOf, type RecordPointer, type Thing } from "../shelf.ts";
 
 export type LendingAct = "donate" | "borrow" | "return" | "cancel" | "publish";
