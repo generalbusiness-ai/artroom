@@ -125,7 +125,15 @@ four native reads. The index is
 These checks cover stored native hash chains, recorded destination effects,
 the ordinary written receipt, child result, and exact public bytes. They do
 not prove judgment Replay or independently fetched new history-publication
-Git objects. Anonymous browser visual checking remains separate.
+Git objects. A separate anonymous desktop browser run `19326` passed: history, shelf,
+and the Small pot link taken from the actual shelf DOM each returned 200
+at that same history commit. It had zero blocked requests and page errors,
+and no document overflow at a 1280-pixel viewport. The operator visually
+inspected all three screenshots and confirmed the exact Small pot text.
+Its proof SHA256 is
+`1605a3e8bec92afe4616e81247a58e51936d41aac77551d4504a435ef7b075c3`.
+This machine-operated anonymous browser witness is separate from the byte
+collector; it does not prove human or physical-device acceptance.
 
 The original ordinary merge guard refusal remains retained. The operator
 corrected the rules scope's global floor to sequence 7 and made a new ask
