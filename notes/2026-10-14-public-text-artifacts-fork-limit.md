@@ -33,8 +33,12 @@ The Library correction distinguishes final run `9377` recoveries from the
 earlier rehearsal, records the completed history policy correction and
 publication, and keeps the original f33 gate separate from the later
 receiving MCP correspondence. The prior external patch remains preserved.
-Homepage hosting is not inferred. Actual completion wording can be updated
-only from its own later evidence.
+Homepage publication is now supported by original `89750`: all five
+provider phases passed, its final guard passed, and all 13 anonymous static
+readbacks matched. The four final Library hrefs were checked without
+following another service. This reused build `55847` and did not repeat
+a build or gate. The original f33 gate remains distinct from the receiving
+MCP composition. No geometry or human acceptance is claimed.
 
 Before review, run the doc-link check, the owning checks for changed test
 comments, and one gate on the final composed candidate. These remain unrun.
