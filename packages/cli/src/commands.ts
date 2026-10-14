@@ -1461,12 +1461,12 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     const change = await activeDefinition(ctx, config, reader, "change");
     if (change.declared.acts["propose-file"]?.on !== "source" && !supportsEdit(change.declared, path, content, bytes)) return failed(`Unsupported edit: the active change definition ${change.digest} does not support this command's ask-rules, one-file manifest and merge inputs and effects. No change was opened.`);
     const destination = await destinationOf(ctx, config);
-    if (destination.summary.definition === "platform:destination@3" && change.declared.acts["propose-file"]?.on === "source") {
+    if (["platform:destination@3", "platform:destination@4"].includes(destination.summary.definition) && change.declared.acts["propose-file"]?.on === "source") {
       const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
       if (typeof base !== "string") return failed("Cannot edit: no-published-head.");
       return proposingFiles(ctx, config, base, [{ path, bytes }], options.title ?? `Edit ${path}`, { edit: true, ...(closes ? { closes } : {}) });
     }
-    if (! ["platform:destination@2", "platform:destination@3"].includes(destination.summary.definition)) return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
+    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4"].includes(destination.summary.definition)) return failed(`Unsupported edit: destination ${repository.destination} runs ${destination.summary.definition}; this command requires platform:destination@2 for a one-file manifest. No change was opened.`);
 
     // The change lane, opened by the directory.
     const D = await handleOf(ctx, config, repository.directory.scope, reader);
@@ -1487,7 +1487,7 @@ export function edit(ctx: Context, path: string, options: { file?: string; title
     // The one version: the file on the published head. Lane/rules awaits
     // may advance it; the earlier protocol check is not a frozen head.
     const currentDestination = await destinationOf(ctx, config);
-    if (! ["platform:destination@2", "platform:destination@3"].includes(currentDestination.summary.definition)) return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
+    if (! ["platform:destination@2", "platform:destination@3", "platform:destination@4"].includes(currentDestination.summary.definition)) return failed(`The destination ${repository.destination} no longer serves the supported one-file protocol. The change ${lane} stays open; no file was proposed.`);
     const head = currentDestination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof head !== "string") return failed(`The destination ${repository.destination} has no published head yet.`);
     const file = { base: head, path, digest: digestBytes(bytes), size: bytes.length, content };
@@ -1522,7 +1522,7 @@ export function propose(ctx: Context, branch: string, options: { title?: string 
     if (!ctx.git?.files) return failed("Cannot propose: git-unavailable.");
     const config = await configOf(ctx);
     const destination = await destinationOf(ctx, config);
-    if (destination.summary.definition !== "platform:destination@3") return failed("Cannot propose: version-mismatch. This room has no manifest-list destination.");
+    if (!["platform:destination@3", "platform:destination@4"].includes(destination.summary.definition)) return failed("Cannot propose: version-mismatch. This room has no manifest-list destination.");
     const base = destination.summary.items.find((item) => item.type === "branch")?.values["head"];
     if (typeof base !== "string") return failed("Cannot propose: no-published-head.");
     const captured = await ctx.git.files(base, branch);
