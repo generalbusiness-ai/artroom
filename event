@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:43f48ff9f0f68c8a15d5f6295298fbd3fb86fbc4","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:43f52c5fecf283846faf6ee788a8149b91c0aa6d","text":"Merge retired a covered predecessor; the successor is at plans/027-artroom-usability/research_notes/Artroom usability and design/ui.md."}
