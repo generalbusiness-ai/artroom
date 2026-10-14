@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e56376789b2b680b5f59cfd1333a7b9e1c368ea4","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e688ee24302439d9659a60117b215fd94891edb9","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-12-dap-docs-delivery.md."}
