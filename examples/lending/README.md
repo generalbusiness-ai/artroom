@@ -32,7 +32,7 @@ waits for its separate design approval.
 | `browser/join.ts` | Joining with an invitation link under a device key that WebCrypto holds, with the same custody; and finding the room's lending scope in its directory. |
 | `browser/storage.ts` | This origin's private storage: the device key, the seat, and the kept requests, in IndexedDB under a Web Lock. |
 | `browser/main.ts`, `index.html`, `style.css` | The screens: join, the shelf, donate, borrow, return, cancel, the kept request, each page's text, and the record. |
-| `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `packages/scope/src/lending-assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
+| `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `examples/lending/worker/assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
 | `runbook.md` | Deployed provisioning and six-output observation ledger; unrun, with actual destinations still unset. |
 | `demo-script.md` | The script for the recording. |
 | `definition.test.ts` | Plain-function tests: the bytes and the pin, the story of Nasruddin and the pot, and the bounds. Grants are scripted. |

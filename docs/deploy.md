@@ -1,7 +1,7 @@
 # Deploy the scope Worker
 
 `npm run deploy:scope` deploys the scope Worker from
-`packages/scope/wrangler.jsonc` with Wrangler 4.147.0. Follow
+`apps/room/wrangler.jsonc` with Wrangler 4.147.0. Follow
 [Run dap in 10 minutes](self-host.md) to deploy it on your own account,
 create a room, and invite another device. This page describes the service
 settings and the GitHub setup order.
@@ -145,7 +145,7 @@ No additional setting or token is required. See [pages.md](pages.md).
 ## The page
 
 The scope Worker serves the room's page at `/page/` from
-`packages/scope/src/page-assets.ts`, which is committed and which the
+`apps/room/page/assets.ts`, which is committed and which the
 page package's build writes ([The page](../apps/room/docs/page.md)). Deploying the Worker
 deploys the page; it needs no binding, setting or secret of its own.
 

@@ -481,7 +481,7 @@ read sessions under a TEST SECRET, and the site route for addresses under
 own Git service) and the scheduler are labelled stand-ins there. Its reads
 and acts are the page's own data functions. The `page` project is its Node
 tests: the states of a change, and that the scope Worker's page module
-(`packages/scope/src/page-assets.ts`) is the page's build of its source.
+(`apps/room/page/assets.ts`) is the page's build of its source.
 `record.scope.test.ts` is no test of a property: it runs only with
 `PAGE_RECORD=1`, and `apps/room/page/test/screens.mjs` uses what it prints
 to take the page's screenshots in Chromium. That script needs

@@ -26,7 +26,7 @@ npm run build --workspace @generalbusiness/dap-room-page
 
 This bundles the page with esbuild and writes three files:
 `apps/room/page/dist/index.html` and `page.js`, and
-`packages/scope/src/page-assets.ts`, the module from which the scope
+`apps/room/page/assets.ts`, the module from which the scope
 Worker serves the two files. That module is committed. The page's test
 `assets.test.ts` fails while it differs from a fresh build of the page's
 source, so run the build after any change under `apps/room/page/src`, and
@@ -227,6 +227,6 @@ against the Worker's routes on a room that the command line creates, with
 the real read sessions, the edit command and the site route; the Git host
 and the scheduler are labelled stand-ins. `assets.test.ts` checks the
 Worker's page module, `states.test.ts` the states of a change, and
-`packages/scope/test/page-route.test.ts` the `/page/` route.
+`apps/room/page/test/route.scope.test.ts` the `/page/` route.
 `apps/room/page/test/screens.mjs` takes the screenshots in
 `apps/room/page/test/screenshots`.
