@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at spikes/parked/ui/wrangler.jsonc","body":{"commit":"0f1f485d1899f08c9ce949181a071c313ea404c6","path":"spikes/parked/ui/wrangler.jsonc"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:00080b06344640773ee06859cbb06651aa392e17","text":"Merge retired a covered predecessor with no successor at its old path."}
