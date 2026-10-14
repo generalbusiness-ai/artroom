@@ -30,3 +30,26 @@ export function scriptedOrigin(name: "change" | "issue" = "change", route = name
   const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: name }, { fact: factRefOf(creator), entry: creator, under }];
   return { definition, directory, destination, at, creator, genesis, merge, origin, from: factRefOf(merge) };
 }
+
+/** SCRIPTED factory proof only: signed coherent facts, no native factory judge. */
+export function scriptedApplicationOrigin(pin: "platform:directory@8" | "platform:directory@5" = "platform:directory@8", destinationField = true) {
+  const native = scriptedOrigin("change", "establish-application");
+  const directorySeed: Seed = { v: 1, kind: "directory", definition: pin, creator: null, cause: d("d"), ordinal: 0 };
+  const directory = { ...native.directory, scope: scopeIdOf(directorySeed) };
+  const signed = signIntent({
+    v: 1, to: directory, actor: keys.rita.key, kind: "establish-application", on: null, expected: {}, fields: { definition: native.definition },
+    idempotencyKey: "scripted-application", notAfter: t(60) }, keys.rita.secret);
+  const seed: Seed = { v: 1, kind: "lane", definition: native.definition, creator: directory, cause: intentDigest(signed.intent), ordinal: 0 };
+  const at = { ...native.at, scope: scopeIdOf(seed) };
+  const message = { class: "request", type: "create", body: { directory, membership: { ...directory, kind: "membership" }, creationContext: { v: 1 },
+    fields: destinationField ? { destination: native.destination } : {} } } as const;
+  const creator: Entry = { ...native.creator, at: directory, input: { type: "act", signed, authority: [], presented: {} }, sends: [{ n: 0, to: seed, message }] };
+  const genesis: Entry = { ...native.genesis, at, input: { type: "genesis", seed, inc: at.inc, kind: "open", founding: null,
+    source: factRefOf(creator), n: 0, message, decision: "applied" } };
+  const office: Entry = { ...native.genesis, at: directory, input: { type: "genesis", seed: directorySeed, inc: directory.inc, kind: "found",
+    founding: null, source: null, n: null, message: null, decision: "applied" } };
+  const merge: Entry = { ...native.merge, at };
+  const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "declared:change" },
+    { fact: factRefOf(creator), entry: creator, under: "platform:directory" }, { fact: factRefOf(office), entry: office, under: "platform:directory" }];
+  return { ...native, directory, at, creator, genesis, merge, origin, from: factRefOf(merge) };
+}

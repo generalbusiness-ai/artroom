@@ -31,7 +31,7 @@ import { own } from "./values.ts";
 
 export type Owner = CapabilityName | PlatformDefinition;
 /** Native runtime admission metadata; it changes no recorded data or effects. */
-export interface PublicationOrigin { from: FactRef; directory: ScopeRef; destination: ScopeRef }
+export interface PublicationOrigin { from: FactRef; directory: ScopeRef; destination: ScopeRef; mode?: "application" }
 export type OutcomeInput = Extract<Input, { type: "outcome" }>;
 type Result = OutcomeInput["result"];
 
@@ -105,6 +105,8 @@ export interface OperationRules {
    * outcome entry. It derives nothing and settles nothing. Absent: it may.
    */
   ready?(view: StateView, operation: Operation, attempt: number): boolean;
+  /** A known local refusal before the durable sent mark; null permits the original send. Sent attempts never call this. */
+  beforeSend?(view: StateView, operation: Operation, attempt: number, own: Own): Evidence | null;
   /** Null permits non-publication/cleanup work; false rejects malformed provenance. */
   publicationOrigin?(view: StateView, operation: Operation, own: Own): PublicationOrigin | false | null;
   /**
