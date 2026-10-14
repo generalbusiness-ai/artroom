@@ -3,20 +3,28 @@
 A script for recording the lending library. The story is Nasruddin and the
 pot. It takes two people, or one person with two browser profiles.
 
-**Run status: unrun on a deployed room or in a browser.** The story and
-refusals are witnessed by the existing native scenario, not by screenshots
-or public pages. The screens exist in Source. Their actual controls and
-storage still need the browser run in [the runbook](runbook.md).
+**Run status: final automated browser run `9377` passed the exact script.**
+The seven lending acts and their destination publications completed. The
+Small pot description is exactly "Baby born when the big pot was with me";
+the cancellation reason is exactly "Nasruddin says the pot died". Both
+original-answer checks completed without second acts. This is a machine-run
+browser witness, not human or separate physical-device acceptance.
 
-The table's published-page outcomes require approval and implementation of
-the fold publication design. That stage is unapproved, unbuilt, and unrun
-in this preparation. Before that stage, show a
-lending act's acceptance separately and label its page unpublished. Do not
-make browser page edits to simulate automatic publication.
+The earlier publication run is retained as a rehearsal because its Small pot
+description differed. Its browser and Git extraction results remain real,
+separate evidence. Local Git history extraction passed. The curated public history is now published and anonymously verified.
+Homepage hosting and the final validation gate remain pending.
+
+The [runbook](runbook.md) records the cohort, exact declaration, and original
+failures. Its earlier nonpublishing rehearsal remains separate. Show each
+act taking effect separately from the destination receipt and immutable page.
+Do not edit a repository file or recorded description to impersonate the
+approved story. Nasruddin's quoted line and Small pot description below
+remain exact.
 
 ## The point
 
-The record holds what each person did, in order, and the rules decide
+The journal holds what each person did, in order, and the application rules decide
 what can be done. A person's account of why is kept as their own signed
 words, in a description or a reason. The library judges none of it: the
 birth and the death are recorded the same way.
@@ -25,10 +33,12 @@ birth and the death are recorded the same way.
 
 - A room is provisioned as [the runbook](runbook.md) says, with the library
   established and empty.
-- The neighbour has joined as the room's founder. The neighbour is staff.
-- Nasruddin has joined with a verified membership 4 invitation, as a member.
-  The baseline retained issuer does not support that cohort; complete the
-  runbook's reviewed issuance dependency first.
+- The final founder is `@library-operator`. The neighbour joined as admin
+  and played the staff acts in the final room.
+- Nasruddin joined as a member. The final join that took effect and Small pot
+  donation each had a lost answer reconciled by **Check**, without a second
+  act. Their keys remain distinct and nonextractable in separate browser
+  profiles; neither profile is a separate physical-device claim.
 - Each has the member interface open. A third window shows the published
   shelf.
 - At least five minutes have passed since the roles were granted.
@@ -44,7 +54,7 @@ birth and the death are recorded the same way.
 | 5 | Nasruddin | Donates "Small pot", description "Baby born when the big pot was with me". | The small pot, available, donated by @nasruddin, with his description. | "So he donates it. The description is his. The library keeps his words and judges none of them." |
 | 6 | Nasruddin | Borrows the big pot again. | Lent to @nasruddin. | "He borrows the big pot again." |
 | 7 | Nasruddin | Says the pot died. Does nothing in the interface. | No change. | "This time he comes back empty-handed. The pot, he says, has died." |
-| 8a | Nasruddin | Presents the retained signed cancellation refusal, reason "The pot died", beside the interface. Do not claim the member interface offers a staff-only cancel button. | The actual native refusal and unchanged lent pot. Record the observed wording. | "He cannot strike it from the library himself. Only staff can." |
+| 8a | Nasruddin | Cancels the big pot, reason "The pot died". The member interface offers **Cancel this thing** to members too. | "Only staff can cancel a thing. (unauthorized)" The pot is still lent. | "He cannot strike it from the library himself. Only staff can." |
 | 8b | Neighbour | Cancels the big pot, reason "Nasruddin says the pot died". | The pot is gone. The reason is on its page and in the record, under the neighbour's name. | "The neighbour records it, in the neighbour's own words." |
 | 9 | Neighbour | Donates "New big pot", description "Copper, eight litres." | Two things on the shelf: the small pot and the new big pot. The old pot's page stays, marked gone. | "And the shelf is replenished." |
 
@@ -69,11 +79,11 @@ decide. (revision-moved)". Either way the pot has one borrower.
 
 | Shot | Show | Say |
 |---|---|---|
-| 10 | The published shelf: three pages. The old big pot reads "gone: Nasruddin says the pot died". Each page names the lending entry it reflects. | "The shelf is a published copy. Each page names the entry it came from." |
+| 10 | The published shelf: three pages. The old big pot reads "gone: Nasruddin says the pot died". Each page names the lending scope it came from, and the commit history shows each page's changes. | "The shelf is a published copy of the library's record. Each change to a page is a commit, and the library's record says which act made it." |
 | 11 | The record, in the interface or with `dap log`: seven acts in order, each with its signer. The refused cancel is not among them. | "The record is the authority. Seven acts took effect. The one that was refused changed nothing." |
 | 12 | `dap verify` on the lending scope. | "And anyone with the record can check it again." |
 
-## What is in the record at the end
+## What is in the journal at the end
 
 The lending scope's journal, after its genesis and the confirmation of
 its creation:
@@ -88,17 +98,27 @@ its creation:
 
 ## Record the actual run
 
-Keep actual control labels, accepted facts, refusal reasons, item numbers,
-and publication receipts with each shot. If a current list offers no invalid
-borrow action, show the retained native refusal beside it. Do not fabricate
+Keep actual control labels, facts of acts that took effect, refusal reasons, item numbers,
+and publication receipts with each shot. If a current list offers no borrow for a lent thing, show the retained native refusal beside it. Do not fabricate
 an interactive control or substitute a local refusal for a scope judgment.
 
-Record interrupted donation and invitation recovery as separate acceptance
-witnesses. The participant reuses the original kept request after a reload.
-Do not let that witness add an extra donation to the seven-act story.
+If an actual donation or join has an unknown answer, record recovery beside
+its original request. Reuse that kept request after a reload. Do not add an
+extra donation or join to replace it. The retained rehearsal contains both
+Check recoveries; do not present them as observations of the fresh final room.
 
-For the public closing shot, use an unseated browser. It must read all three
-shelf pages and commit history. Show the cancelled page's reason and compare
-its record pointer with the member's lending journal. The journal remains
-for members; its private session is never part of a public link. Actual
-publication and this public-history witness are still unrun.
+For the public closing shot, use an unseated browser. Read all three shelf
+pages and commit history. Show the cancelled page's reason and the lending
+scope and incarnation named by its text. Match its commit to the member's
+`cancel` journal entry through the destination receipt, which names the sending entry
+and ordinal. The journal stays member-only; no private session belongs in a
+public link.
+
+All three final anonymous pages are observed at
+`bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction
+verified actual Git commits, linear parents, page blobs, and receipt bytes.
+The later history publication is commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Its index, 14 raw companions,
+shelf folder, and three current pages passed anonymous readback. Homepage
+hosting and the final validation gate remain pending.
+No whole judgment Replay or human/physical-device acceptance is inferred.

@@ -2,9 +2,11 @@
 
 To write a dap application, declare its definitions as data, validate
 them, pin their bytes, and create scopes under them. This page shows each
-step. [Build a counter](build-a-counter.md) walks through a small
-definition first, and [The architecture of a dap application](architecture.md)
-explains what the runtime does with one.
+step. Two tutorials walk through a definition first:
+[Build a counter](build-a-counter.md) and
+[Build a lending library](build-a-lending-library.md).
+[The architecture of a dap application](architecture.md) explains what
+the runtime does with one.
 
 A definition names the items a scope holds, the acts people and agents
 sign, the conditions each act must meet and the changes it records. The
@@ -15,6 +17,9 @@ Start from a template and remove what your application does not need:
 
 - For a small application with turns and a target, start from the
   [Counter definition](../apps/counter/definition.ts).
+- For things that members hold, lend and remove, with a member role and a
+  staff role, start from the
+  [lending definition](../examples/lending/definition.ts).
 - For work shaped around issues and changes, start from the room's demo
   profile in [demo.ts](../apps/room/lanes/src/demo.ts). It selects acts
   and handlers from the full lane definitions and keeps their item types
@@ -70,6 +75,8 @@ Write each invariant as a plain sentence before choosing its form.
 | A person accepts the terms that were offered. | The fixed `commitment.termsAt` reference and the `accept` guard that compares it with the supplied `terms`. |
 | Only the named offeree accepts an offer that names one. | The `accept` guard, in the definition. |
 | A fulfilled commitment has ended. | `fulfilled` is a final state of the commitment item. Holds under a commitment end in the entry that makes it final. |
+| A thing that is lent cannot be borrowed again until it is returned. | The lending `borrow` guard `{ state: ["available"] }`. |
+| Only staff remove a thing from the library. | The lending `cancel` act names `lending.staff` in its `grant` field. In the rehearsal room, membership gives that action to the `admin` role only. |
 | A person may promise work only when allowed to. | The act names `issue.promise` in its `grant` field, and membership says who is allowed to take it. Being allowed does not replace the act's guards. |
 | Each recorded attempt at an outside effect is sent at most once, including across restarts. | The platform's operation ledger and driver. The application inherits this rule. |
 | Publishing a change to the rules extent needs the controller's approval. | The room's published rules configuration, which its controller may change. The destination judges the change against that configuration. |
@@ -96,12 +103,12 @@ the validated definition or the problems that refuse it.
 
 Use the installation's bounds. The supplied examples use
 `PROPOSED_BOUNDS`. These numbers are provisional. If the definition
-declares named rules, pass `RULE_PROFILES` from
+declares rule expressions, pass `RULE_PROFILES` from
 `@generalbusiness/dap-derive/rule` as the third argument, as the
 [Counter's tests](../apps/counter/definition.test.ts) do. The
 [lane definition tests](../apps/room/lanes/test/definitions.test.ts) show
 the validator calls for the room's lane definitions and their demo
-profiles, which declare no named rules.
+profiles, which declare no rule expressions.
 
 The validator imports below use the published SDK names. The lane demo
 definitions remain checkout-only source because the public SDK has no lanes
@@ -128,7 +135,7 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-This exact checkout command ran with Node.js 26.11.1 at Source
+This exact checkout command ran with Node.js 26.11.1 at commit
 `fdafc051ae2ddc384c5dea940fe469e677993dec` and exited 0. It uses the
 materialized repository workspace packages, separately from the Counter
 tutorial's public npm install. Its observed output was:
@@ -239,6 +246,14 @@ detached texts. Membership must then allow the intended members to take the
 definition's own actions, such as `counting.control`. Enrollment alone
 allows none. [The dap command](cli.md#an-explicitly-selected-application-room)
 lists the install and claim commands and the custody each one needs.
+
+The lending library's [runbook](../examples/lending/runbook.md) has the
+commands for this path: `activate`, `establish-application` and
+`set-actions` for each role. Its rehearsal section records them run on a
+deployed service on 14 October 2026, under the library's first
+definition. `--value` sends a file
+exactly as it is, and the digest covers the canonical bytes with no
+trailing newline. The runbook writes a copy without the newline first.
 
 Validation, pins and creation check the declaration and its record. They
 do not establish that a host, an outside adapter or a whole application

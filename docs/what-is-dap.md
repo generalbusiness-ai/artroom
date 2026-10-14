@@ -6,7 +6,7 @@ dap is a framework for building collaborative applications for people and
 agents. A scope is an actor that holds an ordered record and judges signed
 acts against its definition, and an application is a set of definitions.
 This page explains what the framework does, the actor model it is built
-on, and the three applications built with it.
+on, and the four applications built with it.
 
 ## A framework for shared work with a record
 
@@ -75,7 +75,7 @@ full.
 
 dap gives no verb a universal meaning. "Review", "merge", "join" and
 "speak" are words that an application declares. An application is a set
-of definitions, and the scopes that run them. Three applications are built
+of definitions, and the scopes that run them. Four applications are built
 on dap.
 
 **dap-room** brings a repository's work together. A room has a membership
@@ -95,6 +95,16 @@ the full roster, the arithmetic and whose turn it is. The source is in
 [Build a counter](build-a-counter.md) builds a smaller version of its
 definition.
 
+**dap-library** is a lending library for kitchenware and tools. Each
+thing is an item that is available, lent or gone. Members donate,
+borrow and return things. Only staff remove a thing, with a reason in
+their own words, and a thing that is gone stays in the record. The source
+is in [examples/lending](../examples/lending). The tutorial
+[Build a lending library](build-a-lending-library.md) writes its first
+definition. Its current definition also publishes each thing's page to
+the room's repository. The member interface is deployed in a rehearsal
+room; publication is built and not yet run on a deployed room.
+
 **dap-jam** lets musicians improvise together in a room. Its record holds
 themes, interpretations, instrument claims and patterns, and a live layer
 plays the patterns. It lives in its own
@@ -103,10 +113,11 @@ its design in the [jam room note](../notes/2026-10-01-jam-room.md). The
 jam's page is deployed. Recording its musical acts in native dap scopes
 is later work.
 
-The three show why application vocabulary belongs to the application. A
+The four show why application vocabulary belongs to the application. A
 sketch that sounds good in the jam is a musical outcome, not a code
 review. A spoken number in the Counter is a fact about a turn, not a
-publication.
+publication. A returned pot in the library is a change of state, not a
+promise kept.
 
 ## How you take part today
 
@@ -131,11 +142,13 @@ in the room's browser page.
 
 ## Source and acceptance
 
-Written against main `d309b6b9`. Sources:
+Written against main `d309b6b9`; the dap-library paragraph against main
+`70729eac`. Sources:
 [the entry and its inputs](../packages/contract/src/entry.ts),
 [the four answers](../packages/contract/src/result.ts),
 [the judges](../packages/derive/src/index.ts),
-[the Counter definition](../apps/counter/definition.ts), and
+[the Counter definition](../apps/counter/definition.ts),
+[the lending definition](../examples/lending/definition.ts), and
 [the jam room design](../notes/2026-10-01-jam-room.md). This page claims
 no run. Independent review and acceptance of this version are owed. The
 [ledger](../apps/room/docs/ledger.md) keeps the review history of the

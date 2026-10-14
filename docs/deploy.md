@@ -13,7 +13,7 @@ package has shipped, each by the version that its genesis pinned
 ## Settings and secrets
 
 A setting is a plain value. A secret is stored by the host and is never
-in this repository, in a command argument, in a log, in a scope's history
+in this repository, in a command argument, in a log, in a scope's journal
 or in the command line's config.
 
 | Name | Kind | What it is |
@@ -149,13 +149,43 @@ The scope Worker serves the room's page at `/page/` from
 page package's build writes ([The page](../apps/room/docs/page.md)). Deploying the Worker
 deploys the page; it needs no binding, setting or secret of its own.
 
+The same Worker serves the lending library's member interface at
+`/lending/`, from `examples/lending/worker/assets.ts`, which
+`examples/lending/scripts/assets.mjs` writes. Like the page, it needs no
+binding, setting or secret of its own. Serving it does not create a
+library: a room creates one with its application factory, as the
+library's [runbook](../examples/lending/runbook.md) describes.
+
+## The lending library's deployment
+
+The project's library runs on its own deployment of the scope Worker,
+`dap-lending`, at <https://dap-lending.inguz.workers.dev>. Its
+configuration is `apps/room/wrangler.lending.jsonc`: its own
+Durable Object namespace, the Artifacts namespace `dap-lending`, and an
+`ARTIFACTS_CONFIG` that names the library room's register. Deploy it from
+`apps/room`:
+
+```sh
+npx -y wrangler@4.147.0 deploy --config wrangler.lending.jsonc
+```
+
+Set `DEPLOYMENT` and `SESSION_SECRET` for it as for any deployment, from
+standard input. `dap install --plan` needs the service's address and
+prints the register's ID, so the first deployment has no
+`ARTIFACTS_CONFIG`. Set it to that register and deploy again before the
+room is created. The [runbook](../examples/lending/runbook.md) gives the
+whole order, and its rehearsal section records the run of
+14 October 2026.
+
 ## The homepage
 
-The static-assets Worker `dap-home` serves the four pages from `homepage/`.
+The static-assets Worker `dap-home` serves the homepage and the pages for
+the room, the library, the Counter and Jam from `homepage/`.
 Run `npm run build:home` to copy its source and the repository brand masters
 into `homepage/assets/`. Its Wrangler configuration attaches
-`dap.generalbusiness.ai` as a custom domain. The room, Counter and Jam
-applications keep their own addresses; the homepage links to those origins.
+`dap.generalbusiness.ai` as a custom domain. The room, library, Counter
+and Jam applications keep their own addresses; the homepage links to
+those origins.
 
 ## What is never written down
 

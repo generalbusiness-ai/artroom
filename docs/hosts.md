@@ -20,7 +20,7 @@ that namespace. The directory and the destination copy the same record,
 
 The Worker builds one outside port for each host that it is configured
 for, and sends each host operation to the port of the host that the
-scope's own history records. A deployment can serve both hosts at once. A
+scope's own journal records. A deployment can serve both hosts at once. A
 register whose host is neither, or a host that is not configured, gets no
 outside port: its operations stay recorded and unsent.
 
@@ -64,7 +64,7 @@ What it does:
   confirmed, the outcome names the token by a local handle,
   `creation:<name>`, and the register owes a `revoke-credential`
   operation. The token's plaintext is kept privately in the register's
-  storage until that revocation is confirmed. It is never in a history.
+  storage until that revocation is confirmed. It is never in a journal.
   A cleanup handle is reported only when that exact plaintext is durably
   held. Deleting a token's plaintext does not prove that the provider
   revoked the token. Only a confirmed revocation shows that. If custody and immediate revocation both fail, the result is unknown.

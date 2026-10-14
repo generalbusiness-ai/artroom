@@ -4,7 +4,7 @@ This stage targets C1 `counting-commitments`, pin
 `sha256:b55824346382d9b158be4cadd9d098008f8129147fba772537778e2f738d5271`,
 and the explicit M1 cohort register@6, directory@6, membership@5, rules@3,
 destination@2 and inbox@1. The old C0 declaration and pin remain shipped;
-this stage does not migrate old applications or private history.
+this stage does not migrate old applications or private scope journals.
 
 The production Worker serves `/counting/`, `/counting/counting.js` and
 `/counting/counting.css` on the same origin as its native scope API. Build
@@ -34,7 +34,7 @@ separate. Preserve ordinary pending install/enrollment envelopes.
 
 Each runner uses its own independently enrolled member/device key. An agent
 member is added as kind `agent`, then receives an agent-key invitation and
-its native enrolment; a person with a role named agent is not equivalent.
+its native enrollment; a person with a role named agent is not equivalent.
 The application controller initializes the paused board. Participation is
 initially inactive; a device chooses a usable voice and activates. Start
 opens claims without selecting a speaker. Eligible active devices may commit
@@ -84,7 +84,7 @@ The UI distinguishes the promised number from the last fulfilled number.
 The native 30-second deadline belongs to the accepted pledge. Its board timer
 expires before the promise timer; both must settle before another commitment.
 Reset requires paused or finished without a live pledge. It preserves roster
-and native history and does not resolve private unknown requests.
+and the native journal and does not resolve private unknown requests.
 
 Before any sound, one random audio ID and the full identity/turn/voice/start
 time are committed and read back in the existing private voice slot under its
@@ -115,7 +115,8 @@ the route's self-only CSP.
 
 ## Evidence still required
 
-Source and fake DOM/speech/transport witnesses are not deployment evidence.
+Tests of the code, with stand-in DOM, speech and transport, are not
+evidence of a deployment.
 The native C1/M1 witness uses actual factory creation, agent enrollment, grants,
 HTTP sessions, contention, all acts, ordered expiry, restart and proven replay;
 its Git host answers and clock are labeled stand-ins. Actual deployment must

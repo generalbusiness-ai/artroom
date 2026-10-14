@@ -111,7 +111,7 @@ flowchart TD
   No participant signs that step.
 - From a paused board the controller can start again or reset. Reset
   begins a new generation with the count at 0, and keeps the participants
-  and the history.
+  and the journal.
 - Start, pause and reset are refused while a promise is pledged.
 
 ## Grants

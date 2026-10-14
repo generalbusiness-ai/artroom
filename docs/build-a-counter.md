@@ -6,7 +6,8 @@ participants who join, and a board that hands the turn from one
 participant to the next until the count reaches its target. It is a
 smaller version of the Counter in [apps/counter](../apps/counter).
 
-We write the definition in four steps. After each step we run it in a
+We write the definition in four steps and run the count in a fifth.
+After each step we run it in a
 scope held in memory, sign acts as test members, and print what the scope
 recorded. No service, deployment or browser is involved.
 
@@ -310,7 +311,7 @@ roster as its `basis` and names the participant who speaks next.
 
 The client proposes those values and the scope checks every one. The
 `roster` guard requires the basis to list exactly the joined participants,
-in the order they joined. The named rules check the arithmetic: the
+in the order they joined. The rule expressions check the arithmetic: the
 number is one more than the last, the serial moves by one, and `next` is
 the participant whose place in the roster matches the number. A client
 cannot skip a participant, repeat a number or speak out of turn.
@@ -404,7 +405,7 @@ const rules = {
 };
 ```
 
-Add the acts and the rules to `counter`:
+Add the acts and the rule expressions to `counter`:
 
 ```ts
 	items: { configuration, participant, board },
@@ -487,7 +488,8 @@ report that takes effect moves the turn. When `@una` says 3, the target,
 the board becomes `finished` and its turn slots are cleared.
 
 The last line shows that folding the eight entries again gives the same
-state. That is what a verifier does with a real scope's history.
+state. A verifier also replays a real scope's journal, and checks more
+besides; [The record](manual/record.md) says what its report covers.
 
 ## Where to go next
 
@@ -495,6 +497,8 @@ state. That is what a verifier does with a real scope's history.
   commitment that the participant then fulfills, and adds activity, pause,
   reset and a deadline. Its page has diagrams of every act. Its source and
   tests belong to a repository checkout, not the published SDK packages.
+- [Build a lending library](build-a-lending-library.md) is a second
+  tutorial, on items with states, a final state and grants.
 - [Write an application](write-an-application.md) shows how to declare,
   validate and pin a definition of your own.
 - [The architecture of a dap application](architecture.md) explains what

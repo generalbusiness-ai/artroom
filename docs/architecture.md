@@ -5,17 +5,19 @@ keeps the record, and how someone else can check it. It follows the
 logical parts first and ends with how they are deployed today. For the
 full contract of each part, read [Scopes](scopes.md).
 
-![The dap model. A person or an agent signs an act and sends it over the command line, MCP or HTTP. A scope judges it against its pinned definition, with guards, rule expressions in a restricted JSONata, and the signer's grants. An act that takes effect becomes an entry in the journal, and its declared effects are folded into the scope's items. The journal can be replayed, entries send messages to other scopes, and published files go to a Git repository on Cloudflare Artifacts or GitHub, which serves pages.](assets/dap-architecture.svg)
+![The dap model. A person or an agent signs an act and sends it over the command line, MCP or HTTP. A scope judges it against its pinned definition, with guards, rule expressions in a restricted JSONata, and the signer's grants. An act that takes effect becomes an entry in the journal, and its declared effects are folded into the scope's items. The journal can be replayed, entries send messages to other scopes, and a destination scope publishes the files it is sent to a Git repository on Cloudflare Artifacts or GitHub, which serves pages. Dashed lines are planned.](assets/dap-architecture.svg)
 
 The diagram shows the intended model. Two parts of it are planned and not
-yet built: the dashed line that writes items to the repository, and the
-archive of the journal in Git. Today a room's destination scope publishes
-changes to the repository, as "How it is deployed today" describes. A
+yet built, and are drawn dashed: writing items to the repository, and the
+archive of the journal in Git. Today a destination scope publishes to the
+repository: a room's merged changes, as "How it is deployed today"
+describes, and files that an application's acts send it, such as the
+lending library's shelf pages. A
 refused act gets a reason and the head at which it was judged.
 
 ## A scope is an actor with one definition
 
-Every part of a dap application is a scope. A scope has an ID, a history
+Every part of a dap application is a scope. A scope has an ID, a journal
 of entries and a set of items. It pins one definition by digest in its
 first entry, the genesis, and is judged by that definition for as long as
 it exists.
@@ -28,8 +30,8 @@ A definition is a JSON value, not code. It declares:
   take, its guards, its effects and its sends;
 - handlers for messages from other scopes;
 - timed rules, which apply when a deadline held in an item passes;
-- named rules, which a guard evaluates. A rule is an expression in a
-  restricted JSONata. It reads the act's fields and the items the act
+- rule expressions, which a guard evaluates. A rule expression is written
+  in a restricted JSONata. It reads the act's fields and the items the act
   names, and answers true or false. It cannot write: only declared
   effects change states and slots.
 
@@ -55,7 +57,7 @@ The scope handles one input at a time. Each is a turn:
 1. It fetches each entry of another scope that the input names, and checks
    it against its hash.
 2. It applies every deadline that has passed, each as its own timed entry.
-3. It evaluates the named rules the act uses, outside the storage
+3. It evaluates the rule expressions the act uses, outside the storage
    transaction.
 4. In one transaction, it reads the clock once, checks that the head has
    not moved, judges the input, seals the entry, writes its sends, and
@@ -68,7 +70,7 @@ the turn starts again. A judgment is always about one head.
 
 An entry records exactly one input and what followed from it: the effects
 on items, the messages it sends, the foreign entries it read, and the
-results of the rules it evaluated. Each entry names the hash of the entry
+results of the rule expressions it evaluated. Each entry names the hash of the entry
 before it. There are eight kinds of input: genesis, act, delivery, timed,
 diagnosis, preparation, outcome and checkpoint.
 
@@ -76,8 +78,7 @@ When an act takes effect, the scope returns a **receipt**: the fact
 reference of the entry (scope, position and hash), its effects, and a
 duty ID for each message it sent. The receipt is built after the entry is
 sealed, so it is not part of the entry's own bytes. A receipt proves what
-this scope recorded. It does not prove that another scope accepted a
-message or that a Git host published a commit. Those outcomes are their
+this scope recorded. It does not prove that a message took effect in another scope or that a Git host published a commit. Those outcomes are their
 own entries.
 
 ## Derivation is pure and shared
@@ -88,7 +89,7 @@ and one clock reading, to the entry that input writes or the answer it
 gets. `applyEntry` is the only code that changes state.
 
 The runtime calls these functions inside the commit. The verifier calls
-the same functions on the stored history. That choice is the heart of the
+the same functions on the stored journal. That choice is the heart of the
 design. Replay does not call the runtime. Both use the same derivation
 code, `dap-derive`, on the types of `dap-contract`. Replay also depends on
 the stored bytes it reads: the entries and the inputs the scope retained.
@@ -122,8 +123,7 @@ confirms. A room is built this way: the register creates a directory, and
 the directory creates membership, the rules scope and the destination.
 
 The price of this design is that a result in one scope can arrive after
-the caller's act has returned. An accepted merge request in a change lane
-is not yet a publication. The application has to say what it waits for,
+the caller's act has returned. A merge that has taken effect in a change lane is not yet a publication. The application has to say what it waits for,
 and the client has to follow the later entries. The price is worth
 paying: each scope stays small enough to judge and replay on its own, and
 no scope can change another's record.
@@ -139,7 +139,7 @@ A scope that judges an act does not share membership's storage. It reads
 membership before the turn and decides in the commit whether what it read
 still allows the signer to act. The entry retains the observation it
 used. A verifier works out again what the signer was allowed to do, from
-that observation and from the membership scope's history. Without such
+that observation and from the membership scope's journal. Without such
 an observation, the signer is not allowed to act.
 
 Rules work the same way. The room's destination observes the rules scope
@@ -153,7 +153,7 @@ dap keeps the record in three places, each with a different job.
 **The scope's own storage.** Each scope is one Durable Object. Its
 entries, sends, retained inputs and folded items are written in one
 storage transaction per turn. This is the authority for the scope's
-order. Nothing outside the service holds the history until a reader
+order. Nothing outside the service holds the journal until a reader
 copies it.
 
 **Publication to a Git host.** A dap-room destination publishes
@@ -164,22 +164,22 @@ entry, the operation and the published commit. Its ref is
 `refs/artroom/receipts/<hash>`, named by the hash of the entry that
 opened the operation. The published repository and its receipts outlive
 the service, and anyone who can clone the repository can read them. This publication covers the
-repository's content and the receipts, not the full history of every
+repository's content and the receipts, not the full journal of every
 scope.
 
 **Replay as the independent reader.** `@generalbusiness/dap-replay`
 reads a scope's stored bytes through the read API and checks them without
 the runtime. In integrity mode it checks the chain, the hashes and the
-signatures. In replay mode it also folds the history and derives every
+signatures. In replay mode it also folds the journal and derives every
 entry again. Its report states the head it reached, its coverage, and
 what it took on trust, such as the service's clock. "Consistent" holds
 for that coverage and those trusts, and no further. To check that the
-history has not been cut short, give it a head from a receipt you kept.
+journal has not been cut short, give it a head from a receipt you kept.
 
 ## How it is deployed today
 
 Clients sign requests. A Cloudflare Worker routes each one to a scope's
-Durable Object. That object keeps the scope's history and derived state
+Durable Object. That object keeps the scope's journal and derived state
 in its own storage. The judges in `dap-derive` decide the allowed
 changes. The runtime controls reads, the clock, bounded turns and storage
 transactions.
@@ -214,12 +214,12 @@ checked inputs to a judgment, not shared storage.
 | Lane | The application's work items, versions, reviews and declared messages |
 | Destination | Judging a publication and recording its outside-operation duties |
 | Git host adapter | Bounded Git reads and authorized host requests. It reports evidence, not decisions |
-| Replay | Independent checking of a recorded history, with its stated coverage and trusts |
+| Replay | Independent checking of a recorded journal, with its stated coverage and trusts |
 
 The outside-operation driver marks each attempt before it sends a
 mutation. A missing reply leaves the outcome unknown and a cleanup duty
 open. The driver does not send the same mutation again. Private
-credentials are kept apart from the public history. Deleting a token's
+credentials are kept apart from the public journal. Deleting a token's
 plaintext does not prove that the provider revoked the token.
 [Configure a Git host](hosts.md#the-hostings-own-git-service-host-artifacts)
 says how each host keeps and revokes its tokens. A Git commit does not
