@@ -47,7 +47,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
 creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -59,7 +59,7 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
 signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will create,
@@ -76,7 +76,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`dap install --planned [--cohort application|counting-commitments]`** creates the planned register, with the kept
+**`dap install --planned [--cohort application|application-publication|counting-commitments]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -91,7 +91,7 @@ or delete the original config or keys.
 
 For example, set `ARTROOM_HOME` to a new private directory, then run
 `dap install --plan <base-url> --cohort <cohort> --host <host>
---namespace <namespace>`, using `application` or `counting-commitments`
+--namespace <namespace>`, using `application`, `application-publication` or `counting-commitments`
 for `<cohort>`. After configuring the new register ID,
 run `dap install --planned --cohort <cohort>` with the same
 `ARTROOM_HOME`. This creates separate custody and a new operator key; it
@@ -116,11 +116,22 @@ Omitting `--cohort` keeps the legacy default. `--cohort application` selects
 `APPLICATION_COHORT`: register@5, directory@5, membership@4, rules@3,
 destination@2 and inbox@1, each with the `platform:` prefix.
 `--cohort counting-commitments` retains its separate register@6,
-directory@6 and membership@5 lineage. Both choices use the existing exact
+directory@6 and membership@5 lineage. `--cohort application-publication`
+selects `FILE_PUBLICATION_COHORT`: register@9, directory@8, membership@4,
+rules@3, destination@4 and inbox@1. All three choices use the existing exact
 planned-install custody. Unknown or multiple choices, another retained
 cohort, service, host or namespace refuse before signing or sending.
 `install --planned` may omit the selection: it uses the saved definition
 and signature. It never upgrades a plan to a newer catalog version.
+
+Choose `application-publication` for a new application room whose acts tell
+the destination `publish-file`. Configure the host with that exact planned
+register ID before installing. Existing rooms retain their original pins.
+Directory@8 supplies its own destination when the application's genesis
+declares `destination` with type `scope` and kind `destination`; callers
+cannot include that reserved field in `values`. See
+[Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
+for the write authority and publication outcomes.
 
 For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
 and a deployed service that supports all six exact application pins:
