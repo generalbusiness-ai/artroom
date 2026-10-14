@@ -712,7 +712,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
+    const checked = ["platform:destination@3", "platform:destination@4"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
     if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
@@ -1049,8 +1049,8 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
       const [compromised, next] = [publication.values["aborting"] === true, andNext(given, state, { slot: true })];
       const reason = compromised ? "compromised" : "host-refused";
       return {
-        effects: [{ effect: "state", item: id, state: pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
-        opens: [...next.opens, ...(pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
+        effects: [{ effect: "state", item: id, state: ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
+        opens: [...next.opens, ...(["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
         update: { publication, state: "aborted", outcome: compromised ? "aborted" : "refused", reason },
       };
     }
@@ -1424,7 +1424,7 @@ function reportsBound(given: Pick<RuleGiven, "uses" | "own">, statement: Stateme
   const commits = reportCommits(given, statement);
   if (!manifest || commits === undefined) return undefined;
   // i5 edit: a one-file manifest selects no report.
-  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (pinnedOf(given.own) === "platform:destination@3" && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
+  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (["platform:destination@3", "platform:destination@4"].includes(pinnedOf(given.own) ?? "") && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
   if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
   const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
   return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
@@ -1683,7 +1683,7 @@ const WRITTEN: Rules = {
     place: "effect", most: 3,
     run: (given) => {
       const { state, resolved } = given;
-      const expiredSlot = pinnedBy(given) === "platform:destination@3" && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
+      const expiredSlot = ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self, ...(expiredSlot ? { slot: true } : {}) })];
       return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
@@ -1889,9 +1889,9 @@ const WRITTEN: Rules = {
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || (closed(target) && !(served.write.owner === "platform:destination@3" && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
+        if (target === null || (closed(target) && !(["platform:destination@3", "platform:destination@4"].includes(served.write.owner) && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
-          effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...(target.type === "publication" && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
+          effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...((target.type === "publication" || target.type === "file-publication") && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
         };
       },
@@ -2103,7 +2103,7 @@ export function publicationOrigin(state: StateView, operation: Operation, own: O
     const publicationFor = (target: Item | null): Item | false | null => {
       if (!target) return false;
       if (target.type === "publication") return target;
-      if (target.type === "receipt") return target.refs["publication"] == null ? null : publicationAt(state, target.refs["publication"]) ?? false;
+      if (target.type === "receipt") { const id = target.refs["publication"] ?? target.values["publication"]; return id == null ? null : publicationAt(state, id) ?? false; }
       return target.type === "branch" ? null : false;
     };
     let publication: Item | false | null;
@@ -2353,7 +2353,7 @@ export const destinationRules3: Rules = (() => {
     const base = receiptPrior.rules.derives!(given, operation, selected);
     const written = base.effects.find((effect) => effect.effect === "state" && effect.state === "written");
     if (!written || written.effect !== "state") return base;
-    const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"];
+    const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"] ?? receipt?.values["publication"];
     const publication = typeof publicationId === "number" ? given.state.item(publicationId) : null;
     if (!publication) return base;
     if (!publication.values["tree"] || !stagedOwn(given, publication, given.resolved.self)) return { ...base, effects: [...base.effects, { effect: "state", item: publication.id, state: "cleaned" }] };
@@ -2670,7 +2670,14 @@ export const destinationRules4: Rules = (() => {
         const decided = fileJudge(given); return { effects: decided.effects, sends: [], opens: decided.opens };
       },
     } },
-    receipt: destinationRules2["receipt"]!,
+    receipt: { ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>), rules: {
+      ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>).rules,
+      derives: (given, operation, selected) => {
+        const receipt = targetOf(given.state, given.own, operation), id = receipt?.refs["publication"] ?? receipt?.values["publication"];
+        const rule = (destinationPublicationAt(given.state, id)?.type === "file-publication" ? destinationRules2 : destinationRules3)["receipt"] as Extract<PlatformRule, { place: "outcome" }>;
+        return rule.rules.derives!(given, operation, selected);
+      },
+    } },
     "publication-update": { place: "send", run: (given) => {
       const operation = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
       if (operation && (operation.kind === "judge" ? isFileJudge(given) : targetOf(given.state, given.own, operation)?.type === "file-publication")) return null;
