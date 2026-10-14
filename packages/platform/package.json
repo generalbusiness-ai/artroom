@@ -7,6 +7,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./membership-actions": "./src/membership-actions.ts",
     "./testing": "./test/support.ts"
   },
   "scripts": {

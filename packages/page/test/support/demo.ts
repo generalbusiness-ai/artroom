@@ -9,7 +9,7 @@ import { beginSessionFixture, beginSessionChild, type SessionOwner } from "../..
  * | The commands that set the room up | Real: `command` of the cli package, with a store in memory for each person: `install`, `claim`, `invite`, paul's `join`, the rules' `publish`, and the two `activate` acts with the demo profile's bytes beside them. |
  * | The scopes, the routes and the readers | Real: the namespace `PLATFORM`, the Worker's HTTP routes (`routed`), and the read sessions of `sessions.ts` under a TEST SECRET that this file generates. |
  * | The site route | Real: `site` of the scope package, reached as the Worker reaches it, for an address under `/site/`. |
- * | The Git host | A STAND-IN: `OwnGit` of `packages/scope/test/hosts.ts`, under the production wiring of the hosting own Git service's ports (`artifacts-wiring.ts`). Refs and objects are maps; each push is a real pack that the stand-in decodes. |
+ * | The Git host | A STAND-IN: `OwnGit` of `packages/scope/test/hosts.ts`, under the production wiring of the ports of Cloudflare Artifacts (`artifacts-wiring.ts`). Refs and objects are maps; each push is a real pack that the stand-in decodes. |
  * | The scheduler | A STAND-IN: `pause` runs the operations drivers and dispatchers of the scopes named, and of the register and the destination, as a deployment's alarms would. |
  * | The clock | The scripted clock of the namespaces. |
  */

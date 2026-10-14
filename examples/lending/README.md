@@ -19,9 +19,13 @@ Each step has its own written destination receipt and anonymous immutable
 page. The original clone and extraction verified actual commits, parents, page
 blobs, and receipt bytes. The curated public history is published at commit
 `14401f8bd851ce525ac1526ed57d2bceaf36d360`; its index, raw companions,
-and current shelf pages passed anonymous readback. Final homepage hosting
-and the final validation gate remain pending. These are machine-operated browser profiles, not a human
-or separate physical-device acceptance test.
+and current shelf pages passed anonymous readback. Homepage publication
+`89750` and the original gate at `f33a7d7f` completed. The
+[completion note](../../notes/2026-10-14-library-publication-completion.md)
+keeps that gate separate from the later MCP composition. The journal and
+staff-control follow-up still awaits its own validation, gate, and deployment.
+These are machine-operated browser profiles, not a human or separate
+physical-device acceptance test.
 
 The earlier publication rehearsal remains at its original service. It
 completed mechanically, but its Small pot description differed from the
@@ -41,11 +45,17 @@ shows who stated it, and the next act on the thing rewrites the page.
 planner's four-step tutorial for the first definition without publication.
 
 The older member interface remains at
-<https://dap-lending.inguz.workers.dev/lending/>. The existing homepage
-[Library page](https://dap.generalbusiness.ai/library/) linked that rehearsal.
-Final-room homepage links are prepared separately and have no hosting proof
-in this draft. The interface still offers **Cancel this thing** to members;
-the native scope refuses a nonstaff cancellation as `unauthorized`.
+<https://dap-lending.inguz.workers.dev/lending/>. The homepage
+[Library page](https://dap.generalbusiness.ai/library/) previously linked that
+rehearsal. Its four Library links now target the final service and its
+verified shelf and public-history routes. Original Home publication `89750`
+verified those links and all 13 static readbacks. The updated member
+interface reads the signer's active seat and its
+role's actions from membership. It offers the reason box and **Cancel this
+thing** only when those actions include `lending.staff`. The control stays
+hidden while the actions are loading or cannot be read. The native scope
+still refuses a nonstaff cancellation as `unauthorized`, including when a
+previously observed staff role has changed.
 
 ## What is here
 

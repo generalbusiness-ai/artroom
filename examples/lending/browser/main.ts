@@ -10,7 +10,7 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Entry } from "@generalbusiness/dap-contract";
 import { lendingGateway, type ActOutcome, type LendingGateway, type LendingState, type Pending } from "./client.ts";
 import { deviceSigner, findLending, joining, newDeviceKey, readInvitation, type DeviceKey, type JoinOutcome, type Seat } from "./join.ts";
-import { actsFor, type LendingAct, type LendingView, type ShownThing } from "./model.ts";
+import { offeredActs, journalRows, type LendingAct, type LendingView, type ShownThing } from "./model.ts";
 import { shelfPage } from "../shelf.ts";
 import { readPage, type PublishedPage } from "./publication.ts";
 import { actStore, browserLock, joinStore, remembered, type Remembered } from "./storage.ts";
@@ -23,6 +23,9 @@ let memory: Remembered | null = null, gateway: LendingGateway | null = null, sta
 let kept: Pending | null = null, keptJoin: Seat | null = null, notice: Notice = null, busy = false, timer: number | undefined;
 /** Controls whose typed text a redraw must drop: a donation that took effect empties its form. */
 const dropped = new Set<string>();
+/** Keep a staff member's draft while a permission refresh temporarily hides its control. */
+const reasonDrafts = new Map<string, string>();
+let drawnEpoch = epoch;
 let published = new Map<number, PublishedPage>(), pageRead: AbortController | null = null;
 async function pages(view: LendingView, version: number, at: number): Promise<void> {
   pageRead?.abort(); const controller = new AbortController(); pageRead = controller;
@@ -59,6 +62,9 @@ async function work(task: () => Promise<void>): Promise<void> {
 async function look(): Promise<void> {
   const at = epoch, version = ++reading, using = gateway;
   if (!using) return;
+  // A new permission read hides Cancel immediately, including while it is still loading.
+  if (state.status === "current") state = { ...state, actions: null };
+  draw();
   const [next, pending] = [await using.look(), await using.pending()];
   if (at !== epoch || version !== reading || using !== gateway) return;
   state = next; kept = pending; published = new Map(); draw();
@@ -81,6 +87,7 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
 });
 
 async function open(next: Remembered): Promise<void> {
+  reasonDrafts.clear();
   epoch++; reading++; pageRead?.abort(); published = new Map(); busy = false; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
   memory = next; draw();
   if (timer !== undefined) clearInterval(timer);
@@ -172,7 +179,7 @@ function drawThing(thing: ShownThing, view: LendingView): Node {
   const status = thing.state === "available" ? "Available" : thing.state === "lent" ? `Lent to ${thing.borrower ?? "a member"}` : `Gone: ${thing.reason ?? ""}`;
   const card = h("div", { class: `panel thing ${thing.state}` }, h("h3", {}, thing.name || `Thing ${thing.id}`), h("p", {}, thing.description),
     h("p", { class: `state ${thing.state}` }, status), h("p", { class: "muted" }, `Donated by ${thing.donor}`));
-  const acts = actsFor(thing), row = h("div", { class: "row" });
+  const acts = offeredActs(thing, state.status === "current" ? state.actions : null), row = h("div", { class: "row" });
   if (acts.includes("borrow")) row.append(button("Borrow", () => void act("borrow", { thing: thing.id })));
   if (acts.includes("return")) row.append(button("Return", () => void act("return", { thing: thing.id })));
   if (acts.includes("cancel")) {
@@ -190,12 +197,11 @@ function drawThing(thing: ShownThing, view: LendingView): Node {
 
 function drawRecord(entries: readonly Entry[]): Node {
   const body = h("tbody");
-  entries.forEach((entry, seq) => {
-    if (entry.input.type !== "act") return;
-    const { intent } = entry.input.signed;
-    body.append(h("tr", {}, h("td", {}, String(seq)), h("td", {}, intent.kind), h("td", {}, entry.input.authority[0]?.subject.member ?? ""),
-      h("td", {}, intent.kind === "donate" ? String(intent.fields["name"] ?? "") : intent.kind === "cancel" ? `thing ${intent.on}: ${String(intent.fields["reason"] ?? "")}` : `thing ${intent.kind === "publish" ? intent.fields["thing"] : intent.on}`)));
-  });
+  for (const row of journalRows(entries)) {
+    const what = h("td");
+    what.textContent = row.what;
+    body.append(h("tr", {}, h("td", {}, String(row.seq)), h("td", {}, row.kind), h("td", {}, row.signer), what));
+  }
   return h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Entry"), h("th", {}, "Act"), h("th", {}, "Signed by"), h("th", {}, "What"))), body);
 }
 
@@ -225,7 +231,7 @@ function drawLibrary(seat: Seat): Node[] {
       if (at !== epoch) return;
       await remembered.forget();
       if (at !== epoch) return;
-      epoch++; reading++; pageRead?.abort(); published = new Map(); busy = false; gateway?.dispose(); gateway = null; memory = null;
+      reasonDrafts.clear(); epoch++; reading++; pageRead?.abort(); published = new Map(); busy = false; gateway?.dispose(); gateway = null; memory = null;
       notice = { kind: "plain", text: "This browser's key and seat are forgotten. The room still has the seat." }; draw();
     });
   }), true)));
@@ -236,7 +242,14 @@ function draw(): void {
   const controls = () => [...root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("[data-key]")];
   const focused = document.activeElement instanceof HTMLElement ? document.activeElement.getAttribute("data-key") : null;
   const typed = new Map(controls().map((control) => [control.dataset["key"]!, control.value]));
-  for (const key of dropped) typed.delete(key);
+  if (drawnEpoch !== epoch) {
+    reasonDrafts.clear();
+    for (const key of typed.keys()) if (key.startsWith("reason-")) typed.delete(key);
+    drawnEpoch = epoch;
+  }
+  for (const [key, value] of typed) if (key.startsWith("reason-")) reasonDrafts.set(key, value);
+  for (const key of dropped) { typed.delete(key); reasonDrafts.delete(key); }
+  for (const [key, value] of reasonDrafts) if (!typed.has(key)) typed.set(key, value);
   dropped.clear();
   const nodes = memory?.seat && memory.identity ? drawLibrary(memory.seat) : drawJoin();
   if (memory?.seat && !memory.identity) nodes.push(button("Look for the library again", () => void work(() => seated(memory!.device, memory!.seat!)), true));

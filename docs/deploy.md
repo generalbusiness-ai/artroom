@@ -71,7 +71,7 @@ register exists. Plan first, then set the setting, then install:
    nothing new. `--again` signs a second claim, which creates a second
    repository.
 
-The same order holds for the hosting's own Git service, with `--host
+The same order holds for Cloudflare Artifacts, with `--host
 artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
 ([hosts.md](hosts.md)).
 
