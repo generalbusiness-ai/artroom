@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4cc86cc6182154e9b530b8e937f42fcbfb28c22c","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4d28e09fca2f12fc6828f90c5ec6de3d4d3f2e32","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-04-notes-reconciliation/mcp.md."}
