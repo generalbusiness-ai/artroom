@@ -11,7 +11,10 @@ client does. The framework is described in
 This page describes the definition `counting-commitments`, declared in
 [commitments.ts](commitments.ts). The Counter page in [browser](browser)
 runs it, and `dap install --cohort counting-commitments` installs its
-cohort. An earlier definition, `counting`, is also kept here; see
+cohort.
+[Taking part in a Counter](../../docs/mcp.md#taking-part-in-a-counter)
+shows an agent taking part through MCP tools. An earlier definition,
+`counting`, is also kept here; see
 [The first definition](#the-first-definition).
 
 ## Items
@@ -179,7 +182,5 @@ and passes the turn to the next participant in join order. It also has
 No scope moves from one definition to the other.
 
 [Build a counter](../../docs/build-a-counter.md) is a tutorial that builds
-a smaller version of this first definition.
-[Taking part in a Counter](../../docs/mcp.md#taking-part-in-a-counter)
-shows an agent taking part in one. Its source record is
+a smaller version of this first definition. Its source record is
 [definition-README.md](definition-README.md).
