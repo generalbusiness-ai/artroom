@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { FactRef, ScopeId } from "@generalbusiness/dap-contract";
 import { canonicalize, keyIdOfSecret } from "@generalbusiness/artroom-bytes";
-import { APPLICATION_COHORT, FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
+import { FILE_PUBLICATION_COHORT, FIRST_ACTIONS_OF } from "@generalbusiness/dap-platform";
 import { lending } from "../../../examples/lending/definition.ts";
 import { LENDING_DEFINITION } from "../../../examples/lending/pin.ts";
 import { mcpRoom, type Agent, type Room } from "./support/room.ts";
@@ -18,10 +18,10 @@ function libraryRecipe(mode: "default" | "generic"): { tools: string[]; count: n
   return { tools: [...cell.matchAll(/`([a-z][a-z0-9.-]*)`/g)].map((m) => m[1]!), count: Number([...cell.matchAll(/: (\d+)/g)].at(-1)![1]) };
 }
 
-/** A room of the application cohort, founded by rita, with the library's definition active and its actions in the admin role. */
+/** A room of the application-publication cohort, founded by rita, with the library's definition active and its actions in the admin role. */
 async function libraryRoom(room: Room): Promise<Agent> {
   const rita = room.agent("rita");
-  const installed = await rita.ok("create", { definition: APPLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
+  const installed = await rita.ok("create", { definition: FILE_PUBLICATION_COHORT.register, kind: "install", fields: { host: "artifacts", namespace: "artroom-demo", policy: "keys", founders: [rita.key] }, idempotencyKey: "install" });
   const register = installed["scope"] as ScopeId;
   await room.wireRegister(register);
   const claimed = await rita.ok("room.create", { target: register, fields: { branch: "main", founderHandle: "@rita", recoveryKey: keyIdOfSecret(crypto.getRandomValues(new Uint8Array(32))) }, idempotencyKey: "claim" });
@@ -33,7 +33,7 @@ async function libraryRoom(room: Room): Promise<Agent> {
   await rita.ok("room.first-key", { fields: { member: (seat["fact"] as FactRef).seq }, idempotencyKey: "first-key" });
   expect((await rita.ok("rules.activate", { fields: { digest: LENDING_DEFINITION, name: NAME }, values: [canonicalize(lending)], idempotencyKey: "activate" }))["answer"]).toBe("accepted");
   // The deployed library's admin role: every first admin action, and both of the library's.
-  const actions = [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "lending.member", "lending.staff"];
+  const actions = [...FIRST_ACTIONS_OF[FILE_PUBLICATION_COHORT.membership]!.admin, "lending.member", "lending.staff"];
   expect((await rita.ok("member.actions", { on: 0, fields: { role: "admin", actions }, idempotencyKey: "actions" }))["answer"]).toBe("accepted");
   room.advance(301_000);   // the earlier grant's reuse window ends; no immediate-revocation claim
   const established = await rita.ok("application.create", { fields: { definition: LENDING_DEFINITION, values: "{}", execution: "recorded-do" }, values: [canonicalize(lending)], idempotencyKey: "library" });
@@ -64,10 +64,12 @@ async function takePart(taker: Agent, mode: "default" | "generic"): Promise<{ ca
     expect(answer["answer"], JSON.stringify(answer)).toBe("accepted");
     return (answer["fact"] as FactRef).seq;
   };
-  // A donation opens the thing at the entry that records it: the fact's position is the thing's ID.
-  const thing = await did("donate", { fields: { name: "Big pot", description: "A heavy copper pot. Holds eight litres." } });
-  await did("borrow", { on: thing });
-  await did("return", { on: thing });
+  // Each act carries the shelf page's text, which the library tells the destination to publish at the thing's path. A donation
+  // opens the thing at the entry that records it: the fact's position is the thing's ID.
+  const page = (state: string) => `# Big pot\n\nA heavy copper pot. Holds eight litres.\n\nStatus: ${state}\n`;
+  const thing = await did("donate", { fields: { name: "Big pot", description: "A heavy copper pot. Holds eight litres.", page: `shelf/${mode}-big-pot.md`, content: page("available") } });
+  await did("borrow", { on: thing, fields: { content: page("lent") } });
+  await did("return", { on: thing, fields: { content: page("available") } });
   return { calls: taker.calls.slice(from), library, thing };
 }
 
@@ -79,7 +81,7 @@ for (const mode of ["default", "generic"] as const) {
     const room = mcpRoom();
     try {
       const rita = await libraryRoom(room);
-      expect(await rita.names()).toEqual(expect.arrayContaining(["donate", "borrow", "return", "cancel"].map((k) => `${NAME}.${k}`)));
+      expect(await rita.names()).toEqual(expect.arrayContaining(["donate", "borrow", "return", "cancel", "publish"].map((k) => `${NAME}.${k}`)));
       const taker = mode === "default" ? rita : room.agent("rita, --generic", { mode: "generic", secret: rita.secret, config: rita.config, share: true });
       const { calls, library, thing } = await takePart(taker, mode);
       const recipe = libraryRecipe(mode);
@@ -87,7 +89,7 @@ for (const mode of ["default", "generic"] as const) {
       // The thing is available again; a second return is refused by the guard, and nothing is written.
       const inspected = (await rita.ok("inspect", { scope: library }))["items"] as { id: number; type: string; state: string }[];
       expect(inspected.find((i) => i.id === thing)).toMatchObject({ type: "thing", state: "available" });
-      const again = await rita.ok(`${NAME}.return`, { target: library, on: thing, idempotencyKey: "return-again" });
+      const again = await rita.ok(`${NAME}.return`, { target: library, on: thing, fields: { content: "A page" }, idempotencyKey: "return-again" });
       expect([again["answer"], again["reason"]], JSON.stringify(again)).toEqual(["refused", "guard-failed"]);
       const kinds = ["establish", "donate", "borrow", "return"];
       expect(((await rita.ok("steps", { scope: library }))["steps"] as { kind: string }[]).map((s) => s.kind).filter((k) => kinds.includes(k))).toEqual(kinds);

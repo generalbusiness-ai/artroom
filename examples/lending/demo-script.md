@@ -6,12 +6,12 @@ pot. It takes two people, or one person with two browser profiles.
 **Run status: the story's seven acts, the refused cancel and `dap verify`
 ran in a rehearsal room on 14 October 2026, without publication; the
 [runbook's rehearsal section](runbook.md#the-rehearsal-run-14-october-2026)
-records what was seen.** The published
-shelf, shot 10 and the shelf parts of shots 1, 8b and 9 wait for
-publication. Its design is approved; the build is in progress. Until it
-lands, show a lending act's acceptance on its own and label its page
-unpublished. Do not make browser page edits to simulate automatic
-publication.
+records what was seen.** The rehearsal room does not publish. Publication
+is built (main `5e11ca03`) and runs in the final room, which is not yet
+provisioned; until then, the published shelf, shot 10 and the shelf
+parts of shots 1, 8b and 9 are unrun. In the rehearsal room, show a
+lending act's acceptance on its own and label its page unpublished. Do
+not make browser page edits to simulate automatic publication.
 
 ## The point
 
@@ -67,7 +67,7 @@ decide. (revision-moved)". Either way the pot has one borrower.
 
 | Shot | Show | Say |
 |---|---|---|
-| 10 | The published shelf: three pages. The old big pot reads "gone: Nasruddin says the pot died". Each page names the lending entry it reflects. | "The shelf is a published copy. Each page names the entry it came from." |
+| 10 | The published shelf: three pages. The old big pot reads "gone: Nasruddin says the pot died". Each page names the lending scope it came from, and the commit history shows each page's changes. | "The shelf is a published copy of the library's record. Each change to a page is a commit, and the library's record says which act made it." |
 | 11 | The record, in the interface or with `dap log`: seven acts in order, each with its signer. The refused cancel is not among them. | "The record is the authority. Seven acts took effect. The one that was refused changed nothing." |
 | 12 | `dap verify` on the lending scope. | "And anyone with the record can check it again." |
 
@@ -96,7 +96,9 @@ witnesses. The participant reuses the original kept request after a reload.
 Do not let that witness add an extra donation to the seven-act story.
 
 For the public closing shot, use an unseated browser. It must read all three
-shelf pages and commit history. Show the cancelled page's reason and compare
-its record pointer with the member's lending journal. The journal remains
+shelf pages and commit history. Show the cancelled page's reason and the
+lending scope it names. Match its commit to the `cancel` entry in the
+member's lending journal through the destination's receipt, which names the
+sending entry. The journal remains
 for members; its private session is never part of a public link.
 Publication and this public-history witness have not run yet.

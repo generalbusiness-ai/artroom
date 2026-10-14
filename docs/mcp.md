@@ -1389,19 +1389,30 @@ verified against the receipt's definition.
 ## Taking part in the lending library
 
 The [lending library](../examples/lending) is also an application that
-the room's application factory creates. Its definition name is
-`lending`, so its act tools are `lending.donate`, `lending.borrow`,
-`lending.return` and `lending.cancel`. The library's genesis takes no
-values (`values` is `{}`), and the factory makes the signer its founder.
-A donation opens a thing at the entry that records it, so the position of
-the act's fact is the thing's ID. `borrow`, `return` and `cancel` name
-that ID in `on`.
+the room's application factory creates, in a room of the
+`application-publication` cohort. Its definition name is `lending`, so
+its act tools are `lending.donate`, `lending.borrow`, `lending.return`,
+`lending.cancel` and `lending.publish`. The caller's genesis values are
+`{}`: the factory makes the signer the founder and supplies the room's
+destination. A donation opens a thing at the entry that records it, so
+the position of the act's fact is the thing's ID. `borrow`, `return` and
+`cancel` name that ID in `on`.
+
+Every act after `establish` carries `content`, the text of the thing's
+shelf page, and the library tells the destination to publish it. A
+donation also names the page's path in `page`, which must start with
+`shelf/` and end with `.md`; the member interface picks
+`shelf/<16 characters>.md`. The scope does not check the text against the
+thing. An agent that writes the page states it under its own key, and
+the next act on the thing rewrites it. Taking effect is not publication:
+read the destination's receipt to see the commit.
 
 `packages/mcp/test/lending.scope.test.ts` runs this recipe on the real
 test Worker in both modes, after an admin has activated the definition,
 given the admin role `lending.member` and `lending.staff`, and created
 the library. It checks the tools called and their count against this
-table (observed). The room's setup is not counted.
+table (observed). The room's setup is not counted, and the test does not
+read the destination.
 
 | Activity | Default | --generic |
 |---|---|---|
@@ -1413,10 +1424,10 @@ lent. A refusal is an answer, not a tool error, and the scope writes
 nothing for it.
 
 Who may sign each act is set by the room, not the server. `donate`,
-`borrow` and `return` need `lending.member`; `cancel` needs
-`lending.staff`. In the deployed library the `admin` role holds both
-actions and the `member` role holds `lending.member`, so an agent
-enrolled as a member is refused `cancel` as `unauthorized`. Anyone with
+`borrow`, `return` and `publish` need `lending.member`; `cancel` needs
+`lending.staff`. In the rehearsal room the `admin` role holds both
+actions and the `member` role holds `lending.member`; there a member's
+`cancel` was refused as `unauthorized`. Anyone with
 `lending.member` may return a lent thing, not only its borrower. The
 library's [README](../examples/lending/README.md) lists the items and the
 acts.

@@ -49,7 +49,8 @@ delivery in its own turn, as it judges an act.
   that is lost or broken. The source is in
   [examples/lending](examples/lending), and the tutorial
   [Build a lending library](docs/build-a-lending-library.md) writes its
-  whole definition. Publishing its shelf as pages is being built.
+  first definition. Each act also publishes the thing's page to the
+  room's repository; that is built, and not yet run on a deployed room.
 - **dap-jam** lets musicians improvise together in a room. Its source and
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).

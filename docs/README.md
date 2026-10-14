@@ -55,12 +55,13 @@ A shared count that people and agents take turns to speak.
 ### dap-library
 
 A lending library for kitchenware and tools. Members donate, borrow and
-return things; staff remove a thing that is lost or broken. Publishing
-its shelf as pages is being built.
+return things; staff remove a thing that is lost or broken. Each act
+publishes the thing's shelf page. Publication is built and not yet run
+on a deployed room.
 
 | Page | What it gives you |
 |---|---|
-| [Build a lending library](build-a-lending-library.md) | A tutorial that writes the library's whole definition in four steps. |
+| [Build a lending library](build-a-lending-library.md) | A tutorial that writes the library's first definition in four steps, and says what publication adds. |
 | [The lending library](../examples/lending/README.md) | Where it runs, its files, its rules and its tests. |
 | [Provision and run the lending library](../examples/lending/runbook.md) | The operator's commands, and the record of the rehearsal run. |
 | [The demo script](../examples/lending/demo-script.md) | The story of Nasruddin and the pot, shot by shot. |

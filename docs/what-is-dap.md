@@ -100,9 +100,10 @@ thing is an item that is available, lent or gone. Members donate,
 borrow and return things. Only staff remove a thing, with a reason in
 their own words, and a thing that is gone stays in the record. The source
 is in [examples/lending](../examples/lending). The tutorial
-[Build a lending library](build-a-lending-library.md) writes its whole
-definition. Its member interface is deployed; publishing its shelf as
-pages is being built.
+[Build a lending library](build-a-lending-library.md) writes its first
+definition. Its current definition also publishes each thing's page to
+the room's repository. The member interface is deployed in a rehearsal
+room; publication is built and not yet run on a deployed room.
 
 **dap-jam** lets musicians improvise together in a room. Its record holds
 themes, interpretations, instrument claims and patterns, and a live layer

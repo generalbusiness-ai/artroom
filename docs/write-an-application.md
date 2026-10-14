@@ -76,7 +76,7 @@ Write each invariant as a plain sentence before choosing its form.
 | Only the named offeree accepts an offer that names one. | The `accept` guard, in the definition. |
 | A fulfilled commitment has ended. | `fulfilled` is a final state of the commitment item. Holds under a commitment end in the entry that makes it final. |
 | A thing that is lent cannot be borrowed again until it is returned. | The lending `borrow` guard `{ state: ["available"] }`. |
-| Only staff remove a thing from the library. | The lending `cancel` act names `lending.staff` in its `grant` field. In the deployed library, membership gives that action to the `admin` role only. |
+| Only staff remove a thing from the library. | The lending `cancel` act names `lending.staff` in its `grant` field. In the rehearsal room, membership gives that action to the `admin` role only. |
 | A person may promise work only when allowed to. | The act names `issue.promise` in its `grant` field, and membership says who is allowed to take it. Being allowed does not replace the act's guards. |
 | Each recorded attempt at an outside effect is sent at most once, including across restarts. | The platform's operation ledger and driver. The application inherits this rule. |
 | Publishing a change to the rules extent needs the controller's approval. | The room's published rules configuration, which its controller may change. The destination judges the change against that configuration. |
@@ -249,8 +249,9 @@ lists the install and claim commands and the custody each one needs.
 
 The lending library's [runbook](../examples/lending/runbook.md) has the
 commands for this path: `activate`, `establish-application` and
-`set-actions` for each role. They ran on a deployed service on
-14 October 2026, as its rehearsal section records. `--value` sends a file
+`set-actions` for each role. Its rehearsal section records them run on a
+deployed service on 14 October 2026, under the library's first
+definition. `--value` sends a file
 exactly as it is, and the digest covers the canonical bytes with no
 trailing newline. The runbook writes a copy without the newline first.
 

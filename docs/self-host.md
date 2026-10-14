@@ -186,9 +186,9 @@ Counting cohort, native factory, membership grants, and device enrollment.
 deployment on 14 October 2026.
 
 The same scope Worker serves the library's member interface at
-`/lending/`. The library needs a room of the application cohort, which
-the room above is not: plan it with `install --plan ... --cohort
-application`. The project gives the library its own Worker and Artifacts
+`/lending/`. The library needs a room of the `application-publication`
+cohort, which the room above is not: plan it with `install --plan ...
+--cohort application-publication`. The project gives the library its own Worker and Artifacts
 namespace ([its deployment](deploy.md#the-lending-librarys-deployment)).
 Follow the [runbook](../examples/lending/runbook.md) to activate the
 definition, establish the library, give the roles their actions, and

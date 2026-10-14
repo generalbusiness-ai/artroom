@@ -6,7 +6,8 @@ participants who join, and a board that hands the turn from one
 participant to the next until the count reaches its target. It is a
 smaller version of the Counter in [examples/counting](../examples/counting).
 
-We write the definition in four steps. After each step we run it in a
+We write the definition in four steps and run the count in a fifth.
+After each step we run it in a
 scope held in memory, sign acts as test members, and print what the scope
 recorded. No service, deployment or browser is involved.
 
@@ -487,7 +488,8 @@ report that takes effect moves the turn. When `@una` says 3, the target,
 the board becomes `finished` and its turn slots are cleared.
 
 The last line shows that folding the eight entries again gives the same
-state. That is what a verifier does with a real scope's history.
+state. A verifier also replays a real scope's history, and checks more
+besides; [The record](manual/record.md) says what its report covers.
 
 ## Where to go next
 

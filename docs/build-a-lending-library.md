@@ -3,9 +3,10 @@
 In this tutorial we build the lending library's definition on dap and
 watch each act take effect. Members donate things to the library, borrow
 them and return them, and staff remove a thing that is lost or broken.
-By the last step the definition is the same one the
-[lending library](../examples/lending) runs: its digest matches the
-library's pin.
+By the last step the definition is the lending library's first
+definition, the one its rehearsal room runs: its digest matches that
+room's pin. The [current definition](../examples/lending/definition.ts)
+adds publication; the last section says what that adds.
 
 [Build a counter](build-a-counter.md) teaches guards that compare lists
 and rules that check arithmetic. This tutorial teaches the other half of
@@ -148,8 +149,8 @@ genesis and is judged by that definition for life.
 
 A library holds many things. We add a `thing` item type, with
 `many: true` and a limit of 64 live things, and a `donate` act that opens
-one. A thing has a name of up to 80 characters and a description of up to
-1000. The donor is whoever signs the act.
+one. A thing has a name of at most 80 bytes of UTF-8 text and a
+description of at most 1000. The donor is whoever signs the act.
 
 Add these declarations to `definition.ts`, above
 `export const lending`:
@@ -232,7 +233,7 @@ valid: sha256:243fc67d132e9d16fd0161259051e0ed5d8e2ebdacc1dfb13c6b62d7530945a9
 ```
 
 `write` means the act took effect and the scope wrote its entry. The
-second donation is refused because its name has 86 characters, more than
+second donation is refused because its name is 86 bytes long, more than
 the 80 the field allows. A refused act writes nothing, so the small pot
 is item 2. Each thing starts in the type's `initial` state, `available`.
 
@@ -356,7 +357,7 @@ Then change the `acts` line of `lending`:
 ```
 
 So far the fixture has let every key take every action. A real room
-grants actions to roles in its membership scope. In the deployed library
+grants actions to roles in its membership scope. In the rehearsal room
 the `admin` role holds `lending.member` and `lending.staff`, and the
 `member` role holds `lending.member`. We now present those grants
 ourselves.
@@ -422,19 +423,45 @@ return is refused because `gone` is final.
 The earlier acts in the script still take effect, because `@rita`, `@una`
 and `@vic` all hold `lending.member`.
 
-The digest on the first line is the digest in
-[examples/lending/pin.ts](../examples/lending/pin.ts). You have written
-the lending library's definition. The canonical bytes do not depend on
-the order of keys in the source, so this file and
-[the library's own](../examples/lending/definition.ts) give the same pin.
+The digest on the first line is the pin of the lending library's first
+definition, which its rehearsal room runs. You have written that
+definition. The canonical bytes do not depend on the order of keys in the
+source, so this file and [the library's first
+definition](https://github.com/generalbusiness-ai/dap/blob/dedcb14b1d9483bfde3064f5bc09756b34b99f8d/examples/lending/definition.ts) give the same pin.
 
 The last line shows that folding the seven entries again gives the same
-state. That is what a verifier does with a real scope's history.
+state. A verifier also replays a real scope's history, and checks more
+besides; [The record](manual/record.md) says what its report covers.
+
+## What publication adds
+
+The library's current definition publishes a page for each thing to the
+room's Git repository. It adds:
+
+- a `destination` reference on the library, which the room's directory
+  supplies when it creates the library;
+- a `page` value on each thing: its path, `shelf/<16 characters>.md`,
+  which the member's interface chooses at donation and the thing keeps;
+- a `content` field on every act after `establish`: the page's text,
+  which the interface writes and the member signs;
+- a `tell` on each of those acts, which asks the destination to
+  `publish-file` that text at the thing's path;
+- a sixth act, `publish`, which publishes a thing's page again without
+  changing the thing;
+- one named rule, `shelf-page`, which checks the form of a path.
+
+A tell needs a second scope to receive it, so this tutorial stops before
+publication. [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
+describes the form. The library's
+[definition tests](../examples/lending/definition.test.ts) check the
+page each act sends, against a stand-in destination reference; nothing is
+delivered there.
 
 ## Where to go next
 
-- [The lending library](../examples/lending) runs this definition in a
-  room: its member interface, joining by invitation, and kept requests.
+- [The lending library](../examples/lending) runs the publishing
+  definition in a room: its member interface, joining by invitation, and
+  kept requests.
   Its source and tests belong to a repository checkout, not the published
   SDK packages.
 - [Write an application](write-an-application.md) shows how to place
