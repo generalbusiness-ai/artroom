@@ -63,7 +63,7 @@
     <rect x="330" y="210" width="6" height="104" fill="#123F2B"/>
     <text x="356" y="244" class="sans eyebrow" fill="#123F2B">JUDGE</text>
     <text x="356" y="278" class="sans title" fill="#16180F">check the act</text>
-    <text x="356" y="300" class="sans body" fill="#16180F" fill-opacity="0.7">guards · rules · grants</text>
+    <text x="356" y="300" class="sans body" fill="#16180F" fill-opacity="0.7">guards · grants</text>
 
     <!-- Entry -->
     <rect x="536" y="234" width="114" height="56" fill="#123F2B" fill-opacity="0.08" stroke="#123F2B" stroke-opacity="0.45" stroke-width="1.4"/>
@@ -99,7 +99,7 @@
   <!-- Rule expressions -->
   <g>
     <rect x="330" y="348" width="170" height="64" fill="#16180F"/>
-    <text x="415" y="373" text-anchor="middle" class="mono code" fill="#FFFFFF">rules</text>
+    <text x="415" y="373" text-anchor="middle" class="mono code" fill="#FFFFFF">rule expressions</text>
     <text x="415" y="397" text-anchor="middle" class="mono code" fill="#F3F1EA" fill-opacity="0.6">restricted JSONata</text>
   </g>
   <path d="M415 348V322" class="guide"/>

@@ -333,7 +333,7 @@ answers, and nothing about a real host, a real tree or a runner.
 
 ## While you work
 
-Root `npm test` and `npm run test:changed` first apply the narrow Cloudflare
+At the repository root, `npm test` and `npm run test:changed` first apply the narrow Cloudflare
 pool compatibility backport in `scripts/cloudflare-pool-compat.mjs`. It accepts
 only the pinned 0.22.0 package and complete known bundle hashes. Cache-linked
 views receive a private physical copy; the shared cache is never patched.
@@ -458,8 +458,8 @@ test runtime. It does not fix that native helper bug or prove mixed-cohort
 cleanup or physical draining. Captured frames locate IncomingRequest task
 cancellation through the native abort, but do not identify the actor or
 context. The extra Worker startup costs time and memory; the denial project
-starts no clone fixture or Git server. Current full-gate cost and complete
-exact-head Source acceptance remain separate obligations.
+starts no clone fixture or Git server. Current full-gate cost and the approval
+of the exact commit under review remain separate obligations.
 
 The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
 the root inside the `scope` project too, and has no Worker of its own. Its

@@ -31,6 +31,37 @@ An **issue** lane holds a goal: its conditions, the commitments people
 make to it, the holds they take, what they report, how the goal is
 planned and split, its discussion, and whether it is open.
 
+## Commitment
+
+A **commitment** is a promise to do one piece of work. In the contract, a
+`Commitment` names one exact operation that its issuer has promised to
+complete ([scope.ts](../../../packages/contract/src/scope.ts)). In a
+definition, a commitment is an item that moves from `offered` to
+`accepted` to `fulfilled`. The room's issue definition declares that
+item, with a requester, an offeree and a performer, and with other final
+states for a commitment that is declined, withdrawn or cancelled.
+
+## Hold
+
+A **hold** is a time-limited claim, taken under one accepted commitment
+by its performer. A hold item has a holder, a fixed reference `under` to
+the commitment, an end time and an `epoch`. Only a `hold` effect opens,
+renews or ends it. A timed rule ends it when its time passes, and it also
+ends in the entry that takes its commitment to a final state. The
+validator checks this shape, and the `hold@1` capability in
+[hold.ts](../../../packages/derive/src/capability/hold.ts) derives the
+records of a hold's workspace.
+
+## Plan and concern
+
+A **plan** is one way to split a goal into parts, and a **concern** is
+one part of a plan. Both are items of the room's issue definition, in
+[issue.ts](../../../packages/lanes/src/issue.ts). A plan is `open` while
+concerns are added, then `sealed` as the goal's current plan. Adding a
+concern sends a `create` for a new lane under the same definition, and
+the concern's state follows that request: `creating`, then `created`,
+`refused` or `conflict`.
+
 ## Change
 
 A **change** lane holds a proposed change to the repository. A change

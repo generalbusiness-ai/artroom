@@ -135,7 +135,7 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-This exact checkout command ran with Node.js 26.11.1 at Source
+This exact checkout command ran with Node.js 26.11.1 at commit
 `fdafc051ae2ddc384c5dea940fe469e677993dec` and exited 0. It uses the
 materialized repository workspace packages, separately from the Counter
 tutorial's public npm install. Its observed output was:

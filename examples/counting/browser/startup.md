@@ -34,7 +34,7 @@ separate. Preserve ordinary pending install/enrollment envelopes.
 
 Each runner uses its own independently enrolled member/device key. An agent
 member is added as kind `agent`, then receives an agent-key invitation and
-its native enrolment; a person with a role named agent is not equivalent.
+its native enrollment; a person with a role named agent is not equivalent.
 The application controller initializes the paused board. Participation is
 initially inactive; a device chooses a usable voice and activates. Start
 opens claims without selecting a speaker. Eligible active devices may commit
@@ -115,7 +115,8 @@ the route's self-only CSP.
 
 ## Evidence still required
 
-Source and fake DOM/speech/transport witnesses are not deployment evidence.
+Tests of the code, with stand-in DOM, speech and transport, are not
+evidence of a deployment.
 The native C1/M1 witness uses actual factory creation, agent enrollment, grants,
 HTTP sessions, contention, all acts, ordered expiry, restart and proven replay;
 its Git host answers and clock are labeled stand-ins. Actual deployment must

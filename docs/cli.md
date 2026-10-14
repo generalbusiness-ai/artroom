@@ -190,7 +190,7 @@ normal Page build passed and reproduced the unchanged generated module.
 An initial tool-hash guard typo stopped before any build; that outcome is
 retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
-independent Source review are still required for this successor.
+an independent review of the code are still required for this follow-up.
 
 **`dap create <name> [--handle @you] [--branch main] [--again]`**
 
@@ -200,7 +200,8 @@ workflows. All three commands use the same creation and recovery code.
 
 The command signs the register's recorded `found` act. It waits until the
 directory, membership, the rules scope and the destination are created and
-confirmed. Then it takes the founder's seat and first key in membership,
+confirmed. Then it takes the founder's seat, their member item, and first key in
+membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
