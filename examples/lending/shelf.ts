@@ -9,6 +9,9 @@ export type ThingState = "available" | "lent" | "gone";
 /** A thing as the shelf shows it. `donor` and `borrower` are member handles. */
 export interface Thing {
   id: number;
+  /** Fixed path chosen before the donation is signed. */
+  page: string;
+  revision: number;
   state: ThingState;
   name: string;
   description: string;
@@ -18,14 +21,15 @@ export interface Thing {
   /** The entry that last changed this thing. */
   seq: number;
 }
-/** The lending entry a page reflects: the scope, its incarnation, and the entry's place and hash. */
+/** The coherent read's record head. Page text uses only its known Scope/incarnation. */
 export interface RecordPointer { scope: string; incarnation: string; seq: number; hash: string }
+export type ScopePointer = Pick<RecordPointer, "scope" | "incarnation">;
 
-/** A thing's page. The path is the item's number, never a name a member typed. */
-export const shelfPath = (id: number): string => {
-  if (!Number.isSafeInteger(id) || id < 0) throw new Error("A shelf path needs an item number.");
-  return `shelf/${id}.md`;
-};
+/** A random path, made inside custody before signing; never derived from a typed name or future item number. */
+export function shelfPath(random: Uint8Array): string {
+  if (random.length !== 8) throw new Error("A shelf path needs eight random bytes.");
+  return `shelf/${[...random].map((n) => n.toString(16).padStart(2, "0")).join("")}.md`;
+}
 
 const PUNCTUATION = /[!-/:-@[-`{-~]/g;
 // C0 controls, DEL, NEL, and the line and paragraph separators.
@@ -49,8 +53,8 @@ const statusOf = (thing: Thing): string =>
     : thing.state === "lent" ? `lent to ${literal(thing.borrower ?? "a member")}`
       : `gone: ${literal(thing.reason ?? "")}`.trimEnd();
 
-/** The page of one thing, as it stands at `record`. The three list lines are the interface's alone. */
-export function shelfPage(thing: Thing, record: RecordPointer): string {
+/** The page of one thing. No future entry or item number is claimed in this signed text. */
+export function shelfPage(thing: Thing, record: ScopePointer): string {
   const name = literal(thing.name) || `Thing ${thing.id}`;
   const description = literal(thing.description);
   return [
@@ -58,7 +62,7 @@ export function shelfPage(thing: Thing, record: RecordPointer): string {
     ...(description ? [description, ""] : []),
     `- Status: ${statusOf(thing)}`,
     `- Donated by: ${literal(thing.donor)}`,
-    `- Record: lending scope ${record.scope}, incarnation ${record.incarnation}, entry ${record.seq}, hash ${record.hash}`,
+    `- Record: lending scope ${record.scope}, incarnation ${record.incarnation}`,
     "",
   ].join("\n");
 }
@@ -78,14 +82,25 @@ export function thingsOf(entries: readonly Entry[]): Thing[] {
     const { intent } = entry.input.signed;
     const signer = entry.input.authority[0]?.subject.member ?? "";
     if (intent.kind === "donate") {
-      things.set(seq, { id: seq, state: "available", name: text(intent.fields["name"]), description: text(intent.fields["description"]), donor: signer, borrower: null, reason: null, seq });
+      things.set(seq, { id: seq, page: text(intent.fields["page"]), revision: 1, state: "available", name: text(intent.fields["name"]), description: text(intent.fields["description"]), donor: signer, borrower: null, reason: null, seq });
       return;
     }
     const thing = typeof intent.on === "number" ? things.get(intent.on) : undefined;
     if (!thing) return;
+    if (["borrow", "return", "cancel"].includes(intent.kind)) thing.revision++;
     if (intent.kind === "borrow") Object.assign(thing, { state: "lent", borrower: signer, seq });
     else if (intent.kind === "return") Object.assign(thing, { state: "available", borrower: null, seq });
     else if (intent.kind === "cancel") Object.assign(thing, { state: "gone", borrower: null, reason: text(intent.fields["reason"]), seq });
   });
   return [...things.values()];
+}
+
+export interface PageText { title: string; description: string; lines: string[] }
+const words = (value: string): string => value.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]+/g, " ").replace(/ {2,}/g, " ").trim();
+export function expectedPage(thing: Thing, scope: ScopePointer): PageText {
+ return {title:words(thing.name)||`Thing ${thing.id}`, description:words(thing.description), lines:[
+  `Status: ${thing.state === "available" ? "available" : thing.state === "lent" ? `lent to ${words(thing.borrower ?? "a member")}` : `gone: ${words(thing.reason ?? "")}`.trimEnd()}`,
+  `Donated by: ${words(thing.donor)}`,
+  `Record: lending scope ${scope.scope}, incarnation ${scope.incarnation}`,
+ ]};
 }

@@ -3,8 +3,7 @@
  * notes/2026-10-13-lending-library.md. Every word a member typed is put on the
  * page as text, never as markup.
  *
- * Not built here: publishing a shelf page. The interface shows each page's text
- * and says that it is not published by this interface yet.
+ * Each act keeps its page text in the signed request. Published text is read separately.
  */
 import "./style.css";
 import { canonicalize } from "@generalbusiness/artroom-bytes";
@@ -12,7 +11,8 @@ import type { Entry } from "@generalbusiness/dap-contract";
 import { lendingGateway, type ActOutcome, type LendingGateway, type LendingState, type Pending } from "./client.ts";
 import { deviceSigner, findLending, joining, newDeviceKey, readInvitation, type DeviceKey, type JoinOutcome, type Seat } from "./join.ts";
 import { actsFor, type LendingAct, type LendingView, type ShownThing } from "./model.ts";
-import { shelfPage, shelfPath } from "../shelf.ts";
+import { shelfPage } from "../shelf.ts";
+import { readPage, type PublishedPage } from "./publication.ts";
 import { actStore, browserLock, joinStore, remembered, type Remembered } from "./storage.ts";
 
 type Notice = { kind: "plain" | "refusal"; text: string } | null;
@@ -23,6 +23,16 @@ let memory: Remembered | null = null, gateway: LendingGateway | null = null, sta
 let kept: Pending | null = null, keptJoin: Seat | null = null, notice: Notice = null, busy = false, timer: number | undefined;
 /** Controls whose typed text a redraw must drop: a donation that took effect empties its form. */
 const dropped = new Set<string>();
+let published = new Map<number, PublishedPage>(), pageRead: AbortController | null = null;
+async function pages(view: LendingView, version: number, at: number): Promise<void> {
+  pageRead?.abort(); const controller = new AbortController(); pageRead = controller;
+  published = new Map();
+  const identity=memory?.identity, directory=memory?.seat?.directory.scope;
+  if(!identity || !directory) return;
+  const rows=await Promise.all(view.things.map(async thing => [thing.id,await readPage(identity.origin,directory,thing,view.record,controller.signal)] as const));
+  if(at!==epoch || version!==reading || controller.signal.aborted) return;
+  published=new Map(rows); draw();
+}
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attributes: Record<string, string> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag);
@@ -51,7 +61,8 @@ async function look(): Promise<void> {
   if (!using) return;
   const [next, pending] = [await using.look(), await using.pending()];
   if (at !== epoch || version !== reading || using !== gateway) return;
-  state = next; kept = pending; draw();
+  state = next; kept = pending; published = new Map(); draw();
+  if(next.status === "current") void pages(next.view,version,at);
 }
 function tell(kind: LendingAct | "kept", outcome: ActOutcome | null): void {
   if (outcome === null) { notice = null; return; }
@@ -70,7 +81,7 @@ const act = (kind: LendingAct, input: { thing?: number; name?: string; descripti
 });
 
 async function open(next: Remembered): Promise<void> {
-  epoch++; reading++; busy = false; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
+  epoch++; reading++; pageRead?.abort(); published = new Map(); busy = false; gateway?.dispose(); gateway = null; state = { status: "loading" }; kept = null;
   memory = next; draw();
   if (timer !== undefined) clearInterval(timer);
   if (!next.identity) return;
@@ -168,8 +179,12 @@ function drawThing(thing: ShownThing, view: LendingView): Node {
     const reason = h("input", { type: "text", "data-key": `reason-${thing.id}`, "aria-label": `Why thing ${thing.id} is gone`, placeholder: "Why it is gone (staff only)" });
     row.append(reason, button("Cancel this thing", () => void act("cancel", { thing: thing.id, reason: reason.value }), true));
   }
+  const page = published.get(thing.id);
+  if (acts.includes("publish") && page?.status !== "matches") row.append(button("Publish this page", () => void act("publish", { thing: thing.id }), true));
   if (acts.length) card.append(row);
-  card.append(h("details", {}, h("summary", {}, `Shelf page ${shelfPath(thing.id)} (not published by this interface yet)`), h("pre", {}, shelfPage(thing, view.record))));
+  card.append(h("p", {class:"muted"}, page?.status === "matches" ? "Published page text matches this thing at the observed commit." : page?.status === "differs" ? "The published page text differs. Publish this page to refresh it." : page?.status === "unreadable" ? page.reason : "Reading the published page…"));
+  if(page && page.status !== "unreadable") card.append(h("p", {}, h("a",{href:page.url},`Read page at commit ${page.commit}`)));
+  card.append(h("details", {}, h("summary", {}, `Shelf page ${thing.page}`), h("pre", {}, shelfPage(thing, view.record))));
   return card;
 }
 
@@ -179,7 +194,7 @@ function drawRecord(entries: readonly Entry[]): Node {
     if (entry.input.type !== "act") return;
     const { intent } = entry.input.signed;
     body.append(h("tr", {}, h("td", {}, String(seq)), h("td", {}, intent.kind), h("td", {}, entry.input.authority[0]?.subject.member ?? ""),
-      h("td", {}, intent.kind === "donate" ? String(intent.fields["name"] ?? "") : intent.kind === "cancel" ? `thing ${intent.on}: ${String(intent.fields["reason"] ?? "")}` : `thing ${intent.on}`)));
+      h("td", {}, intent.kind === "donate" ? String(intent.fields["name"] ?? "") : intent.kind === "cancel" ? `thing ${intent.on}: ${String(intent.fields["reason"] ?? "")}` : `thing ${intent.kind === "publish" ? intent.fields["thing"] : intent.on}`)));
   });
   return h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Entry"), h("th", {}, "Act"), h("th", {}, "Signed by"), h("th", {}, "What"))), body);
 }
@@ -210,7 +225,7 @@ function drawLibrary(seat: Seat): Node[] {
       if (at !== epoch) return;
       await remembered.forget();
       if (at !== epoch) return;
-      epoch++; reading++; busy = false; gateway?.dispose(); gateway = null; memory = null;
+      epoch++; reading++; pageRead?.abort(); published = new Map(); busy = false; gateway?.dispose(); gateway = null; memory = null;
       notice = { kind: "plain", text: "This browser's key and seat are forgotten. The room still has the seat." }; draw();
     });
   }), true)));

@@ -11,5 +11,5 @@ export default defineConfig({
     { find: "@generalbusiness/artroom-bytes", replacement: source("bytes/src/index.ts") },
     { find: "@generalbusiness/dap-contract", replacement: source("contract/src/index.ts") },
   ] },
-  test: { include: ["definition.test.ts", "shelf.test.ts", "browser/model.test.ts", "browser/custody.test.ts"], environment: "node", pool: "threads" },
+  test: { include: ["definition.test.ts", "shelf.test.ts", "browser/model.test.ts", "browser/custody.test.ts", "browser/publication.test.ts"], environment: "node", pool: "threads" },
 });

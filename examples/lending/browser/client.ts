@@ -174,7 +174,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         if ((await options.store.load() ?? null) !== null) return { status: "nothing-sent", reason: "An earlier request is kept. Check it first." };
         current();
         if (!view || !fresh) return { status: "nothing-sent", reason: "The list is not current yet. Nothing was sent." };
-        const proposed = propose(view, kind, input);
+        const proposed = propose(view, kind, input, identity.member.member);
         if (!proposed.ok) return { status: "nothing-sent", reason: proposed.reason };
         const { on, expected, fields } = proposed.proposal;
         let held: Kept;
@@ -194,7 +194,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
       if (held === null || held === undefined) return null;
       if (!validKept(held, binding)) return { kind: "unknown", thing: null, name: null, notAfter: "", unsent: false };
       const { intent } = held.envelope.signed;
-      return { kind: held.kind, thing: intent.on, name: typeof intent.fields["name"] === "string" ? intent.fields["name"] : null, notAfter: intent.notAfter, unsent: held.phase === "prepared" };
+      return { kind: held.kind, thing: held.kind === "publish" && typeof intent.fields["thing"] === "number" ? intent.fields["thing"] : intent.on, name: typeof intent.fields["name"] === "string" ? intent.fields["name"] : null, notAfter: intent.notAfter, unsent: held.phase === "prepared" };
     },
     check() {
       return options.lock.run(async () => {

@@ -109,3 +109,19 @@ test("explicit Continue keeps the exact envelope after loss; storage or context 
   expect(await advance(broken.store, identity, broken.ports, e, false, true)).toEqual({ status: "unknown" });
   expect([broken.phase(), broken.calls]).toEqual(["unknown", []]);
 });
+
+// Path and text are already signed and kept. A lost reply and reload cannot regenerate either.
+test("the exact signed page and a library publish survive a lost answer and read-only recovery", async () => {
+ for (const kind of ["donate","publish"] as const) {
+  const fields=kind === "donate" ? {name:"Sieve",description:"Fine mesh",page:"shelf/0102030405060708.md",content:"The exact signed text"} : {thing:7,content:"The exact repaired text"};
+  const e:Envelope={grants:[],beside:{},signed:signIntent({v:1,to:scope,actor:keys.una.key,kind,on:kind === "publish" ? 0 : null,expected:kind === "publish" ? {on:1,thing:4} : {library:1},fields,idempotencyKey:`page-${kind}`,notAfter:t(60)},keys.una.secret)};
+  const original:Kept={v:1,kind,envelope:e,phase:"prepared"}, b=bench(original), sent:string[]=[];
+  b.ports.post=async exact=>{sent.push(JSON.stringify(exact));throw new Error("reply lost");};
+  expect(validKept(original,identity)).toBe(true);
+  expect(await advance(b.store,identity,b.ports,e)).toEqual({status:"unknown"});
+  expect((await b.store.load() as Kept).envelope).toEqual(e);
+  expect(await advance(b.store,identity,b.ports,e,true)).toEqual({status:"unknown"});
+  expect(sent).toEqual([JSON.stringify(e)]);
+  expect((await b.store.load() as Kept).envelope.signed.intent.fields).toEqual(fields);
+ }
+});
