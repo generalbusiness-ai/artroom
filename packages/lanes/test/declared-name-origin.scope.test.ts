@@ -21,9 +21,9 @@ import { declaredChangeAttack } from "../../scope/test/support/declared-change-a
 // clock and inspector reads are labelled stand-ins; grants are native.
 // This successor checks only reserve admission, not an outside judge or push.
 // The original c8 witness failed on A-to-B and never reached B-to-B. It is
-// retained as historical evidence; this successor also isolates F1 from P21
-// with a supported canonical pin whose non-native factory origin is also qualified.
-test("native reserve admission refuses declared-name and canonical F1 applications across rooms and inside the destination room; Git host is a STAND-IN", async ({ task }) => {
+// retained as historical evidence. Canonical F1 creation is separately refused
+// by the existing capability restriction, before any reserve can be sent.
+test("native reserve refuses declared-name applications across rooms and inside the destination room, while F1 refuses capability-bearing canonical lanes; Git host is a STAND-IN", async ({ task }) => {
   const owner = beginSessionFixture({ secret: null, sessions: false, inspector: reader });
   const lifetime = nativeFixtureLifetime(owner, { required: false });
   const settle = (...nodes: Platform[]) => dispatchFixture(nodes, lifetime.wait);
@@ -71,12 +71,12 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
     const A = await room("A", keys.rita, keys.una), B = await room("B", keys.sam, keys.vic);
     const destination = await B.G.at();
     const checkpoints: unknown[] = [];
-    Object.assign(task.meta, { nativeReserveCheckpoints: checkpoints, attackJudgeOrPushDriven: false });
+    const creationRefusals: unknown[] = [];
+    Object.assign(task.meta, { nativeReserveCheckpoints: checkpoints, canonicalCreationRefusals: creationRefusals, attackJudgeOrPushDriven: false });
     for (const [label, source, canonical] of [["A-to-B declared", A, false], ["B-to-B declared", B, false],
       ["A-to-B canonical F1", A, true], ["B-to-B canonical F1", B, true]] as const) {
-      // F1's existing cohort pins G2. The supported legacy demo sends G2's
-      // manifest shape; a changeDemo3 source-list send would fail on an
-      // unknown field before testing source identity and mask its control.
+      // This canonical pin carries hold/git-read capabilities. F1's existing
+      // application guard rejects it; do not weaken that guard for a control.
       const declaration = canonical ? changeDemo : declaredChangeAttack;
       const bytes = canonicalize(declaration), digest = definitionDigest(declaration);
       if (canonical) {
@@ -95,6 +95,11 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
         fields: { definition: digest, values: canonicalize(canonical
           ? { title: label, draft: false, destination, rules: await source.Q.at() } : { destination }), execution: "recorded-do" } });
       const established = await source.D.stub.submit(signed, [], { values: [bytes] });
+      if (canonical) {
+        creationRefusals.push({ label, definition: digest, directory: await source.D.at(), answer: established });
+        expect(established, "Canonical capabilities must retain their existing F1 refusal.").toMatchObject({ answer: "refused", reason: "unsupported-definition", name: "unsupported-application" });
+        continue;
+      }
       expect(established).toMatchObject({ answer: "accepted" });
       if (established.answer !== "accepted") throw new Error("Native application creation did not run.");
       const app = await source.D.created(established.receipt.fact.seq);
@@ -136,7 +141,7 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
         publicationIds: publications.map(i => i.id), attackJudgeOrPushDriven: false };
       checkpoints.push(checkpoint);
       // The JSON reporter retains this bounded public checkpoint even if the
-      // next assertion fails. The disabled-origin-identity control must fail here by
+      // next assertion fails. The disabled-name-qualification control must fail here by
       // assertion, before any further scenario or outside operation is driven.
       expect(publications, `${label} opened a native publication; remaining scenarios are UNRUN.`).toHaveLength(0);
       expect([sourced.under, sourced.at]).toEqual(["declared:change", from]);
