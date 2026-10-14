@@ -51,8 +51,9 @@ the move. Each renamed note also retains its exact bytes:
 | log-bounded.md | [2026-10-01-log-bounded.md](2026-10-01-log-bounded.md) |
 | mcp-stage0.md | [2026-10-02-mcp-stage0.md](2026-10-02-mcp-stage0.md) |
 
-The original focused check ran once at implementation commit
-`70f1cb899edc0402cc2b540e7f7a42470d854cf9`:
+The worker reports these original focused checks on the implementation bytes
+later committed as `70f1cb899edc0402cc2b540e7f7a42470d854cf9`. These are
+reported outcomes, with no independent sealed claim of the exact start head:
 
 - `node --test scripts/active-source.test.mjs`: seven passed, none failed.
 - `node scripts/check-doc-links.mjs`: 285 relative links, none broken.
