@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f3c5227290b5dc0bd9fd5e4036af626185413e3c","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f469c2ce00d1464bf2d54c2b72814f619b0fcc09","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-jam-room.md."}
