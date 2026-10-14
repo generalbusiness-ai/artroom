@@ -5,7 +5,7 @@
  * TEST SECRET; the Git host and the scheduler are STAND-INs, as in story.scope.test.ts.
  *
  * Witnesses: issuance and enrolment of two separate agent configurations with real membership@5 receipts and the agent role's
- * acts; the same on membership@4; and three refusals: an invitation whose pin names another definition than the membership's
+ * acts; the same on membership@4, with a kept person invitation whose answer is lost, checked and joined; and three refusals: an invitation whose pin names another definition than the membership's
  * receipt, a counting invitation presented to the library's membership, and an issuance by an admin who names another member
  * as the controller. No link is relabelled into acceptance, no directory allowlist is widened, no person is substituted, and no
  * key is transplanted between rooms.
@@ -19,14 +19,14 @@ import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { Platform, routed } from "../../scope/test/repository.ts";
 import { outsideOf } from "../../scope/test/outside.ts";
 import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "../../scope/test/support/native-fixture-lifetime.ts";
-import { command, enrolAgentKey, issueInvitation, memoryStore, type Config, type Context, type Outcome, type Store } from "../src/index.ts";
+import { command, enrolAgentKey, issueInvitation, linkOf, memoryStore, type Config, type Context, type Outcome, type Store } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
 const reader = "a test reader";
 
 describe("tagged agent-key enrolment on the Counting and application cohorts, over the Worker's routes on real scopes", () => {
-  test("membership@5: two agents enrolled with real receipts and the agent role's acts; membership@4: one more; a relabelled pin, a link presented to another room and a foreign controller are each refused with nothing replaced", async () => {
+  test("membership@5: two agents enrolled with real receipts and the agent role's acts; membership@4: one more, and a kept person invitation checked after a lost answer and joined; a relabelled pin, a link presented to another room and a foreign controller are each refused with nothing replaced", async () => {
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
     const lifetime = nativeFixtureLifetime(owner);
     try { await story(lifetime); } finally { lifetime.release(); }
@@ -183,6 +183,65 @@ async function story(lifetime: Lifetime): Promise<void> {
   expect([(await library.M.summary()).value.definition, APPLICATION_COHORT.membership]).toEqual(["platform:membership@4", "platform:membership@4"]);
   const third = await enrol(library, person(), await link(lia, library.membership, "@bot3", "@lia"), "@bot3", "platform:membership@4");
   expect([first.key, second.key]).not.toContain(third.key);
+
+  // A kept person invitation on membership@4, the library's: `dap invite --keep` keeps the secret and the exact signed request
+  // before it is sent, so a lost answer is checked and never replaced. STAND-IN: the answer to the first invite-member is lost on
+  // its way back, after the scope has recorded it.
+  let lose = true;
+  const losing = (async (url: string, init?: RequestInit) => {
+    const response = await (fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    if (lose && new URL(url).pathname.endsWith("/acts") && typeof init?.body === "string" && init.body.includes('"invite-member"')) { lose = false; throw new Error("the answer was lost"); }
+    return response;
+  }) as unknown as Fetch;
+  const lost = await run({ ...lia, fetch: losing }, "invite", "@pat", "--role", "member", "--keep");
+  expect(lost.code, lost.lines.join("\n")).toBe(1);
+  expect(lose, "the invite-member was sent once and its answer lost").toBe(false);
+  // While its outcome is unknown, the retained invitation blocks a new one: nothing new is signed or sent.
+  const blocked = await run(lia, "invite", "@quin", "--role", "member", "--keep");
+  expect(blocked).toEqual({ code: 1, lines: ["An invitation of @pat is retained. Run dap invite --check, or dap invite --continue. Nothing new was signed."] });
+  const recorded = (await library.M.summary()).at;
+  const checked = await run(lia, "invite", "--check");
+  expect([checked.code, checked.lines[0]], checked.lines.join("\n")).toEqual([0, "Invited @pat: the invitation is recorded and verified."]);
+  expect((await library.M.summary()).at, "--check sends nothing").toEqual(recorded);
+  expect((await library.M.summary()).value.items.filter((item) => item.type === "member" && item.values["handle"] === "@pat"), "one invitation of @pat").toHaveLength(1);
+  const personLink = checked.lines[1]!.split(": ")[1]!;
+  expect(linkOf(personLink)?.definition, "the person link carries the library membership's pin").toBe("platform:membership@4");
+  const pat = person();
+  const joined = await run(pat, "join", personLink);
+  expect(joined.code, joined.lines.join("\n")).toBe(0);
+  expect((await pat.store.config())!.repository?.membership).toEqual(library.membership);
+  // The finished invitation was released when it was verified, so the next one starts.
+  const next = await run(lia, "invite", "@quin", "--role", "member", "--keep");
+  expect([next.code, next.lines[0]], next.lines.join("\n")).toEqual([0, "Invited @quin: the invitation is recorded and verified."]);
+
+  // Twenty Continues whose answers are all lost: each resends the same signed invite-member and keeps no new snapshot, so the
+  // retained record stays readable. Then a Check whose directory read is interrupted stays unknown, and a second Check settles
+  // the original: one native invitation of @rex, signed once.
+  const dropping = (match: (url: string, body: string) => boolean) => (async (url: string, init?: RequestInit) => {
+    const response = await (fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    if (match(url, typeof init?.body === "string" ? init.body : "")) throw new Error("the answer was lost");
+    return response;
+  }) as unknown as Fetch;
+  const invites = dropping((url, body) => new URL(url).pathname.endsWith("/acts") && body.includes('"invite-member"'));
+  expect((await run({ ...lia, fetch: invites }, "invite", "@rex", "--role", "member", "--keep")).code).toBe(1);
+  for (let i = 0; i < 20; i++) {
+    const again = await run({ ...lia, fetch: invites }, "invite", "--continue");
+    expect([again.code, again.lines[0]], again.lines.join("\n")).toEqual([1, expect.stringMatching(/^The invitation of @rex is unknown\./)]);
+  }
+  const signedOnce = (await library.M.entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "invite-member" && (entry.input.signed.intent.fields as { handle?: string }).handle === "@rex");
+  expect(signedOnce, "one invite-member of @rex, however often it was continued").toHaveLength(1);
+  const headBefore = (await library.M.summary()).at;
+  const directoryScope = library.repository.directory.scope;
+  const interrupted = await run({ ...lia, fetch: dropping((url) => url.includes(directoryScope)) }, "invite", "--check");
+  expect([interrupted.code, interrupted.lines[0]], interrupted.lines.join("\n")).toEqual([1, expect.stringMatching(/Nothing was read; the read may be made again\. The original invitation is retained/)]);
+  const settled = await run(lia, "invite", "--check");
+  expect([settled.code, settled.lines[0]], settled.lines.join("\n")).toEqual([0, "Invited @rex: the invitation is recorded and verified."]);
+  expect((await library.M.summary()).at, "Check sends nothing").toEqual(headBefore);
+  expect((await library.M.summary()).value.items.filter((item) => item.type === "member" && item.values["handle"] === "@rex")).toHaveLength(1);
+  // The three modes stay distinct on the command line.
+  expect((await run(lia, "invite", "--check", "--continue")).code).toBe(2);
+  expect((await run(lia, "invite", "--check", "--hours", "2")).code).toBe(2);
+  expect((await run(lia, "invite", "@sam", "--role", "member", "--keep", "--acts", "x")).code).toBe(2);
 
   // ---- Refusals. Each leaves the receiving configuration without a repository and the rooms' heads unchanged by the refusal.
   const relabel = (text: string, over: Partial<AgentKeyInvitation>): string => encodeAgentKeyInvitation({ ...agentKeyInvitationOf(text)!, ...over });

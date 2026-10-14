@@ -235,6 +235,21 @@ Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
 Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
 ```
 
+With `--keep`, the invitation is kept before it is sent: the command
+makes the secret, signs `invite-member`, and saves both in an owner-only
+private file first. The link names the membership's exact definition,
+for example `platform:membership@4` in a room of the application cohort.
+If the answer is lost, run `dap invite --check`, which reads the outcome
+and sends nothing, or `dap invite --continue`, which resumes the exact
+original request. While one kept invitation is unresolved, a new one is
+refused, so a lost answer is never replaced by a second invitation. A
+verified or refused invitation is released, and its link is printed once.
+
+```
+Invited @una: the invitation is recorded and verified.
+Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
+```
+
 **`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
