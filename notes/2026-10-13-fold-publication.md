@@ -1,10 +1,10 @@
 # Publication from a fold
 
-13 October 2026. **Proposed design, Draft 3. Design only: nothing here is
-built.** One thing was run for this draft, a trial of the lending
-definition of section 5 against the validator and the judges in memory;
-section 5.4 says what it showed and what it did not. Baseline main
-`6afbb5b53`.
+13 October 2026; Draft 4, 14 October 2026. **Proposed design. Design
+only: nothing here is built.** Two trials were run, in memory, of the
+lending definition of section 5 against the validator, the rule
+evaluator and the judges; section 5.4 says what they showed and what they
+did not. Baseline main `47a2a4b5`.
 
 This note proposes the simplest way for an application's act to put a
 file in its room's repository. Today only the change lane can do that.
@@ -29,6 +29,26 @@ proposes one act more than the approved lending design has (section
 
 Draft 3 records Hugh's decision of 13 October 2026, 15:57 Eastern, on
 section 5.3: the library gains the act `publish`. Nothing else changed.
+
+Draft 4 answers the checker's review `3781416c` of Draft 3:
+
+- **A gone thing's page can be repaired.** `publish` is an act on the
+  library, which is never final, and names the thing as a second item.
+  The judge refuses a transition only on a primary item that is final;
+  the trial wrote `publish` for a gone thing (section 5.3).
+- **A page belongs to one thing for good.** The donation's guard now
+  covers gone things too, so a cancelled thing's page cannot be taken by
+  a later donation (section 5.1).
+- **No registration.** The destination admits `publish-file` from a
+  scope whose creation by its own directory is proved by the checked
+  native origin that the publication-origin repair (`2ce4730e`, main
+  `9a3e43d2`) added. Nothing is told to the destination when an
+  application is created, so there is no registration to lose or repair
+  (section 9.2).
+- Corrections: section 4.2 no longer says a page cannot fall behind;
+  section 8 states the receipt bound as the source has it; the queue
+  details of section 9.3 become builder criteria; section 10 lists the
+  witnesses the review asked for.
 
 ## 1. The aim
 
@@ -79,7 +99,7 @@ A new destination version adds one handler:
 | Part | Value |
 |---|---|
 | Message | `publish-file`, class `tell` |
-| From | a scope of kind `lane`, under any definition name, that the directory named as one of its applications (section 9.2) |
+| From | a scope of kind `lane`, under any definition name, whose checked native origin shows that this destination's own directory created it (section 9.2) |
 | Fields | `path`: text, at most 1,024 bytes. `content`: text, at most 65,536 bytes. |
 | Opens | a file publication, queued, with the sender and the sending entry as its cause (section 9.2) |
 | Judgment | none of the room's review rules apply; see section 6 |
@@ -109,8 +129,12 @@ already has: a field of the act, a slot of an item, or a constant.
 In the simplest use the signer's client writes the page text into a
 field of the act, and the entry carries it to the destination. The scope
 does not check that the text agrees with the item's state. What changes
-is that the page and the act are one signed entry: the page cannot fall
-behind, and the record shows who stated the text and when.
+is that the page text and the act are one signed entry: the record keeps
+the text that the act stated, with who stated it and when. The published
+page can still lag the record, by the time of a push, or until the next
+act on the thing if a push fails for good (section 7). A page at the
+published head does not prove that this act's push completed; the
+receipt does.
 
 (The reading of "produces text output" as "any existing send source" is
 the planner's. A form that renders an item's slots as text would be a
@@ -153,13 +177,21 @@ when this design is approved.
 | `thing` | A value `page`: the path of the thing's shelf page, text, fixed, set by `donate`. |
 | `donate` | Two more fields: `page` and `content`. A rule and a guard on `page` (below). It tells the destination `publish-file` with the `page` and the `content`. |
 | `borrow`, `return`, `cancel` | One more field, `content`. Each tells the destination `publish-file` with the thing's stored `page` and the `content`. |
-| Every act but `establish` | Names the one `library` item, to read its `destination`. The library never changes, so this adds no contention. |
+| `publish` | A sixth act, on the `library`, naming a thing (section 5.3). |
+| Every act but `establish` | Names the one `library` item, to read its `destination`. No act changes the library, so its revision never moves and naming it adds no contention; the trials showed the revision unchanged after donations, a cancellation and `publish`. |
 
 The guards on a donation's `page`:
 
 - a rule, `shelf-page`, in the restricted expression language: the path
   starts with `shelf/`, ends with `.md`, and holds no `..`;
-- no live thing already has that `page`.
+- no thing, available, lent or gone, already has that `page`.
+
+A gone thing is final, and the scope keeps it (section 6.5 of the
+contract: retained final items are not evicted), so its `page` stays
+taken. The guard reads every thing the scope holds, live or retained; the
+cost grows with the things ever donated, within the scope's bound on
+entries. A random name is still the interface's choice; the guard is
+what makes a page belong to one thing.
 
 So a lending act can write only under `shelf/`, and only the page of the
 thing it is about. The wide authority of section 6 remains the
@@ -196,20 +228,50 @@ an act takes effect, so a page that is wrong, or whose push was refused,
 stays so until the next act on that thing. A thing that is `gone` has no
 next act.
 
-So the library gains one act: `publish`, on a thing in any state, with
-the field `content`, allowed to `lending.member`. It changes no state
-and tells the destination `publish-file` for the thing's page. It is the
-repair for a page that is behind or wrong.
+So the library gains one act, `publish`, allowed to `lending.member`. Hugh
+decided on 13 October 2026 that the library gains this sixth one; the
+approved lending design said "keep five acts".
 
-The approved lending design says "keep five acts". Hugh decided on
-13 October 2026 that the library gains this sixth one.
+| Part | Value |
+|---|---|
+| Step and primary item | `transition` on the `library`, which is never final |
+| `also` | `thing`, the thing the field `thing` names, in any state |
+| Fields | `thing` (required), `content` (required, at most 4,096 bytes) |
+| Effects | none |
+| Send | `publish-file` to the library's `destination`, with the thing's stored `page` and the `content` |
 
-Whether an act can be on an item in a final state was not checked. The
-trial of the lending definition met the refusal `final` for an act on a
-`gone` thing. If no act can be on one, `publish` covers live things, and
-a gone thing's page is right or is repaired by hand.
+The judge refuses a transition whose primary item is final
+(`packages/derive/src/judge.ts`, the check after the expected revisions).
+It does not refuse an `also` item that is final, and an act with no
+effects changes nothing on it, so the fold's rule that no effect changes a
+final item (`fold.ts`, `touch`) is not met. A comment cannot do this:
+comments do not send.
+
+This is the repair for every page, including a gone thing's. It replaces
+Draft 3's "a gone thing's page is right or is repaired by hand". A full
+refresh is one `publish` for each thing that the interface finds behind;
+the interface reads the published head and offers it.
 
 ### 5.4 What was run
+
+**Draft 4 trial, 14 October 2026.** In memory, with the real validator,
+rule evaluator, judges, seal and fold, on the definition of sections 5.1
+and 5.3, every act reading the destination from the library. The
+destination reference was made up; nothing was delivered.
+
+- The validator accepted the definition.
+- Donation A with page `shelf/a1.md` was written; its one send is
+  `publish-file` with that path.
+- The cancellation of A was written, with a send for the same path; A is
+  gone.
+- Donation B with page `shelf/a1.md` was refused `guard-failed`, at the
+  guard over all states: a gone thing keeps its page.
+- A donation with page `README.md` was refused by the rule.
+- `publish` naming the gone A was written. Its send carries A's stored
+  path. A stays gone. The library's revision was 1 before and after.
+- Folding the record again gave the same state.
+
+**Draft 2 trial, 13 October 2026.** The same, on Draft 2's definition:
 
 One trial, in memory, with the real validator, rule evaluator and
 judges, on the lending definition changed as in section 5.1. It had no
@@ -243,9 +305,12 @@ section 4.4.
 
 ## 6. Authority
 
-Any application scope may write any path. This is Hugh's decision for
-now, on the ground that every such write has a recorded cause: the
-sending entry, its signer, the publication and the receipt.
+Any application scope of the room may write any path. This is Hugh's
+decision for now, on the ground that every such write has a recorded
+cause: the sending entry, its signer, the publication and the receipt.
+The review accepted it and asked that it be documented; the user
+documentation of the new destination version states it with the
+consequences below.
 
 Consequences to state plainly in the documentation:
 
@@ -278,8 +343,9 @@ from a scope of its own room. Section 9.2 proposes how.
   exist keep the versions they pinned.
 - No change to the `restricted` profile or to the declared forms.
 - One file of at most 65,536 bytes of UTF-8 text for each send.
-- The destination refuses a new publication while 64 receipts are owed
-  (`receipts-owed`). An application that sends a file on every act
+- The destination refuses a new publication once 65 receipts are owed
+  (`receipts-owed`): its guard counts owed receipts with `max:
+  RECEIPTS_OWED`, which is 64 (`destination.ts`). An application that sends a file on every act
   meets this bound under a burst; the act's `refused` clause is where it
   shows.
 - A send counts toward the sends of one entry.
@@ -334,13 +400,26 @@ them. Nothing here was run except the trial of section 5.4.
 
 ### 9.2 Proposed answers, for the review
 
-1. **Same room.** The directory tells the destination of each
-   application it creates, and the destination keeps one small item for
-   each. `publish-file` is accepted only from a scope that such an item
-   names. This uses declared forms only, and the destination trusts its
-   own directory, as its `import` and `compromised` handlers already do
-   by comparing the sender with `branch.directory`. The item type's
-   bound is the most applications a room may have that publish.
+1. **Same room, by the sender's proved origin.** Draft 3 proposed that
+   the directory tell the destination of each application it creates.
+   The review found that creation and registration would be separate
+   effects, so a lost or refused registration would leave a created
+   application unable to publish, with no repair. Draft 4 drops
+   registration. Since main `9a3e43d2` (request `2ce4730e`), a scope
+   that judges a delivery can read the sender's native origin with the
+   source entry: the sender's genesis and the creating entry of its
+   creator (`sourced` and `sourceOrigin` in
+   `packages/scope/src/namespace.ts`). A destination reservation already
+   checks that origin against the destination and its full directory
+   reference, including incarnations, before judgment, and the outside
+   operations driver checks it again before a send, recovery or late
+   settlement. `publish-file` uses the same check: the sender's genesis
+   seed names this destination's directory as creator, and the creating
+   entry is that directory's `establish-application`, whose signed act,
+   cause, seed and creation send match. Missing proof leaves the
+   delivery pending, as for a reservation; it is not refused and not
+   replayed. Nothing is told at creation, so there is nothing to
+   reconcile.
 2. **The cause.** A file publication records its cause as the sender's
    scope reference with the sending entry's number and hash, read from
    the verified source entry. It does not reuse the `operation` slot. A
@@ -349,36 +428,52 @@ them. Nothing here was run except the trial of section 5.4.
 3. **The factory.** `destination` joins `opener` as a reserved genesis
    field: a caller cannot supply it, and the factory injects the
    repository's destination when the genesis act declares a field of
-   that name with type `scope` and kind `destination`.
+   that name with type `scope` and kind `destination`. A creation whose
+   `values` name `destination` is refused, as one naming `opener` is.
 4. **Versions.** One new destination version with the handler and the
-   two item types; one new directory version whose factory injects the
-   reference and tells the destination of each application; and an
-   application cohort that pins both. Rooms that exist keep what they
+   file-publication item type; one new directory version whose factory
+   injects the reference; and an application cohort that pins both. Rooms that exist keep what they
    pinned. The lending room is created under the new cohort.
 
-### 9.3 Still open
+### 9.3 Builder criteria
 
-- **The queue.** The destination holds one publication at a time. Where
-  a file publication waits behind a change's publication, and the
-  reverse, was not designed. The first version may share the one slot.
+- **One publication slot.** File publications share the destination's
+  one slot with a change's publications, in the order they are admitted.
+  Admission and owed receipts are counted together for both kinds.
+- **The cause is bound.** A file publication's commit and receipt name
+  the path, the content's digest, the sender's full reference and the
+  sending entry's number and hash. An older publication's completion is
+  never shown as a newer act's page.
+- **A restart keeps an unknown push unknown.** As for a change's
+  publication: sent at most once, an unknown answer stays unknown until
+  it is read.
+- **Content size.** A page built from the longest name, description and
+  reason, each escaped, fits in 4,096 bytes of UTF-8; a builder witness
+  shows it.
 - **A push that fails for good.** The sender is not told (section 4.4).
-  The page stays behind until the next act, or `publish` (section 5.3).
+  The page stays behind until the next act on that thing, or `publish`.
 - **Removing a file.** Not proposed.
-- **An act on a final item**, for section 5.3.
 
 ## 10. Witnesses a builder would owe
 
 - A real application scope whose act sends `publish-file`; the commit,
   the receipt naming the entry, and the page served by the site.
-- The refusals: a sender outside the room; text over the bound; 65
-  receipts owed.
+- The refusals: a sender created by another room's directory; a sender
+  that is no application of this directory (a lane of another kind, or a
+  scope with no creator); text over the bound; 65 receipts owed; a
+  creation whose `values` name `destination`.
+- A sender whose origin cannot be proved yet: the delivery stays pending
+  and is not refused or replayed; after the proof is available it is
+  judged once.
 - A restart between the entry and the push, showing one push.
-- The refusal of a scope that the directory did not name as one of its
-  applications, including an application of another room.
+- Interleaved change and file publications, and two successive shelf
+  writes for one thing: each receipt names its own entry, and the later
+  page wins.
 - The lending library with its pages written this way: the story of the
   lending design, each page at the published head after its act, the
-  rule's refusal of a path outside `shelf/`, and a lost reply to a
-  lending act that leaves one entry and one commit.
+  rule's refusal of a path outside `shelf/`, a donation refused for a
+  gone thing's page, `publish` repairing a gone thing's page, and a lost
+  reply to a lending act that leaves one entry and one commit.
 
 ## 11. Out of scope
 
