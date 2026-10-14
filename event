@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:032bd6b169a78ca6e129edbacfb4a2e5ac31cd0b","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:041afe9ab93626c45d681c4ff12cc0c07c88bed2","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i3-host-review.md."}
