@@ -86,9 +86,23 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   // One root holds the commit, staged once. Each refused version left a pin that is still `provisional`, and the admitted one is `held`.
   const records = async (kind: string, state: string) => (await C.state()).recordCount("hold@1", kind, state);
   expect([await records("root", "live"), await records("pin", "provisional"), await records("pin", "held"), await records("check", "recorded"), [A, B, C].reduce((count, lane) => count + r.hosts.get(lane.name)!.asked.filter(kind => kind === "stage").length, 0)]).toEqual([1, 3, 1, 4, 3]);
-  // Its authors are derived: the integrator, the authors of each selected report, and the member each acts for.
+  // Native grants attribute the signing member; their principal is null.
+  // Controllers are separately retained Native observations, not additional authors.
   const manifest = await C.item(m1);
-  expect(manifest.parties["authors"]).toMatchObject([{ member: "@paul" }, { member: "@quinn" }, { member: "@una" }, { member: "@vic" }]);
+  expect(manifest.parties["authors"]).toEqual([await r.member("@una"), await r.member("@vic")]);
+  for (const [lane, seq, member, controller] of [[A, ra.seq, "@vic", "@quinn"], [B, rb.seq, "@una", "@paul"], [C, m1, "@una", "@paul"]] as const) {
+    const input = (await lane.entry(seq)).input;
+    expect(input.type).toBe("act");
+    if (input.type !== "act") throw new Error("Native report/manifest authority is not an act");
+    expect(input.authority).toHaveLength(1);
+    expect(input.authority[0]).toMatchObject({ principal: null, subject: await r.member(member),
+      fresh: { observation: { of: await r.M.at(), member, memberState: "active", keyState: "active", controller, controllerActive: true } } });
+  }
+  // The original four-author/principal refusals remain covered by the unchanged
+  // derive/test/judge.test.ts case "a report after a handover is attributed to
+  // both performers, both holders and their principals", with scripted grants.
+  // Controller review exclusion belongs to Destination eligibility; the pure
+  // platform/test/extents.test.ts controller cases cover it, not this Native lane.
 
   // A later version in a child changes nothing in the manifest: it holds the exact entries it was proposed with.
   const later = (await B.stagedDid(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("e"), tree: oid("5") } })).fact;
@@ -96,9 +110,9 @@ test("T3, a manifest and its evidence: it is complete only by the plan's recorde
   expect(await C.item(m1)).toEqual(manifest);
   expect(manifest.values).toMatchObject({ selected: [fromA, fromB], decisions: [decided], complete: true, tree: oid("3") });
 
-  // Review. An author of any selected work, the integrator, and the member an author acts for may not give a verdict.
+  // Review: both the selected-report author and the integrator are refused.
   const verdict = { fields: { manifest: m1, verdict: "approve" } } as const;
-  expect([await C.asks(vic, "review-verdict", verdict), await C.asks(una, "review-verdict", verdict), await C.asks(paul, "review-verdict", verdict)]).toEqual(Array(3).fill("guard-failed: author-cannot-review"));
+  expect([await C.asks(vic, "review-verdict", verdict), await C.asks(una, "review-verdict", verdict)]).toEqual(Array(2).fill("guard-failed: author-cannot-review"));
   // Merge. Each refusal is named, in the order of the guards: no rules yet; then no approval; then the required check has not passed.
   const merges = (manifest = m1, reports = [ra, rb]) => C.asks(rita, "merge", { fields: { manifest, reports } });
   expect(await merges()).toBe("guard-failed: rules-unknown");

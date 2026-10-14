@@ -3,9 +3,14 @@ import { DIGESTS, change, issue } from "../../src/index.ts";
 import { rita, soon, una, vic } from "./graph.ts";
 import { room as nativeRoom, checkerKey } from "./room.ts";
 
-/** Native test configuration: two delegated agents and independent people, not fixture grants. */
+/** Native test configuration: two controlled agents and independent people, not fixture grants. */
 export async function delegatedRoom() {
   const r = await nativeRoom({ roster: ["@paul"] });
+  const memberActions = (await r.M.item(0)).values["memberActions"];
+  if (!Array.isArray(memberActions) || !memberActions.every(action => typeof action === "string")) throw new Error("Native member actions unavailable");
+  // Explicit test policy lets Paul check and lets the independent reviewer's
+  // wrong-checker attempt reach the lane guard, before either key is observed.
+  await r.M.did(rita, "set-actions", { on: 0, expected: await r.M.expected({ on: 0 }), fields: { role: "member", actions: [...new Set([...memberActions, "change.check"])] } });
   const quinnSecret = new Uint8Array(32).fill(7);
   const quinn = { secret: quinnSecret, key: keyIdOfSecret(quinnSecret), member: await r.member("@quinn"), principal: null };
   const reviewer = { ...checkerKey, member: await r.member("@check"), principal: null };
