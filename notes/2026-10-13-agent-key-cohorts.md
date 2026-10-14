@@ -64,6 +64,29 @@ controller binding (the issuer must be the controller, a person admin
 holding `membership.invite` and `membership.manage`); the private request,
 envelope and key custody of both functions; person invitations.
 
+## Kept person invitations (added 14 October 2026)
+
+Hugh asked on 14 October 2026 for the lending library to reach its final
+state, member interface first. The lending runbook named one gap on that
+path: no retained person invitation for `platform:membership@4`. The
+issuance in `invitations.ts` already handles `kind: "person"` and, with the
+pin set above, tags the link with the membership's own pin, but only the
+page called it. This head adds the command:
+
+- **`dap invite <@member> --role <role> --keep`** calls `issueInvitation`
+  for a person. The secret and the signed `invite-member` are kept before
+  sending; the link names the membership's exact definition.
+- **`dap invite --check`** reads the kept invitation's outcome and sends
+  nothing; **`dap invite --continue`** resumes the exact original.
+- One kept invitation at a time. While it is unresolved, a new one is
+  refused and nothing is signed. A verified or refused one is released at
+  once, and its link is printed once, as `dap invite` prints it. (A person
+  who has joined consumes the invitation, so it can no longer be verified
+  later; releasing at verification is what lets the next one start.)
+- Plain `dap invite` is unchanged.
+- `examples/lending/runbook.md` now names the command in place of the gap.
+  `docs/cli.md` documents it.
+
 ## Witnesses
 
 `packages/cli/test/agent-key.scope.test.ts`, one scenario on real scopes
@@ -95,6 +118,13 @@ sessions, the Git host and the scheduler as stand-ins, as
   membership, `guard-failed`; its head does not move; a retry reports the
   retained refusal and sends nothing. The same with the pin left at `@5`
   is refused too; neither room's head moves.
+- **Kept person invitation on membership@4.** In the application cohort
+  room, the answer to the first `invite-member` is lost after the scope
+  records it (a fetch stand-in). A new `--keep` invitation is then refused
+  with nothing signed. `dap invite --check` verifies the original without
+  moving the membership's head; there is one invitation of `@pat`; the
+  link names `platform:membership@4`; a fresh configuration joins with it.
+  The next `--keep` invitation is verified.
 - **Controller.** An issuance naming another member (`@bot1`) as the
   controller is refused before anything is signed, and the Counting
   membership's head does not move.

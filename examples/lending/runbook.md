@@ -100,33 +100,32 @@ time. Measure the actual grant reuse window before the lending acts.
 
 ## Join in a browser and show custody
 
-**Baseline gap: retained membership 4 invitation issuance is unsupported.**
-The ordinary CLI invitation command reads the actual membership definition
-and tags its link accordingly, but does not retain the issuance secret and
-signed request before submission. The retained tagged issuance path in
-`packages/cli/src/invitations.ts` admits membership 2 and its demo directory,
-not this application's membership 4 and directory 5. Neither path is a
-shown recoverable issuance path for this runbook. Do not run a plausible
-`dap invite` command and claim this gap has been closed.
+**Issue each person invitation with `dap invite --keep`.** It reads the
+actual membership's definition, checks the issuer's active key and
+`membership.invite`, and checks the directory's membership, rules and
+destination references against that definition's directory. It makes the
+invitation secret and keeps it with the exact signed `invite-member`
+request in an owner-only private file before anything is sent. It verifies
+the accepted receipt, the recorded invitation's handle, role, hash and
+expiry, and prints a link tagged with the membership's exact definition,
+`platform:membership@4` here:
 
-A separately reviewed native membership 4 issuance helper must:
+```sh
+node packages/cli/bin/dap.js invite @nasruddin --role member --keep
+```
 
-1. Verify the actual membership 4 summary, issuer's active key and invitation
-   authority, and the directory's membership, rules, and destination references.
-2. Generate the invitation secret privately and retain it with the exact
-   signed `invite-member` request before dispatch.
-3. Verify the accepted receipt, intent digest, full membership reference,
-   incarnation, and recorded invitation's handle, role, hash, and expiry.
-4. Encode the private person link with the actual repository references,
-   invitation number, and explicit `platform:membership@4` tag.
-5. Reconcile an unknown issuance through that retained original request.
-   Do not generate another invitation or merely change a membership 2 tag.
+If the answer is lost, run `dap invite --check`, which reads the outcome
+and sends nothing, or `dap invite --continue`, which resumes the exact
+original request. While an invitation is unresolved the command refuses a
+new one; do not issue a second invitation to replace an unknown one.
+`packages/cli/test/agent-key.scope.test.ts` shows a lost answer checked
+and the link joined on a membership 4 room. A deployed issuance is still
+**unrun**.
 
-This helper and its deployed issuance remain **unrun and owed**. The CLI's
-person join loads the explicit membership pin and keeps its signed join.
-The Library browser additionally requires the membership 4 tag and the
-current service origin, then verifies the native receipt before enrollment
-is called joined. That receiver parity does not supply the missing issuer.
+The CLI's person join loads the explicit membership pin and keeps its
+signed join. The Library browser additionally requires the membership 4
+tag and the current service origin, then verifies the native receipt
+before enrollment is called joined.
 
 Open the verified library service's `/lending/` interface in an independent
 browser profile. Paste the invitation into **Invitation link** and use the
