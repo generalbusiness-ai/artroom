@@ -664,6 +664,10 @@ function nextJudge(state: Pick<StateView, "page">, after: { slot?: boolean; judg
   return queued?.id ?? after.opens ?? null;
 }
 
+function queuedJudgeKind(state: Pick<StateView, "item">, id: number, input?: RuleGiven["input"], opens?: number): "judge" | "file-judge" {
+  return state.item(id)?.type === "file-publication" || id === opens && input?.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "publish-file" ? "file-judge" : "judge";
+}
+
 /** The position of the entry that opened an operation: the first part of its ID (the contract's section 4.3, item 1). */
 const seqOf = (id: OperationId): number => Number(id.slice(0, id.indexOf(":")));
 
@@ -984,11 +988,11 @@ function updateRequest({ own, resolved }: RuleGiven, update: Update): RuleReques
 }
 
 /** "The next `judge`", as an outcome's rule yields it: the reference `branch.judging` and the operation. `emptied`: the entry empties `judging`, so it is emptied where no `judge` follows. */
-function andNext(given: Pick<RuleGiven, "input" | "own">, state: Pick<StateView, "page">, after: Parameters<typeof nextJudge>[1], emptied = false): Pick<Decided, "effects" | "opens"> {
+function andNext(given: Pick<RuleGiven, "input" | "own">, state: Pick<StateView, "page" | "item">, after: Parameters<typeof nextJudge>[1], emptied = false): Pick<Decided, "effects" | "opens"> {
   const [branch, publication] = [branchOf(state), nextJudge(state, after)];
   if (!branch) throw new Error("a destination holds its branch item");
   if (publication === null) return { effects: emptied ? [{ effect: "ref", item: branch.id, slot: "judging", to: null }] : [], opens: [] };
-  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(given, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication)] };
+  return { effects: [{ effect: "ref", item: branch.id, slot: "judging", to: publication }], opens: [opening(given, queuedJudgeKind(state, publication), DESTINATION_ATTEMPTS.judge, publication)] };
 }
 
 /** One attempt of a push, as the outcome entry that is written leaves it: the operation, the attempt, the result, and whether the ledger opens the next attempt in the entry. */
@@ -1685,7 +1689,7 @@ const WRITTEN: Rules = {
       const { state, resolved } = given;
       const expiredSlot = ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self, ...(expiredSlot ? { slot: true } : {}) })];
-      return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
+      return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, queuedJudgeKind(state, publication, given.input, resolved.self), DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
   },
   /**
@@ -2505,7 +2509,7 @@ export const destination4: PlatformData = {
     } },
     "file-publication": {
       many: true, max: 64, initial: "queued",
-      holds: { operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, items: 1 },
+      holds: { operations: { "file-judge": 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, items: 1 },
       states: { queued: { final: false }, reserved: { final: false }, publishing: { final: false }, unresolved: { final: false },
         published: { final: true }, aborted: { final: true }, superseded: { final: true } }, parties: {},
       refs: { sender: { fixed: true, required: true, to: { type: "scope", kind: "lane" } } },
@@ -2525,6 +2529,12 @@ export const destination4: PlatformData = {
     receipt: { ...receipt3, max: RECEIPTS_OWED + 128 + 1, refs: receiptRefs4,
       values: { ...receipt3.values, publication: { fixed: true, required: false, of: ITEM_ID },
         supersededBy: { fixed: true, required: false, of: fileCauseType } } },
+  },
+  outcomes: {
+    ...Object.fromEntries(Object.entries(destination3.outcomes).map(([name, mark]) => [name, mark.most?.operations?.includes("judge")
+      ? { ...mark, most: { ...mark.most, operations: [...(mark.most.operations ?? []), "file-judge"] } } : mark])),
+    "file-judge": { code: "file-judge", row: "P19", attempts: 1, origin: "rule",
+      most: { effects: 10, operations: ["push", "mint", "judge", "file-judge", "receipt"], opens: "receipt" } },
   },
   receives: { ...destination3.receives,
     "publish-file": { message: "publish-file", class: "tell", from: { kind: "lane" }, opens: "file-publication", also: BRANCH,
@@ -2618,7 +2628,6 @@ function fileJudge(given: RuleGiven): Decided {
 }
 
 export const destinationRules4: Rules = (() => {
-  const oldJudge = destinationRules3["judge"] as Extract<PlatformRule, { place: "outcome" }>;
   const oldPush = destinationRules3["push"] as Extract<PlatformRule, { place: "outcome" }>;
   const isFileJudge = (given: RuleGiven) => destinationPublicationAt(given.state, branchOf(given.state)?.refs["judging"])?.type === "file-publication";
   const push4 = { ...oldPush, rules: { ...oldPush.rules,
@@ -2662,13 +2671,11 @@ export const destinationRules4: Rules = (() => {
       return [{ effect: "ref", item: resolved.self, slot: "sender", to: input.from.at },
         ...Object.entries({ sourceSeq: input.from.seq, sourceHash: input.from.hash, sourceOrdinal: input.n, path: resolved.fields["path"], content: resolved.fields["content"], contentDigest: textDigest(resolved.fields["content"]) }).map(([slot, value]) => ({ effect: "value", item: resolved.self, slot, value } as const))];
     } },
-    judge: { ...oldJudge, rules: { ...oldJudge.rules, most: { effects: 10, requests: 1, operations: 3 },
-      subjects: (given, operation, row, first) => isFileJudge(given) ? [] : oldJudge.rules.subjects!(given, operation, row, first),
-      wellFormed: (result, evidence, given) => isFileJudge(given) ? result === "confirmed" && record(evidence.body, { head: isObjectId, present: value => typeof value === "boolean", tree: value => value === null || isObjectId(value) }) : oldJudge.rules.wellFormed!(result, evidence, given),
-      derives: (given, operation, selected) => {
-        if (!isFileJudge(given)) return oldJudge.rules.derives!(given, operation, selected);
-        const decided = fileJudge(given); return { effects: decided.effects, sends: [], opens: decided.opens };
-      },
+    "file-judge": { place: "outcome", clock: true, rules: {
+      selects: false, read: false, most: { effects: 10, requests: 0, operations: 3 }, retries: () => false,
+      origin: ({ state }) => destinationPublicationAt(state, branchOf(state)?.refs["judging"])?.id ?? null,
+      wellFormed: (result, evidence) => result === "confirmed" && record(evidence.body, { head: isObjectId, present: value => typeof value === "boolean", tree: value => value === null || isObjectId(value) }),
+      derives: given => { const decided = fileJudge(given); return { effects: decided.effects, sends: [], opens: decided.opens }; },
     } },
     receipt: { ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>), rules: {
       ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>).rules,

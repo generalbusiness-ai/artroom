@@ -29,6 +29,10 @@ test("destination4 validates integer queue pointers with zero as a real publicat
   expect(destinationPublicationAt({ item: id => id === 0 ? first : wrong }, 0)).toEqual(first);
   for (const id of [null, undefined, -1, 0.5, Number.MAX_SAFE_INTEGER + 1, 1]) expect(destinationPublicationAt({ item: () => wrong }, id)).toBeNull();
   expect(destination4.items["receipt"]!.max).toBe(193);
+  expect(destination4.outcomes["file-judge"]!.observes).toBeUndefined();
+  expect(destination4.outcomes["file-judge"]!.most!.opens).toBe("receipt");
+  expect(destination4.outcomes["file-judge"]!.most!.operations).toContain("receipt");
+  expect(destination4.items["file-publication"]!.holds!.operations?.["file-judge"]).toBe(1);
 });
 
 test("source order wins across every retained page and final state, with send ordinal and full sender incarnation as part of its key", () => {
