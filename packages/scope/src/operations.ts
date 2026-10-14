@@ -364,6 +364,7 @@ export class Operations {
     }
     const scope = store.scope()!;
     const work: (() => Promise<void>)[] = [];
+    let localRefusals = 0;
     const offered = new Set<string>();
     for (const row of due) {
       const { operation: id, attempt } = row;
@@ -410,7 +411,8 @@ export class Operations {
       // already have left and never enter this branch.
       const local = rules.beforeSend?.(store, operation, attempt, ownOf(store));
       if (local) {
-        const recorded = await this.#record({ type: "outcome", operation: id, attempt, result: "refused", evidence: local });
+        const recorded = await this.#record({ type: "outcome", operation: id, attempt, result: "refused", evidence: local }, false);
+        if (recorded.recorded === "written") { localRefusals++; this.#again = true; }
         if (recorded.recorded === "unavailable" || recorded.recorded === "refused") {
           if (row.next !== null) store.postpone(id, attempt, null);
           this.#waiting = true;
@@ -431,7 +433,7 @@ export class Operations {
     const replies = runs ? await this.#replies(offered, batch) : 0;
     const resumed = runs ? await this.#resume(batch) : 0;
     await this.#wake(now);
-    return work.length + replies + resumed;
+    return work.length + replies + resumed + localRefusals;
   }
 
   /** One retained page after work/held answers; no network, mark or send. */
@@ -612,13 +614,13 @@ export class Operations {
   }
 
   /** One `outcome` input, judged in the scope's turn like any other input. */
-  async #record(input: Outcome): Promise<OutcomeRecorded> {
+  async #record(input: Outcome, notifyOutside = true): Promise<OutcomeRecorded> {
     const definition = this.#scope.pinned()?.definition;
     if (!definition) return { recorded: "unavailable" };
     const bounds = this.#bounds;
     const known = recordedOutcome(this.#store, input);
     if (known) {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       if (known.result === "conflict") this.#conflict?.(input.operation, input.attempt, known.seq);
       return { recorded: known.result, seq: known.seq };
     }
@@ -637,7 +639,7 @@ export class Operations {
     let values: ReturnType<typeof evidenceValues>;
     try { values = evidenceValues(rules, input.evidence); } catch { values = null; }
     const invalidValue = (detail: string): OutcomeRecorded => {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       return { recorded: "refused", detail: `bad-input: ${detail}` };
     };
     if (values === null) return invalidValue("the evidence names a value outside its owner declaration");
@@ -648,7 +650,7 @@ export class Operations {
       bytes.push(given.bytes);
     }
     if (named.some((digest) => !retain.some((given) => given.kind === "snapshot" && given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
     }
     const wrote: { sealed: Sealed | null } = { sealed: null };
@@ -697,7 +699,7 @@ export class Operations {
     // for: the walk looks at each of them again.
     if (recorded.recorded === "written") this.committed();
     // The port is told of each decisive answer that the scope has judged, with the entry that it wrote, if it wrote one.
-    if (input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
+    if (notifyOutside && input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
     // An incident (authority note, section 12, G13): nothing is written for it, so it is kept in the operator's record alone. It is told
     // once, after the turn, and not from the judgment, which a turn may run again.
     if (recorded.recorded === "conflict") this.#conflict?.(input.operation, input.attempt, recorded.seq);

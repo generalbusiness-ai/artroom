@@ -48,7 +48,8 @@ export function scriptedApplicationOrigin(pin: "platform:directory@8" | "platfor
     source: factRefOf(creator), n: 0, message, decision: "applied" } };
   const office: Entry = { ...native.genesis, at: directory, input: { type: "genesis", seed: directorySeed, inc: directory.inc, kind: "found",
     founding: null, source: null, n: null, message: null, decision: "applied" } };
-  const merge: Entry = { ...native.merge, at };
+  const merge: Entry = { ...native.merge, at, input: { type: "act", signed: signIntent({ v: 1, to: at, actor: keys.rita.key,
+    kind: "merge", on: null, expected: {}, fields: {}, idempotencyKey: "scripted-application-merge", notAfter: t(60) }, keys.rita.secret), authority: [], presented: {} } };
   const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "declared:change" },
     { fact: factRefOf(creator), entry: creator, under: "platform:directory" }, { fact: factRefOf(office), entry: office, under: "platform:directory" }];
   return { ...native, directory, at, creator, genesis, merge, origin, from: factRefOf(merge) };
