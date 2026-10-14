@@ -11,12 +11,13 @@ const HOME = "https://dap.generalbusiness.ai/", DOCS = "https://github.com/gener
 const words = html => html.replace(/<br\s*\/?\s*>/g, " ").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const anchors = html => [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map(match => ({ attributes: Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(part => [part[1], part[2]])), content: match[2] }));
 const expected = {
-  "index.html": { title: "dap", copy: "Durable action platform for people and agents. Room Shared work, governed by your rules. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [HOME, GITHUB, DOCS, "/room/", "/counter/", "/jam/", "https://github.com/generalbusiness-ai/dap/blob/main/docs/self-host.md"] },
+  "index.html": { title: "dap", copy: "Durable action platform for people and agents. Room Shared work, governed by your rules. → Library Kitchenware and tools, shared by members. → Counter Demo: agents take turns counting aloud → Jam Demo: music improvisation → Documentation Build your own applications and learn to self-host. →", targets: [HOME, GITHUB, DOCS, "/room/", "/library/", "/counter/", "/jam/", "https://github.com/generalbusiness-ai/dap/blob/main/docs/self-host.md"] },
   "room/index.html": { title: "dap - room", copy: "A room for shared work. Raise issues, propose changes and publish when the room’s rules are met. Open room Raise an issue Propose a change Publish under the rules The room records who did what, and why.", targets: [HOME, GITHUB, DOCS, "https://artroom-scope.inguz.workers.dev/page/"] },
+  "library/index.html": { title: "dap - library", copy: "A lending library. Donate kitchenware and tools. Borrow what is available, return what is lent, and keep the story in the record. The demo is not online yet. Donate a thing Borrow and return Keep its story Member interface: not available yet. Published shelf: not available yet. Members’ record: not available yet. Published shelf pages are public. The lending record is for members. Only staff can cancel a thing.", targets: [HOME, GITHUB, DOCS] },
   "counter/index.html": { title: "dap - counter", copy: "Agents that count. Three agents take turns counting aloud, with each completed turn added to the record. Open counter A Ada → B Beau → C Cleo One turn at a time. Choose an identity and join. The turns follow automatically.", targets: [HOME, GITHUB, DOCS, "https://artroom-counting.inguz.workers.dev/counting/"] },
   "jam/index.html": { title: "dap - jam", copy: "A little music. Explore a procedural music demo. Open jam Synth Percussion Lead Sound starts when you press Play.", targets: [HOME, GITHUB, DOCS, "https://artroom-jam.inguz.workers.dev/"] },
 };
-test("four built homepages preserve the approved copy, every link, child headers and shared supporting rule", async () => {
+test("five built homepages preserve the approved copy, every link, child headers and shared supporting rule", async () => {
   const temporary = await mkdtemp(resolve(tmpdir(), "dap-home-test-"));
   try {
     const built = await buildHome(resolve(temporary, "assets")), pages = {};
@@ -36,9 +37,9 @@ test("four built homepages preserve the approved copy, every link, child headers
     }
     const utility = pages["index.html"].match(/<div class="utility">([\s\S]*?)<\/div>/)?.[1]; assert.ok(utility);
     assert.match(utility, /^<a class="brand-link" data-home /, "the homepage wordmark is the utility row’s first child");
-    for (const file of ["room/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], file === "jam/index.html" ? utility.replace('width="432"', 'width="440"') : utility, "all four pages share header links and labels; Jam retains its deferred intrinsic width");
+    for (const file of ["room/index.html", "library/index.html", "counter/index.html", "jam/index.html"]) assert.equal(pages[file].match(/<header class="utility page">([\s\S]*?)<\/header>/)?.[1], file === "jam/index.html" ? utility.replace('width="432"', 'width="440"') : utility, "all five pages share header links and labels; Jam retains its deferred intrinsic width");
     const rows = anchors(pages["index.html"]).filter(link => link.attributes.class === "destination");
-    assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Counter", "Jam", "Documentation"]);
+    assert.deepEqual(rows.map(row => row.content.match(/<h2>(.*?)<\/h2>/)?.[1]), ["Room", "Library", "Counter", "Jam", "Documentation"]);
     const icons = anchors(pages["index.html"]).filter(link => link.attributes.class === "icon-link");
     assert.deepEqual(icons.map(icon => [icon.attributes["aria-label"], icon.attributes.href]), [["GitHub repository", GITHUB], ["Documentation", DOCS]]);
     const support = html => html.match(/<p class="([^"]+)">(?:The room records who did what, and why\.|Sound starts when you press Play\.)<\/p>/)?.[1];
