@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:72525d12403625b7eba85a4b0294de0b8fb0eb0e"}
+{"kind":"artifact","text":"packages/derive/src/ledger.ts at exact 7335aa27d3b5b42026ba1f6b3192692918d5e59e on request/publication-compose, under promise git:sha1…f230251 on request git:sha1…fd7be23","body":{"commit":"7335aa27d3b5b42026ba1f6b3192692918d5e59e","path":"packages/derive/src/ledger.ts"}}
