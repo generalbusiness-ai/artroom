@@ -1,10 +1,11 @@
-# Library publication: final browser story and local history verified
+# Library publication: final browser story and public history verified
 
 14 October 2026. Draft for full request `ebda829bb491b43de02f1ab6e91bf2e18ef7e857`,
 promise `23fed5e28dc5a51fb3da7ae730c12025898dc3f6`. The six-output parent
 remains open. This note records the operator's reported current observations;
 the final browser story and per-step publications have completed;
-curated public-history publication and homepage hosting evidence remain pending. The earlier
+curated public-history publication has now passed readback; homepage
+hosting and the final validation gate remain pending. The earlier
 `dap-library-publication-1014` publication run is retained as a rehearsal because the Small pot description
 differed from the approved script. The named closed
 context and three publication projections have been read for this draft.
@@ -98,9 +99,40 @@ known scope and incarnation without inventing a future entry number.
 The selected safe summary
 `6130d5711874305edcca02ffbf1b25255e29c8ea56cfe97d459c13d42cc09482`
 corresponds those final-room facts. Its `newHistory`, `homepage`, and `gate`
-owning proofs remain null. This is local verification, not publication of a
-curated public-history index, independent provider Replay, or whole judgment
-Replay. No raw companions or nested paths were read for this documentation.
+proof slots were null when that summary was made. The later history
+publication proof below fills the history observation separately. The clone
+and extraction alone did not prove publication, independent provider Replay,
+or whole judgment Replay. No raw companions or nested paths were read for this documentation.
+
+## Ordinary public-history publication
+
+Readback `19810` completed with exit 0 and its final guard passed. Its closed
+public proof has SHA256
+`0da3b226b556cd243bc44f2e1517c88b8ddb0849d0577cd72e128992880e48ca`.
+The history commit is `14401f8bd851ce525ac1526ed57d2bceaf36d360`, later
+than the seven-story commit `bd724ee1d21486dbe822faf740312318be38cb5d`.
+The ordinary merge took effect at child sequence 24. Destination publication
+66 reached its published transition at 73, produced written receipt 77,
+and was normally cleaned at 81; the child published result is sequence 27.
+The collector follows that ordinary terminal outcome, rather than requiring
+an already cleaned publication to remain open.
+
+It verified 19 anonymous immutable responses: the history index, seven raw
+commit attachments, seven raw receipt attachments, the shelf folder, and
+three current shelf pages. It also used one native read-session request and
+four native reads. The index is
+[public at the history commit](https://dap-library-publication-final-1014.inguz.workers.dev/site/sc_jfdinhhufm5jfjqr4cqsgk5kvw2lhyxx5lh4gaqgp74ldijemsla/14401f8bd851ce525ac1526ed57d2bceaf36d360/history.md).
+These checks cover stored native hash chains, recorded destination effects,
+the ordinary written receipt, child result, and exact public bytes. They do
+not prove judgment Replay or independently fetched new history-publication
+Git objects. Anonymous browser visual checking remains separate.
+
+The original ordinary merge guard refusal remains retained. The operator
+corrected the rules scope's global floor to sequence 7 and made a new ask
+child at sequence 21; checkpoint `68996` passed before the later merge.
+All four required extents were preserved. Early admission of the nonhistory
+lane changed; the destination's publication requirements did not. Neither
+that correction nor the earlier refusal is erased by the successful readback.
 
 ## Deployed code and retained publication rehearsal
 
@@ -180,8 +212,8 @@ acceptance is claimed.
 
 The final service, Library, browser joins, exact-script story, and three
 anonymous pages are observed. The original clone and extraction verified actual raw commits, parents,
-page blobs, and receipt bytes. Curated public-history publication, homepage
-hosting, and their final owning proofs remain pending. None is inferred from the retained rehearsal. The parent amendment and design section 9 do not require a generic
+page blobs, and receipt bytes. The curated public history is now published and anonymously verified.
+Homepage hosting and the final validation gate remain pending. None is inferred from the retained rehearsal. The parent amendment and design section 9 do not require a generic
 additional creation or interruption fault. Existing original install, create,
 and both browser Check recoveries remain preserved.
 

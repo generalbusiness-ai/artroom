@@ -17,8 +17,10 @@ browser run. The Small pot description is exactly "Baby born when the big
 pot was with me", and cancellation records "Nasruddin says the pot died".
 Each step has its own written destination receipt and anonymous immutable
 page. The original clone and extraction verified actual commits, parents, page
-blobs, and receipt bytes. Curated public-history publication and final homepage
-hosting remain pending. These are machine-operated browser profiles, not a human
+blobs, and receipt bytes. The curated public history is published at commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`; its index, raw companions,
+and current shelf pages passed anonymous readback. Final homepage hosting
+and the final validation gate remain pending. These are machine-operated browser profiles, not a human
 or separate physical-device acceptance test.
 
 The earlier publication rehearsal remains at its original service. It

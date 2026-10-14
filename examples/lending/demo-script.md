@@ -12,8 +12,8 @@ browser witness, not human or separate physical-device acceptance.
 
 The earlier publication run is retained as a rehearsal because its Small pot
 description differed. Its browser and Git extraction results remain real,
-separate evidence. Local Git history extraction passed. Curated public-history publication
-and homepage hosting remain pending.
+separate evidence. Local Git history extraction passed. The curated public history is now published and anonymously verified.
+Homepage hosting and the final validation gate remain pending.
 
 The [runbook](runbook.md) records the cohort, exact declaration, and original
 failures. Its earlier nonpublishing rehearsal remains separate. Show each
@@ -117,5 +117,8 @@ public link.
 All three final anonymous pages are observed at
 `bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction
 verified actual Git commits, linear parents, page blobs, and receipt bytes.
-Curated public-history publication and homepage hosting remain pending.
+The later history publication is commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Its index, 14 raw companions,
+shelf folder, and three current pages passed anonymous readback. Homepage
+hosting and the final validation gate remain pending.
 No whole judgment Replay or human/physical-device acceptance is inferred.

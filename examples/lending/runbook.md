@@ -1,8 +1,8 @@
 # Provision and run the lending library
 
 **Run status: the final room completed the exact-script automated browser
-story and all seven publications.** Curated public Git-history publication after the original clone
-and homepage hosting remain pending. Two earlier rehearsals are retained.
+story and all seven publications.** The curated public Git history is now published and anonymously verified.
+Homepage hosting and the final validation gate remain pending. Two earlier rehearsals are retained.
 The publication rehearsal produced real browser acts, written receipts, and
 anonymous immutable pages. Its Small pot description differed from the
 approved script, so its mechanical completion is not final story acceptance.
@@ -221,9 +221,14 @@ This is the public-history witness. The retained run reports the publication reh
 mechanically. The final exact-script run completed its seven lending acts and publication
 receipts. The final original clone and extraction passed: actual Git commit
 bytes, linear parents, page blobs, and all seven fetched receipt refs and
-canonical receipt bodies were verified. Curated public-history publication
-still has no owning proof. These local object checks do not claim full
-judgment Replay or human acceptance.
+canonical receipt bodies were verified. The later ordinary history publication completed at commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`, separate from the seven-story
+commit `bd724ee1d21486dbe822faf740312318be38cb5d`. Readback `19810`
+verified 19 anonymous responses: the index, 14 raw commit and receipt
+attachments, the shelf folder, and three current pages. It checked the
+ordinary written receipt and the child's published result after normal
+cleanup. This does not prove judgment Replay, independently fetched new
+history Git objects, or human acceptance.
 
 Members can inspect the lending journal with the actual full scope reference:
 
@@ -300,8 +305,10 @@ and extraction. Its description mismatch prevents final script acceptance.
 The final run `9377` passed with the approved Small pot description, both
 original-answer checks, and three anonymous pages at commit
 `bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction passed, including actual parents, page
-blobs, and receipt bytes. Curated public-history publication and homepage
-hosting remain pending; the six-output parent stays open. Keep each
+blobs, and receipt bytes. The curated public history was published and its index, raw companions,
+and current shelf pages were anonymously verified at
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Homepage hosting and the
+final validation gate remain pending; the six-output parent stays open. Keep each
 rehearsal's original results, failures, and uncertainties separate from the
 future final run.
 
