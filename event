@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b854160025e989d8f71fcdf178ae2eb24fc6fe1d"}
+{"kind":"assert","text":"At Hugh's request exported manual clone pickup lower terminal only from 01:30 to source end: /Users/hughpyle/Movies/workroom-clone-lower-terminal-0130-end.mp4. Crop x3100 y1030 width1028 height942, preserved native scale, 60fps H264 MP4 without muted audio. ffprobe verifies 65.916667s, 1028x942, 4,823,639 bytes. First and middle frames inspected. Original 5K recording preserved.","body":{"no_git_artifact":"true"}}
