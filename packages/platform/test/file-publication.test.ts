@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import type { FactRef, FieldValue, Item, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Entry, FactRef, FieldValue, Item, ScopeRef } from "@generalbusiness/dap-contract";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, newIncarnation, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
-import { PROFILES, validateDefinition, type StateView } from "@generalbusiness/dap-derive";
-import { destination4, destinationPublicationAt, filePublicationCause, filePublicationCurrent, newestFilePublication } from "../src/destination.ts";
+import { MemoryState, PROFILES, validateDefinition, type Operation, type Own, type StateView } from "@generalbusiness/dap-derive";
+import { destination4, destinationPublicationAt, filePublicationCause, filePublicationCurrent, fileSupersededOutcome, newestFilePublication } from "../src/destination.ts";
 import { filePublicationCommit, fileReceiptObjects, fileReceiptRef } from "../src/destination-objects.ts";
 
 // Pure schema/state/object witnesses. These rows and causes are scripted;
@@ -29,6 +29,10 @@ test("destination4 validates integer queue pointers with zero as a real publicat
   expect(destinationPublicationAt({ item: id => id === 0 ? first : wrong }, 0)).toEqual(first);
   for (const id of [null, undefined, -1, 0.5, Number.MAX_SAFE_INTEGER + 1, 1]) expect(destinationPublicationAt({ item: () => wrong }, id)).toBeNull();
   expect(destination4.items["receipt"]!.max).toBe(193);
+  expect(destination4.outcomes["file-judge"]!.observes).toBeUndefined();
+  expect(destination4.outcomes["file-judge"]!.most!.opens).toBe("receipt");
+  expect(destination4.outcomes["file-judge"]!.most!.operations).toContain("receipt");
+  expect(destination4.items["file-publication"]!.holds!.operations?.["file-judge"]).toBe(1);
 });
 
 test("source order wins across every retained page and final state, with send ordinal and full sender incarnation as part of its key", () => {
@@ -58,4 +62,22 @@ for (const format of ["sha1", "sha256"] as const) test(`file ${format} commit an
   expect(fileReceiptRef(cause)).not.toBe(fileReceiptRef(later));
   expect(objects.commit).not.toBe(fileReceiptObjects(format, sender.scope, time, later, { ...receipt, cause: later }).commit);
   expect(() => fileReceiptRef({ from: cause.from as FactRef, n: -1 })).toThrow();
+});
+
+
+test("only an unsent stale file holding the shared slot yields a cause-bound supersession; an unknown attempt stays held", () => {
+  const state = new MemoryState(), early = file(1, 7, 0, "reserved"), later = file(4, 8, 0, "published");
+  state.putItem({ ...file(0, 0), type: "branch", state: "ready", refs: {}, values: { slot: early.id, judging: null, head: "a".repeat(40) } });
+  state.putItem(early); state.putItem(later);
+  const operation: Operation = { id: "2:0", owner: "platform:destination@4", kind: "push", for: early.id, most: 1, selected: null, attempts: [{ attempt: 1, opened: 2, outcomes: [] }] };
+  const entry: Entry = { v: 1, at: { ...sender, kind: "destination" }, seq: 2, prev: null, time: "2026-10-14T03:00:00Z", clamped: false, epoch: 0,
+    input: { type: "outcome", owner: "platform:destination@4", kind: "judge", operation: "1:0", attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { head: "a".repeat(40), present: true, tree: "b".repeat(40) } } }, uses: [], prepared: [], effects: [{ effect: "state", item: early.id, state: "reserved" }], sends: [] };
+  const own: Own = seq => seq === 2 ? { entry, hash: textDigest("PUBLIC TEST scripted opening") } : null;
+  const before = state.snapshot();
+  expect(fileSupersededOutcome(state, operation, own)).toEqual({ basis: "own-answer", body: { send: "not-sent", seen: "a".repeat(40), supersededBy: filePublicationCause(later) } });
+  expect(state.snapshot()).toEqual(before);
+  const unknown: Operation = { ...operation, attempts: [{ ...operation.attempts[0]!, outcomes: [{ seq: 3, result: "unknown", evidence: textDigest("PUBLIC TEST unknown"), selected: null }] }] };
+  expect(fileSupersededOutcome(state, unknown, own)).toBeNull();
+  state.putItem({ ...state.item(0)!, values: { ...state.item(0)!.values, slot: null } });
+  expect(fileSupersededOutcome(state, operation, own)).toBeNull();
 });
