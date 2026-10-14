@@ -16,9 +16,10 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
   if (!summary.ok) return unavailable(summary.reason);
   if (!summary.complete || summary.next !== undefined) return unavailable("incomplete summary");
   if (!sameHead(summary.at) || canonicalize(summary.value.scope) !== canonicalize(target.at)) return unavailable("the current head or incarnation differs from the replay target");
+  // Versions 3 and 4 share staged change-reservation cleanup status.
   // Legacy pins define no staged-reservation cleanup status. Preserve their
   // historical output without adding any absence or cleanup-complete claim.
-  if (summary.value.definition !== "platform:destination@3") return { lines: [], finding: null };
+  if (!["platform:destination@3", "platform:destination@4"].includes(summary.value.definition)) return { lines: [], finding: null };
   if (!Number.isSafeInteger(pages) || pages < 1) return unavailable("the cleanup page bound must be a positive integer");
   // The summary contains live items; the items route enumerates retained
   // final items. An owed cleanup keeps custody and is deliberately live.
@@ -38,7 +39,7 @@ export async function observeCleanup(reader: CleanupReader, target: FactRef, pag
       if (!read.complete) return unavailable("incomplete publication enumeration");
       const end = await reader.summary();
       if (!end.ok) return unavailable(end.reason);
-      if (!end.complete || end.next !== undefined || !sameHead(end.at) || canonicalize(end.value.scope) !== canonicalize(target.at) || end.value.definition !== "platform:destination@3") return unavailable("the destination changed before cleanup enumeration completed");
+      if (!end.complete || end.next !== undefined || !sameHead(end.at) || canonicalize(end.value.scope) !== canonicalize(target.at) || end.value.definition !== summary.value.definition) return unavailable("the destination changed before cleanup enumeration completed");
       const owed = [...items.values()].filter((item) => item.state === "cleanup-owed").sort((a, b) => a.id - b.id);
       const expiry = end.value.reservationExpiry;
       const reserved = [...items.values()].filter((item) => item.state === "reserved" && typeof item.values["checkDeadline"] === "string").sort((a, b) => a.id - b.id);
