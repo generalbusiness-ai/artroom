@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:c18cd39d5a79c3da11325afa42b5869528ceaa89"}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1d8703d6b65ba20968a4e98a243cdf02915e0526","text":"Retired: the artifact of packages/mcp/src/node.ts at b366d97c is succeeded by the one at exact head 5a69a390 (the eighth filing of the hosted MCP endpoint, request 9b3084d4), whose batch recorded the successor without recording this succession."}
