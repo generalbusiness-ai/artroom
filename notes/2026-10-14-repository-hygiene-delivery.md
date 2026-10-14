@@ -80,7 +80,18 @@ locally, and created private empty Vite cache directories. It preserved the
 donor's bytes, modes, ownership and inode identities. No package was installed,
 and no application module was imported during preparation.
 
-Root will review the final Source census, dependency census and held plan,
-then run the single ordinary `npm run gate` required by
-[docs/testing.md](../docs/testing.md). The gate has not run for this hygiene
-candidate. Final review, filing and landing remain with Root.
+Root ran the single ordinary `npm run gate` required by
+[docs/testing.md](../docs/testing.md) at commit
+`09ed389510971df71adc50f62ecc35a9fd2f978c`, tree
+`febf9114cc6d8fb78365b46b5be2e68a4c5c4500`. The public result records exit 0
+and 206.007 seconds elapsed. Whitespace, typecheck and test each exited 0;
+Vitest passed 1,195 cases and skipped three, and the two Node groups passed
+ten and 55 cases. Installation was skipped and the postguard passed.
+
+The result follows the recorded scoped Source review. It does not claim that
+Root read every candidate file in full. The byte checks for all archive files
+and renamed note bodies are program verification, distinct from human body
+reads. This gate summary comes from the retained public result; private raw
+logs were not read for this note update. This successor changes only the note;
+Source and tests are otherwise unchanged. The gate is not repeated for it.
+Final review, filing and landing remain with Root.
