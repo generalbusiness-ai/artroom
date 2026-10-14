@@ -301,14 +301,16 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const name = pinned.definition?.declared.name;
     // A retained historical name is not authority. Authenticate the creator
     // through its current native pin before exposing a reserved lane identity.
-    if (name !== undefined && sourceName(pinned.named, name) === null && proof[1]) {
+    const application = origin && proof[0]?.entry.input.type === "genesis"
+      && proof[1]?.entry.input.type === "act" && proof[1].entry.input.signed.intent.kind === "establish-application";
+    if (name !== undefined && (sourceName(pinned.named, name) === null || application) && proof[1]) {
       const creator = proof[1];
       if (creator.fact.at.scope === this.#name) return null;
       try {
         const read = await within(() => this.#resolver.read(creator.fact, this.#fetchSeconds, true), this.#fetchSeconds);
         if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, creator.fact)) return null;
         proof = [proof[0]!, { ...creator, under: read.under }];
-        if (read.under === "issue") {
+        if (read.under === "issue" || application) {
           const parent = read.origin?.find(copy => copy.fact.seq === 0 && canonicalize(copy.fact.at) === canonicalize(creator.fact.at));
           if (!parent || !isEntryOf(parent.entry, parent.fact) || parent.entry.input.type !== "genesis") return null;
           proof = [...proof, { ...parent, under: read.under }];
