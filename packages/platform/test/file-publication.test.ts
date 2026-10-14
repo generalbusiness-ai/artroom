@@ -67,7 +67,7 @@ test("only an unsent stale file holding the shared slot yields a cause-bound sup
   state.putItem(early); state.putItem(later);
   const operation: Operation = { id: "2:0", owner: "platform:destination@4", kind: "push", for: early.id, most: 1, selected: null, attempts: [{ attempt: 1, opened: 2, outcomes: [] }] };
   const entry: Entry = { v: 1, at: { ...sender, kind: "destination" }, seq: 2, prev: null, time: "2026-10-14T03:00:00Z", clamped: false, epoch: 0,
-    input: { type: "checkpoint", through: 1, state: textDigest("PUBLIC TEST scripted state") }, uses: [], prepared: [], effects: [], sends: [] };
+    input: { type: "outcome", owner: "platform:destination@4", kind: "judge", operation: "1:0", attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body: { head: "a".repeat(40), present: true, tree: "b".repeat(40) } } }, uses: [], prepared: [], effects: [{ effect: "state", item: early.id, state: "reserved" }], sends: [] };
   const own: Own = seq => seq === 2 ? { entry, hash: textDigest("PUBLIC TEST scripted opening") } : null;
   const before = state.snapshot();
   expect(fileSupersededOutcome(state, operation, own)).toEqual({ basis: "own-answer", body: { send: "not-sent", seen: "a".repeat(40), supersededBy: filePublicationCause(later) } });
