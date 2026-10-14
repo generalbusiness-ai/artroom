@@ -73,9 +73,9 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
   // The change lane pins another definition, and reads that kind from the entry (scope contract, sections 4.1 and 6.2).
   const goal = await G.fact(0);
   const plan = (await G.did(rita, "open-plan", {})).fact.seq;
-  const a = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The parser", role: "required", title: "Parse", conditions: ["it parses"] } })).fact.seq;
-  const b = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The printer", role: "required", title: "Print", conditions: ["it prints"] } })).fact.seq;
-  const [A, B] = [await nativelyCreatedChild(r, G, a), await nativelyCreatedChild(r, G, b)];
+  const first = await nativelyCreatedChild(r, G, await G.signed(rita, "add-concern", { fields: { plan, purpose: "The parser", role: "required", title: "Parse", conditions: ["it parses"] } }));
+  const second = await nativelyCreatedChild(r, G, await G.signed(rita, "add-concern", { fields: { plan, purpose: "The printer", role: "required", title: "Print", conditions: ["it prints"] } }));
+  const [a, b] = [first.receipt.fact.seq, second.receipt.fact.seq], [A, B] = [first.child, second.child];
   const sealed = (await G.did(rita, "seal-plan", { on: plan, fields: { goalAt: goal, required: [{ item: a, child: A.at }, { item: b, child: B.at }], optional: [] } })).fact;
 
   // Concern A is done by vic on the concern's own terms, judged by its requester, and fulfilled: the parent records the delivery.

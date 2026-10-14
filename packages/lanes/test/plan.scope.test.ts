@@ -94,8 +94,8 @@ test("a Native issue concern child authenticates its inherited role and delivers
   await room.activate(issue, DIGESTS.issue);
   const parent = await room.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "Native parent", conditions: ["it works"] });
   const plan = (await parent.did(rita, "open-plan", {})).fact.seq;
-  const concern = (await parent.did(rita, "add-concern", { fields: { plan, purpose: "One real child", role: "required", title: "Native concern", conditions: ["it works"] } })).fact;
-  const child = await nativelyCreatedChild(room, parent, concern.seq);
+  const created = await nativelyCreatedChild(room, parent, await parent.signed(rita, "add-concern", { fields: { plan, purpose: "One real child", role: "required", title: "Native concern", conditions: ["it works"] } }));
+  const concern = created.receipt.fact, child = created.child;
   const birth = (await child.entry(0)).input;
   expect(birth).toMatchObject({ type: "genesis", kind: "file", source: concern, seed: { definition: DIGESTS.issue, creator: parent.at }, message: { body: { directory: await room.D.at() } } });
   const sourced = await (child.object as unknown as { source(seq: number, origin: boolean): Promise<Sourced | null> }).source(0, true);
