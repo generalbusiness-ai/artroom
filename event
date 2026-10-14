@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bbf4a52b63eead7c5e2dee53492e4b880fce3d24","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/worker.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bd327aa0c50d0ca97bf272f1d3d7943b3707efa2","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-mcp-generic-delivery.md."}
