@@ -255,7 +255,7 @@ export class DestinationHost implements Outside {
     const reader = this.#options.snapshotReader;
     const scope = this.#given.scope();
     const intent = asked?.intent;
-    if (!reader || scope?.at.kind !== "destination" || this.#given.genesis()?.seed.definition !== "platform:destination@3" || !verifySignedIntent(asked)
+    if (!reader || scope?.at.kind !== "destination" || !["platform:destination@3", "platform:destination@4"].includes(this.#given.genesis()?.seed.definition ?? "") || !verifySignedIntent(asked)
       || intent.kind !== "git-read@1:job-read" || intent.on !== null || Object.keys(intent.expected).length || Object.keys(intent.fields).length !== 1 || !isFactRef(intent.fields["job"])) return null;
     const jobFact = intent.fields["job"];
     if (!intent.to || canonicalize(intent.to) !== canonicalize(jobFact.at)) return null;
