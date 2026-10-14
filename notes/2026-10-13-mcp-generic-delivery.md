@@ -807,6 +807,18 @@ lifecycle path, and three nonblocking gaps.
 | Nonblocking: H6 resubmit | | The custody record under the key is read in the agent object: after the plain repeat, attempt 1 with one outcome; after the explicit resubmit, attempt 2 with two outcomes and the same intent digest, the same envelope sent again |
 | Nonblocking: H7 continuation | | The `steps` continuation is followed to exhaustion: more than one page, the last without a cursor, and the pages together equal the directory's whole history as an independent reader pages it, each step once and in order |
 
+**Corrections of review fe82ee58 (sixth filing, `056e1fea`).** The three
+P2s of the fifth filing and the stdio ordering were credited; two P2s and
+three P3s remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. An aborted replacement lost live capacity: the replacement took the incumbent's slot before the snapshot, and when its client went away it returned with no body, so the incumbent stayed open and uncounted and four incumbents were counted as three | The layer owns capacity across every exit of a replacement: it counts the replacements being opened for a session, and one that exits without opening gives the slot back to the incumbent when the incumbent is still the session's live stream and no later replacement holds it (`http.ts`) | `http.test.ts`, over loopback: four live incumbents, a replacement of the first that goes away while the snapshot is held, the snapshot released; four streams are counted, the first session still has its stream, and a fifth session's GET is refused. Named red: on `http.ts` at `056e1fea` three are counted and the fifth is admitted |
+| 2. A result write that failed after the scope had answered was reported as "nothing was sent": the plain storage failure became `unreadable`, and that finding's sentence says nothing was sent, though the envelope was sent, the record stays `sent` and the act may have taken effect | What comes of a dispatch is kept by one method, after the answer or the lost reply; a store that fails there raises `unkept` with the answer (or `lost`), and the finding says the envelope was sent, what the scope answered, that the outcome was not kept, that the act may have taken effect and nothing was sent twice, and that settle under the same key is next (`custody.ts`, `errors.ts`, `service.ts`) | The hosted story: the scope accepts, the result write fails; the result is `custody` with state `unkept` and answer `accepted`, its sentence says the scope answered accepted and the act may have taken effect and never that nothing was sent; the record is read back as `sent`; the scope holds one entry; settle under the same key writes the receipt and a repeat is retained. Named red: at `056e1fea` the state is `unreadable` and the sentence says nothing was sent |
+| P3: a late initialized hook | After the row is written, a session that ended meanwhile takes no live marker and no watcher (`wire.ts`) | Covered by the ended-session fence; no asynchronous hosted hook exists to witness, as the report says |
+| P3: H7's loops | Each loop asserts that its last page has no cursor, and that the positions paged reach the scope's own head as the last read reported it | The H7 story |
+| P3: the overview's `405` | The overview says what the matrix says: `GET` and `DELETE` are served under the 2025-11-25 header only, `400` without a session ID, `404` without a live session; `405` with `Allow: POST` under no header or the 2026-07-28 header (`docs/mcp.md`) | Read |
+
 **What differs from the design's words.** The `create` body is
 `{ link }`, the agent-key invitation link itself, rather than its fields
 spelled out: it is the same information, already encoded and validated by
@@ -822,7 +834,7 @@ invitation's, recorded at creation. The watch timer is the runtime's
 
 | Command | Result |
 |---|---|
-| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  92 passed \| 1 skipped (93)` (observed, after the corrections of reviews 7e00dc3a, 2e85245b, ce968d18, 10e33e40 and 0bab47e6): the wire tests with the modern headers, H8 over loopback with the concurrent admission and the disconnected opening, the SQLite store with the archived-refusal, saturated-budget, terminal-step and exact-boundary cases |
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  95 passed \| 1 skipped (96)` (observed, after the corrections of reviews 7e00dc3a, 2e85245b, ce968d18, 10e33e40, 0bab47e6 and fe82ee58): the wire tests with the modern headers and the same-turn dispatch, H8 over loopback with the concurrent admission, the disconnected opening and the aborted replacement, the SQLite store with the archived-refusal, saturated-budget, terminal-step and exact-boundary cases |
 | `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  17 passed (17)` (observed), before H8 through the route was added; the stories, with H1 to H8 of `hosted.scope.test.ts`, are in the gate below |
 | `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
 
@@ -831,13 +843,15 @@ being built, and main moved again to `27bb745f` (the logo and self-host
 delivery records), to `2a40db9b` (the Counter preparation note) and to
 `dedcb14b` (the architecture diagram, the `dap.js` rename and the
 invitation service URL check, the sprint report and the Lending library
-baseline) during review; main was merged into the branch each time, taking
-main's version of every path this head does not change. The last merge
-met main's Lending route beside this head's hosted route in the Worker's
-fetch, kept both, and regenerated the page, counting and lending Worker
-modules and their built assets, since each bundles the bytes package this
-head changes. At the head, `git diff --name-only origin/main...HEAD` lists
-this head's own 29 paths and no other.
+baseline) and to `5e11ca03` (the agent-key cohorts, the Counter
+documentation, the Library homepage and the fold publication) during
+review; main was merged into the branch each time, taking main's version
+of every path this head does not change. The merge of `dedcb14b` met
+main's Lending route beside this head's hosted route in the Worker's
+fetch and kept both; each merge regenerated the page, counting and
+lending Worker modules and their built assets, since each bundles the
+bytes package this head changes. At the head, `git diff --name-only
+origin/main...HEAD` lists this head's own 29 paths and no other.
 
 ## What is owed
 

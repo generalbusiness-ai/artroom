@@ -145,7 +145,9 @@ export type Finding =
   | { error: "stale-descriptor"; scope: string; runs: string; tool: string | null }
   | { error: "restart" }
   | { error: "transport"; scope: string; submitted: boolean }
-  | { error: "custody"; state: "conflicting" | "full" | "locked" | "unreadable" | "terminal" | "too-large"; key: string; scope: string; keys?: string[]; recorded?: string; bytes?: number; reason?: "budget";
+  | { error: "custody"; state: "conflicting" | "full" | "locked" | "unreadable" | "terminal" | "too-large" | "unkept"; key: string; scope: string; keys?: string[]; recorded?: string; bytes?: number; reason?: "budget";
+      /** For `unkept`: what the scope answered before the store failed to keep it (`lost` for a reply that never came). */
+      answer?: string;
       /** The dead reclaimer's file, relative to the custody directory (ARTROOM_HOME/private/mcp-custody). */
       stale?: string }
   | { error: "credential"; destination: string; why: string }
@@ -160,6 +162,10 @@ export function finding(f: Finding): Said & { error: string } {
     case "restart": return { error: f.error, sentence: "The tool list changed; list again from the start.", next: "Call tools/list without a cursor." };
     case "transport": return { error: f.error, sentence: `The reply from ${clip(f.scope)} was lost or malformed; the outcome is unknown.${f.submitted ? " The envelope is under custody." : ""}`, next: f.submitted ? HINTS.settle : "Call again; nothing was submitted." };
     case "custody": {
+      if (f.state === "unkept") {
+        const said = f.answer === "lost" ? "the reply was lost" : `the scope answered ${f.answer}`;
+        return { error: f.error, sentence: `The envelope for key ${clip(f.key)}${f.scope ? ` on ${clip(f.scope)}` : ""} was sent and ${said}, and the server could not keep that outcome. The act may have taken effect; the kept envelope stays, and nothing was sent twice.`, next: "Call settle with the same idempotencyKey: it reads the scope's settlement of that envelope and keeps it. Do not use a new key." };
+      }
       const extra = f.state === "full" && f.reason === "budget" ? ` The server's custody store is at its budget: it holds ${f.bytes} bytes with what unresolved records may still receive, and admits no completion capacity for another dispatch; nothing was signed.`
         : f.state === "full" && f.bytes !== undefined ? ` The envelope would carry about ${f.bytes} bytes, more than a record of 2 MiB holds with its outcomes; nothing was signed.`
         : f.state === "full" && f.keys ? ` The oldest unresolved keys: ${f.keys.map((k) => clip(k)).join(", ")}.` : f.recorded ? ` It holds ${f.recorded}.`

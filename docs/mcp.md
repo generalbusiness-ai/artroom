@@ -66,7 +66,10 @@ same way, through one HTTP layer (`packages/mcp/src/http.ts`); the rules
 are under "The hosted endpoint", below. In short: a 2026-07-28 request
 carries `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method`, and
 `Mcp-Name` on `tools/call`; a 2025-11-25 request names its session; and a
-`GET` or `DELETE` is answered `405` unless it names a live session.
+`GET` or `DELETE` is served only under the 2025-11-25 header, where it
+needs `Mcp-Session-Id` (`400` without it) and a live session (`404`
+otherwise); with no header, or the 2026-07-28 header, it is `405` with
+`Allow: POST`.
 
 ### Options
 

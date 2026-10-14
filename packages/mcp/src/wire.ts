@@ -219,6 +219,7 @@ export class Wire {
         // (stdio, loopback) the live marker moves at once, before any other message of the same read is dispatched.
         const persist = this.hooks.changed;
         if (persist) await persist(session, { initialized: true });
+        if (session.ended) return null;   // ended while the row was written: no live marker, no watcher
         session.initialized = true;
         this.watchLegacy(session);
         return null;

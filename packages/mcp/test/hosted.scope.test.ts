@@ -497,26 +497,36 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     // The steps, followed to exhaustion: the last page has no cursor, and the pages together are the whole history, each step
     // once and in order.
     const stepPages: { seq: number }[][] = [];
-    for (let cursor: unknown = undefined, n = 0; n < 64; n++) {
-      const next = await within("steps", { scope: "directory", ...(cursor !== undefined ? { cursor } : {}) }, BOUNDS.large);
+    let stepsCursor: unknown = undefined, stepsHead: { seq: number } | null = null;
+    for (let n = 0; n < 64; n++) {
+      const next = await within("steps", { scope: "directory", ...(stepsCursor !== undefined ? { cursor: stepsCursor } : {}) }, BOUNDS.large);
       stepPages.push(next["steps"] as { seq: number }[]);
-      cursor = next["cursor"];
-      if (cursor === undefined) break;
+      stepsHead = next["head"] as { seq: number };
+      stepsCursor = next["cursor"];
+      if (stepsCursor === undefined) break;
     }
-    expect(wholeThenContiguous(stepPages.flat().map((step) => step.seq)), "the steps paged through are the whole history, each once, in order").toBe(true);
+    expect(stepsCursor, "the steps continuation is exhausted").toBeUndefined();
+    const stepSeqs = stepPages.flat().map((step) => step.seq);
+    expect(wholeThenContiguous(stepSeqs), "the steps paged through are the whole history, each once, in order").toBe(true);
+    // Against the scope's own head, as the last read reported it: every position through the head, and nothing past it.
+    expect(stepSeqs.length, "the steps reach the scope's head").toBeGreaterThanOrEqual(stepsHead!.seq + 1);
     // The record, whose entries are larger than steps, actually continues: more than one page within the bound, the last
     // without a cursor, and the pages together are the whole history, each entry once and in order.
     const recordPages: { seq: number }[][] = [];
-    for (let cursor: unknown = undefined, n = 0; n < 64; n++) {
-      const next = await within("record", { scope: "directory", ...(cursor !== undefined ? { cursor } : {}) }, BOUNDS.large);
+    let recordCursor: unknown = undefined, recordHead: { seq: number } | null = null;
+    for (let n = 0; n < 64; n++) {
+      const next = await within("record", { scope: "directory", ...(recordCursor !== undefined ? { cursor: recordCursor } : {}) }, BOUNDS.large);
       recordPages.push(next["entries"] as { seq: number }[]);
-      cursor = next["cursor"];
-      if (cursor === undefined) break;
+      recordHead = next["head"] as { seq: number };
+      recordCursor = next["cursor"];
+      if (recordCursor === undefined) break;
     }
+    expect(recordCursor, "the record continuation is exhausted").toBeUndefined();
     expect(recordPages.length, "an actual continuation: more than one page").toBeGreaterThan(1);
     for (const page of recordPages) expect(page.length, "no page is empty").toBeGreaterThan(0);
     const recorded = recordPages.flat().map((entry) => entry.seq ?? (entry as { entry?: { seq: number } }).entry?.seq ?? -1);
     expect(wholeThenContiguous(recorded), `the record's pages together are the whole history, each entry once, in order: ${JSON.stringify(recorded)} for ${JSON.stringify(whole)}`).toBe(true);
+    expect(recorded.length, "the record reaches the scope's head as the last read reported it").toBeGreaterThanOrEqual(recordHead!.seq + 1);
   } finally { done(room); }
 });
 
@@ -780,17 +790,22 @@ test("H6 through the endpoint: a custody budget refuses full before signing, a s
   } finally { done(room); }
 });
 
-test("H6 through the endpoint: a write that fails while a result is written leaves the record unknown, and settle writes the receipt", async () => {
+test("H6 through the endpoint: a write that fails while a result is written is reported as an outcome not kept, never as nothing sent; the record stays sent, and settle under the same key writes the receipt", async () => {
   const { room, rita } = await roomWithIssues();
   hostedTest.custodyBounds = { budget: 1024 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
   try {
     const bot = await hosted(room, rita, "@bot", "create-bot");
     const result = async (r: Response) => (await r.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
-    // The scope accepts the act; the store fails as the result is written: the tool reports a storage failure, not an outcome.
+    // The scope accepts the act; the store fails as the result is written: the tool reports that the scope answered and the
+    // outcome was not kept, with what the scope said, that the act may have taken effect, and that settle under the same key is
+    // the next step. It never says that nothing was sent.
     hostedTest.failWrite = "result";
     const failed = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "written late", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "late" })));
-    expect(failed["answer"], JSON.stringify(failed)).not.toBe("accepted");
     expect(failed["error"], JSON.stringify(failed)).toBe("custody");
+    expect(String(failed["message"]), JSON.stringify(failed)).toMatch(/was sent and the scope answered accepted, and the server could not keep that outcome\. The act may have taken effect/);
+    expect(String(failed["message"])).not.toMatch(/nothing was sent[.;]/);
+    expect(String(failed["next"])).toMatch(/settle with the same idempotencyKey/);
+    expect((await agentStub(bot.agent).custodyRecord("late"))?.phase, "the record stays sent").toBe("sent");
     const sent = ((await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[]).filter((e) => e.kind === "open-issue" && e.signer === bot.key);
     expect(sent.length, "the act was admitted by the scope").toBe(1);
     // settle reads the scope's receipt and writes it now that writes succeed; the record is accepted with the same entry.

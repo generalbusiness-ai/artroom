@@ -102,6 +102,8 @@ export class McpHttp {
   readonly #open = new Set<object>();
   /** The listen streams by their owner, so a graceful ending can complete each one. */
   readonly #listens = new Map<object, { end: (final: boolean) => void }>();
+  /** How many replacements of a session's stream are being opened: the incumbent's slot is theirs until the last of them exits. */
+  readonly #replacing = new Map<LegacySession, number>();
   constructor(readonly port: HttpPort) {
     // Issuance persists a new session; an update persists only a session that is still live. One that ended while its request
     // was pending (deleted, evicted, retired, or discarded with its layer) is never written again: an ended session's row stays
@@ -257,7 +259,9 @@ export class McpHttp {
    * The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. The
    * stream's slot is owned before anything is awaited: a fresh open takes a new slot or is refused, and a replacement takes
    * over the incumbent's slot at once, so the incumbent's cancellation during the await frees nothing for another session. A
-   * client that went away while the snapshot was read (`signal`) opens no stream: its slot is released and nothing watches.
+   * client that went away while the snapshot was read (`signal`) opens no stream: its slot is released and nothing watches. A
+   * replacement that does not open gives the slot back to its incumbent, which is still live and still the session's stream:
+   * live capacity is owned across every exit, so four live incumbents are never counted as three.
    */
   async #stream(session: LegacySession, signal?: AbortSignal): Promise<Response> {
     const slot = {};
@@ -266,16 +270,25 @@ export class McpHttp {
       if (this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
     } else {
       this.#open.delete(incumbent);   // the slot passes to the replacement now
+      this.#replacing.set(session, (this.#replacing.get(session) ?? 0) + 1);
     }
     this.#open.add(slot);
+    // When a replacement exits without opening: the incumbent takes its slot back if it is still the session's live stream and
+    // no later replacement holds it; otherwise nothing is owed, since the incumbent is gone or another replacement will close it.
+    const exit = (opened: boolean) => {
+      if (incumbent === null) return;
+      const left = (this.#replacing.get(session) ?? 1) - 1;
+      if (left > 0) this.#replacing.set(session, left); else this.#replacing.delete(session);
+      if (!opened && left === 0 && session.stream === incumbent) this.#open.add(incumbent);
+    };
     // Reconciliation before the stream is attached: a change made while no stream was open, or while the object was evicted, is
     // told once now, unless the client has listed since.
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
     this.#open.delete(slot);
     // The session may have ended, or the client gone, while the snapshot was read: then no stream opens, and the slot is released.
-    if (session.id !== null && !this.sessions.has(session.id)) return bare(404);
-    if (signal?.aborted) return bare(204);
+    if (session.id !== null && !this.sessions.has(session.id)) { exit(false); return bare(404); }
+    if (signal?.aborted) { exit(false); return bare(204); }
     const old = session.stream;
     const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });
     const stream: Stream = {
@@ -286,6 +299,7 @@ export class McpHttp {
     if (old) { this.#open.delete(old); old.close(false); }
     this.#open.add(stream);
     session.stream = stream;
+    exit(true);
     sse.send(": stream\n\n");
     // A session that has listed is told once of a generation it has not listed; one that never listed has nothing to reconcile.
     if (generation !== null) {

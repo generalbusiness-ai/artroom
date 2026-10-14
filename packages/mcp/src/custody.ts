@@ -170,6 +170,8 @@ export type HeldBack =
   | { held: "full"; reason: "budget"; bytes: number }
   | { held: "locked"; stale?: string }
   | { held: "unreadable" }
+  /** The envelope was sent and answered, and the store could not keep the outcome: the act may have taken effect; the record stays `sent`. */
+  | { held: "unkept"; answer: Answer["answer"] | "lost" }
   | { held: "too-large" };
 
 export class CustodyError extends Error {
@@ -211,6 +213,22 @@ export class Custody {
 
   async #read(id: string): Promise<CustodyRecord | null> {
     try { return await this.store.read(id); } catch { throw new CustodyError({ held: "unreadable" }); }
+  }
+
+  /**
+   * Keep what came of a dispatch. The envelope left and was answered (or its reply was lost) before this write; a store that
+   * fails here settles nothing, and what is reported must say so: the record stays `sent` on disk, the act may have taken
+   * effect, and settle under the same key resolves it. It is never "nothing was sent".
+   */
+  async #outcomeKept(id: string, record: CustodyRecord, answer: Answer["answer"] | "lost", outcome: () => Promise<void>): Promise<void> {
+    try {
+      await outcome();
+      record.updated = this.now();
+      await this.#write(id, record);
+    } catch (error) {
+      if (error instanceof CustodyError && error.why.held === "too-large") throw error;
+      throw new CustodyError({ held: "unkept", answer });
+    }
   }
 
   async #write(id: string, record: CustodyRecord, dispatch = false): Promise<void> {
@@ -353,16 +371,12 @@ export class Custody {
       } catch (error) {
         if (!(error instanceof Lost)) throw error;
         record.phase = "unknown";
-        await this.#outcome(id, record, { at: this.now(), lost: true, attempt: record.attempt });
-        record.updated = this.now();
-        await this.#write(id, record);
+        await this.#outcomeKept(id, record, "lost", async () => { await this.#outcome(id, record, { at: this.now(), lost: true, attempt: record.attempt }); });
         return { record, lost: true };
       }
       // `unavailable` resolves nothing; a definitive answer does.
       record.phase = answer.answer === "unavailable" ? "unknown" : answer.answer;
-      await this.#outcome(id, record, { at: this.now(), answer, attempt: record.attempt });
-      record.updated = this.now();
-      await this.#write(id, record);
+      await this.#outcomeKept(id, record, answer.answer, async () => { await this.#outcome(id, record, { at: this.now(), answer, attempt: record.attempt }); });
       return { record, answer, retained: false };
     });
   }
