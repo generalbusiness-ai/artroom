@@ -11,11 +11,11 @@ The production Worker serves `/counting/`, `/counting/counting.js` and
 its three public assets before compiling or deploying the Worker:
 
 ```sh
-node examples/counting/scripts/assets.mjs
+node apps/counter/scripts/assets.mjs
 ```
 
-The builder writes `examples/counting/browser-build/` and the committed
-`packages/scope/src/counting-assets.ts`. The asset witness compares a fresh
+The builder writes `apps/counter/browser-build/` and the committed
+`apps/counter/src/counting-assets.ts`. The asset witness compares a fresh
 write-free build with the committed module. The deployment includes no fake
 preview, keys, sessions or recorded fixture data. `preview.html` remains an
 explicit local fake transport/session/scope/speech/clock QA surface. It is

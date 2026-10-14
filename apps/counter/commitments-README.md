@@ -77,8 +77,8 @@ Later owner-released focused commands, with cached dependencies already bound
 to this exact worktree, are:
 
 ```sh
-node node_modules/typescript/bin/tsc -p examples/counting/tsconfig.json
-node node_modules/vitest/vitest.mjs run --config examples/counting/commitments.vitest.config.ts
+node node_modules/typescript/bin/tsc -p apps/counter/tsconfig.json
+node node_modules/vitest/vitest.mjs run --config apps/counter/commitments.vitest.config.ts
 ```
 
 No types, config import, discovery, tests, semantic controls, native run, browser,
