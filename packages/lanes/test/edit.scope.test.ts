@@ -50,7 +50,7 @@ async function publicationCheckpoint(node: Platform) {
     const admission = (operation: typeof operationPage.operations[number]["operation"]) => {
       if (operation.kind !== "check-judge") return undefined;
       const mark = code?.data.outcomes?.[operation.kind];
-      const rule = code && mark && operation.owner === code.named ? ruleAt(code.rules, mark.code, "outcome") : null;
+      const rule = code && mark && operation.owner === definition ? ruleAt(code.rules, mark.code, "outcome") : null;
       const callback = rule?.rules.publicationOrigin;
       try {
         const asked = callback?.(store, operation, ownOf(store));
