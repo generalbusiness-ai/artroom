@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at package-lock.json","body":{"commit":"3bd0ef1c67f2559f943dcdfe945795e23696952f","path":"package-lock.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/bytes/src/session.ts","body":{"commit":"3bd0ef1c67f2559f943dcdfe945795e23696952f","path":"packages/bytes/src/session.ts"}}
