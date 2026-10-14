@@ -1,10 +1,10 @@
 # Publication from a fold
 
-13 October 2026; Draft 4, 14 October 2026. **Proposed design. Design
+13 October 2026; Draft 5, 14 October 2026. **Proposed design. Design
 only: nothing here is built.** Two trials were run, in memory, of the
 lending definition of section 5 against the validator, the rule
 evaluator and the judges; section 5.4 says what they showed and what they
-did not. Baseline main `47a2a4b5`.
+did not. Baseline main `26d2bc8a`.
 
 This note proposes the simplest way for an application's act to put a
 file in its room's repository. Today only the change lane can do that.
@@ -49,6 +49,22 @@ Draft 4 answers the checker's review `3781416c` of Draft 3:
   section 8 states the receipt bound as the source has it; the queue
   details of section 9.3 become builder criteria; section 10 lists the
   witnesses the review asked for.
+
+Draft 5 answers the checker's review `8f1c6397` of Draft 4, which credited
+the three answers above:
+
+- **Source order wins, not arrival order.** An older act's page that
+  reaches the destination after a later act's page for the same sender
+  and path is never pushed; it is recorded as superseded (section 4.5).
+- **The cause is unambiguous.** A file publication's cause includes the
+  send's ordinal in its entry, since an entry can hold several sends
+  (section 9.3).
+- **The origin check is the application's.** The destination proves its
+  own directory's `establish-application` creation and full references;
+  the change-factory verifier is adapted, not reused as it is (section
+  9.2).
+- Section 9.1's readings are marked as made before the repair; section
+  4.5 distinguishes a retried tell, a new act and an unknown push.
 
 ## 1. The aim
 
@@ -161,6 +177,41 @@ commit through the receipt.
 
 A `publication` update to the sender, with a handler the application
 declares, is left for a later version.
+
+### 4.5 Order: the later act's page wins
+
+Two acts on one thing make two sends to the same path. The destination
+holds one publication at a time, in the order it admits them. Admission
+order is not source order: an earlier send can wait for its origin proof
+or for a retry while a later one is delivered and published. Published
+in admission order, the older page would then overwrite the newer.
+
+So the destination keeps, for each sender (full reference, with its
+incarnation) and path, the source position of the newest file
+publication it has admitted: the sending entry's number, then the send's
+ordinal. A file publication is admitted only if its position is above
+the kept one; then the kept position moves to it. One whose position is
+not above is recorded as `superseded`, with its own receipt naming its
+cause and the position that superseded it, and is never pushed.
+
+The kept position moves at admission, which is a judged entry of the
+destination, so a restart reads it from the record. Queued work is
+checked again before the push: a queued publication whose position is
+no longer the kept one for its sender and path is superseded before it
+is sent. A push already sent is not recalled; a later publication for
+that path queues behind it in the one slot, so its push lands after.
+A push whose outcome is unknown stays unknown and holds the slot as now;
+it is never replaced by a resend.
+
+Three things are kept apart:
+
+- **A retried tell.** The sender's outbox may deliver the same send
+  again after a lost answer. It has the same cause (entry, hash,
+  ordinal), so the destination recognises it and admits it once.
+- **A new act.** A later entry is a new cause with a higher position;
+  it is admitted, and supersedes any older one still queued.
+- **An unknown push.** It stays unknown until read; nothing sends it
+  again.
 
 ## 5. The lending library's use
 
@@ -358,7 +409,11 @@ them. Nothing here was run except the trial of section 5.4.
 
 ### 9.1 Settled by reading
 
-1. **Sender in the same room: no check exists today.** The `reserve`
+Each reading here was made at main `6afbb5b53`, before the
+publication-origin repair landed at `9a3e43d2`; point 1 describes the
+destination as it was then.
+
+1. **Sender in the same room: no check existed then.** The `reserve`
    handler (`packages/platform/src/destination.ts`, from line 366) has
    three guards: the operation fact is in the sender's own scope, no
    publication exists for it, and fewer than 65 receipts are owed. None
@@ -413,10 +468,14 @@ them. Nothing here was run except the trial of section 5.4.
    checks that origin against the destination and its full directory
    reference, including incarnations, before judgment, and the outside
    operations driver checks it again before a send, recovery or late
-   settlement. `publish-file` uses the same check: the sender's genesis
-   seed names this destination's directory as creator, and the creating
-   entry is that directory's `establish-application`, whose signed act,
-   cause, seed and creation send match. Missing proof leaves the
+   settlement. `publish-file` uses a check of the same kind, adapted to
+   applications: the sender's genesis seed names this destination's
+   directory, with its full reference and incarnation, as creator, and
+   the creating entry is that directory's `establish-application`,
+   whose signed act, cause, seed and creation send match. The repair's
+   verifier proves a change or issue lane's creation through the
+   change factory; the builder adapts it to the application factory and
+   does not reuse it unchanged. Missing proof leaves the
    delivery pending, as for a reservation; it is not refused and not
    replayed. Nothing is told at creation, so there is nothing to
    reconcile.
@@ -442,7 +501,11 @@ them. Nothing here was run except the trial of section 5.4.
   Admission and owed receipts are counted together for both kinds.
 - **The cause is bound.** A file publication's commit and receipt name
   the path, the content's digest, the sender's full reference and the
-  sending entry's number and hash. An older publication's completion is
+  sending entry's number, hash and send ordinal. That triple is also the
+  key that recognises a retried tell (section 4.5).
+- **Origin on every step.** The origin check applies at admission, to
+  queued work before a push, to recovery and to late settlement, as the
+  repair applies it to change publications. An older publication's completion is
   never shown as a newer act's page.
 - **A restart keeps an unknown push unknown.** As for a change's
   publication: sent at most once, an unknown answer stays unknown until
@@ -469,6 +532,13 @@ them. Nothing here was run except the trial of section 5.4.
 - Interleaved change and file publications, and two successive shelf
   writes for one thing: each receipt names its own entry, and the later
   page wins.
+- Out of order: act A's send is held (its origin proof withheld, or its
+  delivery failed and retried) while the later act B's send for the
+  same path is admitted and pushed; then A is released. A is recorded
+  `superseded` with a receipt naming its cause and B's position, A is
+  not pushed, and B's page stays at the published head. The same with a
+  restart between B's push and A's release.
+- A retried delivery of one send is admitted once.
 - The lending library with its pages written this way: the story of the
   lending design, each page at the published head after its act, the
   rule's refusal of a path outside `shelf/`, a donation refused for a
