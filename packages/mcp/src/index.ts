@@ -12,3 +12,6 @@ export * from "./shape.ts";
 export * from "./paging.ts";
 export * from "./service.ts";
 export * from "./wire.ts";
+export * from "./http.ts";
+export * from "./sqlite-custody.ts";
+export * from "./hosted.ts";

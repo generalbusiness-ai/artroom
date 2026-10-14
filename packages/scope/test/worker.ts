@@ -37,7 +37,8 @@ import { sessionsOf, type LimitConfig } from "../src/index.ts";
 import { codeLost, controls, net, netPorts, testPorts } from "../src/testing.ts";
 import { signedDiagnosticFor } from "./signed-read-diagnostic.ts";
 import { sessionFields, testSessionBypass } from "./session-settings.ts";
-import { DeployedScope, ScopeService, route, sessionWiring, type Env } from "../src/worker.ts";
+import { DeployedScope, McpAgent, McpRegistry, ScopeService, mcpRoute, route, sessionWiring, type Env, type McpEnv } from "../src/worker.ts";
+import type { HostedAgent } from "@generalbusiness/dap-mcp";
 import { outsideOf, owners, wired } from "./outside.ts";
 
 export { ScopeObject };
@@ -175,4 +176,70 @@ export class NetService extends ScopeService<NetEnv> {
   protected override scopes() { return this.env.NET; }
 }
 
-export default { fetch: (request: Request, env: NetEnv): Promise<Response> => route(request, env.NET) };
+export default { fetch: async (request: Request, env: NetEnv & HostedEnv): Promise<Response> => (await mcpRoute(request, env)) ?? route(request, env.NET) };
+
+/**
+ * The hosted MCP endpoint in this Worker: the deployed classes over the
+ * namespace `PLATFORM`, so a hosted agent reads and acts on the same real
+ * scopes the stories found. `hostedTest` holds what a test lends them: the
+ * fixture's clock, and the pause between two polls of `wait`, which drives
+ * the fixture's operations as a deployment's alarms would.
+ */
+export const hostedTest: {
+  now: (() => number) | null; pause: ((waiting: readonly string[]) => Promise<void>) | null;
+  /** The next request whose path ends with this reaches the scope, and its reply is lost: a STAND-IN for a dropped reply. */
+  lose: string | null;
+  /** A small control budget for an agent object made while it is set, in place of 16 MiB and 1 MiB. */
+  controlBudget: { budget: number; reserve: number } | null;
+  /** Small custody bounds for an agent object made while it is set; `failWrite` makes its next custody write fail, as SQLITE_FULL would. */
+  custodyBounds: { budget: number; identityMost: number; terminalMost: number; ageDays: number } | null;
+  /** The next custody write of this kind fails, as SQLITE_FULL would. */
+  failWrite: "keep" | "dispatch" | "result" | "segment" | null;
+  /** The creation fence at which the next creation fails, as a reset would: the object throws there and drops its memory. */
+  faultAt: "reservation" | "seed" | "kept" | "accepted" | "complete" | null;
+  /** The next session-row write of an agent fails, as a storage failure would. */
+  failSession: boolean;
+  /** While set, every configuration read of an agent, and with it every listing and snapshot, waits on this promise. */
+  configHold: Promise<void> | null;
+} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false, configHold: null };
+/** The scripted reset: thrown at a fence, once. */
+export class ScriptedReset extends Error { constructor(fence: string) { super(`scripted reset at ${fence}`); } }
+type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
+export class PlatformMcpRegistry extends McpRegistry<HostedEnv> {
+  protected override scopes() { return this.env.PLATFORM; }
+  protected override now(): number { return hostedTest.now?.() ?? Date.now(); }
+  protected override ports() { return { ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}), fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } } }; }
+  reset(): void { this.evict(); }
+  heldAnswers(): { op: string; answer: boolean }[] { return this.answers(); }
+}
+export class PlatformMcpAgent extends McpAgent<HostedEnv> {
+  protected override scopes() { return this.env.PLATFORM; }
+  /** The harness's instance reset: what an eviction leaves. */
+  reset(): void { this.evict(); }
+  /** Fire the service's watch once, as 30 seconds passing would. */
+  async tick(): Promise<boolean> { const service = this.held()?.inside().service; if (!service) return false; await service.check(); return true; }
+  heldAnswers(): { control: { op: string; answer: boolean }[]; agent: boolean } { return this.answers(); }
+  used(): number { return this.controlUsed(); }
+  durableFacts(): ReturnType<HostedAgent["durable"]> { return this.durable(); }
+  /** The custody record under an idempotency key: its intent digest, attempt and outcomes. */
+  custodyRecord(key: string): ReturnType<HostedAgent["custodyOf"]> { return this.custodyOf(key); }
+  /** The open streams and sessions this instance holds. */
+  counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
+  protected override ports() {
+    const scopes = this.env.PLATFORM;
+    return {
+      ...(hostedTest.controlBudget ? { controlBudget: hostedTest.controlBudget } : {}),
+      ...(hostedTest.custodyBounds ? { custodyBounds: { ...hostedTest.custodyBounds, fail: (point: "keep" | "dispatch" | "result" | "segment") => { if (hostedTest.failWrite === point) { hostedTest.failWrite = null; throw new Error("SQLITE_FULL: scripted"); } } } } : {}),
+      fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } },
+      sessionFault: () => { if (hostedTest.failSession) { hostedTest.failSession = false; throw new Error("SQLITE_FULL: scripted session write"); } },
+      configHold: () => hostedTest.configHold ?? undefined,
+      now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
+      pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
+      fetch: (async (url: string, init?: RequestInit) => {
+        const response = await route(new Request(url, init), scopes);
+        if (hostedTest.lose !== null && new URL(url).pathname.endsWith(hostedTest.lose)) { hostedTest.lose = null; await response.body?.cancel(); throw new Error("scripted loss of the reply"); }
+        return response;
+      }) as never,
+    };
+  }
+}

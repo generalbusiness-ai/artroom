@@ -12,9 +12,11 @@
       { "name": "SCOPES", "class_name": "TestScope" },
       { "name": "AS_DEPLOYED", "class_name": "ScopeObject" },
       { "name": "NET", "class_name": "NetScope" },
-      { "name": "PLATFORM", "class_name": "PlatformScope" }
+      { "name": "PLATFORM", "class_name": "PlatformScope" },
+      { "name": "REGISTRIES", "class_name": "PlatformMcpRegistry" },
+      { "name": "AGENTS", "class_name": "PlatformMcpAgent" }
     ]
   },
   "services": [{ "binding": "API", "service": "artroom-scope-test", "entrypoint": "NetService" }],
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope", "PlatformScope"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestScope", "ScopeObject", "NetScope", "PlatformScope", "PlatformMcpRegistry", "PlatformMcpAgent"] }]
 }

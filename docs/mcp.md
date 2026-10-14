@@ -61,6 +61,16 @@ request that carries an `Origin` header (no browser page is a client of a
 signing server), and `404` to any path but `/mcp`. A new process makes a
 new token. Batches are not served.
 
+The loopback server and the hosted endpoint validate every request the
+same way, through one HTTP layer (`packages/mcp/src/http.ts`); the rules
+are under "The hosted endpoint", below. In short: a 2026-07-28 request
+carries `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method`, and
+`Mcp-Name` on `tools/call`; a 2025-11-25 request names its session; and a
+`GET` or `DELETE` is served only under the 2025-11-25 header, where it
+needs `Mcp-Session-Id` (`400` without it) and a live session (`404`
+otherwise); with no header, or the 2026-07-28 header, it is `405` with
+`Allow: POST`.
+
 ### Options
 
 | Option | Effect |
@@ -1385,6 +1395,126 @@ actions as the roster lists them for the membership the room is pinned to:
 membership@2, membership@4 (the application cohort) or membership@5 (the
 Counting cohort); the invitation carries that pin, and the enrolment is
 verified against the receipt's definition.
+
+## The hosted endpoint
+
+The same service, served from the scope Worker at `POST /mcp`, for an agent
+on a host that cannot run a process. One Durable Object per agent holds the
+agent's key, its bearer, its sessions and its custody, so one agent's
+sessions, subscriptions and custody are kept apart from every other
+agent's by construction; one registry per repository creates agents. The
+design is notes/2026-10-13-hosted-mcp-endpoint.md; this section is what an
+operator and a controller need.
+
+### Routes
+
+| Route | Authorization | What it does |
+|---|---|---|
+| `POST /mcp/agents` | `Control`, action `create` | Creates and enrols an agent. Body: `{ "link": "<artroom-agent-key:…>" }`, the agent-key invitation from `dap invite --kind agent-key`. Answers `201` once with `{ agent, key, handle, member, bearer }`; the bearer is shown this once, and again only to the same `op` |
+| `POST /mcp/agents/<agent>/bearer` | `Control`, action `bearer` | A new bearer. Every session of the agent ends, every 2025-11-25 stream closes with a final event and every listen completes with its result. A replay of a completed `op` returns its answer and ends nothing |
+| `DELETE /mcp/agents/<agent>` | `Control`, action `retire` | Retires the bearer; sessions and streams end the same way. A retired agent answers `401` from then on, and no later `bearer` or unfinished `create` revives it. An enrolment still unfinished can be retired |
+| `POST /mcp` | `Bearer <agent>.<secret>` | One JSON-RPC request or notification, either revision |
+| `GET /mcp` | `Bearer`, `Mcp-Session-Id` | The 2025-11-25 server stream of that session |
+| `DELETE /mcp` | `Bearer`, `Mcp-Session-Id` | Ends that 2025-11-25 session |
+
+### Creating an agent: the controller's recipe
+
+Enrolment is the membership's own; nothing here grants a permission.
+
+1. An admin adds the agent as a member with its controller, an active
+   person: `member.add` with `kind: agent`, the handle and `controller`.
+2. An admin invites a key for that member: `key.invite` with the member,
+   `kind: agent`, `inviteHash` (the digest of a 32-byte secret) and
+   `inviteEnds`. `dap invite --kind agent-key` performs both and prints the
+   invitation link, which holds the secret: keep it private.
+3. The controller (or an admin) signs a **control request** with their own
+   member key and sends `create` with the link as the body. The Worker's
+   registry checks the signature, that the request is for this service and
+   this membership with its incarnation, the body's digest, the deadline
+   (at most 15 minutes ahead), and the signer's current authority, read
+   from the membership now: an active key of an active member who holds
+   `membership.manage` or is the agent's recorded controller. Then it
+   records the request under `op` and creates the agent's object.
+4. The agent's object makes its key, keeps the signed `enrol` under
+   custody before sending it, reads the admitted entry back, confirms the
+   key is active, and mints the bearer. The secret of the invitation lives
+   where the membership puts it, in `enrol`'s signed fields and the entry
+   that retains them, and nowhere else in the hosted store.
+5. Give the agent host `https://<service>/mcp` and
+   `Authorization: Bearer <agent>.<secret>`.
+
+A control request is the canonical JSON of
+`{ v: 1, action, service, membership, agent, actor, body, op, notAfter }`,
+signed by `actor` under the tag `artroom-mcp-control-1`, and presented as
+`Authorization: Control <base64url of the JSON>.<signature>`. `body` is the
+SHA-256 digest of the request body; `agent` is null for `create`; `op` is
+the caller's identity for the operation, 1 to 128 bytes. The same `op` with
+the same request answers the same, resuming unfinished work; another
+request under the same `op` is refused `409`; an answer is kept seven days
+past the request's `notAfter`, then `409` as stale, and the `op` is never
+reused. Each object removes expired answer bodies when it next acts; the
+`create` answer, which shows the bearer, is among them. Refusals are fixed bodies naming a rule, never a value: `403` for a
+bad signature, another service, another repository or incarnation, a
+revoked key, an ended member or a signer without authority; `400` for a
+binding that does not match the route, a body digest that differs or a
+deadline out of range; `507` when the object's control budget is full.
+
+### The bearer
+
+`<agent>.<secret>`: the object holds the secret's digest and compares in
+constant time. Missing, malformed, wrong and retired each answer `401` with
+no body. Failures that name an agent are counted by that agent per
+connecting address: after ten in a minute, the eleventh request from that
+address answers `429`, right bearer or not. Revocation is also the
+membership's: `key.revoke` or `member.remove` by an admin makes the key's
+acts refused everywhere; `retire` only stops the hosted service.
+
+### The two revisions over HTTP
+
+Exactly `2025-11-25` and `2026-07-28` are served; any other
+`MCP-Protocol-Version` is refused `400` before anything is dispatched, on
+every method. The revision is selected before the method is handled: from
+the header when present, else from the request's own content (a `_meta`
+protocol version, or `initialize`) or from the recorded version of the
+session the request names. Then:
+
+| Version, as selected | `POST` | `GET` | `DELETE` |
+|---|---|---|---|
+| header `2026-07-28` | modern: `_meta` must name the same version, `Mcp-Method` must equal the method, `Mcp-Name` the tool on `tools/call` (`=?base64?…?=` for a name that is not header-safe); else `400` with `-32020`; an unknown method `404` with `-32601`; a notification `202` | `405` with `Allow: POST`; no session consulted | `405`; nothing ended |
+| header `2025-11-25` | legacy: `initialize` mints a session; any other request needs `Mcp-Session-Id` (`400` without, `404` unknown); `Mcp-Method` and `Mcp-Name` are ignored | session required: `400` without, `404` unknown, else the stream | session required; else the session ends |
+| header absent, `_meta` names `2026-07-28` | `400` with `-32020`: that revision requires the header | | |
+| header absent, `initialize` | legacy | | |
+| header absent, `Mcp-Session-Id` names a live session | that session's revision | the stream | the session ends |
+| header absent, otherwise | `400` | `405` | `405` |
+
+A batch is refused on every request; a body over 1 MiB is `413`; an
+`Origin` header is `403`. At most 16 sessions per agent (a 17th
+`initialize` is admitted first and then ends the oldest; a refused
+`initialize` ends nothing) and 4 open streams, legacy streams and
+listens together (a 5th is `409`). Every byte bound here counts UTF-8
+bytes. A session survives the object's
+eviction; its open stream does not: when the stream reconnects, a list
+change the client has not listed is told once more.
+
+### Budgets and recovery
+
+| Budget | Bound | When full |
+|---|---|---|
+| Custody, per agent | 1 GiB | A new act whose completion need (its record up to 2 MiB plus a 512 KiB segment row) cannot be reserved is refused `full` before anything is signed; a resubmit, repeat step or settle that cannot reserve is refused before anything is dispatched; retained answers stay readable |
+| One identity's history | 64 MiB | Further attempts on that identity refuse `full`; its retained answer stays readable |
+| Control, per registry and per agent | 16 MiB, the last 1 MiB for `retire` alone; one aggregate of every persisted row: each operation (4 KiB reserved, its answer charged beyond that), each 2025-11-25 session row (its declared capabilities at most 16 KiB), and the agent's configuration | `create` and `bearer` refuse `507`; a session cannot be issued (`507`, error `-32001`); a root cannot be added; `retire` still succeeds. Were the reserve exhausted too, the admin's `key.revoke` ends the agent's authority in the scope regardless of the hosted objects |
+
+Nothing is deleted: terminal custody records move to an archive table in
+the same object. A storage failure rolls its transaction back and settles
+nothing; the next `settle` writes the receipt. Recovery of a budget-full
+agent is `retire` and a new agent; an `export` control action is owed.
+
+### Observed figures
+
+| Figure | Value | How taken |
+|---|---|---|
+| HTTP framing beyond the CallResult, a 2026-07-28 `tools/call` | 144 bytes: the JSON-RPC envelope with a one-digit id (34) and the modern result's added members (110) | Observed, `packages/mcp/test/hosted.scope.test.ts`, H7 |
+| Control request header | about 600 bytes | Reconstruction: the canonical JSON of the nine members, base64url, and a 64-byte signature |
 
 ## Budgets and observed figures
 

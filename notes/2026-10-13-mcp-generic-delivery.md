@@ -706,13 +706,176 @@ signing and proxy settings are not the cause. No newer Git was tried here.
 The fix, in the runner or in the cloud image's Git, is not this
 delivery's.
 
+## The hosted endpoint (request 9b3084d4)
+
+Built locally by the planner, in the worktree `planner/mcp-hosted` from the
+discovery head `0728c881`, as notes/2026-10-13-hosted-mcp-endpoint.md
+designs it (Draft 5, checker approval 4a0af914, landed as main 77d9cca0).
+Hugh, 2026-10-13 15:08 Eastern: no cloud session; the build is local.
+
+| Section of the design | What was built | Witness |
+|---|---|---|
+| 3.4, the HTTP layer | `packages/mcp/src/http.ts`, one module for the loopback server and the hosted endpoint: the revision selected before the method is handled, from the header, else the request's content or the named session's recorded version; exactly the two commissioned revisions; one method and version matrix; `Mcp-Method` and `Mcp-Name` with the sentinel on the raw value; batches refused; errors with `id` null when undetectable; 16 sessions, 4 streams; `405` with `Allow: POST`. `node.ts` serves loopback HTTP through it, so the loopback server now requires the modern headers too (the wire tests send them) | `test/http.test.ts` (H8 over loopback, 4 tests); `test/hosted.scope.test.ts` H8 through the route |
+| 3.5, wire and sessions | `wire.ts`: `told` split into `listed` (durable, set by `tools/list`, written through `Wire.hooks.changed` before the response) and `notified` (per stream, in memory); reconciliation when a stream opens, only for a session that has listed; a replacement `GET` closes the old stream without detaching the watch | H5; `test/wire.test.ts` |
+| 3.6, custody | `sqlite-custody.ts`: records in chunks of at most 1 MiB, outcomes in segment rows of at most 512 KiB with split outcomes and an atomic index, an archive that deletes nothing, `used` and `reserved` counters topped up to the completion need before every unresolved write (the write before a send, a refused resubmit, a repeat step), refusing `full` inside the transaction before anything is written; a terminal write consumes its reservation and releases the rest; a storage failure rolls back and settles nothing. `custody.ts` lets a store's own `full` pass through `write` | `test/sqlite-custody.test.ts` (6 tests on Node's SQLite); H6 through the route |
+| 3.1 to 3.3, 3.7, objects and control | `hosted.ts`: `HostedRegistry` and `HostedAgent` over a SQLite port; control requests under `artroom-mcp-control-1` (`contract/session.ts`, `bytes/session.ts` `signControl` and `verifyControl`); the checks before any effect, then current authority through the membership's observation read, then the reservation under `op` in one transaction before the handoff; enrolment by the object's own key, kept under custody before sending, read back and confirmed active before the bearer is minted; `bearer` and `retire` in one transaction with every session deleted and every stream closed with a final event; the bearer's digest compared in constant time, failures that name the agent counted per address; a 16 MiB control budget per object with 1 MiB for `retire` alone; answers retained seven days past the original request's deadline, tombstones kept | H1, H2, H3, H4 |
+| 5, deployment | `packages/scope/src/worker.ts`: `McpRegistry` and `McpAgent`, `mcpRoute`, `McpEnv`; `wrangler.jsonc`: the bindings `REGISTRIES` and `AGENTS` and migration `v2`; `packages/scope/package.json` depends on `@generalbusiness/dap-mcp`; the test Worker binds `PlatformMcpRegistry` and `PlatformMcpAgent` over `PLATFORM`, with `hostedTest` lending the fixture's clock, its pause and a scripted lost reply | the stories |
+| 9, docs | `docs/mcp.md`, "The hosted endpoint": routes, the controller's recipe, the control request, the bearer and its limiter, the two revisions over HTTP as the matrix, budgets and recovery including `key.revoke` as the authority-ending recovery that is not a hosted `retire`, and the observed framing overhead; the loopback section points at the shared rules | `inventory.test.ts` reads the docs |
+
+**The checker's non-blocking points of approval 4a0af914.** A header-less
+`GET` or `DELETE` without session context is `405`, stated in the docs'
+matrix and in `http.ts`. Version consistency is checked before `Wire` in
+both directions: a July header on a body without the July `_meta` and a
+November header on July body metadata are both `-32020` (H8). A retired
+agent is terminal: its bearer answers `401`, a later `bearer` under a new
+`op` answers `409`, and each control operation under a fresh `op` is
+charged its row against the control budget, so "retirement is always
+possible" holds for as many retirements as the 1 MiB reserve admits, which
+is one retirement for an agent, many times over. The operator recipe is in
+`docs/mcp.md`. No retained operation and no original outcome is replaced
+or forgotten.
+
+**Corrections of review 7e00dc3a (first filing, `c6ef8a4e`).** Nine P2
+findings, each repaired in source with a witness through the actual custody
+and Worker paths.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. Concurrent creation could mint a second bearer | The agent object runs its control operations one at a time (a queue), and decides the terminal transition on the durable row as it is then: an agent already enrolled answers its stored answer, one retired answers `409`, and no second bearer is minted for one creation | H1: two concurrent `create` requests under one op answer one agent, one key and one bearer; the registry lists one agent |
+| 2. Expired answer bodies stayed in storage | Each object removes every answer body past its retention at the start of its next control operation, in the same transaction, from the control row and from the agent row (which held the bearer shown at creation); the row's fingerprint, deadline and state stay as the tombstone. Expiry is lazy: a copy is removed when that object next acts, so the registry's copy goes at the registry's next `create` | H3: eight days on, a replay is `409` stale and the persisted rows of both objects hold no answer body (read through a test-only hook) |
+| 3. A completed control replay closed current streams | `control` returns whether this call committed the action; only a fresh action closes streams and ends sessions. A replay returns the retained answer and disturbs nothing opened since | H4: rotate, open a stream and a listen under the new bearer, replay the rotation: both stay open |
+| 4. An unfinished enrolment could not be retired | `retire` is admitted while the agent is `enrolling`, under the same authority check; the creation's terminal transition re-reads the row and never revives a retired agent; `bearer` on an unfinished agent is `409` | H6: an enrolment whose reply is lost is `503` unresolved; an admin retires the reserved agent; the creation's retry is `409` retired |
+| 5. Archived refusals could not be archived again | A record written live takes its archived copy's place in the same transaction; archival replaces an earlier copy. The record carries every outcome and its segment rows are never removed, so history is kept | `sqlite-custody.test.ts`: an archived refusal is resubmitted, live again, terminal again and archived again, with both outcomes |
+| 6. Reservations at the wrong boundary | `CustodyStore.write` takes `dispatch: true` from custody on the writes that precede a send, a resubmit and a step, whatever the record's phase; the store arms only then, reserving the net growth (the record up to its bound plus one segment row) and refusing `full` before anything is written; a result's write consumes what is held and reserves nothing. `custody.ts` also applies the design's 256 KiB inline threshold | `sqlite-custody.test.ts`: at a saturated budget 65 lost outcomes spill and complete from the held capacity while another dispatch is refused; a step on a terminal act arms and is refused full |
+| 7. Modern listens did not close gracefully | The HTTP layer keeps each listen's handle; a graceful ending completes every listen with its result on its own stream and closes the body (`Wire.endStream`); an abrupt one sends nothing | H4: a listen open at `retire` receives its result and the end of its body |
+| 8. Concurrent legacy `GET`s could exceed four streams | A stream's slot is taken before the awaited snapshot and released on refusal; a session ended during the snapshot opens nothing | `http.test.ts`: with three streams open and the snapshot held, two concurrent `GET`s on two sessions admit one and refuse one |
+| 9. The control body was buffered before its bound | The Worker reads the control body in chunks and cancels at the chunk that passes 64 KiB, before any object is reached; the exact bytes read are what the object digests | H3: a streaming body of unbounded length is `413` and no registry row appears |
+
+Non-blocking: the 256 KiB inline threshold is implemented as above; an
+unknown method under the modern revision stays `404` with `-32601` and a
+request-only method sent as a notification stays `202` as the matrix
+states.
+
+**Corrections of review 2e85245b (second filing, `b3a7b418`).** Seven of
+the nine were credited; three P2s remained, each repaired with a witness.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. The control budget was not an aggregate: session rows and the agent row were not charged | Every persisted row of the control plane is charged by its stored bytes against one budget: a control row (its `op`, fingerprint and answer; an operation reserves 4 KiB first and its answer is charged beyond that), each session row (its JSON as stored, the difference on an update, credited when the session ends), and the agent row's configuration (its growth, so a root added is charged). A session's declared capabilities are bounded at 16 KiB, so a session row is bounded; a session the store cannot keep is not issued (`-32001`, `507`). Expired answer bodies credit their bytes; the tombstone keeps its row. The last 1 MiB stays `retire`'s | The hosted story: with a 64 KiB test budget and an 8 KiB reserve, a 20 KiB capabilities declaration is refused and an 8 KiB one is charged and credited; rotations with distinct 128-byte ops reach the ceiling and the next is `507`; at the ceiling no session is issued; after a reset the used bytes read the same and the next rotation is still refused; `retire` succeeds from the reserve |
+| 2. A step on a terminal act released its capacity before the step was sent | The store releases an identity's capacity only when nothing is in flight: not on a write that precedes a dispatch, and not while any step is `sent` or `unknown`. The reservation lives through the step's durable result, a lost answer and a restart | `sqlite-custody.test.ts`: through `Custody.step` on an accepted act with the delivery paused, the reservation is held, a competing identity's dispatch is refused `full`, a lost answer keeps it, a store opened again over the same storage reads it back, the answered step consumes it, and the competitor is admitted |
+| 3. A replacement `GET` could exceed four streams | A replacement takes over the incumbent's slot before the awaited snapshot, so the incumbent's cancellation during the await frees nothing for another session; a session that ends during the await opens nothing and its slot is released | `http.test.ts`: four streams open, the snapshot held, the first session's replacement entered, its incumbent cancelled, a fifth session's `GET` refused `409`, the replacement opens, four streams |
+
+**Corrections of review ce968d18 (third filing, `e31a3c54`).** The three
+earlier P2s were credited; one new P2, a P3 and the commissioned
+witnesses remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| P2. A refused seventeenth `initialize` ended the oldest session first | The new session is admitted first (its capabilities validated, its row kept) and only then does a seventeenth end the oldest; a refused initialize issues no session, keeps nothing and ends nothing; a row the hook kept for a refused one is removed | The hosted story: sixteen sessions, a seventeenth with 20 KiB capabilities refused and all sixteen still served, a seventeenth at a full control budget refused with the earlier session still served, a valid seventeenth ending exactly the oldest |
+| P3. Byte bounds and accounting used UTF-16 units | Every bound, debit and credit of the control budget and the capabilities bound use encoded UTF-8 bytes | 6,000 three-byte characters of capabilities are refused though they are 6,000 units |
+| H1, the five fences | Test-only faults at the design's five fences (the registry's reservation, the agent's seed, the kept envelope, the accepted enrol before the registry completes, the completed result before the reply), each a thrown reset that drops the object's memory; the creation keeps the envelope with `custody.keep` and reads it back before `send` | For each fence: the request fails with no answer, both objects are reset, the retry under the same op resumes and answers, a further retry answers the same, exactly one `enrol` entry is signed by the agent's key, the registry lists one agent with that key, and the bearer serves |
+| H5, the remaining assertions | | A change while no stream is open is told once at the next stream; the replacement is told nothing the session has not listed anew and receives a later change while the closed stream does not; a modern listen across a reset ends with no event, and the reopened listen is acknowledged with its ID and honored types and replays nothing |
+| H6 through the endpoint | A test's custody bounds and a scripted write failure on the agent's store | With room for two completion needs, one act is accepted beside the enrolment's record and the next is refused `full` before anything is signed (the scope saw one act), while the first's retained answer is read; a write that fails as a result is written leaves the act admitted by the scope and the record unresolved, `settle` writes the receipt, and the act is never signed twice |
+| H7 through the endpoint | | The plan 031 bounds hold through the route: `room`, `inspect`, an act, `steps` and `settle` each within their bound beyond the measured framing |
+
+**Corrections of review 10e33e40 (fourth filing, `e0aa08e5`).** The
+earlier P2 and P3 were credited; two P2s and the acceptance obligations
+remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. A failed `tools/list` persistence advanced the live `listed` marker | The transport's hook is given the prospective session state and writes the row first; the live session takes the state only once that write succeeded, for a listing and for `notifications/initialized` alike, so live and durable truth stay the same | The hosted story: a listing whose session-row write fails answers a correlated internal error and no list; a reconnect without a reset is told the change once; a listing that succeeds suppresses further reconciliation |
+| 2. The completion budget was admitted after signing | `CustodyStore` gains `admit` and `unadmit`: under the exclusive admission, before the envelope is built and signed, a store with a budget reserves the new identity's completion need or refuses `full`; nothing admitted stays reserved when no record came of it | `sqlite-custody.test.ts`: through `Custody.send` with the budget held, the build is never called, no record and no reservation remain, the first identity's envelope is untouched, and after it completes the second is admitted and built once. The endpoint: `settle` for the refused key finds no record |
+| H1, the fences | The agent exposes its durable facts to a test hook: its key, its state, the digest of the kept enrol intent, and whether a bearer exists | After each fence the facts are captured; after the retry the key and the kept intent are the same, the bearer exists only after the `complete` fence, and the admitted entry's intent (read through `step`) is the kept one |
+| H5, the modern reset | Eviction ends every stream abruptly through the layer, with no event, before the memory is dropped | The old listen's body ends, with no result and no final event |
+| The full-budget incumbent | | The session is kept before the budget fills, so the check is unconditional |
+| H6 matrix through the endpoint | | A dispatch write that fails leaves the kept envelope, the retry sends it once and a later repeat returns it from the archive; concurrent send and settle on one key leave one decisive outcome; two lost replies with a reset between then settle leave one entry; a scope refusal archived at once is returned by a repeat and sent again by an explicit resubmit; 256 unresolved records (the most) refuse the next by count before anything is sent and a settle admits it; a full registry control budget refuses `create` with no reservation and no agent |
+| H7 matrix through the endpoint | | Each response is a successful outcome within its bound beyond the framing: `room`, `inspect`, an act, `settle`, the declaration, `items`, `steps` paged through a continuation |
+
+**Corrections of review 0bab47e6 (fifth filing, `444b0eb6`).** The
+prospective-listed and initialized persistence, the modern reset, H1 and
+H6 were credited; three P2s remained, each a missing accounting or
+lifecycle path, and three nonblocking gaps.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. The completion capacity could still fail after signing: `admit` discounted a forecast of the record's bytes, the kept rows then consumed that reservation, and the first dispatch's top-up could cross the budget after the envelope was built and signed | The need is counted on the record rows as stored, never on a forecast: the record at its bound with every row's overhead (`chargedOf`), less the record rows as stored, plus one segment row with its overhead; `COMPLETION_BYTES` is that whole cost. `admit` reserves it all before build; what a write stores comes out of the reservation one for one and a shrink of an identity in flight goes back to it, so an admitted identity's stored and reserved bytes sum to its complete cost until its result is written, and the dispatch tops up nothing | `sqlite-custody.test.ts`: an identity in flight holds exactly `COMPLETION_BYTES` between stored and reserved however small its record; at a budget one byte short of a second complete cost, `Custody.send` is refused `full` with the build never called, no record and no reservation, the first identity's holding untouched; at the boundary it is built once, the sum is whole before the build and again at the delivery, the result releases the rest. Named red: on the source at `444b0eb6` the witness fails at the first sum (2,620,925 for 2,621,440) |
+| 2. A pending listing could resurrect a deleted session: the listing awaited the page, then persisted a copy of the session it had captured, and `DELETE` (or rotation, retirement) had removed the row meanwhile; the upsert recreated it and a restart restored it | A session that ended carries `ended`; the hook is given the live session and the prospective change, and persists only a session that has not ended. `DELETE`, the seventeenth's eviction, a refused `initialize`, `closeAll` and `abrupt` end their sessions, so a layer discarded with its sessions persists nothing more. The fallback `initialized` of a listing without `notifications/initialized` is now durable before it moves too | The hosted story: a listing's configuration read is held, the session is deleted while it waits (the row credited), the read released; the listing still answers its request, the control budget is as before the session and the session count is 0; after a reset the old ID is `404` for `POST` and `GET`, the budget unchanged, and a fresh session is issued and served. Named red: on the source at `444b0eb6` the budget after the listing is 5,284 for 4,958 |
+| 3. A legacy loopback client that disconnected while its stream was opening leaked its slot: the opening held the slot across the snapshot, the server subscribed to the socket's close only after the handler returned, and a close during the await was never seen | The loopback server tracks the socket's close before the handler is awaited and passes an abort signal with the request; the layer's opening releases its slot and attaches no stream when the signal is aborted after the snapshot; a body returned to a closed socket is cancelled at once | `http.test.ts`, over loopback: a GET enters while the snapshot is held, its socket closes, the snapshot is released; the slot count returns to 0 and the session has no stream; four healthy opens then take the four slots. Named red: on `node.ts` at `444b0eb6` the slot is never released |
+| Nonblocking: the fallback `initialized` | Durable with the listing's row before the live marker moves (above) | The listing's persistence witnesses |
+| Found by the gate: the stdio server dispatches every line of one read at once, and since the fourth filing `notifications/initialized` awaited its hook before the live marker moved, so a `tools/list` in the same read could be refused "Not initialized" | With no persistence hook (stdio, loopback) the live `initialized` marker moves at once, before any other line of the read is dispatched; with a hook, durable first as before | `wire.test.ts`: `notifications/initialized` and `tools/list` dispatched in the same turn, with no hook, list; the first gate at this head's predecessor failed the stdio story on exactly this, and it passes alone and after the change |
+| Nonblocking: H6 resubmit | | The custody record under the key is read in the agent object: after the plain repeat, attempt 1 with one outcome; after the explicit resubmit, attempt 2 with two outcomes and the same intent digest, the same envelope sent again |
+| Nonblocking: H7 continuation | | The `steps` continuation is followed to exhaustion: more than one page, the last without a cursor, and the pages together equal the directory's whole history as an independent reader pages it, each step once and in order |
+
+**Corrections of review fe82ee58 (sixth filing, `056e1fea`).** The three
+P2s of the fifth filing and the stdio ordering were credited; two P2s and
+three P3s remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. An aborted replacement lost live capacity: the replacement took the incumbent's slot before the snapshot, and when its client went away it returned with no body, so the incumbent stayed open and uncounted and four incumbents were counted as three | The layer owns capacity across every exit of a replacement: it counts the replacements being opened for a session, and one that exits without opening gives the slot back to the incumbent when the incumbent is still the session's live stream and no later replacement holds it (`http.ts`) | `http.test.ts`, over loopback: four live incumbents, a replacement of the first that goes away while the snapshot is held, the snapshot released; four streams are counted, the first session still has its stream, and a fifth session's GET is refused. Named red: on `http.ts` at `056e1fea` three are counted and the fifth is admitted |
+| 2. A result write that failed after the scope had answered was reported as "nothing was sent": the plain storage failure became `unreadable`, and that finding's sentence says nothing was sent, though the envelope was sent, the record stays `sent` and the act may have taken effect | What comes of a dispatch is kept by one method, after the answer or the lost reply; a store that fails there raises `unkept` with the answer (or `lost`), and the finding says the envelope was sent, what the scope answered, that the outcome was not kept, that the act may have taken effect and nothing was sent twice, and that settle under the same key is next (`custody.ts`, `errors.ts`, `service.ts`) | The hosted story: the scope accepts, the result write fails; the result is `custody` with state `unkept` and answer `accepted`, its sentence says the scope answered accepted and the act may have taken effect and never that nothing was sent; the record is read back as `sent`; the scope holds one entry; settle under the same key writes the receipt and a repeat is retained. Named red: at `056e1fea` the state is `unreadable` and the sentence says nothing was sent |
+| P3: a late initialized hook | After the row is written, a session that ended meanwhile takes no live marker and no watcher (`wire.ts`) | Covered by the ended-session fence; no asynchronous hosted hook exists to witness, as the report says |
+| P3: H7's loops | Each loop asserts that its last page has no cursor, and that the positions paged reach the scope's own head as the last read reported it | The H7 story |
+| P3: the overview's `405` | The overview says what the matrix says: `GET` and `DELETE` are served under the 2025-11-25 header only, `400` without a session ID, `404` without a live session; `405` with `Allow: POST` under no header or the 2026-07-28 header (`docs/mcp.md`) | Read |
+
+**Corrections of review 1dcf27be (seventh filing, `b366d97c`).** The
+single aborted replacement, the act's outcome-not-kept boundary, the
+late-initialized check and the H7 exhaustion were credited; two P2s and
+two qualifications remained.
+
+| Finding | What changed | Witness |
+|---|---|---|
+| 1. Overlapping replacement generations could still leave a live stream uncounted: capacity was counted by stream and replacements by session, so R1 and R2 replacing A, R1 installing B, R3 replacing B and going away, then R2 going away last, left B live and uncounted | One capacity owner per session: the session holds one slot from the moment an opening is admitted, across every opening pending for it and the stream it holds, until it has no stream and no opening pending; a fresh open takes the session's slot or is refused, a replacement takes nothing new, and whatever overlaps and aborts in whatever order, a session with a live stream is counted exactly once (`http.ts`) | `http.test.ts`, over loopback, with one hold per snapshot read: A and three others live; R1 and R2 replace A, each held; R1 released installs B; R3 replaces B, is held, goes away, is released; R2 goes away last and is released; four streams are counted, the session's stream is B and still serves, and a fifth session's GET is refused |
+| 2. A preparation step's answer the store could not keep was reported as "nothing was sent": `step` wrote the step as sent, dispatched, received the resource's answer, and a plain write failure became `unreadable` | The step's post-answer write raises `unkept` with the answer (or `lost`) and the step's identity (resource, capability, step); the finding says the step was sent, what the resource answered, that the answer was not kept, that the step may have changed the resource and the act is not submitted, and that the same prepare under the same key, resource, capability and step is the recovery, not settle (`custody.ts`, `errors.ts`, `service.ts`) | The hosted story, on a lane the agent holds a commitment and a hold on: a standalone `hold@1:instance` step the lane accepts, its answer write failing; the message names the step, the lane and `accepted`, never "nothing was sent"; the record read in the object is `sent` with the step `sent`; the lane holds one preparation entry; the same prepare again is answered, the record settles with the same intent and nothing reserved, still one entry. The ordinary form: a report staged and answered, then its check step with the answer write failing; the act stays `prepared` with the check `sent` beside the answered stage; the same prepare again answers it. Named red: at `b366d97c` the message is "unreadable; nothing was sent" |
+| A pending GET after `abrupt` | The opening checks `ended` after the snapshot, so a layer discarded while a GET was pending opens nothing on it (`http.ts`) | By the ended check; no live eviction witness is claimed |
+| H7's baseline | Beside the head the last read reported, each loop's pages are compared with the native fixture's own reading of the directory, apart from any MCP implementation (the room fixture now names the fixture's inspector reader, which no agent presents): they end at or before the native head and at or past the first page's head | The H7 story |
+
+**What differs from the design's words.** The `create` body is
+`{ link }`, the agent-key invitation link itself, rather than its fields
+spelled out: it is the same information, already encoded and validated by
+`agentKeyInvitationOf`, and it carries the repository references the
+agent's configuration needs. The bearer's failures are counted by the
+agent they name, per address, because a Worker has no state across
+isolates; a request naming no valid agent is `401` and counted nowhere,
+which brute-forces no secret. The hosted agent's `service` is the
+invitation's, recorded at creation. The watch timer is the runtime's
+`setInterval` while a stream holds the object.
+
+**What ran in this head.**
+
+| Command | Result |
+|---|---|
+| `npx vitest run --config vitest.config.ts` in `packages/mcp` | `Test Files  9 passed (9)`, `Tests  96 passed \| 1 skipped (97)` (observed, after the corrections of reviews 7e00dc3a, 2e85245b, ce968d18, 10e33e40, 0bab47e6, fe82ee58 and 1dcf27be): the wire tests with the modern headers and the same-turn dispatch, H8 over loopback with the concurrent admission, the disconnected opening, the aborted replacement and the overlapping generations, the SQLite store with the archived-refusal, saturated-budget, terminal-step and exact-boundary cases |
+| `npx vitest run --project scope packages/mcp/test` | `Test Files  8 passed (8)`, `Tests  25 passed (25)` (observed, after the corrections of review 1dcf27be): the stories, with H1 to H8, the fences, the budget, the ended session and the two outcome-not-kept cases of `hosted.scope.test.ts` |
+| `npm run gate`, once, at the exact head | The planner's local gate at the exact reviewed head, on Git 2.54, is a CLOSED public projection at `~/play/artroom-diagnostics/mcp-hosted-gate-<head>/public-result.json` (read-only, with the gate script's own logs and SHA256SUMS), named with its SHA in the review request. Its figures are not written into this head, which would move the head it gates. The gate at the head before the page and counting modules were regenerated failed exactly their two asset-equality tests, as expected for a bytes or contract change, and passed after the regeneration (observed, 1158 passed, 3 skipped). |
+
+**Paths.** The discovery head landed as main `8235c6b3` while this head was
+being built, and main moved again to `27bb745f` (the logo and self-host
+delivery records), to `2a40db9b` (the Counter preparation note) and to
+`dedcb14b` (the architecture diagram, the `dap.js` rename and the
+invitation service URL check, the sprint report and the Lending library
+baseline) and to `5e11ca03` (the agent-key cohorts, the Counter
+documentation, the Library homepage and the fold publication) during
+review; main was merged into the branch each time, taking main's version
+of every path this head does not change. The merge of `dedcb14b` met
+main's Lending route beside this head's hosted route in the Worker's
+fetch and kept both; each merge regenerated the page, counting and
+lending Worker modules and their built assets, since each bundles the
+bytes package this head changes. At the head, `git diff --name-only
+origin/main...HEAD` lists this head's own 30 paths and no other (the
+thirtieth is the room fixture of the MCP stories, which now names the
+fixture's inspector reader).
+
 ## What is owed
 
-- **The hosted endpoint** of plan 031's stage 2: a remote MCP endpoint
-  with a bearer per agent, a session store for the 2025-11-25 revision, and
-  each bearer's sessions and subscriptions kept apart. Its design has
-  landed on main as `notes/2026-10-13-hosted-mcp-endpoint.md` (Draft 5);
-  nothing of it is built on this branch.
+- **The hosted endpoint** of plan 031's stage 2 is built in this head (the
+  section above). Owed after it lands: the planner's deployment of the
+  scope Worker with the two new bindings and the migration, the live check
+  against the deployment, and a note-only head recording it; the `export`
+  control action for a budget-full agent; OAuth, the pinned diff and file
+  reads, resources and prompts. The handler stays the minimal one; the SDK
+  choice is unchanged.
 - **The optional amendment of `docs/cli.md`**, naming `dap mcp` in its
   list of commands and pointing at `docs/mcp.md`. The usage line is in the
   command line; the guide is not amended.
