@@ -1,10 +1,11 @@
 import { expect, test } from "vitest";
-import { canonicalize, definitionDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest } from "@generalbusiness/artroom-bytes";
 import { PROPOSED_BOUNDS, type DeclaredDefinition, type MemberRef } from "@generalbusiness/dap-contract";
 import { runnable, validateDefinition, type RuleGiven } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
+import { Directory, rita } from "./support-founding.ts";
 import { definitionClosure } from "../src/definition-input.ts";
-import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, NEWEST, applicationValues, platform } from "../src/index.ts";
+import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, NEWEST, applicationValues, applicationPublicationValues, directoryRules8, DIRECTORY_OF, SIBLINGS_OF, platform } from "../src/index.ts";
 
 // Made-up declaration: a pure schema and version-boundary witness, no native authority or creation claim.
 const declaration: DeclaredDefinition = {
@@ -67,4 +68,47 @@ test("complete static closure requires unique exact declared places; missing bin
   expect(definitionClosure(given({ definition: rootDigest, dependency1: childDigest, dependency2: childDigest }, { definition: root, dependency1: child }), "definition").result).toBe("unsupported");
   expect(definitionClosure(given({ definition: childDigest, dependency1: rootDigest }, { definition: child, dependency1: root }), "definition").result).toBe("unsupported");
   expect(definitionClosure(given({ definition: rootDigest, dependency1: childDigest }, { definition: root, dependency1: declaration }), "definition").result).toBe("unsupported");
+});
+
+// Pure factory policy witness: these full refs are scripted, not a native birth proof.
+test("publication factory reserves destination, injects the recorded full reference only into the exact schema, and keeps legacy values unchanged", () => {
+  const destination = { kind: "destination", scope: `sc_${"b".repeat(51)}a`, inc: `in_${"b".repeat(25)}a` } as const;
+  const declared: DeclaredDefinition = { ...declaration, acts: { ...declaration.acts, establish: { ...declaration.acts["establish"]!,
+    fields: { ...declaration.acts["establish"]!.fields, destination: { type: "scope", kind: "destination", required: true } } } } };
+  expect(applicationPublicationValues('{"target":7}', declared, opener, PROPOSED_BOUNDS, destination)).toEqual({ opener, target: 7, destination });
+  expect(applicationValues(canonicalize({ target: 7, destination }), declared, opener, PROPOSED_BOUNDS)).toEqual({ opener, target: 7, destination });
+  for (const definition of [declaration, declared]) {
+    expect(applicationPublicationValues(canonicalize({ target: 7, destination }), definition, opener, PROPOSED_BOUNDS, destination)).toBeNull();
+  }
+  expect(applicationPublicationValues('{"target":7}', declaration, opener, PROPOSED_BOUNDS, null)).toEqual(applicationValues('{"target":7}', declaration, opener, PROPOSED_BOUNDS));
+  expect(applicationPublicationValues('{"target":7}', declared, opener, PROPOSED_BOUNDS, null)).toBeNull();
+  const wrong: DeclaredDefinition = { ...declared, acts: { ...declared.acts, establish: { ...declared.acts["establish"]!, fields: { ...declared.acts["establish"]!.fields, destination: { type: "scope", kind: "directory", required: false } } } } };
+  expect(applicationPublicationValues('{"target":7}', wrong, opener, PROPOSED_BOUNDS, destination)).toBeNull();
+  expect(DIRECTORY_OF[FILE_PUBLICATION_COHORT.register]).toBe(FILE_PUBLICATION_COHORT.directory);
+  expect(SIBLINGS_OF[FILE_PUBLICATION_COHORT.directory]).toEqual({ membership: "platform:membership@4", rules: "platform:rules@3", destination: "platform:destination@4" });
+  expect(DIRECTORY_OF[APPLICATION_COHORT.register]).toBe(APPLICATION_COHORT.directory);
+  expect(SIBLINGS_OF[APPLICATION_COHORT.directory]?.destination).toBe("platform:destination@2");
+  for (const named of [FILE_PUBLICATION_COHORT.register, FILE_PUBLICATION_COHORT.directory]) {
+    const supplied = platform(named)!;
+    const checked = validateDefinition(supplied.data, PROPOSED_BOUNDS, RULE_PROFILES, { platform: true });
+    expect(checked.ok, named).toBe(true);
+    if (checked.ok) expect(runnable(checked.definition, supplied.rules), named).toBe(true);
+  }
+});
+
+// Directory support judges the parent rows in memory; its child genesis entries
+// are scripted. This witnesses the actual F1 callback, not a complete native birth.
+test("publication creation uses its recorded destination and preserves signed cause and full creator lineage", () => {
+  const parent = new Directory();
+  const declared: DeclaredDefinition = { ...declaration, acts: { ...declaration.acts, establish: { ...declaration.acts["establish"]!, fields: { ...declaration.acts["establish"]!.fields, destination: { type: "scope", kind: "destination", required: true } } } } };
+  const definition = definitionDigest(declared);
+  const fields = { definition, values: '{"target":7}', execution: "recorded-do" };
+  const signed = parent.intent(rita, "establish-application", { fields });
+  const membership = parent.children.membership!;
+  const given = { state: parent.state, input: { type: "act", signed }, placed: () => declared,
+    resolved: { at: parent.at, fields, bounds: PROPOSED_BOUNDS, signer: { member: { membership, member: "@rita" } } } } as unknown as RuleGiven;
+  const rule = directoryRules8["create-application"]!;
+  if (rule.place !== "send") throw new Error("factory creation must be a send rule");
+  expect(rule.run(given)).toEqual({ to: { v: 1, kind: "lane", definition, creator: parent.at, cause: intentDigest(signed.intent), ordinal: 0 },
+    message: { class: "request", type: "create", body: { fields: { target: 7, opener: { membership, member: "@rita" }, destination: parent.children.destination }, directory: parent.at, membership, creationContext: { v: 1 } } } });
 });

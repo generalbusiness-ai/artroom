@@ -10,8 +10,8 @@
  * it.
  */
 
-import { APPLICATION_COHORT, directory5, directoryRules5 } from "./application.ts";
-export { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, directory5, directoryRules5 } from "./application.ts";
+import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
+export { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, applicationPublicationValues, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 
@@ -123,6 +123,8 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
   [WEB_DEMO_REGISTER]: { data: webDemoRegister, rules: demoRegisterRules },
   [WEB_DEMO_COHORT.directory]: { data: directory7, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
   "platform:inbox@1": { data: inbox, rules: inboxRules },
+  [FILE_PUBLICATION_COHORT.register]: { data: register, rules: registerRules },
+  [FILE_PUBLICATION_COHORT.directory]: { data: directory8, rules: directoryRules8, membership: directoryMembership, rulesScope: directoryRulesScope },
   [APPLICATION_COHORT.register]: { data: register, rules: registerRules },
   [APPLICATION_COHORT.directory]: { data: directory5, rules: directoryRules5, membership: directoryMembership, rulesScope: directoryRulesScope },
   [APPLICATION_COHORT.membership]: { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, APPLICATION_COHORT.membership) },
