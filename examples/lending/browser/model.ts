@@ -3,14 +3,15 @@
  * a summary and a record that were read together; nothing here signs or sends.
  */
 import type { Entry, FieldValue, Item, Summary } from "@generalbusiness/dap-contract";
-import { thingsOf, type RecordPointer, type Thing } from "../shelf.ts";
+import { shelfPage, shelfPath, thingsOf, type RecordPointer, type Thing } from "../shelf.ts";
 
-export type LendingAct = "donate" | "borrow" | "return" | "cancel";
-/** A thing with the revision an act on it must expect. A gone thing has none: no act can change it. */
-export interface ShownThing extends Thing { revision: number | null }
+export type LendingAct = "donate" | "borrow" | "return" | "cancel" | "publish";
+/** A thing with its retained revision; publish reads a gone thing without changing it. */
+export interface ShownThing extends Thing {}
 export interface LendingView {
   /** Every thing, live and gone, in the order it was donated. */
   things: ShownThing[];
+  library: { id: number; revision: number } | null;
   /** The entry the view reflects. Each page written from this view names it. */
   record: RecordPointer;
   /** True when the record read is older than the summary: the list of gone things may be behind. */
@@ -34,19 +35,20 @@ export function lendingView(summary: Summary, at: { seq: number; hash: string },
   for (const [id, item] of live) {
     const state = item.state === "lent" ? "lent" : "available";
     const known = recorded.find((thing) => thing.id === id);
-    things.push({ id, state, name: words(item.values["name"]), description: words(item.values["description"]),
+    things.push({ id, page: words(item.values["page"]), state, name: words(item.values["name"]), description: words(item.values["description"]),
       donor: handle(item.parties["donor"]) ?? "", borrower: handle(item.parties["borrower"]), reason: null,
       seq: known?.seq ?? item.revision, revision: item.revision });
   }
-  for (const thing of recorded) if (!live.has(thing.id) && thing.state === "gone") things.push({ ...thing, revision: null });
+  for (const thing of recorded) if (!live.has(thing.id) && thing.state === "gone") things.push({ ...thing });
   things.sort((a, b) => a.id - b.id);
-  return { things, behind: entries.length <= at.seq,
+  const library = summary.items.find((item) => item.type === "library");
+  return { things, library: library ? { id: library.id, revision: library.revision } : null, behind: entries.length <= at.seq,
     record: { scope: summary.scope.scope, incarnation: summary.scope.inc, seq: at.seq, hash: at.hash } };
 }
 
 /** The acts a thing's state allows. Whether the signer may cancel is membership's to say; the scope answers. */
 export function actsFor(thing: ShownThing): LendingAct[] {
-  return thing.state === "available" ? ["borrow", "cancel"] : thing.state === "lent" ? ["return", "cancel"] : [];
+  return thing.state === "available" ? ["borrow", "cancel", "publish"] : thing.state === "lent" ? ["return", "cancel", "publish"] : ["publish"];
 }
 
 export interface Proposal { kind: LendingAct; on: number | null; expected: Record<string, number>; fields: Record<string, FieldValue> }
@@ -54,18 +56,23 @@ export type Proposed = { ok: true; proposal: Proposal } | { ok: false; reason: s
 const no = (reason: string): Proposed => ({ ok: false, reason });
 
 /** The exact act to sign, or why there is nothing to sign. A refusal here sends nothing. */
-export function propose(view: LendingView, kind: LendingAct, input: { thing?: number; name?: string; description?: string; reason?: string } = {}): Proposed {
+export function propose(view: LendingView, kind: LendingAct, input: { thing?: number; name?: string; description?: string; reason?: string } = {}, author = "", random: () => Uint8Array = () => crypto.getRandomValues(new Uint8Array(8))): Proposed {
+  if (!view.library) return no("The library could not be read.");
+  const expectedLibrary = { "library": view.library.revision };
   if (kind === "donate") {
     const name = (input.name ?? "").trim(), description = (input.description ?? "").trim();
     if (!name) return no("Give the thing a name.");
     if (!description) return no("Describe the thing.");
     if (bytes(name) > NAME_BYTES) return no(`The name is too long: at most ${NAME_BYTES} bytes.`);
     if (bytes(description) > DESCRIPTION_BYTES) return no(`The description is too long: at most ${DESCRIPTION_BYTES} bytes.`);
-    return { ok: true, proposal: { kind, on: null, expected: {}, fields: { name, description } } };
+    const page = shelfPath(random());
+    const content = shelfPage({ id: 0, page, revision: 1, state: "available", name, description, donor: author, borrower: null, reason: null, seq: 0 }, view.record);
+    return { ok: true, proposal: { kind, on: null, expected: expectedLibrary, fields: { name, description, page, content } } };
   }
   const thing = view.things.find((candidate) => candidate.id === input.thing);
   if (!thing) return no("That thing is not in the library.");
-  if (thing.revision === null) return no("That thing is gone.");
+  if (kind === "publish") return { ok: true, proposal: { kind, on: view.library.id, expected: { on: view.library.revision, thing: thing.revision }, fields: { thing: thing.id, content: shelfPage(thing, view.record) } } };
+  if (thing.state === "gone") return no("That thing is gone.");
   if (!actsFor(thing).includes(kind)) return no(kind === "borrow" ? "That thing is already lent." : "That thing is not lent.");
   const fields: Record<string, FieldValue> = {};
   if (kind === "cancel") {
@@ -74,7 +81,9 @@ export function propose(view: LendingView, kind: LendingAct, input: { thing?: nu
     if (bytes(reason) > REASON_BYTES) return no(`The reason is too long: at most ${REASON_BYTES} bytes.`);
     fields["reason"] = reason;
   }
-  return { ok: true, proposal: { kind, on: thing.id, expected: { on: thing.revision }, fields } };
+  const after = { ...thing, state: kind === "borrow" ? "lent" as const : kind === "return" ? "available" as const : "gone" as const, borrower: kind === "borrow" ? author : null, reason: kind === "cancel" ? String(fields["reason"]) : thing.reason };
+  fields["content"] = shelfPage(after, view.record);
+  return { ok: true, proposal: { kind, on: thing.id, expected: { on: thing.revision, ...expectedLibrary }, fields } };
 }
 
 /** A refusal in plain words, with the reason the scope gave. */
