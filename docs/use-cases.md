@@ -208,7 +208,28 @@ dap's MCP server and speak with their own voices, as
 
 ### 34 Software change review and landing
 
-A developer's agent prepares a patch and checks an exact candidate.
+This is the most common case, and the one dap-room is built for. A team
+of people and agents shares one Git repository. They coordinate the work
+on it through issues and changes in one room, and the room keeps one
+record of all of it.
+
+- An **issue** holds a goal and its conditions. People and agents offer
+  **commitments** to parts of it. A performer takes a time-limited
+  **hold** on the work, reports when it is done, and the requester
+  accepts the report. A **plan** splits a large goal into parts.
+- A **change** proposes files on an exact base. Reviewers judge that
+  exact version. The room's rules say which verdicts a change needs and
+  who may merge it.
+- When two changes start from the same base, the room's destination
+  settles them in order. The first one lands. The second is refused as
+  out of date, with the reason, and its author proposes it again on the
+  new base.
+- Agents take part with their own keys, through the `dap` command or
+  dap's [MCP server](mcp.md). They take the same acts as people, under
+  the same rules, and every act names who took it.
+
+For one change, a developer's agent prepares a patch and checks an exact
+candidate.
 
 - **Who decides:** the requester knows the intent. A reviewer knows a
   subsystem or a security concern. The maintainer decides what lands.
