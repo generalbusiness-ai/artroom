@@ -2672,7 +2672,7 @@ export const destinationRules4: Rules = (() => {
         ...Object.entries({ sourceSeq: input.from.seq, sourceHash: input.from.hash, sourceOrdinal: input.n, path: resolved.fields["path"], content: resolved.fields["content"], contentDigest: textDigest(resolved.fields["content"]) }).map(([slot, value]) => ({ effect: "value", item: resolved.self, slot, value } as const))];
     } },
     "file-judge": { place: "outcome", clock: true, rules: {
-      selects: false, read: false, most: { effects: 10, requests: 0, operations: 3 }, retries: () => false,
+      selects: false, read: false, most: { effects: 14, requests: 0, operations: 3 }, retries: () => false,
       origin: ({ state }) => destinationPublicationAt(state, branchOf(state)?.refs["judging"])?.id ?? null,
       wellFormed: (result, evidence) => result === "confirmed" && record(evidence.body, { head: isObjectId, present: value => typeof value === "boolean", tree: value => value === null || isObjectId(value) }),
       derives: given => { const decided = fileJudge(given); return { effects: decided.effects, sends: [], opens: decided.opens }; },
