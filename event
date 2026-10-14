@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8ba7d92fdca521d5ab64d045a8064637cbfaaa04","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:8d2b2306f2ebf279dbec035b676178d601a212ee","text":"Merge retired a covered predecessor; the successor is at .github/workflows/row-writes.yml."}
