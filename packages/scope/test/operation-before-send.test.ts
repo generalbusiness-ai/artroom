@@ -11,8 +11,8 @@ import { found, reader } from "./support.ts";
 test("a known local refusal is recorded before the sent mark; a later stale signal never recalls or resends an unknown original", async () => {
   const s = await found();
   const sent: EffectRequest[] = [];
-  let stale = true, checked = 0, late: LateAnswers | undefined;
-  const outside: Outside = { accepts: () => true, send: async request => { sent.push(request); return null; }, late: give => { late = give; } };
+  let stale = true, checked = 0, notified = 0, late: LateAnswers | undefined;
+  const outside: Outside = { accepts: () => true, send: async request => { sent.push(request); return null; }, late: give => { late = give; }, judged: () => { notified++; } };
   const rules: typeof owners = { rules: (_owner, kind) => kind === "read" ? {
     selects: false, read: true, retries: () => false,
     beforeSend: () => { checked++; return stale ? { basis: "own-answer", body: { send: "not-sent", reason: "superseded" } } : null; },
@@ -29,8 +29,9 @@ test("a known local refusal is recorded before the sent mark; a later stale sign
     await s.restart();
     const first = await open(s, { owner: "platform:destination@1", kind: "read", attempts: 1 });
     if (first === "scope-full") throw new Error("the fixture opens its first operation");
-    await surface().effect();
+    expect(await surface().effect()).toBe(1);
     expect(sent).toHaveLength(0);
+    expect(notified).toBe(0);
     expect(await status(first[0]!)).toMatchObject({ state: "settled", sends: [{ sent: null }] });
     expect((await status(first[0]!)).operation.attempts[0]!.outcomes).toMatchObject([{ result: "refused" }]);
     expect((await s.sealed()).at(-1)!.entry.input).toMatchObject({ type: "outcome", result: "refused", evidence: { body: { send: "not-sent" } } });
