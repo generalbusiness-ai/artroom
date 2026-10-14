@@ -98,6 +98,37 @@ export const TEST_DEPLOYMENT = "artroom-scope-test";
 type PlatformEnv = Env & { PLATFORM: DurableObjectNamespace };
 
 export class PlatformScope extends DeployedScope<PlatformEnv> {
+  readonly #scheduledCallbacks: Promise<unknown>[];
+
+  constructor(ctx: DurableObjectState, env: PlatformEnv) {
+    // Retain the actual context and delegate each exact original promise.
+    // This test-only registry neither replaces a callback nor changes its scheduling.
+    const scheduled: Promise<unknown>[] = [];
+    const originalWaitUntil = ctx.waitUntil.bind(ctx);
+    ctx.waitUntil = promise => {
+      scheduled.push(promise);
+      try { originalWaitUntil(promise); }
+      catch (error) { scheduled.splice(scheduled.lastIndexOf(promise), 1); throw error; }
+    };
+    super(ctx, env);
+    this.#scheduledCallbacks = scheduled;
+  }
+
+  /** Join only this actual object's scheduled callbacks; no driver, clock advance or read retry. */
+  async awaitScheduledCallbacks(): Promise<{ batches: number; callbacks: number }> {
+    let callbacks = 0;
+    for (let batches = 0; batches < 64; batches++) {
+      if (this.#scheduledCallbacks.length === 0) return { batches, callbacks };
+      if (this.#scheduledCallbacks.length > 4096) throw new Error("Native fixture scheduled callback batch exceeded 4096 promises");
+      const batch = this.#scheduledCallbacks.splice(0);
+      callbacks += batch.length;
+      const settled = await Promise.allSettled(batch);
+      const failures = settled.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+      if (failures.length) throw new AggregateError(failures, "Native fixture scheduled callback failed");
+    }
+    throw new Error("Native fixture scheduled callbacks exceeded 64 batches");
+  }
+
   protected override scopes() { return this.env.PLATFORM; }
   protected override wiring(name: string | undefined): Wiring {
     const deployed = super.wiring(name);
