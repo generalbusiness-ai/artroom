@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test } from "vitest";
 import type { Receipt } from "@generalbusiness/dap-contract";
 import { canonicalize, utf8 } from "@generalbusiness/artroom-bytes";
-import { COMPLETION_BYTES, SEGMENT_ROW_BYTES, sqliteStore, type Sql, type SqlValue, type SqliteCustodyBounds } from "../src/sqlite-custody.ts";
+import { COMPLETION_BYTES, SEGMENT_ROW_BYTES, chargedOf, sqliteStore, type Sql, type SqlValue, type SqliteCustodyBounds } from "../src/sqlite-custody.ts";
 import { Custody, CustodyError, Lost, RECORD_BYTES, identityId, type CustodyRecord, type Outcome } from "../src/custody.ts";
 
 /** Node's SQLite as the store sees a Durable Object's: `exec` with bindings, and a transaction that rolls back on a throw. */
@@ -114,13 +114,14 @@ describe("the custody store over SQLite", () => {
     const bounds: SqliteCustodyBounds = { budget: 2 * COMPLETION_BYTES + 4096, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
     const store = sqliteStore(sql, bounds);
     await store.write("a", recordOf("a", "sent"), { dispatch: true });
-    // The need is the net growth: the record up to its bound and one segment row; the write before the send draws its own
-    // bytes from the reservation it armed.
-    const needOf = (record: CustodyRecord) => COMPLETION_BYTES - sized(record);
-    expect(store.identity("a").reserved).toBe(needOf(recordOf("a", "sent")) - store.identity("a").stored);
-    expect(store.used() + store.reserved()).toBe(needOf(recordOf("a", "sent")));
+    // The need is counted on the record rows as stored: the record up to its bound with its rows' overhead, and one segment row.
+    // The write before the send draws its own rows from the reservation it armed, so an identity in flight holds exactly its
+    // complete cost between what it stores and what it reserves.
+    expect(store.identity("a").stored).toBe(chargedOf(sized(recordOf("a", "sent"))));
+    expect(store.identity("a").reserved).toBe(COMPLETION_BYTES - store.identity("a").stored);
+    expect(store.used() + store.reserved()).toBe(COMPLETION_BYTES);
     await store.write("b", recordOf("b", "sent"), { dispatch: true });
-    const held = needOf(recordOf("a", "sent")) + needOf(recordOf("b", "sent"));
+    const held = 2 * COMPLETION_BYTES;
     expect(store.used() + store.reserved()).toBe(held);
     // A third identity cannot be armed: refused full before dispatch, nothing written, the two reservations intact.
     const error = await store.write("c", recordOf("c", "sent"), { dispatch: true }).catch((e: unknown) => e);
@@ -198,9 +199,9 @@ test("at a saturated budget, results that the reservation covers are written, an
   const sql = nodeSql();
   const first = recordOf("a", "sent");
   // Room for exactly one identity's completion need and nothing more.
-  const store = sqliteStore(sql, { budget: COMPLETION_BYTES - sized(first) + 512, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 });
+  const store = sqliteStore(sql, { budget: COMPLETION_BYTES + 512, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 });
   await store.write("a", first, { dispatch: true });
-  expect(store.used() + store.reserved()).toBeLessThanOrEqual(COMPLETION_BYTES - sized(first) + 512);
+  expect(store.used() + store.reserved()).toBe(COMPLETION_BYTES);
   // 65 lost outcomes: the 65th spills a segment row; each result write consumes the held capacity and reserves nothing.
   const outcomes: Outcome[] = [];
   for (let n = 1; n <= 65; n++) {
@@ -294,4 +295,36 @@ test("a new identity's completion need is admitted before anything is built or s
   await store.write(identityId(first.identity), recordOf("a", "accepted", 0, [settled(1)]));
   const sent = await custody.send(second, "sha256:m" as never, async () => { built++; return { binding: first.binding, envelope: first.envelope }; }, async () => ({ answer: "accepted", receipt: receipt() }) as never, { notAfter: T });
   expect([built, "answer" in sent ? sent.answer.answer : "lost"]).toEqual([1, "accepted"]);
+});
+
+test("the complete charged cost is reserved before anything is built: one byte short, refused with nothing built, kept or reserved; at the boundary, built once, dispatched and answered with no top-up", async () => {
+  const first = recordOf("a", "sent");
+  const a = identityId(first.identity);
+  const second = { ...first.identity, key: "b" };
+  const b = identityId(second);
+  /** A store with `budget`, holding the first identity in flight. */
+  const holding = async (budget: number) => { const store = sqliteStore(nodeSql(), { budget, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 }); await store.write(a, first, { dispatch: true }); return store; };
+  // What an identity in flight holds, however small its record: its stored rows and its reservation sum to the complete cost,
+  // which is the record at its bound with every row's overhead and one more segment row with its overhead.
+  const probe = await holding(Number.MAX_SAFE_INTEGER);
+  expect(probe.identity(a).stored + probe.identity(a).reserved).toBe(COMPLETION_BYTES);
+  expect(probe.used() + probe.reserved()).toBe(COMPLETION_BYTES);
+  // Exact boundary: one byte short of a second complete cost. Refused before build: nothing built or signed, no record, no reservation.
+  const short = await holding(2 * COMPLETION_BYTES - 1);
+  let built = 0;
+  const refused = await new Custody(short, () => T).send(second, "sha256:m" as never, async () => { built++; return { binding: first.binding, envelope: first.envelope }; }, async () => { throw new Error("never"); }, { notAfter: T }).catch((e: unknown) => e);
+  expect((refused as CustodyError).why).toMatchObject({ held: "full", reason: "budget" });
+  expect([built, await short.read(b), short.identity(b)]).toEqual([0, null, { stored: 0, reserved: 0 }]);
+  expect(short.used() + short.reserved(), "the first identity's holding is untouched").toBe(COMPLETION_BYTES);
+  // At the boundary: admitted, built once, the preparation kept, the first dispatch armed from what was admitted, and the
+  // result written, with no `full` at any step: at every point the identity's stored and reserved bytes sum to its complete cost.
+  const enough = await holding(2 * COMPLETION_BYTES);
+  const sums: number[] = [];
+  const custody = new Custody(enough, () => T);
+  const sent = await custody.send(second, "sha256:m" as never, async () => { built++; sums.push(enough.identity(b).stored + enough.identity(b).reserved); return { binding: first.binding, envelope: first.envelope }; }, async () => { sums.push(enough.identity(b).stored + enough.identity(b).reserved); return { answer: "accepted", receipt: receipt() } as never; }, { notAfter: T });
+  expect([built, "answer" in sent ? sent.answer.answer : "lost"]).toEqual([1, "accepted"]);
+  expect(sums, "admitted whole before build, and still whole at the dispatch").toEqual([COMPLETION_BYTES, COMPLETION_BYTES]);
+  expect(enough.identity(b).reserved, "the result releases the rest").toBe(0);
+  expect((await enough.read(b))?.phase).toBe("accepted");
+  expect(enough.used() + enough.reserved()).toBe(COMPLETION_BYTES + enough.identity(b).stored);
 });

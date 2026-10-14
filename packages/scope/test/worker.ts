@@ -166,7 +166,9 @@ export const hostedTest: {
   faultAt: "reservation" | "seed" | "kept" | "accepted" | "complete" | null;
   /** The next session-row write of an agent fails, as a storage failure would. */
   failSession: boolean;
-} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false };
+  /** While set, every configuration read of an agent, and with it every listing and snapshot, waits on this promise. */
+  configHold: Promise<void> | null;
+} = { now: null, pause: null, lose: null, controlBudget: null, custodyBounds: null, failWrite: null, faultAt: null, failSession: false, configHold: null };
 /** The scripted reset: thrown at a fence, once. */
 export class ScriptedReset extends Error { constructor(fence: string) { super(`scripted reset at ${fence}`); } }
 type HostedEnv = McpEnv & { PLATFORM: DurableObjectNamespace };
@@ -195,6 +197,7 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
       ...(hostedTest.custodyBounds ? { custodyBounds: { ...hostedTest.custodyBounds, fail: (point: "keep" | "dispatch" | "result" | "segment") => { if (hostedTest.failWrite === point) { hostedTest.failWrite = null; throw new Error("SQLITE_FULL: scripted"); } } } } : {}),
       fault: (fence: string) => { if (hostedTest.faultAt === fence) { hostedTest.faultAt = null; this.evict(); throw new ScriptedReset(fence); } },
       sessionFault: () => { if (hostedTest.failSession) { hostedTest.failSession = false; throw new Error("SQLITE_FULL: scripted session write"); } },
+      configHold: () => hostedTest.configHold ?? undefined,
       now: () => hostedTest.now?.() ?? Date.now(), every: () => () => {},
       pause: (waiting: readonly string[]) => hostedTest.pause?.(waiting) ?? new Promise<void>((r) => setTimeout(r, 50)),
       fetch: (async (url: string, init?: RequestInit) => {

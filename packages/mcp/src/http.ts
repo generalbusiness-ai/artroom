@@ -103,7 +103,10 @@ export class McpHttp {
   /** The listen streams by their owner, so a graceful ending can complete each one. */
   readonly #listens = new Map<object, { end: (final: boolean) => void }>();
   constructor(readonly port: HttpPort) {
-    port.wire.hooks.changed = (session) => (session.id === null ? undefined : port.persist?.(rowOf(session)));
+    // Issuance persists a new session; an update persists only a session that is still live. One that ended while its request
+    // was pending (deleted, evicted, retired, or discarded with its layer) is never written again: an ended session's row stays
+    // gone, and a restart restores nothing of it.
+    port.wire.hooks.changed = (session, next) => (session.id === null || session.ended ? undefined : port.persist?.(rowOf({ ...session, ...next })));
   }
 
   /** How many streams are open: legacy streams and modern listens together. */
@@ -136,7 +139,7 @@ export class McpHttp {
       if (sessionId === null) return header === LEGACY ? json(400, rpcError(null, -32600, "Mcp-Session-Id is required.")) : notAllowed();
       const session = this.sessions.get(sessionId);
       if (!session) return bare(404);
-      return method === "GET" ? this.#stream(session) : this.#end(session, true);
+      return method === "GET" ? this.#stream(session, request.signal) : this.#end(session, true);
     }
     if (method !== "POST") return notAllowed();
     const body = await this.#body(request);
@@ -225,7 +228,7 @@ export class McpHttp {
     if (issued) {
       // Refused: no session was issued, nothing of it stays, and a row the hook may have kept is removed. A store that could
       // not keep it answers 507.
-      if (response?.error) { this.port.wire.endLegacy(session); await this.port.remove?.(issued); return json(response.error.code === SESSION_FULL ? 507 : 200, response); }
+      if (response?.error) { session.ended = true; this.port.wire.endLegacy(session); await this.port.remove?.(issued); return json(response.error.code === SESSION_FULL ? 507 : 200, response); }
       this.sessions.set(issued, session);
       while (this.sessions.size > SESSIONS_MOST) {
         const oldest = this.sessions.keys().next().value!;
@@ -253,9 +256,10 @@ export class McpHttp {
   /**
    * The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. The
    * stream's slot is owned before anything is awaited: a fresh open takes a new slot or is refused, and a replacement takes
-   * over the incumbent's slot at once, so the incumbent's cancellation during the await frees nothing for another session.
+   * over the incumbent's slot at once, so the incumbent's cancellation during the await frees nothing for another session. A
+   * client that went away while the snapshot was read (`signal`) opens no stream: its slot is released and nothing watches.
    */
-  async #stream(session: LegacySession): Promise<Response> {
+  async #stream(session: LegacySession, signal?: AbortSignal): Promise<Response> {
     const slot = {};
     const incumbent = session.stream;
     if (incumbent === null) {
@@ -269,8 +273,9 @@ export class McpHttp {
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
     this.#open.delete(slot);
-    // The session may have ended while the snapshot was read: then no stream opens, and the slot is released.
+    // The session may have ended, or the client gone, while the snapshot was read: then no stream opens, and the slot is released.
     if (session.id !== null && !this.sessions.has(session.id)) return bare(404);
+    if (signal?.aborted) return bare(204);
     const old = session.stream;
     const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });
     const stream: Stream = {
@@ -319,16 +324,22 @@ export class McpHttp {
   /** End a session gracefully: its stream closes with a final event, and its row is removed. */
   async #end(session: LegacySession, final: boolean): Promise<Response> {
     const stream = session.stream;
+    session.ended = true;
     this.port.wire.endLegacy(session);
     if (stream) { this.#open.delete(stream); stream.close(final); }
     if (session.id !== null) { this.sessions.delete(session.id); await this.port.remove?.(session.id); }
     return bare(200);
   }
 
-  /** End every stream abruptly, as an eviction or an exception does: the bodies end with no event, and the session rows stay. */
+  /**
+   * End every stream abruptly, as an eviction or an exception does: the bodies end with no event, and the session rows stay.
+   * The layer is discarded with its sessions: a request of it still pending persists nothing more, and the rows as they are
+   * restore into the next layer.
+   */
   abrupt(): void {
     for (const session of this.sessions.values()) {
       const stream = session.stream;
+      session.ended = true;
       this.port.wire.endLegacy(session);
       if (stream) { this.#open.delete(stream); stream.close(false); }
     }

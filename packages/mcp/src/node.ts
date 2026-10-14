@@ -384,14 +384,21 @@ export async function serveHttp(service: McpService, host: string, port: number,
     const given = Buffer.from(String(req.headers["authorization"] ?? ""));
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return bare(res, 401);
     if (new URL(req.url ?? "/", "http://loopback").pathname !== "/mcp") return bare(res, 404);
+    // The socket's close is tracked before the handler is awaited: a client that goes away while a stream is being opened is
+    // seen by the layer through the request's signal, and a body the handler returns to a closed socket is cancelled at once,
+    // so it holds no stream slot and no watcher.
+    const gone = new AbortController();
+    let closed = false;
+    res.on("close", () => { closed = true; gone.abort(); });
     let request: Request;
     try {
       const headers = new Headers();
       for (const [name, value] of Object.entries(req.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(", ") : value);
       const withBody = req.method === "POST";
-      request = new Request(`http://loopback${req.url ?? "/"}`, { method: req.method ?? "GET", headers, ...(withBody ? { body: Readable.toWeb(req) as unknown as ReadableStream, duplex: "half" } : {}) } as RequestInit);
+      request = new Request(`http://loopback${req.url ?? "/"}`, { method: req.method ?? "GET", headers, signal: gone.signal, ...(withBody ? { body: Readable.toWeb(req) as unknown as ReadableStream, duplex: "half" } : {}) } as RequestInit);
     } catch { return json(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32020, message: "A header is not well formed." } }); }
     const response = await http.handle(request);
+    if (closed) { await response.body?.cancel().catch(() => undefined); return; }
     res.writeHead(response.status, Object.fromEntries(response.headers));
     if (!response.body) { res.end(); return; }
     const reader = response.body.getReader();

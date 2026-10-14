@@ -238,6 +238,33 @@ describe("H8, streams opened concurrently", () => {
   });
 });
 
+describe("a legacy client that goes away while its stream is opening", () => {
+  test("the held opening releases its slot and attaches no stream; four healthy opens follow", async () => {
+    const sessions = [await legacySession(), await legacySession(), await legacySession(), await legacySession(), await legacySession()];
+    // The snapshot every stream open takes is held; a GET enters, takes its slot, and its socket closes while it waits.
+    let release!: () => void;
+    hold = new Promise<void>((r) => { release = r; });
+    const gone = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[0]! });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(s.http.streams, "the slot is held while the snapshot is read").toBe(1);
+    gone.abort.abort();
+    await new Promise((r) => setTimeout(r, 100));
+    release();
+    hold = null;
+    await gone.opened;
+    // Nothing of it is retained: no slot, and the session has no stream.
+    expect(await until(() => s.http.streams === 0), "the slot is released").toBe(true);
+    expect(s.http.sessions.get(sessions[0]!)?.stream, "no dead stream is attached to the session").toBeNull();
+    // Four healthy opens take the four slots.
+    const healthy = sessions.slice(1).map((id) => openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": id }));
+    for (const st of healthy) expect(await until(() => st.text().includes(": stream"))).toBe(true);
+    expect(s.http.streams).toBe(STREAMS_MOST);
+    for (const st of healthy) st.abort.abort();
+    expect(await until(() => s.http.streams === 0)).toBe(true);
+    for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
+  });
+});
+
 describe("H8, a replacement while the snapshot is held", () => {
   test("the incumbent's slot passes to the replacement: its cancellation frees nothing for another session", async () => {
     const sessions = [await legacySession(), await legacySession(), await legacySession(), await legacySession(), await legacySession()];

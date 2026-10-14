@@ -639,6 +639,42 @@ test("the control budget is one aggregate: operations, sessions and configuratio
   } finally { done(room); }
 });
 
+test("a listing pending while its session is deleted persists nothing: the old ID stays 404 across a reset, the accounting is as before the session, and a fresh session is issued", async () => {
+  const { room, rita } = await roomWithIssues();
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const stub = agentStub(bot.agent);
+    const list = (session: string, id: number) => mcp(bot.bearer, "POST", { "mcp-protocol-version": LEGACY, "mcp-session-id": session }, { jsonrpc: "2.0", id, method: "tools/list" });
+    const before = await stub.used();
+    const S = await legacySession(bot.bearer);
+    expect(await stub.used(), "the session row is charged").toBeGreaterThan(before);
+    // A listing's configuration read is held; the session is deleted while the listing waits; then the read is released.
+    let release!: () => void;
+    hostedTest.configHold = new Promise<void>((r) => { release = r; });
+    const pending = list(S, 2);
+    await settle(100);
+    expect((await mcp(bot.bearer, "DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": S })).status).toBe(200);
+    expect(await stub.used(), "the row's bytes are credited at the delete").toBe(before);
+    release();
+    hostedTest.configHold = null;
+    // The request that was in flight still answers; the ended session is not written again.
+    expect((await pending).status).toBe(200);
+    expect(await stub.used(), "no row is recreated by the pending listing").toBe(before);
+    expect((await stub.counts()).sessions).toBe(0);
+    expect((await list(S, 3)).status, "the old ID is gone").toBe(404);
+    // A reset restores the rows as they are: none of the old session; the accounting is unchanged; a fresh session is issued.
+    await stub.reset();
+    expect((await list(S, 4)).status, "the old ID stays 404 after the reset").toBe(404);
+    expect(await stream(bot.bearer, S).ended, "and opens no stream").toBe(404);
+    expect(await stub.used()).toBe(before);
+    expect((await stub.counts()).sessions).toBe(0);
+    const fresh = await legacySession(bot.bearer);
+    expect(fresh).not.toBe(S);
+    expect((await list(fresh, 5)).status, "a fresh session is served").toBe(200);
+    expect((await stub.counts()).sessions).toBe(1);
+  } finally { hostedTest.configHold = null; done(room); }
+});
+
 test("H1 fences: a reset at each adopted fence of a creation resumes with the same agent, key, envelope and bearer", async () => {
   const { room, rita } = await roomWithIssues();
   try {

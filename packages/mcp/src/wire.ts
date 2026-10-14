@@ -80,6 +80,8 @@ export interface LegacySession {
   /** The session's open stream; null while there is none. */
   stream: Stream | null;
   unsubscribe: (() => void) | null;
+  /** Set once the session has ended (deleted, evicted, retired, or discarded with its layer): nothing of it is persisted again. */
+  ended: boolean;
 }
 
 /**
@@ -114,7 +116,7 @@ export function frameOf(v: unknown): "request" | "notification" | "response" | "
 export const isFrame = (v: unknown): v is Message => frameOf(v) !== "invalid";
 
 export function newSession(id: string | null = null): LegacySession {
-  return { id, created: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null };
+  return { id, created: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null, ended: false };
 }
 
 /** The revision a request is served by. */
@@ -137,7 +139,7 @@ export class Wire {
    * `changed`: a session's persisted fields are about to change (issue, initialization, a listing); the transport writes the
    * row with the prospective state before the response, and the live session takes that state only once the write succeeded.
    */
-  readonly hooks: { changed?: (session: LegacySession) => void | Promise<void> } = {};
+  readonly hooks: { changed?: (session: LegacySession, next?: Partial<Pick<LegacySession, "initialized" | "listed">>) => void | Promise<void> } = {};
   constructor(readonly service: McpService) {}
 
   /**
@@ -212,19 +214,23 @@ export class Wire {
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
       case "notifications/initialized":
-        // The durable row is written with the prospective state first; the live session changes only once that succeeded.
-        await this.hooks.changed?.({ ...session, initialized: true });
+        // The durable row is written with the prospective state first; the live session changes only once that succeeded. The
+        // hook sees the live session, so one that ended while a request was pending is not persisted again.
+        await this.hooks.changed?.(session, { initialized: true });
         session.initialized = true;
         this.watchLegacy(session);
         return null;
       case "notifications/cancelled": return null;
       case "ping": return notification ? null : reply(id, {});
       case "tools/list": {
-        if (!session.initialized && !notification) session.initialized = session.version !== null;
+        // A client that lists without having sent notifications/initialized is taken as initialized; like the listed marker,
+        // that is durable first: the row is written with both prospective values before either live marker moves.
+        const initialized = session.initialized || (!notification && session.version !== null);
         const page = await this.service.page(params["cursor"]);
         // The listed generation is durable: the row is written with the prospective value before the response is emitted, and
         // the live marker moves only once that write succeeded, so a failed write leaves live and durable truth the same.
-        await this.hooks.changed?.({ ...session, listed: page.generation });
+        await this.hooks.changed?.(session, { initialized, listed: page.generation });
+        session.initialized = initialized;
         session.listed = page.generation;
         return reply(id, { tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
       }

@@ -271,6 +271,8 @@ export interface AgentPorts extends Authority {
   fault?: (fence: CreationFence) => void;
   /** A test's fault on a session-row write: throwing there is the storage failure. */
   sessionFault?: () => void;
+  /** A test's hold on the configuration read, and with it on every listing and snapshot, while another request runs. */
+  configHold?: () => Promise<void> | void;
 }
 
 interface AgentRow { op: string; seed: Uint8Array; key: KeyId; state: "enrolling" | "enrolled" | "retired" | "refused"; membership: ScopeRef; handle: string; config: McpConfig; bearer: string | null; answer: ControlAnswer | null }
@@ -321,7 +323,7 @@ export class HostedAgent {
   /** The service of this agent: its key from the seed, its configuration from the row, its custody in this object's storage. */
   #serviceOf(row: AgentRow): McpService {
     if (this.#service) return this.#service;
-    const read = async (): Promise<McpConfig> => this.#row()?.config ?? row.config;
+    const read = async (): Promise<McpConfig> => { await this.ports.configHold?.(); return this.#row()?.config ?? row.config; };
     this.#service = new McpService({
       service: row.config.service, fetch: this.ports.fetch, signer: secretSigner(row.seed), custody: sqliteStore(this.sql, this.ports.custodyBounds, this.ports.now), now: this.ports.now,
       ...(this.ports.every ? { every: this.ports.every } : {}), ...(this.ports.pause ? { pause: this.ports.pause } : {}),
