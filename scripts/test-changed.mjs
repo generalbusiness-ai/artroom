@@ -51,7 +51,7 @@ if (rootFile) run("root vitest run", `every test, because ${rootFile} changed`, 
 else if (unreadable) run("root vitest run", `every test, because vitest cannot read the changed name ${JSON.stringify(unreadable)} from git`, "npx", ["vitest", "run"]);
 else run("root vitest run", "the test files that import a changed file", "npx", ["vitest", "run", "--changed", ...(since ? [since] : [])]);
 // It reads every active file and takes a tenth of a second.
-run("active source check", "always: no active file reaches into parked/ or names a removed format", "node", ["--test", "scripts/active-source.test.mjs"]);
+run("active source check", "always: no active file reaches into spikes/parked/ or names a removed format", "node", ["--test", "scripts/active-source.test.mjs"]);
 
 console.error(`\nChanged files: ${changed.length}, compared with ${since ?? "HEAD"}.`);
 for (const r of results) console.error(`  ${r.label}: ${r.text}`);

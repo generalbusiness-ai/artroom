@@ -1,1 +1,77 @@
 Copyright (c) 2026 Hugh Pyle, inguz ᛜ outcomes llc
+
+Third-party runtime dependencies
+================================
+
+These attributions cover the runtime dependency closure of the workspaces in
+packages/, including optional dependencies for supported platforms. Development
+tools are excluded. The project itself is licensed under Apache-2.0; its full
+license is in LICENSE.
+
+MIT
+---
+
+@noble/curves@2.4.0 and @noble/hashes@2.4.0
+Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+
+jsonata@2.2.2
+© Copyright IBM Corp. 2018 All Rights Reserved
+© Copyright IBM Corp. 2016, 2018 All Rights Reserved
+© Copyright IBM Corp. 2016, 2017 All Rights Reserved
+
+tsx@4.21.0, get-tsconfig@4.14.3 and resolve-pkg-maps@1.0.0
+Copyright (c) Hiroki Osame <hiroki.osame@gmail.com>
+
+fsevents@2.3.3 (optional macOS dependency)
+Copyright (C) 2010-2020 by Philipp Dunkel, Ben Noordhuis, Elan Shankar, Paul Miller
+
+esbuild@0.27.7 and its optional platform binaries
+Copyright (c) 2020 Evan Wallace
+Platform packages (all version 0.27.7):
+  @esbuild/aix-ppc64
+  @esbuild/android-arm
+  @esbuild/android-arm64
+  @esbuild/android-x64
+  @esbuild/darwin-arm64
+  @esbuild/darwin-x64
+  @esbuild/freebsd-arm64
+  @esbuild/freebsd-x64
+  @esbuild/linux-arm
+  @esbuild/linux-arm64
+  @esbuild/linux-ia32
+  @esbuild/linux-loong64
+  @esbuild/linux-mips64el
+  @esbuild/linux-ppc64
+  @esbuild/linux-riscv64
+  @esbuild/linux-s390x
+  @esbuild/linux-x64
+  @esbuild/netbsd-arm64
+  @esbuild/netbsd-x64
+  @esbuild/openbsd-arm64
+  @esbuild/openbsd-x64
+  @esbuild/openharmony-arm64
+  @esbuild/sunos-x64
+  @esbuild/win32-arm64
+  @esbuild/win32-ia32
+  @esbuild/win32-x64
+
+The following MIT permission and warranty notice applies to the dependencies
+listed above.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

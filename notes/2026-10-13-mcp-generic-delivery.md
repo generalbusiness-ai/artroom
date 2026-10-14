@@ -174,7 +174,7 @@ the branch's own paths; at the merged head `git diff --name-only
 origin/main...HEAD` lists 60 paths, every one under packages/mcp,
 packages/cli, packages/client (index.ts, invitation.ts), docs/mcp.md,
 docs/mcp-tools.json, this note, scripts/active-source.test.mjs,
-parked/README.md, plans/README.md, package-lock.json, vitest.config.ts
+spikes/parked/README.md, plans/README.md, package-lock.json, vitest.config.ts
 or tsconfig, and none elsewhere. The planner's amendment is kept.
 
 | Item | What changed | Witness |
@@ -194,7 +194,7 @@ at this round's head, `git diff --name-only origin/main...HEAD` lists 60
 paths, every one of them the branch's own (packages/mcp, packages/cli,
 packages/client's index.ts and invitation.ts, docs/mcp.md,
 docs/mcp-tools.json, this note, scripts/active-source.test.mjs,
-parked/README.md, plans/README.md, package-lock.json and
+spikes/parked/README.md, plans/README.md, package-lock.json and
 vitest.config.ts), and `git diff --name-only origin/main HEAD` lists no
 other path. Both of the planner's amendments are kept.
 
@@ -345,7 +345,7 @@ round added `test/proto.scope.test.ts` and `test/support/pantry.ts`); `packages/
 `packages/cli/test/invitation-link.test.ts`;
 `packages/client/src/index.ts` and `packages/client/src/invitation.ts`;
 `docs/mcp.md`, `docs/mcp-tools.json`, `scripts/active-source.test.mjs`,
-`parked/README.md`, `plans/README.md`, this note, `package-lock.json` (the
+`spikes/parked/README.md`, `plans/README.md`, this note, `package-lock.json` (the
 new package and its pinned development dependencies) and
 `vitest.config.ts` (the mcp project and the mcp stories).
 

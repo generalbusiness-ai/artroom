@@ -342,7 +342,7 @@ declared definition. The client still derives no judgment.
 | `docs/scopes.md` | "Definitions are data": the forms of section 2. "What is not delivered yet": the lane row now names two definitions and what waits. Capacity: `settles`, entries only. |
 | `docs/testing.md` | The runner list, with the lane package's projects. |
 | `packages/lanes/README.md`, new; the guides of `contract`, `bytes`, `derive`, `scope`, `replay` and `client` | Each lists what its package gained. |
-| `parked/README.md` | Section 5. |
+| `spikes/parked/README.md` | Section 5. |
 | `notes/2026-10-05-i2-contract-deltas.md`, `notes/2026-10-05-i2-delivery.md`, new | The dated source choices, and the delivery note. |
 
 `docs/protocol.md` and `docs/policy-pack.md` stay inactive and unedited.
@@ -352,17 +352,17 @@ replace.
 ## 5. Removal
 
 The demo contract's sections 8 and 9.1 to 9.4 give I2 these removals. The
-parked ledger, `parked/README.md`, says what I1 did.
+parked ledger, `spikes/parked/README.md`, says what I1 did.
 
 | Item the demo contract gives to I2 | State at `6b863c51` | I2 does |
 |---|---|---|
-| `packages/policy`: the code-review declarations, the policy pack and the helpers, with the exports `./helpers` and `./pack` (sections 8, 9.1, 9.3) | I1 deleted them. The ledger's table "What I1 deleted" lists them. Only `parked/policy/src/admin.ts` is left, and it is I3's. | Records that I1 deleted them. Removes nothing. Restores nothing. |
+| `packages/policy`: the code-review declarations, the policy pack and the helpers, with the exports `./helpers` and `./pack` (sections 8, 9.1, 9.3) | I1 deleted them. The ledger's table "What I1 deleted" lists them. Only `spikes/parked/policy/src/admin.ts` is left, and it is I3's. | Records that I1 deleted them. Removes nothing. Restores nothing. |
 | The declared-act stage flags in `packages/room/src/declared.ts` (section 8) | I1 deleted `declared.ts`. | Records it. |
 | `packages/room/test/workerd/declared-run.test.ts` (section 9.4) | I1 deleted every such test of the Room. | Records it. |
 | The pack and code-review tests of `packages/policy/test` (section 9.4) | I1 deleted them. | Records it. |
-| `evidence.ts` of the earlier contract (section 9.1; the ledger: "I2 for evidence") | Parked: `parked/contract/src/evidence.ts`. | Deletes it when the `review`, `job` and `result` item types of `change` validate. `parked/contract/src/guards.ts` still names its types. That file is I3's, and the ledger says so. |
-| The UI's generation history (section 8) | Parked with the whole of `parked/ui`, which the ledger gives to I5: `src/ui/ChangeHistory.tsx`, `src/room/changes.ts`, `test/change-history.test.tsx`. | Deletes those three files when manifest versions validate, if the planner confirms (Q7). Other parked files still name them, and they go with I5. |
-| The subject of a check (section 9.1, `packages/checkers`: "I3; I2") | Parked whole: `parked/checkers`. | Nothing is removed. The `job` item is the new subject. I3 rewrites `job.ts` and `checker.ts` against it. |
+| `evidence.ts` of the earlier contract (section 9.1; the ledger: "I2 for evidence") | Parked: `spikes/parked/contract/src/evidence.ts`. | Deletes it when the `review`, `job` and `result` item types of `change` validate. `spikes/parked/contract/src/guards.ts` still names its types. That file is I3's, and the ledger says so. |
+| The UI's generation history (section 8) | Parked with the whole of `spikes/parked/ui`, which the ledger gives to I5: `src/ui/ChangeHistory.tsx`, `src/room/changes.ts`, `test/change-history.test.tsx`. | Deletes those three files when manifest versions validate, if the planner confirms (Q7). Other parked files still name them, and they go with I5. |
+| The subject of a check (section 9.1, `packages/checkers`: "I3; I2") | Parked whole: `spikes/parked/checkers`. | Nothing is removed. The `job` item is the new subject. I3 rewrites `job.ts` and `checker.ts` against it. |
 
 I2 claims no removal that belongs to I3 or I5. I8 audits and removes
 nothing for I2.
@@ -550,7 +550,7 @@ planner decides otherwise (question Q8).
 | Q4 | How an entry records a party list that is set whole. The `Effect` list of section 4.1 has `list` records for one member and no record for a whole list. | `d56d7f65` | Choose one: `list` records, first each removal and then each addition, in byte order of member identifier; or a new record. I2 would build the first and record it as delta D1. |
 | Q5 | May a declared definition state a name that begins `platform:`? | `d56d7f65`, with `406983fe` | Yes or no. I2 would refuse it, and build its platform peers as scripted entries. |
 | Q6 | Two points that revision 12 raises about the lane rows. The `renew-hold` row of `change` has no guard on the proposal, and the prose says a hold "runs to its end or is released" after a merge (R1-46). Nothing ends the pending state of a `timed-out` job that nobody answers, so its reserved entry is held and the lane cannot reach its closing checkpoint (R1-45). | The lane forms | For each: confirm the row as written, or change it. I2 writes the rows as they stand. |
-| Q7 | Where the data lives, and one removal. The lane forms' section 12 puts the definitions in the application's repository. The demo contract gives I2 the UI's generation history, and the parked ledger gives all of `parked/ui` to I5 and says parked files are not edited. | The planner | Confirm `packages/lanes` in this repository until the application's repository exists. Say whether I2 deletes the three parked files of section 5. |
+| Q7 | Where the data lives, and one removal. The lane forms' section 12 puts the definitions in the application's repository. The demo contract gives I2 the UI's generation history, and the parked ledger gives all of `spikes/parked/ui` to I5 and says parked files are not edited. | The planner | Confirm `packages/lanes` in this repository until the application's repository exists. Say whether I2 deletes the three parked files of section 5. |
 | Q8 | May the base of section 7.1 and 7.2 be reviewed and land while the request stays open for the steps of section 7.3? | The planner | Yes or no. The plan assumes yes, and reports the base as a milestone, never as I2. |
 
 ## 9. What I2 will not do

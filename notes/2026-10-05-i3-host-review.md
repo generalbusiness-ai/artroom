@@ -8,7 +8,7 @@ in the pattern of `notes/2026-10-05-i3-git-review.md`.
 
 "The authority note" is revision 21 at `f9ec25e4`, adopted. "The proof
 plan" is revision 9 at `85be9f0b`, adopted. "The deltas" is
-`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `parked/`,
+`notes/2026-10-05-i3-contract-deltas.md`. Parked paths are under `spikes/parked/`,
 as they were at `4f771d901`. "Rule n" is a ledger rule of the authority
 note's section 5.4.
 
