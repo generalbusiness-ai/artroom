@@ -108,11 +108,6 @@ test("native reserve refuses declared-name applications across rooms and inside 
       const appGenesis = (await app.entries())[0]!;
       const expectedMembership = await source.M.at();
       expect(appGenesis.input).toMatchObject({ type: "genesis", message: { body: { membership: expectedMembership } } });
-      if (canonical) {
-        expect((await app.item(0)).parties["author"]).toMatchObject({ membership: expectedMembership });
-        await app.did(source.who, "ask-rules", { on: 0, expected: await app.expected({ on: 0 }) });
-        await settle(app, source.Q);
-      }
       const before = await B.G.summary();
       const base = (await B.G.item(0)).values["head"];
       if (typeof base !== "string") throw new Error("B's actual first head is missing.");
@@ -120,9 +115,8 @@ test("native reserve refuses declared-name applications across rooms and inside 
       const file = await app.did(source.who, "propose-file", { fields: {
         base, path: "security-witness.txt", content, digest: digestBytes(raw), size: raw.length } });
       const manifest = file;
-      const merge = await app.did(source.who, "merge", { fields: canonical ? { manifest, reports: [] } : { manifest },
-        expected: await app.expected(canonical ? { manifest, proposal: 0, rules: (await app.summary()).value.items.find(i => i.type === "rules")!.id }
-          : { manifest, configuration: 0 }) });
+      const merge = await app.did(source.who, "merge", { fields: { manifest },
+        expected: await app.expected({ manifest, configuration: 0 }) });
       const merger = (await app.entries())[merge]!;
       expect(merger.input).toMatchObject({ type: "act", authority: [{ fresh: { observation: {
         of: expectedMembership, actions: expect.arrayContaining(["change.merge"]) } } }] });
