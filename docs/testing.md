@@ -280,7 +280,7 @@ git package.
 
 `packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
 successor on real platform and lane scopes, through the production wiring
-of the hosting's own Git service over its labelled host stand-in. It
+of Cloudflare Artifacts over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
 tree before a required check, refuses a wrong source digest and wrong job
 tree, and publishes only after a configured checker member signs a pass.
@@ -299,7 +299,7 @@ deadline, and refuse a final membership read that exceeded its window.
 
 `packages/lanes/test/issues.scope.test.ts` runs `dap issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
-on the hosting's own Git service only, for the same reason.
+on Artifacts only, for the same reason.
 `packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
 `scripts/demo/rehearse.ts`, the same way: every shot of the demo script's
 middle, from the planned install to the page, with a stand-in for `git`
@@ -477,8 +477,7 @@ The page's story, `packages/page/test/story.scope.test.ts`, runs from the
 root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
 created by the command line over the Worker's HTTP routes, with the real
 read sessions under a TEST SECRET, and the site route for addresses under
-`/site/`; the Git host (`OwnGit` under the production wiring of the hosting
-own Git service) and the scheduler are labelled stand-ins there. Its reads
+`/site/`; the Git host (`OwnGit` under the production wiring of Artifacts) and the scheduler are labelled stand-ins there. Its reads
 and acts are the page's own data functions. The `page` project is its Node
 tests: the states of a change, and that the scope Worker's page module
 (`packages/scope/src/page-assets.ts`) is the page's build of its source.

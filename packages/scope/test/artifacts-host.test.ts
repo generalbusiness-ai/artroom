@@ -7,7 +7,7 @@ import { ArtifactsProvider, READ_TTL, WRITE_TTL, type ArtifactsNamespace, type C
 import type { DestinationBinding } from "../src/destination-host.ts";
 
 // Every reply here is SCRIPTED: a binding double stands for the hosting's
-// own Git service, and a scripted fetch for its smart-HTTP endpoint. No
+// Cloudflare Artifacts, and a scripted fetch for its smart-HTTP endpoint. No
 // repository, token or remote exists. These tests show what the provider
 // sends and how it reads the answers, and nothing about the real service.
 

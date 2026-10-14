@@ -230,6 +230,24 @@ ordinary written receipt and the child's published result after normal
 cleanup. This does not prove judgment Replay, independently fetched new
 history Git objects, or human acceptance.
 
+The completed history publication retained an original merge refusal:
+`guard-failed`, naming `approvals-needed`, at child entry 20. The operator
+published a replacement policy at rules entry 7, changing the global
+approval floor from 1 to 0 while preserving all four extent requirements.
+The existing change requested those rules at entry 21. Checkpoint `68996`
+verified the rules reply at entry 8 and its application at child entry 22;
+the original manifest at child entry 20 stayed unchanged. The fresh merge
+at child entry 24 took effect. Nonhistory lanes can now pass early admission,
+but the destination still requires their explicit extent approval of 1;
+the history extent requires 0.
+
+That ordinary merge published history commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Destination publication 66
+reached its published transition at 73, produced written receipt 77, and
+was normally cleaned at 81. These are observations of a completed run,
+not instructions to repeat policy changes or merge in the existing room.
+Keep the original refusal and correction with their original journal facts.
+
 Members can inspect the lending journal with the actual full scope reference:
 
 ```sh
@@ -307,10 +325,15 @@ original-answer checks, and three anonymous pages at commit
 `bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction passed, including actual parents, page
 blobs, and receipt bytes. The curated public history was published and its index, raw companions,
 and current shelf pages were anonymously verified at
-`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Homepage hosting and the
-final validation gate remain pending; the six-output parent stays open. Keep each
-rehearsal's original results, failures, and uncertainties separate from the
-future final run.
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. The original gate at
+`f33a7d7feadeda092151aab5a993be37fb24edae` completed: 1,197 Vitest
+cases passed and three were skipped; the Node groups passed 10 and 55 cases.
+The later receiving commit `12a99599de2c2514a50be22f6194d1813d5c38d0`
+preserves that candidate while composing separately approved Main MCP
+changes. That correspondence is separate from the original gate; no gate
+on the combined commit is claimed. Homepage hosting and the full six-output
+request remain pending. Keep each rehearsal's original results, failures,
+and uncertainties separate from the completed final run.
 
 | Output | Evidence to record |
 | --- | --- |

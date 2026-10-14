@@ -104,8 +104,11 @@ an interactive control or substitute a local refusal for a scope judgment.
 
 If an actual donation or join has an unknown answer, record recovery beside
 its original request. Reuse that kept request after a reload. Do not add an
-extra donation or join to replace it. The retained rehearsal contains both
-Check recoveries; do not present them as observations of the fresh final room.
+extra donation or join to replace it. The final run `9377` separately
+reconciled its lost join answer and lost Small pot donation answer with
+**Check**, without second acts. The earlier
+rehearsal also contains two Check recoveries; keep each run's evidence
+with its own room.
 
 For the public closing shot, use an unseated browser. Read all three shelf
 pages and commit history. Show the cancelled page's reason and the lending

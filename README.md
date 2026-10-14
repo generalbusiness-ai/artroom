@@ -38,6 +38,7 @@ delivery in its own turn, as it judges an act.
   are in [apps/room/docs](apps/room/docs). Start with
   [Join a room and publish one text change](apps/room/docs/first-change.md)
   and [Lanes](apps/room/docs/lanes.md).
+  [Concurrent changes are settled by reservation and judgment, not by merging.](docs/demo.md#what-the-concurrency-shots-show)
   Its definitions are in [packages/platform](packages/platform) and
   [packages/lanes](packages/lanes).
 - **dap-counter** keeps a shared count. People and agents join, take
