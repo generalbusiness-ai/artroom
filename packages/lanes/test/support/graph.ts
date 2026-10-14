@@ -366,9 +366,12 @@ export class Peer {
   #seq = 0;
   #first: FactRef | null = null;
 
-  constructor(kind: "rules" | "destination" | "task", readonly under: string) {
+  /** An explicit reference still labels a scripted peer entry, never an
+   * admitted history of the real object that owns that reference. */
+  constructor(kind: "rules" | "destination" | "task", readonly under: string, at?: ScopeRef) {
+    if (at && at.kind !== kind) throw new Error("the scripted peer reference has another kind");
     const seed: Seed = { v: 1, kind, definition: `platform:${kind}@1`, creator: null, cause: textDigest(`a scripted peer ${crypto.randomUUID()}`), ordinal: 0 };
-    this.at = { scope: scopeIdOf(seed), inc: newIncarnation(crypto.getRandomValues(new Uint8Array(16))), kind };
+    this.at = at ?? { scope: scopeIdOf(seed), inc: newIncarnation(crypto.getRandomValues(new Uint8Array(16))), kind };
   }
 
   /** One entry with one send to `to`, as an act of kind `kind` would have written it. The envelope is returned, to be delivered. */

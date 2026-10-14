@@ -1,24 +1,74 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, test, onTestFinished } from "vitest";
-import type { DeclaredDefinition, FactRef, Item, Read, ScopeId } from "@generalbusiness/dap-contract";
+import type { DeclaredDefinition, Entry, FactRef, Item, Read, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, definitionDigest, entryHash, scopeIdOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, foundingObjects, platform } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
+import { CAPABILITY_CODE, SqliteStore } from "@generalbusiness/artroom-scope";
+import { ruleAt } from "@generalbusiness/dap-derive";
+import { ownOf } from "../../scope/src/core.ts";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { drainScheduledFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { site } from "../../scope/src/site/route.ts";
 import type { SiteEnv } from "../../scope/src/site/host.ts";
 import { gitHub, ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
+import { Platform, routed } from "../../scope/test/repository.ts";
 import { command, memoryStore, type Context, type Outcome } from "../../cli/src/index.ts";
 import { DEMO_DIGESTS, changeDemo } from "../src/index.ts";
 
 const SERVICE = "https://scopes.test";
 /** The test's own reader, which the command never presents. */
 const reader = "a test reader";
+
+/** Read-only bounded diagnostic projection; no values, tokens or recorded bodies. */
+async function publicationCheckpoint(node: Platform) {
+  const clockRead = net.clock.now;
+  return runInDurableObject(node.object, (_instance, state) => {
+    const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: closure => state.storage.transactionSync(closure) });
+    const scope = store.scope();
+    const operationPage = store.operations(null, 16, false);
+    const first = store.stored(0);
+    const birth = first ? JSON.parse(first.bytes) as Entry : null;
+    const definition = birth?.input.type === "genesis" ? birth.input.seed.definition : null;
+    const code = definition ? platform(definition) : null;
+    const publicationPage = store.page("publication", Object.keys(code?.data.items["publication"]?.states ?? {}), null, 16);
+    const branch = store.page("branch", ["empty", "ready"], null, 1).items[0];
+    const entries = [];
+    for (let seq = Math.max(0, (scope?.head.seq ?? -1) - 7); seq <= (scope?.head.seq ?? -1); seq++) {
+      const row = store.stored(seq);
+      if (!row) continue;
+      const entry = JSON.parse(row.bytes) as Entry;
+      entries.push({ seq, hash: row.hash, input: entry.input.type,
+        kind: entry.input.type === "act" ? entry.input.signed.intent.kind : entry.input.type === "outcome" ? entry.input.kind : null,
+        effects: entry.effects.map(effect => ({ effect: effect.effect,
+          ...(effect.effect === "state" ? { item: effect.item, state: effect.state } : {}),
+          ...(effect.effect === "value" || effect.effect === "ref" ? { item: effect.item, slot: effect.slot } : {}) })) });
+    }
+    const admission = (operation: typeof operationPage.operations[number]["operation"]) => {
+      if (operation.kind !== "check-judge") return undefined;
+      const mark = code?.data.outcomes?.[operation.kind];
+      const rule = code && mark && operation.owner === definition ? ruleAt(code.rules, mark.code, "outcome") : null;
+      const callback = rule?.rules.publicationOrigin;
+      try {
+        const asked = callback?.(store, operation, ownOf(store));
+        return { callback: !!callback, result: asked === undefined ? "absent" : asked === null ? "not-required" : asked === false ? "denied" : "required",
+          ...(asked && { from: asked.from, directory: asked.directory, destination: asked.destination }) };
+      } catch (error) { return { callback: !!callback, result: "threw", errorCategory: error instanceof Error ? error.name.slice(0, 80) : "non-error" }; }
+    };
+    return { clockRead, scope: scope?.at ?? null, head: scope?.head ?? null, definition,
+      branch: branch ? { id: branch.id, state: branch.state, directory: branch.refs["directory"] ?? null, judging: branch.refs["judging"] ?? null, slot: branch.refs["slot"] ?? null } : null,
+      publications: publicationPage.items.map(item => ({ id: item.id, state: item.state, operation: item.refs["operation"] ?? null, lane: item.refs["lane"] ?? null })),
+      operations: operationPage.operations.map(({ operation, state, sends }) => ({ id: operation.id, kind: operation.kind, for: operation.for ?? null, state, admission: admission(operation),
+        attempts: operation.attempts.map(attempt => ({ attempt: attempt.attempt, opened: attempt.opened, outcomes: attempt.outcomes.map(outcome => ({ seq: outcome.seq, result: outcome.result })) })), sends })),
+      operationsMore: operationPage.more, publicationsMore: publicationPage.more, entries };
+  });
+}
+
+
 
 // Invariant: `dap edit` proposes one file as a change of the room's lane, the room judges it by its rules, and the destination
 // writes the published tree with that file and pushes the commit; the site route then serves the file. A change in the rules extent
@@ -35,13 +85,13 @@ const reader = "a test reader";
 // | The clock | The scripted clock of the namespaces. |
 describe("dap edit on real scopes, through the production wiring of each Git host's ports. The Git hosts and the scheduler are STAND-INs", () => {
   for (const [label, made] of [["the hosting's own Git service", async () => ownHost()], ["GitHub", gitHub]] as const) {
-    test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async () => {
+    test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async ({ task }) => {
       net.hold = net.deaf = null;
       const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
       onTestFinished(owner.close);
       const wired = new Set<ScopeId>();
       try {
-        await story(await made(), wired);
+        await story(await made(), wired, task.meta);
       } finally {
         owner.close();
         net.hold = null;
@@ -51,7 +101,7 @@ describe("dap edit on real scopes, through the production wiring of each Git hos
   }
 });
 
-async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
+async function story(at: Stand, wired: Set<ScopeId>, checkpointMeta?: object): Promise<void> {
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
   const host = at.stand;
@@ -61,18 +111,9 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
   // STAND-IN for the scheduler: each pass drives the operations of every scope the command waits on, and of the register and the
   // destination, then their dispatchers, until nothing is due.
   const known: Platform[] = [];
-  const pause = async (waiting: readonly string[]) => {
-    const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => new Platform(scope as never))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of nodes) {
-        while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
-        made += await node.stub.dispatch();
-      }
-      if (made === 0) return;
-    }
-    await settle(...nodes);
-  };
+  const pause = async (waiting: readonly string[]) => drainScheduledFixture(() => [
+    ...known, ...[...wired, ...waiting].map(scope => new Platform(scope as ScopeId)),
+  ]);
   // An older valid change definition has no one-file proposal. Another
   // valid definition has that name but carries detached content, unlike the
   // command's signed-text protocol. Neither supports this edit workflow.
@@ -281,7 +322,14 @@ async function story(at: Stand, wired: Set<ScopeId>): Promise<void> {
     for (const fault of ["refusal", "transport"] as const) {
       // Before deliberately starting another test command, the test inspector
       // confirms the previous real merge ended; no unknown-observation retry.
+      const before = checkpointMeta ? await publicationCheckpoint(G) : null;
+      if (checkpointMeta) Object.assign(checkpointMeta, { badPathMergeDriverCheckpoint: { before, mergeFact, status: "awaiting-owned-scheduler" } });
       await pause([badLane, G.name]);
+      if (checkpointMeta) {
+        const after = await publicationCheckpoint(G);
+        const laneRefused = (await new Platform(badLane as ScopeId).entries()).some(entry => entry.effects.some(effect => effect.effect === "state" && effect.item === mergeSeq && effect.state === "refused"));
+        Object.assign(checkpointMeta, { badPathMergeDriverCheckpoint: { before, after, mergeFact, laneRefused } });
+      }
       expect((await new Platform(badLane as ScopeId).entries()).some((entry) => entry.effects.some((effect) => effect.effect === "state" && effect.item === mergeSeq && effect.state === "refused"))).toBe(true);
       let fact: FactRef | null = null;
       let acceptedVersion: number | null = null;

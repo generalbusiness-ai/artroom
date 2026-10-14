@@ -14,7 +14,7 @@ not the current directory, and installs or downloads nothing at launch.
 | `line` | `command(ctx, argv)`: a command line, read into one of those functions. |
 | `store` | The config and the keys, and `memoryStore()` for a test. |
 | `files` | The store on disk under Node, owner-only. Not exported. |
-| `main` | The command under Node. `bin/artroom.js` runs it. Not exported. |
+| `main` | The command under Node. `bin/dap.js` runs it. Not exported. |
 
 ## How to test
 

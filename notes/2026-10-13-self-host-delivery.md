@@ -114,3 +114,65 @@ and readback after Source approval and landing. The disposable homepage
 rehearsal does not fulfill that duty. Empty Artifacts namespace removal remains
 unsupported and unrun; later HTTP 403 visibility has an unknown cause.
 This delivery does not claim that the full original request is closed.
+
+## Final publication record
+
+The production homepage publication described above as owed is now complete.
+The earlier pending-approval and publication statements record the state at
+those earlier stages. The bounded self-host Source child has been satisfied.
+This section records the remaining homepage publication for the original
+self-host request.
+
+The existing `dap-home` Worker was updated from the published main snapshot
+`d3f5aa74218cabd8200468616a4b9e60c8d6f8a6`, tree
+`fe870241e071387305e97efc70aca3af2028794d`. The approved Source was
+`950ee6a85690a7ff5643a146bd69899077db11f9`. Its normal landing preserved
+the receiving notes, and the snapshot adds only the planner's sprint note.
+The executable, homepage, and brand trees remain exact to the approved Source.
+The exact approval, ratification, and normal landing events are:
+
+```text
+approval:     0b4c76430215823cafc54dd4f0301e028b49514d
+ratification: 3d2a21f3bca8b4531fdf55609e709dd3cc41b07d
+landing:      fbedaa11f779801a2705c8719f5c0537e56b07ee
+```
+
+The external `approval.public.json` proof has SHA-256
+`c25c9f252ff6571c7d8731305cdf7559bb7fc6d799b06e5bd37b6b991730b761`.
+The external `landing.public.json` proof has SHA-256
+`ed1c0cbb94f2b4c1734458dece880fd9dc124b26004be140a918d0b96275cc7d`.
+
+The original production run (1897) exited zero. It ran the normal
+`homepage/build.mjs` once with pinned Node 26.11.1, then uploaded once with
+pinned Wrangler 4.147.0 and `--keep-vars`. All six command phases exited zero
+without a signal or spawn error, and the final Source and dependency guards
+passed. No command was retried. This note did not trigger another build,
+test, or gate.
+
+Version `62889daf-97c7-43d4-825b-3fcf1e9b21c8` received 100% of traffic.
+All eleven anonymous readbacks matched the built bytes, MIME types, and cache
+headers. The homepage index was 2,066 bytes and its documentation destination
+was the self-host guide. Its SHA-256 was
+`5fb7018cf7d43040aad1a9029d90aa02f4bf1ad096327071f1ccf2caabeeb481`.
+The domain and protected resource settings were preserved. The external
+production `public-result.json` proof, SHA-256
+`9176d174245651ac28e575dfc816f01dcef2c5eb78e97977378be672fbe94cfb`,
+retains the original deployment version and all eleven readback rows. That
+original build and upload bind the served bytes to the snapshot. Matching
+bytes alone would not establish a source commit.
+
+The guide's fresh-clone timing and native guest enrollment still belong to
+its original `a313` rehearsal. Its login was excluded, configuration entry
+was automated, and the guest used an independent browser profile. No human
+manual timing or second physical-device join is claimed. The `02dc` gate and
+cache-control results remain bound to that checked Source. They are not new
+runtime results for the later `950` Source or published snapshot.
+
+The original failed cleanup and partial dependency-copy attempts above remain
+part of the record. The repository, Durable Object namespace, and disposable
+Workers were removed. Empty Artifacts namespace removal remains unsupported
+and **unrun**, with its later HTTP 403 visibility and cause unknown. Full
+cleanup is not claimed. GitHub deployment, Counter enrollment, the optional
+page rebuild, manual shell variations, private-key disposal, and physical
+second-device use retain their step-specific unrun labels in the guide.
+No secret, invitation, private key, or credential value is included here.

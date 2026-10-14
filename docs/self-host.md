@@ -99,15 +99,14 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    ```sh
    export ARTROOM_HOME="$(mktemp -d)"
-   node packages/cli/bin/artroom.js install --plan https://<name>.<subdomain>.workers.dev --host artifacts --namespace dap-my-room
+   node packages/cli/bin/dap.js install --plan https://<name>.<subdomain>.workers.dev --host artifacts --namespace dap-my-room
    ```
 
    **Run note:** the plan command passed with the deployed address and namespace.
    The helper created a private key directory. The `mktemp` line above was not
    exercised.
 
-   The source launcher is the `dap` command. Its physical filename remains
-   `artroom.js`. The plan prints `Planned: register sc_...`, its definition,
+   The source launcher is the `dap` command. The plan prints `Planned: register sc_...`, its definition,
    and its deadline. It creates nothing. Finish the next two steps before
    that deadline, 14 minutes after the plan.
 
@@ -121,8 +120,8 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    ```sh
    npm run deploy:scope
-   node packages/cli/bin/artroom.js install --planned
-   node packages/cli/bin/artroom.js claim first-room --handle @owner
+   node packages/cli/bin/dap.js install --planned
+   node packages/cli/bin/dap.js claim first-room --handle @owner
    ```
 
    **Run note:** the second deployment, `install --planned`, and
@@ -140,7 +139,7 @@ no global installation or Wrangler dependency in this checkout is needed.
 7. Invite the person using the second device.
 
    ```sh
-   node packages/cli/bin/artroom.js invite @guest --role member
+   node packages/cli/bin/dap.js invite @guest --role member
    ```
 
    **Run note:** the invitation command passed. Native evidence verified the
