@@ -6,7 +6,8 @@ import { requestSession, sessionRequest, signedReader, type Fetch } from "@gener
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { SqliteStore, CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
-import { validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import { ownOf } from "../../scope/src/core.ts";
+import { validateDefinition, valueDigest, ruleAt } from "@generalbusiness/dap-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
@@ -35,6 +36,7 @@ const SERVICE = "https://scopes.test";
 const reader = "a test reader";
 /** Read-only bounded diagnostic projection; no values, tokens or recorded bodies. */
 async function publicationCheckpoint(node: Platform) {
+  const clockRead = net.clock.now;
   return runInDurableObject(node.object, (_instance, state) => {
     const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: closure => state.storage.transactionSync(closure) });
     const scope = store.scope();
@@ -56,14 +58,37 @@ async function publicationCheckpoint(node: Platform) {
           ...(effect.effect === "state" ? { item: effect.item, state: effect.state } : {}),
           ...(effect.effect === "value" || effect.effect === "ref" ? { item: effect.item, slot: effect.slot } : {}) })) });
     }
-    return { scope: scope?.at ?? null, head: scope?.head ?? null, definition,
+    const admission = (operation: typeof operationPage.operations[number]["operation"]) => {
+      if (operation.kind !== "check-judge") return undefined;
+      const mark = code?.data.outcomes?.[operation.kind];
+      const rule = code && mark && operation.owner === code.named ? ruleAt(code.rules, mark.code, "outcome") : null;
+      const callback = rule?.rules.publicationOrigin;
+      try {
+        const asked = callback?.(store, operation, ownOf(store));
+        return { callback: !!callback, result: asked === undefined ? "absent" : asked === null ? "not-required" : asked === false ? "denied" : "required",
+          ...(asked && { from: asked.from, directory: asked.directory, destination: asked.destination }) };
+      } catch (error) { return { callback: !!callback, result: "threw", errorCategory: error instanceof Error ? error.name.slice(0, 80) : "non-error" }; }
+    };
+    return { clockRead, scope: scope?.at ?? null, head: scope?.head ?? null, definition,
       branch: branch ? { id: branch.id, state: branch.state, directory: branch.refs["directory"] ?? null, judging: branch.refs["judging"] ?? null, slot: branch.refs["slot"] ?? null } : null,
       publications: publicationPage.items.map(item => ({ id: item.id, state: item.state, operation: item.refs["operation"] ?? null, lane: item.refs["lane"] ?? null })),
-      operations: operationPage.operations.map(({ operation, state, sends }) => ({ id: operation.id, kind: operation.kind, for: operation.for ?? null, state,
+      operations: operationPage.operations.map(({ operation, state, sends }) => ({ id: operation.id, kind: operation.kind, for: operation.for ?? null, state, admission: admission(operation),
         attempts: operation.attempts.map(attempt => ({ attempt: attempt.attempt, opened: attempt.opened, outcomes: attempt.outcomes.map(outcome => ({ seq: outcome.seq, result: outcome.result })) })), sends })),
       operationsMore: operationPage.more, publicationsMore: publicationPage.more, entries };
   });
 }
+
+/** One owned driver pass, retaining the original checkpoint and any safe error category. */
+async function publicationDriverCheckpoint(node: Platform, meta: object) {
+  const before = await publicationCheckpoint(node);
+  Object.assign(meta, { publicationCheckpoint: before, publicationDriverCheckpoint: { before, status: "awaiting-owned-pass" } });
+  let count: number | null = null, errorCategory: string | null = null;
+  try { count = await (node.stub as unknown as { effect(): Promise<number> }).effect(); }
+  catch (error) { errorCategory = error instanceof Error ? error.name.slice(0, 80) : "non-error"; }
+  const after = await publicationCheckpoint(node);
+  Object.assign(meta, { publicationCheckpoint: before, publicationDriverCheckpoint: { before, count, errorCategory, after } });
+}
+
 
 
 test("a manifest-list reservation records both files before the configured checker passes; no branch push occurs before that pass (real scopes, STAND-IN Git host and scheduler)", async ({ task }) => {
@@ -774,8 +799,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
     expect([runs, prepares, snapshots]).toEqual([1, 0, 1]);
     await pause([lane, repository.destination]);
+    if (checkpointMeta) await publicationDriverCheckpoint(G, checkpointMeta);
     const published = host.refs.get("refs/heads/main")!;
-    if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
     expect(published).not.toBe(first);
     expect(host.refs.has(reservationRef)).toBe(false);
     const git = readerOf(host); const commit = await git.commit(published);
@@ -830,8 +855,8 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "closed" });
   expect(runs).toBe(1);
   await pause([lane, repository.destination]);
+  if (checkpointMeta) await publicationDriverCheckpoint(G, checkpointMeta);
   const published = host.refs.get("refs/heads/main")!;
-  if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
   expect(published).not.toBe(first);
   expect(host.refs.has(reservationRef)).toBe(false);
   const git = readerOf(host); const commit = await git.commit(published);
