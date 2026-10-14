@@ -20,7 +20,7 @@ import { rita } from "./support-founding.ts";
 // Evidence: /tmp/artroom-cohort25-generation-one/result.json
 // SHA-256: e2a2052d23705690ec4b884786f453718875f6505d515fdda88a20191eb64269.
 const DIGESTS: Readonly<Record<string, string>> = {
-  "platform:destination@4": "sha256:7b56727a04c968063e0a8f70092db7c55c7f5d853a5099eab7b2d18994681b88",
+  "platform:destination@4": "sha256:f29353b2ca1f551ab6a7d622bbd57aa6dfc7fc3748358ce709ccee728e4c15df",
   "platform:register@9": "sha256:4f85c4f4ad35ffc3580cba3fc3ec17f29b59cfc9ccb9eee84b7ad355125926d6",
   "platform:directory@8": "sha256:db86423258d5de0df43956187460d5ade0d3e878371c24d89c33ecd51c2b1bd5",
   "platform:register@7": "sha256:1363aa547f314eb9c598c33415a1e9e3c90b4e5afce351233abf9b3f757069b5",

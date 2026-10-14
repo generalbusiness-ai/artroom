@@ -78,10 +78,10 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
+    accepts: (owner: string, kind: string): boolean => owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -177,7 +177,7 @@ export class DestinationHost implements Outside {
         if (reply?.["id"] !== token || typeof reply["revoked"] !== "boolean") return null;
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
-      if (operation.kind === DESTINATION_KINDS.judge) {
+      if (operation.kind === DESTINATION_KINDS.judge || operation.owner === "platform:destination@4" && operation.kind === "file-judge") {
         const publication = this.#judging();
         if (publication?.type === "file-publication") return this.#inspectFile(repository, ref, publication);
         const list = this.#list(this.#judging());
