@@ -3,6 +3,11 @@
 **Run status: the final room completed the exact-script automated browser
 story and all seven publications.** The curated public Git history is now published and anonymously verified.
 Homepage hosting and the final validation gate remain pending. Two earlier rehearsals are retained.
+The member interface offers **Cancel this thing** and its reason box only
+after membership confirms that the signer's role holds `lending.staff`.
+The control is hidden while that read is loading or unavailable. The scope
+still refuses an unauthorized cancel if the observed role is stale.
+
 The publication rehearsal produced real browser acts, written receipts, and
 anonymous immutable pages. Its Small pot description differed from the
 approved script, so its mechanical completion is not final story acceptance.
@@ -290,9 +295,10 @@ Corrections found in the run:
   the digest of the bytes without it. `--value` sends a file as it is, so
   the runbook's first commands were refused `bad-field`. The commands
   above now send a copy without the newline.
-- The demo script's shot 8a said not to claim that the member interface
-  offers a cancel button to a member. It does, and the scope refuses it.
-  The script now shows that refusal.
+- During this rehearsal, the interface offered a cancel button to an
+  ordinary member, and the scope refused the act. Shot 8a was changed to
+  show that refusal. The current interface hides the button unless the
+  signer's observed role holds `lending.staff`.
 
 Not done in this run: publication, the published shelf, the public
 history witness, and a second physical device.

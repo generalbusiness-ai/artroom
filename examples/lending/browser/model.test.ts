@@ -2,7 +2,17 @@ import { expect, test } from "vitest";
 import { type Entry, type Summary } from "@generalbusiness/dap-contract";
 import { grantOf, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { donation, make as makeLedger, submit } from "../test-support.ts";
-import { actsFor, journalRows, lendingView, propose, refusalWords } from "./model.ts";
+import { actsFor, journalRows, lendingView, membershipActions, offeredActs, propose, refusalWords } from "./model.ts";
+
+// A STAND-IN for a complete authenticated membership summary, not a native authority observation.
+const roster = (role: "member" | "admin"): Summary => ({
+  scope: keys.rita.member.membership,
+  items: [
+    { id: 0, type: "roster", state: "open", values: { memberActions: ["lending.member"], adminActions: ["lending.member", "lending.staff"] } },
+    { id: 1, type: "member", state: "active", values: { handle: "@rita", role, kind: "person" }, parties: { member: keys.rita.member }, refs: {} },
+    { id: 2, type: "key", state: "active", values: { id: keys.rita.key }, refs: { member: 1 } },
+  ],
+} as unknown as Summary);
 
 // The summary here is made by hand from the fold's own state (a STAND-IN for the scope's read).
 const read = (s: Ledger): { summary: Summary; at: { seq: number; hash: string }; entries: Entry[] } => ({
@@ -27,6 +37,18 @@ test("the view lists every thing in order, live from the summary and gone from t
   expect((await send(keys.rita, view(), "donate", { name: " Big pot ", description: "Copper." })).result).toBe("write");
   expect((await send(keys.una, view(), "donate", { name: "Small pot", description: "Baby born when the big pot was with me" })).result).toBe("write");
   const [big, small] = view().things;
+  const ordinary = membershipActions(roster("member"), keys.rita.member, keys.rita.key);
+  const staff = membershipActions(roster("admin"), keys.rita.member, keys.rita.key);
+  expect(ordinary).toEqual(["lending.member"]);
+  expect(staff).toEqual(["lending.member", "lending.staff"]);
+  const unknown = [null, membershipActions(roster("admin"), keys.una.member, keys.una.key)];
+  expect(unknown).toEqual([null, null]);
+  for (const state of ["available", "lent"] as const) {
+    const thing = { ...big!, state };
+    expect(offeredActs(thing, ordinary)).toEqual([state === "available" ? "borrow" : "return", "publish"]);
+    expect(offeredActs(thing, staff)).toEqual([state === "available" ? "borrow" : "return", "cancel", "publish"]);
+    for (const actions of unknown) expect(offeredActs(thing, actions)).not.toContain("cancel");
+  }
   expect([big!.name, big!.state, big!.donor, actsFor(big!)]).toEqual(["Big pot", "available", "@rita", ["borrow", "cancel", "publish"]]);
   expect((await send(keys.una, view(), "borrow", { thing: big!.id })).result).toBe("write");
   expect(view().things[0]).toMatchObject({ state: "lent", borrower: "@una" });
@@ -38,6 +60,7 @@ test("the view lists every thing in order, live from the summary and gone from t
   expect(after.things.map((thing) => [thing.id, thing.state, thing.state === "gone"])).toEqual([[big!.id, "gone", true], [small!.id, "available", false]]);
   expect(after.things[0]).toMatchObject({ reason: "Nasruddin says the pot died", borrower: null });
   expect(actsFor(after.things[0]!)).toEqual(["publish"]);
+  expect(offeredActs(after.things[0]!, staff)).toEqual(["publish"]);
   expect(after.record).toEqual({ scope: s.at.scope, incarnation: s.at.inc, seq: s.last.seq, hash: s.entries.at(-1)!.hash });
   expect(after.behind).toBe(false);
   expect((await send(keys.rita, after, "publish", { thing: big!.id })).result).toBe("write");

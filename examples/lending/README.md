@@ -44,8 +44,12 @@ The older member interface remains at
 <https://dap-lending.inguz.workers.dev/lending/>. The existing homepage
 [Library page](https://dap.generalbusiness.ai/library/) linked that rehearsal.
 Final-room homepage links are prepared separately and have no hosting proof
-in this draft. The interface still offers **Cancel this thing** to members;
-the native scope refuses a nonstaff cancellation as `unauthorized`.
+in this draft. The member interface reads the signer's active seat and its
+role's actions from membership. It offers the reason box and **Cancel this
+thing** only when those actions include `lending.staff`. The control stays
+hidden while the actions are loading or cannot be read. The native scope
+still refuses a nonstaff cancellation as `unauthorized`, including when a
+previously observed staff role has changed.
 
 ## What is here
 
