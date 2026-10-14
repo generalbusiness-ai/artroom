@@ -31,10 +31,12 @@ fabric. The verifier line, "nothing you saw depends on trusting our
 database", stays as the supporting proof, not the way in.
 
 The hosting surface, said once, never as a service count: Cloudflare
-Artifacts holds one repository per destination, the Worker runs the room,
-and the same journal runs on GitHub. Published pages are copies of the
-journal. A fork for each hold remains the unbuilt design in plan 029;
-the original per-hold repository wording described that intended design.
+Artifacts holds one repository per destination. The Worker runs the room
+and keeps its scope journal; the same room can publish to GitHub. Published
+pages carry signer-authored text, whose faithfulness to the journal is not
+checked by the scope. A fork for each hold remains the unbuilt design in
+plan 029; the original per-hold repository wording described that intended
+design.
 
 ## The order of the video
 
@@ -215,8 +217,10 @@ them leads with a results table and a long video).
    state, and a restart at once; more adds nothing the record does not
    already show. The hosting surface is one line, not a service count:
    Artifacts holds one repository per destination, the Worker runs the
-   room, the pages are copies of the journal, and the same journal runs
-   on GitHub. Per-hold forks remain the unbuilt plan 029 design.
+   room and keeps its scope journal, and the same room can publish to
+   GitHub. Published pages carry signer-authored text; the scope does not
+   check its faithfulness to the journal. Per-hold forks remain the
+   unbuilt plan 029 design.
 
 The practice script is amended by a builder request filed with this
 section: the no-merge sentence verbatim in section 1, the Counter line in

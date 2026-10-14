@@ -7,11 +7,13 @@ candidate `55c177c2`, which includes journal labels `3e5a6d7c`, and merges
 public-text candidate `5bd3e9c9`. Main remains the separate receiving
 commit `f20df342` for this preparation.
 
-Journal labels use retained donations, including cancelled things. Recorded
-empty names are labelled Unnamed, distinct from an unknown donation. The
-member interface offers Cancel only after observing `lending.staff`; loading
-or unreadable membership does not offer it. These are prepared changes,
-not claims that the new interface has been built or served.
+Journal labels use retained donations, including cancelled things. Later
+borrow, return, cancel, and publish rows label a recorded empty name Unnamed,
+distinct from an unknown donation. The donation row keeps its original empty
+name. The member interface offers Cancel only after observing `lending.staff`;
+loading or unreadable membership does not offer it. At composition these
+were prepared changes, with no claim that the new interface had been built
+or served.
 
 The public-text changes name Cloudflare Artifacts and explain the current
 one-repository concurrency behavior and unbuilt per-hold fork design. The
@@ -22,13 +24,15 @@ The only merge conflict was the runbook's opening status. Its resolution
 retains the current staff paragraph and the documented Home completion.
 Historical refusal observations remain unchanged.
 
-All checks for this combined candidate are UNRUN: compiler roots, focused
-model and native cases, doc links, the predicate control, generated assets,
-and the ordinary gate. The owning model file has four cases; the existing
-Scope Lending case remains a real-scope witness with its labelled outside
-stand-ins. One combined asset producer and one gate remain for later release.
-No dependency namespace was materialized in this worktree. No application,
-provider, SDK, build or test ran during composition.
+At the original composition, all checks for this combined candidate were
+UNRUN: compiler roots, focused model and native cases, doc links, the predicate
+control, generated assets, and the ordinary gate. The owning model file has
+four cases; the existing Scope Lending case remains a real-scope witness
+with its labelled outside stand-ins. The composition plan held one combined
+asset producer and one gate for later release. No dependency namespace was
+materialized, and no application, provider, SDK, build, or test ran during
+composition. This is the composition-time status. Actual later checks and
+the final delivery must be recorded separately against their checked head.
 
 Genuine hosted MCP acceptance is separately held under its own request.
 Neither the public-text comments nor this composition satisfy that task.
