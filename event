@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4034553706c489f29e4d5c2a9d8a53d68575b6de","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/counting-assets.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:41e691608323bb08c45c2b4493974b908ced23ab","text":"Merge retired a covered predecessor; the successor is at packages/scope/wrangler.test.jsonc."}
