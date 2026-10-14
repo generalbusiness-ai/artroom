@@ -305,9 +305,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       const creator = proof[1];
       if (creator.fact.at.scope === this.#name) return null;
       try {
-        const read = await within(() => this.#resolver.read(creator.fact, this.#fetchSeconds), this.#fetchSeconds);
+        const read = await within(() => this.#resolver.read(creator.fact, this.#fetchSeconds, true), this.#fetchSeconds);
         if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, creator.fact)) return null;
         proof = [proof[0]!, { ...creator, under: read.under }];
+        if (read.under === "issue") {
+          const parent = read.origin?.find(copy => copy.fact.seq === 0 && canonicalize(copy.fact.at) === canonicalize(creator.fact.at));
+          if (!parent || !isEntryOf(parent.entry, parent.fact) || parent.entry.input.type !== "genesis") return null;
+          proof = [...proof, { ...parent, under: read.under }];
+        }
       } catch { return null; }
     }
     return sourced(this.#store, pinned, seq, origin, proof);

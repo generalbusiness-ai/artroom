@@ -4,7 +4,7 @@ import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
 import { grantFrom, namedBy, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
 import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
-import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, standingOf } from "../../platform/src/index.ts";
+import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, sourceName, standingOf } from "../../platform/src/index.ts";
 import { Roster } from "../../platform/test/support.ts";
 import { Rulebook } from "../../platform/test/support-rules.ts";
 import { MemorySource, TRUSTS, platformCode, render, verify, type MemoryScope, type Options, type Tally } from "../src/index.ts";
@@ -63,6 +63,26 @@ test("a replay without native identity policy leaves a reserved declared source 
   const options = { mode: "replay" as const, scope: T.at.scope, ...AS_RECORDED };
   const missing = await verify(source(), options);
   expect([missing.report.result, missing.why]).toEqual(["incomplete", "the replay has no supplied source-identity policy for a reserved declared name"]);
+  // Explicit catalog policy still cannot bless the raw reserved alias of an
+  // ordinary founding. Its source history is checked, without an anchor.
+  const classified = await verify(source(), { ...options, sourceName });
+  expect([classified.report.result, classified.report.anchors, classified.why]).toEqual([
+    "mismatch", [], `the retained copy of entry ${fact.seq} of ${fact.at.scope} names another definition than that scope pins`,
+  ]);
+  const qualifiedReceiver = validateDefinition({ ...notesDefinition.declared, acts: { ...notesDefinition.declared.acts,
+    vouch: { ...notesDefinition.declared.acts["vouch"]!, presents: { proof: { kind: ["write"], under: "declared:change", required: true } } } } }, PROPOSED_BOUNDS);
+  if (!qualifiedReceiver.ok) throw new Error("the qualified fixture definition must validate");
+  const Q = founded(qualifiedReceiver.definition, {}, "qualified-receiving-note");
+  expect(Q.act(keys.rita, "vouch", { ...on(Q, 0), fields: {} }, { presented: { proof: fact }, facts: [{ fact, entry: S.last, under: "declared:change" }] }).result).toBe("write");
+  const qualifiedHistory = served(Q, [S, Q]);
+  // served() normally reconstructs fixture metadata from the declaration's
+  // raw name. This retention records the qualified name actually given to Q.
+  qualifiedHistory.retained = qualifiedHistory.retained.map(retained => retained.kind === "entry" ? { ...retained, under: "declared:change" } : retained);
+  const qualifiedSender = served(S, [S, Q]);
+  qualifiedSender.retained.push({ kind: "text", digest: textDigest(body), bytes: canonicalize(body) });
+  const qualifiedSource = new MemorySource([qualifiedSender, qualifiedHistory]);
+  const qualified = await verify(qualifiedSource, { ...options, scope: Q.at.scope, sourceName });
+  expect([qualified.report.result, qualified.why, qualified.report.dependencies.missing, qualified.report.anchors]).toEqual(["consistent", null, [], []]);
   const anchored = await verify(source(), { ...options, anchors: [{ scope: fact.at.scope, seq: fact.seq, hash: fact.hash }] });
   expect([anchored.report.result, anchored.why, anchored.report.trusts.includes(TRUSTS.anchors), anchored.report.anchors]).toEqual(["consistent", null, true, [fact]]);
 });

@@ -16,6 +16,21 @@ export const ISSUE_LANE_DIGESTS = [
 
 const same = (a: unknown, b: unknown): boolean => canonicalize(a) === canonicalize(b);
 
+/** A reserve must address the full Directory and destination of its birth. */
+export function publishingLaneAffiliation(from: FactRef, directory: ScopeRef, destination: ScopeRef, facts: readonly Fetched[]): boolean {
+  try {
+    const genesis = facts.find(copy => copy.fact.seq === 0 && same(copy.fact.at, from.at));
+    if (!genesis || !isEntryOf(genesis.entry, genesis.fact) || genesis.entry.input.type !== "genesis") return false;
+    const born = genesis.entry.input;
+    return born.decision === "applied" && born.kind === "open" && from.at.kind === "lane" && born.inc === from.at.inc && isSeed(born.seed)
+      && born.seed.kind === "lane" && scopeIdOf(born.seed) === from.at.scope
+      && directory.kind === "directory" && destination.kind === "destination"
+      && same(born.seed.creator, directory) && born.message !== null && born.message.class === "request" && born.message.type === "create" && isObject(born.message.body)
+      && same(born.message.body["directory"], directory) && isObject(born.message.body["fields"])
+      && same(born.message.body["fields"]["destination"], destination);
+  } catch { return false; }
+}
+
 /** Null means missing proof. False means positively non-native or invalid proof. */
 function nativeOrigin(named: Digest, name: "change" | "issue", facts: readonly Fetched[], at?: ScopeRef): boolean | null {
   const genesis = facts.find(copy => copy.fact.seq === 0 && (!at || same(copy.fact.at, at)));
@@ -26,31 +41,49 @@ function nativeOrigin(named: Digest, name: "change" | "issue", facts: readonly F
   if (!isFactRef(born.source)) return false;
   const creator = facts.find(copy => same(copy.fact, born.source));
   if (!creator) return null;
-  if (!isEntryOf(creator.entry, creator.fact) || creator.entry.input.type !== "act" || creator.under !== "platform:directory") return false;
+  if (!isEntryOf(creator.entry, creator.fact) || creator.entry.input.type !== "act") return false;
+  const childIssue = name === "issue" && creator.under === "issue";
+  if (!childIssue && creator.under !== "platform:directory") return false;
   const made = creator.entry.input;
-  const route = name === "change" ? "open-pr" : "open-issue";
+  const route = childIssue ? "add-concern" : name === "change" ? "open-pr" : "open-issue";
   if (born.decision !== "applied" || born.kind !== (name === "change" ? "open" : "file") || !isSeed(seed) || seed.kind !== "lane" || seed.ordinal !== 0
     || seed.definition !== named || genesis.fact.at.kind !== "lane" || born.inc !== genesis.fact.at.inc
     || !same(genesis.entry.at, genesis.fact.at) || scopeIdOf(seed) !== genesis.fact.at.scope
-    || !isScopeRef(seed.creator) || seed.creator.kind !== "directory"
+    || !isScopeRef(seed.creator) || seed.creator.kind !== (childIssue ? "lane" : "directory")
     || !same(seed.creator, born.source.at) || made.signed.intent.kind !== route
     || !same(made.signed.intent.to, seed.creator) || !verifySignedIntent(made.signed)
-    || made.signed.intent.fields["definition"] !== named || intentDigest(made.signed.intent) !== seed.cause
+    || (!childIssue && made.signed.intent.fields["definition"] !== named) || intentDigest(made.signed.intent) !== seed.cause
     || born.n === null || born.message === null || born.message.class !== "request" || born.message.type !== "create") return false;
   const body = born.message.body;
-  if (!isObject(body) || !same(body["directory"], seed.creator) || !isObject(body["fields"])) return false;
+  if (!isObject(body) || !isObject(body["fields"])) return false;
   const fields = body["fields"];
+  if (childIssue) {
+    // The creator's CURRENT authenticated issue identity is supplied by the
+    // runtime/replay. Its own immutable genesis additionally proves self pin
+    // and the inherited Directory; a retained raw name is never sufficient.
+    const parent = facts.find(copy => copy.fact.seq === 0 && same(copy.fact.at, seed.creator));
+    if (!parent) return null;
+    if (!isEntryOf(parent.entry, parent.fact) || parent.entry.input.type !== "genesis") return false;
+    const birth = parent.entry.input;
+    if (!isSeed(birth.seed) || birth.seed.definition !== named || birth.decision !== "applied" || birth.kind !== "file"
+      || birth.inc !== parent.fact.at.inc || parent.fact.at.kind !== "lane" || scopeIdOf(birth.seed) !== parent.fact.at.scope
+      || !birth.message || !isObject(birth.message.body) || !isScopeRef(body["directory"]) || body["directory"].kind !== "directory"
+      || !same(birth.message.body["directory"], body["directory"])) return false;
+    // creationFields resolves the exact self marker to the creating entry.
+    // Its immutable message retains the marker rather than its own hash.
+    const origin = fields["origin"];
+    if (!(isObject(origin) && Object.keys(origin).length === 1 && origin["self"] === true)
+      && !same(origin, born.source)) return false;
+  } else if (!same(body["directory"], seed.creator)) return false;
   if (name === "change" && (!isScopeRef(fields["destination"]) || fields["destination"].kind !== "destination")) return false;
   return sentBy(creator.entry, { from: born.source, n: born.n, to: seed, message: born.message });
 }
 
-/** A supported reserved name also requires its native factory's actual creation facts. */
+/** Reserved roles require authenticated native creation, including activated extensions. */
 export function sourceName(named: Digest | PlatformDefinition, declaredName: string, origin?: readonly Fetched[]): string | null {
   if (isPlatformDefinition(named)) return platformName(named);
   if (declaredName.startsWith("platform:")) return `declared:${declaredName}`;
   if (declaredName !== "change" && declaredName !== "issue") return declaredName;
-  const supported = declaredName === "change" ? PUBLISHING_LANE_DIGESTS.some(digest => digest === named) : ISSUE_LANE_DIGESTS.some(digest => digest === named);
-  if (!supported) return `declared:${declaredName}`;
   try {
     const native = nativeOrigin(named, declaredName, origin ?? []);
     return native === null ? null : native ? declaredName : `declared:${declaredName}`;
@@ -63,7 +96,7 @@ export function publishingLaneOrigin(from: FactRef, directory: ScopeRef, destina
     const genesis = facts.find(copy => copy.fact.seq === 0 && same(copy.fact.at, from.at));
     if (!genesis || genesis.entry.input.type !== "genesis") return false;
     const born = genesis.entry.input;
-    if (!isDigest(born.seed.definition) || !PUBLISHING_LANE_DIGESTS.some(digest => digest === born.seed.definition)
+    if (!isDigest(born.seed.definition)
       || nativeOrigin(born.seed.definition, "change", facts, from.at) !== true
       || !same(born.seed.creator, directory) || directory.kind !== "directory" || destination.kind !== "destination"
       || !born.message || !isObject(born.message.body) || !isObject(born.message.body["fields"])) return false;

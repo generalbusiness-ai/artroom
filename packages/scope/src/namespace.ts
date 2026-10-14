@@ -91,7 +91,7 @@ export function nameUnder(pinned: Pinned, origin: readonly Fetched[] = []): stri
   if (name === undefined) return null;
   // A declaration may use these words without acquiring the native identity
   // that privileged handlers and fact types select. Existing lane bytes stay
-  // exact; a supported digest and its native factory facts establish the role.
+  // exact; authenticated native factory facts establish the role.
   return sourceName(pinned.named, name, origin);
 }
 
@@ -218,7 +218,7 @@ export function namespace(binding: Binding): { resolver: Resolver; transport: Tr
         try {
           const proof: Fetched[] = [];
           if (origin && answer.origin) {
-            if (!Array.isArray(answer.origin) || answer.origin.length > 2) return { absent: true };
+            if (!Array.isArray(answer.origin) || answer.origin.length > 3) return { absent: true };
             for (const row of answer.origin) {
               const entry = parseStrict(row.bytes) as Entry;
               if (!isEntryOf(entry, row.fact) || typeof row.under !== "string") return { absent: true };

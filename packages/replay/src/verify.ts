@@ -106,6 +106,14 @@ export interface Options {
    */
   platform?: ((named: PlatformDefinition) => Coded | null) | undefined;
   /**
+   * The explicit identity policy of the supplied native catalog, also for
+   * histories that contain only declared definitions. It classifies checked
+   * source and creator histories; it supplies no foreign fact or anchor.
+   * A native version that supplies its policy must use this same function.
+   * With none, a reserved declared source remains incomplete.
+   */
+  sourceName?: Coded["sourceName"];
+  /**
    * How a recorded grant that holds no freshness proof is read. Such a
    * grant is no grant, and an entry that holds one is no entry (section
    * 15.6n, on the I3 delta E8): `proven`, a `mismatch` at that entry. The
@@ -429,6 +437,7 @@ class Verifier {
     this.#capabilities = options.capabilities;
     this.#owners = options.owners;
     this.#platform = options.platform;
+    this.#sourceName = options.sourceName;
     this.#grants = options.grants ?? "proven";
   }
 
@@ -1126,6 +1135,10 @@ class Verifier {
       if (!isPlatformDefinition(named) && (declared === "change" || declared === "issue" || declared.startsWith("platform:"))) throw new Stop("incomplete", "the replay has no supplied source-identity policy for a reserved declared name", where);
       return declared;
     }
+    // Ordinary names and identities established without origin proof need
+    // no creator recursion. Null still requires actual checked birth facts.
+    const direct = this.#sourceName(named, declared);
+    if (direct !== null) return direct;
     const genesis = source.sealed[0];
     const origin: Fetched[] = [];
     if (genesis?.entry.input.type === "genesis") {
@@ -1133,7 +1146,14 @@ class Verifier {
       const from = genesis.entry.input.source;
       const creator = from && this.#runs.get(from.at.scope);
       const made = from && creator?.sealed[from.seq];
-      if (from && creator?.at && sameScope(creator.at, from.at) && made?.hash === from.hash && creator.definition) origin.push({ fact: from, entry: made.entry, under: this.#sourceIdentity(creator, where) });
+      if (from && creator?.at && sameScope(creator.at, from.at) && made?.hash === from.hash && creator.definition) {
+        const creatorUnder = this.#sourceIdentity(creator, where);
+        origin.push({ fact: from, entry: made.entry, under: creatorUnder });
+        const parentGenesis = creator.sealed[0];
+        if (creatorUnder === "issue" && parentGenesis?.entry.input.type === "genesis") origin.push({
+          fact: { at: parentGenesis.entry.at, seq: 0, hash: parentGenesis.hash }, entry: parentGenesis.entry, under: creatorUnder,
+        });
+      }
     }
     const identity = this.#sourceName(named, declared, origin);
     if (identity === null) throw new Stop("incomplete", "the source's required native genesis or creator proof is missing", where);

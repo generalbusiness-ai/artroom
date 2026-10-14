@@ -1,9 +1,13 @@
+import { env } from "cloudflare:workers";
+import { isEntryOf } from "@generalbusiness/dap-derive";
+import { namespace, type Sourced } from "@generalbusiness/artroom-scope";
 import { expect, test } from "vitest";
-import type { Intent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS, type DeclaredDefinition, type Intent, type ScopeRef, type Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, digestBytes, intentDigest, isSeed, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
-import { APPLICATION_COHORT, firstExtents, repositoryName } from "@generalbusiness/dap-platform";
+import { APPLICATION_COHORT, firstExtents, publishingLaneOrigin, repositoryName } from "@generalbusiness/dap-platform";
 import { changeDemo } from "../src/index.ts";
+import { room as nativeRoom, rita as nativeRita } from "./support/room.ts";
 import { soon } from "../../scope/test/net.ts";
 import { outsideOf } from "../../scope/test/outside.ts";
 import { foundingPublication } from "../../scope/test/publication.ts";
@@ -147,4 +151,59 @@ test("native reserve refuses declared-name applications across rooms and inside 
       expect(admission.reason).toMatchObject({ code: "unknown-message" });
     }
   } finally { lifetime.release(); }
+});
+
+// A genuine Native role is necessary but does not authorize a foreign room.
+// This separate case preserves the original combined declared/F1 scenarios.
+test("a genuine Native change extension cannot reserve another room's destination; Git hosts and scheduler are STAND-INs", async ({ task }) => {
+  const rita = nativeRita;
+  const A = await nativeRoom({ roster: [] }), B = await nativeRoom({ roster: [] });
+  const definition = {
+    ...changeDemo,
+    acts: { ...changeDemo.acts, merge: {
+      ...changeDemo.acts.merge,
+      fields: { ...changeDemo.acts.merge.fields, foreign: { type: "scope", kind: "destination", required: true } },
+      sends: changeDemo.acts.merge.sends.map(form => ({ tell: { ...form.tell, to: { field: "foreign" } } })),
+    } },
+  } as const satisfies DeclaredDefinition;
+  const digest = definitionDigest(definition);
+  await A.activate(definition, digest);
+  expect(await A.publishRules({ approvals: 0, checks: [], ownerMayReview: false })).toMatchObject({ answer: "accepted" });
+  const lane = await A.lane(rita, "open-pr", definition, digest, { title: "Native foreign target", draft: false });
+  await lane.did(rita, "ask-rules", { on: 0 });
+  await A.settle();
+  const offer = (await lane.did(rita, "offer", { fields: { offeree: await A.member("@rita"), terms: "Test native affiliation" } })).fact;
+  await lane.did(rita, "accept", { on: offer.seq, fields: { terms: offer } });
+  const hold = (await lane.did(rita, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
+  await lane.instance(rita, hold, "foreign-1");
+  const version = (await lane.stagedDid(rita, "propose-manifest", { fields: { hold, instance: "foreign-1", base: A.firstHead, integration: "c".repeat(40), tree: "3".repeat(40), complete: true, selected: [], decisions: [] } })).fact.seq;
+  const foreign = await B.G.at();
+  const before = await B.G.summary();
+  const beforePublications = before.value.items.filter(item => item.type === "publication").map(item => ({ id: item.id, state: item.state }));
+  const merged = (await lane.did(rita, "merge", { fields: { manifest: version, reports: [], foreign } })).fact;
+  const sourced = await (lane.object as unknown as { source(seq: number, origin: boolean): Promise<Sourced | null> }).source(merged.seq, true);
+  Object.assign(task.meta, { normalRawScopeOrigin: sourced ? { at: sourced.at, under: sourced.under, originFacts: sourced.origin?.map(copy => copy.fact) ?? [] } : null });
+  expect(sourced, "Current source must retain its authentic Native closure").not.toBeNull();
+  if (!sourced) throw new Error("Native source closure unavailable");
+  expect([sourced.at, sourced.under]).toEqual([lane.at, "change"]);
+  const decoded = await namespace(env.PLATFORM).resolver.read(merged, PROPOSED_BOUNDS.fetchSeconds, true);
+  expect(decoded && "entry" in decoded, "Production resolver must decode the Native origin facts").toBe(true);
+  if (!decoded || !("entry" in decoded)) throw new Error("Decoded Native source closure unavailable");
+  expect(isEntryOf(decoded.entry, merged)).toBe(true);
+  expect(decoded.under).toBe("change");
+  expect(publishingLaneOrigin(merged, await A.D.at(), await A.G.at(), decoded.origin ?? [])).toBe(true);
+  const envelope = await lane.envelope(merged.seq);
+  expect(envelope.to).toEqual(foreign);
+  const answer = await B.G.stub.deliver(envelope);
+  const after = await B.G.summary();
+  const afterPublications = after.value.items.filter(item => item.type === "publication").map(item => ({ id: item.id, state: item.state }));
+  Object.assign(task.meta, { nativeForeignReserve: { definition: digest, source: lane.at, under: sourced.under, from: merged,
+    directory: await A.D.at(), ownDestination: await A.G.at(), foreignDestination: foreign,
+    originFacts: sourced.origin?.map(copy => copy.fact) ?? [], before: before.at, after: after.at, answer,
+    beforePublications, afterPublications, outsideJudgeOrPushDriven: false } });
+  // The forward-affiliation-only control must fail by assertion here, after
+  // retaining the actual B publication opening, before any outside pump.
+  expect(answer).toEqual({ answer: "source-unverified" });
+  expect(after.at).toEqual(before.at);
+  expect(afterPublications).toEqual(beforePublications);
 });

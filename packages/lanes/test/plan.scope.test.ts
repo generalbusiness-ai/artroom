@@ -2,9 +2,13 @@ import { describe, expect, onTestFinished, test } from "vitest";
 import type { Entry, ScopeId, Seed } from "@generalbusiness/dap-contract";
 import { intentDigest, messageDigest, scopeIdOf, textDigest } from "@generalbusiness/artroom-bytes";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
+import { sourceName } from "@generalbusiness/dap-platform";
 import { scriptedCapability, type CapabilityScript } from "@generalbusiness/artroom-scope/testing";
 import { README, answered, graph, net, rita, routed, type Graph, type Node } from "./support/graph.ts";
-import type { issue } from "../src/index.ts";
+import { DIGESTS, issue } from "../src/index.ts";
+import { room as nativeRoom, vic as nativeVic } from "./support/room.ts";
+import { nativelyCreatedChild, settleNativeChildren } from "./support/natively-created-child.ts";
+import type { Sourced } from "@generalbusiness/artroom-scope";
 
 /** What each entry of a history is: its input's type, and for a delivery the message's class and the clause or decision it recorded. */
 const kinds = (entries: readonly Entry[]) => entries.map((e) => (e.input.type !== "delivery" ? e.input.type : "clause" in e.input ? `result ${e.input.clause}` : e.input.message.class));
@@ -59,14 +63,16 @@ describe("a plan's concerns are lanes of their own (lane forms, sections 3.5 and
 
   test("T9, replay agrees with the runtime on the graph that T2 left: the office, the goal and a concern are each derived again from the bytes the Worker's read routes serve, with the same test capability table", async () => {
     // B9 over B3. The verifier reads each history as bytes over HTTP and derives every entry again with derive's judges. It is
-    // given the scripted test capability, a STAND-IN: with no rules for a capability it cannot derive under a lane definition
+    // given the real source-identity policy explicitly: this graph contains no native platform version that could supply it.
+    // Its made-up office establishes no native issue role; every source is still proved from its complete history, with no anchor.
+    // It is given the scripted test capability, a STAND-IN: with no rules for a capability it cannot derive under a lane definition
     // at all, and says so. No capability guard is asked in these histories. The report's own list says what stays on trust.
     if (!left) throw new Error("T2 left no graph");
     const { g, G, K } = left;
     net.capability = {};
     onTestFinished(() => { net.capability = null; });
     const source = httpSource("https://scopes.test", { fetch: routed });
-    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", grants: "as-recorded", scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability as CapabilityScript) } : {}) })).report;
+    const replayed = async (node: { name: ScopeId }, rules = true) => (await verify(source, { mode: "replay", grants: "as-recorded", sourceName, scope: node.name, ...(rules ? { capabilities: scriptedCapability(() => net.capability as CapabilityScript) } : {}) })).report;
     const [office, goal, child] = [await replayed(g.office), await replayed(G), await replayed(K[0]!)];
     expect([office.result, goal.result, child.result]).toEqual(["consistent", "consistent", "consistent"]);
     // Each replay covers its own history whole, and every scope it used as far as it used it: the goal used its creator and both children.
@@ -79,4 +85,35 @@ describe("a plan's concerns are lanes of their own (lane forms, sections 3.5 and
     // With no rules for the capabilities that the definition lists, nothing is derived: the limit that the report above is read with.
     expect(await replayed(G, false)).toMatchObject({ result: "unsupported-definition", at: { seq: 0 } });
   });
+});
+
+// Separate positive: genuine Native Directory birth and actual issue-child
+// creation/fulfilment. No Graph office or scripted native identity is used.
+test("a Native issue concern child authenticates its inherited role and delivers its actual fulfilment to its parent; Git host and scheduler are STAND-INs", async ({ task }) => {
+  const room = await nativeRoom({ roster: ["@vic"] });
+  await room.activate(issue, DIGESTS.issue);
+  const parent = await room.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "Native parent", conditions: ["it works"] });
+  const plan = (await parent.did(rita, "open-plan", {})).fact.seq;
+  const concern = (await parent.did(rita, "add-concern", { fields: { plan, purpose: "One real child", role: "required", title: "Native concern", conditions: ["it works"] } })).fact;
+  const child = await nativelyCreatedChild(room, parent, concern.seq);
+  const birth = (await child.entry(0)).input;
+  expect(birth).toMatchObject({ type: "genesis", kind: "file", source: concern, seed: { definition: DIGESTS.issue, creator: parent.at }, message: { body: { directory: await room.D.at() } } });
+  const sourced = await (child.object as unknown as { source(seq: number, origin: boolean): Promise<Sourced | null> }).source(0, true);
+  Object.assign(task.meta, { normalRawScopeOrigin: sourced ? { at: sourced.at, under: sourced.under, originFacts: sourced.origin?.map(copy => copy.fact) ?? [] } : null });
+  expect(sourced, "Native issue child source must be available").not.toBeNull();
+  if (!sourced) throw new Error("Native child source closure unavailable");
+  Object.assign(task.meta, { nativeIssueChild: { parent: parent.at, child: child.at, creation: concern, under: sourced.under, originFacts: sourced.origin?.map(copy => copy.fact) ?? [] } });
+  expect(sourced.under).toBe("issue");
+  expect(sourced.origin).toHaveLength(3);
+  expect(sourced.origin!.map(copy => copy.fact)).toEqual([await child.fact(0), concern, await parent.fact(0)]);
+  const terms = await child.fact(0);
+  const offer = (await child.did(rita, "offer", { fields: { offeree: await room.member("@vic") } })).fact;
+  await child.did(nativeVic, "accept", { on: offer.seq, fields: { terms } });
+  const hold = (await child.did(nativeVic, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
+  await child.instance(nativeVic, hold);
+  const report = (await child.stagedDid(nativeVic, "report", { fields: { commitment: offer.seq, terms, commit: "a".repeat(40), tree: "1".repeat(40), claims: ["it works"] } })).fact;
+  await child.did(rita, "accept-report", { on: report.seq, fields: { commitment: offer.seq, terms } });
+  await child.did(rita, "fulfil", { on: offer.seq, fields: { report: report.seq } });
+  await settleNativeChildren(room);
+  expect(await parent.item(concern.seq)).toMatchObject({ state: "delivered", refs: { child: child.at, result: offer } });
 });

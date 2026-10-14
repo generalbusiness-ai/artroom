@@ -110,6 +110,8 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
     const signedReadObserver = signedDiagnosticFor(name);
     return {
       ...(ports?.outside ? rest : deployed),
+      // Explicit per-name fixture bounds only; deployed defaults are unchanged.
+      ...(net.sized.has(name ?? "") ? { bounds: net.sized.get(name ?? "")! } : {}),
       ...(outside ? { outside: (given: OutsideGiven) => outside(given, this.ctx.storage.sql) } : {}),
       sessions: session.sessions,
       ...(signedReadObserver ? { signedReadObserver } : {}),

@@ -1,17 +1,17 @@
 /** SCRIPTED immutable facts for pure provenance and runtime-boundary tests. No factory judge ran. */
-import type { Entry, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { type Fetched } from "@generalbusiness/dap-derive";
 import { d, keys, T0, t } from "@generalbusiness/dap-derive/testing";
 import { ISSUE_LANE_DIGESTS, PUBLISHING_LANE_DIGESTS } from "../src/publishing-provenance.ts";
 
-export function scriptedOrigin(name: "change" | "issue" = "change", route = name === "change" ? "open-pr" : "open-issue", under = "platform:directory") {
+export function scriptedOrigin(name: "change" | "issue" = "change", route = name === "change" ? "open-pr" : "open-issue", under = "platform:directory", extension?: Digest) {
   const ref = (kind: ScopeRef["kind"], fill: string): ScopeRef => {
     const seed: Seed = { v: 1, kind, definition: d(fill), creator: null, cause: d(fill), ordinal: 0 };
     return { scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(fill.charCodeAt(0))), kind };
   };
   const directory = ref("directory", "d"), destination = ref("destination", "e");
-  const definition = name === "change" ? PUBLISHING_LANE_DIGESTS[1] : ISSUE_LANE_DIGESTS[1];
+  const definition = extension ?? (name === "change" ? PUBLISHING_LANE_DIGESTS[1] : ISSUE_LANE_DIGESTS[1]);
   const signed = signIntent({ v: 1, to: directory, actor: keys.rita.key, kind: route, on: null, expected: {},
     fields: { definition }, idempotencyKey: "scripted-origin", notAfter: t(60) }, keys.rita.secret);
   const seed: Seed = { v: 1, kind: "lane", definition, creator: directory, cause: intentDigest(signed.intent), ordinal: 0 };
