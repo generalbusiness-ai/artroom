@@ -3,8 +3,8 @@
  * Callers serialize one Store and fence their captured Page context. */
 import type { Answer, Entry, FactRef, MemberRef, Receipt, SignedIntent, Summary, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, entryHash, factRefOf, intentDigest, isMemberRef, isScopeRef, isScopeId, isRecord, isHead, isKeyId, REFUSAL_REASONS, unb64url, timeMs, isReceipt, isSignedIntentShape, keyIdOfSecret, parseStrict, scopeIdOf, textDigest, timeOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
-import { agentKeyInvitationOf, encodeAgentKeyInvitation, httpTransport, ScopeHandle, secretSigner, signedIntent, requestSession, sessionRequest } from "@generalbusiness/artroom-client";
-import { DEMO_REGISTER, DIRECTORY_OF, WEB_DEMO_COHORT, isHandle, platform } from "@generalbusiness/dap-platform";
+import { agentKeyInvitationOf, encodeAgentKeyInvitation, httpTransport, isAgentKeyMembership, ScopeHandle, secretSigner, signedIntent, requestSession, sessionRequest, type AgentKeyMembership } from "@generalbusiness/artroom-client";
+import { APPLICATION_COHORT, COUNTING_COHORT, DEMO_REGISTER, DIRECTORY_OF, WEB_DEMO_COHORT, isHandle, platform } from "@generalbusiness/dap-platform";
 import { expectedOf, LINK, linkOf, type Context, type DefinitionShape, type Link, type Outcome } from "./commands.ts";
 import type { Config, PendingInvitationIssue, Repository } from "./store.ts";
 
@@ -12,7 +12,7 @@ export interface InvitationIssueInput { kind: "person" | "agent-key"; handle: st
 export interface InvitationIssueOptions { privateRequests: readonly string[]; reservedRequest?: string; mode: "new" | "check" | "continue"; operation: string; current?: () => boolean }
 export interface InvitationIssueResult { operation: string; kind: "person" | "agent-key"; handle: string; state: "prepared" | "unknown" | "refused" | "verified"; reason?: string; /** Private handoff, never put into a public status log. */ link?: string }
 interface Stage { signed: SignedIntent; attempted: boolean; receipt?: Receipt; refused?: Extract<Answer, { answer: "refused" }> }
-interface Issue { previous?: { request: string; digest: import("@generalbusiness/dap-contract").Digest }; v: 1; operation: string; input: InvitationIssueInput; service: string; repository: Repository; actor: string; secret: string; ends: string; member?: Stage; invitation?: Stage; link?: string }
+interface Issue { previous?: { request: string; digest: import("@generalbusiness/dap-contract").Digest }; v: 1; operation: string; input: InvitationIssueInput; service: string; repository: Repository; actor: string; secret: string; ends: string; /** The membership's pinned definition, read at issuance; a retained row without it is a membership@2 row. */ definition?: AgentKeyMembership; member?: Stage; invitation?: Stage; link?: string }
 const same = (a: unknown, b: unknown) => a === undefined || b === undefined ? a === b : canonicalize(a) === canonicalize(b);
 const blocked = () => new Error("The original invitation custody or context is unavailable. Nothing was replaced.");
 const privateName = (prefix: "i" | "a" | "k") => prefix + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 30);
@@ -29,17 +29,35 @@ async function readerFor(ctx: Context, service: string, membership: ScopeRef, se
 function handle(ctx: Context, service: string, scope: import("@generalbusiness/dap-contract").ScopeId, reader: string): ScopeHandle {
   return new ScopeHandle(httpTransport(service, ctx.fetch ? { fetch: ctx.fetch } : {}), scope, reader);
 }
-async function summary(M: ScopeHandle, at: ScopeRef): Promise<Summary> {
+/**
+ * The membership's summary, which must name the exact definition expected: the pin a retained issuance or an invitation
+ * carries. The same acts (`add-member`, `invite-key`, `enrol`) exist under each supported pin; the pin is what the receipts
+ * are checked against, never a name alone.
+ */
+async function summary(M: ScopeHandle, at: ScopeRef, definition: AgentKeyMembership): Promise<Summary> {
   const read = await M.summary();
-  if (!read.ok || !read.complete || read.next !== undefined || !same(read.value.scope, at) || read.value.definition !== "platform:membership@2") throw blocked();
+  if (!read.ok || !read.complete || read.next !== undefined || !same(read.value.scope, at) || read.value.definition !== definition) throw blocked();
   return read.value;
 }
+/** The membership's summary and its pinned definition, which must be one this command enrols agents under. */
+async function pinnedSummary(M: ScopeHandle, at: ScopeRef): Promise<{ summary: Summary; definition: AgentKeyMembership }> {
+  const read = await M.summary();
+  if (!read.ok || !read.complete || read.next !== undefined || !same(read.value.scope, at) || !isAgentKeyMembership(read.value.definition) || platform(read.value.definition)?.data.name !== "platform:membership") throw blocked();
+  return { summary: read.value, definition: read.value.definition };
+}
+/** The directory definitions each membership pin is founded beside: exact pairs of the cohorts, not names. */
+const DIRECTORIES_OF: Readonly<Record<AgentKeyMembership, readonly string[]>> = {
+  "platform:membership@2": [DIRECTORY_OF[DEMO_REGISTER]!, WEB_DEMO_COHORT.directory],
+  "platform:membership@4": [APPLICATION_COHORT.directory],
+  "platform:membership@5": [COUNTING_COHORT.directory],
+};
+const pinOf = (issue: Pick<Issue, "definition">): AgentKeyMembership => issue.definition ?? "platform:membership@2";
 const closed = (value: unknown, required: string[], optional: string[] = []): value is Record<string, unknown> => isRecord(value) && required.every(k => Object.hasOwn(value, k)) && Object.keys(value).every(k => required.includes(k) || optional.includes(k));
-async function boundDirectory(ctx: Context, service: string, reader: string, repository: Repository, membership: Summary): Promise<Repository | null> {
+async function boundDirectory(ctx: Context, service: string, reader: string, repository: Repository, membership: Summary, definition: AgentKeyMembership): Promise<Repository | null> {
   const roster = membership.items.find(item => item.type === "roster" && item.state === "open");
   if (!roster || !same(roster.refs["directory"], repository.directory)) return null;
   const read = await handle(ctx, service, repository.directory.scope, reader).summary();
-  if (!read.ok || !read.complete || read.next !== undefined || read.value.status !== "active" || (read.value.definition !== DIRECTORY_OF[DEMO_REGISTER] && read.value.definition !== WEB_DEMO_COHORT.directory) || !same(read.value.scope, repository.directory)) return null;
+  if (!read.ok || !read.complete || read.next !== undefined || read.value.status !== "active" || !DIRECTORIES_OF[definition].includes(read.value.definition) || !same(read.value.scope, repository.directory)) return null;
   const item = read.value.items.find(item => item.type === "repository"), rules = item?.refs["rules"], destination = item?.refs["destination"];
   if (!item || !same(item.refs["membership"], repository.membership) || !isScopeRef(rules) || rules.kind !== "rules" || rules.scope !== repository.rules || !isScopeRef(destination) || destination.kind !== "destination" || destination.scope !== repository.destination) return null;
   return { directory: read.value.scope, membership: membership.scope, rules: rules.scope, destination: destination.scope };
@@ -56,14 +74,15 @@ function repositoryValid(r: unknown): r is Repository {
 }
 function stageValid(stage: Stage, issue: Issue, kind: string): boolean {
   if (!closed(stage, ["signed", "attempted"], ["receipt", "refused"]) || !isSignedIntentShape(stage.signed) || !verifySignedIntent(stage.signed) || stage.signed.intent.kind !== kind || stage.signed.intent.actor !== issue.actor || !same(stage.signed.intent.to, issue.repository.membership) || typeof stage.attempted !== "boolean") return false;
-  if (stage.receipt && (!stage.attempted || !isReceipt(stage.receipt) || stage.receipt.definition !== "platform:membership@2" || stage.receipt.intent !== intentDigest(stage.signed.intent) || !same(stage.receipt.fact.at, issue.repository.membership))) return false;
+  if (stage.receipt && (!stage.attempted || !isReceipt(stage.receipt) || stage.receipt.definition !== pinOf(issue) || stage.receipt.intent !== intentDigest(stage.signed.intent) || !same(stage.receipt.fact.at, issue.repository.membership))) return false;
   if (stage.refused && (!stage.attempted || stage.receipt || !closed(stage.refused, ["answer", "reason", "judgedAt"], ["name"]) || stage.refused.answer !== "refused" || !Object.hasOwn(REFUSAL_REASONS, stage.refused.reason) || !isHead(stage.refused.judgedAt) || stage.refused.name !== undefined && typeof stage.refused.name !== "string")) return false;
   return true;
 }
 function issueValid(value: unknown): value is Issue {
   try {
-    if (!closed(value, ["v", "operation", "input", "service", "repository", "actor", "secret", "ends"], ["member", "invitation", "link", "previous"])) return false;
+    if (!closed(value, ["v", "operation", "input", "service", "repository", "actor", "secret", "ends"], ["member", "invitation", "link", "previous", "definition"])) return false;
     const row = value as unknown as Issue;
+    if (row.definition !== undefined && !isAgentKeyMembership(row.definition)) return false;
     if (row.v !== 1 || !uuid(row.operation) || !isInvitationIssueInput(row.input) || typeof row.secret !== "string" || typeof row.ends !== "string" || timeMs(row.ends) === null || !isKeyId(row.actor) || !repositoryValid(row.repository) || typeof row.service !== "string") return false;
     if (row.previous && (!closed(row.previous, ["request", "digest"]) || typeof row.previous.request !== "string" || !/^i-[0-9a-f]{30}$/.test(row.previous.request) || !/^sha256:[0-9a-f]{64}$/.test(row.previous.digest))) return false;
     const secret = unb64url(row.secret);
@@ -84,7 +103,7 @@ function issueValid(value: unknown): value is Issue {
       const { inbox: _inbox, ...repository } = row.repository;
       if (row.input.kind === "person") {
         const parsed = linkOf(row.link);
-        if (!parsed || !same(parsed, { v: 1, service: row.service, repository, invitation: row.invitation.receipt.fact.seq, secret: row.secret, handle: row.input.handle, definition: "platform:membership@2" })) return false;
+        if (!parsed || !same(parsed, { v: 1, service: row.service, repository, invitation: row.invitation.receipt.fact.seq, secret: row.secret, handle: row.input.handle, definition: pinOf(row) })) return false;
       } else {
         const parsed = agentKeyInvitationOf(row.link);
         if (!parsed || !row.member?.receipt || parsed.service !== row.service || !same(parsed.repository, repository) || parsed.handle !== row.input.handle || !same(parsed.controller, row.input.controller) || !same(parsed.member, row.member.receipt.fact) || !same(parsed.invitation, row.invitation.receipt.fact) || parsed.secret !== row.secret) return false;
@@ -137,8 +156,8 @@ async function followFact(M: ScopeHandle, fact: FactRef): Promise<Entry | null> 
   const read = await M.entry(fact.seq);
   return read.ok && read.complete && read.next === undefined && same(factRefOf(read.value.entry), fact) && read.value.hash === fact.hash && entryHash(read.value.entry) === fact.hash ? read.value.entry : null;
 }
-async function follow(M: ScopeHandle, signed: SignedIntent, receipt: Receipt): Promise<Entry | null> {
-  if (!isReceipt(receipt) || receipt.definition !== "platform:membership@2" || receipt.intent !== intentDigest(signed.intent) || !same(receipt.fact.at, signed.intent.to)) return null;
+async function follow(M: ScopeHandle, signed: SignedIntent, receipt: Receipt, definition: AgentKeyMembership): Promise<Entry | null> {
+  if (!isReceipt(receipt) || receipt.definition !== definition || receipt.intent !== intentDigest(signed.intent) || !same(receipt.fact.at, signed.intent.to)) return null;
   const read = await M.followReceipt(receipt);
   return read.ok && read.entry.input.type === "act" && same(read.entry.input.signed, signed) ? read.entry : null;
 }
@@ -188,7 +207,9 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
       }
     } else {
       if (options.mode !== "new") throw blocked();
-      row = { v: 1, operation: options.operation, input: structuredClone(input), service: config.service, repository: structuredClone(config.repository), actor, secret: b64url(crypto.getRandomValues(new Uint8Array(32))), ends: timeOf(Math.floor(now(ctx) / 1000) * 1000 + input.hours * 3600_000) };
+      // The membership's exact pin is read once and kept with the retained issuance: every later read and receipt is held to it.
+      const pinned = await wait(options, async () => pinnedSummary(await membershipHandle(), config!.repository!.membership));
+      row = { v: 1, operation: options.operation, input: structuredClone(input), service: config.service, repository: structuredClone(config.repository), actor, secret: b64url(crypto.getRandomValues(new Uint8Array(32))), ends: timeOf(Math.floor(now(ctx) / 1000) * 1000 + input.hours * 3600_000), definition: pinned.definition };
     }
     const status = (state: InvitationIssueResult["state"], reason?: string): InvitationIssueResult => ({ operation: row.operation, kind: row.input.kind, handle: row.input.handle, state, ...(reason ? { reason } : {}) });
     const persist = async (): Promise<void> => {
@@ -206,9 +227,10 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
       if (!same(await wait(options, () => ctx.store.config()), config)) throw blocked();
     };
     if (!pointer) await persist();
-    const shape = platform("platform:membership@2")!.data as unknown as DefinitionShape;
+    const pin = pinOf(row);
+    const shape = platform(pin)!.data as unknown as DefinitionShape;
     const prepare = async (kind: string, fields: Record<string, import("@generalbusiness/dap-contract").FieldValue>): Promise<Stage> => {
-      const s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership));
+      const s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership, pin));
       const member = s.items.find(i => i.type === "member" && i.state === "active" && i.values["handle"] === config!.handle);
       const activeKey = member && s.items.find(i => i.type === "key" && i.state === "active" && i.refs["member"] === member.id && i.values["id"] === actor);
       const roster = s.items.find(i => i.type === "roster" && i.state === "open");
@@ -222,7 +244,7 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
       if (options.mode === "check" || stage.receipt) {
         let settled: Awaited<ReturnType<ScopeHandle["settle"]>>;
         try { settled = await wait(options, async () => (await membershipHandle()).settle(stage.signed)); } catch { check(options); return "unknown"; }
-        if (!settled.ok || stage.receipt && !same(settled.value, stage.receipt) || !await wait(options, async () => follow(await membershipHandle(), stage.signed, settled.value))) return "unknown";
+        if (!settled.ok || stage.receipt && !same(settled.value, stage.receipt) || !await wait(options, async () => follow(await membershipHandle(), stage.signed, settled.value, pin))) return "unknown";
         if (!stage.attempted || !stage.receipt) { stage.attempted = true; stage.receipt = settled.value; await persist(); }
         return "verified";
       }
@@ -231,7 +253,7 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
       try { answer = await wait(options, async () => (await membershipHandle()).submit(stage.signed)); } catch { check(options); return "unknown"; }
       if (answer.answer === "refused") { stage.refused = answer; await persist(); return "refused"; }
       if (answer.answer !== "accepted") return "unknown";
-      if (!await wait(options, async () => follow(await membershipHandle(), stage.signed, answer.receipt))) return "unknown";
+      if (!await wait(options, async () => follow(await membershipHandle(), stage.signed, answer.receipt, pin))) return "unknown";
       stage.receipt = answer.receipt; await persist(); return "verified";
     };
     if (row.input.kind === "agent-key") {
@@ -249,25 +271,25 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
     }
     const result = await advance(row.invitation);
     if (result !== "verified") return status(result, result === "refused" ? `Native refusal: ${row.invitation.refused!.reason}${row.invitation.refused!.name ? " (" + row.invitation.refused!.name + ")" : ""}. The original invitation is retained.` : "The original invitation is retained.");
-    const receipt = row.invitation.receipt!, s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership));
+    const receipt = row.invitation.receipt!, s = await wait(options, async () => summary(await membershipHandle(), row.repository.membership, pin));
     const invited = s.items.find(i => i.id === receipt.fact.seq && i.type === (row.input.kind === "person" ? "member" : "key"));
     if (!invited || invited.state !== "invited" || invited.values["inviteHash"] !== textDigest(row.secret) || invited.values["inviteEnds"] !== row.ends) return status("unknown", "The current native invitation could not be verified.");
-    const observedRepository = await wait(options, () => boundDirectory(ctx, row.service, reader!, row.repository, s));
+    const observedRepository = await wait(options, () => boundDirectory(ctx, row.service, reader!, row.repository, s, pin));
     if (!observedRepository) return status("unknown", "The native directory and repository siblings could not be verified.");
     const repository = observedRepository;
     let link: string;
     if (row.input.kind === "person") {
       if (invited.values["kind"] !== "person" || invited.values["handle"] !== row.input.handle || invited.values["role"] !== row.input.role) return status("unknown");
-      const person: Link = { v: 1, service: row.service, repository, invitation: receipt.fact.seq, secret: row.secret, handle: row.input.handle, definition: "platform:membership@2" };
+      const person: Link = { v: 1, service: row.service, repository, invitation: receipt.fact.seq, secret: row.secret, handle: row.input.handle, definition: pin };
       link = LINK + b64url(utf8(JSON.stringify(person)));
     } else {
       const member = s.items.find(i => i.type === "member" && i.id === row.member!.receipt!.fact.seq), roster = s.items.find(i => i.type === "roster" && i.state === "open");
       const controller = s.items.find(item => item.type === "member" && item.state === "active" && item.values["kind"] === "person" && same(item.parties["member"], row.input.controller));
       if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || member.values["handle"] !== row.input.handle || !same(member.parties["controller"], row.input.controller) || invited.values["kind"] !== "agent" || invited.refs["member"] !== member.id || !isMemberRef(member.parties["member"]) || !roster) return status("unknown");
       const owner = member.parties["member"];
-      const opening = await wait(options, async () => follow(await membershipHandle(), row.member!.signed, row.member!.receipt!));
+      const opening = await wait(options, async () => follow(await membershipHandle(), row.member!.signed, row.member!.receipt!, pin));
       if (!opening || !await wait(options, () => inboxOfOpening(ctx, row.service, reader!, opening, row.repository.membership, owner))) return status("unknown", "The native agent inbox creation could not be verified.");
-      link = encodeAgentKeyInvitation({ v: 1, kind: "agent-key", service: row.service, repository, definition: "platform:membership@2", handle: row.input.handle, controller: row.input.controller!, member: row.member!.receipt!.fact, invitation: receipt.fact, secret: row.secret, expected: { on: roster.revision, member: member.revision } });
+      link = encodeAgentKeyInvitation({ v: 1, kind: "agent-key", service: row.service, repository, definition: pin, handle: row.input.handle, controller: row.input.controller!, member: row.member!.receipt!.fact, invitation: receipt.fact, secret: row.secret, expected: { on: roster.revision, member: member.revision } });
     }
     if (!row.link) { row.link = link; await persist(); }
     return { ...status("verified"), link: row.link };
@@ -363,17 +385,20 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
       }
       const reader = await readerFor(ctx, link.service, link.repository.membership, key);
       M = handle(ctx, link.service, link.repository.membership.scope, reader);
-      if (!await follow(M, signed, receipt)) return bad();
+      // The exact pin: the receipt names the membership's definition; an invitation issued under another is not verified, and
+      // the original enrolment stays retained.
+      if (isReceipt(receipt) && receipt.definition !== link.definition) return { code: 1, lines: [`The invitation names ${link.definition}, and the membership's receipt names ${receipt.definition}. The exact original enrolment is retained unverified; nothing was replaced.`] };
+      if (!await follow(M, signed, receipt, link.definition)) return bad();
       config = { ...config!, join: { ...config!.join!, accepted: receipt.fact } }; await save(config);
       if (!same(await ctx.store.config(), config)) return bad();
-      const [memberEntry, invitationEntry, s] = await Promise.all([followFact(M, link.member), followFact(M, link.invitation), summary(M, link.repository.membership)]);
+      const [memberEntry, invitationEntry, s] = await Promise.all([followFact(M, link.member), followFact(M, link.invitation), summary(M, link.repository.membership, link.definition)]);
       if (!memberEntry || !invitationEntry || memberEntry.input.type !== "act" || invitationEntry.input.type !== "act") return bad();
       const opened = memberEntry.input.signed.intent, invited = invitationEntry.input.signed.intent;
       if (opened.kind !== "add-member" || !same(opened.fields, { handle: link.handle, kind: "agent", controller: link.controller }) || invited.kind !== "invite-key" || !same(invited.fields, { member: link.member.seq, kind: "agent", inviteHash: textDigest(link.secret), inviteEnds: invited.fields["inviteEnds"] })) return bad();
       const member = s.items.find(i => i.type === "member" && i.id === link.member.seq), activeKey = s.items.find(i => i.type === "key" && i.id === link.invitation.seq);
       const controller = s.items.find(item => item.type === "member" && item.state === "active" && item.values["kind"] === "person" && same(item.parties["member"], link.controller));
       if (!controller || !s.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === controller.id) || !member || member.state !== "active" || member.values["handle"] !== link.handle || member.values["kind"] !== "agent" || member.values["role"] !== "agent" || !same(member.parties["controller"], link.controller) || !activeKey || activeKey.state !== "active" || activeKey.values["kind"] !== "agent" || activeKey.values["id"] !== keyIdOfSecret(key) || activeKey.refs["member"] !== member.id || !isMemberRef(member.parties["member"])) return bad();
-      const observed = await boundDirectory(ctx, link.service, reader, link.repository, s);
+      const observed = await boundDirectory(ctx, link.service, reader, link.repository, s, link.definition);
       if (!observed) return bad();
       const inbox = await inboxOfOpening(ctx, link.service, reader, memberEntry, link.repository.membership, member.parties["member"]);
       if (!inbox) return bad();
