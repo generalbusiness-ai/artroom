@@ -85,9 +85,19 @@ not erase those failures. The held mixed-case provider response was not
 lost: its outside map update had already happened while the Native answer
 remained pending.
 
-**Final gate: owed.** Root will record one gate's exact head, tree and
-terminal outcome here before review. Source approval and landing remain
-owed. Full `23fed5e2` stays open for the real new-cohort Artifacts library,
+**Final gate: passed once.** The original `npm run gate` at
+`60c158b94bb637d219701c780ae76107f36cfd42`, tree
+`65ed867d7209f9c371055bb0fe20565addb7a673`, exited 0 in 192.265 seconds.
+Whitespace, the full typecheck and the test phase each exited 0. Vitest
+reported 1,195 passed and three skipped cases; the two Node/browser groups
+reported 10 and 55 passes, with no failures. Installation was skipped.
+The post-command Source, tool and dependency guard passed. The original
+result is retained at the local diagnostics path
+`publication-compose-60c158-final-gate-released-one/gate-one/result.public.json`,
+SHA-256 `761dd3ffa196538ec72074cad6a76a5073a1ec71aa204de0869692de259ef6fa`.
+This note-only successor records that outcome. Production and test bytes
+remain those of the gated head. No gate or producer was repeated.
+Source approval and landing remain owed. Full `23fed5e2` stays open for the real new-cohort Artifacts library,
 deployed member interface, shelf pages after their acts, public history
 witness and homepage Published shelf link. The Native tests and local
 browser fixture do not satisfy those hosted obligations.
