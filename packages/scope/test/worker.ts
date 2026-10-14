@@ -188,6 +188,8 @@ export class PlatformMcpAgent extends McpAgent<HostedEnv> {
   heldAnswers(): { control: { op: string; answer: boolean }[]; agent: boolean } { return this.answers(); }
   used(): number { return this.controlUsed(); }
   durableFacts(): ReturnType<HostedAgent["durable"]> { return this.durable(); }
+  /** The custody record under an idempotency key: its intent digest, attempt and outcomes. */
+  custodyRecord(key: string): ReturnType<HostedAgent["custodyOf"]> { return this.custodyOf(key); }
   /** The open streams and sessions this instance holds. */
   counts(): { streams: number; sessions: number } { const http = this.held()?.inside().http; return { streams: http?.streams ?? 0, sessions: http?.sessions.size ?? 0 }; }
   protected override ports() {

@@ -187,7 +187,7 @@ function stream(bearer: string, session: string): { text: () => string; stop: ()
 }
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const until = async (check: () => boolean, ms = 3000) => { for (let t = 0; t < ms && !check(); t += 25) await new Promise((r) => setTimeout(r, 25)); return check(); };
-const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }>; used(): Promise<number>; durableFacts(): Promise<{ key: string | null; state: string | null; enrol: string | null; bearer: boolean }> };
+const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }>; used(): Promise<number>; durableFacts(): Promise<{ key: string | null; state: string | null; enrol: string | null; bearer: boolean }>; custodyRecord(key: string): Promise<{ intent: string; attempt: number; outcomes: number; phase: string } | null> };
 const intentDigestOf = (intent: unknown) => digestBytes(utf8(canonicalize(intent as never)));
 const registryStub = (membership: string) => env.REGISTRIES.get(env.REGISTRIES.idFromName(membership)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]>; heldAnswers(): Promise<{ op: string; answer: boolean }[]> };
 /** A 2026-07-28 listen, read in the background: its events so far. */
@@ -487,11 +487,36 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     expect(declaration["declaration"] ?? declaration["definition"], "the declaration is in the result").toBeDefined();
     await within("items", { scope: "membership", type: "member" }, BOUNDS.large);
     for (let n = 0; n < 12; n++) expect((await rita.ok("issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: `page filler ${n}`, conditions: ["done"] }, idempotencyKey: `filler-${n}` }))["answer"]).toBe("accepted");
-    const page1 = await within("steps", { scope: "directory" }, BOUNDS.large);
-    const seen = [(page1["steps"] as unknown[]).length];
-    let cursor = page1["cursor"];
-    for (let n = 0; cursor !== undefined && n < 8; n++) { const next = await within("steps", { scope: "directory", cursor }, BOUNDS.large); seen.push((next["steps"] as unknown[]).length); cursor = next["cursor"]; }
-    expect(seen.reduce((a, b) => a + b, 0), "every step of the directory was paged through").toBeGreaterThanOrEqual(14);
+    // The continuation is followed to exhaustion: more than one page, the last without a cursor, and the steps in all are the
+    // directory's whole history as an independent reader pages it, each sequence number once and in order.
+    // The whole history as an independent reader pages it first, by sequence number. The room is live, so the hosted pages
+    // read after it may end with entries that landed since: they must begin with this whole and stay contiguous from 0.
+    const whole = (await allSteps(rita, "directory")).map((step) => step.seq);
+    expect(whole.length).toBeGreaterThanOrEqual(14);
+    const wholeThenContiguous = (seqs: number[]) => seqs.length >= whole.length && whole.every((seq, i) => seqs[i] === seq) && seqs.every((seq, i) => seq === i);
+    // The steps, followed to exhaustion: the last page has no cursor, and the pages together are the whole history, each step
+    // once and in order.
+    const stepPages: { seq: number }[][] = [];
+    for (let cursor: unknown = undefined, n = 0; n < 64; n++) {
+      const next = await within("steps", { scope: "directory", ...(cursor !== undefined ? { cursor } : {}) }, BOUNDS.large);
+      stepPages.push(next["steps"] as { seq: number }[]);
+      cursor = next["cursor"];
+      if (cursor === undefined) break;
+    }
+    expect(wholeThenContiguous(stepPages.flat().map((step) => step.seq)), "the steps paged through are the whole history, each once, in order").toBe(true);
+    // The record, whose entries are larger than steps, actually continues: more than one page within the bound, the last
+    // without a cursor, and the pages together are the whole history, each entry once and in order.
+    const recordPages: { seq: number }[][] = [];
+    for (let cursor: unknown = undefined, n = 0; n < 64; n++) {
+      const next = await within("record", { scope: "directory", ...(cursor !== undefined ? { cursor } : {}) }, BOUNDS.large);
+      recordPages.push(next["entries"] as { seq: number }[]);
+      cursor = next["cursor"];
+      if (cursor === undefined) break;
+    }
+    expect(recordPages.length, "an actual continuation: more than one page").toBeGreaterThan(1);
+    for (const page of recordPages) expect(page.length, "no page is empty").toBeGreaterThan(0);
+    const recorded = recordPages.flat().map((entry) => entry.seq ?? (entry as { entry?: { seq: number } }).entry?.seq ?? -1);
+    expect(wholeThenContiguous(recorded), `the record's pages together are the whole history, each entry once, in order: ${JSON.stringify(recorded)} for ${JSON.stringify(whole)}`).toBe(true);
   } finally { done(room); }
 });
 
@@ -831,8 +856,14 @@ test("H6 matrix through the endpoint: prepared reset, concurrent send and settle
     expect(refused["answer"], JSON.stringify(refused)).toBe("refused");
     const repeated = await result(await room.wait(() => close("close-2")));
     expect([repeated["answer"], repeated["retained"]]).toEqual(["refused", true]);
+    // The record under the key, read in the agent object: the plain repeat sent nothing (attempt 1, one outcome, archived at
+    // once as refused); the explicit resubmit sent the same envelope again (the same intent digest, attempt 2, two outcomes).
+    const original = (await agentStub(bot.agent).custodyRecord("close-2"))!;
+    expect([original.attempt, original.outcomes, original.phase]).toEqual([1, 1, "refused"]);
     const resubmitted = await result(await room.wait(() => close("close-2", { resubmit: true })));
     expect([resubmitted["answer"], resubmitted["retained"]], JSON.stringify(resubmitted)).toEqual(["refused", false]);
+    const again = (await agentStub(bot.agent).custodyRecord("close-2"))!;
+    expect([again.intent, again.attempt, again.outcomes, again.phase], "the same envelope, a second attempt, a second outcome").toEqual([original.intent, 2, 2, "refused"]);
     // 256 unresolved records (the most), then the next admission is refused by count before anything is signed.
     for (let n = 0; n < 256; n++) {
       hostedTest.lose = `/${rita.config.repository!.directory.scope}/acts`;

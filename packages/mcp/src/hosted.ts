@@ -569,6 +569,24 @@ export class HostedAgent {
     }
     return { key: row.key, state: row.state, enrol, bearer: row.bearer !== null };
   }
+
+  /**
+   * A test's read of the custody record kept under an idempotency key, live or archived: the digest of its envelope's intent,
+   * its attempt and how many outcomes it holds; null when there is none. What a witness compares across a repeat and a resubmit.
+   */
+  custodyOf(key: string): { intent: string; attempt: number; outcomes: number; phase: string } | null {
+    const hasStore = this.sql.exec(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'record'`).toArray().length > 0;
+    if (!hasStore) return null;
+    const live = this.sql.exec(`SELECT id, chunks FROM record WHERE key = ?`, key).toArray()[0];
+    const found = live ?? this.sql.exec(`SELECT id, chunks FROM archive WHERE key = ?`, key).toArray()[0];
+    if (!found) return null;
+    const parts = this.sql.exec(`SELECT bytes FROM ${live ? "chunk" : "archive_chunk"} WHERE id = ? ORDER BY idx`, String(found["id"])).toArray().map((r) => (r["bytes"] instanceof Uint8Array ? r["bytes"] : new Uint8Array(r["bytes"] as ArrayBuffer)));
+    const whole = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) { whole.set(p, at); at += p.length; }
+    const record = JSON.parse(new TextDecoder().decode(whole)) as { envelope: { signed: { intent: unknown } }; attempt: number; count: number; phase: string };
+    return { intent: digestBytes(utf8(canonicalize(record.envelope.signed.intent as never))), attempt: record.attempt, outcomes: record.count, phase: record.phase };
+  }
 }
 
 export type { ControlRequest, SignedControl, Digest };

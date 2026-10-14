@@ -585,6 +585,7 @@ export class McpAgent<E extends McpEnv = McpEnv> extends DurableObject<E> {
   protected evict(): void { this.#agent?.abrupt(); this.#agent = null; }
   /** The durable facts a witness compares across a reset. For a test's subclass. */
   protected durable(): ReturnType<HostedAgent["durable"]> { return this.#of().durable(); }
+  protected custodyOf(key: string): ReturnType<HostedAgent["custodyOf"]> { return this.#of().custodyOf(key); }
   /** What this instance holds in memory now. For a test's subclass. */
   protected held(): HostedAgent | null { return this.#agent; }
   /** The control budget's used bytes, for a test's subclass. */
