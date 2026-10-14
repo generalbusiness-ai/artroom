@@ -185,13 +185,46 @@ map is exact. This bounded review receipt has SHA256
 No complete human reading of the minified diff or proof of every compiled
 behavior is claimed.
 
-At this note's freeze, the existing Page freshness witness and next ordinary
-gate are UNRUN. The generated module and this truthful note must be committed
-before the witness binds that clean commit. Their later original results
-will be reported externally against the exact Source they checked; this note
-does not predict a pass.
+At the preceding `a5147e3e` freeze, the existing Page freshness witness and
+next ordinary gate were UNRUN. That frozen note required a clean commit
+before the witness and external reporting of the later original results.
+It did not predict a pass.
 
 Exact-head review, normal landing and deployment of these interface
 follow-ups remain pending. Completed Home delivery, the full Library parent's
 final review and genuine hosted MCP acceptance remain separate duties.
 These local checks do not establish hosted, physical-device or human acceptance.
+
+## Gate result and documentation link correction
+
+Ordinary gate `59777` subsequently passed at `a5147e3e1bebe776453a9c3c68da5f3361438929`,
+tree `43806f0d55de5c70ea7a2c32f0401f755903d8e5`. This is the original
+runtime validation, not a gate run on this documentation successor.
+Whitespace, typecheck and tests exited 0; 1,231 Vitest cases passed and
+three were skipped. The later Node and Counting checks passed 10 and 55
+cases. The complete final guard passed, with no timeout or retry. The
+original result SHA256 is
+`af30c5248a1ebbd4d587d97f14d5fe07e50dddc0411391ea25d3977878a96597`.
+
+The separate required documentation-link check, original `91923`, failed at
+that same Source: 434 relative links checked, one broken. The architecture
+guide still linked to the old Artifacts heading in the hosts guide. The
+child exited 1 without a timeout; the full final guard passed. Its original
+public result SHA256 is
+`7e35712a1a45fdb4cc037c3594a8d9a783c5900c4b7ced0e5c9ba02e6beb2f8a`.
+This successor corrects that anchor to `#cloudflare-artifacts-host-artifacts`.
+Correction request `b0536fe6`, promise `904e65e1`, tracks this successor.
+
+The released check plan also changed its diagnostic output path and recorded
+invocation beyond the authorized ready/release fields. The child still ran
+the single pinned Node documentation-link command. The original failed
+result and plan deviation remain retained; they are not relabelled as a pass
+or retroactively authorized.
+
+At this successor's freeze, the new documentation-link check is UNRUN. Only
+the architecture link and this note change. The proposed correspondence
+retains the original runtime gate and requires every other tracked file to
+match `a5147e3e` exactly; that correspondence must be checked against the
+actual new commit. No feature, interface, native policy or generated asset
+changes. No whole suite or producer is repeated for this two-document fix.
+The exact-head documentation check and normal checker review remain owed.
