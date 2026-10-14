@@ -112,13 +112,6 @@
     <text x="544" y="398" class="sans body" fill="#16180F" fill-opacity="0.7">ordered · hashed</text>
   </g>
 
-  <!-- Effects are declared -->
-  <g>
-    <rect x="686" y="348" width="156" height="64" fill="#16180F"/>
-    <text x="764" y="373" text-anchor="middle" class="mono code" fill="#FFFFFF">effects</text>
-    <text x="764" y="397" text-anchor="middle" class="mono code" fill="#F3F1EA" fill-opacity="0.6">declared · no code</text>
-  </g>
-  <path d="M764 348V322" class="guide"/>
 
   <!-- Items -->
   <path d="M842 262H867" class="flow"/>
