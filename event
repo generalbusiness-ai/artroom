@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:82f86124b5a02911e0d270812d7c3bb143c913ba","text":"Merge retired a covered predecessor; the successor is at examples/lending/tsconfig.json."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:831fcb8865091ac19ef2457748b33a5993930867","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/ledger.ts."}
