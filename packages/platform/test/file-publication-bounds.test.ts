@@ -42,12 +42,13 @@ function make() {
   return ledger;
 }
 function answer(ledger: Ledger, operation: OperationId, body: Evidence["body"], hand: Partial<Parameters<typeof settleOutcome>[3]> = {}) {
-  const judgment = settleOutcome(ledger.state, definition, { type: "outcome", operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body } }, { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, own: ledger.own, platform, ...hand });
+  const judgment = settleOutcome(ledger.state, definition, { type: "outcome", operation, attempt: 1, result: "confirmed", evidence: { basis: "own-answer", body } }, { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, own: ledger.own, facts: ledger.foldOptions.facts, platform, ...hand });
   expect(judgment.result, JSON.stringify(judgment)).toBe("write"); if (judgment.result !== "write") throw Error("Not written"); ledger.seal(judgment.draft);
 }
 function file(ledger: Ledger, content = "# Pot\n") {
   const message: Request = { class: "request", type: "tell", body: { message: "publish-file", fields: { path: "shelf/pot.md", content } } };
   const source = handMade(app, "donate", [{ n: 0, to: ledger.at, message }]);
+  ledger.remember([fetched(source, "lending")]);
   const judgment = judgeDelivery(ledger.state, definition, { to: ledger.at, from: factRefOf(source), n: 0, message }, { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], own: ledger.own, source: { entry: source, under: "lending" }, platform });
   if (judgment.result === "write") ledger.seal(judgment.draft);
   return judgment;
