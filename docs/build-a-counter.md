@@ -489,78 +489,12 @@ the board becomes `finished` and its turn slots are cleared.
 The last line shows that folding the eight entries again gives the same
 state. That is what a verifier does with a real scope's history.
 
-## The full Counter
-
-The deployed Counter runs a larger definition, `counting-commitments`, in
-[examples/counting/commitments.ts](../examples/counting/commitments.ts).
-In place of `spoken`, a participant first commits to say the next number
-and then reports that they said it. The two diagrams show the acts that
-each participant can attempt. A box is an act, labelled with who may sign
-it. A rounded shape is an item in a state. An arrow into an act shows the
-state that the act needs.
-
-The first diagram covers setting up the scope and its participants:
-
-```mermaid
-flowchart TD
-  establish["Opener: establish"] --> ready([configuration: ready])
-  ready --> initialize["Controller: initialize"]
-  initialize --> paused([board: paused])
-  participate["Any member: participate"] --> inactive([participant: inactive])
-  inactive --> activate["Participant: activate"]
-  activate --> active([participant: active])
-  active --> deactivate["Participant: deactivate"]
-  active --> force["Controller: force-deactivate"]
-  deactivate --> inactive
-  force --> inactive
-  inactive --> remove["Controller: remove-participant"]
-  remove --> removed([participant: removed])
-```
-
-A member can hold one participant item that is inactive or active, and
-the scope holds at most 16 of them. The controller can force-deactivate
-another participant, but not themselves. A removed item is final; that
-member can participate again, which opens a new item. A participant who
-holds a pledged promise cannot be deactivated or removed.
-
-The second diagram covers the turns:
-
-```mermaid
-flowchart TD
-  paused([board: paused]) --> start["Controller: start"]
-  start --> open([board: open])
-  open --> pause["Controller: pause"]
-  open --> commit["Active participant: commit"]
-  commit --> pledged([promise: pledged])
-  pledged --> fulfill["Holder: fulfill"]
-  pledged --> fail["Holder: fail"]
-  pledged --> cancel["Controller: cancel"]
-  pledged -.-> expiry["Clock: 30 seconds pass"]
-  fulfill -->|Below the target| open
-  fulfill -->|At the target| finished([board: finished])
-  pause --> stopped([board: paused])
-  fail --> stopped
-  cancel --> stopped
-  expiry -.-> stopped
-  stopped --> reset["Controller: reset"]
-  finished --> reset
-  reset --> fresh([board: paused, count at 0])
-```
-
-Start needs a count below the target. Any active participant can commit
-while the board is open and no promise is pledged. When more than one
-participant is active, the last speaker cannot commit next. The holder is
-the participant who made the promise. Fulfill must take effect within 30
-seconds of the commitment. After that the clock pauses the board and
-expires the promise; no participant signs that step. From a paused board
-the controller can start again or reset. Start, pause and reset are
-refused while a promise is pledged.
-
 ## Where to go next
 
-- [The full Counter](../examples/counting) adds leave, pause, reset, and
-  timed turns. Its source and tests belong to a repository checkout, not
-  the published SDK packages.
+- [The full Counter](../examples/counting) replaces `spoken` with a
+  commitment that the participant then fulfills, and adds activity, pause,
+  reset and a deadline. Its page has diagrams of every act. Its source and
+  tests belong to a repository checkout, not the published SDK packages.
 - [Write an application](write-an-application.md) shows how to declare,
   validate and pin a definition of your own.
 - [The architecture of a dap application](architecture.md) explains what

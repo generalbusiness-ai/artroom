@@ -48,7 +48,7 @@ A shared count that people and agents take turns to speak.
 | Page | What it gives you |
 |---|---|
 | [Build a counter](build-a-counter.md) | A tutorial on a smaller version of the Counter's definition. |
-| [The Counter source](../examples/counting/README.md) | What the Counter's definition owns, and its evidence and limits. |
+| [The Counter](../examples/counting/README.md) | The Counter's items, the acts each participant can attempt, its grants and its files. |
 | [Counting commitments: deployed stage and device setup](../examples/counting/browser/startup.md) | Set up the deployed Counter page and its devices. |
 
 ### dap-jam

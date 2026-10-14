@@ -1,136 +1,185 @@
-# Counting: pure application source
+# The Counter
 
 The Counter, dap-counter, is an application built on dap. People and
-agents join a board, commit to say the next number, and speak it aloud,
-and a dap scope judges every turn against the Counter's definition. The
-framework is described in [What is dap?](../../docs/what-is-dap.md) and
+agents take part in a shared count. A participant commits to say the next
+number, says it aloud, and reports that they said it. A dap scope judges
+every act against the Counter's definition, so the count holds whatever a
+client does. The framework is described in
+[What is dap?](../../docs/what-is-dap.md) and
 [The architecture of a dap application](../../docs/architecture.md).
-[Build a counter](../../docs/build-a-counter.md) is a tutorial that builds
-a smaller version of this definition, and
-[Write an application](../../docs/write-an-application.md) shows how to
-declare, validate and pin one of your own.
 
-The rest of this page is the source record for the first Counter
-definition, `counting`. The deployed Counter page uses its successor,
-`counting-commitments`, described in
-[commitments-README.md](commitments-README.md) and
-[browser/startup.md](browser/startup.md).
+This page describes the definition `counting-commitments`, declared in
+[commitments.ts](commitments.ts). The Counter page in [browser](browser)
+runs it, and `dap install --cohort counting-commitments` installs its
+cohort. An earlier definition, `counting`, is also kept here; see
+[The first definition](#the-first-definition).
 
-For an application author, this example shows how a scope can own a shared
-count using existing declaration forms. It supplies a typed definition,
-its complete canonical declaration and pin, and focused model witnesses.
-It supplies no browser, speech adapter, hosted scope or enrollment flow.
+## Items
 
-2026-10-09. Source preparation under request
-`8d319c43d9cf62573126cbcf7ef9758acdfa0fc6`, promise
-`09fd9347f0fd099c487853db6f6290969e46e918`; planner disposition `ae893dbd`.
-The earlier `807e4b2e` / `dd474e38` and `d96023ac` / `416f2f3d` tracking
-chains were retired in favor of this single successor. Full counting
-request `4073e756` and durability `578edf65` remain open. Baseline is main
-`9d7e4c2777ea8d35441b4a9d79b407cd701065fa`; this example's source review,
-coordinated candidate gate and normal landing are still required.
+The scope holds four types of item:
 
-## What the definition owns
+| Item | How many | States | What it holds |
+| --- | --- | --- | --- |
+| `configuration` | One | `ready` | The controller and the target, from 1 to 100. Neither can change. |
+| `board` | One | `paused`, `open`, `finished` | The last fulfilled number, the last speaker, the generation and serial, and a link to the pledged promise. |
+| `participant` | Up to 16 that are not removed | `inactive`, `active`, `removed` | The member who takes part. |
+| `promise` | One pledged at a time | `pledged`, then `fulfilled`, `failed`, `cancelled` or `expired` | The holder, the number, the active participants at the time, and a deadline 30 seconds after the commitment. |
 
-One participant item per joined MemberRef gives the roster its native order:
-ascending Join-opening IDs. Each issued turn retains that complete ordered
-basis. The selected member reports the exact generation, serial and number.
-Clients may propose the successor fields, but the scope independently checks
-the complete roster, member correspondence, arithmetic and selected item
-before copying any values. No external counter or app-specific Core rule
-chooses a speaker. There is no sort, key-projection or computed-effect extension.
+## Who can attempt each act
 
-The complete closure is the single [counting definition](definition.ts):
-it creates no other definitions and declares no outside operations or
-capabilities. [definition.json](definition.json) holds its canonical bytes,
-with one trailing newline. [pin.ts](pin.ts) records the validated digest:
+Four kinds of participant sign acts:
 
-`sha256:435d9f5745048183d3cf0392ce909cd76909fd69ee368dfc57e142ba96af1d09`
+- The **opener** is the member named when the scope is created. The
+  opener becomes the **controller**.
+- The controller runs the board and manages participants.
+- Any **member** can become a **participant**, and a participant chooses
+  when they are active.
+- The **holder** is the active participant whose commitment the scope
+  recorded.
 
-The validator checks the actual restricted@1 rule grammar. The pin binds
-the whole declaration, not a display name. Its profile/interpreter remains
-the existing version; no old pin or runtime behavior changes.
+In the two diagrams, a box is an act, labelled with who may sign it. A
+rounded shape is an item in a state. An arrow into an act shows the state
+that the act needs. The scope refuses any other attempt.
 
-## Establish, initialize, then count
+### Setting up the scope and its participants
 
-Current forms prohibit a genesis that opens a timed item. Establish therefore
-opens an untimed configuration containing the native creator's opener and
-target. The authorized controller then submits **Initialize**, which opens
-the paused board and copies that configuration. This extra act is deliberate;
-it is not a claim that a generic application factory is already available.
+```mermaid
+flowchart TD
+  establish["Opener: establish"] --> ready([configuration: ready])
+  ready --> initialize["Controller: initialize"]
+  initialize --> paused([board: paused])
+  participate["Any member: participate"] --> inactive([participant: inactive])
+  inactive --> activate["Participant: activate"]
+  activate --> active([participant: active])
+  active --> deactivate["Participant: deactivate"]
+  active --> force["Controller: force-deactivate"]
+  deactivate --> inactive
+  force --> inactive
+  inactive --> remove["Controller: remove-participant"]
+  remove --> removed([participant: removed])
+```
 
-Join opens a participant; Leave removes the signer's joined item. Start
-issues a new turn, and Spoken records its completed number/member and the
-actual signed key. A Join affects future turns. A non-current Leave preserves
-the active turn; a current Leave issues a different serial for the same
-number, or pauses if nobody remains. The controller's CancelTurn can remove
-the exact current speaker for disconnect/media-error; it cannot remove an
-unrelated participant. The controller can leave their own participant through
-ordinary self Leave.
+- A member can hold one participant item that is inactive or active.
+- The controller can force-deactivate another participant, but not
+  themselves.
+- A removed item is final. That member can participate again, which
+  opens a new item.
+- A participant who holds a pledged promise cannot be deactivated or
+  removed.
 
-Pause clears the active turn without advancing the number. Reset changes
-generation and resets count while preserving the roster and old history.
-The 15-second expiry clears the turn and pauses. The next Start advances its
-serial. Target completion changes state to finished and clears active values;
-Reset is still possible. Empty fields and optional next binding are checked
-through the real judges, not assumed from the earlier prose draft.
+### Taking turns
 
-There is one configuration, one board, at most eight live participants,
-target 1–100, and generation/serial at most 1,000,000. Every join/completion
-is an entry; final participant rows and history remain retained. These bounds
-do not promise unlimited resets or an archive. The normal scope capacity for acts that take
-effect and for settlement still applies.
+```mermaid
+flowchart TD
+  paused([board: paused]) --> start["Controller: start"]
+  start --> open([board: open])
+  open --> pause["Controller: pause"]
+  open --> commit["Active participant: commit"]
+  commit --> pledged([promise: pledged])
+  pledged --> fulfill["Holder: fulfill"]
+  pledged --> fail["Holder: fail"]
+  pledged --> cancel["Controller: cancel"]
+  pledged -.-> expiry["Clock: 30 seconds pass"]
+  fulfill -->|Below the target| open
+  fulfill -->|At the target| finished([board: finished])
+  pause --> stopped([board: paused])
+  fail --> stopped
+  cancel --> stopped
+  expiry -.-> stopped
+  stopped --> reset["Controller: reset"]
+  finished --> reset
+  reset --> fresh([board: paused, count at 0])
+```
 
-## Pure evidence and its limits
+- Start needs a count below the target. It opens the board to
+  commitments and does not choose a speaker.
+- Any active participant can commit while the board is open and no
+  promise is pledged. If several try, the scope records one.
+- When more than one participant is active, the last speaker cannot
+  commit next.
+- Fulfill must take effect before the promise's deadline. It moves the
+  count to the promised number.
+- Fail and cancel pause the board and leave the count where it was.
+- After 30 seconds the clock pauses the board and expires the promise.
+  No participant signs that step.
+- From a paused board the controller can start again or reset. Reset
+  begins a new generation with the count at 0, and keeps the participants
+  and the history.
+- Start, pause and reset are refused while a promise is pledged.
 
-The [model witnesses](definition.test.ts) use the real validator, restricted
-evaluator, judgment, sealing and fold through derive's reusable Ledger.
-Its membership grants are scripted current answers, and its clock/store are
-in memory. Genesis is a pure model creation, not a proved authorized native
-application creation. The tests establish sequence, designated MemberRef,
-three-to-four roster progression, ordered full basis, duplicate/stale reports,
-departures, empty next binding, reset, pause, expiry and deterministic refolding.
-They do not establish DO persistence, reactivation, real authority windows,
-transport retry, private browser custody or audible output.
+## Grants
 
-A completed report can receive a known roster refusal after a new Join.
-The model shows a corrected successor proposal retaining that same completion's
-generation/serial/N can be accepted. A future voice client must reuse that
-retained completion without speaking again. An unknown acknowledgment must
-stay fenced to the exact original envelope; the pure model implements no
-network/outbox and supplies no recovery proof. Refolding memory is not a
-Worker restart test. Revocation must be refused when observed under native
-authority windows, not claimed instantly across scopes.
+Each act needs a grant, which the membership's policy gives to roles.
+Creating the application grants nothing by implication. The guards above
+apply as well: holding `counting.control` is not enough to start the
+board, because start also requires the controller's signature.
 
-With dependencies already prepared, run only this example from the repository root:
+| Grant | Acts |
+| --- | --- |
+| `counting.establish` | `establish` |
+| `counting.control` | `initialize`, `start`, `pause`, `reset`, `cancel`, `force-deactivate`, `remove-participant` |
+| `counting.participate` | `participate` |
+| `counting.activity` | `activate`, `deactivate` |
+| `counting.commit` | `commit` |
+| `counting.fulfill` | `fulfill` |
+| `counting.fail` | `fail` |
+
+## What the scope checks
+
+A client proposes values, and the scope checks every one before it copies
+any of them:
+
+- A commitment carries the board's generation, the next serial, the next
+  number, and the complete list of active participants in the order they
+  first took part. The scope checks each against its own state.
+- Fulfill, fail and cancel carry the promise's generation, serial and
+  number. They take effect only on the promise that the board links to.
+- Reset carries the next generation, so a report from before a reset no
+  longer matches.
+
+The definition uses the common declaration forms and four named rules. It
+sends nothing, receives nothing, declares no capabilities and creates no
+other definitions.
+
+## Files
+
+| File | What it is |
+| --- | --- |
+| [commitments.ts](commitments.ts) | The `counting-commitments` definition. |
+| [commitments.json](commitments.json), [commitments-pin.ts](commitments-pin.ts) | Its canonical bytes and its digest. |
+| [commitments.test.ts](commitments.test.ts) | Four tests of the definition in a scope held in memory. |
+| [commitments-README.md](commitments-README.md) | The source record for the definition, with its evidence and limits. |
+| [browser](browser) | The Counter page. [browser/startup.md](browser/startup.md) covers its setup, device keys and speech. |
+| [definition.ts](definition.ts), [definition.json](definition.json), [pin.ts](pin.ts), [definition.test.ts](definition.test.ts) | The first definition, `counting`. |
+| [definition-README.md](definition-README.md) | The source record for the first definition. |
+
+## Run the tests
+
+From the repository root, with dependencies installed:
 
 ```sh
 node node_modules/vitest/vitest.mjs run --project counting
 node node_modules/typescript/bin/tsc -p examples/counting/tsconfig.json
 ```
 
-The ordinary root test run includes the `counting` Node project in its existing
-Node phase; it selects exactly this one file. The root typecheck includes the
-example's existing type project after its workspace and script checks. All
-other projects remain present. The inherited local config resolves workspace
-modules to this checkout; focused verification has used the actual root
-selection above. No dependency or lockfile changes are needed. Two bounded
-semantic controls were checked: removing ordered roster enforcement accepts
-the wrong sequence; removing the reset-generation guard accepts a late old
-completion. Clean source was restored. No Worker, audio, provider, browser,
-installation, mutation sweep or whole gate was run for C0.
+The first command runs both definitions' tests: eight tests in two files.
+They use the real validator, rule evaluator, judgment, sealing and fold,
+with grants and a clock that the test scripts. They do not establish
+stored state, restart, membership authority or audible speech.
+[packages/scope/test/counting-commitments.test.ts](../../packages/scope/test/counting-commitments.test.ts)
+runs the definition in a native scope.
 
-## Still needed for the visible demo
+## The first definition
 
-The generic authorized application factory and client watch lifecycle need
-their own versioned source/review. Existing authenticated summaries/head
-streams can be reused; a custom `found` request with no verified membership
-does not supply native application authority. Independent clients still need
-real enrolled keys, sessions and exact pending-request custody.
+[definition.ts](definition.ts) declares `counting`, the first Counter
+definition. It has no promises. The controller's `start` gives the turn
+to one participant, and that participant's `spoken` reports the number
+and passes the turn to the next participant in join order. It also has
+`join`, `leave`, `cancel-turn`, `pause`, `reset`, and a 15-second turn.
+No scope moves from one definition to the other.
 
-Root's separate no-audio inventory found three named local voices; it proves
-neither audible distinguishability nor end/cancel behavior. Actual TTS,
-automatic peer state, unknown reply/reconnect/DO restart controls, a hosted
-sequence, measured acknowledgment/peer/audio gaps, qualified replay, reviewed
-source and the final natural recording remain owed. No provider fallback is
-commissioned by this example.
+[Build a counter](../../docs/build-a-counter.md) is a tutorial that builds
+a smaller version of this first definition.
+[Taking part in a Counter](../../docs/mcp.md#taking-part-in-a-counter)
+shows an agent taking part in one. Its source record is
+[definition-README.md](definition-README.md).
