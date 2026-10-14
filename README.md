@@ -78,6 +78,9 @@ configuration file and key of a member who has already joined.
 - [Write an application](docs/write-an-application.md) shows how to
   declare item types, acts and invariants, then validate and pin them.
 - [Scopes](docs/scopes.md) is the full description of the runtime.
+- [The roadmap](docs/roadmap.md) says what runs today and what is not
+  yet built, and [Use cases](docs/use-cases.md) is the catalogue behind
+  it.
 - [The documentation index](docs/README.md) lists every page.
 
 dap is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
