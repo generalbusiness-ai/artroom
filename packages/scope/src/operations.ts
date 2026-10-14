@@ -37,11 +37,12 @@
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { clockOf, recordedOutcome, evidenceValues, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
+import { clockOf, recordedOutcome, evidenceValues, isEntryOf, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type Operation, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
+import { applicationPublicationOrigin, publishingLaneOrigin } from "@generalbusiness/dap-platform";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
-import type { Clock, Ports } from "./ports.ts";
+import type { Clock, Ports, Resolver } from "./ports.ts";
 import type { Sealed, Sending, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
 
@@ -191,6 +192,7 @@ export class Operations {
   readonly #scope: Scope;
   readonly #store: Store;
   readonly #outside: Outside;
+  readonly #resolver: Resolver;
   readonly #owners: Owners | undefined;
   readonly #clock: Clock;
   readonly #wakes: Wakes;
@@ -201,8 +203,8 @@ export class Operations {
    * says that it is not ready (`OperationRules.ready`): the request of an
    * attempt of a staging waits for its tokens (authority note, section 5.7).
    * It has no time to be looked at next, so it costs no wake-up (rule 7).
-   * The next outcome entry that this driver writes may be what it waits
-   * for, so that entry starts the walk again, which looks at every such
+   * The next committed entry may be what it waits for, so the commit
+   * starts the walk again, which looks at every such
    * attempt once more. In memory only: a restart begins the walk in any case.
    */
   #waiting = false;
@@ -246,11 +248,12 @@ export class Operations {
   readonly #conflict: ((operation: OperationId, attempt: number, seq: number) => void) | undefined;
 
   /** `owners`: the rules of the owners this runtime has code for. With none, no outcome can be judged, so nothing is sent. */
-  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
+  constructor(scope: Scope, store: Store, ports: Pick<Ports, "outside" | "clock" | "owners" | "diagnoses" | "resolver">, wakes: Wakes, bounds: Bounds, conflict?: (operation: OperationId, attempt: number, seq: number) => void) {
     this.#conflict = conflict;
     this.#scope = scope;
     this.#store = store;
     this.#outside = ports.outside;
+    this.#resolver = ports.resolver;
     this.#owners = ports.owners ?? undefined;
     this.#clock = ports.clock;
     this.#wakes = wakes;
@@ -264,6 +267,29 @@ export class Operations {
    * it asks about at most one batch of them, and writes nothing. A pass that finds one starts the walk again (`#pass`).
    */
   reaccepted(): boolean { return this.#accepted(false); }
+
+  /** A committed entry may make a parked attempt ready. */
+  committed(): void {
+    if (!this.#waiting) return;
+    this.#waiting = false;
+    this.#walk = { after: null };
+    this.#again = true;
+  }
+
+  /** Forward security check only: it changes neither old entries nor their derivation. */
+  async #publicationReady(operation: Operation): Promise<boolean> {
+    const rules = this.#scope.owners()?.rules(operation.owner, operation.kind);
+    const asked = rules?.publicationOrigin?.(this.#store, operation, ownOf(this.#store));
+    if (asked === undefined || asked === null) return true;
+    if (asked === false) return false;
+    try {
+      const read = await within(() => this.#resolver.read(asked.from, this.#bounds.fetchSeconds, true), this.#bounds.fetchSeconds);
+      if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, asked.from)) return false;
+      return asked.mode === "application"
+        ? applicationPublicationOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []) === true
+        : read.under === "change" && publishingLaneOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []);
+    } catch { return false; }
+  }
 
   /** Bounded rotating inspection of the in-memory refused queue. A read
    * leaves an accepted entry first, so its following pass sees that same
@@ -338,6 +364,7 @@ export class Operations {
     }
     const scope = store.scope()!;
     const work: (() => Promise<void>)[] = [];
+    let localRefusals = 0;
     const offered = new Set<string>();
     for (const row of due) {
       const { operation: id, attempt } = row;
@@ -346,6 +373,12 @@ export class Operations {
         continue;
       }
       if (row.sent !== null) {
+        const operation = store.operation(id);
+        if (operation && !await this.#publicationReady(operation)) {
+          if (row.next !== null) store.postpone(id, attempt, null);
+          this.#waiting = true;
+          continue;
+        }
         // The request may have left: its durable mark has no outcome. An answer in hand wins; otherwise only an accepted safe
         // recovery read may obtain one. With neither, unknown is offered. The original mutation is never sent again.
         const input = this.#held.get(keyOf(id, attempt));
@@ -367,10 +400,23 @@ export class Operations {
       }
       this.#refused.delete(keyOf(id, attempt));
       // The owner's rule on when the request may leave, such as the tokens of an attempt of a staging. Not ready: recorded and not
-      // sent, with no wake-up, until an outcome entry is written and the walk looks again.
-      if (rules.ready && !rules.ready(store, operation, attempt)) {
+      // sent, with no wake-up, until a committed entry starts the walk again.
+      if (!await this.#publicationReady(operation) || rules.ready && !rules.ready(store, operation, attempt)) {
         if (row.next !== null) store.postpone(id, attempt, null);
         this.#waiting = true;
+        continue;
+      }
+      // A stale file is judged as known not sent, before the durable mark.
+      // Recovery and late answers above concern an original request that may
+      // already have left and never enter this branch.
+      const local = rules.beforeSend?.(store, operation, attempt, ownOf(store));
+      if (local) {
+        const recorded = await this.#record({ type: "outcome", operation: id, attempt, result: "refused", evidence: local }, false);
+        if (recorded.recorded === "written") { localRefusals++; this.#again = true; }
+        if (recorded.recorded === "unavailable" || recorded.recorded === "refused") {
+          if (row.next !== null) store.postpone(id, attempt, null);
+          this.#waiting = true;
+        }
         continue;
       }
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,
@@ -387,7 +433,7 @@ export class Operations {
     const replies = runs ? await this.#replies(offered, batch) : 0;
     const resumed = runs ? await this.#resume(batch) : 0;
     await this.#wake(now);
-    return work.length + replies + resumed;
+    return work.length + replies + resumed + localRefusals;
   }
 
   /** One retained page after work/held answers; no network, mark or send. */
@@ -568,13 +614,13 @@ export class Operations {
   }
 
   /** One `outcome` input, judged in the scope's turn like any other input. */
-  async #record(input: Outcome): Promise<OutcomeRecorded> {
+  async #record(input: Outcome, notifyOutside = true): Promise<OutcomeRecorded> {
     const definition = this.#scope.pinned()?.definition;
     if (!definition) return { recorded: "unavailable" };
     const bounds = this.#bounds;
     const known = recordedOutcome(this.#store, input);
     if (known) {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       if (known.result === "conflict") this.#conflict?.(input.operation, input.attempt, known.seq);
       return { recorded: known.result, seq: known.seq };
     }
@@ -584,12 +630,16 @@ export class Operations {
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
     const rules = operation && this.#scope.owners()?.rules(operation.owner, operation.kind);
+    if (operation && !await this.#publicationReady(operation)) {
+      this.#waiting = true;
+      return { recorded: "unavailable" };
+    }
     if (rules?.values !== undefined && rules.valueDomains === undefined) return { recorded: "unavailable" };
     const named = rules?.retains?.(input.evidence) ?? [];
     let values: ReturnType<typeof evidenceValues>;
     try { values = evidenceValues(rules, input.evidence); } catch { values = null; }
     const invalidValue = (detail: string): OutcomeRecorded => {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       return { recorded: "refused", detail: `bad-input: ${detail}` };
     };
     if (values === null) return invalidValue("the evidence names a value outside its owner declaration");
@@ -600,7 +650,7 @@ export class Operations {
       bytes.push(given.bytes);
     }
     if (named.some((digest) => !retain.some((given) => given.kind === "snapshot" && given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {
-      if (input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
+      if (notifyOutside && input.result !== "unknown") this.#judged(input.operation, input.attempt, null);
       return { recorded: "refused", detail: "the evidence names a snapshot whose bytes were not given" };
     }
     const wrote: { sealed: Sealed | null } = { sealed: null };
@@ -647,13 +697,9 @@ export class Operations {
     const recorded: OutcomeRecorded = end.end === "answer" ? end.answer : { recorded: "unavailable" };
     // The turn has ended, so an entry that it wrote is committed. An outcome entry may be what an attempt that is not ready waits
     // for: the walk looks at each of them again.
-    if (recorded.recorded === "written" && this.#waiting) {
-      this.#waiting = false;
-      this.#walk = { after: null };
-      this.#again = true;
-    }
+    if (recorded.recorded === "written") this.committed();
     // The port is told of each decisive answer that the scope has judged, with the entry that it wrote, if it wrote one.
-    if (input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
+    if (notifyOutside && input.result !== "unknown" && recorded.recorded !== "unavailable") this.#judged(input.operation, input.attempt, recorded.recorded === "written" ? wrote.sealed : null);
     // An incident (authority note, section 12, G13): nothing is written for it, so it is kept in the operator's record alone. It is told
     // once, after the turn, and not from the judgment, which a turn may run again.
     if (recorded.recorded === "conflict") this.#conflict?.(input.operation, input.attempt, recorded.seq);

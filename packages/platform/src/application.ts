@@ -1,14 +1,19 @@
 /** Explicit supporting application cohort; legacy room pins and defaults stay unchanged. */
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Bounds, DeclaredDefinition, Digest, FieldType, MemberRef, PlatformData, RulesObservation, Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, intentDigest, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
-import { isObject, readFields, same, type Rules } from "@generalbusiness/dap-derive";
+import type { Bounds, DeclaredDefinition, Digest, FieldType, MemberRef, PlatformData, RulesObservation, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { canonicalize, intentDigest, isScopeRef, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
+import { isObject, readFields, same, type RuleGiven, type Rules } from "@generalbusiness/dap-derive";
 import { definitionClosure, definitionDependencies } from "./definition-input.ts";
 import { DEFINITION_DOMAIN, directory2, directoryMembership, directoryRules, directoryRulesScope } from "./directory.ts";
 
 export const APPLICATION_COHORT = {
   register: "platform:register@5", directory: "platform:directory@5", membership: "platform:membership@4",
   rules: "platform:rules@3", destination: "platform:destination@2", inbox: "platform:inbox@1",
+} as const;
+/** Explicit publication cohort; existing rooms retain their original factory and destination. */
+export const FILE_PUBLICATION_COHORT = {
+  register: "platform:register@9", directory: "platform:directory@8", membership: "platform:membership@4",
+  rules: "platform:rules@3", destination: "platform:destination@4", inbox: "platform:inbox@1",
 } as const;
 export const APPLICATION_VALUES_BYTES = 16 * 1024;
 // Only opener is injected into domain fields. Authoritative membership and
@@ -101,6 +106,54 @@ export const directoryRules5: Rules = {
     const checked = definitionClosure(given, "definition"), signer = given.resolved.signer;
     if (given.input.type !== "act" || checked.result !== "ready" || !signer) throw new Error("application creation follows its validated admission");
     const fields = applicationValues(given.resolved.fields["values"], checked.root, signer.member, given.resolved.bounds);
+    if (!fields) throw new Error("application creation retains its validated genesis values");
+    const membership = directoryMembership(given.state);
+    if (!membership) throw new Error("application creation retains its confirmed native membership");
+    const seed: Seed = { v: 1, kind: "lane", definition: given.resolved.fields["definition"] as Digest, creator: given.resolved.at, cause: intentDigest(given.input.signed.intent), ordinal: 0 };
+    return { to: seed, message: { class: "request", type: "create", body: { fields, directory: given.resolved.at, membership, creationContext: { v: 1 } } } };
+  } },
+};
+
+/** New factory only: callers cannot choose the room's destination, even when the declaration omits it. */
+export function applicationPublicationValues(raw: unknown, declared: DeclaredDefinition, opener: MemberRef, bounds: Bounds, destination: ScopeRef | null): Record<string, import("@generalbusiness/dap-contract").FieldValue> | null {
+  if (typeof raw !== "string" || !rawFits(raw)) return null;
+  let value: unknown;
+  try { value = parseStrict(raw); } catch { return null; }
+  if (!isObject(value) || Object.hasOwn(value, "destination") || canonicalize(value) !== raw) return null;
+  const field = declared.acts[declared.genesis]?.fields["destination"];
+  if (!field) return applicationValues(raw, declared, opener, bounds);
+  if (field.type !== "scope" || field.kind !== "destination" || !isScopeRef(destination) || destination.kind !== "destination") return null;
+  return applicationValues(canonicalize({ ...value, destination }), declared, opener, bounds);
+}
+
+// The data is the application factory's existing rows. Its new immutable version
+// selects new child pins and the reserved-field policy below, never the old rules.
+export const directory8: PlatformData = { ...directory5 };
+const destinationOf = (given: RuleGiven): ScopeRef | null => {
+  const destination = given.state.page("repository", ["open"], null, 1).items[0]?.refs["destination"];
+  return isScopeRef(destination) && destination.kind === "destination" ? destination : null;
+};
+export const directoryRules8: Rules = {
+  ...directoryRules5,
+  "application-ready": { place: "guard", refusals: ["not-activated", "unsupported-application"], run: (given) => {
+    const unavailable = { holds: null, reason: "dependency-unavailable" } as const;
+    const unsupported = { holds: false, name: "unsupported-application", code: "unsupported-definition" } as const;
+    const rules = directoryRulesScope(given.state), membership = directoryMembership(given.state), signer = given.resolved.signer;
+    const observation = given.observed({ asked: "definitions" })?.observation as RulesObservation | undefined;
+    if (!rules || !membership || !signer || !same(signer.member.membership, membership) || !observation || !same(observation.of, rules) || observation.content.asked !== "definitions") return unavailable;
+    if (!observation.content.active.some((active) => active.digest === given.resolved.fields["definition"])) return { holds: false, name: "not-activated" };
+    const checked = definitionClosure(given, "definition");
+    if (checked.result === "unavailable") return unavailable;
+    if (checked.result !== "ready" || checked.declarations.some((declared) => declared.capabilities.length > 0)) return unsupported;
+    const destination = destinationOf(given), field = checked.root.acts[checked.root.genesis]?.fields["destination"];
+    if (field?.type === "scope" && field.kind === "destination" && !destination) return unavailable;
+    if (!applicationPublicationValues(given.resolved.fields["values"], checked.root, signer.member, given.resolved.bounds, destination)) return unsupported;
+    return { holds: true };
+  } },
+  "create-application": { place: "send", run: (given) => {
+    const checked = definitionClosure(given, "definition"), signer = given.resolved.signer;
+    if (given.input.type !== "act" || checked.result !== "ready" || !signer) throw new Error("application creation follows its validated admission");
+    const fields = applicationPublicationValues(given.resolved.fields["values"], checked.root, signer.member, given.resolved.bounds, destinationOf(given));
     if (!fields) throw new Error("application creation retains its validated genesis values");
     const membership = directoryMembership(given.state);
     if (!membership) throw new Error("application creation retains its confirmed native membership");

@@ -80,10 +80,14 @@ test("joined room/account clicks disclose identity without leaving the room, and
     }
     roomDisclosure.all().find(e => e.tag === "a")!.click(); expect(location.hash).toBe("#/join"); redraw(); await drain();
     expect(root.all().find(e => e.tag === "h1")?.textContent).toBe("Join another room");
-    expect(root.textContent).toContain("You are in Hugh's room as @hugh-web");
+    expect(root.all().filter(e => e.attrs["class"] === "entry-intro")).toHaveLength(0);
     const back = root.all().find(e => e.tag === "a" && e.textContent.includes("Back to Hugh's room"))!;
     expect(back.attrs["href"]).toBe("#/");
-    expect(root.all().filter(e => e.attrs["class"] === "entry-choice").map(e => e.attrs["href"])).toEqual(["#/invitation", "#/config"]);
+    expect(root.all().filter(e => e.attrs["class"] === "entry-choice").map(e => [e.attrs["href"], e.all().find(child => child.tag === "h2")?.textContent, e.all().find(child => child.tag === "p")?.textContent])).toEqual([
+      ["#/start", "Create a new room", "Start a new room for shared work"],
+      ["#/invitation", "Join with an invitation link", "Paste a link. We create your key and join the room."],
+      ["#/config", "Join with a config and key", "Use config.json and its matching device key."],
+    ]);
     back.click(); expect(location.hash).toBe("#/");
     expect(setItem).not.toHaveBeenCalled(); expect(root.textContent).not.toContain("Settings");
   } finally { await drain(); vi.unstubAllGlobals(); vi.doUnmock("../src/data.ts"); vi.resetModules(); }

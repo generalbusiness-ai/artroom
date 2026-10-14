@@ -19,7 +19,7 @@ export interface LendingIdentity {
   readonly origin: string; readonly deployment: string; readonly scope: ScopeRef; readonly definition: Digest;
   readonly membership: ScopeRef; readonly member: MemberRef; readonly publicKey: KeyId;
 }
-export const LENDING_ACTS = ["donate", "borrow", "return", "cancel"] as const;
+export const LENDING_ACTS = ["donate", "borrow", "return", "cancel", "publish"] as const;
 /** What a kept request must be bound to: the scope it is addressed to, the key that signed it, and the act kinds allowed. */
 export interface Binding { readonly scope: ScopeRef; readonly publicKey: KeyId; readonly kinds: readonly string[] }
 export const lendingBinding = (identity: LendingIdentity): Binding => ({ scope: identity.scope, publicKey: identity.publicKey, kinds: LENDING_ACTS });

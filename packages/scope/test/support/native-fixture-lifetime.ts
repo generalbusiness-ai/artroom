@@ -194,3 +194,46 @@ export const driveFixture = (nodes: readonly Platform[], wait: <T>(action: () =>
 export const dispatchFixture = (nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> => fixturePasses(nodes, wait, "dispatch");
 /** Effect-only phases never dispatch creation duties before their assertions. */
 export const effectFixture = (nodes: readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T>): Promise<void> => fixturePasses(nodes, wait, "effect");
+
+
+/** Test scheduler that joins only actual object callbacks before and after
+ * native effects/dispatch. Scope discovery is supplied by the owning fixture. */
+export async function drainScheduledFixture(projected: () => readonly Platform[], wait: <T>(action: () => Promise<T>) => Promise<T> = action => action()): Promise<void> {
+  let actions = 0;
+  const count = (value: number): number => {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error("Native scheduled fixture returned invalid work.");
+    actions += value;
+    if (actions > 4096) throw new Error("Native scheduled fixture exceeded its finite work budget.");
+    return value;
+  };
+  const distinct = () => [...new Map(projected().map(node => [node.name, node])).values()];
+  const callbacks = async (nodes: readonly Platform[]): Promise<number> => {
+    let joined = 0;
+    for (const node of nodes) {
+      const result = await wait(() => (node.stub as unknown as { awaitScheduledCallbacks(): Promise<{ callbacks: number }> }).awaitScheduledCallbacks());
+      joined += count(result.callbacks);
+    }
+    return joined;
+  };
+  let nodes = distinct();
+  for (let pass = 0; pass < 64; pass++) {
+    const previous = new Set(nodes.map(node => node.name));
+    const before = await callbacks(nodes);
+    nodes = distinct();
+    let added = nodes.some(node => !previous.has(node.name)), made = 0;
+    for (const node of nodes) {
+      for (;;) {
+        const effects = count(await wait(() => (node.stub as unknown as { effect(): Promise<number> }).effect()));
+        made += effects;
+        if (effects === 0) break;
+      }
+      made += count(await wait(() => node.stub.dispatch()));
+    }
+    const driven = new Set(nodes.map(node => node.name));
+    nodes = distinct();
+    added ||= nodes.some(node => !driven.has(node.name));
+    const after = await callbacks(nodes);
+    if (!before && !after && !made && !added) return;
+  }
+  throw new Error("Native scheduled fixture exceeded 64 callback/driver rounds.");
+}

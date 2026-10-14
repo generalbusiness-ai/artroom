@@ -243,3 +243,38 @@ lists the install and claim commands and the custody each one needs.
 Validation, pins and creation check the declaration and its record. They
 do not establish that a host, an outside adapter or a whole application
 journey works. A live run is separate evidence.
+
+## Publish a file from an act
+
+Create a room with `dap install --cohort application-publication` to use
+the file-publication factory and destination. Existing rooms keep their
+original pins. The new cohort uses register@9, directory@8, membership@4,
+rules@3, destination@4 and inbox@1, each with the `platform:` prefix.
+
+Declare a genesis field named `destination`, with type `scope` and kind
+`destination`. Keep that reference in a fixed item slot. The directory
+supplies its own recorded destination, including its incarnation. Do not
+include `destination` in the caller's genesis `values`: the factory
+refuses it even when the definition declares no such field.
+
+Declare a `tell` to that slot with message `publish-file`, fields `path`
+and `content`, and result clauses for `refused` and `undelivered`. The
+path is at most 1,024 bytes; the UTF-8 text is at most 65,536 bytes. The
+[Lending definition](../examples/lending/definition.ts) shows this form.
+Its guards further restrict paths to the shelf and keep each path owned
+by one thing, including after that thing is gone.
+
+An application of the room can overwrite any repository path, including
+files in the rules extent. The room's change-review rules do not govern
+`publish-file`. Control remains at activation and creation: a member needs
+`rules.activate` to activate the definition and `application.establish` to
+create its scope. Activate only definitions whose writes you trust.
+The destination proves that its own directory created the sender before
+admitting or pushing its file.
+
+The act takes effect before the destination pushes. A successful act or
+delivery does not prove that its page is published. Read the destination's
+receipt to connect the sending entry and send ordinal to its commit.
+For the same sender and path, a later source position (entry number, then
+send ordinal) supersedes older unsent work even if it arrives first. An unknown push keeps the publication slot
+and is never resent; later work waits behind it.

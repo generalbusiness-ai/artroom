@@ -76,7 +76,7 @@ class Element {
 // Real Start handlers over SCRIPTED DOM, discovery/custody and room reads.
 // Actual key/journal custody is in start-custody.test; native admission is separate.
 test("Start is explicit; Back fences late discovery, reload only offers Check and Continue, and recovery uses the verified founder key", async () => {
-  const root = new Element("div"), location = { origin: "https://start-ui.test", hash: "#/start" };
+  const root = new Element("div"), location = { origin: "https://start-ui.test", hash: "#/join" };
   const ref = (kind: "register" | "directory" | "membership") => ({ scope: scopeIdOf({ v: 1, kind, definition: kind === "register" ? "platform:register@8" : kind === "directory" ? "platform:directory@7" : "platform:membership@2", creator: null, cause: textDigest("SCRIPTED Start UI " + kind), ordinal: 0 }), inc: newIncarnation(new Uint8Array(16).fill(5)), kind });
   const register = ref("register"), directory = ref("directory"), membership = ref("membership");
   const legacyRegister = { ...register, scope: scopeIdOf({ v: 1, kind: "register", definition: "platform:register@7", creator: null, cause: textDigest("SCRIPTED retained UI register"), ordinal: 0 }) };
@@ -115,12 +115,28 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
   const find = (tag: string, text?: string) => root.all().find(e => e.tag === tag && (text === undefined || e.textContent === text))!;
   try {
     await import("../src/main.ts"); await flush();
+    expect(find("h1").textContent).toBe("Join or create a room");
+    expect(root.all().filter(e => e.attrs["class"] === "entry-intro")).toHaveLength(0);
+    const choices = root.all().filter(e => e.attrs["class"] === "entry-choice");
+    expect(choices.map(e => [e.attrs["href"], e.all().find(child => child.tag === "h2")?.textContent, e.all().find(child => child.tag === "p")?.textContent])).toEqual([
+      ["#/start", "Create a new room", "Start a new room for shared work"],
+      ["#/invitation", "Join with an invitation link", "Paste a link. We create your key and join the room."],
+      ["#/config", "Join with a config and key", "Use config.json and its matching device key."],
+    ]);
+    expect(start).not.toHaveBeenCalled(); expect(offerRead).not.toHaveBeenCalled();
+    location.hash = choices[0]!.attrs["href"]!; redraw(); await flush();
     expect(root.textContent).toContain("Start a room"); expect(root.all().some(e => e.attrs["type"] === "email")).toBe(false);
     expect(start).not.toHaveBeenCalled(); expect(offerRead).not.toHaveBeenCalled();
+    // Missing discovery is explained without starting custody or changing the connection.
+    offerRead.mockRejectedValueOnce(new Error("SCRIPTED same-origin founding offer is unavailable or invalid"));
+    find("input").value = "Personal intent"; find("form").fire("submit"); await flush();
+    expect(root.textContent).toContain("This service is not set up to create rooms. Nothing was sent.");
+    expect(start).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled(); expect(values.size).toBe(0); expect(original).toBeNull();
+    expect(location.hash).toBe("#/start");
     find("input").value = "Personal intent"; find("form").fire("submit");
-    expect(offerRead).toHaveBeenCalledTimes(1);
+    expect(offerRead).toHaveBeenCalledTimes(2);
     location.hash = "#/join"; redraw(); finishOffer(offer); await flush();
-    expect(start).not.toHaveBeenCalled(); expect(root.textContent).toContain("Invitation link"); expect(root.textContent).toContain("Config and key");
+    expect(start).not.toHaveBeenCalled(); expect(root.textContent).toContain("Join with an invitation link"); expect(root.textContent).toContain("Join with a config and key");
     location.hash = "#/start"; redraw(); find("input").value = "Personal intent"; find("form").fire("submit"); finishOffer(offer); await flush();
     expect(start).toHaveBeenCalledTimes(1); expect(start.mock.calls[0]![2].mode).toBe("new");
     expect(start.mock.calls[0]![2].offer?.definition).toBe("platform:register@8");
@@ -128,8 +144,10 @@ test("Start is explicit; Back fences late discovery, reload only offers Check an
     original = { ...original!, configured: { register: legacyRegister, definition: "platform:register@7" } };
     selectedDirectory = { ...directory, scope: scopeIdOf({ v: 1, kind: "directory", definition: "platform:directory@3", creator: null, cause: textDigest("SCRIPTED retained UI directory"), ordinal: 0 }) };
     redraw(); await flush(); expect(start).toHaveBeenCalledTimes(1); expect(find("input").hasAttribute("disabled")).toBe(true);
+    start.mockRejectedValueOnce(new Error("SCRIPTED original custody remains unavailable"));
     find("button", "Check status").fire("click"); await flush();
-    expect(start.mock.calls.at(-1)![2].mode).toBe("check"); expect(offerRead).toHaveBeenCalledTimes(2);
+    expect(start.mock.calls.at(-1)![2].mode).toBe("check"); expect(offerRead).toHaveBeenCalledTimes(3);
+    expect(root.textContent).toContain("SCRIPTED original custody remains unavailable");
     find("form").fire("submit"); await flush(); expect(start.mock.calls.at(-1)![2].mode).toBe("continue");
     expect(original!.configured).toEqual({ register: legacyRegister, definition: "platform:register@7" });
     const selectOriginal = start.mock.calls.at(-1)![2].foundingOffer!;

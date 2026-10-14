@@ -231,3 +231,27 @@ export function editTree(
 /** The two public ref names: the fact's entry hash, with no additional domain. */
 export const receiptRef = (operation: FactRef): string | null => factRefName("refs/artroom/receipts/", operation.hash);
 export const importRef = (claim: FactRef): string | null => factRefName("refs/artroom/import/", claim.hash);
+
+/** A file publication is caused by one specific send, not just its entry. */
+export interface FilePublicationCause { from: FactRef; n: number }
+const validSend = (cause: FilePublicationCause): boolean => Number.isSafeInteger(cause.n) && cause.n >= 0 && factText(cause.from) !== null;
+/** One file commit whose message binds the immutable entry and send ordinal. */
+export function filePublicationCommit(format: ObjectFormat, scope: ScopeId, time: Timestamp, tree: string, parent: string, path: string, cause: FilePublicationCause, digest: string): DestinationObject {
+  if (!validSend(cause) || editPath(path) === null || !/^sha256:[a-f0-9]{64}$/.test(digest)) throw new Error("A file publication needs its exact cause, path and content digest");
+  const millis = timeMs(time);
+  if (millis === null) throw new Error("A file publication needs its recorded time");
+  const identity = `artroom <${scope}@artroom.invalid> ${Math.floor(millis / 1000)} +0000`;
+  return object(format, "commit", utf8(`tree ${tree}\nparent ${parent}\nauthor ${identity}\ncommitter ${identity}\n\nWrite ${path}.\n\ncause ${canonicalize(cause)}\ncontent ${digest}\n`));
+}
+/** Distinct sends of one entry have distinct receipt refs and commit identities. */
+export function fileReceiptRef(cause: FilePublicationCause): string {
+  const ref = validSend(cause) ? receiptRef(cause.from) : null;
+  if (!ref) throw new Error("A file receipt needs its exact sending cause");
+  return `${ref}/${cause.n}`;
+}
+export function fileReceiptObjects(format: ObjectFormat, scope: ScopeId, time: Timestamp, cause: FilePublicationCause, receipt: unknown): DestinationCommit {
+  if (!validSend(cause)) throw new Error("A file receipt needs its exact sending cause");
+  const blob = object(format, "blob", utf8(canonicalize(receipt))), tree = oneFile(format, "receipt.json", blob);
+  const commit = commitObject(format, scope, time, tree.id, `Receipt for send ${cause.n}.`, "cause", cause.from);
+  return { commit: commit.id, objects: [blob, tree, commit] };
+}

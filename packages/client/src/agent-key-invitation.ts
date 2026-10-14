@@ -3,10 +3,15 @@ import { invitationServiceUrl } from "./invitation-service.ts";
 import type { FactRef, MemberRef, ScopeRef, ScopeId } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, isFactRef, isMemberRef, isRecord, isScopeId, isScopeRef, parseStrict, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 export const AGENT_KEY_LINK = "artroom-agent-key:";
+/** The membership definitions an agent-key invitation may name: each is the exact pin of the membership scope it was issued at. */
+export const AGENT_KEY_MEMBERSHIPS = ["platform:membership@2", "platform:membership@4", "platform:membership@5"] as const;
+export type AgentKeyMembership = (typeof AGENT_KEY_MEMBERSHIPS)[number];
+export const isAgentKeyMembership = (value: unknown): value is AgentKeyMembership => typeof value === "string" && (AGENT_KEY_MEMBERSHIPS as readonly string[]).includes(value);
 export interface AgentKeyInvitation {
   v: 1; kind: "agent-key"; service: string;
   repository: { directory: ScopeRef; membership: ScopeRef; rules: ScopeId; destination: ScopeId };
-  definition: "platform:membership@2"; handle: string; controller: MemberRef;
+  /** The membership's pinned definition at issuance; the enrolment is verified against the receipt's definition, never a name. */
+  definition: AgentKeyMembership; handle: string; controller: MemberRef;
   member: FactRef; invitation: FactRef; secret: string;
   expected: { on: number; member: number };
 }
@@ -15,7 +20,7 @@ const same = (a: unknown, b: unknown): boolean => canonicalize(a) === canonicali
 const revision = (n: unknown): n is number => Number.isSafeInteger(n) && Number(n) >= 1;
 export function isAgentKeyInvitation(value: unknown): value is AgentKeyInvitation {
   try {
-    if (!closed(value, ["v", "kind", "service", "repository", "definition", "handle", "controller", "member", "invitation", "secret", "expected"]) || value["v"] !== 1 || value["kind"] !== "agent-key" || value["definition"] !== "platform:membership@2" || typeof value["service"] !== "string" || typeof value["handle"] !== "string" || utf8(value["handle"]).length > 256 || !/^@[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value["handle"])) return false;
+    if (!closed(value, ["v", "kind", "service", "repository", "definition", "handle", "controller", "member", "invitation", "secret", "expected"]) || value["v"] !== 1 || value["kind"] !== "agent-key" || !isAgentKeyMembership(value["definition"]) || typeof value["service"] !== "string" || typeof value["handle"] !== "string" || utf8(value["handle"]).length > 256 || !/^@[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value["handle"])) return false;
     const origin = invitationServiceUrl(value["service"]);
     if (!origin || origin.origin !== value["service"] || origin.pathname !== "/") return false;
     const r = value["repository"];

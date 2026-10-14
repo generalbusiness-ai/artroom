@@ -11,5 +11,5 @@
       "@generalbusiness/dap-derive/testing": ["../../packages/derive/test/fixtures.ts"]
     }
   },
-  "include": ["*.ts", "browser/model.ts", "browser/model.test.ts", "browser/custody.ts", "browser/custody.test.ts"]
+  "include": ["*.ts", "browser/model.ts", "browser/model.test.ts", "browser/custody.ts", "browser/custody.test.ts", "browser/publication.test.ts"]
 }
