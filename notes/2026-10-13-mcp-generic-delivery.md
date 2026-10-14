@@ -827,12 +827,16 @@ invitation's, recorded at creation. The watch timer is the runtime's
 
 **Paths.** The discovery head landed as main `8235c6b3` while this head was
 being built, and main moved again to `27bb745f` (the logo and self-host
-delivery records) and to `2a40db9b` (the Counter preparation note) during
-review; main was merged into the branch each time, taking main's version
-of every path this head does not change. At the head, `git diff
---name-only origin/main...HEAD` lists this head's own 27 paths (the page
-and counting Worker modules and their built assets among them, regenerated
-for the bytes and contract changes) and no other.
+delivery records), to `2a40db9b` (the Counter preparation note) and to
+`dedcb14b` (the architecture diagram, the `dap.js` rename and the
+invitation service URL check, the sprint report and the Lending library
+baseline) during review; main was merged into the branch each time, taking
+main's version of every path this head does not change. The last merge
+met main's Lending route beside this head's hosted route in the Worker's
+fetch, kept both, and regenerated the page, counting and lending Worker
+modules and their built assets, since each bundles the bytes package this
+head changes. At the head, `git diff --name-only origin/main...HEAD` lists
+this head's own 29 paths and no other.
 
 ## What is owed
 
