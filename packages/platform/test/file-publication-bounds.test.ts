@@ -31,7 +31,10 @@ function make() {
   const asked = { name: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(21)), to: seed, from: factRefOf(original), n: 0, message };
   write(ledger, judgeGenesis(ledger.state, definition, asked, { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [fetched(claim, "platform:register")], prepared: [], source: { entry: original, under: "platform:directory" }, platform }));
   const control: Request | { class: "control"; type: "confirm"; genesis: ReturnType<typeof factRefOf> } = { class: "control", type: "confirm", genesis: ledger.fact(0) };
-  const confirmation = handMade(directory, "confirm-destination", [{ n: 0, to: ledger.at, message: control }]);
+  const returned = ledger.last.sends.find(send => send.message.class === "result");
+  if (!returned || returned.message.class !== "result") throw Error("The judged genesis returned its original result");
+  const confirmation = { ...handMade(directory, "confirm-destination", [{ n: 0, to: ledger.at, message: control }]),
+    input: { type: "delivery", from: ledger.fact(0), n: returned.n, message: returned.message, clause: "applied" } as const };
   write(ledger, judgeDelivery(ledger.state, definition, { to: ledger.at, from: factRefOf(confirmation), n: 0, message: control }, { clock: clockOf(ledger.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source: { entry: confirmation, under: "platform:directory" }, own: ledger.own, platform }));
   const adopt = ledger.act(keys.rita, "adopt-head", { on: 0, expected: { on: ledger.item(0).revision }, fields: { commit: HEAD, why: "SCRIPTED host base for bounds" } }, { platform });
   expect(adopt.result).toBe("write");
