@@ -1,83 +1,114 @@
 # Provision and run the lending library
 
-**Run status: a rehearsal ran on 14 October 2026, without publication;
-see [the rehearsal run](#the-rehearsal-run-14-october-2026).** This is
-the operator runbook for the full lending request. It records no deployed outcome, browser result, online room, or
-published page. Fill the observation ledger from the original run before
-calling those outputs delivered.
+**Run status: the final room completed the exact-script automated browser
+story and all seven publications.** The curated public Git history is now published and anonymously verified.
+Homepage hosting and the final validation gate remain pending. Two earlier rehearsals are retained.
+The publication rehearsal produced real browser acts, written receipts, and
+anonymous immutable pages. Its Small pot description differed from the
+approved script, so its mechanical completion is not final story acceptance.
+The [earlier rehearsal](#the-rehearsal-run-14-october-2026) remains a separate,
+nonpublishing room. The fresh final room has been created and inspected. The Library, browser story, and per-step publication results now have their
+own original evidence. Final public-history and homepage results remain separate.
 
 The approved [library design](../../notes/2026-10-13-lending-library.md)
 remains unchanged. Amendment `19264feb21b49756fb3e9913b0ba11b2520e1e3a`
 requires all six outputs and replaces browser page edits with publication
-from the lending fold. The new destination and factory fields must wait for
-that publication design's approval. This runbook does not authorize building
-or choosing those versions early.
+from the lending fold. The [publication design](../../notes/2026-10-13-fold-publication.md)
+is approved. Its implementation landed at
+`5e11ca0300cc0a538f7c59b36d490f5cf14be15f`, from reviewed code
+`7335aa27d3b5b42026ba1f6b3192692918d5e59e`. The full six-output request
+remains open until its deployed and public witnesses are complete.
 
 ## Bind the service and room
 
-The command blocks target the pending final physical launcher
-`packages/cli/bin/dap.js`. The preserved preparation Source still has
-`packages/cli/bin/artroom.js`. Bind the actual renamed file in the final
-composition before any command is run. No command here has been executed.
+Use `packages/cli/bin/dap.js` from the approved, landed checkout. The
+final service is `https://dap-library-publication-final-1014.inguz.workers.dev`.
+Its Worker and Artifacts namespace are `dap-library-publication-final-1014`.
+Its configured version is `db397334-9455-436d-b197-1faba3a9f90c`; SQLite is
+`975bba8bbe8e4921a643d82a7e14f89e`. The older `dap-lending`,
+`dap-lending-demo-1014`, and `dap-library-publication-1014` remain separate.
 
-Record the approved Source head, deployed bounds, exact application cohort,
-Worker name, Artifacts namespace, and verified service origin. Use a separate
-library deployment whose Artifacts binding and register configuration belong
-to this room. Do not repoint the workroom's register configuration. Public
-destinations are unset until their original readbacks have been verified.
+The following commands describe provisioning, not permission to replay a
+completed run. The final room already exists. Retain its original plan and operator key;
+do not rerun provisioning against that custody. The earlier publication
+rehearsal's custody and record remain intact. The final register and service
+configuration are bound to their own original plan, not inferred from a rehearsal.
+A seat is your registration in membership. A device key signs acts for that
+seat. The operator key signs installation and setup, and is kept separately
+from each browser's nonextractable device key.
 
-Keep the operator key and each pending envelope in an owner-only
-`ARTROOM_HOME`. Supply the actual service origin and namespace below:
-
-```sh
-node packages/cli/bin/dap.js install --plan "<service-origin>" --cohort application --host artifacts --namespace "<namespace>"
-```
-
-Retain the printed plan, its deadline, and its register ID. Set that
-register ID in the library deployment's `ARTIFACTS_CONFIG`. Its namespace
-must match both `ARTIFACTS_NAMESPACE` and the `ARTIFACTS` binding. Complete
-that deployment configuration through the separately reviewed deployment
-procedure. Then finish the retained plan:
+Keep the operator key and each original request in a separate, owner-only
+`ARTROOM_HOME` outside the checkout. Do not expose invitation links, private
+keys, session headers, or pending envelopes in public evidence.
 
 ```sh
-node packages/cli/bin/dap.js install --planned --cohort application
-node packages/cli/bin/dap.js create lending-library --handle @neighbour
+node packages/cli/bin/dap.js install --plan "https://dap-library-publication-final-1014.inguz.workers.dev" --cohort application-publication --host artifacts --namespace "dap-library-publication-final-1014"
 ```
 
-If the result is unknown, preserve the original plan and request. Resume
-that request through the supported recovery path. Do not create another room
-to replace an uncertain first one.
+Retain the original plan, deadline, and register ID. Set `ARTIFACTS_CONFIG`
+from that plan: exactly `registerScope`, `namespace`, `host`, `maxBytes`, and
+`credentialIdentity: "adapter-attempt"`. The host is the verified Artifacts
+hostname, not the install selector `artifacts`. Match the namespace to
+`ARTIFACTS_NAMESPACE` and the `ARTIFACTS` binding. Configure the new Worker
+through the reviewed deployment procedure, preserving its session secret.
 
-Record full register, directory, membership, rules, and destination
-references, including incarnation and definition. The current baseline
-application cohort uses register 5, directory 5, membership 4, rules 3, and
-destination 2. It is not the demo or Counting cohort. Verify actual creation
-and confirmation receipts before taking the next step.
+Then finish the same original plan:
 
-A prepublication rehearsal uses its recorded baseline pins. If the approved
-fold design changes a pin or genesis field, provision the final room with
-those explicitly approved values. Do not silently upgrade the earlier room
-or call its unpublishing rehearsal the final online shelf.
+```sh
+node packages/cli/bin/dap.js install --planned --cohort application-publication
+node packages/cli/bin/dap.js create lending-library --handle @library-operator
+```
+
+A selected plan lives for 840 seconds. An unknown attempted install keeps
+its original envelope and deadline. Do not refresh the plan or silently
+replace the operator key. Check and reconcile the retained outcome before
+any new mutation. An unattempted expired plan remains retained; a new plan
+requires a separate empty custody directory and its own configured register.
+
+The retained run reports original final plan `55114`, install `58075`, verification
+`79522`, creation `90673`, and native inspection `85900` completed with exit 0.
+The final founder is `@library-operator`. Its recorded Artifacts repository is
+`jfdinhhufm5jfjqr4cqsgk5kvw2lhyxx5lh4gaqgp74ldijemsla-1`.
+The later browser run `9377` separately proves the final Library journey;
+provisioning alone did not show an act taking effect.
+
+Record full references, including incarnation, for register 9, directory 8,
+membership 4, rules 3, destination 4, and inbox 1. The new cohort does not
+upgrade the earlier register 5, directory 5, and destination 2 rehearsal.
+
+The rules scope stores definition activations and checker configuration.
+Rule expressions are part of a definition; they are not that rules scope.
+An act is signed. An action such as `lending.member` is a role permission
+that allows a member's key to sign the corresponding acts.
 
 ## Establish the current lending application
 
-Validate the exact declaration under the deployed bounds through the public
-validator. Keep the canonical declaration bytes and their digest with the
-run's evidence. The current baseline pin is
-`sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff`.
-These commands describe that baseline, not a future publishing definition:
+Use the approved declaration's canonical bytes under the deployed bounds.
+Its pin is
+`sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7`.
+The checked-in authoring file has one trailing LF. `--value` sends a file
+unchanged, so remove that authoring newline before activation or establishment.
+The current canonical input is 4,458 bytes, not the 4,459-byte authoring file.
 
 ```sh
+umask 077
 node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set name=lending --value "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff --set 'values={}' --set execution=recorded-do --value "$ARTROOM_HOME/lending.json"
+node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set name=lending --value "$ARTROOM_HOME/lending.json"
+node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set 'values={}' --set execution=recorded-do --value "$ARTROOM_HOME/lending.json"
 ```
 
-Keep the exact signed establishment request before submission. Reconcile an
-unknown answer against its original accepted fact and confirmed child seed.
-Record the application's actual full reference. Its factory supplies the
-trusted opener and membership; the current baseline genesis values are `{}`.
-A future factory-supplied destination is a separate approved requirement.
+Keep the exact signed establishment request before submission. Reconcile
+an unknown answer against the fact that records its original act taking effect and confirmed child seed.
+Directory 8 supplies the trusted opener and the room's own destination.
+The caller supplies canonical `{}`; the caller cannot override `destination`.
+
+In the retained publication rehearsal, original activation `81460` refused `bad-field` when
+sent the authoring LF. Corrected canonical activation `87349` was recorded
+at rules sequence 2. Establishment `84688` was recorded at directory sequence
+5. Both original outcomes remain part of the evidence. In the final room,
+the retained run reports canonical activation `71302` recorded at rules sequence 2. The established final Library is now observed as
+`sc_vlhn4jvbohib33xwlhqntgo4enlsbvsu4x5fipygw6twfgl7ljua`, incarnation `in_slxgyvbpyi6vqxxj6xv6bhrnfi`.
+Do not reuse the rehearsal's Library reference.
 
 ## Preserve each role's actions
 
@@ -94,7 +125,7 @@ node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set ro
 node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set role=member --set 'actions=<complete-member-JSON-list>'
 ```
 
-Record both before and after lists and their accepted facts. Show that an
+Keep both before and after lists and the facts of the acts that took effect. Show that an
 admin still has an earlier administration action, and that a member keeps
 its earlier actions. Do not claim immediate revocation. The native scenario
 advances a scripted clock by 301 seconds; it does not prove deployed elapsed
@@ -108,7 +139,7 @@ actual membership's definition, checks the issuer's active key and
 destination references against that definition's directory. It makes the
 invitation secret and keeps it with the exact signed `invite-member`
 request in an owner-only private file before anything is sent. It verifies
-the accepted receipt, the recorded invitation's handle, role, hash and
+the receipt confirming that the act took effect, the recorded invitation's handle, role, hash and
 expiry, and prints a link tagged with the membership's exact definition,
 `platform:membership@4` here:
 
@@ -121,13 +152,14 @@ and sends nothing, or `dap invite --continue`, which resumes the exact
 original request. While an invitation is unresolved the command refuses a
 new one; do not issue a second invitation to replace an unknown one.
 `packages/cli/test/agent-key.scope.test.ts` shows a lost answer checked
-and the link joined on a membership 4 room. A deployed issuance is still
-**unrun**.
+and the link joined on a membership 4 room. In the retained publication rehearsal,
+the retained run reports verified four-hour invitations for `@neighbour` as admin and
+`@nasruddin` as member. The founder remains `@library-operator`.
 
 The CLI's person join loads the explicit membership pin and keeps its
 signed join. The Library browser additionally requires the membership 4
 tag and the current service origin, then verifies the native receipt
-before enrollment is called joined.
+before enrollment is confirmed.
 
 Open the verified library service's `/lending/` interface in an independent
 browser profile. Paste the invitation into **Invitation link** and use the
@@ -136,31 +168,43 @@ run. Do not put the invitation, secret, key, or session headers in public
 evidence.
 
 Verify a distinct browser device key and membership 4 enrollment with the
-native accepted receipt, full membership reference, and incarnation. A test
+native receipt confirming that the act took effect, full membership reference, and incarnation. A test
 Worker result does not substitute for this deployed browser witness.
 
-Exercise an interrupted donation and an interrupted join at the reviewed
-custody boundary. Retain the original request before dispatch. Reload, then
-use **Check the join** or **Continue the join** for enrollment, and
-**Check** or **Continue** for a lending act. These are the prepared SDK
-interface labels, not observed browser results. Record the accepted fact and exactly one donation or enrollment.
-Do not sign a replacement for an unknown original. The custody owner prepares
-and reviews this harness separately; these steps have not been run.
+If an actual request has an unknown answer, reload and use **Check the join**
+for enrollment, or **Check** for a lending act. Continue only the same retained
+request through its supported recovery path. Keep the fact confirming that the act took effect and
+exactly one donation or enrollment. The retained run reports both browser joins in the
+publication rehearsal. Nasruddin's lost join answer was reconciled with
+**Check the join**, without a second act. The later Small pot donation was
+also reconciled with **Check**. Keep both recoveries with their original room;
+no additional induced interruption is a condition of final acceptance.
+
+The final run `9377` passed in three separate persistent browser profiles.
+The retained run reports distinct nonextractable device keys. The join that took effect before its answer was lost
+and the lost Small pot answer were both reconciled with **Check**, without
+second acts. The run is machine-operated and does not show human acceptance
+or two physical devices. Preserve the earlier rehearsals' recoveries as their
+own evidence too.
 
 ## Play the story and complete publication
 
-Play [the demo script](demo-script.md). Keep the seven accepted lending acts
-in order with their signers, alongside genesis and any other actual history
+Play [the demo script](demo-script.md). Keep the seven lending acts that took effect
+in order with their signers, alongside genesis and any other actual journal
 entries. Record both refusals separately. Read actual item numbers from the
-record; do not infer them from their names or a test fixture.
+journal; do not infer them from their names or a test fixture.
 
-Current baseline screens show shelf text as unpublished. Do not manually
-edit repository files to impersonate fold publication. After the fold design
-is approved and its implementation is reviewed, bind its exact lending and
-destination definitions and factory fields, then run the final story.
-For each accepted lending act, record publication separately from acceptance:
-its original send, destination receipt, commit, numbered shelf path, and the
-lending entry named by the page. Retain pending or unknown outcomes honestly.
+The deployed browser signs bounded shelf text with each lending request.
+The destination judges and publishes that text. The browser separately reads
+the immutable page at a commit; an act taking effect alone does not prove publication.
+Do not manually edit repository files to impersonate fold publication.
+For each lending act that takes effect, check publication separately from the act taking effect:
+its original send, the destination receipt naming the sending entry and send
+ordinal, the commit, and the thing's fixed `shelf/<16 characters>.md` path.
+The browser chooses that path before donation is signed. The page cannot
+name the future entry that creates it. The signed text names the lending
+scope and incarnation; the receipt ties the commit to its actual entry.
+Retain pending or unknown outcomes honestly.
 
 Verify a cancelled thing's page remains present with its reason. A member's
 name, description, and reason are literal text. The current renderer can
@@ -168,12 +212,25 @@ autolink a bare address or email address; this is the recorded deviation from
 the design's stronger “or a link” wording, not arbitrary markup permission.
 
 An unauthenticated visitor must read the shelf listing, the thing pages,
-and repository commit history. Compare each page's record pointer with the
-lending entry. The lending journal is for seated members; record an actual
+and repository commit history. Check that each page names the lending
+scope and incarnation, and use the destination's receipts to match each
+commit to the lending entry that sent it. The lending journal is for
+members with a seat; record an actual
 unauthenticated refusal rather than publishing a private read credential.
-This is the public history witness. It remains unrun.
+This is the public-history witness. The retained run reports the publication rehearsal's clone and Git extraction completed
+mechanically. The final exact-script run completed its seven lending acts and publication
+receipts. The final original clone and extraction passed: actual Git commit
+bytes, linear parents, page blobs, and all seven fetched receipt refs and
+canonical receipt bodies were verified. The later ordinary history publication completed at commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`, separate from the seven-story
+commit `bd724ee1d21486dbe822faf740312318be38cb5d`. Readback `19810`
+verified 19 anonymous responses: the index, 14 raw commit and receipt
+attachments, the shelf folder, and three current pages. It checked the
+ordinary written receipt and the child's published result after normal
+cleanup. This does not prove judgment Replay, independently fetched new
+history Git objects, or human acceptance.
 
-Members can inspect the lending history with the actual full scope reference:
+Members can inspect the lending journal with the actual full scope reference:
 
 ```sh
 node packages/cli/bin/dap.js log "<lending-scope>"
@@ -181,23 +238,27 @@ node packages/cli/bin/dap.js verify "<lending-scope>"
 ```
 
 Record verifier coverage and trusts as well as the result. Missing foreign
-history is a finding, not a successful verification.
+journal entries are a finding, not a successful verification.
 
 ## Bind the homepage destinations
 
 The Home links are ordered **Room, Library, Counter, Jam, Documentation**.
-The Library page has three destinations to bind only after verification:
+The Library page has three destinations, each bound only after
+verification:
 
 | Destination | Required result before adding its link |
 | --- | --- |
 | Member interface | Deployed `/lending/` screens, actual membership 4 browser join, and original-request recovery shown. |
-| Published shelf | Anonymous read of the final room's numbered pages and current public history. |
-| Members' record | Verified member interface record view or documented seated-reader route. No invitation or credential in the URL. |
+| Published shelf | Anonymous read of the final room's shelf pages and current public history. |
+| Members' journal | Verified member interface journal view or documented route for a member with a seat. No invitation or credential in the URL. |
 
-They are currently unset. Replace the unavailable text with those actual
-verified URLs in the final Source, then run its owning Home check and one
-final gate through the Root-owned validation procedure. Publish the homepage
-normally only after Source approval and landing. Retain its original build,
+The existing member-interface and members' journal links target the older
+`https://dap-lending.inguz.workers.dev/lending/` rehearsal. Those links landed
+at `26d2bc8a`. Preserve their historical record. Final publication-room link
+changes are prepared separately and remain unhosted in this draft. Replace unavailable text only with the new room's
+verified destinations in the final commit, then run the homepage's own test
+and one final gate. Publish the homepage only after that commit is approved
+and landed. Retain its original build,
 deployment version, and byte, MIME, cache, and link readbacks.
 
 ## The rehearsal run, 14 October 2026
@@ -211,7 +272,7 @@ built, under the pins it then needs.
 
 | Step | Observed |
 |---|---|
-| Source | Main `dedcb14b`. |
+| Code | Main `dedcb14b`. |
 | Service | Worker `dap-lending`, `https://dap-lending.inguz.workers.dev`, its own Durable Object namespace and Artifacts namespace `dap-lending`. Version `4b289327-c1c8-47fa-b108-ce84cad6975a` carries `ARTIFACTS_CONFIG`. `DEPLOYMENT` and `SESSION_SECRET` were set through stdin. |
 | Room | `install --plan --cohort application`, then `install --planned`, then `create lending-library --handle @neighbour`: register `sc_c67lq575…`, directory `sc_sgj2favz…` (`platform:directory@5`), membership `sc_x6lr4msi…` (`@4`), rules `sc_xeeasdyw…` (`@3`), destination `sc_kkehgsll…` (`@2`); each created and confirmed. |
 | Definition | `activate` took effect at rules entry 2; `establish-application` at directory entry 5. The lending scope is `sc_vsleihvx…`, under the pin `sha256:439cd20e…`. |
@@ -220,7 +281,7 @@ built, under the pins it then needs.
 | Browser join | Chrome, its own profile, driven by Playwright. The answer to the join was dropped after the scope received it. The page said "No answer came back that could be trusted. The original join is kept." After a reload, **Check the join** read the original: "You joined as @nasruddin." One join, membership entry 8. |
 | Story | Seven acts in the script's order, lending entries 2 to 8: donate Big pot (@neighbour, command line); borrow, return, donate Small pot, borrow (@nasruddin, browser); cancel "Nasruddin says the pot died" and donate New big pot (@neighbour, command line). |
 | Interrupted donation | The answer to the Small pot donation was dropped after the scope received it. After a reload the page offered **Check**, **Continue** and **Give up**; **Check** said "The kept request took effect." One donation, entry 5. |
-| Refusals | The neighbour's borrow of the lent big pot: `guard-failed`. Nasruddin's cancel, reason "The pot died": the page offers **Cancel this thing** to a member too, and shows "Only staff can cancel a thing. (unauthorized)". Neither is in the record. |
+| Refusals | The neighbour's borrow of the lent big pot: `guard-failed`. Nasruddin's cancel, reason "The pot died": the page offers **Cancel this thing** to a member too, and shows "Only staff can cancel a thing. (unauthorized)". Neither is in the journal. |
 | Verify | `dap verify` on the lending scope: consistent, replay mode, entries 0 to 8 with the directory, register, membership, rules, destination and inboxes it names. |
 
 Corrections found in the run:
@@ -229,27 +290,35 @@ Corrections found in the run:
   the digest of the bytes without it. `--value` sends a file as it is, so
   the runbook's first commands were refused `bad-field`. The commands
   above now send a copy without the newline.
-- The demo script's shot 8a says not to claim that the member interface
-  offers a cancel button to a member. It does; the scope refuses it.
+- The demo script's shot 8a said not to claim that the member interface
+  offers a cancel button to a member. It does, and the scope refuses it.
+  The script now shows that refusal.
 
 Not done in this run: publication, the published shelf, the public
 history witness, and a second physical device.
 
 ## Observation ledger
 
-All deployed and browser observation slots below are currently **UNRUN**.
-The existing definition and native-fixture witnesses retain their original
-Source bindings; this ledger does not say they never ran. Record original
-terminals and uncertain outcomes before any continuation. Keep failed
-attempts as evidence.
+The publication rehearsal has deployed assets, native provisioning, browser
+joining and recovery, publications, and a mechanically completed Git clone
+and extraction. Its description mismatch prevents final script acceptance.
+The final run `9377` passed with the approved Small pot description, both
+original-answer checks, and three anonymous pages at commit
+`bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction passed, including actual parents, page
+blobs, and receipt bytes. The curated public history was published and its index, raw companions,
+and current shelf pages were anonymously verified at
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Homepage hosting and the
+final validation gate remain pending; the six-output parent stays open. Keep each
+rehearsal's original results, failures, and uncertainties separate from the
+future final run.
 
 | Output | Evidence to record |
 | --- | --- |
 | 1. Definition and scenario | Exact approved bytes and pin; real-scope story, refusals, another member's return, live-item bound, and final-state witnesses. |
-| 2. Member interface | Actual screens, browser storage, distinct device join, original-request custody and recovery, acceptance and publication shown separately. |
+| 2. Member interface | Actual screens, browser storage, distinct device join, original-request custody and recovery, the act taking effect and publication shown separately. |
 | 3. Deployed runbook | Service/version/bounds, full scope references, original commands and receipts, complete role lists and measured grant window. |
 | 4. Demo script | Actual controls and outcomes for every shot; preserve Nasruddin's exact spoken line and donation description. |
-| 5. Online room | Final room with the story already played, three numbered shelf pages, cancelled-page reason, public commits and member-only journal. |
+| 5. Online room | Final room with the story already played, three shelf pages at their `shelf/<16 characters>.md` paths, cancelled-page reason, destination receipts, public commits and member-only journal. |
 | 6. Homepage Library | Verified three destinations, required Home ordering, original normal publication and served readbacks. |
 
 A local test, plan, or prepared page does not close the six-output request.

@@ -5,7 +5,7 @@ under `packages/` that hold the substrate, the platform definitions, the
 Git code and the checker service. A tenth package, `lanes`, holds the two lane
 definitions as data, and [lanes.md](../apps/room/docs/lanes.md) describes it. This guide is
 for a technical reader who has not read the design notes. It says what a scope is, how a change to one takes effect,
-how scopes work together, how a history is checked, and what is not built
+how scopes work together, how a journal is checked, and what is not built
 yet.
 
 The scope and replay contract is the authority for the design. Where the
@@ -24,7 +24,7 @@ why. Nothing in either note is adopted by being built.
 | `@generalbusiness/dap-git` | The Git object reader, commands, push evidence, token gateway and snapshot builder, with separate Web API modules for smart HTTP and GitHub App requests. It runs outside a scope's commit. Scope and checkers import it. | contract, bytes |
 | `@generalbusiness/dap-checkers` | The pure parts of the checker service: its own read of a job before a run, its record of at most one run for a job, the runner's checkout and gateway rule, and the signer. It has no runner, no storage and no Worker: each is a port with no adapter. | contract, bytes, git |
 | `@generalbusiness/dap-scope` | The runtime of a scope on a Cloudflare Durable Object with SQLite storage, the Worker's routes and opt-in wiring for two Git hosts, GitHub and the hosting's own Git service ([hosts.md](hosts.md)). | contract, bytes, derive, platform, git |
-| `@generalbusiness/dap-replay` | An independent check of a history, its report, and the command `artroom-replay`. | contract, bytes, derive |
+| `@generalbusiness/dap-replay` | An independent check of a journal, its report, and the command `artroom-replay`. | contract, bytes, derive |
 | `@generalbusiness/dap-client` | Building and signing an intent, and a typed handle on one scope. | contract, bytes |
 
 The packages' guides and exported modules describe their parts. The
@@ -36,9 +36,9 @@ imports the lanes package.
 
 A scope is one small, independent record with its own rules. It holds:
 
-- a **history**: a list of entries, numbered from 0, each naming the hash
+- a **journal**: a list of entries, numbered from 0, each naming the hash
   of the one before it;
-- **items**: the things the history is about, each with a type, a state
+- **items**: the things the journal is about, each with a type, a state
   and some slots;
 - one **definition**: the rules that say which changes are allowed.
 
@@ -96,7 +96,7 @@ created before version 2 keeps creating rooms at version 1.
 The table describes this candidate's supported declarations. Every @1
 declaration preserves actual main `1eed91aa`, including its definition-byte
 places. It does not establish the executable or judging source of older
-histories; that historical correspondence remains owed.
+journals; that historical correspondence remains owed.
 
 | Definition | Version 1 | Version 2 |
 |---|---|---|
@@ -194,17 +194,15 @@ A scope answers a submitted intent in one of four ways (`Answer`):
 |---|---|---|
 | `accepted` | The act is an entry. The answer carries a receipt. | Keep the receipt. |
 | `refused` | The request was refused. The answer names a reason and the head it was judged at. When the guard that failed declares a `reason`, the answer also carries it, as `name`. The category alone proves no absence of timed entries. | Read the reason and the name. A refusal is a statement about that head only. |
-| `unavailable` | This reply confirms no acceptance. Timed entries may already have been written, or an accepted replay may not have reached its receipt. | Inspect the history and original request before another mutation. Recovery requires the same original signed intent. |
+| `unavailable` | This reply does not say whether the act took effect. Timed entries may already have been written, or a replay of an act that took effect may not have returned its receipt. | Inspect the journal and original request before another mutation. Recovery requires the same original signed intent. |
 | `mismatch` | The same actor and key are on an entry with another intent. | Inspect the recorded intent and original request before another mutation. |
 
 A **receipt** (`Receipt`) holds the fact of the entry, the effects it
 derived, and a duty ID for each message it sent.
 
-The idempotency key belongs to the first intent that was accepted under
-it, for the life of the scope. Exact replay can return the accepted receipt
-without judging the act again. A timed drain can run first and return
+The idempotency key belongs to the first intent that took effect under it, for the life of the scope. Exact replay can return the earlier receipt without judging the act again. A timed drain can run first and return
 unavailable before that receipt. Keep the original signed envelope and inspect
-the history rather than signing a new request to recover a lost reply.
+the journal rather than signing a new request to recover a lost reply.
 
 ## How a change takes effect
 
@@ -218,7 +216,7 @@ A scope processes one input at a time. Each is a **turn**:
    its own `timed` entry, in a fixed order: earliest deadline, then lowest
    item ID, then rule name. No other input may pass a due deadline.
 3. The head is noted.
-4. The rules the input meets are evaluated, outside the commit.
+4. The rule expressions the input uses are evaluated, outside the commit.
 5. **The commit**, in one storage transaction: the clock is read once; the
    head is checked again; the input is judged; the entry is sealed and
    hashed; its row, its sends and its retained inputs are written; and the
@@ -406,7 +404,7 @@ sender wrote the `self` mark in a message, a reader in another scope reads
 the record `{ "self": true }`, and not the sender's entry.
 
 **Local facts.** A fact that names this scope's own entry is not fetched.
-It is checked against the scope's own history, and a wrong hash is refused
+It is checked against the scope's own journal, and a wrong hash is refused
 `fact-mismatch`. It is then compared as the entry's position.
 
 **Guards.** A guard has three results: it holds, it fails, or it is not
@@ -657,7 +655,7 @@ a cursor `next` when there is more; or a refusal with a reason.
 | `entry` | One entry. |
 | `outbox` | A page of the scope's sends, with the attempts and result of each. |
 | `duty` | The outbox row of one send, by its duty ID. |
-| `log` | A page of the history as stored: each entry's canonical bytes. For a verifier. |
+| `log` | A page of the journal as stored: each entry's canonical bytes. For a verifier. |
 | `retained` | One retained input, by kind and digest: a definition, a foreign entry, a rule's input, a detached text until it is redacted, or a value in its byte domain. |
 
 Platform data declares further observations on acts, outcome kinds and
@@ -676,8 +674,7 @@ member beside the signed intent. An outcome's evidence values come from
 its outside port and are checked against the pinned owner's declarations.
 No observation or value changes the signed intent.
 
-**Settlement** answers one question: was this exact signed intent
-accepted? `settle` returns its receipt or `not-found`. It writes nothing.
+**Settlement** answers one question: did this exact signed intent take effect? `settle` returns its receipt or `not-found`. It writes nothing.
 
 The contract's `ScopeApi` is all of these as one interface. The Worker
 serves it twice: over HTTP (`route`, with the routes listed in the scope
@@ -696,16 +693,16 @@ entries, the entries whose cause chain leads within four causes to one of
 those (an outcome to the act that opened its operation, a delivery to
 the entry that sent it, a child's genesis to what created it), and the
 retained inputs that those entries carry. A quoted digest in unrelated text
-is not provenance for an input. Filtered history has only the coverage it
+is not provenance for an input. A filtered journal has only the coverage it
 actually supplies; it does not establish complete replay of omitted entries. So the operator key that signed
 `install` reads the register, and a founder's key reads the register's
 record of its claim, the directory and its three children, before it
 holds a session. Under decision ca8ad1cf, a recent local register signer reads its whole
-history and typed retained inputs. An authenticated session of membership
-created by one of the register's claims also reads that whole history and
+journal and typed retained inputs. An authenticated session of membership
+created by one of the register's claims also reads that whole journal and
 its typed retained inputs, without the signed-entry window; it gains no
-register summary or items permission. Whole register history does not
-grant access to another directory's private history. A reader with
+register summary or items permission. The whole register journal does not
+grant access to another directory's private journal. A reader with
 neither reads nothing. The scope package's guide says what a
 session binds, how it ends, and the form of a signed read.
 
@@ -713,14 +710,14 @@ One credential route answers a read token once to the authorized session of the 
 
 ## Replay, and what a report means
 
-`@generalbusiness/dap-replay` checks a history without running the
+`@generalbusiness/dap-replay` checks a journal without running the
 runtime. `verify(source, options)` reads a scope's stored bytes through a
 `HistorySource` and returns a report. There are two modes.
 
 - **Integrity** checks the chain, each entry's bytes and hash, that the
   scope ID is the digest of the genesis's seed, and the actors'
   signatures. It derives no judgment.
-- **Replay** also folds the history from its genesis and derives every
+- **Replay** also folds the journal from its genesis and derives every
   entry again with the judges of `derive`, from the recorded input, the
   retained inputs and the recorded time. It compares the result with the
   entry, byte for byte. It checks that the kind which the genesis records
@@ -740,7 +737,7 @@ result is one of:
 |---|---|
 | `consistent` | Everything the mode checks holds, for the coverage and trusts stated. |
 | `mismatch` | An entry is not what its bytes, its chain, its signature or its replay say. The report names the entry. |
-| `missing-dependency` | A history that an entry used cannot be read, and no anchor names the entry. |
+| `missing-dependency` | A journal that an entry used cannot be read, and no anchor names the entry. |
 | `incomplete` | A retained input is missing, or a limit was reached. A detached text that is gone with no tombstone is a missing input. No claim is made beyond the coverage. |
 | `unsupported-definition` | The scope pins a definition this replay has no code for: a platform definition whose data and rules the caller did not give, or gave without the rule of one mark; or a declared one that needs a capability's rules, which the caller did not give. The package has none of its own. With the rules of a platform definition, the report lists `platform-code` under `trusts`, with the name and the version. |
 
@@ -748,10 +745,10 @@ result is one of:
 trusts. It is not "verified". A replay trusts, among other things, the
 service's clock, that each read of membership behind a recorded grant
 was made as recorded, and, when the caller gives no known head, the
-service's word for where the history ends. The grant itself is derived
+service's word for where the journal ends. The grant itself is derived
 again, from the observation that it retains and from the membership
-scope's history. A grant with no such observation is no grant: the
-command line reports its entry as a mismatch. Give a head from a receipt you kept, and a history that is shorter
+scope's journal. A grant with no such observation is no grant: the
+command line reports its entry as a mismatch. Give a head from a receipt you kept, and a journal that is shorter
 or different is a mismatch.
 
 Everything a source returns is untrusted. The verifier limits the bytes,
@@ -819,7 +816,7 @@ bindings; they grant no source approval, receipt or request closure.
 | Who may read, and sessions | The same | Read sessions bound to one repository, in `packages/scope/src/sessions.ts`, with the client's side in `packages/client/src/session.ts`. The form of a token and of a session request are source choices (I3 deltas, entries ES1 to ES9). |
 | Platform definitions: register, directory, membership, rules, destination, inbox, task | The same | `packages/platform` supplies six runnable definitions: register, directory, membership, rules, destination and inbox. Each carries every rule of its marks. `platform:task@1` is not supplied, and a runtime or replay that lacks any rule of a pinned version answers `unsupported-definition` for the whole scope. The rules scope answers observations with its revision, the digest of its extents, and the separately retained canonical value. Platform data now states the subjects that acts, outcomes and result clauses observe; the runtime reads them before the turn and retains what the declared rows require. It also reads named values in declared byte domains. The destination reads its reservation evidence from the retained lane entries, observes membership and the rules, judges the touched extents, and counts its work under the branch and publication holders. Its first-head, receipt and deciding-read rules are tested with the real judges in memory (`packages/platform/test/destination-creates.test.ts`); its computed objects and public ref names are checked with real local Git in both object formats (`destination-objects.test.ts`). These witnesses use a made-up bureau or host answers where labelled. The initial GitHub adapter checkpoint owed a deployed run; the [GitHub component witness](../notes/2026-10-07-demo-git-host-live-witness.md) later recorded a real first publication and public clone at source `dfaa5395`, while its authenticated replay probes failed. The separately bound expanded own-host witness above records six consistent authenticated replays. Neither closes full I3 or supplies the task definition. |
 | Hold tokens, workspaces and their export | The same | The hold item, its epoch and its timed end. `workspaceEffects` in `packages/derive` derives its workspace records when the judge has the code of `hold@1`; the production ports supply that code. The production authority reads the membership scope that a lane records. The directory now declares observations of active definitions for `open-issue` and `open-pr`, and of the worker for `open-task`; the runtime can read those subjects before a turn. Native lane hold-token minting and revocation have a driver, but no production adapter reaches a real Git host for those operations. |
-| The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). With only the production defaults no grant is read and nothing is sent outside, so every act and step is refused `unauthorized` and no attempt is sent. A verifier runs them when its caller gives them (`Options.capabilities` and `Options.owners`, in `packages/replay`). The replay command gives none, and answers `unsupported-definition` for a history that needs them. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
+| The rules of the `hold@1` and `git-read@1` capabilities in a running scope: their records, guards, effects and steps | The same | The rules are pure functions in `packages/derive` (`src/capability/`, `src/prepare.ts`), with tests on made-up definitions, and the Git reader is `packages/git`. The production ports hold them (`CAPABILITY_CODE`, in `packages/scope/src/ports.ts`). With only the production defaults no grant is read and nothing is sent outside, so every act and step is refused `unauthorized` and no attempt is sent. A verifier runs them when its caller gives them (`Options.capabilities` and `Options.owners`, in `packages/replay`). The replay command gives none, and answers `unsupported-definition` for a journal that needs them. The tests of a scope have a scripted stand-in, which is named as one, and the lane scenarios T3, T4 and T5b run on the code itself with a stand-in for the Git host. |
 | Publication to a destination, and the evidence of an outside write | The same | The destination has all its outcome rules, a reader of retained change-lane entries, the five reservation observation rows, and held counts for operations, requests, items and a bound withdrawal decision. A publication keeps its receipt and cleanup duties after it becomes final, and releases the remaining reservation when those duties settle. The operations driver reads declared subjects and records the evidence values beside their outcomes, under the pinned owner's byte domains. The first-commit and receipt object builders take the repository's object format explicitly. The production default outside port sends nothing. Explicit GitHub configuration enables register and destination adapters, private credential custody, safe read recovery and retrieval of retained mint replies. The ARTIFACTS binding and ARTIFACTS_CONFIG enable the hosting service adapter; the Worker selects the recorded host, and the demo namespace is pinned to artroom-demo ([hosts.md](hosts.md)). Host authority is pinned to one register and its destinations. Focused witnesses use scripted provider replies and real local Git or SQLite where stated. The expanded live witness records the own-host first head and receipt, their recorded token cleanup answers, and a real clone that advertised both refs. Replay accepts those outside answers as recorded; it does not independently verify provider revocation. That first publication contains an empty tree and establishes no native content-change publication. Native lane hold and Git-read operations still have no production host adapter. |
 | Running the two lane definitions, `issue` and `change` | The authority and publication delivery, for the capability rules and the platform scopes that the rows read | The two definitions as data, in `packages/lanes`, validated whole and pinned by digest. Both use capability forms, whose code the production ports hold, so a scope can be created under either. With only the production defaults no act and no step takes effect, because no grant is read. W1 to W5 and the demo story run real lanes created by the real directory with production membership authority; their Git host and changed set are stand-ins, and W5 signs the checker answer in the test with no runner. The separate graph fixture uses a made-up directory and test authority. [lanes.md](../apps/room/docs/lanes.md) states the remaining native host and live journey limits. |
 | The application: browser pages, the command line, tools for agents | The application delivery | The client handle and the command in `packages/cli`, described in [cli.md](cli.md). Its story fixture uses real authority, signed reads and sessions, a stand-in Git host and test-driven dispatchers. It establishes no complete deployed journey. |

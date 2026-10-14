@@ -5,8 +5,8 @@ thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
 It judges nothing: whether an act takes effect is the scope's decision,
 and the command prints the scope's actual answer category. A refusal exits
-1 with its reason. An unavailable answer confirms no acceptance; timed
-entries may already have been written. Inspect the history before another
+1 with its reason. An unavailable answer does not say whether the act took effect; timed
+entries may already have been written. Inspect the journal before another
 mutation. Recovery needs the original signed envelope; repeating a generic
 command signs a new request.
 
@@ -98,11 +98,10 @@ run `dap install --planned --cohort <cohort>` with the same
 does not renew or replace the expired original.
 
 An attempted or acknowledged original must instead be reconciled from its
-original directory with `install --planned`. Expiry does not prove that a
-request was never accepted and does not authorize a replacement. After
+original directory with `install --planned`. Expiry does not prove that a request never took effect and does not authorize a replacement. After
 creation, the receipt must match the original planned register, definition
 and intent. Its acceptance is a service acknowledgement; independent
-history verification remains separate.
+journal verification remains separate.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.
@@ -157,17 +156,16 @@ required declaration dependencies in the actual rules scope. The authorized
 `establish-application` act on directory@5 names that digest, bounded
 canonical genesis `values` and `execution=recorded-do`. Supply declaration
 bytes beside it; the factory supplies the trusted opener and membership.
-Keep the exact signed creation request before submission and reconcile its
-accepted fact and confirmed child seed after an unknown answer. Do not
+Keep the exact signed creation request before submission and reconcile its recorded fact and confirmed child seed after an unknown answer. Do not
 create a second application to replace an uncertain first one.
 
 Membership must explicitly grant the declaration's domain actions to the
 intended role or agent. Enrollment and a read session alone grant no domain
 act. Respect the deployed grant reuse window after permission changes.
-Provision each verifier reader for the target and every foreign history it
+Provision each verifier reader for the target and every foreign journal it
 needs; a room session may not read another root or membership. Retain the
 actual deployed bounds, exact platform catalog, capability versions and
-parameters with the public configuration. Missing history or unsupported
+parameters with the public configuration. A missing journal or unsupported
 pins remain verification failures. Jam must consume genuine published SDK
 packages; this CLI bootstrap proves no registry, deployment, microphone,
 model, playback or distributed-user acceptance.
@@ -190,7 +188,7 @@ normal Page build passed and reproduced the unchanged generated module.
 An initial tool-hash guard typo stopped before any build; that outcome is
 retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
-independent Source review are still required for this successor.
+an independent review of the code are still required for this follow-up.
 
 **`dap create <name> [--handle @you] [--branch main] [--again]`**
 
@@ -200,17 +198,16 @@ workflows. All three commands use the same creation and recovery code.
 
 The command signs the register's recorded `found` act. It waits until the
 directory, membership, the rules scope and the destination are created and
-confirmed. Then it takes the founder's seat and first key in membership,
+confirmed. Then it takes the founder's seat, their member item, and first key in
+membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
 Before each creation step, the command saves its exact signed envelope:
-`found`, then `seat`, then `first-key`. It saves accepted fact references
-as each step completes. These records contain no private signing key.
+`found`, then `seat`, then `first-key`. It saves the recorded fact references as each step completes. These records contain no private signing key.
 A refusal, unavailable reply or lost answer leaves the request pending;
-a later run keeps the same signature and deadline. An accepted marker is
-checked against the receipt for that exact envelope before reuse.
+a later run keeps the same signature and deadline. A marker that the act took effect is checked against the receipt for that exact envelope before reuse.
 
 ```
 Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
@@ -264,11 +261,10 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 **`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
-is absent from public config. It saves the accepted fact and inbox progress
+is absent from public config. It saves the recorded fact and inbox progress
 before waiting for the member's inbox. After a lost reply or an interrupted
 wait, run `dap join` with the original link again. This reuses the same
-key, request and deadline. An accepted request is confirmed by a read-only
-settlement, even after its deadline. A missing private request or a different
+key, request and deadline. A request that took effect is confirmed by a read-only settlement, even after its deadline. A missing private request or a different
 link stops the retry; it never signs a replacement automatically.
 
 ```
@@ -290,8 +286,7 @@ link with `--check` to settle and follow the original without submitting a
 mutation. Run the same command without `--check` only to Continue explicitly.
 It retains the original signature, idempotency key and deadline.
 
-The command saves a usable connection only after it verifies the accepted
-enrollment, genuine agent and key kinds, controller, recorded directory
+The command saves a usable connection only after it verifies the recorded enrollment, genuine agent and key kinds, controller, recorded directory
 siblings, and active inbox incarnation. A missing private request, changed
 link, person/agent mismatch or definite native refusal keeps the original;
 it does not generate a replacement key or request. Existing `artroom-invite:`
@@ -333,7 +328,7 @@ example, an admin activates the demo profile's change definition with
 `packages/lanes/src/digests.ts`.
 
 **`dap log <scope> [--limit n]`** and **`dap show <entry>`**
-read the history and one entry over the read routes.
+read the journal and one entry over the read routes.
 
 ```
 sc_p6xp2lmd...:8  2099-01-01T00:00:00Z  act add-member by key_baqzbaDy...; 6 effects, 1 sends
@@ -346,7 +341,7 @@ routes, with the platform package's rules and the code of the two lane
 capabilities, `hold@1` and `git-read@1`, so it replays a lane too. It reads with the caller's
 session, and a read that the session is refused goes again as a signed
 read by the caller's key. It prints the verifier's report: the result,
-what it covered, and what it takes on trust. A history whose first page
+what it covered, and what it takes on trust. A journal whose first page
 cannot be read has no report; the command prints
 `... cannot be read: <reason>` and exits 1.
 
@@ -359,9 +354,9 @@ Mode: replay. Within the coverage stated below, the history was folded from its 
 room: the register, the directory, and every scope that the directory
 created and each of those created (membership, the rules scope, the
 destination, each lane, each inbox), reached by the creations in their
-histories. It prints one line for each scope: its kind, its ID, the entry
+journals. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
-scopes.`, or the first finding, and then the command exits 1. A history
+scopes.`, or the first finding, and then the command exits 1. A journal
 that cannot be read is a finding. The example is from
 `packages/lanes/test/issues.scope.test.ts`, after two issues were closed by
 two published changes:
@@ -635,8 +630,8 @@ session a member can read the scopes that record their membership, and,
 at the register, its genesis and the entries that come from the claim
 that created the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
-it (the intent window), and the retained inputs those entries carry. History and log pages can
-be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-history trust.
+it (the intent window), and the retained inputs those entries carry. Journal and log pages can
+be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-journal trust.
 
 ## What it does not do yet
 
