@@ -10,12 +10,13 @@ import { ownOf } from "../../scope/src/core.ts";
 import { validateDefinition, valueDigest, ruleAt } from "@generalbusiness/dap-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { drainScheduledFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
 import { snapshotReaderOf } from "../../scope/src/worker.ts";
 import { env } from "cloudflare:workers";
 import { ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
+import { Platform, routed } from "../../scope/test/repository.ts";
 import { command, memoryStore, expectedOf, type ActShape, type Context, type Outcome } from "../../cli/src/index.ts";
 import { change3, changeDemo3, issueDemo } from "../src/index.ts";
 
@@ -78,16 +79,6 @@ async function publicationCheckpoint(node: Platform) {
   });
 }
 
-/** One owned driver pass, retaining the original checkpoint and any safe error category. */
-async function publicationDriverCheckpoint(node: Platform, meta: object) {
-  const before = await publicationCheckpoint(node);
-  Object.assign(meta, { publicationCheckpoint: before, publicationDriverCheckpoint: { before, status: "awaiting-owned-pass" } });
-  let count: number | null = null, errorCategory: string | null = null;
-  try { count = await (node.stub as unknown as { effect(): Promise<number> }).effect(); }
-  catch (error) { errorCategory = error instanceof Error ? error.name.slice(0, 80) : "non-error"; }
-  const after = await publicationCheckpoint(node);
-  Object.assign(meta, { publicationCheckpoint: before, publicationDriverCheckpoint: { before, count, errorCategory, after } });
-}
 
 
 
@@ -290,18 +281,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   // STAND-IN for the scheduler: each pass drives the operations of every scope the command waits on, and of the register and the
   // destination, then their dispatchers, until nothing is due.
   const known: Platform[] = [];
-  const pause = async (waiting: readonly string[]) => {
-    const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => new Platform(scope as never))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of nodes) {
-        while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
-        made += await node.stub.dispatch();
-      }
-      if (made === 0) return;
-    }
-    await settle(...nodes);
-  };
+  const pause = async (waiting: readonly string[]) => drainScheduledFixture(() => [
+    ...known, ...[...wired, ...waiting].map(scope => new Platform(scope as ScopeId)),
+  ]);
 
   const files: Record<string, Uint8Array> = { "change3.json": utf8(canonicalize(activeChange)), "one.md": utf8("# One\n"), "two.md": utf8("# Two\n") };
   const person = (): Context => ({ store: memoryStore(), fetch, now, pause, read: async (path) => files[path] ?? null });
@@ -799,7 +781,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
     expect([runs, prepares, snapshots]).toEqual([1, 0, 1]);
     await pause([lane, repository.destination]);
-    if (checkpointMeta) await publicationDriverCheckpoint(G, checkpointMeta);
+    if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
     const published = host.refs.get("refs/heads/main")!;
     expect(published).not.toBe(first);
     expect(host.refs.has(reservationRef)).toBe(false);
@@ -855,7 +837,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "closed" });
   expect(runs).toBe(1);
   await pause([lane, repository.destination]);
-  if (checkpointMeta) await publicationDriverCheckpoint(G, checkpointMeta);
+  if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
   const published = host.refs.get("refs/heads/main")!;
   expect(published).not.toBe(first);
   expect(host.refs.has(reservationRef)).toBe(false);
