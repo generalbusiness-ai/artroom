@@ -85,8 +85,9 @@ lending library sends one kind of message, to its room's destination, to
 publish a page. No declared application yet consists of scopes of its own
 that ask one another.
 
-**Not offered.** One act that takes effect in two scopes at once. A
-request, its result and the sender's result clause are the form.
+**Not offered.** One act cannot take effect in two scopes at once.
+Instead, one scope sends a request, the other answers with a result, and
+the sender's rules decide what that result means.
 
 **The dap-spike's contribution.** Its design note gives the test for where
 a boundary may go: a right that only one party can exercise needs one
@@ -155,8 +156,8 @@ and the seller's one acceptance, and neither sees the other's price.
 
 **Today.** Every member of a room reads the whole record. An application
 can redact a detached text, and it can keep private material in another
-room. Neither gives two readers of one record different views with a
-checked agreement between them.
+room. Neither lets two readers of one record see different parts and
+still check that they agree.
 
 **Use cases.** Group 3 of the [catalogue](use-cases.md#3-private-views):
 the guitar sale with private offers (32), community governance with
@@ -181,9 +182,9 @@ It wrote the conditions for failure before it ran.
   model, and Sale needed six. Every repair was an error about who could
   read what.
 
-**What that means here.** The property can hold, and a person or an agent
-is likely to get the audiences wrong by hand. Private views in dap should
-come with a check that the author cannot skip.
+**What that means here.** Private views can work. A person or an agent
+who writes the readers by hand is likely to get them wrong, so private
+views in dap should come with a check that the author cannot skip.
 
 ### Evidence capture and private custody
 
