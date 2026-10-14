@@ -32,6 +32,7 @@ test("the view lists every thing in order, live from the summary and gone from t
   expect(view().things[0]).toMatchObject({ state: "lent", borrower: "@una" });
   expect(actsFor(view().things[0]!)).toEqual(["return", "cancel", "publish"]);
   expect((await send(keys.una, view(), "return", { thing: big!.id })).result).toBe("write");
+  expect((await send(keys.una, view(), "borrow", { thing: big!.id })).result).toBe("write");
   expect((await send(keys.rita, view(), "cancel", { thing: big!.id, reason: "Nasruddin says the pot died" })).result).toBe("write");
   const after = view();
   expect(after.things.map((thing) => [thing.id, thing.state, thing.state === "gone"])).toEqual([[big!.id, "gone", true], [small!.id, "available", false]]);
@@ -44,7 +45,7 @@ test("the view lists every thing in order, live from the summary and gone from t
   const beforeLabels = JSON.stringify(retained);
   const rows = journalRows(retained);
   expect(rows.filter((row) => ["borrow", "return", "cancel", "publish"].includes(row.kind)).map((row) => row.what)).toEqual([
-    `Big pot (thing ${big!.id})`, `Big pot (thing ${big!.id})`,
+    `Big pot (thing ${big!.id})`, `Big pot (thing ${big!.id})`, `Big pot (thing ${big!.id})`,
     `Big pot (thing ${big!.id}): Nasruddin says the pot died`, `Big pot (thing ${big!.id})`,
   ]);
   expect(rows.find((row) => row.kind === "cancel")).toMatchObject({ signer: "@rita" });
