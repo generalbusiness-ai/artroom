@@ -746,7 +746,7 @@ function startScreen(): HTMLElement {
       // choosing another first-run task. Read-only Start Check remains safe.
       const enrollment = originalJoin(location.origin, localStorage);
       if (mode !== "check" && enrollment && ["prepared", "unknown"].includes(enrollment.status)) throw new Error("An original invitation enrollment remains unresolved. Check that original join before starting another room.");
-      const offer = mode === "new" ? await foundingOffer(location.origin) : undefined;
+      const offer = mode === "new" ? await foundingOffer(location.origin).catch(() => { throw new Error("This service is not set up to create rooms. Nothing was sent."); }) : undefined;
       if (!current()) return;
       const result = await startRoom(location.origin, localStorage, { mode, ...(offer ? { offer } : {}), label: name.value,
         foundingOffer: async register => { const offered = await foundingOffer(location.origin, { register }); if (canonicalize(offered.register) !== canonicalize(register)) throw new Error("The offered register changed. Original Start is retained."); return offered; }, current });
@@ -767,12 +767,12 @@ function connectionScreen(path: "join" | "invitation" | "config", connected: Roo
   const back = () => h("a", { class: "entry-back", href: "#/join" }, h("span", { "aria-hidden": "true" }, "‹"), "Back");
   if (path === "join") return h("main", { class: "screen entry-screen" },
     connected ? h("a", { class: "entry-back", href: "#/" }, h("span", { "aria-hidden": "true" }, "‹"), `Back to ${connected.name}`) : null,
-    h("h1", {}, connected ? "Join another room" : "Join a room"), h("p", { class: "entry-intro" }, connected ? `You are in ${connected.name} as ${connected.me!.handle}` : "How would you like to join?"),
+    h("h1", {}, connected ? "Join another room" : "Join or create a room"),
     ignoredSavedAddress ? h("p", { class: "entry-answer" }, "The saved connection address is ignored. Your room and key are kept. Use a connection below; this page reads only its own service.") : null,
     h("div", { class: "entry-choices" },
-      h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
-      h("a", { class: "entry-choice", href: "#/config" }, h("div", {}, h("h2", {}, "Config and key"), h("p", {}, "Use config.json and its matching device key.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›"))),
-    h("a", { class: "link-button", href: "#/start" }, "Start a room"));
+      h("a", { class: "entry-choice", href: "#/start" }, h("div", {}, h("h2", {}, "Create a new room"), h("p", {}, "Start a new room for shared work")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
+      h("a", { class: "entry-choice", href: "#/invitation" }, h("div", {}, h("h2", {}, "Join with an invitation link"), h("p", {}, "Paste a link. We create your key and join the room.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›")),
+      h("a", { class: "entry-choice", href: "#/config" }, h("div", {}, h("h2", {}, "Join with a config and key"), h("p", {}, "Use config.json and its matching device key.")), h("span", { class: "entry-chevron", "aria-hidden": "true" }, "›"))));
   const message = h("p", { class: "entry-answer", role: "status", "aria-live": "polite" });
   const tell = (text: string, bad = false) => { if (!current()) return; message.textContent = text; message.className = `entry-answer${bad ? " bad" : ""}`; };
   const selectRoom = async (next: Settings, expectedHandle?: string): Promise<boolean> => {
