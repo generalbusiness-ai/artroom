@@ -66,7 +66,6 @@
  * observation read of a membership scope. It has no route here.
  */
 
-import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { FactRef, Entry, Answer, Beside, Cursor, DeclaredDefinition, Digest, DutyId, Grant, LogPage, PlatformDefinition, Read, ReadRefusal, RetainedInput, ScopeApi, ScopeId, Seed, SessionAnswer, SessionRefusal, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
@@ -86,11 +85,6 @@ import { within } from "./turn.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
-import { isSite, site } from "./site/route.ts";
-import { isPage, page } from "./page.ts";
-import { isCounting, countingPage } from "./counting.ts";
-import { isLending, lendingPage } from "./lending.ts";
-import { isBrand, brand } from "./brand.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -438,9 +432,4 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
  * `GET /site/...` is a room's published pages (`site/route.ts`); `GET /page/` is the room's page, its static files bundled into
  * this Worker (`page.ts`); every other path is a route of the table above.
  */
-export default {
-  fetch: async (request: Request, env: Env): Promise<Response> => {
-    if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
-    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
-  },
-};
+export { default } from "../../../apps/room/fetch.ts";

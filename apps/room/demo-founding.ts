@@ -3,8 +3,8 @@ import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { isScopeRef } from "@generalbusiness/dap-derive";
 import { DEMO_PURPOSE, DEMO_REGISTER, WEB_DEMO_REGISTER } from "@generalbusiness/dap-platform";
-import type { Binding } from "./namespace.ts";
-import type { Store } from "./store.ts";
+import type { Binding } from "../../packages/scope/src/namespace.ts";
+import type { Store } from "../../packages/scope/src/store.ts";
 const ORIGINS = new Set(["https://artroom-scope.inguz.workers.dev", "https://artroom-rehearsal.inguz.workers.dev"]);
 export const DEMO_OFFER_PATH = "/v1/demo/founding-offer";
 export interface DemoFoundingBindings { DEMO_START_CONFIG?: string; DEPLOYMENT?: string }

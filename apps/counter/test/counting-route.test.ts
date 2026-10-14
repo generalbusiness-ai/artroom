@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import worker, { type Env } from "../../../packages/scope/src/worker.ts";
+import worker, { type Env } from "../../room/worker.ts";
 import { isCounting } from "../src/counting.ts";
 import { COUNTING_ASSETS } from "../src/counting-assets.ts";
 

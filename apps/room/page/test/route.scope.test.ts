@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import worker, { type Env } from "../src/worker.ts";
-import { PAGE_HTML, PAGE_JS } from "../src/page-assets.ts";
+import worker, { type Env } from "../../worker.ts";
+import { PAGE_HTML, PAGE_JS } from "../assets.ts";
 
 // Invariant: the deployed Worker's one entry serves the room's page at `/page/`, its HTML and its one script, from the module that
 // the page's build writes, each under a policy that runs this origin's scripts only; any other path under `/page/` is not found,
