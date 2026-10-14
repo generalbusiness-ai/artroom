@@ -12,6 +12,11 @@ That request commissions bounded implementation/planning; this amendment is its
 design/source-plan artifact, implements nothing and adopts no protocol. Keep
 the seven current correctness repairs and their coordinated gate ahead of
 runtime expansion. The original full volatile brief and all 14 sections remain.
+Amended again on 12 October 2026 under request
+`0d72a50b28c683046f6ea127d0ebe5b484f87822`: section 15 designs a journal
+archive in Git, and section 16 makes the scope the unit that declares a
+durability level, withdrawing the regions of section 2. They add two sections
+and two pointers, and change no other text.
 
 ## 1. Guarantees, goals and current foundations
 
@@ -75,6 +80,9 @@ barrier. It does not expose a collection of archive/publication switches.
 | Recorded, DO journal | Complete canonical acts, judgments and required evidence/pins, preserving native replay and custody duties. | Existing Core/SQLite journal commitment and its actual receipt/output gate. Reuse this working recorded path; generic application establishment is still owed. Optional later Git archive is not promised by this acknowledgment. |
 | Recorded, required Git/Artifacts custody | The complete declared journal/evidence closure in the exact required store, not merely a queue or current-state snapshot. | Final confirmation waits for verified required journal commitment. This capability is **UNSUPPORTED** until its actual backend, exact custody proof and recovery seam are delivered/adopted. It does not block the other two paths. |
 
+Section 15 separates the third row's archive from its barrier, and designs the
+archive only. The barrier below stays unsupported.
+
 The third row is an alternative journal barrier, not a third user question or
 another initial volatile mode. A binding that requires it cannot quietly use
 the DO-only acknowledgment. If supported later, persist the exact operation,
@@ -108,7 +116,8 @@ The proposed DO-journal adapter preserves that barrier; it never opts out with
 
 **Choice proposed for adoption:** execution belongs to a declared **state
 region**, not each invocation, transport, individual field or caller flag.
-All types/acts/timers in a region share its execution contract. Initially the
+All types/acts/timers in a region share its execution contract. Section 16
+withdraws the region: a scope declares its level (15.2). Initially the
 only new region profile is `artroom-live@1`; ordinary recorded definitions keep
 their existing pinned format, profile and entry semantics unchanged.
 
@@ -1333,3 +1342,665 @@ Turn335–351 sealing; Core42 receipts; sessions419–465 head stream; Worker31�
 transition near1642. Comparisons use the exact local revisions above, targeted
 live/session/decorator/presence/storage/ADR sources, and cited primary documents.
 No claim of a full source audit, current deployed support or measured speedup.
+
+## 15. Journal archive in Git (amendment, 12 October 2026)
+
+**Proposed design; no runtime adoption.** Request
+`0d72a50b28c683046f6ea127d0ebe5b484f87822`, planner promise
+`fae322e0901ae73e961b1434c6fe55ec6d842b73`, resting on the durability
+request `578edf653772749b5fa9b47f6782f6db4d0ab720`. Read against main
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`. Sections 1 to 14 are unchanged
+except for two pointers: one after the establishment table in section 1,
+and one at the start of section 2. Draft 2 of this section adds 15.2, the
+declaration, and renumbers what follows. Draft 3 revises 15.2 for section 16.
+Draft 4 answers the checker's report `7e549a27` of 14 October 2026: the
+ref and path spelling (15.4), the frozen input set of a pass (15.3 and
+15.5), the receipt confirmed at its own position (15.6), and in section 16
+the acyclic live identity (16.2) and the bounded host reads (16.3, 16.4).
+Draft 4 was read against main `70729eac`, merged into this branch. Draft 5
+answers report `f4066bc5` on Draft 4: the dependency inventory of a pass
+is the replay's, exhaustive by input variant (15.3), and the Mark row's
+rebuild reads only named, immutable dependencies under a missing-data
+contract (15.5), with the witnesses of A2 and A3 extended. Draft 6
+answers report `36a2aba0` on Draft 5: the inventory's outcome row gains
+the snapshots an outcome names and the delivery row the values an
+observing delivery names, with their cutoff witnesses, and the ancestry
+trust limit is kept as it is.
+
+### 15.1 The decision
+
+Section 1 names one Git capability, "Recorded, required Git/Artifacts
+custody", and marks it unsupported. It joins two properties that can be
+delivered apart:
+
+| Property | Meaning | This amendment |
+|---|---|---|
+| Archive | A scope's entries and retained inputs are in a Git repository. A verifier needs a clone and nothing from the service. | Designed here, for adoption. |
+| Barrier | The final answer to an act waits until Git has confirmed those bytes. | Still unsupported. Not designed here. |
+
+The archive is written after the journal commitment, and it may lag. A
+recorded act keeps its existing meaning: Recorded is the DO journal
+commitment and its receipt. The archive adds one observation, **Archived
+through N**: every entry of the scope through position N is in the
+archive ref. A client that wants the stronger guarantee for one act waits
+until its receipt's position is at or below N.
+
+Hugh decided five points on 12 October 2026:
+
+1. Build the archive, not the barrier.
+2. Archive pushes use a deployment-level credential. Archive progress is
+   bookkeeping outside history. Archiving writes no entry.
+3. The first archived scopes are lanes and the room's membership, rules
+   and destination. Inboxes are left out. The register is shared across
+   rooms and is not archived to a room's repository.
+4. A detached text is not archived. The archive holds its digest only,
+   inside the entry that names it.
+5. The definition drives the application, and it declares the durability
+   level of its scope (section 16). The archive is one of those levels,
+   declared in the definition. It is not a setting of a deployment or of
+   a scope kind.
+
+The earlier protocol published a room's log to `refs/artroom/log`
+([protocol.md](../docs/protocol.md), R-LOG-8 to R-LOG-10 and section 30).
+The scope contract removed it: "No log is pushed to a Git ref"
+(`request/scope-contract`, its section 11.4). This design restores the
+property for scopes. It reuses that protocol's measured object bound and
+its rule for a lost push reply. It restores no room key, no signed
+checkpoint and no earlier format.
+
+### 15.2 The declaration
+
+A scope declares one of three levels. Section 16 makes the scope the
+only unit that carries a level, and withdraws the regions of section 2.
+The level is part of the definition's bytes, so it is pinned by digest
+when the scope is made and never changes for that scope. No caller,
+transport or deployment setting selects it.
+
+| Level | Declared as | What survives | Confirmation | Support |
+|---|---|---|---|---|
+| Live | `level: { name: "live", version: 1 }` | Nothing | Applied | Designed in sections 2 to 14 and 16; not built |
+| Recorded | No `level` member, or `level: { name: "recorded", version: 1 }` | The journal in the Durable Object | Recorded, with a receipt | Built; every definition today |
+| Archived | `level: { name: "archived", version: 1 }` | The journal, and a copy in the room's repository that a clone can verify | Recorded, with a receipt; then Archived through N | Designed in this section; not built |
+
+**Where it is written.** `DeclaredDefinition` gains one optional member:
+
+```ts
+level?: { name: "live" | "recorded" | "archived"; version: 1 };
+```
+
+An absent member means Recorded. So the bytes and digest of every
+existing definition are unchanged, and no pinned scope changes level. A
+runtime or replay that does not know the member answers
+`unsupported-definition` for a definition that has it, which is the
+existing answer for a definition it has no code for. Whether today's
+validator already refuses an unknown member is owed a check in slice A0.
+
+**One level for a scope.** A scope has one history, or none. The level
+covers every item type, act, handler and timed rule of its definition. An
+application that needs two levels is two scopes.
+
+**The declaration is a requirement; the room gives permission.** A room
+states at its claim whether its repository may hold an archive. The
+directory keeps that in its genesis.
+
+| Definition declares Archived | Room permits it | Result |
+|---|---|---|
+| Yes | Yes | The scope is created and archives. |
+| Yes | No, or the room has no destination | The creation is refused, with the reason `archive-unavailable`. Nothing is created unarchived. |
+| No | Either | The scope is created at the level it declares. |
+
+The room's own membership, rules and destination scopes run platform
+definitions. They archive when the room permits it, because a lane's
+replay reads their histories (15.7). Inboxes and the register do not.
+
+This is not backward compatible, and Hugh accepted that on 12 October
+2026. Holding the permission needs new versions of the register, the
+directory and the three platform definitions. A room founded earlier
+does not gain the archive, and no migration is owed.
+
+**Relation to publication.** A definition may also declare acts whose
+result is written to the repository, as the `change` lane does. That is
+publication: the application's own outside effect, opened by an entry
+and receipted under `refs/artroom/receipts/`. The archive is the
+platform's copy of the history under `refs/artroom/journal/`. They share
+the repository and nothing else. Declaring one neither needs nor implies
+the other.
+
+### 15.3 What is archived
+
+A scope is archived when its definition declares it and its room
+permits it (15.2). For each archived scope, the archive holds:
+
+- every entry, as the canonical bytes that the `log` read returns;
+- every retained input of the kinds `definition`, `entry`, `rule`,
+  `snapshot` and `value`, as the `retained` read returns it.
+
+It does not hold:
+
+- a retained input of the kind `text`. The entry still holds the text's
+  digest. A tombstone therefore removes nothing from Git, because the
+  bytes were never there;
+- outbox rows, dispatcher marks, sessions, credentials or any other
+  bookkeeping. None of it is history, and no judgment reads it;
+- the folded state. A verifier folds the entries.
+
+A retained `entry` is a copy of one entry of another scope that a
+judgment used. An archived lane therefore carries single entries of
+scopes that are not archived themselves, such as the register's record of
+a claim. That is the same copy that the lane's own readers can read
+today.
+
+**The input set of a pass is closed under a cutoff.** A pass archives
+the entries from `archivedThrough + 1` to a cutoff `through`, and
+exactly the retained inputs a replay of those entries reads. The
+inventory is the replay's own (`packages/replay/src/verify.ts`, each
+`#retained` and `source.retained` call at main `70729eac`), listed here
+by input variant so that the archiver and the verifier share one list:
+
+| Entry input | Retained inputs the replay reads | Kind |
+|---|---|---|
+| Any | The declaration the genesis seed names (`seed.definition`), read once per history by `#pin`; and every declaration a declaration or a field names in the definition domain, followed to closure | `definition` |
+| Any that records `uses` | Each foreign entry a use cites, by its content digest | `entry` |
+| Any that records `prepared` | The input of each rule evaluated | `rule` |
+| `act` | The value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains (`#hand`, line 1048) | `value`, `definition` |
+| `timed` | As `prepared` above | `rule` |
+| `outcome` | The snapshots of staged refs its evidence names under its owner's `retains`, and the snapshot its ancestry record names (`#snapshots`, lines 1094 to 1127, called at 1372): each is retained before the entry that names it, and a later act's `ancestry` guard reads it; the values its evidence names under its owner declaration, by domain and digest (line 1388); and the values its recorded observations name (`#hand`) | `snapshot`, `value` |
+| `delivery` | The values the observations of a result's clause name, under the definition's retained domains (`#hand`, called at line 1322 for an observing definition) | `value` |
+| `checkpoint` | None beyond `uses` and `prepared` | |
+| Any | A detached text | `text`: never archived (15.1, point 4) |
+
+The closure is transitive: a declaration that names another declaration
+brings it in, and an archived foreign entry brings in nothing further,
+since its own inputs belong to its own scope's archive. A retained input
+is immutable by digest and an entry by position, so the selection is a
+pure function of the cutoff. An input that a later turn retains belongs
+to an entry past the cutoff and is not in the set. The kinds and domains
+left out (`text`, and any domain J2 excludes) are listed in the pass's
+manifest as omissions by kind, domain and digest, so a reader of the
+archive can tell "left out by rule" from "missing". A1 keeps this table
+and the verifier's reads in step by consumer: for each input variant,
+each kind and domain the verifier reads is a row here, and a read the
+table does not cover, for that variant, fails the slice. Listing a call
+somewhere is not coverage.
+
+**What the archive does not change.** A replay from the service already
+reads an ancestry snapshot's bytes and never walks the commits it names,
+so it ends `incomplete` for that entry and says so (`#snapshots`, "the
+walk is not derived again"). A replay from the clone has the same bytes
+and the same limit: the snapshot is in the archive, the walk is not
+derived, and the report is `incomplete` for the same reason. The archive
+turns that neither into `missing-input`, which is for a named dependency
+the store cannot read, nor into a claim of consistency the service's own
+report would not make.
+
+The archive is in the room's own repository at its destination's host.
+Whoever can fetch that repository's refs can read the archive. Reads of
+the service stay gated by sessions as they are now; the archive is a
+second, coarser door, and section 15.10 lists it as a point for review.
+
+### 15.4 Layout
+
+One ref for each archived scope, named by the scope ID as the platform
+spells it, `sc_` and 52 characters of the base32 alphabet
+`a` to `z` and `2` to `7` (`packages/bytes/src/domains.ts`, `scopeIdOf`):
+
+```
+refs/artroom/journal/<scope ID>      for example refs/artroom/journal/sc_c67lq575…
+```
+
+That spelling is a valid Git ref component as it is: lowercase letters,
+digits and one underscore. No conversion is defined; a ref whose name is
+not a scope ID of that form is not an archive ref.
+
+Each scope writes only its own ref. No write spans two scopes, as no
+transaction does.
+
+The tree of each archive commit:
+
+| Path | Content |
+|---|---|
+| `journal/v1/head.json` | Canonical JSON: `{ v: 1, scope: <ScopeRef>, through: <seq>, hash: <entry hash> }` |
+| `journal/v1/segments/<first>.jsonl` | Entries from `first` on, one canonical entry for each line; `first` is 12 decimal digits |
+| `journal/v1/manifest.json` | Canonical JSON: the pass's input set, `{ v: 1, through, parent, format, entries: [first, last], retained: [{ kind, domain?, digest }], omitted: [{ kind, domain?, digest, reason }] }` |
+| `journal/v1/retained/<kind>/<hex>` | One retained input's bytes, for the kinds `definition`, `entry`, `rule` and `snapshot`; `<hex>` is the 64 hex characters of the digest after `sha256:` |
+| `journal/v1/retained/value/<domain>/<hex>` | One named value's bytes, under its byte domain, encoded as below |
+
+**Path encoding.** Every path segment the archive writes is drawn from
+`[a-z0-9_.-]` and is never `.`, `..`, empty, or longer than 255 bytes. The
+kinds and the fixed names are literal. A digest is its 64 hex
+characters. A byte domain is a native string that the platform does not
+constrain, so it is encoded, reversibly: `d_` followed by the base32 of
+its UTF-8 bytes, in the alphabet above, no padding. The verifier decodes
+the segment and compares the domain to the one the entry names; a
+segment that does not decode, or decodes to another domain, is a
+`mismatch`. No native string is ever used as a path as it is.
+
+Rules:
+
+- **Segments.** A segment closes at 1,000 entries, or when the next line
+  would take it past the object bound B. Boundaries depend only on the
+  lines' lengths.
+- **The object bound.** B is 8 MiB. The hosting service refused a Git
+  object over 32 MiB when measured on 2 October 2026 (protocol.md,
+  section 30). A retained input is at most 1 MiB by the contract
+  (`RETAINED_INPUT_BYTES`). An entry line over B is not archived: the
+  archiver stops and reports `object-too-large`. Whether the contract
+  already bounds an entry below B is an open point (15.10).
+- **Fan-out.** A directory lists at most 4,096 names; above that it splits
+  by the rule of protocol.md R-LOG-19.
+- **The commit.** Its parent is the previous archive commit, or none. Its
+  author, committer and message are fixed text. Its time is the recorded
+  time of entry `through`. Its tree is a function of the manifest alone:
+  the parent, the cutoff, the object format (SHA-1 or SHA-256, fixed by
+  the repository) and the manifest's entries and retained inputs. So the
+  same manifest on the same parent gives the same commit ID, whoever
+  builds it and however many times. A different parent, or a different
+  batch of cutoffs, gives different commit IDs for the same history; that
+  is expected, and no two archives of one scope are compared by commit ID.
+- **Append only.** A segment other than the last never changes. A retained
+  file never changes. `head.json` is replaced in each commit.
+
+`head.json` is a statement, not a proof. It has no signature, because a
+scope holds no signing key (scope contract, D1-6).
+
+### 15.5 The writer
+
+The archiver runs in the archived scope's own Durable Object, after a
+commit, from the object's alarm. It never runs inside a turn and never
+delays an answer.
+
+1. **Target.** The scope finds its room's repository once: from its seed's
+   creator to the directory, then the destination that the directory's
+   `repository` item names. It keeps the answer as bookkeeping. An
+   archiving scope always has one, because its creation was refused
+   otherwise (15.2).
+2. **Plan.** It chooses the cutoff: its head, or an earlier position when
+   the pass's bound on entries or bytes is reached first. It builds the
+   manifest of 15.3 for that cutoff, and from the manifest the objects and
+   the commit of 15.4 on the last confirmed commit.
+3. **Mark.** It writes one bookkeeping row before any request leaves: the
+   parent, the cutoff, the manifest's bytes, the commit ID and the time.
+   At most one commit is outstanding for a scope. The row holds no entry
+   or input bytes; it names them. A rebuild after a restart, a lost reply
+   or a resend reads exactly the dependencies the manifest names, and
+   nothing else: each entry by its position from the scope's own journal,
+   each retained input by its kind, domain and digest from the retained
+   store. Both are immutable for what an entry names: an entry is never
+   rewritten or removed below the head, and the retained store keeps an
+   input of the kinds archived for as long as an entry names it (a text,
+   which it may tombstone, is never in the set). A rebuild never
+   enumerates "what is retained now", so a turn after Mark cannot change
+   it. A named dependency that cannot be read is `missing-input`: the
+   archiver stops, reports the kind, domain and digest, and substitutes
+   nothing; that is a fault of the store, not of the history. A rebuild
+   that reads every dependency and gives another commit ID stops as
+   `rebuild-mismatch`, a fault of the builder. The commit and its objects
+   are kept in the object's memory for the pass only; they are not
+   persisted, because they are a function of the row and the immutable
+   dependencies, and the row is enough to make them again.
+4. **Send.** It sends the objects and one ref update with the expected old
+   value, through the provider's existing `send`
+   (`packages/scope/src/destination-host.ts`). It never forces.
+5. **Resolve.** It reads the ref back before it records any result:
+
+| The ref is | Result |
+|---|---|
+| The outstanding commit | Confirmed. `archivedThrough` becomes its `through`. |
+| The parent | Not written. Send the same commit again, with a delay that doubles. |
+| Anything else | `conflict`. Stop. Report it. Never overwrite. |
+
+A lost reply, a timeout or a restart leaves the row in place, and step 5
+decides. The archiver builds no second commit while one is outstanding.
+
+**The credential.** The provider gains one call that mints a short-lived
+write token for the archive, outside the scope's ledger of operations.
+The token stays inside the object, is used for one pass and is revoked or
+left to end. It is not recorded in any entry, so an archive pass writes
+no history and the archive can reach the head.
+
+This widens authority, and review should weigh it. Today every write to
+a repository is an operation that an entry opened. The archive token is
+not. Where the host's tokens cannot be limited to a ref prefix, the
+adapter enforces the prefix `refs/artroom/journal/` at `send`, and the
+archiver is trusted code in the same way as the destination's driver.
+
+**Fairness.** One pass has a bound on entries, bytes and time. A scope
+that is busy with turns archives later; it never refuses a turn in order
+to archive.
+
+**What a turn after Mark changes.** Nothing in the outstanding commit.
+Entries past the cutoff and inputs they retain wait for the next pass.
+A3 witnesses this: with a commit marked and its parent still not updated
+on the host, a turn retains a new input; the resend after a restart is
+the identical commit, and the next pass archives the new entry and its
+input on top of it.
+
+### 15.6 What a read states
+
+`Summary` gains an optional member:
+
+```ts
+archive?: {
+  state: "current" | "behind" | "conflict" | "stopped";
+  through: number | null;      // last confirmed position, or null before the first
+  hash: Digest | null;         // that entry's hash
+  commit: string | null;       // the confirmed archive commit
+  reason?: string;             // for conflict and stopped
+}
+```
+
+A scope whose level is Recorded or Live has no `archive` member.
+`through` and `hash` are the last position the archiver read back from
+the host and the hash of that entry; they are the service's bookkeeping,
+not a fresh observation of the remote. A ref moved by someone else is
+seen at the next pass as `conflict`, not here.
+
+The client gains `followArchived(receipt)`. A receipt names one entry:
+its full `ScopeRef` (ID, incarnation, kind), its position `n` and its
+hash. The archive's `hash` belongs to position `through`, so for `n`
+below `through` the two hashes differ in the ordinary case and nothing is
+learned by comparing them. The client confirms the receipt at its own
+position instead:
+
+| Check | Outcome |
+|---|---|
+| The summary's `scope` is not the receipt's `ScopeRef`, incarnation included | `not-this-history`. The receipt is of another incarnation; it is never waited on. |
+| No `archive` member | `not-archived`. The scope's level is not Archived. |
+| `state` is `conflict` or `stopped` | That state, with its reason. Reported, not waited on. |
+| `through` is null or below `n` | `behind`. Read again later. |
+| `through` is `n` or past it | Read entry `n` from the service (`entry`), under the same `ScopeRef`. Its hash equals the receipt's: `archived`. It differs: `mismatch`, reported, never waited on. |
+
+Why that is enough: each entry's bytes name the previous entry's hash,
+so entry `through` commits to one chain, and the archive is that chain's
+prefix. The service's entry `n` under the same incarnation is in that
+prefix exactly when `n` is at or below `through`. The check does not
+reach the host; it adds no acknowledgement barrier, and it proves
+membership only on the service's word about `through`.
+
+**Confirmation from the clone.** A caller that wants the archive's own
+word reads commit `commit` from a clone: `artroom-replay --git <clone>
+--receipt <file>` finds the segment that holds position `n`, decodes the
+line, and reports `archived` when its `ScopeRef`, position and hash are
+the receipt's, `mismatch` when the line differs, and `behind` when the
+commit's `head.json` is below `n`. That is the only check that does not
+trust the service.
+
+A4 covers each row: `n` equal to `through`, `n` below it, a receipt of
+another incarnation, a receipt whose hash differs, a scope with no
+archive, and a stopped archive. It derives no judgment.
+
+### 15.7 The verifier
+
+`@generalbusiness/artroom-replay` gains a second source,
+`gitSource(directory)`, which implements `HistorySource`
+(`packages/replay/src/source.ts`) over a local clone. `verify` and the
+judges do not change.
+
+```
+artroom-replay --git <clone> <scope ID> [--mode integrity|replay]
+    [--head <seq>:<hash>] [--texts <directory>] [--json]
+```
+
+- Each foreign scope is read from its own ref in the same clone. A scope
+  with no ref there is `missing-dependency`, unless the caller gives an
+  anchor.
+- With no `--head`, the target is `head.json`, checked against the last
+  entry's own hash, and the report lists `archive-head` under `trusts`.
+- A detached text is absent. In integrity mode nothing needs it. In
+  replay mode an entry whose judgment reads a text is `incomplete`, and
+  the report counts those entries apart from other missing inputs. With
+  `--texts`, the verifier takes a text from the caller's directory and
+  checks it against its digest.
+
+Everything read from a clone is untrusted, with the same limits on bytes,
+entries and scopes as the HTTP source. The source resolves the named
+commit through the object store, never through a working tree: it reads
+the commit, its tree and the blobs under `journal/v1/` by object ID,
+refuses any tree entry that is not a plain file or a directory (a symlink,
+a submodule, an executable), refuses a path segment outside the grammar
+of 15.4, and bounds each blob at B and each segment at its line count. A
+ref that does not name a commit, or a commit whose tree lacks `head.json`,
+is `mismatch`. No path from the clone is ever joined to a filesystem
+path.
+
+### 15.8 What a clone shows, and what it does not
+
+A clone shows, with no call to the service:
+
+- the hash chain and each entry's bytes;
+- that the scope ID is the digest of the genesis's seed;
+- each actor's signature;
+- in replay mode, every judgment derived again, for the coverage stated.
+
+It does not show:
+
+- anything after `through`. The archive is a prefix;
+- that the ref was never rewritten. The service is the only writer and
+  holds no key of its own. A verifier that kept an earlier commit, a
+  receipt or a head detects a rewrite; one that kept nothing does not;
+- the bytes of a detached text;
+- what replay already takes on trust: the service's clock, and that each
+  recorded read of membership was made as recorded.
+
+The Git host is a second holder of the bytes, apart from the service. The
+archive makes verification independent of the service's availability and
+of its answers. It does not make the service unable to equivocate.
+
+### 15.9 Slices and witnesses
+
+Each slice is reviewable alone. No slice changes an entry's bytes, a
+judgment, a receipt or a publication.
+
+| Slice | Work | Witness |
+|---|---|---|
+| A0. Declaration | The `level` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
+| A1. Layout | A pure function from a manifest (15.3) to the objects and commit of 15.4, for both object formats; the path encoding and its decoder. | The same manifest on the same parent gives the same commit ID, built twice. Segment and fan-out boundaries at their limits. A text is never written; an omitted input is listed. Every domain name the platform defines and an adversarial name (`../x`, a slash, a NUL, 300 bytes) round-trip through the encoding or are refused. The ref name is the native `sc_` spelling. Real local Git reads the tree back byte for byte. |
+| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. Four histories replay in replay mode from the clone alone, with no service and no anchor, each a pass whose cutoff ends at the entry that first needs the dependency: a scope whose only entry is a declared genesis (its declaration is in the archive); a pass ending at an outcome that first introduces a value named by its evidence (that value is in the archive); a pass ending at an outcome that first names a snapshot of staged refs, with no later act (that snapshot is in the archive, and the report is `incomplete` for the unwalked ancestry exactly as the service's report is, not `missing-input`); and a pass ending at an observing delivery that first requires a retained value (that value is in the archive). A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, after the clone's own integrity and continuity are checked, or reported `mismatch` or `behind`. |
+| A3. Archiver | Target resolution, the manifest and the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. A reset after Mark and before any object reached the host, then a turn that retains a new input, then a restart: the archiver rebuilds the original commit, byte for byte, reading only the dependencies the row names (the store is instrumented to refuse any read the manifest does not name), and sends it; the next pass archives the new entry on top. A named dependency made unreadable stops as `missing-input` with no substitution. A rebuild that differs stops as `rebuild-mismatch`. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
+| A4. Read and client | `Summary.archive` and `followArchived`. | Each row of 15.6: `n` equal to `through` and `n` below it are `archived` when the service's entry `n` carries the receipt's hash; a receipt of another incarnation is `not-this-history`; a differing hash is `mismatch`, not waited on; no archive is `not-archived`; a stopped or conflicting archive reports its state; a receipt past `through` waits. `through` is shown to be the last read-back, not a fresh remote read. |
+| A5. Live run | One deployed room on the hosting service: archive, clone, replay offline. | A recorded run, bound to its source and deployment, with measured lag and push duration. |
+
+Run the tests of each slice while it is built, and the gate once before
+review ([docs/testing.md](../docs/testing.md)).
+
+### 15.10 Open points
+
+| Point | Question | Proposed |
+|---|---|---|
+| J1 | Is an entry's canonical line bounded below B by the contract? | Confirm in A1. If not, adopt protocol.md R-LOG-18's chunk rule before A3. |
+| J2 | A `value` or a retained `entry` may hold bytes that a session would not show to every member. | List the byte domains and foreign kinds in A1. Any that is narrower than "every member of the room" is left out as a text is, and reported the same way. |
+| J3 | The archive is readable by whoever can fetch the repository's refs. | For a public repository this publishes the lanes' histories and the room's membership history. The room's permission (15.2) is the consent. The claim must say so in plain words before a person gives it. |
+| J4 | The archive token is a write that no entry opened. | Review the adapter's prefix check as a security boundary in A3. |
+| J5 | A `conflict` has no automatic repair. | An operator reads the ref and decides. A later design may add a recorded repair act. |
+| J7 | How a creation learns the room's permission. | Decided (15.2): the directory holds the permission in its genesis and refuses a `create` of a declaring definition without it. Not backward compatible. The exact new versions are owed in slice A0. |
+| J8 | The acknowledgement barrier, if it is ever built. | It would be a fourth level, declared the same way, with a new `level` name. Nothing here reserves its meaning. |
+| J6 | Histories that reach the scope's entry budget. | Unchanged: the archive follows the history that exists. Archival that frees service storage is not designed. |
+| J9 | Witnesses the checker named for the build, beyond the slices above. | Owed to A1 to A4, not decided here: a value domain that is legal but longer than a path segment allows stops the pass as `stopped` with its reason, never truncated or silently omitted; the receipt check from a clone establishes the clone's integrity and continuity before it claims prefix membership; the J2 disclosures are made to the room before any byte is exported. |
+
+This amendment ran no product tests, gate, provider or deployment probes.
+The provider's `send`, the `log` and `retained` reads, the `HistorySource`
+interface and the directory's `repository` item were read in source at
+the head above. The path from a lane's seed to its room's destination
+(15.5, step 1) was read as declarations only and is owed a witness in A3.
+
+## 16. The scope is the unit of durability (amendment, 12 October 2026)
+
+**Proposed design; no runtime adoption.** Same request and promise as
+section 15. Hugh decided on 12 October 2026 that the region is not needed
+apart from the scope. This section amends sections 1 to 14; where it and
+they differ, this section holds. The JSON examples of section 2 are not
+rewritten; 16.3 says how to read them. Draft 4 makes the live identity
+acyclic and names the locator a live object starts from (16.2), and
+bounds a live scope's reads of its host instead of claiming they cost
+the host nothing (16.3, 16.4, 16.5).
+
+### 16.1 The decision
+
+The scope is the only unit. Each scope's definition declares one level:
+Live, Recorded or Archived (15.2). An application that needs live state
+beside recorded state is two scopes, composed as scopes already are.
+
+Withdrawn from section 2:
+
+- named regions, and `regions.*.execution`;
+- the `artroom-application-1` envelope and its `host.recordedDefinition`
+  binding;
+- the operation identity `(fullScopeRef, applicationDigest, region, act)`;
+- one scheduler that shares an object between live and recorded turns
+  (section 11).
+
+Kept, unchanged in meaning:
+
+- the Live guarantee: zero durability, and the results Applied and Reset;
+- generations and revisions, sessions, leases, duplicate aids, limits;
+- the live forms and their validation (section 2's table of extensions);
+- the presence, messaging and discussion-turn applications;
+- discover, invoke, query and watch (section 9);
+- crossings and deliberate promotion (section 10);
+- every static refusal of a durable effect in live state.
+
+Why. A scope has one history, so it could only ever hold one recorded
+region. The region therefore separated nothing but live from recorded,
+and it brought a second format, a second address and a shared scheduler
+to do so. One rule replaces them: every scope declares what survives.
+
+### 16.2 A live scope
+
+A live scope shares three things with every other scope: an ID that is
+the digest of its seed, one pinned definition, and its own Durable
+Object, named by its ID. It differs in the rest.
+
+| | Recorded or archived scope | Live scope |
+|---|---|---|
+| History | One hash chain | None. It writes no entry and no storage. |
+| State | Items folded from entries | Items held in memory |
+| Life | An incarnation, minted at the first entry | A generation G, minted at each start or reset |
+| Reference | ID, incarnation, kind | ID, generation, kind |
+| Can be cited as a fact | Yes, by `FactRef` | No. Nothing names an entry of it, because it has none. |
+| Replay | From its genesis | None. A report never covers it. |
+| Answer to an act | `accepted` with a receipt, and the other three | `applied`, `refused`, `reset`, `unavailable` (section 3) |
+| Made by | A recorded creation and its confirmation | Establishment on its host, below |
+
+**Its seed.** The kind is `live`, which is new. The creator is the host
+scope. The cause is the digest of the signed intent of the act that
+established it, the same `cause` a native seed carries (`intentDigest`
+of the creating input; `Seed.cause`, "the one input that asked for this
+scope"). The ordinal is which live scope of that intent, from 0. The
+definition is the digest of a definition whose level is Live. The seed
+is therefore built from the act before its entry is sealed, as the
+platform builds the seeds of a creation's sends, and the entry records
+the ID the seed gives. Nothing in the seed depends on the entry's hash,
+and the entry may name the ID: there is no cycle. Draft 3 made the cause
+the establishing entry's digest, which the entry could not then contain;
+the checker's P1, withdrawn here.
+
+**Establishment.** A live scope is legitimate because a recorded entry
+says so. Section 2 proposes an owned `establish-application` act; under
+this section that act records, in a recorded scope, the live definition's
+digest, the membership scope the live scope reads, and the live scope's
+ID, derived as above. The entry is the durable fact. The live scope is
+what can be rebuilt from it.
+
+**The locator.** A live object has no storage and its name is an opaque
+hash, so it cannot find its host by itself. Whoever addresses it
+presents a bounded locator, which discovery on the host hands out with
+each established live scope (L3):
+
+```ts
+{ host: ScopeRef, established: number, ordinal: number }
+```
+
+The object reads entry `established` from the host, through the
+namespace with the host's own authorization (16.4), takes the signed
+intent from it, rebuilds the seed (`live`, the host, `intentDigest` of
+that intent, the ordinal, the definition digest the entry records) and
+derives the ID. Only when that ID is its own name does it read the
+definition's bytes by that digest, check them, mint G and begin. A
+locator that names another host, entry or ordinal derives another ID and
+is refused `unavailable`; the object holds nothing and tells nothing of
+why. The locator is routing, not authority: it points at a fact, and the
+fact is checked.
+
+**It exists when addressed.** There is no creation handshake, because
+the live side cannot record one. When a live scope's object starts, it
+does the above from the locator it was addressed with, and begins empty.
+If the entry or the definition cannot be read or does not match, it
+answers `unavailable` and holds nothing. When the object stops for any
+reason, the next start is a new generation. That is a Reset, not a
+recovery.
+
+**Authority.** A live act is judged under a grant read from the
+membership scope that the establishing entry names, as section 5 says.
+Nothing about sessions changes.
+
+### 16.3 Reading sections 2 to 14 under this section
+
+| Where | Was | Is |
+|---|---|---|
+| Section 1, the establishment table | Contracts of a region | Levels of a scope (15.2) |
+| Section 2, the three applications | An envelope with `regions.live` | A definition with `level: live`. Read each example by lifting the content of `regions.live` to the top level and dropping `format`, `host` and `regions`. |
+| Section 2, "one act transitions both recorded and live items" | Refused as a cross-region mutation | Cannot be written: an act is on one scope |
+| Section 2, coexistence | One scope identity with regions beside it | A host scope and its live scopes. Discovery from the host lists the live scopes it has established. |
+| Section 3, the pipeline | A turn in the region | A turn in the live scope's own object. No step changes. |
+| Sections 4 and 6, references | Scope, application digest, region, G, item | Live scope ID, G, item |
+| Section 5, the signing domain | Binds scope, application and region | Binds the live scope's ID and G |
+| Section 9, composite observation | Recorded and live parts of one scope | Two observations, one of each scope |
+| Section 10, crossings | Between regions | Between scopes. Live to recorded is still an explicit capture and a new signed act on the recorded scope. Recorded to live is still an ordinary authorized read. |
+| Section 11, fairness | One scheduler gives recorded turns precedence | Withdrawn. A live flood runs in another object, so it takes none of the host's turn budget by itself. What it can take is the host's read work, through the reads of 16.4; those are bounded and refused `busy` beyond their bound, so the host's turns stay within the host's own limits. The claim that live traffic "cannot delay" the host is not made. |
+| Section 14, phase 1 | The envelope and region types | The `level` member and the live forms in the definition |
+| Section 14, phase 3 | A live module beside Core in the host's object | A live mode of the one object class, chosen by the pinned level |
+| Section 14, "Same scope coexistence" | Live operations make no native entries in the scope | The host's head is the same before and after any live traffic |
+
+### 16.4 What it costs
+
+- **A live scope is a scope in less than the contract says.** The scope
+  contract defines a scope as a history, items and a definition, and says
+  nothing else is state. It must say plainly that a live scope has no
+  history, and list what does not apply to it: facts, receipts, replay,
+  checkpoints, the outbox, timed drains across a restart.
+- **A read of the host crosses objects, and costs the host.** A live
+  view that shows host state, and the start that checks the locator, read
+  the host through the namespace with the host's own authorization. Each
+  such read is host work, and a flood of live acts that read the host is
+  a flood of reads on the host. The bound is explicit:
+  - a live object holds a read budget for each generation, a count for
+    each second and a count in flight; past it, the live act is refused
+    `busy` and no read is sent;
+  - the host serves reads under the limits it already has for any reader,
+    and refuses `busy` rather than queue without bound; a refused read is
+    a refused live act, not a retry inside the host;
+  - a live act that needs no host read is not throttled by this.
+  The budget's values are owed a measurement with the witness of 16.5,
+  not stated here.
+- **More objects.** One for each live scope. An idle object that the
+  platform stops resets its live scope. That is within the guarantee, and
+  an application must be written to expect it.
+
+### 16.5 Witnesses added
+
+| Invariant | Witness |
+|---|---|
+| The level is in the definition | A definition with `level: live` and a `tell` send, a hold or an outside operation is refused whole by the validator. A recorded definition with a live form is refused the same way. |
+| Identity without history | On a real host scope, the `establish-application` act is signed and judged; the seed is built from its intent before the entry is sealed; the entry records the ID; a live object addressed with the locator rebuilds the seed from the sealed entry and derives the same ID; a second start gives the same ID and a new generation. The witness constructs the real intent, entry and seed; it starts from no prebuilt ID. |
+| Establishment | A live scope whose establishing entry is absent, names another definition, or is addressed with a locator of another host, entry or ordinal, answers `unavailable` and holds no state. |
+| The host is untouched by live writes | Live traffic writes no entry on the host: its head is the same before and after. |
+| Host reads are bounded | A mixed witness on one host: live acts that read the host at a rate past the budget, beside the host taking its own turns. The live object refuses `busy` past the budget and sends no read; the host's turn latency stays within its own limits, measured; the host refuses `busy` beyond its read limit rather than queueing. The measured budget is recorded with the witness. |
+| No citation | A field of type `fact` that names a live scope is refused. |
+
+### 16.6 Open points
+
+| Point | Question | Proposed |
+|---|---|---|
+| L1 | Do the live forms enter `artroom-definition-1`, or a new format? | A new format version for definitions that use them, so that no existing validator reads a live definition as a recorded one. Owner decision before phase 1. |
+| L2 | The kind `live` is new in the seed. | Add it to the kinds. A live scope's kind says nothing of its application; its definition does. |
+| L3 | Which scope records establishment, and how discovery lists live scopes. | The directory, by the act that section 2 proposes, with one item for each established live scope. Owner decision; it needs a new directory version. |
+| L4 | A live definition has no genesis act. | The member `genesis` is absent for level Live, and the validator requires that. |
+| L5 | Sections 5 to 9 were written for one object. | Read against this section for this amendment; a line-by-line pass is owed before phase 2, and any conflict found is decided for this section. The pass must carry the bound of 16.4 into section 5's reads of membership and section 9's observations. |
+| L6 | Where the locator travels. | Discovery on the host lists it with each established live scope (L3); a client keeps it with the live reference; a request to a live object carries it. It is bounded (one `ScopeRef`, two integers) and checked against the ID, never trusted. |
+| L7 | Witnesses the checker named for the build. | Owed to phase 1, not decided here: a locator validates only through an establishing entry that an authorized act wrote (an entry of another kind, or one a judgment refused, validates nothing); the host's read admission counts the start's reads before G is minted and the membership and watch reads of 16.4 in one budget with every other reader's. |
+
+This section ran no product tests, gate or probes. The seed's members,
+the scope kinds and the single object class were read in source at main
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`; for Draft 4, `Seed.cause`
+and `scopeIdOf`, the founding's seed in `core.ts` and the scope ID's
+spelling were read again at main `70729eac`.
