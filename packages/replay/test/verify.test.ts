@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/dap-contract";
 import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
-import { grantFrom, namedBy, observationOf } from "@generalbusiness/dap-derive";
+import { grantFrom, namedBy, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
 import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
 import { MEMBERSHIP, RULES_SCOPE as RULES, firstExtents, platform, standingOf } from "../../platform/src/index.ts";
@@ -41,6 +41,30 @@ describe("replay of a good history (sections 9.3 to 9.5)", () => {
     expect(report).toMatchObject({ result: "missing-dependency", at: { seq: 2 }, coverage: [{ scope: w.I.scope, from: 0, through: 1 }], dependencies: { verified: 0, anchored: 2 } });
     expect([report.anchors.map((a) => a.seq), report.trusts.includes(TRUSTS.anchors), report.trusts.includes(TRUSTS.head)]).toEqual([[4, 5], true, false]);
   });
+});
+
+// A reserved alias is not established by a digest or by a retained copy.
+// These histories use derive's fixture authority, not native factory admission.
+test("a replay without native identity policy leaves a reserved declared source incomplete, while an exact source anchor remains explicit trust", async () => {
+  const reserved = validateDefinition({ ...notesDefinition.declared, name: "change" }, PROPOSED_BOUNDS);
+  const receiver = validateDefinition({ ...notesDefinition.declared, acts: { ...notesDefinition.declared.acts,
+    vouch: { ...notesDefinition.declared.acts["vouch"]!, presents: { proof: { kind: ["write"], under: "change", required: true } } } } }, PROPOSED_BOUNDS);
+  expect([reserved.ok, receiver.ok]).toEqual([true, true]);
+  if (!reserved.ok || !receiver.ok) throw new Error("the fixture definitions must validate");
+  const S = founded(reserved.definition, {}, "reserved-source");
+  const T = founded(receiver.definition, {}, "receiving-note");
+  const body = "ordinary declared note";
+  const written = S.act(keys.rita, "write", { ...on(S, 0), fields: { body: textDigest(body) } }, { texts: () => body.length });
+  expect(written.result).toBe("write");
+  const fact = S.fact(S.last.seq);
+  const vouched = T.act(keys.rita, "vouch", { ...on(T, 0), fields: {} }, { presented: { proof: fact }, facts: [{ fact, entry: S.last, under: "change" }] });
+  expect(vouched.result).toBe("write");
+  const all = [S, T], source = () => new MemorySource(all.map(L => served(L, all)));
+  const options = { mode: "replay" as const, scope: T.at.scope, ...AS_RECORDED };
+  const missing = await verify(source(), options);
+  expect([missing.report.result, missing.why]).toEqual(["incomplete", "the replay has no supplied source-identity policy for a reserved declared name"]);
+  const anchored = await verify(source(), { ...options, anchors: [{ scope: fact.at.scope, seq: fact.seq, hash: fact.hash }] });
+  expect([anchored.report.result, anchored.why, anchored.report.trusts.includes(TRUSTS.anchors), anchored.report.anchors]).toEqual(["consistent", null, true, [fact]]);
 });
 
 describe("a detached text whose bytes are gone (section 9.3)", () => {

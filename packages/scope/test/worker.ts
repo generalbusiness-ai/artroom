@@ -128,7 +128,7 @@ export class PlatformScope extends DeployedScope<PlatformEnv> {
         // Transport that a test can hold: a send that `net.hold` matches is not delivered, and its attempt gets no answer.
         transport: { send: (envelope) => (net.hold?.(envelope) ? Promise.resolve(null) : transport!.send(envelope)) },
         // A scripted peer: an entry that a test wrote by hand, for a lane that sends a notice. Every other entry is read from the real object.
-        resolver: { read: (fact, seconds) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } },
+        resolver: { read: (fact, seconds, origin) => { const peer = net.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds, origin); } },
         definitions: { read: (named, holder) => definitions.read(named, holder), platform: (named) => (platformNet.without === null ? platform(named) : lacking(named, platformNet.without)) },
         // The ports that one test wired for this name: the STAND-IN host of `outside.ts`, for a register, whose one outside effect is
         // the creation of a repository at the Git host. With none wired the outside port is the production one, which sends nothing.

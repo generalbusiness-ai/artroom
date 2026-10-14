@@ -2,11 +2,11 @@ import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, inject, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Answer, Entry, Intent, Observation, ObservationUse, OperationId, Read, ScopeRef, Seed, SignedReadName } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, platformName, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, entryHash, factRefOf, hex, intentDigest, newIncarnation, platformName, scopeIdOf, seedDigest, signIntent, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { requestSession, secretSigner, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
-import { PROFILES, grantFrom, ruleAt, validateDefinition, valueDigest, type Item } from "@generalbusiness/dap-derive";
-import { d, keys, otherLane, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
-import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
+import { PROFILES, grantFrom, ruleAt, useOf, validateDefinition, valueDigest, type Fetched, type Item } from "@generalbusiness/dap-derive";
+import { d, keys, ticket, ticketDefinition } from "@generalbusiness/dap-derive/testing";
+import { CONFIGURATION_DOMAIN, DESTINATION, DESTINATION_CHANGED_SET, DIRECTORY, PUBLISHING_LANE_DIGESTS, REGISTER, destinationReceipt, firstExtents, foundingObjects, platform, repositoryName, revokedToken, RULES_EXTENTS_VALUE } from "@generalbusiness/dap-platform";
 import { TRUSTS, httpSource, verify, type HistorySource, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { targetOf } from "../../platform/src/destination.ts";
 import { SqliteStore, type Sealed, type Summary } from "../src/index.ts";
@@ -409,15 +409,36 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const retainedConfiguration = await rulesScope!.stub.retained(reader, "value", digest, CONFIGURATION_DOMAIN);
     expect(retainedConfiguration).toMatchObject({ ok: true, value: { bytes: canonicalize(configuration) } });
 
-    // SCRIPTED source facts: manifest (anchor 1), job opening (anchor 2), passed decision (anchor 3), merge (anchor 4).
-    // No lane judged them and no checker runner ran. The passed decision is signed by the actually enrolled key; its fresh
+    // SCRIPTED source facts: two native-shaped origin copies plus manifest,
+    // job opening, passed decision and merge. No Directory or lane judged
+    // these six facts and no checker runner ran. All six are explicit replay
+    // anchors; this fixture does not establish native factory authority.
+    // The passed decision is signed by the actually enrolled key; its fresh
     // change.check grant is built from this real membership answer, with only the source read metadata supplied by the test.
-    // The destination retains all four facts, reads them with its production reader, and reads that key's current standing.
+    // Destination retains the four message facts and reads current standing.
+    // The two origin copies serve only the runtime's forward security check.
     const integration = "b".repeat(40);
     const tree = "d".repeat(40);
     const by = { membership, member: "@rita" } as const;
+    const factoryIntent: Intent = { v: 1, to: directory, actor: rita.key, kind: "open-pr", on: null, expected: {},
+      fields: { definition: PUBLISHING_LANE_DIGESTS[0] }, idempotencyKey: "scripted-source-origin", notAfter: soon(60) };
+    const laneSeed: Seed = { v: 1, kind: "lane", definition: PUBLISHING_LANE_DIGESTS[0], creator: directory,
+      cause: intentDigest(factoryIntent), ordinal: 0 };
+    const otherLane: ScopeRef = { scope: scopeIdOf(laneSeed), inc: newIncarnation(new Uint8Array(16).fill(29)), kind: "lane" };
+    const creationMessage = { class: "request", type: "create", body: { directory, membership, fields: {
+      opener: by, title: "scripted source", draft: false, destination: branchScope, rules: await rulesScope!.at(),
+    } } } as const;
+    const creator: Entry = { v: 1, at: directory, seq: 1000000, prev: d("0"), time: timeOf(lifetime.now()), clamped: false, epoch: 0,
+      input: { type: "act", signed: signIntent(factoryIntent, rita.secret), authority: [], presented: {} },
+      uses: [], prepared: [], effects: [], sends: [{ n: 0, to: laneSeed, message: creationMessage }] };
+    const genesis: Entry = { v: 1, at: otherLane, seq: 0, prev: null, time: timeOf(lifetime.now()), clamped: false, epoch: 0,
+      input: { type: "genesis", seed: laneSeed, inc: otherLane.inc, kind: "open", founding: null,
+        source: factRefOf(creator), n: 0, message: creationMessage, decision: "applied" },
+      uses: [useOf(factRefOf(creator), creator)], prepared: [], effects: [], sends: [] };
+    const origin: readonly Fetched[] = [{ fact: factRefOf(genesis), entry: genesis, under: "change" },
+      { fact: factRefOf(creator), entry: creator, under: "platform:directory" }];
     const signed = (kind: string, fields: Intent["fields"]) => signIntent({ v: 1, to: otherLane, actor: rita.key, kind, on: null, expected: {}, fields, idempotencyKey: kind, notAfter: soon(60) }, rita.secret);
-    const manifest: Entry = { v: 1, at: otherLane, seq: 1, prev: d("0"), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("propose-manifest", { base: firstHead, integration, tree, complete: true, selected: [] }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "party", item: 1, slot: "integrator", member: by }], sends: [] };
+    const manifest: Entry = { v: 1, at: otherLane, seq: 1, prev: entryHash(genesis), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("propose-manifest", { base: firstHead, integration, tree, complete: true, selected: [] }), authority: [], presented: {} }, uses: [], prepared: [], effects: [{ effect: "party", item: 1, slot: "integrator", member: by }], sends: [] };
     const checkerAnswer = await membershipScope!.stub.observe({ of: membership, key: paul.key }) as Omit<Observation, "at">;
     expect(checkerAnswer).toMatchObject({ of: membership, head: (await membershipScope!.summary()).at, key: paul.key, keyState: "active", member: "@check", memberState: "active", role: "checker", actions: expect.arrayContaining(["change.check"]), within: { membership } });
     const checkGrant = grantFrom({ observation: { ...checkerAnswer, at: timeOf(lifetime.now()) }, read: { run: "scripted-source-check-read", n: 1 }, use: "fresh", prior: null });
@@ -425,9 +446,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
     const decision: Entry = { v: 1, at: otherLane, seq: 3, prev: entryHash(job), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signIntent({ v: 1, to: otherLane, actor: paul.key, kind: "check", on: null, expected: {}, fields: { job: 2, tree, configuration: digest, outcome: "passed" }, idempotencyKey: "scripted-check", notAfter: soon(60) }, paul.secret), authority: [checkGrant], presented: {} }, uses: [], prepared: [], effects: [{ effect: "state", item: 2, state: "passed" }], sends: [] };
     const request = { class: "request", type: "tell", body: { message: "reserve", fields: { operation: { self: true }, manifest: factRefOf(manifest), verdicts: [], jobs: [{ job: factRefOf(job), name: "unit", state: "passed", decidedBy: factRefOf(decision) }], links: [], reports: [] } } } as const;
     const merge: Entry = { v: 1, at: otherLane, seq: 4, prev: entryHash(decision), time: timeOf(lifetime.now()), clamped: false, epoch: 0, input: { type: "act", signed: signed("merge", { manifest: 1 }), authority: [], presented: {} }, uses: [], prepared: [], effects: [], sends: [{ n: 0, to: branchScope, message: request }] };
-    const sourceFacts = [manifest, job, decision, merge];
+    const sourceFacts = [genesis, creator, manifest, job, decision, merge];
     for (const entry of sourceFacts) {
-      lifetime.peer(entryHash(entry), { entry, under: "change" });
+      const peer = { entry, under: entry === creator ? "platform:directory" : "change", origin: entry === creator ? [] : origin };
+      lifetime.peer(entryHash(entry), peer);
     }
     expect(await G.stub.deliver({ to: branchScope, from: factRefOf(merge), n: 0, message: request })).toMatchObject({ answer: "recorded" });
     lifetime.active();
@@ -440,7 +462,7 @@ describe("a founding on real scopes under the deployed class (authority note, se
       return { item: store.item(publication), held: store.holder(publication), operations: store.operationsFor(publication), owedReceipts: store.page("receipt", ["owed"], null, 130).items };
     }));
     expect(await G.item(publication)).toMatchObject({ state: "queued", refs: { operation: factRefOf(merge), manifest: factRefOf(manifest), lane: otherLane } });
-    expect(queued.uses.map((use) => use.fact.hash).sort()).toEqual(sourceFacts.map(entryHash).sort());
+    expect(queued.uses.map((use) => use.fact.hash).sort()).toEqual(sourceFacts.slice(2).map(entryHash).sort());
     for (const use of queued.uses) expect(await G.stub.retained(reader, "entry", use.content)).toMatchObject({ ok: true, value: { bytes: canonicalize(sourceFacts.find((entry) => entryHash(entry) === use.fact.hash)) } });
     expect((await storedPublication()).held?.decisions?.["withdraw"]).toBe(1);
     const judging = `${queued.seq}:0` as OperationId;
@@ -491,7 +513,10 @@ describe("a founding on real scopes under the deployed class (authority note, se
     // A verifier reads the five histories as bytes and derives every entry again, with the platform package's data and rules: the
     // register's outcome entry with its creation, the directory's genesis under the fourth cause, the clause of the result, and
     // the grants of the rules scope from their observations, the first of which fixed the incarnation. No grant is taken as current.
-    // Only the four scripted source facts are anchored (no membership or rules facts). Every actual founding, authority and destination history is replayed.
+    // Only the six explicitly scripted source/origin facts are anchored (no
+    // membership or rules facts). Actual founding and authority entries are
+    // replayed; the scripted Directory creation anchor supplies no native
+    // factory claim, and the separate native-origin witness owns that check.
     const options = { mode: "replay", platform, grants: "proven", anchors: sourceFacts.map((entry) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) })) } as const;
     for (const node of [R, D, membershipScope!, rulesScope!, G]) {
       const { report, why } = await lifetime.wait(async () => verify(httpSource(SERVICE, { fetch }), { ...options, scope: node.name, head: (await node.summary()).at }));

@@ -1,0 +1,148 @@
+import { expect, test } from "vitest";
+import type { Intent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { canonicalize, definitionDigest, digestBytes, intentDigest, isSeed, scopeIdOf, seedDigest, signIntent, utf8 } from "@generalbusiness/artroom-bytes";
+import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
+import { APPLICATION_COHORT, firstExtents, repositoryName } from "@generalbusiness/dap-platform";
+import { changeDemo } from "../src/index.ts";
+import { soon } from "../../scope/test/net.ts";
+import { outsideOf } from "../../scope/test/outside.ts";
+import { foundingPublication } from "../../scope/test/publication.ts";
+import type { Platform } from "../../scope/test/repository.ts";
+import { reader } from "../../scope/test/support.ts";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { dispatchFixture, effectFixture, nativeFixtureLifetime } from "../../scope/test/support/native-fixture-lifetime.ts";
+import { declaredChangeAttack } from "../../scope/test/support/declared-change-attack.ts";
+
+// Invariant: an arbitrary application cannot acquire a native change lane's
+// destination publication privilege by declaring the same name.
+// Real PlatformScope, SQLite, factory, membership authority, rules and source
+// resolution. Git creation and founding writes use existing OutsideDouble;
+// no provider, production Git repository, or network is mutated. Scripted
+// clock and inspector reads are labelled stand-ins; grants are native.
+// This successor checks only reserve admission, not an outside judge or push.
+// The original c8 witness failed on A-to-B and never reached B-to-B. It is
+// retained as historical evidence; this successor also isolates F1 from P21
+// with a supported canonical pin whose non-native factory origin is also qualified.
+test("native reserve admission refuses declared-name and canonical F1 applications across rooms and inside the destination room; Git host is a STAND-IN", async ({ task }) => {
+  const owner = beginSessionFixture({ secret: null, sessions: false, inspector: reader });
+  const lifetime = nativeFixtureLifetime(owner, { required: false });
+  const settle = (...nodes: Platform[]) => dispatchFixture(nodes, lifetime.wait);
+  type Room = { R: Platform; D: Platform; M: Platform; Q: Platform; G: Platform; who: Actor };
+  const room = async (label: string, who: Actor, recovery: Actor): Promise<Room> => {
+    const install: Intent = { v: 1, to: null, actor: keys.paul.key, kind: "install", on: null,
+      expected: {}, fields: { host: "git.example", namespace: `security-${label}`,
+        policy: "keys", founders: [who.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const R = lifetime.platform(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register,
+      creator: null, cause: intentDigest(install), ordinal: 0 }));
+    const host = outsideOf(R.name);
+    lifetime.wire(R.name, () => ({ outside: {
+      accepts: () => { lifetime.active(); return host.accepts(); },
+      send: request => lifetime.wait(() => host.send(request)),
+      late: deliver => { lifetime.active(); host.late(deliver); },
+    } }));
+    expect(await R.stub.found(signIntent(install, keys.paul.secret), APPLICATION_COHORT.register)).toMatchObject({ answer: "accepted" });
+    const found = await R.intent(who, "found", { expected: await R.expected({ register: 0 }),
+      fields: { branch: "main", founderHandle: label === "A" ? "@rita" : "@sam", recoveryKey: recovery.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory,
+      creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    const D = lifetime.platform(scopeIdOf(seed));
+    host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer",
+      body: { name: repositoryName(seedDigest(seed), 1), id: `security-${label}` } } });
+    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    await effectFixture([R], lifetime.wait); await settle(R, D);
+    const sends = (await D.entries())[0]!.sends;
+    const child = (kind: Seed["kind"]) => {
+      const send = sends.find(s => isSeed(s.to) && s.to.kind === kind);
+      if (!send || !isSeed(send.to)) throw new Error(`Actual ${label} ${kind} creation is missing.`);
+      return lifetime.platform(scopeIdOf(send.to));
+    };
+    const M = child("membership"), Q = child("rules"), G = child("destination");
+    await settle(R, D, M, Q, G);
+    expect([(await D.summary()).value.definition, (await M.summary()).value.definition,
+      (await Q.summary()).value.definition, (await G.summary()).value.definition]).toEqual([
+      APPLICATION_COHORT.directory, APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, APPLICATION_COHORT.destination]);
+    const seat = await M.did(who, "seat", { expected: await M.expected({ roster: 0 }) });
+    await M.did(who, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    await foundingPublication(G, lifetime);
+    expect(await G.item(0)).toMatchObject({ state: "ready" });
+    return { R, D, M, Q, G, who };
+  };
+  try {
+    const A = await room("A", keys.rita, keys.una), B = await room("B", keys.sam, keys.vic);
+    const destination = await B.G.at();
+    const checkpoints: unknown[] = [];
+    Object.assign(task.meta, { nativeReserveCheckpoints: checkpoints, attackJudgeOrPushDriven: false });
+    for (const [label, source, canonical] of [["A-to-B declared", A, false], ["B-to-B declared", B, false],
+      ["A-to-B canonical F1", A, true], ["B-to-B canonical F1", B, true]] as const) {
+      // F1's existing cohort pins G2. The supported legacy demo sends G2's
+      // manifest shape; a changeDemo3 source-list send would fail on an
+      // unknown field before testing source identity and mask its control.
+      const declaration = canonical ? changeDemo : declaredChangeAttack;
+      const bytes = canonicalize(declaration), digest = definitionDigest(declaration);
+      if (canonical) {
+        await source.Q.did(source.who, "publish", { on: 0, expected: await source.Q.expected({ rules: 0 }),
+          fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }).map(extent => ({ ...extent })) } });
+      }
+      // The named app is activated and created by actual native signed acts.
+      const activation = await source.Q.stub.submit(await source.Q.intent(source.who, "activate",
+        { fields: { digest, name: "change" } }), [], { values: [bytes] });
+      expect(activation).toMatchObject({ answer: "accepted" });
+      const signed = await source.D.intent(source.who, "establish-application", {
+        expected: await source.D.expected({ repository: 0 }),
+        fields: { definition: digest, values: canonicalize(canonical
+          ? { title: label, draft: false, destination, rules: await source.Q.at() } : { destination }), execution: "recorded-do" } });
+      const established = await source.D.stub.submit(signed, [], { values: [bytes] });
+      expect(established).toMatchObject({ answer: "accepted" });
+      if (established.answer !== "accepted") throw new Error("Native application creation did not run.");
+      const app = await source.D.created(established.receipt.fact.seq);
+      await settle(source.D, app);
+      expect((await app.summary()).value.definition).toBe(digest);
+      const appGenesis = (await app.entries())[0]!;
+      const expectedMembership = await source.M.at();
+      expect(appGenesis.input).toMatchObject({ type: "genesis", message: { body: { membership: expectedMembership } } });
+      if (canonical) {
+        expect((await app.item(0)).parties["author"]).toMatchObject({ membership: expectedMembership });
+        await app.did(source.who, "ask-rules", { on: 0, expected: await app.expected({ proposal: 0 }) });
+        await settle(app, source.Q);
+      }
+      const before = await B.G.summary();
+      const base = (await B.G.item(0)).values["head"];
+      if (typeof base !== "string") throw new Error("B's actual first head is missing.");
+      const content = `security witness ${label}\n`, raw = utf8(content);
+      const file = await app.did(source.who, "propose-file", { fields: {
+        base, path: "security-witness.txt", content, digest: digestBytes(raw), size: raw.length } });
+      const manifest = file;
+      const merge = await app.did(source.who, "merge", { fields: canonical ? { manifest, reports: [] } : { manifest },
+        expected: await app.expected(canonical ? { manifest, proposal: 0, rules: (await app.summary()).value.items.find(i => i.type === "rules")!.id }
+          : { manifest, configuration: 0 }) });
+      const merger = (await app.entries())[merge]!;
+      expect(merger.input).toMatchObject({ type: "act", authority: [{ fresh: { observation: {
+        of: expectedMembership, actions: expect.arrayContaining(["change.merge"]) } } }] });
+      await settle(app, B.G);
+      const after = await B.G.summary();
+      const admissions = (await B.G.entries()).filter(e => e.seq > before.at.seq);
+      const publications = after.value.items.filter(i => i.type === "publication" && i.id > before.at.seq);
+      const from = await app.at();
+      const sourced = await lifetime.wait(() => (app.object as unknown as { source(seq: number): Promise<{ under: string; at: ScopeRef }> }).source(merge));
+      const reserveAdmissions = admissions.filter(e => e.input.type === "delivery"
+        && e.input.from.at.scope === app.name && e.input.from.seq === merge);
+      const checkpoint = { label, definition: digest, under: sourced.under, app: from, creator: await source.D.at(), membership: expectedMembership,
+        destination, manifest, merge, before: before.at, after: after.at,
+        admissions: reserveAdmissions.map(e => ({ seq: e.seq, input: e.input.type === "delivery" && "decision" in e.input
+          ? { decision: e.input.decision, reason: e.input.reason } : { type: e.input.type }, uses: e.uses.length, effects: e.effects.length })),
+        publicationIds: publications.map(i => i.id), attackJudgeOrPushDriven: false };
+      checkpoints.push(checkpoint);
+      // The JSON reporter retains this bounded public checkpoint even if the
+      // next assertion fails. The disabled-origin-identity control must fail here by
+      // assertion, before any further scenario or outside operation is driven.
+      expect(publications, `${label} opened a native publication; remaining scenarios are UNRUN.`).toHaveLength(0);
+      expect([sourced.under, sourced.at]).toEqual(["declared:change", from]);
+      expect(reserveAdmissions, "An empty publication list alone is not an admission refusal.").toHaveLength(1);
+      const admission = reserveAdmissions[0]!.input;
+      if (admission.type !== "delivery" || !("decision" in admission)) throw new Error("Reserve produced no native admission decision.");
+      expect(admission.decision).toBe("refused");
+      expect(admission.reason?.code, "Retain an explicit native refusal code.").toBeTypeOf("string");
+      expect(admission.reason).toMatchObject({ code: "unknown-message" });
+    }
+  } finally { lifetime.release(); }
+});
