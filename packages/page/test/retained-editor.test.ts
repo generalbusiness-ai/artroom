@@ -1,8 +1,9 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { canonicalize, definitionDigest, digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf, utf8 } from "@generalbusiness/artroom-bytes";
-import type { ScopeRef } from "@generalbusiness/dap-contract";
+import type { Item, ScopeRef, Summary } from "@generalbusiness/dap-contract";
 import { changeDemo } from "@generalbusiness/dap-lanes";
-import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
+import { secretSigner, signedIntent, type Fetch } from "@generalbusiness/artroom-client";
+import * as data from "../src/data.ts";
 import { actAssociation, type ChangeView, type Room } from "../src/data.ts";
 import { retainedEditor } from "../src/retained-editor.ts";
 import { continueEdit, editFields, prepareEdit, type EditTask } from "../src/retained-editor-data.ts";
@@ -157,4 +158,41 @@ test("title/path-only input preserves untouched BOM CRLF/CR bytes while delibera
   const edited=shown.all().find(e=>e.tag==="textarea")!;edited.value="new\r\ntext";edited.event("input");
   shown=retainedEditor(room,change,{current:()=>true}) as unknown as Element;
   expect(shown.all().find(e=>e.tag==="textarea")!.textContent).toBe("new\ntext");
+});
+
+// Node read-route stand-in: the room refresh is supplied, while the real
+// editor task reads the destination summary and stops before any mutation.
+test("editor reads the inherited destination4 head for both workflows and still rejects legacy LIST1 and future pins", async () => {
+  const actual = await vi.importActual<typeof import("../src/retained-editor-data.ts")>("../src/retained-editor-data.ts");
+  const secret = new Uint8Array(32), digest = definitionDigest(changeDemo), opening = digestBytes(utf8("scripted head route"));
+  const ref = (kind: ScopeRef["kind"], ordinal: number): ScopeRef => ({ kind, scope: scopeIdOf({ v: 1, kind, definition: kind === "lane" ? digest : `platform:${kind}@1`, creator: null, cause: opening, ordinal }), inc: newIncarnation(new Uint8Array(16).fill(ordinal)) });
+  const directory = ref("directory", 1), membership = ref("membership", 2), rules = ref("rules", 3), destination = ref("destination", 4), source = ref("lane", 5);
+  const definition: Item = { id: 1, type: "definition", state: "active", revision: 1, opened: opening, attributed: [], parties: {}, refs: {}, values: { name: "change", digest } };
+  let pin = "platform:destination@4", headReads = 0, mutations = 0;
+  const fetch: Fetch = async (url, init) => {
+    if (init?.method && init.method !== "GET") { mutations++; throw new Error("No mutation belongs to this head-read witness"); }
+    const path = new URL(url).pathname;
+    const at = path.endsWith(directory.scope) ? directory : path.endsWith(rules.scope) ? rules : path.endsWith(destination.scope) ? destination : null;
+    if (!at) throw new Error("Unexpected read route");
+    if (at === destination) headReads++;
+    const value: Summary = { scope: at, definition: at === directory ? "platform:directory@3" : at === rules ? "platform:rules@3" : pin as Summary["definition"], status: "active", time: "2099-01-01T00:00:00Z", counts: [], items: at === rules ? [definition] : at === destination ? [{ ...definition, id: 0, type: "branch", state: "ready", values: { head: "b".repeat(40) } }] : [] };
+    return Response.json({ ok: true, complete: true, at: { seq: 1, hash: opening }, value });
+  };
+  const room = { session: { service: "https://editor.test", secret, fetch }, directory: directory.scope, membership, rules: rules.scope, destination: destination.scope, key: keyIdOfSecret(secret), me: null, reader: null, definitions: new Map() } as Room;
+  const refresh = vi.spyOn(data, "openRoom").mockResolvedValue(room);
+  try {
+    for (const [version, workflow, supported] of [[2, "legacy", true], [3, "legacy", true], [4, "legacy", true], [3, "list1", true], [4, "list1", true], [2, "list1", false], [5, "legacy", false], [5, "list1", false]] as const) {
+      pin = `platform:destination@${version}`;
+      const task: EditTask = { association: actAssociation(room, source.scope), source: { definition: digest, manifestFact: { at: source, seq: 1, hash: opening }, sourceFact: { at: source, seq: 1, hash: opening }, scope: source, manifest: 1, opened: opening, base: "a".repeat(40), path: "a.md", digest: opening, size: 0, content: "" },
+        draft: { title: "Head route", path: "a.md", content: "" }, base: "a".repeat(40), definition: digest, definitionBytes: canonicalize(changeDemo), declared: changeDemo, workflow,
+        context: { service: room.session.service, directory, membership, key: room.key, rules: rules.scope, destination: destination.scope }, directory, steps: [], state: "prepared", message: "", busy: false };
+      const before = headReads;
+      await actual.continueEdit(room, task, { current: () => true });
+      expect(headReads - before).toBe(1);
+      expect(task.state).toBe("stopped");
+      expect(task.message).toContain(supported ? "published base moved" : "does not support the one-file text workflow");
+      expect(task.steps).toEqual([]);
+    }
+    expect(mutations).toBe(0);
+  } finally { refresh.mockRestore(); }
 });
