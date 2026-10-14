@@ -409,3 +409,58 @@ export async function enrolAgentKey(ctx: Context, text: string, options: { mode?
     } finally { key.fill(0); }
   } catch { return bad(); }
 }
+
+/** The retained person issuance a configuration points at: its private snapshots, root first, its input and its operation. */
+async function retainedIssue(ctx: Context, pointer: PendingInvitationIssue): Promise<{ names: string[]; input: InvitationIssueInput; operation: string } | null> {
+  const names: string[] = [];
+  let request: string | undefined = pointer.request, input: InvitationIssueInput | null = null;
+  while (request !== undefined) {
+    if (names.includes(request) || names.length >= 16) return null;
+    const bytes = await ctx.store.private(request);
+    if (!bytes) return null;
+    const value = parseStrict(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes));
+    if (!issueValid(value) || value.operation !== pointer.operation) return null;
+    input ??= value.input;
+    names.unshift(request);
+    request = value.previous?.request;
+  }
+  return input ? { names, input, operation: pointer.operation } : null;
+}
+
+/**
+ * `dap invite <@member> --role <role> --keep`: a person invitation through the retained issuance of `issueInvitation`, which
+ * keeps the secret and the exact signed request before anything is sent and reads the membership's own pin, so the link is
+ * tagged with the membership's definition. One retained invitation at a time: `dap invite --check` reads its outcome and
+ * sends nothing; `dap invite --continue` resumes the exact original. A finished one (verified or refused) is released, and its
+ * link is printed once, as `dap invite` prints it. An unknown one blocks a new one, so a lost answer is never replaced.
+ */
+export async function invitePerson(ctx: Context, member: string | undefined, options: { role?: string; hours?: number; mode: "new" | "check" | "continue" }): Promise<Outcome> {
+  const say = (code: Outcome["code"], ...lines: string[]): Outcome => ({ code, lines });
+  const finish = async (result: InvitationIssueResult): Promise<Outcome> => {
+    if (result.state === "verified" || result.state === "refused") {
+      const { invitationIssue: _finished, ...released } = (await ctx.store.config())!;
+      await ctx.store.save(released);
+    }
+    if (result.state === "verified") return say(0, `Invited ${result.handle}: the invitation is recorded and verified.`, `Link for ${result.handle} only (it holds the invitation's secret): ${result.link}`);
+    if (result.state === "refused") return say(1, `The invitation of ${result.handle} was refused. ${result.reason ?? ""}`.trim());
+    return say(1, `The invitation of ${result.handle} is ${result.state}. ${result.reason ?? ""} Run dap invite --check, or dap invite --continue to resume the exact original.`.replace(/\s+/g, " ").trim());
+  };
+  try {
+    const config = await ctx.store.config();
+    if (!config?.repository) return say(2, "No repository is known here. Run: dap create <name>.");
+    const retained = config.invitationIssue ? await retainedIssue(ctx, config.invitationIssue) : null;
+    if (config.invitationIssue && !retained) return say(1, "The retained invitation's private record is unavailable. Nothing was signed or sent.");
+    if (options.mode !== "new") {
+      if (!retained) return say(2, "No invitation is retained here.");
+      return await finish(await issueInvitation(ctx, retained.input, { privateRequests: retained.names, mode: options.mode, operation: retained.operation }));
+    }
+    if (retained) return say(1, `An invitation of ${retained.input.handle} is retained. Run dap invite --check, or dap invite --continue. Nothing new was signed.`);
+    if (!member) return say(2, "Name a member's handle.");
+    const input: InvitationIssueInput = { kind: "person", handle: member, hours: options.hours ?? 24, ...(options.role ? { role: options.role as "member" } : {}) };
+    if (!isInvitationIssueInput(input)) return say(2, "Name a handle and a role with --role: one of member, maintainer, admin.");
+    return await finish(await issueInvitation(ctx, input, { privateRequests: [], mode: "new", operation: crypto.randomUUID() }));
+  } catch (e) {
+    const held = (await ctx.store.config().catch(() => null))?.invitationIssue !== undefined;
+    return say(1, `${e instanceof Error ? e.message : "The invitation could not be completed."}${held ? " The original invitation is retained: run dap invite --check, or dap invite --continue." : " Nothing was replaced."}`);
+  }
+}
