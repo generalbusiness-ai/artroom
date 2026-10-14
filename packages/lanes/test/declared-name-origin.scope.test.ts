@@ -173,7 +173,7 @@ test("a genuine Native change extension cannot reserve another room's destinatio
   } as const satisfies DeclaredDefinition;
   const digest = definitionDigest(definition);
   await A.activate(definition, digest);
-  expect(await A.publishRules({ approvals: 0, checks: [], ownerMayReview: false })).toMatchObject({ answer: "accepted" });
+  expect(await A.publishRules({ approvals: 0, checks: [], ownerMayReview: false, labels: [], extents: firstExtents({ approvals: 0, checks: [] }) })).toMatchObject({ answer: "accepted" });
   const lane = await A.lane(rita, "open-pr", definition, digest, { title: "Native foreign target", draft: false });
   await lane.did(rita, "ask-rules", { on: 0 });
   await A.settle();
