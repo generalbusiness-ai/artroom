@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -90 1400 740" role="img" aria-labelledby="title desc">
   <title id="title">dap architecture</title>
-  <desc id="desc">A person or an agent signs an act and sends it to a scope over the command line, MCP or HTTP. The scope pins one definition, which it read from the scope that created it, and reads the signer's grants from a membership scope before each turn. It judges the act against the definition: guards, rule expressions in a restricted JSONata, and the grants. An act that takes effect becomes one entry in the scope's journal, and the entry's declared effects are folded into the scope's items, which are whatever the definition declares. The signer gets a receipt or a refusal, and reads the state the same way. An entry's sends go to other scopes, and each judges the delivery in its own turn. Anyone can replay the journal and verify the state. Published files and the journal's archive go to a Git repository on Cloudflare Artifacts or GitHub, and pages are served from that repository. A planned path writes items to the repository directly.</desc>
+  <desc id="desc">A person or an agent signs an act and sends it to a scope over the command line, MCP or HTTP. The scope pins one definition, which it read from the scope that created it, and reads the signer's grants from a membership scope before each turn. It judges the act against the definition: guards, rule expressions in a restricted JSONata, and the grants. An act that takes effect becomes one entry in the scope's journal, and the entry's declared effects are folded into the scope's items, which are whatever the definition declares. The signer gets a receipt or a refusal, and reads the state the same way. An entry's sends go to other scopes, and each judges the delivery in its own turn. Anyone can replay the journal and verify the state. A destination scope publishes the files it is sent to a Git repository on Cloudflare Artifacts or GitHub, and pages are served from that repository. Two paths are planned: an archive of the journal in the repository, and writing items to the repository directly.</desc>
   <defs>
     <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
       <path d="M0 0L9 4.5L0 9Z" fill="#16180F"/>
@@ -144,14 +144,17 @@
   <path d="M600 412V548H858" class="flow"/>
   <text x="726" y="538" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">sends</text>
   <g>
-    <rect x="866" y="516" width="296" height="64" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <rect x="866" y="516" width="296" height="84" fill="#FFFFFF" stroke="#D8D5CB"/>
     <text x="890" y="542" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">ANOTHER SCOPE</text>
     <text x="890" y="566" class="sans body" fill="#16180F" fill-opacity="0.7">judges the delivery in its own turn</text>
+    <text x="890" y="588" class="sans body" fill="#16180F" fill-opacity="0.7">a destination publishes files</text>
   </g>
 
   <!-- Git repository, and the pages it drives -->
-  <path d="M655 412V440H1270V352" class="flow"/>
-  <text x="1186" y="430" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">publish · archive</text>
+  <path d="M655 412V440H1236V352" fill="none" stroke="#16180F" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-amber)"/>
+  <text x="1110" y="430" text-anchor="middle" class="mono code" fill="#16180F">archive · planned</text>
+  <path d="M1162 558H1304V352" class="flow"/>
+  <text x="1236" y="548" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">publish</text>
   <path d="M1072 262H1170" fill="none" stroke="#16180F" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-amber)"/>
   <text x="1124" y="250" text-anchor="middle" class="mono code" fill="#16180F">planned</text>
   <path d="M1270 220V196" class="flow"/>
