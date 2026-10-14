@@ -144,17 +144,16 @@
   <path d="M600 412V548H858" class="flow"/>
   <text x="726" y="538" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">sends</text>
   <g>
-    <rect x="866" y="516" width="296" height="84" fill="#FFFFFF" stroke="#D8D5CB"/>
-    <text x="890" y="542" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">ANOTHER SCOPE</text>
-    <text x="890" y="566" class="sans body" fill="#16180F" fill-opacity="0.7">judges the delivery in its own turn</text>
-    <text x="890" y="588" class="sans body" fill="#16180F" fill-opacity="0.7">a destination publishes files</text>
+    <rect x="866" y="516" width="296" height="64" fill="#FFFFFF" stroke="#D8D5CB"/>
+    <text x="890" y="542" class="sans eyebrow" fill="#16180F" fill-opacity="0.6">DESTINATION SCOPE</text>
+    <text x="890" y="566" class="sans body" fill="#16180F" fill-opacity="0.7">a destination publishes files</text>
   </g>
 
   <!-- Git repository, and the pages it drives -->
   <path d="M655 412V440H1236V352" fill="none" stroke="#16180F" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-amber)"/>
   <text x="1110" y="430" text-anchor="middle" class="mono code" fill="#16180F">archive · planned</text>
-  <path d="M1162 558H1304V352" class="flow"/>
-  <text x="1236" y="548" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">publish</text>
+  <path d="M1162 548H1304V352" class="flow"/>
+  <text x="1236" y="538" text-anchor="middle" class="mono code" fill="#16180F" fill-opacity="0.7">publish</text>
   <path d="M1072 262H1170" fill="none" stroke="#16180F" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-amber)"/>
   <text x="1124" y="250" text-anchor="middle" class="mono code" fill="#16180F">planned</text>
   <path d="M1270 220V196" class="flow"/>
