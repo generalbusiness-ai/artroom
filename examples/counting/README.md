@@ -30,15 +30,18 @@ The scope holds four types of item:
 
 ## Who can attempt each act
 
-Four kinds of participant sign acts:
+The application factory writes the first act, and three kinds of
+participant sign the rest:
 
-- The **opener** is the member named when the scope is created. The
-  opener becomes the **controller**.
+- The **application factory** writes the genesis act, `establish`, when
+  a member who holds `application.establish` creates the scope. It names
+  that member as the **opener**, who becomes the **controller**. No
+  participant signs `establish`.
 - The controller runs the board and manages participants.
 - Any **member** can become a **participant**, and a participant chooses
   when they are active.
 - The **holder** is the active participant whose commitment the scope
-  recorded.
+  accepted.
 
 In the two diagrams, a box is an act, labelled with who may sign it. A
 rounded shape is an item in a state. An arrow into an act shows the state
@@ -48,7 +51,7 @@ that the act needs. The scope refuses any other attempt.
 
 ```mermaid
 flowchart TD
-  establish["Opener: establish"] --> ready([configuration: ready])
+  establish["Application factory: establish"] --> ready([configuration: ready])
   ready --> initialize["Controller: initialize"]
   initialize --> paused([board: paused])
   participate["Any member: participate"] --> inactive([participant: inactive])
@@ -97,7 +100,8 @@ flowchart TD
 - Start needs a count below the target. It opens the board to
   commitments and does not choose a speaker.
 - Any active participant can commit while the board is open and no
-  promise is pledged. If several try, the scope records one.
+  promise is pledged. If several try, the scope accepts one commitment
+  and refuses the others.
 - When more than one participant is active, the last speaker cannot
   commit next.
 - Fulfill must take effect before the promise's deadline. It moves the
