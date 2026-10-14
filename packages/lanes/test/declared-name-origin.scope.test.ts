@@ -86,7 +86,7 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
       // The named app is activated and created by actual native signed acts.
       const activation = await source.Q.stub.submit(await source.Q.intent(source.who, "activate",
         { fields: { digest, name: "change" } }), [], { values: [bytes] });
-      expect(activation).toMatchObject({ answer: "accepted" });
+      expect(activation, `Actual ${label} activation: ${canonicalize(activation)}`).toMatchObject({ answer: "accepted" });
       const signed = await source.D.intent(source.who, "establish-application", {
         expected: await source.D.expected({ repository: 0 }),
         fields: { definition: digest, values: canonicalize(canonical
