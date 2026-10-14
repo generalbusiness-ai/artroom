@@ -4,7 +4,7 @@ For a participant checking what happened, this page explains what a
 dap receipt proves, where to find the underlying evidence and what a
 consistency report leaves open.
 
-Every scope has its own numbered history. The first entry records its
+Every scope has its own numbered journal. The first entry records its
 creation; each later entry names the hash of the previous entry. An entry
 records one input, the facts used to judge it, prepared rule results, derived
 item changes and messages to send. **Folding** means applying the recorded
@@ -25,15 +25,15 @@ position and that entry's hash. A position such as “entry 12” is meaningful 
 inside its own scope. An incarnation distinguishes this lifetime from a
 different lifetime under the same scope ID.
 
-## Keep the accepted receipt
+## Keep the receipt
 
-An accepted act returns a receipt containing its fact reference, pinned
+An act that takes effect returns a receipt containing its fact reference, pinned
 definition, intent digest, effects and send duty IDs. It identifies the
 local entry the scope committed. The receipt is built after sealing; it is
 not inserted into that entry's own bytes.
 
-That is enough to locate the accepted request and its immediate changes.
-It does not say that another scope accepted a message, a Git host published
+That is enough to locate the request that took effect and its immediate changes.
+It does not say that a message took effect in another scope, a Git host published
 a commit, or a provider revoked a token. Those outcomes need their own
 entries and evidence. Keep the original signed request too if you need to
 settle a lost reply.
@@ -46,11 +46,10 @@ The word “commit” can refer to three different things here:
 | Git commit object | Git bytes identify a tree, parents and commit metadata |
 | Recorded publication | The destination recorded its publication outcome, using the evidence its rules require |
 
-An accepted merge request is the first of these, not automatically the
+A merge that has taken effect is the first of these, not automatically the
 third. The current change definition sets Merged after receiving a published
 destination outcome. The destination also writes its publication receipt
-through a separate workflow. That Git publication receipt is different from
-the accepted-act receipt returned by submission.
+through a separate workflow. That Git publication receipt is different from the receipt that submitting an act returns.
 
 ## Read with provenance
 
@@ -60,14 +59,14 @@ digest. Those links let a reader check which version, authority observation
 or rule value the judgment used. They do not make later changes apply
 retroactively.
 
-The current HTTP service provides authenticated history, entries, stored log
+The current HTTP service provides authenticated journal pages, entries, stored log
 bytes and retained-input reads. The command line provides log and verify
 commands. [The first-change guide](../../apps/room/docs/first-change.md) shows their contribution
 context; [the scope guide](../scopes.md) describes the interfaces. Do not
 assume the older `refs/artroom/log` publishing scheme is a current route or
-that an operator has exported the whole history offline.
+that an operator has exported the whole journal offline.
 
-Detached text may be removed under a recorded tombstone. The history still
+Detached text may be removed under a recorded tombstone. The journal still
 identifies that redaction; a verifier cannot recreate the removed words.
 Missing bytes without a valid recorded basis are not a complete proof.
 
@@ -79,7 +78,7 @@ definition code and recorded times. Its report names the target head,
 coverage, trusted anchors, missing dependencies and other trusts.
 
 “Consistent” means the checks of that mode hold for that stated coverage and
-those trusts. It does not prove that the history ends where the service
+those trusts. It does not prove that the journal ends where the service
 says, unless an independently kept head establishes the target. It does not
 prove a provider's real-world action merely because the recorded answer
 replays. A source whose ancestry walk cannot be derived can remain
@@ -88,7 +87,7 @@ incomplete even when its other entries match.
 Use a receipt you kept to identify a head when comparing records. Read a
 missing-dependency, incomplete or unsupported-definition report as a limit
 on the conclusion, not as success. Room discovery in `verify --all` is also
-bounded: it follows recorded creation histories for that room, not every
+bounded: it follows recorded creation journals for that room, not every
 scope on the service. Check publication and outstanding duties separately.
 
 ## Source and acceptance

@@ -103,12 +103,12 @@ the validated definition or the problems that refuse it.
 
 Use the installation's bounds. The supplied examples use
 `PROPOSED_BOUNDS`. These numbers are provisional. If the definition
-declares named rules, pass `RULE_PROFILES` from
+declares rule expressions, pass `RULE_PROFILES` from
 `@generalbusiness/dap-derive/rule` as the third argument, as the
 [Counter's tests](../examples/counting/definition.test.ts) do. The
 [lane definition tests](../packages/lanes/test/definitions.test.ts) show
 the validator calls for the room's lane definitions and their demo
-profiles, which declare no named rules.
+profiles, which declare no rule expressions.
 
 The validator imports below use the published SDK names. The lane demo
 definitions remain checkout-only source because the public SDK has no lanes
@@ -135,7 +135,7 @@ for (const definition of [issueDemo, changeDemo]) {
 JS
 ```
 
-This exact checkout command ran with Node.js 26.11.1 at Source
+This exact checkout command ran with Node.js 26.11.1 at commit
 `fdafc051ae2ddc384c5dea940fe469e677993dec` and exited 0. It uses the
 materialized repository workspace packages, separately from the Counter
 tutorial's public npm install. Its observed output was:

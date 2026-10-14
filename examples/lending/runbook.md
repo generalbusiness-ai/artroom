@@ -21,7 +21,7 @@ commands and pins.
 The commands use the launcher `packages/cli/bin/dap.js`. The rehearsal
 ran them on 14 October 2026. The final room has not been provisioned.
 
-Record the approved Source head, deployed bounds, exact application cohort,
+Record the approved commit, deployed bounds, exact application cohort,
 Worker name, Artifacts namespace, and verified service origin. Use a separate
 library deployment whose Artifacts binding and register configuration belong
 to this room. Do not repoint the workroom's register configuration. Public
@@ -76,7 +76,7 @@ node packages/cli/bin/dap.js act establish-application --on directory --set defi
 ```
 
 Keep the exact signed establishment request before submission. Reconcile an
-unknown answer against its original accepted fact and confirmed child seed.
+unknown answer against its original recorded fact and confirmed child seed.
 Record the application's actual full reference. Its factory supplies the
 trusted opener, membership and destination. The caller's genesis values
 are `{}`: the factory refuses a `destination` in them.
@@ -96,7 +96,7 @@ node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set ro
 node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set role=member --set 'actions=<complete-member-JSON-list>'
 ```
 
-Record both before and after lists and their accepted facts. Show that an
+Record both before and after lists and their recorded facts. Show that an
 admin still has an earlier administration action, and that a member keeps
 its earlier actions. Do not claim immediate revocation. The native scenario
 advances a scripted clock by 301 seconds; it does not prove deployed elapsed
@@ -109,8 +109,7 @@ actual membership's definition, checks the issuer's active key and
 `membership.invite`, and checks the directory's membership, rules and
 destination references against that definition's directory. It makes the
 invitation secret and keeps it with the exact signed `invite-member`
-request in an owner-only private file before anything is sent. It verifies
-the accepted receipt, the recorded invitation's handle, role, hash and
+request in an owner-only private file before anything is sent. It verifies the receipt, the recorded invitation's handle, role, hash and
 expiry, and prints a link tagged with the membership's exact definition,
 `platform:membership@4` here:
 
@@ -137,22 +136,20 @@ actual join control. Record the browser's exact control labels during the
 run. Do not put the invitation, secret, key, or session headers in public
 evidence.
 
-Verify a distinct browser device key and membership 4 enrollment with the
-native accepted receipt, full membership reference, and incarnation. A test
+Verify a distinct browser device key and membership 4 enrollment with the native receipt, full membership reference, and incarnation. A test
 Worker result does not substitute for this deployed browser witness.
 
 Exercise an interrupted donation and an interrupted join at the reviewed
 custody boundary. Retain the original request before dispatch. Reload, then
 use **Check the join** or **Continue the join** for enrollment, and
 **Check** or **Continue** for a lending act. These are the prepared SDK
-interface labels, not observed browser results. Record the accepted fact and exactly one donation or enrollment.
+interface labels, not observed browser results. Record the fact and exactly one donation or enrollment.
 Do not sign a replacement for an unknown original. The custody owner prepares
 and reviews this harness separately; these steps have not been run.
 
 ## Play the story and complete publication
 
-Play [the demo script](demo-script.md). Keep the seven accepted lending acts
-in order with their signers, alongside genesis and any other actual history
+Play [the demo script](demo-script.md). Keep the seven lending acts that took effect in order with their signers, alongside genesis and any other actual journal
 entries. Record both refusals separately. Read actual item numbers from the
 record; do not infer them from their names or a test fixture.
 
@@ -163,7 +160,7 @@ the final room is created with `--cohort application-publication` under the
 current pin in `pin.ts`, and its directory supplies the destination. Bind
 those exact definitions, then run the final story.
 
-For each accepted lending act, record publication separately from
+For each lending act that took effect, record publication separately from
 acceptance: its original send, the destination's receipt, which names the
 sending entry and send ordinal, the commit, and the thing's shelf path.
 The interface chooses that path at donation, `shelf/<16 characters>.md`,
@@ -181,11 +178,11 @@ An unauthenticated visitor must read the shelf listing, the thing pages,
 and repository commit history. Check that each page names the lending
 scope and incarnation, and use the destination's receipts to match each
 commit to the lending entry that sent it. The lending journal is for
-seated members; record an actual
+members with a seat; record an actual
 unauthenticated refusal rather than publishing a private read credential.
 This is the public history witness. It remains unrun.
 
-Members can inspect the lending history with the actual full scope reference:
+Members can inspect the lending journal with the actual full scope reference:
 
 ```sh
 node packages/cli/bin/dap.js log "<lending-scope>"
@@ -193,7 +190,7 @@ node packages/cli/bin/dap.js verify "<lending-scope>"
 ```
 
 Record verifier coverage and trusts as well as the result. Missing foreign
-history is a finding, not a successful verification.
+journal is a finding, not a successful verification.
 
 ## Bind the homepage destinations
 
@@ -205,16 +202,16 @@ verification:
 | --- | --- |
 | Member interface | Deployed `/lending/` screens, actual membership 4 browser join, and original-request recovery shown. |
 | Published shelf | Anonymous read of the final room's shelf pages and current public history. |
-| Members' record | Verified member interface record view or documented seated-reader route. No invitation or credential in the URL. |
+| Members' record | Verified member interface record view or documented route for a member with a seat. No invitation or credential in the URL. |
 
 Two are linked now, to the rehearsal room: the member interface at
 `https://dap-lending.inguz.workers.dev/lending/`, which also shows the
 members' record. That link landed on main `26d2bc8a` after the rehearsal
 join and recovery were seen. The published shelf is unlinked, and the
 page says so. When the final room exists, point the links at it, add the
-shelf's verified URL in the final Source, then run its owning Home check and one
-final gate through the Root-owned validation procedure. Publish the homepage
-normally only after Source approval and landing. Retain its original build,
+shelf's verified URL in the final commit, then run the homepage's own test
+and one final gate. Publish the homepage only after that commit is
+approved and landed. Retain its original build,
 deployment version, and byte, MIME, cache, and link readbacks.
 
 ## The rehearsal run, 14 October 2026
@@ -228,7 +225,7 @@ built, under the pins it then needs.
 
 | Step | Observed |
 |---|---|
-| Source | Main `dedcb14b`. |
+| Code | Main `dedcb14b`. |
 | Service | Worker `dap-lending`, `https://dap-lending.inguz.workers.dev`, its own Durable Object namespace and Artifacts namespace `dap-lending`. Version `4b289327-c1c8-47fa-b108-ce84cad6975a` carries `ARTIFACTS_CONFIG`. `DEPLOYMENT` and `SESSION_SECRET` were set through stdin. |
 | Room | `install --plan --cohort application`, then `install --planned`, then `create lending-library --handle @neighbour`: register `sc_c67lq575…`, directory `sc_sgj2favz…` (`platform:directory@5`), membership `sc_x6lr4msi…` (`@4`), rules `sc_xeeasdyw…` (`@3`), destination `sc_kkehgsll…` (`@2`); each created and confirmed. |
 | Definition | `activate` took effect at rules entry 2; `establish-application` at directory entry 5. The lending scope is `sc_vsleihvx…`, under the pin `sha256:439cd20e…`. |
@@ -258,8 +255,8 @@ history witness, and a second physical device.
 This is the final six-output ledger, for the final room. All its
 deployed and browser observation slots are **UNRUN**; the rehearsal
 section above is separate and does not fill them.
-The existing definition and native-fixture witnesses retain their original
-Source bindings; this ledger does not say they never ran. Record original
+The existing definition and native-fixture witnesses remain tied to the
+commits they ran against; this ledger does not say they never ran. Record original
 terminals and uncertain outcomes before any continuation. Keep failed
 attempts as evidence.
 

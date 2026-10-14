@@ -60,7 +60,7 @@ Two things are not done yet:
 | `browser/custody.ts` | Custody of one lending request: kept before it is sent, sent at most once, settled afterwards only by a read. |
 | `browser/client.ts` | The gateway: one coherent read of the scope (summary, head and record), and `act`, `check`, `resume` and `abandon` over that custody. |
 | `browser/join.ts` | Joining with an invitation link under a device key that WebCrypto holds, with the same custody; and finding the room's lending scope in its directory. |
-| `browser/storage.ts` | This origin's private storage: the device key, the seat, and the kept requests, in IndexedDB under a Web Lock. |
+| `browser/storage.ts` | This origin's private storage: the device key, the seat (this member's item in membership), and the kept requests, in IndexedDB under a Web Lock. |
 | `browser/main.ts`, `index.html`, `style.css` | The screens: join, the shelf, donate, borrow, return, cancel, the kept request, each page's text, and the record. |
 | `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `packages/scope/src/lending-assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
 | `browser/model.test.ts`, `browser/custody.test.ts`, `browser/publication.test.ts`, `browser/storage.browser.test.ts` | Tests of the model, the custody, the published-page comparison, and the browser storage. |
@@ -108,7 +108,7 @@ would be better, and is left to the builder.
 - The library holds at most 64 live things. A thing that is gone does not
   count, but its page and path stay with it.
 - A shelf path starts with `shelf/` and ends with `.md`, and belongs to
-  one thing for good. One named rule, `shelf-page`, checks the form.
+  one thing for good. One rule expression, `shelf-page`, checks the form.
 - Every act after `establish` tells the destination `publish-file` with
   the thing's path and the signed page text. The definition uses no
   handler, deadline or capability.

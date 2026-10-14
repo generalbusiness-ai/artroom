@@ -34,7 +34,7 @@ delivery in its own turn, as it judges an act.
 ## Four applications built on dap
 
 - **dap-room** holds membership, rules, issues and changes for a
-  repository, and publishes accepted changes to a Git host. Its pages
+  repository, and publishes approved changes to a Git host. Its pages
   are in [apps/room/docs](apps/room/docs). Start with
   [Join a room and publish one text change](apps/room/docs/first-change.md)
   and [Lanes](apps/room/docs/lanes.md).

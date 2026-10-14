@@ -86,9 +86,8 @@ its creation:
 
 ## Record the actual run
 
-Keep actual control labels, accepted facts, refusal reasons, item numbers,
-and publication receipts with each shot. If a current list offers no invalid
-borrow action, show the retained native refusal beside it. Do not fabricate
+Keep actual control labels, recorded facts, refusal reasons, item numbers,
+and publication receipts with each shot. If a current list offers no borrow for a lent thing, show the retained native refusal beside it. Do not fabricate
 an interactive control or substitute a local refusal for a scope judgment.
 
 Record interrupted donation and invitation recovery as separate acceptance
