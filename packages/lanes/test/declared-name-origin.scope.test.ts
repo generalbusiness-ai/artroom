@@ -80,7 +80,7 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
       const declaration = canonical ? changeDemo : declaredChangeAttack;
       const bytes = canonicalize(declaration), digest = definitionDigest(declaration);
       if (canonical) {
-        await source.Q.did(source.who, "publish", { on: 0, expected: await source.Q.expected({ rules: 0 }),
+        await source.Q.did(source.who, "publish", { on: 0, expected: await source.Q.expected({ on: 0 }),
           fields: { approvals: 0, ownerMayReview: false, checks: [], labels: [], extents: firstExtents({ approvals: 0, checks: [] }).map(extent => ({ ...extent })) } });
       }
       // The named app is activated and created by actual native signed acts.
@@ -102,7 +102,7 @@ test("native reserve admission refuses declared-name and canonical F1 applicatio
       expect(appGenesis.input).toMatchObject({ type: "genesis", message: { body: { membership: expectedMembership } } });
       if (canonical) {
         expect((await app.item(0)).parties["author"]).toMatchObject({ membership: expectedMembership });
-        await app.did(source.who, "ask-rules", { on: 0, expected: await app.expected({ proposal: 0 }) });
+        await app.did(source.who, "ask-rules", { on: 0, expected: await app.expected({ on: 0 }) });
         await settle(app, source.Q);
       }
       const before = await B.G.summary();
