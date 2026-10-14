@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:da7bc6daedb87d009a0d1db5d96531e474e2b129","text":"Merge retired a covered predecessor; the successor is at examples/lending/browser/style.css."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:de4903af06ec1f11e7f252a067197ce502084e55","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/lending-route.test.ts."}
