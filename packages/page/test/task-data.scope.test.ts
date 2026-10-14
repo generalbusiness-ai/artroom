@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test } from "vitest";
 import { digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
-import { DEMO_DIGESTS } from "@generalbusiness/dap-lanes";
+import { DEMO_DIGESTS, DIGESTS, change, issue } from "@generalbusiness/dap-lanes";
 import { firstExtents } from "@generalbusiness/dap-platform";
 import { act, actsOn, issueCreation, createdIssue, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
 import { demo, type Demo } from "./support/demo.ts";
@@ -8,9 +8,13 @@ import { ScopeHandle, httpTransport, secretSigner, signedReads, REPLY_BYTES, REP
 import { PROPOSED_BOUNDS, type ScopeId, type FactRef } from "@generalbusiness/dap-contract";
 import { driveFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { Platform } from "../../scope/test/repository.ts";
-import { graph, onCode, rita, una, vic, routed, net } from "../../lanes/test/support/graph.ts";
+import { Peer, rita, una, vic, net } from "../../lanes/test/support/graph.ts";
 import { nextChangeAction, requestedReviewCandidates, taskReviewExtents } from "../src/task-values.ts";
 import { changeActions, issueActions } from "../src/shell.ts";
+import { routed } from "../../lanes/test/support/room.ts";
+import { delegatedRoom } from "../../lanes/test/support/native-delegated-room.ts";
+import { nativelyCreatedChild, settleNativeChildren } from "../../lanes/test/support/natively-created-child.ts";
+import { beginSessionFixture } from "../../scope/test/session-settings.ts";
 const oid = (c: string) => c.repeat(40);
 
 /** Scheduler provenance uses the same authenticated room transport; no inspector. */
@@ -55,25 +59,28 @@ async function completeIssue(d: Demo, room: Room, fact: FactRef, kind: "open-iss
   return child;
 }
 
-// Real native ISSUE reports and manifest admissions. Authority/rules peers,
-// Git host and clock are the graph's explicitly labelled stand-ins; the
-// selection API uses the real authenticated signed-read path of the signer.
+// Native room, membership agents/controllers, activated lanes and actual concern children.
+// Git host/clock are STAND-INs and only the rules update is SCRIPTED;
+// Page selection reads obtain an authentic membership session with openRoom.
 test("selected merge facts are native ISSUE reports in admitted order, independent of later reports and checker jobs", async () => {
-  const g = await graph();
-  onCode();
-  const G = await g.goal();
+  const owner = beginSessionFixture({ secret: "Native task-data witness session secret of at least thirty-two bytes", sessions: true, inspector: "a test reader" });
+  onTestFinished(() => owner.close());
+  const { r } = await delegatedRoom();
+  const rulesPeer = new Peer("rules", "platform:rules", await r.rules.at());
+  net.hold = e => "scope" in e.to && e.to.scope === rulesPeer.at.scope;
+  const G = await r.lane(rita, "open-issue", issue, DIGESTS.issue, { title: "A goal", conditions: ["it works"] });
   // Everything below names the entry that filed the goal as the goal's conditions: the genesis of the issue lane, of the kind `file`.
   // The change lane pins another definition, and reads that kind from the entry (scope contract, sections 4.1 and 6.2).
   const goal = await G.fact(0);
   const plan = (await G.did(rita, "open-plan", {})).fact.seq;
-  const a = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The parser", role: "required", title: "Parse", conditions: ["it parses"] } })).fact.seq;
-  const b = (await G.did(rita, "add-concern", { fields: { plan, purpose: "The printer", role: "required", title: "Print", conditions: ["it prints"] } })).fact.seq;
-  const [A, B] = [await g.concern(G, a), await g.concern(G, b)];
+  const first = await nativelyCreatedChild(r, G, await G.signed(rita, "add-concern", { fields: { plan, purpose: "The parser", role: "required", title: "Parse", conditions: ["it parses"] } }));
+  const second = await nativelyCreatedChild(r, G, await G.signed(rita, "add-concern", { fields: { plan, purpose: "The printer", role: "required", title: "Print", conditions: ["it prints"] } }));
+  const [a, b] = [first.receipt.fact.seq, second.receipt.fact.seq], [A, B] = [first.child, second.child];
   const sealed = (await G.did(rita, "seal-plan", { on: plan, fields: { goalAt: goal, required: [{ item: a, child: A.at }, { item: b, child: B.at }], optional: [] } })).fact;
 
   // Concern A is done by vic on the concern's own terms, judged by its requester, and fulfilled: the parent records the delivery.
   const filed = await A.fact(0);
-  const ca = (await A.did(rita, "offer", { fields: { offeree: vic.member } })).fact;
+  const ca = (await A.did(rita, "offer", { fields: { offeree: await r.member("@vic") } })).fact;
   await A.did(vic, "accept", { on: ca.seq, fields: { terms: filed } });
   // A report is staged from the performer's own hold, with an instance: without one the lane stages nothing, and the act is refused.
   expect(await A.stagedAsks(vic, "report", { fields: { commitment: ca.seq, terms: filed, commit: oid("a"), tree: oid("1") } })).toBe("capability-refused: not-staged");
@@ -83,7 +90,7 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
   expect(await A.asks(vic, "accept-report", { on: ra.seq, fields: { commitment: ca.seq, terms: filed } })).toBe("guard-failed");
   const aa = (await A.did(rita, "accept-report", { on: ra.seq, fields: { commitment: ca.seq, terms: filed } })).fact;
   await A.did(rita, "fulfil", { on: ca.seq, fields: { report: ra.seq } });
-  await g.settle();
+  await settleNativeChildren(r);
   expect(await G.item(a)).toMatchObject({ state: "delivered", refs: { child: A.at, result: ca } });
   // Concern B is done by una on terms that una proposed and the requester agreed to: changed terms, with their own terms fact.
   const cb = (await B.did(una, "propose-terms", { fields: { conditions: ["it prints", "in colour"] } })).fact;
@@ -93,8 +100,8 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
   const ab = (await B.did(rita, "accept-report", { on: rb.seq, fields: { commitment: cb.seq, terms: cb } })).fact;
 
   // The change lane. una is responsible for the integration and holds; a manifest names exact entries of the other three lanes.
-  const C = await g.change();
-  const offer = (await C.did(rita, "offer", { fields: { offeree: una.member, terms: "Integrate the two concerns." } })).fact;
+  const C = await r.lane(rita, "open-pr", change, DIGESTS.change, { title: "A change", draft: false });
+  const offer = (await C.did(rita, "offer", { fields: { offeree: await r.member("@una"), terms: "Integrate the two concerns." } })).fact;
   await C.did(una, "accept", { on: offer.seq, fields: { terms: offer } });
   const hold = (await C.did(una, "take-hold", { fields: { commitment: offer.seq } })).fact.seq;
   await C.instance(una, hold, "i-1");
@@ -110,20 +117,23 @@ test("selected merge facts are native ISSUE reports in admitted order, independe
   const claim = (await A.did(vic, "comment", { fields: { body: "It is done, and it passes." } })).fact;
   expect(await proposes([{ accepted: aa, report: claim }, fromB], [decided])).toBe("guard-failed: selection-malformed");
   const m1 = (await C.stagedDid(una, "propose-manifest", { fields: { ...version, selected: [fromA, fromB], decisions: [decided] } })).fact.seq;
-  const room = { session: { service: "https://scopes.test", secret: una.secret, fetch: routed, now: () => timeMs(net.clock.now)! }, directory: g.office.at.scope, membership: una.member.membership, rules: g.rules.at.scope, destination: g.destination.at.scope, key: una.key, me: null, reader: null, unsessioned: null, definitions: new Map() } as Room;
-  const selected = await loadChangeSelection(room, C.at.scope);
+  const nativeMembership = await r.M.at();
+  const room = await owner.required(() => openRoom({ service: "https://scopes.test", secret: una.secret, fetch: routed, now: () => timeMs(net.clock.now)! }, { directory: r.D.name, membership: nativeMembership }));
+  expect(room.me?.handle).toBe("@una");
+  expect(room.reader).not.toBeNull();
+  const selected = await owner.required(() => loadChangeSelection(room, C.at.scope));
   expect(selected.scope).toEqual(C.at);
   expect(selected.currentManifest).toBe(m1);
   expect(selected.manifests.find((m) => m.id === m1)?.selectedReports).toEqual([ra, rb]);
   const configuration = textDigest("task-data-ci");
-  expect(await C.stub.deliver(g.rules.relate(C.at, "rules", "published", { approvals: 0, checks: [{ name: "ci", configuration, required: true, checker: rita.member }], ownerMayReview: false }))).toMatchObject({ answer: "recorded" });
+  expect(await C.stub.deliver(rulesPeer.relate(C.at, "rules", "published", { approvals: 0, checks: [{ name: "ci", configuration, required: true, checker: await r.member("@rita") }], ownerMayReview: false }))).toMatchObject({ answer: "recorded" });
   const checkerJob = (await C.did(una, "request-check", { fields: { manifest: m1, name: "ci", configuration } })).fact;
-  const afterJob = await loadChangeSelection(room, C.at.scope);
+  const afterJob = await owner.required(() => loadChangeSelection(room, C.at.scope));
   expect(afterJob.manifests.find((m) => m.id === m1)?.selectedReports).toEqual([ra, rb]);
   expect(afterJob.manifests.find((m) => m.id === m1)?.selectedReports).not.toContainEqual(checkerJob);
   const later = (await B.stagedDid(una, "report", { fields: { commitment: cb.seq, terms: cb, commit: oid("e"), tree: oid("5") } })).fact;
   await B.did(rita, "accept-report", { on: later.seq, fields: { commitment: cb.seq, terms: cb } });
-  expect((await loadChangeSelection(room, C.at.scope)).manifests.find((m) => m.id === m1)?.selectedReports).toEqual([ra, rb]);
+  expect((await owner.required(() => loadChangeSelection(room, C.at.scope))).manifests.find((m) => m.id === m1)?.selectedReports).toEqual([ra, rb]);
 });
 
 // Actual membership, sessions, rules activation and directory creation.

@@ -16,6 +16,7 @@ import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
+import { sourceName } from "./publishing-provenance.ts";
 import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
@@ -36,6 +37,7 @@ export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_ATTEMPTS, DESTINA
 export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree, manifestCommit } from "./destination-objects.ts";
 export { PROPOSE_FILE, fileOf, sourcesOf, manifestFiles } from "./destination-reading.ts";
+export { sourceName, publishingLaneOrigin, publishingLaneAffiliation, PUBLISHING_LANE_DIGESTS, ISSUE_LANE_DIGESTS } from "./publishing-provenance.ts";
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
@@ -58,6 +60,7 @@ export type { Extent, ExtentClass, ExtentJudged, ExtentsAsked, ExtentsJudged, Ho
 export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
+  readonly sourceName?: typeof sourceName;
   /**
    * What a scope under this version answers to an observation read, from
    * its folded state at one head (authority note, section 3.3): a pure
@@ -115,7 +118,7 @@ export interface Platform {
  * one version. A version that is not listed here is one that this package
  * cannot run.
  */
-export const VERSIONS: Readonly<Record<string, Platform>> = {
+const VERSION_DATA: Readonly<Record<string, Platform>> = {
   [DEMO_REGISTER]: { data: demoRegister, rules: demoRegisterRules },
   [WEB_DEMO_REGISTER]: { data: webDemoRegister, rules: demoRegisterRules },
   [WEB_DEMO_COHORT.directory]: { data: directory7, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
@@ -142,6 +145,9 @@ export const VERSIONS: Readonly<Record<string, Platform>> = {
   "platform:destination@2": { data: destination2, rules: destinationRules2, membership: destinationMembership, rulesScope: destinationRulesScope },
   "platform:destination@3": { data: destination3, rules: destinationRules3, membership: destinationMembership, rulesScope: destinationRulesScope },
 };
+
+/** Stable native code objects with the same source policy for runtime and replay. */
+export const VERSIONS: Readonly<Record<string, Platform>> = Object.fromEntries(Object.entries(VERSION_DATA).map(([named, code]) => [named, { ...code, sourceName }]));
 
 /** Existing default founding cohort. Supporting application scopes require explicit APPLICATION_COHORT pins. */
 export const NEWEST: Readonly<Record<string, PlatformDefinition>> = {

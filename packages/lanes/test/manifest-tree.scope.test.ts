@@ -1,20 +1,22 @@
 import { runInDurableObject, runDurableObjectAlarm } from "cloudflare:test";
 import { inject, expect, test, onTestFinished } from "vitest";
-import { PROPOSED_BOUNDS, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS, type Entry, type FactRef, type ScopeId, type ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, timeOf, unb64url, definitionDigest, sign, keyIdOfSecret, digestBytes, factRefOf, scopeIdOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, signedReader, type Fetch } from "@generalbusiness/artroom-client";
 import { firstExtents, CONFIGURATION_DOMAIN, platform, revokedToken, destinationWrite, destinationRevokedMint } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
-import { CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
-import { validateDefinition, valueDigest } from "@generalbusiness/dap-derive";
+import { SqliteStore, CAPABILITY_CODE } from "@generalbusiness/artroom-scope";
+import { ownOf } from "../../scope/src/core.ts";
+import { validateDefinition, valueDigest, ruleAt } from "@generalbusiness/dap-derive";
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
+import { drainScheduledFixture } from "../../scope/test/support/native-fixture-lifetime.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
 import { artifactsOutside } from "../../scope/src/artifacts-wiring.ts";
 import { snapshotReaderOf } from "../../scope/src/worker.ts";
 import { env } from "cloudflare:workers";
 import { ownHost, readerOf, type Stand } from "../../scope/test/hosts.ts";
-import { Platform, routed, settle } from "../../scope/test/repository.ts";
+import { Platform, routed } from "../../scope/test/repository.ts";
 import { command, memoryStore, expectedOf, type ActShape, type Context, type Outcome } from "../../cli/src/index.ts";
 import { change3, changeDemo3, issueDemo } from "../src/index.ts";
 
@@ -33,12 +35,59 @@ import { room as legacyRoom, rita as legacyFounder } from "./support/room.ts";
 
 const SERVICE = "https://scopes.test";
 const reader = "a test reader";
-test("a manifest-list reservation records both files before the configured checker passes; no branch push occurs before that pass (real scopes, STAND-IN Git host and scheduler)", async () => {
+/** Read-only bounded diagnostic projection; no values, tokens or recorded bodies. */
+async function publicationCheckpoint(node: Platform) {
+  const clockRead = net.clock.now;
+  return runInDurableObject(node.object, (_instance, state) => {
+    const store = new SqliteStore({ exec: (query, ...bindings) => state.storage.sql.exec(query, ...bindings), transaction: closure => state.storage.transactionSync(closure) });
+    const scope = store.scope();
+    const operationPage = store.operations(null, 16, false);
+    const first = store.stored(0);
+    const birth = first ? JSON.parse(first.bytes) as Entry : null;
+    const definition = birth?.input.type === "genesis" ? birth.input.seed.definition : null;
+    const code = definition ? platform(definition) : null;
+    const publicationPage = store.page("publication", Object.keys(code?.data.items["publication"]?.states ?? {}), null, 16);
+    const branch = store.page("branch", ["empty", "ready"], null, 1).items[0];
+    const entries = [];
+    for (let seq = Math.max(0, (scope?.head.seq ?? -1) - 7); seq <= (scope?.head.seq ?? -1); seq++) {
+      const row = store.stored(seq);
+      if (!row) continue;
+      const entry = JSON.parse(row.bytes) as Entry;
+      entries.push({ seq, hash: row.hash, input: entry.input.type,
+        kind: entry.input.type === "act" ? entry.input.signed.intent.kind : entry.input.type === "outcome" ? entry.input.kind : null,
+        effects: entry.effects.map(effect => ({ effect: effect.effect,
+          ...(effect.effect === "state" ? { item: effect.item, state: effect.state } : {}),
+          ...(effect.effect === "value" || effect.effect === "ref" ? { item: effect.item, slot: effect.slot } : {}) })) });
+    }
+    const admission = (operation: typeof operationPage.operations[number]["operation"]) => {
+      if (operation.kind !== "check-judge") return undefined;
+      const mark = code?.data.outcomes?.[operation.kind];
+      const rule = code && mark && operation.owner === definition ? ruleAt(code.rules, mark.code, "outcome") : null;
+      const callback = rule?.rules.publicationOrigin;
+      try {
+        const asked = callback?.(store, operation, ownOf(store));
+        return { callback: !!callback, result: asked === undefined ? "absent" : asked === null ? "not-required" : asked === false ? "denied" : "required",
+          ...(asked && { from: asked.from, directory: asked.directory, destination: asked.destination }) };
+      } catch (error) { return { callback: !!callback, result: "threw", errorCategory: error instanceof Error ? error.name.slice(0, 80) : "non-error" }; }
+    };
+    return { clockRead, scope: scope?.at ?? null, head: scope?.head ?? null, definition,
+      branch: branch ? { id: branch.id, state: branch.state, directory: branch.refs["directory"] ?? null, judging: branch.refs["judging"] ?? null, slot: branch.refs["slot"] ?? null } : null,
+      publications: publicationPage.items.map(item => ({ id: item.id, state: item.state, operation: item.refs["operation"] ?? null, lane: item.refs["lane"] ?? null })),
+      operations: operationPage.operations.map(({ operation, state, sends }) => ({ id: operation.id, kind: operation.kind, for: operation.for ?? null, state, admission: admission(operation),
+        attempts: operation.attempts.map(attempt => ({ attempt: attempt.attempt, opened: attempt.opened, outcomes: attempt.outcomes.map(outcome => ({ seq: outcome.seq, result: outcome.result })) })), sends })),
+      operationsMore: operationPage.more, publicationsMore: publicationPage.more, entries };
+  });
+}
+
+
+
+
+test("a manifest-list reservation records both files before the configured checker passes; no branch push occurs before that pass (real scopes, STAND-IN Git host and scheduler)", async ({ task }) => {
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
   onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
-  try { await story(ownHost(), wired); }
+  try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, undefined, false, task.meta); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 test("a retry fence after publication starts is refused without superseding the live job or forgetting the unknown send (real scopes; host and scheduler STAND-INs)", async () => {
@@ -65,12 +114,12 @@ test("an unknown reservation deletion retains the live publication cleanup duty 
   try { await story(ownHost(), wired, false, false, true); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-test("dap edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async () => {
+test("dap edit uses a one-element reservation tree as the real checker service origin and stages it before the configured check (real scopes; host and runner STAND-INs)", async ({ task }) => {
   net.hold = net.deaf = null;
   const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
   onTestFinished(owner.close);
   const wired = new Set<ScopeId>();
-  try { await story(ownHost(), wired, false, false, false, true); }
+  try { await story(ownHost(), wired, false, false, false, true, false, undefined, false, false, undefined, undefined, false, task.meta); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
 // CLI category formatting/pre-send routing lives at the cheaper HTTP boundary
@@ -163,7 +212,7 @@ test("a valid custom required rules input is activated natively but stops the fi
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, "custom-required"); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false): Promise<void> {
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false, checkpointMeta?: object): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;
@@ -232,18 +281,9 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   // STAND-IN for the scheduler: each pass drives the operations of every scope the command waits on, and of the register and the
   // destination, then their dispatchers, until nothing is due.
   const known: Platform[] = [];
-  const pause = async (waiting: readonly string[]) => {
-    const nodes = [...known, ...waiting.filter((scope) => !known.some((node) => node.name === scope)).map((scope) => new Platform(scope as never))];
-    for (let pass = 0; pass < 64; pass++) {
-      let made = 0;
-      for (const node of nodes) {
-        while ((await (node.stub as unknown as { effect(): Promise<number> }).effect()) > 0) made++;
-        made += await node.stub.dispatch();
-      }
-      if (made === 0) return;
-    }
-    await settle(...nodes);
-  };
+  const pause = async (waiting: readonly string[]) => drainScheduledFixture(() => [
+    ...known, ...[...wired, ...waiting].map(scope => new Platform(scope as ScopeId)),
+  ]);
 
   const files: Record<string, Uint8Array> = { "change3.json": utf8(canonicalize(activeChange)), "one.md": utf8("# One\n"), "two.md": utf8("# Two\n") };
   const person = (): Context => ({ store: memoryStore(), fetch, now, pause, read: async (path) => files[path] ?? null });
@@ -741,6 +781,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
     expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "submitted", outcome: { act: "check", outcome: "passed" }, ran: true, lane: "admitted" });
     expect([runs, prepares, snapshots]).toEqual([1, 0, 1]);
     await pause([lane, repository.destination]);
+    if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
     const published = host.refs.get("refs/heads/main")!;
     expect(published).not.toBe(first);
     expect(host.refs.has(reservationRef)).toBe(false);
@@ -796,6 +837,7 @@ async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknow
   expect(await service.deliver({ lane: await L.at(), job: jobFact, name: "text", tree: manifest.values["tree"] as string })).toEqual({ did: "nothing", why: "closed" });
   expect(runs).toBe(1);
   await pause([lane, repository.destination]);
+  if (checkpointMeta) Object.assign(checkpointMeta, { publicationCheckpoint: await publicationCheckpoint(G) });
   const published = host.refs.get("refs/heads/main")!;
   expect(published).not.toBe(first);
   expect(host.refs.has(reservationRef)).toBe(false);

@@ -11,7 +11,7 @@
 
 import { CAPABILITIES, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Bounds, Capability, CapabilityName, Digest, Entry, ObservationRequest, PlatformDefinition, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import type { Capabilities, ContentStates, Delivered, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import type { Capabilities, ContentStates, Delivered, Fetched, Owners, Recorded, StateView, Steps, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { observing } from "./authority.ts";
 import type { EffectAnswer, EffectRequest, Outside } from "./operations.ts";
 import type { Authority, Clock, Definitions, Ports, Readers, Resolver, Rules, Transport } from "./ports.ts";
@@ -297,7 +297,7 @@ export interface Net {
    * namespace reads one as it reads any source entry, so a test that uses
    * one shows the receiver's side of a delivery and nothing about the peer.
    */
-  peers: Map<Digest, { entry: Entry; under: string }>;
+  peers: Map<Digest, { entry: Entry; under: string; origin?: readonly Fetched[] }>;
 }
 
 export const net: Net = { clock: new ScriptedClock("2099-01-01T00:00:00Z"), bounds: PROPOSED_BOUNDS, sized: new Map(), hold: null, deaf: null, capability: null, outside: null, platformCode: true, peers: new Map() };
@@ -322,7 +322,7 @@ export function netPorts(n: Net, transport: Transport, resolver?: Resolver): Par
       return null;
     },
   };
-  const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds); } } } : {};
+  const scripted: Partial<Ports> = resolver ? { resolver: { read: (fact, seconds, origin) => { const peer = n.peers.get(fact.hash); return peer ? Promise.resolve(peer) : resolver.read(fact, seconds, origin); } } } : {};
   const capability = chosenCapability(() => n.capability);
   const outside: Outside = { accepts: (owner, kind) => n.outside?.accepts(owner, kind) ?? false, send: (request) => Promise.resolve(n.outside?.send(request) ?? null) };
   return { clock: n.clock, authority: testAuthority(), readers: testReaders, transport: disturbed, capabilities: capability, owners: capability, outside, ...scripted };
