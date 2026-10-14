@@ -63,6 +63,30 @@ remain historical evidence only. They were not transferred to this composition.
 The receiving main successor `11e3c72b` adds the enrollment landing receipt
 and has exactly the same full tree as `a5d25fd6`.
 
+### Composition with retained invitations
+
+The isolated composition `cfd91dbd` also includes the approved invitation
+change at `7d0aba6d` and the approved fold publication design at `eb53463e`.
+Their original main landings remain separate. The Page uses the changed
+`issueInvitation` function, so this composition needs a new bundle.
+
+In original run `41312`, both Page compilers and the single Vitest command
+exited zero. Six selected cases passed and three unselected cases were skipped.
+They include the five chooser cases above and one connection custody case,
+whose shared sender is mocked. The wrapper exited one because its parser
+expected per-case `pending` statuses where Vitest records `skipped`.
+Passive run `66720` independently verified the original report, exact case
+selection, and fresh Source and dependency guards. It preserved the wrapper
+failure and did not rerun any compiler or test.
+
+The normal Page producer then passed once at `cfd91dbd`, in original run
+`15814`. Its script is 628,955 bytes with SHA-256
+`4fe2e5ef5843fc0c29b5df8ddfe477f631a44deda3e259bf8a5477034b458a5a`.
+The module contains exactly the emitted script and Source HTML. Only the
+generated module changed among tracked files. Its guards passed, and there
+was no prior dist directory. Producer `56955` remains evidence for its earlier
+Source and bundle, rather than this generated module.
+
 The first gate at `282bb48b` (original `36494`) failed one Native membership
 authority witness: an inbox was provisional where the fixture promised active.
 The unchanged authority assertion passed in an isolated diagnostic (`9216`).
