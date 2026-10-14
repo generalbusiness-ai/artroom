@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d8bff6ae5006279568f1a6df6216ff8a6e2cc81d","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-13-mcp-generic-delivery.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d9130bfc05222ade05cf6b51da6038e473039fd5","text":"Merge retired a covered predecessor; the successor is at packages/mcp/src/wire.ts."}
