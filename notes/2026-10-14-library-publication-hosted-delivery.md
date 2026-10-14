@@ -135,7 +135,7 @@ Its proof SHA256 is
 This machine-operated anonymous browser witness is separate from the byte
 collector; it does not prove human or physical-device acceptance.
 
-The original ordinary merge refusal, `guard-approvals-needed`, remains
+The original ordinary merge refusal, `guard-failed` with `approvals-needed`, remains
 retained. The operator published a replacement policy at rules entry 7,
 setting the global approval floor from 1 to 0 while preserving each of the
 four extent requirements. The existing change requested those rules at its
@@ -143,9 +143,8 @@ entry 21; checkpoint `68996` verified the reply at rules entry 8 and its
 application at child entry 22. The original manifest at child entry 20 was
 unchanged before the fresh merge at entry 24. Nonhistory lanes can now pass
 early admission, but the destination still enforces their explicit extent
-requirement of 1; the history extent requires 0. This was no bypass of the
-destination requirements. Neither the policy correction nor the earlier
-refusal is erased by the successful readback.
+requirement of 1; the history extent requires 0. The policy correction and
+the earlier refusal remain part of the retained evidence.
 
 ## Deployed code and retained publication rehearsal
 
