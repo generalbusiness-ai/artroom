@@ -43,7 +43,7 @@ Put each test at the cheapest boundary that can show its property.
 | The order of two things that race | against a real scope, with the test's gate and clock, never with sleeps |
 | What passes between scopes: creation, delivery, a diagnosis | against real scopes in one namespace, in the workerd tests of `scope` |
 | The Worker's routes and the service binding | in workerd, once for each; do not run a whole suite over both |
-| What a verifier reports for a history | over histories in memory, in `replay`; that replay agrees with the runtime, once, in `scope` |
+| What a verifier reports for a journal | over journals in memory, in `replay`; that replay agrees with the runtime, once, in `scope` |
 | What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 | A form of a definition: that the validator accepts or refuses it, and what the judges derive from it | as a plain function in `derive`, on a small made-up definition, in the `forms-*.test.ts` file of its family |
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
@@ -73,7 +73,7 @@ and receipt duties with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a
-scope's genesis will record. The test writes each answer, and no history
+scope's genesis will record. The test writes each answer, and no journal
 stands behind the head it names. With one, the scope's authority is the
 real observation read, with the real guards and windows. A test that uses
 it says so in its name or its first comment. It shows the observing
@@ -126,7 +126,7 @@ below reads that answer from the rules scope.
 `packages/scope/test/values.test.ts` separately shows the generic match,
 SQLite retention and domain read routes, with derive's made-up `gate`
 data and rules. Its outcome witness also shows an owner-declared evidence
-value across a restart: bad bytes write nothing, the valid history replays
+value across a restart: bad bytes write nothing, the valid journal replays
 over HTTP, and missing bytes make that replay `incomplete`. Its grants and
 outside system remain stand-ins.
 
@@ -168,8 +168,8 @@ runner runs. The decision uses the accepted checker key and a fresh
 source read metadata and the passed outcome. The Git host is `OutsideDouble`,
 a scripted port whose replies name the package's computed target IDs;
 no host runs. Reads use the test readers except for the separate real
-read-session witness. All five runtime histories replay `consistent` over
-HTTP, with their authority derived from membership history and only the
+read-session witness. All five runtime journals replay `consistent` over
+HTTP, with their authority derived from the membership journal and only the
 four scripted source facts anchored. Publication updates to that scripted
 lane remain pending. This shows the creation and destination's first
 publication through these boundaries. It proves no deployment, production
@@ -180,10 +180,10 @@ request `cc570904`. The current judge checks entries.
 The bound-request tests in `packages/derive/test/forms-binding.test.ts`
 use the real holder ledger: counts are taken and added, a bound deciding
 entry draws one even when refused, its requests draw on the holder, and a
-final item releases its decisions. Folding the history derives the same
+final item releases its decisions. Folding the journal derives the same
 counts. The platform data and rules remain made up. The replay witness in
 `packages/replay/test/decisions.test.ts` runs the real verifier on a judged
-receiver history, with the sender's entries written by hand and anchored.
+receiver journal, with the sender's entries written by hand and anchored.
 It checks that the taking entry fits its decision reservation. These tests
 show no behavior of a dap platform definition. The marker-duty tests
 in `forms-settles.test.ts` also use made-up platform data and rules.
@@ -226,11 +226,11 @@ gateway, a fork or a push. The sealed entries of
 `packages/git/test/host.test.ts` are made by hand, and no scope judged
 them (`notes/2026-10-05-i3-contract-deltas.md`, entry ET12).
 
-A replay of a history that the test authority wrote says so:
+A replay of a journal that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.
 
-The replay package has two histories with stand-ins of their own, in
+The replay package has two journals with stand-ins of their own, in
 `packages/replay/test/staging.ts`. `Lane` is a staging lane and `Gate` a
 scope under made-up platform data. Derive's judges wrote every entry of
 both, with the code of `hold@1` and `git-read@1` or with made-up rules.
@@ -238,7 +238,7 @@ Three things are stand-ins, and the file labels each: the two entries of
 the lane's creator, each observation of membership, and every answer of
 the outside system. A replay of them is given an anchor for each of the
 first two. Their grants hold a freshness proof, so they are replayed as
-`proven`. Such a test shows what a verifier derives from a history. It
+`proven`. Such a test shows what a verifier derives from a journal. It
 shows nothing about a creation, about membership or about a Git host.
 
 `codeLost`, of the same module, supplies each platform definition with

@@ -76,7 +76,7 @@ node packages/cli/bin/dap.js act establish-application --on directory --set defi
 ```
 
 Keep the exact signed establishment request before submission. Reconcile an
-unknown answer against its original accepted fact and confirmed child seed.
+unknown answer against its original recorded fact and confirmed child seed.
 Record the application's actual full reference. Its factory supplies the
 trusted opener, membership and destination. The caller's genesis values
 are `{}`: the factory refuses a `destination` in them.
@@ -96,7 +96,7 @@ node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set ro
 node packages/cli/bin/dap.js act set-actions --on membership --target 0 --set role=member --set 'actions=<complete-member-JSON-list>'
 ```
 
-Record both before and after lists and their accepted facts. Show that an
+Record both before and after lists and their recorded facts. Show that an
 admin still has an earlier administration action, and that a member keeps
 its earlier actions. Do not claim immediate revocation. The native scenario
 advances a scripted clock by 301 seconds; it does not prove deployed elapsed
@@ -109,8 +109,7 @@ actual membership's definition, checks the issuer's active key and
 `membership.invite`, and checks the directory's membership, rules and
 destination references against that definition's directory. It makes the
 invitation secret and keeps it with the exact signed `invite-member`
-request in an owner-only private file before anything is sent. It verifies
-the accepted receipt, the recorded invitation's handle, role, hash and
+request in an owner-only private file before anything is sent. It verifies the receipt, the recorded invitation's handle, role, hash and
 expiry, and prints a link tagged with the membership's exact definition,
 `platform:membership@4` here:
 
@@ -137,22 +136,20 @@ actual join control. Record the browser's exact control labels during the
 run. Do not put the invitation, secret, key, or session headers in public
 evidence.
 
-Verify a distinct browser device key and membership 4 enrollment with the
-native accepted receipt, full membership reference, and incarnation. A test
+Verify a distinct browser device key and membership 4 enrollment with the native receipt, full membership reference, and incarnation. A test
 Worker result does not substitute for this deployed browser witness.
 
 Exercise an interrupted donation and an interrupted join at the reviewed
 custody boundary. Retain the original request before dispatch. Reload, then
 use **Check the join** or **Continue the join** for enrollment, and
 **Check** or **Continue** for a lending act. These are the prepared SDK
-interface labels, not observed browser results. Record the accepted fact and exactly one donation or enrollment.
+interface labels, not observed browser results. Record the fact and exactly one donation or enrollment.
 Do not sign a replacement for an unknown original. The custody owner prepares
 and reviews this harness separately; these steps have not been run.
 
 ## Play the story and complete publication
 
-Play [the demo script](demo-script.md). Keep the seven accepted lending acts
-in order with their signers, alongside genesis and any other actual history
+Play [the demo script](demo-script.md). Keep the seven lending acts that took effect in order with their signers, alongside genesis and any other actual journal
 entries. Record both refusals separately. Read actual item numbers from the
 record; do not infer them from their names or a test fixture.
 
@@ -163,7 +160,7 @@ the final room is created with `--cohort application-publication` under the
 current pin in `pin.ts`, and its directory supplies the destination. Bind
 those exact definitions, then run the final story.
 
-For each accepted lending act, record publication separately from
+For each lending act that took effect, record publication separately from
 acceptance: its original send, the destination's receipt, which names the
 sending entry and send ordinal, the commit, and the thing's shelf path.
 The interface chooses that path at donation, `shelf/<16 characters>.md`,
@@ -185,7 +182,7 @@ members with a seat; record an actual
 unauthenticated refusal rather than publishing a private read credential.
 This is the public history witness. It remains unrun.
 
-Members can inspect the lending history with the actual full scope reference:
+Members can inspect the lending journal with the actual full scope reference:
 
 ```sh
 node packages/cli/bin/dap.js log "<lending-scope>"
@@ -193,7 +190,7 @@ node packages/cli/bin/dap.js verify "<lending-scope>"
 ```
 
 Record verifier coverage and trusts as well as the result. Missing foreign
-history is a finding, not a successful verification.
+journal is a finding, not a successful verification.
 
 ## Bind the homepage destinations
 

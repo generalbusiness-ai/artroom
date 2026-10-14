@@ -166,7 +166,7 @@ as the specification's runner sets it.
 - **Native proof budget.** Scope/item/entry sizes are checked in SQLite before
   their JSON is allocated. Selection allows 16 pages of 16 receipt items,
   256 item reads, 16 entry reads, a 1 MiB aggregate native payload and
-  at most 4,096 history entries and 16 MiB of stored history before SQL JSON
+  at most 4,096 journal entries and 16 MiB of stored journal before SQL JSON
   inspection. Exhaustion is `unreadable` with
   `publication-history-limit`, never absent or not published. Paths allow
   at most 64 segments and 8 KiB of UTF-8 path bytes.

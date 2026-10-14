@@ -133,7 +133,7 @@ result, including coverage, trusts and the negative outcome.
 The capture comes from the existing `founding-real.test.ts` first rules
 publication, before scripted lane facts. Select that whole file alone with
 the existing `DEMO_RECORD=1` flag in the reviewed native capture plan. The
-opt-in block wraps the actual HTTP history and retained-input source and keeps
+opt-in block wraps the actual HTTP journal and retained-input source and keeps
 only complete prefixes the successful native replay covered. It emits numbered
 `PUBLIC-SDK-NATIVE-CAPTURE` base64url chunks and a terminal marker, following the
 existing verbose recorder's raw-line framing. Only ASCII is chunked, so native

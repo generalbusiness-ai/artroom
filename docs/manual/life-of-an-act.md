@@ -3,8 +3,7 @@
 For a client or application builder, this page follows a request from the
 meaning the application declares to the receipt the participant keeps.
 
-An **act** is an action declared by a scope's application. The participant
-signs an **intent** requesting that action. The scope decides whether the
+An **act** is something a scope's definition declares that a participant can sign. The participant signs an **intent** for that act. The scope decides whether the
 request may take effect. This page describes the native scope API in current
 main, not the older parked Room API or an unlanded intent-v2 wire format.
 
@@ -12,11 +11,9 @@ main, not the older parked Room API or an unlanded intent-v2 wire format.
 
 A scope pins its definition at its creation. That definition declares each
 act's target item type, fields, required authority, guards, changes and
-messages. A client discovers or reads that actual definition; a familiar
-action name is insufficient to choose its meaning.
+messages. A client discovers or reads that actual definition; a familiar act name is not enough to choose its meaning.
 
-The current intent binds the target scope **and incarnation**, signing key,
-action kind, local item ID, expected item revisions, field values,
+The current intent binds the target scope **and incarnation**, signing key, act kind, local item ID, expected item revisions, field values,
 idempotency key and deadline. For example, a verdict must name the actual
 version it reviews. A changed selected version is a new decision for the
 participant, not permission to retarget the existing request silently.
@@ -35,14 +32,14 @@ flowchart TD
   V --> A[Read authority and required observations]
   A --> T[Turn: drain deadlines and evaluate rules]
   T --> J[Commit-time judgment on current head]
-  J -->|Accepted| E[Seal entry and derive receipt]
+  J -->|Takes effect| E[Seal entry and derive receipt]
   J -->|Refused or unavailable| R[Keep reason and original request]
   E --> M[Messages and outside work continue separately]
 ```
 
-A participant key need not already be enrolled for every action. Join checks
+A participant key need not already be enrolled for every act. Join checks
 the invitation and the fresh signing key; creating a repository uses the
-register's creation policy. These specific rules do not allow ordinary member actions.
+register's creation policy. These specific rules do not allow ordinary member acts.
 
 ## Read before committing; judge in the transaction
 
@@ -52,12 +49,12 @@ Rules that need evaluation run on a snapshot before the storage commit.
 
 A turn first drains due deadlines in bounded order. It then checks that the
 head has not moved, judges the input on the transaction's clock reading and
-either commits the derived entry or answers without accepting the act. If
+either commits the derived entry or answers without the act taking effect. If
 another input moved the head during preparation, it starts that judgment
 again within its restart budget. A missing authority read is unavailable,
 not permission inferred from the client's view.
 
-Only the accepted entry, its retained inputs, sends and folded state share
+Only the new entry, its retained inputs, sends and folded state share
 that local transaction. Other scopes do not join it. Their messages and
 outside-operation replies become later inputs with their own judgments.
 
@@ -65,15 +62,14 @@ outside-operation replies become later inputs with their own judgments.
 
 | Answer | Meaning and next step |
 |---|---|
-| Accepted | The scope recorded this act. Keep its receipt and exact request; follow any remaining messages or publication work. |
-| Refused | This request failed a check at the stated head. Read its reason and any named guard; inspect before deliberately changing the request. |
-| Unavailable | This reply establishes no acceptance. Keep the original request and inspect; due entries or a prior acceptance can exist despite the reply. |
-| Mismatch | The actor's idempotency key already belongs to a different accepted intent. Inspect that record; do not substitute new bytes under the same key. |
+| `accepted` | The act took effect: the scope recorded it. Keep its receipt and exact request; follow any remaining messages or publication work. |
+| `refused` | This request failed a check at the stated head. Read its reason and any named guard; inspect before deliberately changing the request. |
+| `unavailable` | This reply does not say whether the act took effect. Keep the original request and inspect; due entries, or an earlier entry for this act, can exist despite the reply. |
+| `mismatch` | The actor's idempotency key already belongs to a different intent that took effect. Inspect that record; do not substitute new bytes under the same key. |
 
 A transport failure gives no native answer. A lost reply does not mean the
 scope did nothing. The caller needs the same original signed intent to ask
-for settlement or exact replay. With an accepted actor/key pair, exact
-replay can return the earlier receipt without accepting a second act.
+for settlement or exact replay. When that actor and idempotency key already have an entry, exact replay can return the earlier receipt without a second act taking effect.
 Timed work can still prevent that receipt from being returned on a given
 turn. A read saying “not found” is not universal permission to sign a new
 mutation.
@@ -93,9 +89,9 @@ attempts and confirmed, refused or unknown outcomes. Unknown mutation
 attempts remain duties; their driver does not re-send the original mutation
 just because its reply was lost.
 
-For a merge, the accepted act opens the workflow. Later destination and
+For a merge, the act opens the workflow when it takes effect. Later destination and
 change records establish publication and Merged. Read those records when
-you need the result, not only the first accepted receipt.
+you need the result, not only the first receipt.
 
 Definition versions remain immutable for the scope's lifetime. Historical
 entries are judged with their pinned meaning. The broader declaration-change,

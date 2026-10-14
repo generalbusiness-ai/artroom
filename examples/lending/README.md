@@ -108,7 +108,7 @@ would be better, and is left to the builder.
 - The library holds at most 64 live things. A thing that is gone does not
   count, but its page and path stay with it.
 - A shelf path starts with `shelf/` and ends with `.md`, and belongs to
-  one thing for good. One named rule, `shelf-page`, checks the form.
+  one thing for good. One rule expression, `shelf-page`, checks the form.
 - Every act after `establish` tells the destination `publish-file` with
   the thing's path and the signed page text. The definition uses no
   handler, deadline or capability.

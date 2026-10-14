@@ -89,10 +89,8 @@ says which checks a part of the repository needs.
 ## Land
 
 To **land** a change is to have the destination publish it. The change
-lane asks for that with its `merge` act. An accepted `merge` request
-records the intent. The change reaches the final state `merged` only when the
-destination's published outcome arrives. An accepted merge request, a
-local Git commit and a merged change are three different states.
+lane asks for that with its `merge` act. A `merge` act that takes effect records the request. The change reaches the final state `merged` only when the
+destination's published outcome arrives. A merge that has taken effect, a local Git commit and a merged change are three different states.
 
 ## Words the room no longer uses
 

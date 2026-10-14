@@ -13,7 +13,7 @@ package has shipped, each by the version that its genesis pinned
 ## Settings and secrets
 
 A setting is a plain value. A secret is stored by the host and is never
-in this repository, in a command argument, in a log, in a scope's history
+in this repository, in a command argument, in a log, in a scope's journal
 or in the command line's config.
 
 | Name | Kind | What it is |

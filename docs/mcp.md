@@ -23,8 +23,8 @@ and `dap create`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
 there as `dap join` does. The link holds the invitation's secret.
 `join`'s own result never repeats it. The join that membership admits
-holds it, as its signed input, so a history read of membership (`step`,
-`record`) returns it to whoever may read that history, as the native
+holds it, as its signed input, so a journal read of membership (`step`,
+`record`) returns it to whoever may read that journal, as the native
 record does for any member's session.
 
 ### Over stdio
@@ -223,9 +223,8 @@ caller's `idempotencyKey`, in the config directory's
   signed.
 - **The outcome** given is always the newest decisive one of the current
   attempt: an answer other than unavailable, or a receipt that settlement
-  found. A record that was lost, then unavailable, then settled answers
-  accepted.
-- **Terminal records.** Accepted and mismatch are never sent again, even
+  found. A record that was lost, then unavailable, then settled answers `accepted`.
+- **Terminal records.** `accepted` and `mismatch` records are never sent again, even
   with `resubmit: true`. A refusal is kept; `resubmit: true` first keeps a
   new attempt, unresolved, with the refusal as history, and then sends the
   same envelope. A lost reply to it leaves the record unresolved, and
@@ -266,7 +265,7 @@ caller's `idempotencyKey`, in the config directory's
 - **Steps with no act.** `prepare` without `kind` sends a capability step
   that has no act, such as hold@1's instance: the step's own intent, kept
   under custody under the caller's key, with its answers kept as the step's.
-  Such a record is never an accepted act. A decisive answer is kept, and
+  Such a record is never an act that took effect. A decisive answer is kept, and
   the same call returns it again without sending; a lost or unavailable
   answer leaves the record unresolved, and the same call sends the exact
   step again. When every step of the record has a decisive answer, the

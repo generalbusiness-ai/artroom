@@ -311,7 +311,7 @@ roster as its `basis` and names the participant who speaks next.
 
 The client proposes those values and the scope checks every one. The
 `roster` guard requires the basis to list exactly the joined participants,
-in the order they joined. The named rules check the arithmetic: the
+in the order they joined. The rule expressions check the arithmetic: the
 number is one more than the last, the serial moves by one, and `next` is
 the participant whose place in the roster matches the number. A client
 cannot skip a participant, repeat a number or speak out of turn.
@@ -405,7 +405,7 @@ const rules = {
 };
 ```
 
-Add the acts and the rules to `counter`:
+Add the acts and the rule expressions to `counter`:
 
 ```ts
 	items: { configuration, participant, board },
@@ -488,7 +488,7 @@ report that takes effect moves the turn. When `@una` says 3, the target,
 the board becomes `finished` and its turn slots are cleared.
 
 The last line shows that folding the eight entries again gives the same
-state. A verifier also replays a real scope's history, and checks more
+state. A verifier also replays a real scope's journal, and checks more
 besides; [The record](manual/record.md) says what its report covers.
 
 ## Where to go next

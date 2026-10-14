@@ -9,7 +9,7 @@ room's pin. The [current definition](../examples/lending/definition.ts)
 adds publication; the last section says what that adds.
 
 [Build a counter](build-a-counter.md) teaches guards that compare lists
-and rules that check arithmetic. This tutorial teaches the other half of
+and rule expressions that check arithmetic. This tutorial teaches the other half of
 most applications:
 
 - many items of one type, each with its own life;
@@ -430,7 +430,7 @@ source, so this file and [the library's first
 definition](https://github.com/generalbusiness-ai/dap/blob/dedcb14b1d9483bfde3064f5bc09756b34b99f8d/examples/lending/definition.ts) give the same pin.
 
 The last line shows that folding the seven entries again gives the same
-state. A verifier also replays a real scope's history, and checks more
+state. A verifier also replays a real scope's journal, and checks more
 besides; [The record](manual/record.md) says what its report covers.
 
 ## What publication adds
@@ -448,7 +448,7 @@ room's Git repository. It adds:
   `publish-file` that text at the thing's path;
 - a sixth act, `publish`, which publishes a thing's page again without
   changing the thing;
-- one named rule, `shelf-page`, which checks the form of a path.
+- one rule expression, `shelf-page`, which checks the form of a path.
 
 A tell needs a second scope to receive it, so this tutorial stops before
 publication. [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
@@ -465,8 +465,8 @@ delivered there.
   Its source and tests belong to a repository checkout, not the published
   SDK packages.
 - [Write an application](write-an-application.md) shows how to place
-  invariants in guards, grants and rules, then validate and pin a
-  definition of your own.
+  invariants in guards, grants, rule expressions and the rules scope, then
+  validate and pin a definition of your own.
 - [Build a counter](build-a-counter.md) uses guards that compare lists
-  and rules in the restricted rule language.
+  and rule expressions in a restricted JSONata.
 - [Scopes](scopes.md) lists every form a definition can use.

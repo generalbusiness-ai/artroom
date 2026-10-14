@@ -23,7 +23,7 @@ Use exact recorded references. For a manifest list, the frozen manifest points t
 | Result | What it establishes | What remains |
 |---|---|---|
 | Proposed | A recorded change/version | Required review, checks and destination publication |
-| Accepted merge | The merge act took effect | Observe its actual publication result |
+| Merge took effect | The merge act took effect | Observe its actual publication result |
 | Reserved tree | The destination recorded an integration for checks | Authentic required check results and publication |
 | Published commit | The destination confirmed publication of that commit | Inspect any separately recorded cleanup duties |
 | Refused, aborted or observation unknown | Publication is not confirmed by this result | Follow the recorded reason or original operation's reconciliation |
@@ -36,11 +36,11 @@ A `Published: commit ...` result names the destination's confirmed commit. Keep 
 
 ## Follow an unknown result without signing a replacement
 
-An accepted merge followed by `Observation unknown` has already taken effect. Read the stated merge fact and change history; do not submit another merge to recover only its observation. A lost transport reply likewise does not prove absence. Generic `act`, `edit`, `propose` and `merge` have no universal retained-envelope recovery journal. Rerunning one may sign another request or open another lane.
+A merge that took effect, followed by `Observation unknown`, has already taken effect. Read the stated merge fact and the change's journal; do not submit another merge to recover only its observation. A lost transport reply likewise does not prove absence. Generic `act`, `edit`, `propose` and `merge` have no universal retained-envelope recovery journal. Rerunning one may sign another request or open another lane.
 
 Exact recovery needs the original signed request and its existing owning mechanism. Read-only inspection does not authorize a replacement or erase outside duties. Join and saved creation recovery are narrower flows, not a promise about every command. [Unknown observation](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L1540)
 
-`verify --all` uses the caller's session and signed-read fallback and reports actual coverage and trusts. The source also inspects destination cleanup against the verified target; an unread or inconsistent history cannot supply that snapshot. A consistency result is not a general proof that every external operation is finished. [Verifier source](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L971)
+`verify --all` uses the caller's session and signed-read fallback and reports actual coverage and trusts. The source also inspects destination cleanup against the verified target; an unread or inconsistent journal cannot supply that snapshot. A consistency result is not a general proof that every external operation is finished. [Verifier source](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/cli/src/commands.ts#L971)
 
 ## If publication stops
 
