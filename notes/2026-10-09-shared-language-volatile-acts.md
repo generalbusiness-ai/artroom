@@ -1353,6 +1353,11 @@ request `578edf653772749b5fa9b47f6782f6db4d0ab720`. Read against main
 except for two pointers: one after the establishment table in section 1,
 and one at the start of section 2. Draft 2 of this section adds 15.2, the
 declaration, and renumbers what follows. Draft 3 revises 15.2 for section 16.
+Draft 4 answers the checker's report `7e549a27` of 14 October 2026: the
+ref and path spelling (15.4), the frozen input set of a pass (15.3 and
+15.5), the receipt confirmed at its own position (15.6), and in section 16
+the acyclic live identity (16.2) and the bounded host reads (16.3, 16.4).
+Draft 4 was read against main `70729eac`, merged into this branch.
 
 ### 15.1 The decision
 
@@ -1477,6 +1482,19 @@ scopes that are not archived themselves, such as the register's record of
 a claim. That is the same copy that the lane's own readers can read
 today.
 
+**The input set of a pass is closed under a cutoff.** A pass archives
+the entries from `archivedThrough + 1` to a cutoff `through`, and
+exactly the retained inputs those entries name: for each entry, the
+foreign entries its `uses` cite, the rule and snapshot digests its
+judgment recorded, and the definition and value digests its act's fields
+name, each read from the retained store by digest. A retained
+input is immutable by digest and an entry by position, so the selection
+is a pure function of the cutoff. An input that a later turn retains
+belongs to an entry past the cutoff and is not in the set. The kinds and
+domains left out (`text`, and any domain J2 excludes) are listed in the
+pass's manifest as omissions, so a reader of the archive can tell "left
+out by rule" from "missing".
+
 The archive is in the room's own repository at its destination's host.
 Whoever can fetch that repository's refs can read the archive. Reads of
 the service stay gated by sessions as they are now; the archive is a
@@ -1484,11 +1502,17 @@ second, coarser door, and section 15.10 lists it as a point for review.
 
 ### 15.4 Layout
 
-One ref for each archived scope:
+One ref for each archived scope, named by the scope ID as the platform
+spells it, `sc_` and 52 characters of the base32 alphabet
+`a` to `z` and `2` to `7` (`packages/bytes/src/domains.ts`, `scopeIdOf`):
 
 ```
-refs/artroom/journal/<scope ID, 64 hex characters>
+refs/artroom/journal/<scope ID>      for example refs/artroom/journal/sc_c67lq575…
 ```
+
+That spelling is a valid Git ref component as it is: lowercase letters,
+digits and one underscore. No conversion is defined; a ref whose name is
+not a scope ID of that form is not an archive ref.
 
 Each scope writes only its own ref. No write spans two scopes, as no
 transaction does.
@@ -1499,8 +1523,19 @@ The tree of each archive commit:
 |---|---|
 | `journal/v1/head.json` | Canonical JSON: `{ v: 1, scope: <ScopeRef>, through: <seq>, hash: <entry hash> }` |
 | `journal/v1/segments/<first>.jsonl` | Entries from `first` on, one canonical entry for each line; `first` is 12 decimal digits |
-| `journal/v1/retained/<kind>/<hex>` | One retained input's bytes, for the kinds `definition`, `entry`, `rule` and `snapshot` |
-| `journal/v1/retained/value/<domain>/<hex>` | One named value's bytes, under its byte domain |
+| `journal/v1/manifest.json` | Canonical JSON: the pass's input set, `{ v: 1, through, parent, format, entries: [first, last], retained: [{ kind, domain?, digest }], omitted: [{ kind, domain?, digest, reason }] }` |
+| `journal/v1/retained/<kind>/<hex>` | One retained input's bytes, for the kinds `definition`, `entry`, `rule` and `snapshot`; `<hex>` is the 64 hex characters of the digest after `sha256:` |
+| `journal/v1/retained/value/<domain>/<hex>` | One named value's bytes, under its byte domain, encoded as below |
+
+**Path encoding.** Every path segment the archive writes is drawn from
+`[a-z0-9_.-]` and is never `.`, `..`, empty, or longer than 255 bytes. The
+kinds and the fixed names are literal. A digest is its 64 hex
+characters. A byte domain is a native string that the platform does not
+constrain, so it is encoded, reversibly: `d_` followed by the base32 of
+its UTF-8 bytes, in the alphabet above, no padding. The verifier decodes
+the segment and compares the domain to the one the entry names; a
+segment that does not decode, or decodes to another domain, is a
+`mismatch`. No native string is ever used as a path as it is.
 
 Rules:
 
@@ -1517,8 +1552,13 @@ Rules:
   by the rule of protocol.md R-LOG-19.
 - **The commit.** Its parent is the previous archive commit, or none. Its
   author, committer and message are fixed text. Its time is the recorded
-  time of entry `through`. So the same entries and retained inputs give
-  the same commit ID, whoever builds it.
+  time of entry `through`. Its tree is a function of the manifest alone:
+  the parent, the cutoff, the object format (SHA-1 or SHA-256, fixed by
+  the repository) and the manifest's entries and retained inputs. So the
+  same manifest on the same parent gives the same commit ID, whoever
+  builds it and however many times. A different parent, or a different
+  batch of cutoffs, gives different commit IDs for the same history; that
+  is expected, and no two archives of one scope are compared by commit ID.
 - **Append only.** A segment other than the last never changes. A retained
   file never changes. `head.json` is replaced in each commit.
 
@@ -1536,12 +1576,18 @@ delays an answer.
    `repository` item names. It keeps the answer as bookkeeping. An
    archiving scope always has one, because its creation was refused
    otherwise (15.2).
-2. **Plan.** It reads its own entries from `archivedThrough + 1` to its
-   head, bounded by a count and a byte limit for one pass, and builds the
-   commit of 15.4 on the last confirmed commit.
+2. **Plan.** It chooses the cutoff: its head, or an earlier position when
+   the pass's bound on entries or bytes is reached first. It builds the
+   manifest of 15.3 for that cutoff, and from the manifest the objects and
+   the commit of 15.4 on the last confirmed commit.
 3. **Mark.** It writes one bookkeeping row before any request leaves: the
-   parent, `through`, the commit ID and the time. At most one commit is
-   outstanding for a scope.
+   parent, the cutoff, the manifest's bytes, the commit ID and the time.
+   At most one commit is outstanding for a scope. From this row the same
+   commit can be built again, byte for byte, without reading the scope's
+   storage: a restart, a lost reply or a resend rebuilds from the marked
+   manifest, never from "whatever is retained now". If a rebuild from the
+   row gives another commit ID, the archiver stops and reports
+   `rebuild-mismatch`; that is a fault in the builder, not in the history.
 4. **Send.** It sends the objects and one ref update with the expected old
    value, through the provider's existing `send`
    (`packages/scope/src/destination-host.ts`). It never forces.
@@ -1572,6 +1618,13 @@ archiver is trusted code in the same way as the destination's driver.
 that is busy with turns archives later; it never refuses a turn in order
 to archive.
 
+**What a turn after Mark changes.** Nothing in the outstanding commit.
+Entries past the cutoff and inputs they retain wait for the next pass.
+A3 witnesses this: with a commit marked and its parent still not updated
+on the host, a turn retains a new input; the resend after a restart is
+the identical commit, and the next pass archives the new entry and its
+input on top of it.
+
 ### 15.6 What a read states
 
 `Summary` gains an optional member:
@@ -1586,10 +1639,45 @@ archive?: {
 }
 ```
 
-A scope whose level is Recorded or Live has no `archive` member. The
-client gains `followArchived(receipt)`: it reads the summary until
-`through` is at or past the receipt's position and the hashes agree, or
-it reports the state that prevents that. It derives no judgment.
+A scope whose level is Recorded or Live has no `archive` member.
+`through` and `hash` are the last position the archiver read back from
+the host and the hash of that entry; they are the service's bookkeeping,
+not a fresh observation of the remote. A ref moved by someone else is
+seen at the next pass as `conflict`, not here.
+
+The client gains `followArchived(receipt)`. A receipt names one entry:
+its full `ScopeRef` (ID, incarnation, kind), its position `n` and its
+hash. The archive's `hash` belongs to position `through`, so for `n`
+below `through` the two hashes differ in the ordinary case and nothing is
+learned by comparing them. The client confirms the receipt at its own
+position instead:
+
+| Check | Outcome |
+|---|---|
+| The summary's `scope` is not the receipt's `ScopeRef`, incarnation included | `not-this-history`. The receipt is of another incarnation; it is never waited on. |
+| No `archive` member | `not-archived`. The scope's level is not Archived. |
+| `state` is `conflict` or `stopped` | That state, with its reason. Reported, not waited on. |
+| `through` is null or below `n` | `behind`. Read again later. |
+| `through` is `n` or past it | Read entry `n` from the service (`entry`), under the same `ScopeRef`. Its hash equals the receipt's: `archived`. It differs: `mismatch`, reported, never waited on. |
+
+Why that is enough: each entry's bytes name the previous entry's hash,
+so entry `through` commits to one chain, and the archive is that chain's
+prefix. The service's entry `n` under the same incarnation is in that
+prefix exactly when `n` is at or below `through`. The check does not
+reach the host; it adds no acknowledgement barrier, and it proves
+membership only on the service's word about `through`.
+
+**Confirmation from the clone.** A caller that wants the archive's own
+word reads commit `commit` from a clone: `artroom-replay --git <clone>
+--receipt <file>` finds the segment that holds position `n`, decodes the
+line, and reports `archived` when its `ScopeRef`, position and hash are
+the receipt's, `mismatch` when the line differs, and `behind` when the
+commit's `head.json` is below `n`. That is the only check that does not
+trust the service.
+
+A4 covers each row: `n` equal to `through`, `n` below it, a receipt of
+another incarnation, a receipt whose hash differs, a scope with no
+archive, and a stopped archive. It derives no judgment.
 
 ### 15.7 The verifier
 
@@ -1615,7 +1703,15 @@ artroom-replay --git <clone> <scope ID> [--mode integrity|replay]
   checks it against its digest.
 
 Everything read from a clone is untrusted, with the same limits on bytes,
-entries and scopes as the HTTP source.
+entries and scopes as the HTTP source. The source resolves the named
+commit through the object store, never through a working tree: it reads
+the commit, its tree and the blobs under `journal/v1/` by object ID,
+refuses any tree entry that is not a plain file or a directory (a symlink,
+a submodule, an executable), refuses a path segment outside the grammar
+of 15.4, and bounds each blob at B and each segment at its line count. A
+ref that does not name a commit, or a commit whose tree lacks `head.json`,
+is `mismatch`. No path from the clone is ever joined to a filesystem
+path.
 
 ### 15.8 What a clone shows, and what it does not
 
@@ -1648,10 +1744,10 @@ judgment, a receipt or a publication.
 | Slice | Work | Witness |
 |---|---|---|
 | A0. Declaration | The `level` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
-| A1. Layout | A pure function from entries and retained inputs to the objects and commit of 15.4, for both object formats. | The same input gives the same commit ID. Segment and fan-out boundaries at their limits. A text is never written. Real local Git reads the tree back byte for byte. |
-| A2. Git source | `gitSource` and the `--git` and `--texts` options. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. |
-| A3. Archiver | Target resolution, the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
-| A4. Read and client | `Summary.archive` and `followArchived`. | Each state is reported. A receipt past `through` waits; a hash that differs is reported, not waited on. |
+| A1. Layout | A pure function from a manifest (15.3) to the objects and commit of 15.4, for both object formats; the path encoding and its decoder. | The same manifest on the same parent gives the same commit ID, built twice. Segment and fan-out boundaries at their limits. A text is never written; an omitted input is listed. Every domain name the platform defines and an adversarial name (`../x`, a slash, a NUL, 300 bytes) round-trip through the encoding or are refused. The ref name is the native `sc_` spelling. Real local Git reads the tree back byte for byte. |
+| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, or reported `mismatch` or `behind`. |
+| A3. Archiver | Target resolution, the manifest and the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. With the parent still not updated on the host and a new input retained after Mark, a restart resends the identical commit, and the next pass archives the new entry on top. A rebuild that differs stops as `rebuild-mismatch`. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
+| A4. Read and client | `Summary.archive` and `followArchived`. | Each row of 15.6: `n` equal to `through` and `n` below it are `archived` when the service's entry `n` carries the receipt's hash; a receipt of another incarnation is `not-this-history`; a differing hash is `mismatch`, not waited on; no archive is `not-archived`; a stopped or conflicting archive reports its state; a receipt past `through` waits. `through` is shown to be the last read-back, not a fresh remote read. |
 | A5. Live run | One deployed room on the hosting service: archive, clone, replay offline. | A recorded run, bound to its source and deployment, with measured lag and push duration. |
 
 Run the tests of each slice while it is built, and the gate once before
@@ -1682,7 +1778,10 @@ the head above. The path from a lane's seed to its room's destination
 section 15. Hugh decided on 12 October 2026 that the region is not needed
 apart from the scope. This section amends sections 1 to 14; where it and
 they differ, this section holds. The JSON examples of section 2 are not
-rewritten; 16.3 says how to read them.
+rewritten; 16.3 says how to read them. Draft 4 makes the live identity
+acyclic and names the locator a live object starts from (16.2), and
+bounds a live scope's reads of its host instead of claiming they cost
+the host nothing (16.3, 16.4, 16.5).
 
 ### 16.1 The decision
 
@@ -1732,23 +1831,52 @@ Object, named by its ID. It differs in the rest.
 | Made by | A recorded creation and its confirmation | Establishment on its host, below |
 
 **Its seed.** The kind is `live`, which is new. The creator is the host
-scope. The cause is the digest of the host's entry that established it.
-The definition is the digest of a definition whose level is Live. So the
-ID is known from the host's history, before the live scope ever runs.
+scope. The cause is the digest of the signed intent of the act that
+established it, the same `cause` a native seed carries (`intentDigest`
+of the creating input; `Seed.cause`, "the one input that asked for this
+scope"). The ordinal is which live scope of that intent, from 0. The
+definition is the digest of a definition whose level is Live. The seed
+is therefore built from the act before its entry is sealed, as the
+platform builds the seeds of a creation's sends, and the entry records
+the ID the seed gives. Nothing in the seed depends on the entry's hash,
+and the entry may name the ID: there is no cycle. Draft 3 made the cause
+the establishing entry's digest, which the entry could not then contain;
+the checker's P1, withdrawn here.
 
 **Establishment.** A live scope is legitimate because a recorded entry
 says so. Section 2 proposes an owned `establish-application` act; under
 this section that act records, in a recorded scope, the live definition's
-digest and the live scope's ID, and the membership scope it reads. The
-entry is the durable fact. The live scope is what can be rebuilt from it.
+digest, the membership scope the live scope reads, and the live scope's
+ID, derived as above. The entry is the durable fact. The live scope is
+what can be rebuilt from it.
+
+**The locator.** A live object has no storage and its name is an opaque
+hash, so it cannot find its host by itself. Whoever addresses it
+presents a bounded locator, which discovery on the host hands out with
+each established live scope (L3):
+
+```ts
+{ host: ScopeRef, established: number, ordinal: number }
+```
+
+The object reads entry `established` from the host, through the
+namespace with the host's own authorization (16.4), takes the signed
+intent from it, rebuilds the seed (`live`, the host, `intentDigest` of
+that intent, the ordinal, the definition digest the entry records) and
+derives the ID. Only when that ID is its own name does it read the
+definition's bytes by that digest, check them, mint G and begin. A
+locator that names another host, entry or ordinal derives another ID and
+is refused `unavailable`; the object holds nothing and tells nothing of
+why. The locator is routing, not authority: it points at a fact, and the
+fact is checked.
 
 **It exists when addressed.** There is no creation handshake, because
 the live side cannot record one. When a live scope's object starts, it
-reads its establishing entry and its definition's bytes from its host,
-checks both against its own ID, mints G, and begins empty. If either
-cannot be read or does not match, it answers `unavailable` and holds
-nothing. When the object stops for any reason, the next start is a new
-generation. That is a Reset, not a recovery.
+does the above from the locator it was addressed with, and begins empty.
+If the entry or the definition cannot be read or does not match, it
+answers `unavailable` and holds nothing. When the object stops for any
+reason, the next start is a new generation. That is a Reset, not a
+recovery.
 
 **Authority.** A live act is judged under a grant read from the
 membership scope that the establishing entry names, as section 5 says.
@@ -1767,7 +1895,7 @@ Nothing about sessions changes.
 | Section 5, the signing domain | Binds scope, application and region | Binds the live scope's ID and G |
 | Section 9, composite observation | Recorded and live parts of one scope | Two observations, one of each scope |
 | Section 10, crossings | Between regions | Between scopes. Live to recorded is still an explicit capture and a new signed act on the recorded scope. Recorded to live is still an ordinary authorized read. |
-| Section 11, fairness | One scheduler gives recorded turns precedence | Not needed. A live flood runs in another object and cannot delay the host's turns. Each object keeps its own limits. |
+| Section 11, fairness | One scheduler gives recorded turns precedence | Withdrawn. A live flood runs in another object, so it takes none of the host's turn budget by itself. What it can take is the host's read work, through the reads of 16.4; those are bounded and refused `busy` beyond their bound, so the host's turns stay within the host's own limits. The claim that live traffic "cannot delay" the host is not made. |
 | Section 14, phase 1 | The envelope and region types | The `level` member and the live forms in the definition |
 | Section 14, phase 3 | A live module beside Core in the host's object | A live mode of the one object class, chosen by the pinned level |
 | Section 14, "Same scope coexistence" | Live operations make no native entries in the scope | The host's head is the same before and after any live traffic |
@@ -1779,9 +1907,20 @@ Nothing about sessions changes.
   nothing else is state. It must say plainly that a live scope has no
   history, and list what does not apply to it: facts, receipts, replay,
   checkpoints, the outbox, timed drains across a restart.
-- **A read of the host crosses objects.** A live view that shows host
-  state reads it through the namespace, with the host's own authorization.
-  Its cost is owed a measurement.
+- **A read of the host crosses objects, and costs the host.** A live
+  view that shows host state, and the start that checks the locator, read
+  the host through the namespace with the host's own authorization. Each
+  such read is host work, and a flood of live acts that read the host is
+  a flood of reads on the host. The bound is explicit:
+  - a live object holds a read budget for each generation, a count for
+    each second and a count in flight; past it, the live act is refused
+    `busy` and no read is sent;
+  - the host serves reads under the limits it already has for any reader,
+    and refuses `busy` rather than queue without bound; a refused read is
+    a refused live act, not a retry inside the host;
+  - a live act that needs no host read is not throttled by this.
+  The budget's values are owed a measurement with the witness of 16.5,
+  not stated here.
 - **More objects.** One for each live scope. An idle object that the
   platform stops resets its live scope. That is within the guarantee, and
   an application must be written to expect it.
@@ -1791,9 +1930,10 @@ Nothing about sessions changes.
 | Invariant | Witness |
 |---|---|
 | The level is in the definition | A definition with `level: live` and a `tell` send, a hold or an outside operation is refused whole by the validator. A recorded definition with a live form is refused the same way. |
-| Identity without history | The same host entry and definition give the same live scope ID on every start. Two starts give two generations. |
-| Establishment | A live scope whose establishing entry is absent, or names another definition, answers `unavailable` and holds no state. |
-| The host is untouched | Live traffic writes no entry on the host and does not delay a host turn. |
+| Identity without history | On a real host scope, the `establish-application` act is signed and judged; the seed is built from its intent before the entry is sealed; the entry records the ID; a live object addressed with the locator rebuilds the seed from the sealed entry and derives the same ID; a second start gives the same ID and a new generation. The witness constructs the real intent, entry and seed; it starts from no prebuilt ID. |
+| Establishment | A live scope whose establishing entry is absent, names another definition, or is addressed with a locator of another host, entry or ordinal, answers `unavailable` and holds no state. |
+| The host is untouched by live writes | Live traffic writes no entry on the host: its head is the same before and after. |
+| Host reads are bounded | A mixed witness on one host: live acts that read the host at a rate past the budget, beside the host taking its own turns. The live object refuses `busy` past the budget and sends no read; the host's turn latency stays within its own limits, measured; the host refuses `busy` beyond its read limit rather than queueing. The measured budget is recorded with the witness. |
 | No citation | A field of type `fact` that names a live scope is refused. |
 
 ### 16.6 Open points
@@ -1804,8 +1944,11 @@ Nothing about sessions changes.
 | L2 | The kind `live` is new in the seed. | Add it to the kinds. A live scope's kind says nothing of its application; its definition does. |
 | L3 | Which scope records establishment, and how discovery lists live scopes. | The directory, by the act that section 2 proposes, with one item for each established live scope. Owner decision; it needs a new directory version. |
 | L4 | A live definition has no genesis act. | The member `genesis` is absent for level Live, and the validator requires that. |
-| L5 | Sections 5 to 9 were written for one object. | Read against this section for this amendment; a line-by-line pass is owed before phase 2, and any conflict found is decided for this section. |
+| L5 | Sections 5 to 9 were written for one object. | Read against this section for this amendment; a line-by-line pass is owed before phase 2, and any conflict found is decided for this section. The pass must carry the bound of 16.4 into section 5's reads of membership and section 9's observations. |
+| L6 | Where the locator travels. | Discovery on the host lists it with each established live scope (L3); a client keeps it with the live reference; a request to a live object carries it. It is bounded (one `ScopeRef`, two integers) and checked against the ID, never trusted. |
 
 This section ran no product tests, gate or probes. The seed's members,
 the scope kinds and the single object class were read in source at main
-`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`.
+`cf22cdc569b5f7daa946689d6eff0fc9795cfdcb`; for Draft 4, `Seed.cause`
+and `scopeIdOf`, the founding's seed in `core.ts` and the scope ID's
+spelling were read again at main `70729eac`.
