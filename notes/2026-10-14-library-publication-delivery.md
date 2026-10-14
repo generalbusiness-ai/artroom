@@ -3,8 +3,8 @@
 14 October 2026. This implements the approved
 [Publication from a fold, Draft 5](2026-10-13-fold-publication.md) under
 full request `ebda829b`, promise `23fed5e2`. It is a Source candidate.
-The final combined gate, Source review and landing, and real hosted library
-acceptance remain owed.
+The final combined gate passed once, as recorded below. Source review and
+landing, and real hosted library acceptance remain owed.
 
 The explicit CLI selection `--cohort application-publication` pins
 register 9, directory 8, membership 4, rules 3, destination 4 and inbox 1.
