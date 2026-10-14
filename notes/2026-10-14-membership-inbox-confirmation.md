@@ -28,6 +28,22 @@ original duty. Its control omits only the fixture completion call and must fail
 the original active/owner assertion. The original authority body retains its
 activation, revocation, freshness, owner and forged-grant checks.
 
-The new compiler checks, two selected native bodies, omission control and final
-gate are UNRUN. The proposed deterministic fault proves a legitimate pending
-confirmation state; it is not a claim about the original gate's unknown cause.
+Both Scope compiler configurations and the two selected native bodies passed
+in original run `44804` at `f482e391`. Three other collected bodies were
+unselected and skipped; this is no whole-file pass claim. The controlled
+Native case recorded Una's inbox as provisional, with the exact retained
+control unanswered and its next time equal to the stored alarm. Completion
+advanced the scripted clock exactly one second to that recorded time. The
+inbox then became active with the same genesis and one sealed confirmation.
+
+The omission control in original run `82315` changed only the compiled fixture
+completion call. Its selected body failed by the original active/owner
+assertion at `membership.test.ts:246`; four other bodies were unselected and
+skipped. The original pending-protocol assertions passed first. Physical
+Source and dependencies were unchanged before and after the control.
+
+The ordinary review gate runs once at the final composed, committed Source.
+Its actual terminal and evidence are supplied separately with the review
+request. This note does not predict a gate pass. The deterministic fault
+proves a legitimate pending confirmation state; the original gate's cause
+remains unknown. No production alarm callback or provider was exercised.

@@ -33,10 +33,11 @@ The authored changes are `packages/page/src/main.ts`,
 `packages/page/test/start-ui.test.ts`, plus the existing chooser expectations
 in `packages/page/test/join-ui.test.ts` and `packages/page/test/settings.test.ts`.
 They are now composed on receiving main
-`11e3c72bb16045f02757ab2d2a74600b3968cbf9`, whose tree is
-`713623ee3385d41be447e41c43f7dbb49fc50441`. This receiving tree preserves
+`26d2bc8a40bbf419c35f0dbfdadead7bb5a7c8e0`, whose tree is
+`46f8966882e10b8f7e8fdabd73464d2ac5be75db`. This receiving tree preserves
 the security landing, Lending baseline, tagged agent enrollment cohort and
-Counter documentation landing. The five authored code and test files retain
+Counter documentation landing, plus the Lending homepage and rehearsal
+record. The five authored code and test files retain
 their exact bytes from `d80d5432`; this note updates their receiving provenance.
 
 At `ff10c5c9`, both Page compiler configurations and all four whole chooser
@@ -62,7 +63,14 @@ remain historical evidence only. They were not transferred to this composition.
 The receiving main successor `11e3c72b` adds the enrollment landing receipt
 and has exactly the same full tree as `a5d25fd6`.
 
-The ordinary review gate runs once at the final committed Source. Its actual
+The first gate at `282bb48b` (original `36494`) failed one Native membership
+authority witness: an inbox was provisional where the fixture promised active.
+The unchanged authority assertion passed in an isolated diagnostic (`9216`).
+The separately tracked fixture correction and its deterministic confirmation
+control are reported in `2026-10-14-membership-inbox-confirmation.md`; the
+original failure cause remains unknown.
+
+The review gate runs once on the changed, composed final Source. Its actual
 terminal, phase results and retained evidence are supplied separately with
 the review request; this note does not predict a pass. No compiler, focused
 test or producer pass replaces that gate.
