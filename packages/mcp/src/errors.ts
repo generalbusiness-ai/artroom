@@ -145,7 +145,11 @@ export type Finding =
   | { error: "stale-descriptor"; scope: string; runs: string; tool: string | null }
   | { error: "restart" }
   | { error: "transport"; scope: string; submitted: boolean }
-  | { error: "custody"; state: "conflicting" | "full" | "locked" | "unreadable" | "terminal" | "too-large"; key: string; scope: string; keys?: string[]; recorded?: string; bytes?: number;
+  | { error: "custody"; state: "conflicting" | "full" | "locked" | "unreadable" | "terminal" | "too-large" | "unkept"; key: string; scope: string; keys?: string[]; recorded?: string; bytes?: number; reason?: "budget";
+      /** For `unkept`: what the scope answered before the store failed to keep it (`lost` for a reply that never came). */
+      answer?: string;
+      /** For `unkept` of a preparation step: the step that was sent and answered. */
+      step?: { resource: string; capability: string; step: string };
       /** The dead reclaimer's file, relative to the custody directory (ARTROOM_HOME/private/mcp-custody). */
       stale?: string }
   | { error: "credential"; destination: string; why: string }
@@ -160,12 +164,22 @@ export function finding(f: Finding): Said & { error: string } {
     case "restart": return { error: f.error, sentence: "The tool list changed; list again from the start.", next: "Call tools/list without a cursor." };
     case "transport": return { error: f.error, sentence: `The reply from ${clip(f.scope)} was lost or malformed; the outcome is unknown.${f.submitted ? " The envelope is under custody." : ""}`, next: f.submitted ? HINTS.settle : "Call again; nothing was submitted." };
     case "custody": {
-      const extra = f.state === "full" && f.bytes !== undefined ? ` The envelope would carry about ${f.bytes} bytes, more than a record of 2 MiB holds with its outcomes; nothing was signed.`
+      if (f.state === "unkept" && f.step) {
+        const said = f.answer === "lost" ? "its reply was lost" : `${clip(f.step.resource)} answered ${f.answer}`;
+        return { error: f.error, sentence: `Step ${clip(f.step.step)} of ${clip(f.step.capability)} for key ${clip(f.key)} was sent to ${clip(f.step.resource)} and ${said}, and the server could not keep that answer. The step may have changed the resource; the step is kept as sent, and the act is not submitted by this.`, next: "Call prepare again with the same idempotencyKey, resource, capability and step: the same signed step is sent again, the resource repeats its answer for the same step, and the answer is kept. Do not use a new key or settle: a preparation is not the act's settlement." };
+      }
+      if (f.state === "unkept") {
+        const said = f.answer === "lost" ? "the reply was lost" : `the scope answered ${f.answer}`;
+        return { error: f.error, sentence: `The envelope for key ${clip(f.key)}${f.scope ? ` on ${clip(f.scope)}` : ""} was sent and ${said}, and the server could not keep that outcome. The act may have taken effect; the kept envelope stays, and nothing was sent twice.`, next: "Call settle with the same idempotencyKey: it reads the scope's settlement of that envelope and keeps it. Do not use a new key." };
+      }
+      const extra = f.state === "full" && f.reason === "budget" ? ` The server's custody store is at its budget: it holds ${f.bytes} bytes with what unresolved records may still receive, and admits no completion capacity for another dispatch; nothing was signed.`
+        : f.state === "full" && f.bytes !== undefined ? ` The envelope would carry about ${f.bytes} bytes, more than a record of 2 MiB holds with its outcomes; nothing was signed.`
         : f.state === "full" && f.keys ? ` The oldest unresolved keys: ${f.keys.map((k) => clip(k)).join(", ")}.` : f.recorded ? ` It holds ${f.recorded}.`
         : f.state === "locked" && f.stale ? " A process died while recovering this lock and left its reclaim file, named in the next step; the server does not break it, so that no two processes can recover at once." : "";
       const next = f.state === "conflicting" ? "Use a new idempotencyKey for a new meaning."
         : f.state === "locked" && f.stale ? `Once no process of this ARTROOM_HOME runs, remove the file private/mcp-custody/${f.stale}, relative to ARTROOM_HOME, then call again with the same idempotencyKey.`
         : f.state === "locked" ? "Wait a moment and call again with the same idempotencyKey."
+        : f.state === "full" && f.reason === "budget" ? "Call settle for the unresolved keys, or wait for them to complete; retained answers are still read."
         : f.state === "full" && f.bytes !== undefined ? "Make the act smaller: move long texts to detached texts or smaller values."
         : f.state === "full" ? "Call settle for the unresolved keys first."
         : f.state === "terminal" ? "The retained outcome is in the result; resubmit: true sends the same envelope again, deliberately."

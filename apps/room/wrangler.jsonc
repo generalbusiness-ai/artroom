@@ -35,9 +35,17 @@
   "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
-    "bindings": [{ "name": "SCOPES", "class_name": "DeployedScope" }]
+    "bindings": [
+      { "name": "SCOPES", "class_name": "DeployedScope" },
+      // The hosted MCP endpoint: one registry per repository, one object per agent (docs/mcp.md, "The hosted endpoint").
+      { "name": "REGISTRIES", "class_name": "McpRegistry" },
+      { "name": "AGENTS", "class_name": "McpAgent" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeployedScope"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DeployedScope"] },
+    { "tag": "v2", "new_sqlite_classes": ["McpRegistry", "McpAgent"] }
+  ],
   // The hosting's own Git service: one namespace, reached by the binding
   // ARTIFACTS. It takes effect only with ARTIFACTS_CONFIG set as above.
   "artifacts": [{ "binding": "ARTIFACTS", "namespace": "artroom-demo", "remote": true }]

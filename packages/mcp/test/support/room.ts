@@ -19,6 +19,7 @@ import { secretSigner, type Fetch } from "@generalbusiness/artroom-client";
 import { ownHost } from "../../../scope/test/hosts.ts";
 import { type Platform, routed } from "../../../scope/test/repository.ts";
 import { beginSessionFixture } from "../../../scope/test/session-settings.ts";
+import { reader } from "../../../scope/test/support.ts";
 import { driveFixture, nativeFixtureLifetime } from "../../../scope/test/support/native-fixture-lifetime.ts";
 import { Host } from "../../../../apps/room/lanes/test/support/graph.ts";
 import { McpService, memoryStore, type CallResult, type McpConfig, type Mode, type Root } from "../../src/index.ts";
@@ -71,7 +72,8 @@ export interface Room {
 
 export function mcpRoom(): Room {
   const secret = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const sessionOwner = beginSessionFixture({ secret, sessions: true, inspector: null });
+  // The fixture's own inspector reader, which no agent presents: a test's native reading of a scope, apart from any MCP read.
+  const sessionOwner = beginSessionFixture({ secret, sessions: true, inspector: reader });
   const lifetime = nativeFixtureLifetime(sessionOwner);
   const { active, wait, release: done } = lifetime;
   const at = ownHost();
