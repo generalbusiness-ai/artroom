@@ -2,9 +2,10 @@
 
 **Run status: a rehearsal ran on 14 October 2026, without publication;
 see [the rehearsal run](#the-rehearsal-run-14-october-2026).** This is
-the operator runbook for the full lending request. It records no deployed outcome, browser result, online room, or
-published page. Fill the observation ledger from the original run before
-calling those outputs delivered.
+the operator runbook for the full lending request. Its rehearsal section
+records one deployed run, with browser results, in a rehearsal room. It
+records no final online room and no published page. Fill the observation
+ledger from the original run before calling those outputs delivered.
 
 The approved [library design](../../notes/2026-10-13-lending-library.md)
 remains unchanged. Amendment `19264feb21b49756fb3e9913b0ba11b2520e1e3a`
@@ -15,10 +16,8 @@ or choosing those versions early.
 
 ## Bind the service and room
 
-The command blocks target the pending final physical launcher
-`packages/cli/bin/dap.js`. The preserved preparation Source still has
-`packages/cli/bin/artroom.js`. Bind the actual renamed file in the final
-composition before any command is run. No command here has been executed.
+The commands use the launcher `packages/cli/bin/dap.js`. The rehearsal
+ran them on 14 October 2026. The final room has not been provisioned.
 
 Record the approved Source head, deployed bounds, exact application cohort,
 Worker name, Artifacts namespace, and verified service origin. Use a separate
@@ -121,8 +120,8 @@ and sends nothing, or `dap invite --continue`, which resumes the exact
 original request. While an invitation is unresolved the command refuses a
 new one; do not issue a second invitation to replace an unknown one.
 `packages/cli/test/agent-key.scope.test.ts` shows a lost answer checked
-and the link joined on a membership 4 room. A deployed issuance is still
-**unrun**.
+and the link joined on a membership 4 room. The rehearsal issued
+`@nasruddin`'s invitation this way on the deployed service.
 
 The CLI's person join loads the explicit membership pin and keeps its
 signed join. The Library browser additionally requires the membership 4

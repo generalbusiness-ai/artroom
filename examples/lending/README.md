@@ -1,21 +1,41 @@
 # The lending library
 
-A small lending library for kitchenware and tools, as one declared dap
-definition. The design is
+The lending library, dap-library, is an application built on dap. Members
+donate kitchenware and tools, borrow them and return them, and staff
+remove a thing that is lost or broken. It is one declared dap definition,
+`lending`. The design is
 [notes/2026-10-13-lending-library.md](../../notes/2026-10-13-lending-library.md).
 
 This directory holds the definition, the shelf page, and the member
 interface: its model, request custody, gateway, joining, storage and
 screens. The Worker serves the interface at `/lending/`.
+[Build a lending library](../../docs/build-a-lending-library.md) is a
+tutorial that writes this definition in four steps.
 
-**The screens and the browser storage have not been run in a browser.**
-They typecheck and bundle. Everything beneath them (the model, the
-custody, the gateway and joining) is tested, on real scopes where that
-matters. Publishing a shelf page is not built yet: the interface shows its text as
-unpublished. The [runbook](runbook.md) and homepage Library page are prepared,
-with deployment destinations unset. The deployed run, browser witnesses,
-final online room, and homepage publication remain unrun. Fold publication
-waits for its separate design approval.
+## Where it runs
+
+The member interface is at <https://dap-lending.inguz.workers.dev/lending/>,
+and the homepage's [Library page](https://dap.generalbusiness.ai/library/)
+links to it. Membership is by invitation: a member who holds `membership.invite`
+issues a link with `dap invite --keep` ([The dap command](../../docs/cli.md)), and the
+interface joins with it. The room there is a rehearsal room, provisioned
+on 14 October 2026. The [runbook](runbook.md#the-rehearsal-run-14-october-2026)
+records that run: a join in Chrome, the story's seven acts, two
+refusals, an interrupted request settled after a reload, and
+`dap verify`.
+
+Two things are not done yet:
+
+- **The published shelf.** Publishing each thing's shelf page from the
+  record is designed and approved
+  ([notes/2026-10-13-fold-publication.md](../../notes/2026-10-13-fold-publication.md))
+  and is being built. Until then the interface shows a page's text as
+  unpublished. The final room is provisioned after publication is built,
+  under the versions it needs.
+- **The cancel button.** The interface offers **Cancel this thing** to
+  members as well as staff. The scope refuses a member's cancel as
+  `unauthorized`, and the interface shows "Only staff can cancel a
+  thing." Nothing is recorded.
 
 ## What is here
 
@@ -33,9 +53,11 @@ waits for its separate design approval.
 | `browser/storage.ts` | This origin's private storage: the device key, the seat, and the kept requests, in IndexedDB under a Web Lock. |
 | `browser/main.ts`, `index.html`, `style.css` | The screens: join, the shelf, donate, borrow, return, cancel, the kept request, each page's text, and the record. |
 | `scripts/assets.mjs` | Bundles the interface into `browser-build/` and into the Worker module `packages/scope/src/lending-assets.ts`. Run it after any change to the browser code. The Worker serves it at `/lending/`. |
-| `runbook.md` | Deployed provisioning and six-output observation ledger; unrun, with actual destinations still unset. |
+| `browser/model.test.ts`, `browser/custody.test.ts`, `browser/storage.browser.test.ts` | Tests of the model, the custody, and the browser storage. |
+| `runbook.md` | Deployed provisioning, the rehearsal run of 14 October 2026, and the six-output observation ledger. |
 | `demo-script.md` | The script for the recording. |
 | `definition.test.ts` | Plain-function tests: the bytes and the pin, the story of Nasruddin and the pot, and the bounds. Grants are scripted. |
+| `shelf.test.ts` | Tests of the shelf page: members' text made literal, and things that are gone read from the record. |
 
 The scenario on real scopes is
 `packages/scope/test/lending.test.ts`. It installs the application cohort
@@ -92,8 +114,10 @@ Three facts that the interface and the runbook need:
   donated thing is item 2.
 - After `set-actions`, the scenario advances its clock by 301 seconds
   before the first lending act, as the existing application test does, so
-  that the earlier grant's reuse window has ended. A shorter wait was not
-  tried. A runbook must allow for that window.
+  that the earlier grant's reuse window has ended. In the deployed
+  rehearsal the first lending act took effect 124 seconds after the
+  grants, with no wait. That is one observation, not a bound: a runbook
+  must still allow for the window.
 
 ## Run the tests
 

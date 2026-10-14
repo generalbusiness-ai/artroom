@@ -30,7 +30,7 @@ replaying the record gives the same state. Scopes share no storage. They
 compose by delivering messages to each other, and each receiver judges a
 delivery in its own turn, as it judges an act.
 
-## Three applications built on dap
+## Four applications built on dap
 
 - **dap-room** holds membership, rules, issues and changes for a
   repository, and publishes accepted changes to a Git host. Its pages
@@ -44,6 +44,12 @@ delivery in its own turn, as it judges an act.
   [examples/counting](examples/counting), and the tutorial
   [Build a counter](docs/build-a-counter.md) builds a smaller version of
   its definition.
+- **dap-library** is a lending library for kitchenware and tools. Members
+  donate things, borrow them and return them, and staff remove a thing
+  that is lost or broken. The source is in
+  [examples/lending](examples/lending), and the tutorial
+  [Build a lending library](docs/build-a-lending-library.md) writes its
+  whole definition. Publishing its shelf as pages is being built.
 - **dap-jam** lets musicians improvise together in a room. Its source and
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).
@@ -62,6 +68,8 @@ configuration file and key of a member who has already joined.
   model and the applications.
 - [Build a counter](docs/build-a-counter.md) is a tutorial. You write a
   small definition and watch each act take effect.
+- [Build a lending library](docs/build-a-lending-library.md) is a second
+  tutorial, on items with states, final states and grants.
 - [The architecture of a dap application](docs/architecture.md) explains
   scopes, acts, entries, delivery and where the record is kept.
 - [Write an application](docs/write-an-application.md) shows how to

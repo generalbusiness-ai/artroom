@@ -179,6 +179,21 @@ or authorize the Counting application. Follow
 [Counter setup](../examples/counting/browser/startup.md) for the explicit
 Counting cohort, native factory, membership grants, and device enrollment.
 
+## Run the lending library
+
+**Run status:** the library was not exercised in this rehearsal. Its own
+[runbook](../examples/lending/runbook.md) ran on the project's library
+deployment on 14 October 2026.
+
+The same scope Worker serves the library's member interface at
+`/lending/`. The library needs a room of the application cohort, which
+the room above is not: plan it with `install --plan ... --cohort
+application`. The project gives the library its own Worker and Artifacts
+namespace ([its deployment](deploy.md#the-lending-librarys-deployment)).
+Follow the [runbook](../examples/lending/runbook.md) to activate the
+definition, establish the library, give the roles their actions, and
+invite members with `dap invite --keep`.
+
 ## Deploy the homepage
 
 Edit `homepage/wrangler.jsonc`: choose a new Worker name and remove `routes`
@@ -197,7 +212,7 @@ homepage deployment.
 
 The command prints the homepage address. Its application links still point
 at the project's demos; change those links before building to use your own
-room and Counter addresses.
+room, library and Counter addresses.
 
 ## Remove the test deployment
 

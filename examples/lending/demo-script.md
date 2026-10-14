@@ -3,16 +3,15 @@
 A script for recording the lending library. The story is Nasruddin and the
 pot. It takes two people, or one person with two browser profiles.
 
-**Run status: unrun on a deployed room or in a browser.** The story and
-refusals are witnessed by the existing native scenario, not by screenshots
-or public pages. The screens exist in Source. Their actual controls and
-storage still need the browser run in [the runbook](runbook.md).
-
-The table's published-page outcomes require approval and implementation of
-the fold publication design. That stage is unapproved, unbuilt, and unrun
-in this preparation. Before that stage, show a
-lending act's acceptance separately and label its page unpublished. Do not
-make browser page edits to simulate automatic publication.
+**Run status: the story's seven acts, the refused cancel and `dap verify`
+ran in a rehearsal room on 14 October 2026, without publication; the
+[runbook's rehearsal section](runbook.md#the-rehearsal-run-14-october-2026)
+records what was seen.** The published
+shelf, shot 10 and the shelf parts of shots 1, 8b and 9 wait for
+publication. Its design is approved; the build is in progress. Until it
+lands, show a lending act's acceptance on its own and label its page
+unpublished. Do not make browser page edits to simulate automatic
+publication.
 
 ## The point
 
@@ -26,9 +25,8 @@ birth and the death are recorded the same way.
 - A room is provisioned as [the runbook](runbook.md) says, with the library
   established and empty.
 - The neighbour has joined as the room's founder. The neighbour is staff.
-- Nasruddin has joined with a verified membership 4 invitation, as a member.
-  The baseline retained issuer does not support that cohort; complete the
-  runbook's reviewed issuance dependency first.
+- Nasruddin has joined as a member, with an invitation that the
+  neighbour issued with `dap invite --keep`.
 - Each has the member interface open. A third window shows the published
   shelf.
 - At least five minutes have passed since the roles were granted.
@@ -44,7 +42,7 @@ birth and the death are recorded the same way.
 | 5 | Nasruddin | Donates "Small pot", description "Baby born when the big pot was with me". | The small pot, available, donated by @nasruddin, with his description. | "So he donates it. The description is his. The library keeps his words and judges none of them." |
 | 6 | Nasruddin | Borrows the big pot again. | Lent to @nasruddin. | "He borrows the big pot again." |
 | 7 | Nasruddin | Says the pot died. Does nothing in the interface. | No change. | "This time he comes back empty-handed. The pot, he says, has died." |
-| 8a | Nasruddin | Presents the retained signed cancellation refusal, reason "The pot died", beside the interface. Do not claim the member interface offers a staff-only cancel button. | The actual native refusal and unchanged lent pot. Record the observed wording. | "He cannot strike it from the library himself. Only staff can." |
+| 8a | Nasruddin | Cancels the big pot, reason "The pot died". The member interface offers **Cancel this thing** to members too. | "Only staff can cancel a thing. (unauthorized)" The pot is still lent. | "He cannot strike it from the library himself. Only staff can." |
 | 8b | Neighbour | Cancels the big pot, reason "Nasruddin says the pot died". | The pot is gone. The reason is on its page and in the record, under the neighbour's name. | "The neighbour records it, in the neighbour's own words." |
 | 9 | Neighbour | Donates "New big pot", description "Copper, eight litres." | Two things on the shelf: the small pot and the new big pot. The old pot's page stays, marked gone. | "And the shelf is replenished." |
 
@@ -100,5 +98,5 @@ Do not let that witness add an extra donation to the seven-act story.
 For the public closing shot, use an unseated browser. It must read all three
 shelf pages and commit history. Show the cancelled page's reason and compare
 its record pointer with the member's lending journal. The journal remains
-for members; its private session is never part of a public link. Actual
-publication and this public-history witness are still unrun.
+for members; its private session is never part of a public link.
+Publication and this public-history witness have not run yet.

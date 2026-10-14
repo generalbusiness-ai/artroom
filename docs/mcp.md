@@ -1386,6 +1386,41 @@ membership@2, membership@4 (the application cohort) or membership@5 (the
 Counting cohort); the invitation carries that pin, and the enrolment is
 verified against the receipt's definition.
 
+## Taking part in the lending library
+
+The [lending library](../examples/lending) is also an application that
+the room's application factory creates. Its definition name is
+`lending`, so its act tools are `lending.donate`, `lending.borrow`,
+`lending.return` and `lending.cancel`. The library's genesis takes no
+values (`values` is `{}`), and the factory makes the signer its founder.
+A donation opens a thing at the entry that records it, so the position of
+the act's fact is the thing's ID. `borrow`, `return` and `cancel` name
+that ID in `on`.
+
+`packages/mcp/test/lending.scope.test.ts` runs this recipe on the real
+test Worker in both modes, after an admin has activated the definition,
+given the admin role `lending.member` and `lending.staff`, and created
+the library. It checks the tools called and their count against this
+table (observed). The room's setup is not counted.
+
+| Activity | Default | --generic |
+|---|---|---|
+| Take part in the lending library: find it, donate a thing, borrow it, return it | `room`, whose applications name the library's scope; `lending.donate`; `lending.borrow`; `lending.return`: 4 | `room`; `actions` on the library, `act` donate; `act` borrow; `act` return: 5 |
+
+The same test then returns the thing a second time. The answer is
+`refused`, with the reason `guard-failed`, because the thing is no longer
+lent. A refusal is an answer, not a tool error, and the scope writes
+nothing for it.
+
+Who may sign each act is set by the room, not the server. `donate`,
+`borrow` and `return` need `lending.member`; `cancel` needs
+`lending.staff`. In the deployed library the `admin` role holds both
+actions and the `member` role holds `lending.member`, so an agent
+enrolled as a member is refused `cancel` as `unauthorized`. Anyone with
+`lending.member` may return a lent thing, not only its borrower. The
+library's [README](../examples/lending/README.md) lists the items and the
+acts.
+
 ## Budgets and observed figures
 
 Each figure below is labelled by how it was taken: an observed run of a
