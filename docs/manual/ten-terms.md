@@ -68,7 +68,7 @@ records of a hold's workspace.
 
 A **plan** is one way to split a goal into parts, and a **concern** is
 one part of a plan. Both are items of the room's issue definition, in
-[issue.ts](../../packages/lanes/src/issue.ts). A plan is `open` while
+[issue.ts](../../apps/room/lanes/src/issue.ts). A plan is `open` while
 concerns are added, then `sealed` as the goal's current plan. Adding a
 concern sends a `create` for a new lane under the same definition, and
 the concern's state follows that request: `creating`, then `created`,
@@ -82,7 +82,7 @@ definitions are active. Its revisions are recorded, and other scopes
 observe a revision when they judge against it. A definition's own named
 expressions, which a `rule` guard evaluates, are rule guards, not this
 scope. The rules scope is in
-[rules-scope.ts](../../packages/platform/src/rules-scope.ts).
+[rules-scope.ts](../../apps/room/definitions/src/rules-scope.ts).
 
 ## 9. Destination
 
@@ -90,7 +90,7 @@ The **destination** is the scope that judges publication to a Git host
 and records the outcome. It reads the change's evidence, observes
 membership and the rules, and writes outside-operation duties for the
 host. For each publication it also writes a receipt commit. It is in
-[destination.ts](../../packages/platform/src/destination.ts).
+[destination.ts](../../apps/room/definitions/src/destination.ts).
 
 ## 10. Replay
 
@@ -105,7 +105,7 @@ holds for that coverage and those trusts. It is in
 
 Written against main `d309b6b9` from the types in `packages/contract`,
 the judges and capability code in `packages/derive`, and the room's
-definitions in `packages/lanes` and `packages/platform`. This page
+definitions in `apps/room/lanes` and `apps/room/definitions`. This page
 claims no run. The earlier version of this page held the room's beginner
 vocabulary. Its review history stays in
 [the ledger](../../apps/room/docs/ledger.md).

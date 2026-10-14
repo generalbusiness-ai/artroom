@@ -7,8 +7,8 @@
 //
 // The first form opens the deployment's page at <base-url>/page/, signed in with the key that the config directory keeps (the
 // founder's, from demo-run.ts), on the room that room.json names. The second form runs the rehearsal on the test Worker instead
-// (`packages/lanes/test/demo.scope.test.ts` with DEMO_RECORD=1) and answers the browser with what the Worker answered there,
-// request by request, as `packages/page/test/screens.mjs` does; a request the recorder did not make fails the script.
+// (`apps/room/lanes/test/demo.scope.test.ts` with DEMO_RECORD=1) and answers the browser with what the Worker answered there,
+// request by request, as `apps/room/page/test/screens.mjs` does; a request the recorder did not make fails the script.
 //
 // It saves six captures in the output directory, each at most 300 kB: the room, the issue, the refused change, the published
 // change, the rules view, and the page that the edit published as the site renders it. The key goes only into the browser's

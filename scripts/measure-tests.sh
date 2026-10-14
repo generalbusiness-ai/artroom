@@ -39,14 +39,14 @@ V() { echo "--reporter=default --reporter=json --outputFile.json=$O/$1.json $SER
 [ -z "$SERIAL" ] && step typecheck . npm run typecheck
 step bytes packages/bytes npx vitest run --config vitest.config.ts $(V bytes)
 step derive packages/derive npx vitest run --config vitest.config.ts $(V derive)
-step platform packages/platform npx vitest run --config vitest.config.ts $(V platform)
+step platform apps/room/definitions npx vitest run --config vitest.config.ts $(V platform)
 step git packages/git npx vitest run --config vitest.config.ts $(V git)
 step checkers packages/checkers npx vitest run --config vitest.config.ts $(V checkers)
 step replay packages/replay npx vitest run --config vitest.config.ts $(V replay)
 step client packages/client npx vitest run --config vitest.config.ts $(V client)
 step scope packages/scope npx vitest run --config vitest.config.ts $(V scope)
-step lanes packages/lanes npx vitest run --config vitest.config.ts $(V lanes)
-step lanes-scope packages/lanes npx vitest run --config vitest.scope.config.ts $(V lanes-scope)
+step lanes apps/room/lanes npx vitest run --config vitest.config.ts $(V lanes)
+step lanes-scope apps/room/lanes npx vitest run --config vitest.scope.config.ts $(V lanes-scope)
 [ -z "$SERIAL" ] && step root-test . npm test
 uptime >> "$O/machine.txt"
 echo done > "$O/done"

@@ -47,7 +47,7 @@ Put each test at the cheapest boundary that can show its property.
 | What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 | A form of a definition: that the validator accepts or refuses it, and what the judges derive from it | as a plain function in `derive`, on a small made-up definition, in the `forms-*.test.ts` file of its family |
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
-| What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `packages/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
+| What only the two real lane definitions can show: several commitments and a hold, a plan's concerns, a manifest and its evidence, links, attention, capacity | against real scopes under the two pinned digests, in a scenario of `apps/room/lanes/test/*.scope.test.ts`, on the one fixture `test/support/graph.ts`. One scenario states one invariant. |
 
 A stand-in proves only the boundary it exposes. A retry, an order of events or a
 restart is shown against the thing that really retries, orders or restarts.
@@ -68,7 +68,7 @@ rule is a stand-in that a test scripts. A test that uses one says so. It
 shows where a count is taken, drawn and released, and nothing about a
 count or a rule of a platform definition. The destination now states
 `holds` for its branch and publication types;
-`packages/platform/test/destination-creates.test.ts` checks their cleanup
+`apps/room/definitions/test/destination-creates.test.ts` checks their cleanup
 and receipt duties with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
@@ -95,7 +95,7 @@ rules: a test of real authority runs there, in the namespace `PLATFORM`
 
 The register and the directory have no stand-in rule: every mark of the
 data of each has its rule in the platform package. Two fixtures are in
-`packages/platform/test/support-founding.ts`. `Register` is a register in
+`apps/room/definitions/test/support-founding.ts`. `Register` is a register in
 memory, created by an install intent. `Directory` is a directory in memory
 that such a register created by its own rules: the claim, the selecting
 outcome with its `create`, the directory's genesis and the register's
@@ -110,7 +110,7 @@ every mark, including `first-head` and `receipt`; its creation no longer needs s
 creation and publication witness is described below.
 
 The rules scope has four stand-ins, in
-`packages/platform/test/support-rules.ts`. `registrar` is a made-up
+`apps/room/definitions/test/support-rules.ts`. `registrar` is a made-up
 directory that creates one rules scope. `asker` is a made-up lane that
 tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
 a registrar, whose acts are judged on the test authority of derive's
@@ -131,7 +131,7 @@ over HTTP, and missing bytes make that replay `incomplete`. Its grants and
 outside system remain stand-ins.
 
 The destination has stand-ins of its own, in
-`packages/platform/test/support-destination.ts`. `bureau` is a made-up
+`apps/room/definitions/test/support-destination.ts`. `bureau` is a made-up
 directory that creates one destination scope. `Branch.read` supplies the
 observations and copies of lane entries at hand for a reservation. The
 lane's and register's entries, the observations, and each Git host answer
@@ -140,7 +140,7 @@ bureau; derive's judges write its entries. Every destination mark has its
 rule in the platform package. No substitute `first-head` or `receipt` rule
 is supplied. `Branch` still replaces the lane reader with a scripted
 `LaneRead`, rather than reading a lane's entries. The package's production
-reader is tested in `packages/platform/test/destination-reading.test.ts`
+reader is tested in `apps/room/definitions/test/destination-reading.test.ts`
 on entries written by hand: its author and deciding-key lists, and its
 checks of each job and verdict's provenance. The rows of `judge`, its
 changed-set value and its holder counts are the package's code. These
@@ -265,10 +265,10 @@ before it runs, what it starts, keeps and signs. It shows nothing about a
 lane's judgment, a storage's loss, a container or a real runner. The
 runner's checkout is tested on a real local repository, which is not a
 host. What a real change lane does with the service's signed results is
-one scenario of the lanes, `packages/lanes/test/checks.scope.test.ts`,
+one scenario of the lanes, `apps/room/lanes/test/checks.scope.test.ts`,
 which calls the service's origin read and its signer as functions.
 
-`packages/lanes/test/edit.scope.test.ts` runs `dap edit` as the
+`apps/room/lanes/test/edit.scope.test.ts` runs `dap edit` as the
 command-line story runs its commands, on each host through the production
 wiring of its ports (`artifacts-wiring.ts`, `github-wiring.ts`) over a
 labelled stand-in of `packages/scope/test/hosts.ts`, which keeps refs and
@@ -278,7 +278,7 @@ because it needs a lane definition and no other package may name the
 lanes package; the stand-ins live in the scope package, which may name the
 git package.
 
-`packages/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
+`apps/room/lanes/test/manifest-tree.scope.test.ts` exercises the manifest-list
 successor on real platform and lane scopes, through the production wiring
 of the hosting's own Git service over its labelled host stand-in. It
 records two signed file entries and a frozen manifest, reserves the shared
@@ -297,17 +297,17 @@ current-job read finished first. Other cases preserve an unresolved push
 when its retry is refused, cancel a pre-push reservation, drain its recorded
 deadline, and refuse a final membership read that exceeded its window.
 
-`packages/lanes/test/issues.scope.test.ts` runs `dap issue`,
+`apps/room/lanes/test/issues.scope.test.ts` runs `dap issue`,
 `issues`, `edit --closes`, `merge --closes` and `verify --all` the same way,
 on the hosting's own Git service only, for the same reason.
-`packages/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
+`apps/room/lanes/test/demo.scope.test.ts` runs the demo runner's rehearsal,
 `scripts/demo/rehearse.ts`, the same way: every shot of the demo script's
 middle, from the planned install to the page, with a stand-in for `git`
 that reads the stand-in host. Its second test is the recorder for
 `scripts/demo-captures.ts --recorded`, and runs only with `DEMO_RECORD=1`
 ([demo.md](demo.md)).
 
-`packages/lanes/test/support/room.ts` creates a repository on the real
+`apps/room/lanes/test/support/room.ts` creates a repository on the real
 platform scopes, in the namespace `PLATFORM`, as `founding-real` does, and
 its real directory creates lanes under the digests that its real rules
 scope activated. The lane scenarios on it, `wiring.scope.test.ts` and
@@ -473,8 +473,8 @@ the command never presents. The `cli` project is its Node test of the key files.
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.
 
-The page's story, `packages/page/test/story.scope.test.ts`, runs from the
-root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
+The page's story, `apps/room/page/test/story.scope.test.ts`, runs from the
+root inside the `scope` project too. Its room is `apps/room/page/test/support/demo.ts`:
 created by the command line over the Worker's HTTP routes, with the real
 read sessions under a TEST SECRET, and the site route for addresses under
 `/site/`; the Git host (`OwnGit` under the production wiring of the hosting
@@ -483,12 +483,12 @@ and acts are the page's own data functions. The `page` project is its Node
 tests: the states of a change, and that the scope Worker's page module
 (`packages/scope/src/page-assets.ts`) is the page's build of its source.
 `record.scope.test.ts` is no test of a property: it runs only with
-`PAGE_RECORD=1`, and `packages/page/test/screens.mjs` uses what it prints
+`PAGE_RECORD=1`, and `apps/room/page/test/screens.mjs` uses what it prints
 to take the page's screenshots in Chromium. That script needs
 `playwright-core` installed outside the checkout; it is not part of the
 gate.
 
-The lane scenarios, `packages/lanes/test/*.scope.test.ts`, run from
+The lane scenarios, `apps/room/lanes/test/*.scope.test.ts`, run from
 the root inside the `scope` project: the same test Worker, loaded once.
 The root `vitest.config.ts` adds them, and no file of the scope package
 names the lanes package. The Site publication and clock lifetime scenarios
@@ -506,16 +506,16 @@ through the Worker's entrypoint takes longer the more of them one run has
 made (observed; `notes/2026-10-05-i2-contract-deltas.md`, entry DK11).
 
 The Node `lanes` project checks the definitions and the scripted CLI proposal
-outcomes in `packages/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
+outcomes in `apps/room/lanes/test/cli-proposal-outcomes.test.ts`. The proposal
 witness has no native judgment or authority; its native counterparts stay in
 `manifest-tree.scope.test.ts`. The four definition tests read the four byte files
-under `packages/lanes/definitions`, and `docs/lanes-reference.md`,
+under `apps/room/lanes/definitions`, and `docs/lanes-reference.md`,
 without importing them. So, by the rule above, a change to one of those
 files alone is not selected by `npm run test:changed`; the gate runs it.
 Two sets of generated files follow the lane definitions:
-`packages/lanes/src/digests.ts` with the byte files, written by
-`packages/lanes/scripts/pin.mjs`, and `docs/lanes-reference.md`, written
-by `packages/lanes/scripts/reference.mjs`. The pins test fails while
+`apps/room/lanes/src/digests.ts` with the byte files, written by
+`apps/room/lanes/scripts/pin.mjs`, and `docs/lanes-reference.md`, written
+by `apps/room/lanes/scripts/reference.mjs`. The pins test fails while
 either is stale.
 
 Nothing under `spikes/parked/` is installed, typechecked or tested.

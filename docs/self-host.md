@@ -33,7 +33,7 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    `npm ci` reports the installed packages. The room assets are committed in
    `packages/scope/src/page-assets.ts`. If you change the page source, rebuild
-   them with `node packages/page/scripts/assets.mjs` before deployment.
+   them with `node apps/room/page/scripts/assets.mjs` before deployment.
 
 2. Log in to Cloudflare from the scope package.
 
@@ -176,7 +176,7 @@ needs no external Git credential.
 The same scope Worker serves `/counting/`. A second Worker is optional if
 its data needs a separate namespace. Deploying its page alone does not create
 or authorize the Counting application. Follow
-[Counter setup](../examples/counting/browser/startup.md) for the explicit
+[Counter setup](../apps/counter/browser/startup.md) for the explicit
 Counting cohort, native factory, membership grants, and device enrollment.
 
 ## Deploy the homepage

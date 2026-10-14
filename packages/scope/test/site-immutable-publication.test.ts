@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { runInDurableObject } from "cloudflare:test";
 import { takeBytes } from "@generalbusiness/artroom-bytes";
-import { demo } from "../../page/test/support/demo.ts";
+import { demo } from "../../../apps/room/page/test/support/demo.ts";
 import { PUBLICATION_PROOF_BOUNDS, type SitePublicationPeer } from "../src/site/publication.ts";
 
 // Real CLI, lanes, destination judgments, receipt writes and production Git wiring.

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import { countingAssets, MODULE, type CountingAssetName } from "../../../../examples/counting/scripts/assets.mjs";
+import { countingAssets, MODULE, type CountingAssetName } from "../../../counter/scripts/assets.mjs";
 
 // The existing Page Node project owns this browser-build freshness witness.
 // One in-memory production build compares its exact three public assets with the committed Worker module;
@@ -9,7 +9,7 @@ import { countingAssets, MODULE, type CountingAssetName } from "../../../../exam
 test("the Counting Worker module contains exactly the three current public production assets, with no fake preview", async () => {
   const actual = await readFile(MODULE, "utf8"), expected = await countingAssets();
   const summary = (text: string) => `${Buffer.byteLength(text, "utf8")} UTF-8 bytes, sha256 ${createHash("sha256").update(text, "utf8").digest("hex")}`;
-  expect(actual === expected, `Counting module differs: actual ${summary(actual)}; expected ${summary(expected)}. Run node examples/counting/scripts/assets.mjs.`).toBe(true);
+  expect(actual === expected, `Counting module differs: actual ${summary(actual)}; expected ${summary(expected)}. Run node apps/counter/scripts/assets.mjs.`).toBe(true);
   // Parse only the generator's literal JSON export; do not evaluate generated source.
   const literal = /^export const COUNTING_ASSETS = (.+) as const;$/m.exec(expected);
   expect(literal, "The production generator must emit its literal asset map").not.toBeNull();

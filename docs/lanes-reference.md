@@ -1,7 +1,7 @@
 # Lane reference
 
-This file is generated. Do not edit it. `packages/lanes/scripts/reference.mjs` writes it from the two lane
-definitions in `packages/lanes/src`. [lanes.md](lanes.md) says how to read a row.
+This file is generated. Do not edit it. `apps/room/lanes/scripts/reference.mjs` writes it from the two lane
+definitions in `apps/room/lanes/src`. [lanes.md](lanes.md) says how to read a row.
 
 The stamp: the definitions this file was generated from, by their pinned digests.
 
@@ -17,7 +17,7 @@ How to read the tables:
 - A final state is in bold. `?` marks a field or a member that is optional.
 - A slot's flags are in brackets: `fixed`, `required`, `list` and `author`. A slot with none has none.
 - "Guards, effects, sends, attention" gives the number of forms of each kind that the row writes. The forms
-  themselves are in `packages/lanes/src`.
+  themselves are in `apps/room/lanes/src`.
 - "Settles" is the pending state that the row's entry ends, where the row declares one.
 - "Needs" names the capability versions whose code the row needs. The validator reads such a row and derives
   nothing of it. The derive package holds that code as pure functions, and the production ports hold it. A runtime that lacks it does not found

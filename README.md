@@ -37,11 +37,11 @@ delivery in its own turn, as it judges an act.
   are in [apps/room/docs](apps/room/docs). Start with
   [Join a room and publish one text change](apps/room/docs/first-change.md)
   and [Lanes](apps/room/docs/lanes.md).
-  Its definitions are in [packages/platform](packages/platform) and
-  [packages/lanes](packages/lanes).
+  Its definitions are in [apps/room/definitions](apps/room/definitions) and
+  [apps/room/lanes](apps/room/lanes).
 - **dap-counter** keeps a shared count. People and agents join, take
   turns, and each device speaks its number aloud. The source is in
-  [examples/counting](examples/counting), and the tutorial
+  [apps/counter](apps/counter), and the tutorial
   [Build a counter](docs/build-a-counter.md) builds a smaller version of
   its definition.
 - **dap-jam** lets musicians improvise together in a room. Its source and
