@@ -98,7 +98,7 @@ no global installation or Wrangler dependency in this checkout is needed.
    deployed address and your namespace in the plan command.
 
    ```sh
-   export ARTROOM_HOME="$(mktemp -d)"
+   export DAP_HOME="$(mktemp -d)"
    node packages/cli/bin/dap.js install --plan https://<name>.<subdomain>.workers.dev --host artifacts --namespace dap-my-room
    ```
 
@@ -131,7 +131,7 @@ no global installation or Wrangler dependency in this checkout is needed.
 
    Install prints `Installed: register sc_..., ... as planned.` Claim prints
    the room's directory and membership references after it creates the Git
-   repository and enrolls the owner. Keep `ARTROOM_HOME` for later commands.
+   repository and enrolls the owner. Keep `DAP_HOME` for later commands.
    If claim gives up waiting, repeat the same command without `--again`.
    Preserve an uncertain install's original plan and run `install --planned`.
    An expired deadline does not authorize replacing an attempted request.
@@ -286,4 +286,4 @@ and original requests were retained with the evidence rather than deleted.
 
 If you deployed a homepage Worker, run pinned Wrangler `delete` from
 `homepage/` with its disposable configuration. Remove the private
-`ARTROOM_HOME` directory when you no longer need its keys or original requests.
+`DAP_HOME` directory when you no longer need its keys or original requests.

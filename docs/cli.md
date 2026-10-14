@@ -27,7 +27,17 @@ authenticated replay.
   (or carried by an invitation link to `join`) and kept in the config.
 - **A key**: an Ed25519 key, which the command makes. It keeps the
   32-byte secret in `keys/<name>.key` under its config directory:
-  `$ARTROOM_HOME`, or `$XDG_CONFIG_HOME/artroom`, or `~/.config/artroom`.
+  `$DAP_HOME`, with `$ARTROOM_HOME` still accepted as a compatible alias.
+  If both are set, they must resolve to the same directory; otherwise the
+  command refuses before reading configuration. Paths are compared after
+  resolving relative paths against the current working directory; the
+  command does not expand `~`. Empty values are unset.
+  Without either variable, an occupied `$XDG_CONFIG_HOME/artroom` takes
+  precedence, followed by an occupied `~/.config/artroom`. A directory with
+  keys or private pending records counts even without `config.json`. Only
+  when neither legacy directory holds entries does the command use the new
+  `$XDG_CONFIG_HOME/dap` default, or `~/.config/dap` without XDG. An empty
+  new directory cannot hide legacy custody. Nothing is moved or rekeyed.
   The directory has mode 0700 and each file 0600. A key is never
   replaced and never printed; only its ID (`key_...`) is printed.
 
@@ -84,17 +94,17 @@ version is not supported by the installed catalog, is refused as
 An expired plan that was never attempted sends nothing. A definitely
 unsent legacy plan can be planned again in the same config. A selected
 application or Counting plan cannot: keep that original config directory unchanged and
-use a separate empty `ARTROOM_HOME` directory for a new plan. Use that same
+use a separate empty `DAP_HOME` directory for a new plan. Use that same
 new directory for every later command, and configure the host's
 `registerScope` with the new plan's ID before installing. Do not copy over
 or delete the original config or keys.
 
-For example, set `ARTROOM_HOME` to a new private directory, then run
+For example, set `DAP_HOME` to a new private directory, then run
 `dap install --plan <base-url> --cohort <cohort> --host <host>
 --namespace <namespace>`, using `application`, `application-publication` or `counting-commitments`
 for `<cohort>`. After configuring the new register ID,
 run `dap install --planned --cohort <cohort>` with the same
-`ARTROOM_HOME`. This creates separate custody and a new operator key; it
+`DAP_HOME`. This creates separate custody and a new operator key; it
 does not renew or replace the expired original.
 
 An attempted or acknowledged original must instead be reconciled from its
@@ -132,7 +142,7 @@ cannot include that reserved field in `values`. See
 [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
 for the write authority and publication outcomes.
 
-For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
+For an application such as Jam, use a separate owner-only `DAP_HOME`
 and a deployed service that supports all six exact application pins:
 
 ```sh
@@ -279,7 +289,7 @@ handoff carries that invitation and full native references. It carries no
 signing key. A person invitation with the role `agent` is still a person;
 it cannot substitute for this agent-key protocol.
 
-Use a separate empty owner-only `ARTROOM_HOME` for the receiving agent. The
+Use a separate empty owner-only `DAP_HOME` for the receiving agent. The
 command generates and retains an independent key and saves the exact private
 enrollment envelope before delivery. After an unknown answer, use the same
 link with `--check` to settle and follow the original without submitting a
