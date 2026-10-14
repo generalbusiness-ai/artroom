@@ -77,11 +77,17 @@ test("native reserve refuses declared-name applications across rooms and inside 
     const checkpoints: unknown[] = [];
     const creationRefusals: unknown[] = [];
     Object.assign(task.meta, { nativeReserveCheckpoints: checkpoints, canonicalCreationRefusals: creationRefusals, attackJudgeOrPushDriven: false });
+    // An arbitrary application may choose the native genesis word too.
+    // This keeps the same-room name-only control from being masked by the
+    // separate birth-kind affiliation check. Its actual factory route is
+    // still establish-application, never Native open-pr.
+    const { establish, ...applicationActs } = declaredChangeAttack.acts;
+    const namedApplication = { ...declaredChangeAttack, genesis: "open", acts: { ...applicationActs, open: establish } } satisfies DeclaredDefinition;
     for (const [label, source, canonical] of [["A-to-B declared", A, false], ["B-to-B declared", B, false],
       ["A-to-B canonical F1", A, true], ["B-to-B canonical F1", B, true]] as const) {
       // This canonical pin carries hold/git-read capabilities. F1's existing
       // application guard rejects it; do not weaken that guard for a control.
-      const declaration = canonical ? changeDemo : declaredChangeAttack;
+      const declaration = canonical ? changeDemo : namedApplication;
       const bytes = canonicalize(declaration), digest = definitionDigest(declaration);
       if (canonical) {
         await source.Q.did(source.who, "publish", { on: 0, expected: await source.Q.expected({ on: 0 }),
@@ -132,7 +138,7 @@ test("native reserve refuses declared-name applications across rooms and inside 
       const sourced = await lifetime.wait(() => (app.object as unknown as { source(seq: number): Promise<{ under: string; at: ScopeRef }> }).source(merge));
       const reserveAdmissions = admissions.filter(e => e.input.type === "delivery"
         && e.input.from.at.scope === app.name && e.input.from.seq === merge);
-      const checkpoint = { label, definition: digest, under: sourced.under, app: from, creator: await source.D.at(), membership: expectedMembership,
+      const checkpoint = { label, definition: digest, genesisKind: appGenesis.input.type === "genesis" ? appGenesis.input.kind : null, creationRoute: "establish-application", under: sourced.under, app: from, creator: await source.D.at(), membership: expectedMembership,
         destination, manifest, merge, before: before.at, after: after.at,
         admissions: reserveAdmissions.map(e => ({ seq: e.seq, input: e.input.type === "delivery" && "decision" in e.input
           ? { decision: e.input.decision, reason: e.input.reason } : { type: e.input.type }, uses: e.uses.length, effects: e.effects.length })),
