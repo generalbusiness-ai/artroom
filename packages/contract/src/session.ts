@@ -9,7 +9,7 @@
  * them.
  */
 
-import type { Base64Url, KeyId, MemberId, ScopeId, ScopeRef, Timestamp } from "./scope.ts";
+import type { Base64Url, Digest, KeyId, MemberId, ScopeId, ScopeRef, Timestamp } from "./scope.ts";
 
 /**
  * The tags of the bytes that a session's MAC, a session request's signature
@@ -88,3 +88,27 @@ export interface ReadRequest { v: 1; to: ScopeId; actor: KeyId; read: SignedRead
 export interface SignedRead { request: ReadRequest; sig: Base64Url }
 /** The reads that a signed read may name. */
 export type SignedReadName = "summary" | "history" | "entry" | "log" | "retained";
+
+/**
+ * The hosted MCP endpoint's control request (notes/2026-10-13-hosted-mcp-endpoint.md,
+ * section 3.2): a signed statement by a member key that an agent of a
+ * repository be created, re-issued a bearer, or retired. It is no intent
+ * and no read: its tag, `artroom-mcp-control-1`, is a tag of nothing else.
+ *
+ * - `service`: the origin of the Worker the request is for.
+ * - `membership`: the repository's membership scope, with its incarnation.
+ * - `agent`: the agent object's ID, or null for `create`.
+ * - `actor`: the member key that signs.
+ * - `body`: the SHA-256 digest of the canonical request body.
+ * - `op`: the caller's identity for this operation, 1 to 128 bytes; the
+ *   same `op` with the same request answers the same, another request
+ *   under the same `op` is refused.
+ * - `notAfter`: at most the intent lifetime ahead.
+ *
+ * Exactly these members. Presented as `Authorization: Control <b64url of the
+ * canonical JSON of the request>.<signature>`.
+ */
+export const CONTROL_DOMAIN = "artroom-mcp-control-1";
+export type ControlAction = "create" | "bearer" | "retire";
+export interface ControlRequest { v: 1; action: ControlAction; service: string; membership: ScopeRef; agent: string | null; actor: KeyId; body: Digest; op: string; notAfter: Timestamp }
+export interface SignedControl { request: ControlRequest; sig: Base64Url }

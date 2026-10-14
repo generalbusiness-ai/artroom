@@ -8,11 +8,11 @@ export async function buildHome(output = resolve(home, "assets")) {
   await mkdir(dirname(output), { recursive: true });
   const staging = await mkdtemp(resolve(dirname(output), ".dap-home-build-"));
   try {
-    for (const file of ["index.html", "room/index.html", "counter/index.html", "jam/index.html", "style.css", "_headers"]) {
+    for (const file of ["index.html", "room/index.html", "library/index.html", "counter/index.html", "jam/index.html", "style.css", "_headers"]) {
       await mkdir(dirname(resolve(staging, file)), { recursive: true });
       await cp(resolve(home, "src", file), resolve(staging, file));
     }
-    const masters = { "dap-wordmark-green.svg": "dap.svg", "dap-symbol-small.svg": "favicon.svg", "fonts/OpenRunde-Regular.woff2": "fonts/OpenRunde-Regular.woff2", "fonts/OpenRunde-Semibold.woff2": "fonts/OpenRunde-Semibold.woff2", "fonts/OpenRunde-Bold.woff2": "fonts/OpenRunde-Bold.woff2", "fonts/LICENSE-OpenRunde.txt": "fonts/LICENSE-OpenRunde.txt" };
+    const masters = { "dap-wordmark-green.svg": "dap.svg", "dist/favicon.svg": "favicon.svg", "dist/favicon.ico": "favicon.ico", "fonts/OpenRunde-Regular.woff2": "fonts/OpenRunde-Regular.woff2", "fonts/OpenRunde-Semibold.woff2": "fonts/OpenRunde-Semibold.woff2", "fonts/OpenRunde-Bold.woff2": "fonts/OpenRunde-Bold.woff2", "fonts/LICENSE-OpenRunde.txt": "fonts/LICENSE-OpenRunde.txt" };
     for (const [master, name] of Object.entries(masters)) {
       await mkdir(dirname(resolve(staging, "brand", name)), { recursive: true });
       await cp(resolve(root, "brand", master), resolve(staging, "brand", name));

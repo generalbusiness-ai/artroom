@@ -354,6 +354,9 @@ export interface OutcomeRule {
   most?: Most;
   /** Whether the request of that attempt may be sent now (`OperationRules.ready`). It reads the folded state alone. Absent: it may. */
   ready?(state: StateView, operation: Operation, attempt: number): boolean;
+  beforeSend?(state: StateView, operation: Operation, attempt: number, own: Own): Evidence | null;
+  /** Runtime provenance admission metadata, independent of recorded judgments. */
+  publicationOrigin?(state: StateView, operation: Operation, own: Own): import("./ledger.ts").PublicationOrigin | false | null;
   retries(result: "refused" | "unknown", operation: Operation, given: RuleGiven): boolean;
   holds?(given: RuleGiven, operation: Operation): boolean;
   wellFormed?(result: "confirmed" | "refused" | "unknown", evidence: Evidence, given: RuleGiven): boolean;

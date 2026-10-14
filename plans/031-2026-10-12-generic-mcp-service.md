@@ -38,7 +38,7 @@ protocol rule. It is to be built in a cloud session on a branch (section
 
 The MCP plan was written on 2026-10-01 against the earlier model: a
 `RoomApi` with lanes, leases, bearer tokens and fourteen named code-review
-tools. That model is parked (`parked/README.md`); the parked `packages/mcp`
+tools. That model is parked (`spikes/parked/README.md`); the parked `packages/mcp`
 is not built or deployed, and no MCP server exists today (`docs/scopes.md`
 lists the HTTP routes that do). The I1 to I5 deliveries replaced it with the
 scope model: definitions are data, every change is a signed intent judged
@@ -1024,7 +1024,7 @@ is recorded as decision 12 in section 13.
 records); `packages/page/src/data.ts` (`actsOn`) and `join-custody.ts`;
 `packages/client/src/handle.ts` (`found`), `session.ts`;
 `packages/platform/src/membership.ts`, `directory.ts`, `rules-scope.ts`;
-`packages/scope/src/worker.ts` (routes); `parked/mcp/src`;
+`packages/scope/src/worker.ts` (routes); `spikes/parked/mcp/src`;
 `examples/counting/definition.json` (`join`, `spoken`, rules);
 `request/agent-key-node` (`agent-key-invitation.ts`, its `docs/cli.md`
 diff); `packages/client/src/prepare.ts`; `packages/derive/src/judge.ts`

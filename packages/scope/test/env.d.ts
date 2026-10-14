@@ -5,6 +5,9 @@ declare namespace Cloudflare {
     AS_DEPLOYED: DurableObjectNamespace;
     NET: DurableObjectNamespace;
     PLATFORM: DurableObjectNamespace;
+    /** The hosted MCP endpoint's namespaces, over PLATFORM (test/worker.ts). */
+    REGISTRIES: DurableObjectNamespace;
+    AGENTS: DurableObjectNamespace;
     /** The test worker's own `NetService` entrypoint, as a service binding. A test reads it as the `Api` of `src/worker.ts`. */
     API: Fetcher;
   }

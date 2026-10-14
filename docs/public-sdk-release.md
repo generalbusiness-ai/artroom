@@ -13,7 +13,7 @@ unrun at this source delivery. Frozen four-package attempts remain separate.
 
 The source-authoring request is `23e6d5e8e2773f11c2271f86d3c1cbf019dd5cf0`,
 promise `a01fe0506ee046908c7a9d97c18df388223c02a0`, under public-release
-request `7b31f843fac3bcc5f64b0b5caaad72f1f8191082`. Source authoring alone
+request `7b31f843fac3bcc5f64b0b5caaad72f1f8191082`. Writing the code alone
 establishes no successful build or public consumer. All new checks remain
 unrun at this delivery.
 
@@ -30,17 +30,20 @@ node scripts/public-release.mjs --source /absolute/clean/checkout --head <full-c
 node scripts/check-public-release.mjs --manifest /private/tmp/fresh-sdk-stage/release-manifest.json --native-capture /private/tmp/reviewed-native-capture.json --native-capture-sha256 <reviewed-SHA256> --esbuild /absolute/pinned-native-esbuild/bin/esbuild --esbuild-sha256 <reviewed-SHA256>
 ```
 
-Hugh adopted the coordinated version `0.1.0-dev.2` for publication in
-assertions `447e0178` and `46eafb31`. The six distribution names, in build
-order, are `@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
+The six published SDK packages, in build order, are
+`@generalbusiness/dap-contract`, `@generalbusiness/dap-bytes`,
 `@generalbusiness/dap-client`, `@generalbusiness/dap-derive`,
-`@generalbusiness/dap-platform` and `@generalbusiness/dap-replay`. Their
-publication follows the minimal rename's landing; this guide records no
-publication result or token rights.
+`@generalbusiness/dap-platform`, and `@generalbusiness/dap-replay`, all at
+`0.1.0-dev.2`.
 
-The workspace rename changes contract, derive, lanes, page, platform and
-cli. The bytes, client and replay workspace names remain internal
-`@generalbusiness/artroom-*` names. The producer keeps an exact original
+The command is `dap`. `artroom` remains an alias. The contract, derive,
+lanes, page, platform, and cli workspaces use `@generalbusiness/dap-*`
+names. Inside this repository, scope, git, checkers, bytes, client, and
+replay still use `@generalbusiness/artroom-*` workspace names, with public
+SDK names mapped at publication. The `artroom-replay` command,
+`ARTROOM_HOME`, `refs/artroom/`, and Worker names are unchanged.
+
+The producer keeps an exact original
 copy of each tracked SDK input, then changes only genuine module literals
 in its separate compiler inputs to the distribution names. Ordinary strings,
 protocol names, package directories and source workspace versions remain
@@ -59,7 +62,7 @@ package's standard libraries. No whole-cache root is allowed. Before each
 package emits, a resolution-only `--listFilesOnly --noEmit` pass checks the
 actual canonical input paths and records their hashes. One emission follows;
 its file set and input hashes must match that preflight. Consumer `noEmit`
-checks keep their single pass. Source HEAD, clean state and copied bytes are
+checks keep their single pass. The checkout's HEAD, clean state and copied bytes are
 checked again before the release manifest is sealed.
 
 Build order is contract, bytes, client, derive, platform, replay. TypeScript 7.0.2 emits ES2022
@@ -130,7 +133,7 @@ result, including coverage, trusts and the negative outcome.
 The capture comes from the existing `founding-real.test.ts` first rules
 publication, before scripted lane facts. Select that whole file alone with
 the existing `DEMO_RECORD=1` flag in the reviewed native capture plan. The
-opt-in block wraps the actual HTTP history and retained-input source and keeps
+opt-in block wraps the actual HTTP journal and retained-input source and keeps
 only complete prefixes the successful native replay covered. It emits numbered
 `PUBLIC-SDK-NATIVE-CAPTURE` base64url chunks and a terminal marker, following the
 existing verbose recorder's raw-line framing. Only ASCII is chunked, so native
@@ -215,7 +218,7 @@ fidelity remain separately owned and open. Browser cross-origin access is
 not established by packaging. This producer adds no CORS, grant, hosting,
 onboarding or universal durable-outbox protocol.
 
-## Module-reference Source repair
+## Module-reference repair
 
 Request `0c3828a0ca7b50dda540dc1c9023950c03b72668` rests on dap
 promise `git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4291f1e6caa20c865f5c2c983418c408b9d65895`. The original one-run
@@ -240,7 +243,7 @@ node --test scripts/public-release-modules.test.mjs
 ```
 
 The case, syntax checks, new-head producer and output checker are all
-unrun at that Source delivery. A later guarded `c4bd` attempt passed the
+unrun when that code was delivered. A later guarded `c4bd` attempt passed the
 one reader case, then compiled and packed contract, bytes and client. Derive
 emission failed with `TS2304: Cannot find name 'structuredClone'` in its
 exported testing fixture. Its resolution-only pass was not semantic type
@@ -267,7 +270,7 @@ calls the real compiled helper, changes a nested cloned value and checks
 that the original small fixture retains exactly its canonical bytes.
 
 All repaired-head imports, cases, compilers, packing and complete output
-checks were unrun at that Source delivery. A later exact `7695` attempt
+checks were unrun when that code was delivered. A later exact `7695` attempt
 passed the reader case and all four packages' resolution, emission and
 offline packing, and sealed its producer manifest. The checker passed its
 archive and emitted fixture ABI guards, then the compiled journey failed:
@@ -326,5 +329,5 @@ lock and assets remain identical, so no gate is repeated for it. All six
 `0.1.0-dev.2` artifacts remain local staged outputs. Verified npm publication
 authority, six public versions and integrities, a cold public consumer and
 actual Jam provisioning, browser, model, audio, recovery and Cloudflare
-acceptance remain owed. The Source request closes none of those whole-demo
+acceptance remain owed. The request for the code closes none of those whole-demo
 obligations.

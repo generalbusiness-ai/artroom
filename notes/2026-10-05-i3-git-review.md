@@ -10,7 +10,7 @@ gateway. The runner is step 25's.
 "The authority note" is revision 18 at `99bc48e8`. "The proof plan" is
 revision 9 at `85be9f0b`. "The facts file" is
 `notes/2026-10-04-authority-effects-and-publication/publication-and-authority-facts.md`
-at `99bc48e8`. Parked paths are under `parked/`, as they were at
+at `99bc48e8`. Parked paths are under `spikes/parked/`, as they were at
 `5e5583e74`. New paths are under `packages/git/`.
 
 Every parked file named here was read in full, at the lines, before

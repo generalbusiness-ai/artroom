@@ -3,7 +3,7 @@
 ## Corrected 2026-10-05 after the checker's review 52cad0fc and the planner's answers bf020684
 
 - Bootstrap: steps 9a to 9c are new. The rules and destination definitions, their genesis and their confirmation are in M1 (sections 8.2 and 9.3). Check and publication behaviour stays in tracks C and D.
-- E1: section 6.2 has one list of retained paths. Every removal step is bound to it. Step 25 and the removal summary keep `parked/checkers/wrangler.spike.jsonc`.
+- E1: section 6.2 has one list of retained paths. Every removal step is bound to it. Step 25 and the removal summary keep `spikes/parked/checkers/wrangler.spike.jsonc`.
 - Authority handoff: the contract's revision 13 is adopted (planner act 42c39a7d). P20 and P23 are available. P19 and P21 wait on revision 14, filed and not adopted. Q1 to Q4 and Q12 are refreshed (sections 1, 2, 4 and 9.1).
 - P25 is not a gap. The "would refuse" wording is limited to declared handlers.
 - I2: its base milestone is landed on main at b57e8774. The plan says what stays owed under request efb4e323 (section 2).
@@ -409,7 +409,7 @@ kept, this way:
 | 24 | Receipt publication | 6.10 | The same | A Git host. | Now, on a real local repository. |
 | 25 | Operator incidents and lists | 12, G13 and G17 | `scope/src/operator.ts`; two reads in `scope/src/reads.ts` | Storage outside every history. | Now. The pages are I5's. |
 | 26 | Capacity for the capability and the six definitions | 5.8 | `derive/src/reserve.ts`; `derive/src/validate/capacity.ts` | Scope storage. | Part. Entries: now. Records: now, as I3 brings the records. Items, bytes and pending requests: with `cc570904` (question Q5). |
-| 27 | The retained Git reader, reviewed | 11.1 | `git/src/reader.ts`, from `parked/log/src/git.ts` | A Git repository. | Now. |
+| 27 | The retained Git reader, reviewed | 11.1 | `git/src/reader.ts`, from `spikes/parked/log/src/git.ts` | A Git repository. | Now. |
 | 28 | The retained runner and signer, reviewed | 11 | `checkers/src/runner.ts`, `sandbox.ts`, `signing.ts` | A container. | Now for the review and the pure parts. |
 | 29 | The join under load | 11.1; 3.6 | `scope/src/limits.ts` | A caller's address; memory. | Now. |
 | 30 | A device that is offline is not revoked | 11.1; 3.6 | No code of its own: nothing reads a connection. | None. | Now: a row of the revocation witness. |
@@ -585,7 +585,7 @@ its earlier interface does not move with it.
 
 ### 6.1 The earlier paths that section 11 gives to I3
 
-Paths are under `parked/`. The section's table names them under
+Paths are under `spikes/parked/`. The section's table names them under
 `packages/`, where they were before I1 parked them.
 
 | Earlier path | Decision of section 11 | Successor | Deleted in step |
@@ -612,12 +612,12 @@ Paths are under `parked/`. The section's table names them under
 | Secrets `ROOM_KEY_SECRET`, `CHECKER_KEY`; variables `LEASE_SECONDS`, `OPERATOR_KEYS` | Replace | The secrets of section 5.5; the founding policy; a hold's duration in the definition | The names leave the source in 10, 15 and 25. The values are E1's. |
 | The lane and lease keys in workspaces, fork tokens, fork names and pinned refs | Remove | Names made from the lane's scope ID, its incarnation, the hold and the attempt | 18. The demo contract's test: no fork name or ref holds a lane identifier of the earlier log. |
 
-When step 31 ends, `parked/contract`, `parked/log`, `parked/policy`,
-`parked/git` and `parked/checkers` are gone, less the retained paths of
-section 6.2: their `measure/` directories, and, in `parked/checkers`,
-`wrangler.spike.jsonc`. `parked/room` keeps only what the ledger gives to
+When step 31 ends, `spikes/parked/contract`, `spikes/parked/log`, `spikes/parked/policy`,
+`spikes/parked/git` and `spikes/parked/checkers` are gone, less the retained paths of
+section 6.2: their `measure/` directories, and, in `spikes/parked/checkers`,
+`wrangler.spike.jsonc`. `spikes/parked/room` keeps only what the ledger gives to
 others: `mcp.ts` (I5), `measure/` (I4), and the spike configuration and
-`scripts/` (E1). `parked/README.md` is reconciled in the same step, row
+`scripts/` (E1). `spikes/parked/README.md` is reconciled in the same step, row
 by row, by reading the tree.
 
 `scripts/active-source.test.mjs` refuses the names `REGISTRY` and
@@ -630,11 +630,11 @@ them. No file moves with such a line.
 summary in section 6.1, is bound to this list. No step deletes, moves or
 reads the body of a path on it.
 
-- `parked/room/wrangler.spike.jsonc`
-- `parked/checkers/wrangler.spike.jsonc` (it exists on this branch)
-- `parked/room/scripts/`
-- `parked/room/src/mcp.ts` (I5)
-- every `measure/` directory under `parked/` (I4 for the room's)
+- `spikes/parked/room/wrangler.spike.jsonc`
+- `spikes/parked/checkers/wrangler.spike.jsonc` (it exists on this branch)
+- `spikes/parked/room/scripts/`
+- `spikes/parked/room/src/mcp.ts` (I5)
+- every `measure/` directory under `spikes/parked/` (I4 for the room's)
 - `.github/workflows/row-writes.yml`
 
 Where a step says it removes a parked directory "but `measure/`", it means
@@ -647,8 +647,8 @@ Nothing below is deleted, listed, read live or settled by I3.
   deployments.
 - Every repository, fork and token at the earlier Git host.
 - The earlier secrets and the credential file.
-- `parked/room/wrangler.spike.jsonc`, `parked/checkers/wrangler.spike.jsonc`
-  and `parked/room/scripts/`. They stay parked until E1 settles.
+- `spikes/parked/room/wrangler.spike.jsonc`, `spikes/parked/checkers/wrangler.spike.jsonc`
+  and `spikes/parked/room/scripts/`. They stay parked until E1 settles.
 - `.github/workflows/row-writes.yml`, which names a parked script. It is
   I4's or E1's.
 - Every unknown duty of the earlier deployments, under its own identity.
@@ -909,12 +909,12 @@ and 6 once step 3 has landed, because they own different modules.
 | 9e | New, from step 26. The destination's rules at its acts and handlers, as pure functions: `declare-first-head` (row 30), `open-first-head` (31), `open-judge` (32), `publication-of` and `open-withdrawn` (34), `abort-if-behind` (35, for the hold alone: it reads the reservation entry of the scope's own history with its `observed`), `open-branch-read` (36), `reopen-publish` (37) and `collect-list` (row b; P25). After steps 8a and 9b. | `platform/src/destination.ts`, the rules at acts and handlers | T50, the destination's first table: each rule from its row, and the cases a to e of section 12.1.5, with the mark `withdrawDecided`. | Care |
 | 9f | New, from steps 26 to 28. The destination's rules for its outcome entries (place 7), as pure functions of the state, the outcome, its evidence and what the entry retains: `judge` (row 33; every reason of section 6.5, the reservation and the slot, the `relate`, and attempt 1 of the push with its mint), and the outcomes of `first-head`, of a push, of its mint and its revocation, of the deciding read, of the receipt, and of the read that `adopt-head` opens (row e). The bodies of the evidence are those the Git package and the capability already state (entries EG7 and EF5). Which attempt a read confirms follows entry EG6, and the note's point O11 stays open with its owner. The `relate` of `judge` has no clause in its row, so it is built on entry EJ1 as the source holds it. After steps 8a, 9e and 21. No port, no host and no token is here: an outcome is given to the rule by the test. | `platform/src/destination.ts`, the rules of `outcomes` | T50, the destination's second table: each reason of section 6.5; each of the three classes of send evidence, to the state that section 6.4 maps it to; a lost reply, which stays `unknown` whatever a read shows; the receipt; the first head. The evidence in each row is written by hand, and the table says so. | Care |
 | 9c | **Waits on EJ1.** Founding complete and the fixture. It is built only when every rule of the five versions exists: steps 7, 9, 9d, 9e and 9f, and the register's one rule that waits. The register's selecting outcome creates the directory. The directory's genesis creates membership, rules and destination in that order, each held until the register's `confirm`. The `confirm` makes all of them take effect, and each `applied` result sets its reference in the directory. Before the `confirm` each admits nothing (`scope-provisional`). The `repository` fixture is made from those real scopes, with the seated founder and a first key, and `MemoryHost`, a labelled stand-in, behind the outside port for the creation of the repository. No scripted peer stands for a scope. **Until then, partial preparation, and labelled as that:** the fixture has a directory that a scripted register created, with a real membership, rules scope and destination below it, each under its whole version. It shows the rules of those four definitions and their provisional gating. It shows nothing of a founding, and it is not M1's acceptance. | `platform/test/support/repository.ts`, `host.ts` | T18 whole, including the provisional gating and the order of two `created` answers. From here the `repository` fixture exists, with five scopes. Step 11 adds the sixth, the inbox. Before EJ1 is answered: the rows of T18 for the directory's three children only, on the partial fixture, named as that in the test. | Care |
-| 10 | **Waits with step 9c.** Remove the earlier founding and registry. Their successor is the register's founding, and it is not shown before step 9c is whole. | `parked/room/src/founding.ts`, `registry.ts`; `parked/README.md` | The check of active files passes. | Small |
+| 10 | **Waits with step 9c.** Remove the earlier founding and registry. Their successor is the register's founding, and it is not shown before step 9c is whole. | `spikes/parked/room/src/founding.ts`, `registry.ts`; `spikes/parked/README.md` | The check of active files passes. | Small |
 | 11 | The inbox on the fixture: membership creates one for a member. The rule P22 for a notice's `source`. | `platform/src/inbox.ts`; `membership.rules.ts`, one send | T40 | Small |
 | 12 | The production wiring of authority and readers for a platform scope. | `scope/src/worker.ts`, `object.ts` | T11 | Care |
-| 13 | Remove the earlier authority, roster and admin code. | `parked/room/src/authority.ts`, `roster.ts`; `parked/contract/src/roster.ts`; `parked/policy/` | The check of active files passes. | Small |
+| 13 | Remove the earlier authority, roster and admin code. | `spikes/parked/room/src/authority.ts`, `roster.ts`; `spikes/parked/contract/src/roster.ts`; `spikes/parked/policy/` | The check of active files passes. | Small |
 | 14 | The grant in a replay. | `replay/src/verify.ts`, `source.ts` | T44 | Care |
-| 15 | Read sessions, the serving limits after review of the parked limiter, and the operator's record with its two lists. Remove the earlier requests code. | `scope/src/sessions.ts`, `limits.ts`, `operator.ts`, `reads.ts` (all new but the last); `client/src/session.ts`; `parked/room/src/requests.ts`, `ratelimit.ts` | T15, T39, T41, T42 | Care for sessions. Small for the lists. |
+| 15 | Read sessions, the serving limits after review of the parked limiter, and the operator's record with its two lists. Remove the earlier requests code. | `scope/src/sessions.ts`, `limits.ts`, `operator.ts`, `reads.ts` (all new but the last); `client/src/session.ts`; `spikes/parked/room/src/requests.ts`, `ratelimit.ts` | T15, T39, T41, T42 | Care for sessions. Small for the lists. |
 
 **Milestone M1, authority.** M1 holds the data of all six definitions
 and every pure rule that their versions require: the register (step 9),
@@ -967,11 +967,11 @@ runs beside track A after step 4. Steps 17 and 21 own only
 | 16b | The rules of `hold@1` over records: `root`, `pin`, `check`, `receiver-pin`, with the guards `staged`, `pin`, `license`, `settled` and the four effects. Records in the fold, with their counts. | `derive/src/capability/hold.ts` (new), `state.ts`, `fold.ts`, `reserve.ts` | `derive/test/forms-records.test.ts`; T21, T22, T28 | Care |
 | 16c | The ancestry walk and the guard `ancestry` of `git-read@1`. | `derive/src/capability/ancestry.ts`, `gitread.ts` (new) | T23 | Care |
 | 16 | The production capabilities. The scripted capability is removed from `scope/src/testing.ts`. The lanes' T3, T4, T5b and T8 run on real records, with a labelled host. | `scope/src/testing.ts`, `ports.ts`; `packages/lanes/test/*` | The lanes' scenarios pass with no scripted capability. | Care |
-| 17 | The Git package, part one: the reader, after its review. | `packages/git/src/reader.ts`; `parked/log/` deleted | T16, T17 | Small for the move. Care for the review. |
-| 18 | The records `fork`, `token`, `instance`; the steps `instance`, `token`, `retry`; the fence answer. Names made from the hold. **Waits on Q3 for what makes a hold have a workspace.** Remove the earlier workspaces and fork tokens. | `derive/src/capability/hold.ts`, the workspace half; `scope/src/reads.ts`; `parked/git/src/workspace/` | T25, T26, T12 | Care |
-| 19 | The host port and the token ledger's driver. Remove the earlier mint ledger and host adapter. | `packages/git/src/host.ts`; `parked/git/src/mints.ts`, `parked/room/src/artifacts.ts` | T19 runs through it. | Care |
+| 17 | The Git package, part one: the reader, after its review. | `packages/git/src/reader.ts`; `spikes/parked/log/` deleted | T16, T17 | Small for the move. Care for the review. |
+| 18 | The records `fork`, `token`, `instance`; the steps `instance`, `token`, `retry`; the fence answer. Names made from the hold. **Waits on Q3 for what makes a hold have a workspace.** Remove the earlier workspaces and fork tokens. | `derive/src/capability/hold.ts`, the workspace half; `scope/src/reads.ts`; `spikes/parked/git/src/workspace/` | T25, T26, T12 | Care |
+| 19 | The host port and the token ledger's driver. Remove the earlier mint ledger and host adapter. | `packages/git/src/host.ts`; `spikes/parked/git/src/mints.ts`, `spikes/parked/room/src/artifacts.ts` | T19 runs through it. | Care |
 | 20 | The redaction witness. | `scope/src/diag.ts`, from the parked file after review | T14 | Small |
-| 21 | The Git package, part two: the commands, the push outcome and the gateway, after their review. | `packages/git/src/gitops.ts`, `push-outcome.ts`, `gateway.ts`; `parked/git/src/publisher/` but `log-push.ts` | T9, T27 | Care |
+| 21 | The Git package, part two: the commands, the push outcome and the gateway, after their review. | `packages/git/src/gitops.ts`, `push-outcome.ts`, `gateway.ts`; `spikes/parked/git/src/publisher/` but `log-push.ts` | T9, T27 | Care |
 | 22 | Replay of preparation, outcomes and an ancestry record. | `replay/src/verify.ts` | T24 | Care |
 
 Steps 16a, 16b and 16c own different modules and can run in parallel.
@@ -992,7 +992,7 @@ rules and its scenario are in M1 (step 9d).
 |---|---|---|---|---|
 | 23 | Moved to M1 as step 9d, whole. Nothing of it is left in this track. | None | None | None |
 | 24 | The step `job-read`, the read token and the snapshot repository. The snapshot commit, written again. | `derive/src/capability/gitread.ts`; `packages/git/src/snapshot.ts`; the three parked snapshot files | A row of `forms-prepare` | Care |
-| 25 | The checker service: the origin read, the outcome store, one run for a job, the signer, the runner after its review. Remove the earlier jobs and checker code. | `packages/checkers/*`; `parked/checkers/` but its retained paths (`measure/` and `wrangler.spike.jsonc`, section 6.2); `parked/room/src/jobs.ts`; `parked/contract/src/checker.ts` | T34, T35, T36 | Care |
+| 25 | The checker service: the origin read, the outcome store, one run for a job, the signer, the runner after its review. Remove the earlier jobs and checker code. | `packages/checkers/*`; `spikes/parked/checkers/` but its retained paths (`measure/` and `wrangler.spike.jsonc`, section 6.2); `spikes/parked/room/src/jobs.ts`; `spikes/parked/contract/src/checker.ts` | T34, T35, T36 | Care |
 
 **Milestone M3, checks.**
 
@@ -1009,8 +1009,8 @@ host session's.
 | Step | Delivers | Owns | Witness | Model |
 |---|---|---|---|---|
 | 26 | The attempt of `judge`, on the rules of steps 9e and 9f: the outside port's reads of the branch's head and of the integration commit's closure, the ten-second observations and the fetched entries that the outcome entry retains. The scenarios of a reservation on real scopes, in both orders of each race. | The outside port for `platform:destination@1`, in `scope/src/worker.ts` and `packages/git/src/host.ts`; `platform/test/reserve.scope.test.ts`, `withdraw.scope.test.ts` | T1, T2, T3, T4, T29 | Care |
-| 27 | Publishing through the port: an attempt's push through the gateway, the mint and its revocation at the host port, the deciding read, the first head's push, the receipt's write. The scenarios with a lost reply. Remove the earlier log push. | The same port; `platform/test/publish.scope.test.ts`, `first-head.scope.test.ts`; `parked/git/src/publisher/log-push.ts`, `parked/room/src/logremote.ts` | T7, T8, T30, T31, T32 | Care |
-| 28 | The scenarios of a publication that does not publish: the host keeps refusing, a compromised key, another writer, `adopt-head`. The fence of section 6.8 is not built: it is proposed and not adopted (U2). Remove the earlier landing machine. | `platform/test/abort.scope.test.ts`; `parked/git/src/landing/`; `parked/contract/src/landing.ts`, `guards.ts` | T5, T33 | Care |
+| 27 | Publishing through the port: an attempt's push through the gateway, the mint and its revocation at the host port, the deciding read, the first head's push, the receipt's write. The scenarios with a lost reply. Remove the earlier log push. | The same port; `platform/test/publish.scope.test.ts`, `first-head.scope.test.ts`; `spikes/parked/git/src/publisher/log-push.ts`, `spikes/parked/room/src/logremote.ts` | T7, T8, T30, T31, T32 | Care |
+| 28 | The scenarios of a publication that does not publish: the host keeps refusing, a compromised key, another writer, `adopt-head`. The fence of section 6.8 is not built: it is proposed and not adopted (U2). Remove the earlier landing machine. | `platform/test/abort.scope.test.ts`; `spikes/parked/git/src/landing/`; `spikes/parked/contract/src/landing.ts`, `guards.ts` | T5, T33 | Care |
 
 **Milestone M4, publication.** The proof plan's A6 and A7 pass in both
 orders of each race, on real scopes, with a lost push reply settled by a
@@ -1022,7 +1022,7 @@ read. Their judgments were shown as pure functions in M1 (T50).
 |---|---|---|---|---|
 | 29 | The membership reference of a lane and the address of a notice, on the adopted forms of revision 13 (P20, P23). **Prepared ahead, filed only on adoption:** activation and bytes (`activate`, `keep-configuration`, `open-issue`, `open-pr`), on the forms that revision 14 decides (P19, P21). | `platform/src/rules.rules.ts`, `directory.rules.ts`; `scope/src/core.ts`, `outbox.ts` | T47 | Care |
 | 30 | The lanes on the real repository: the fixture `graph` uses the real directory, rules scope and destination. The scripted peers and the test authority leave it. | `packages/lanes/test/support/graph.ts`; `scope/src/testing.ts` | The lanes' scenarios; T48; T49 if revision 14 is adopted | Care |
-| 31 | Removal, completed: what is left of the parked packages that section 6.1 names, and the ledger. | `parked/*`; `parked/README.md` | The check of active files; a listing of `parked/` against section 6.1. | Small |
+| 31 | Removal, completed: what is left of the parked packages that section 6.1 names, and the ledger. | `spikes/parked/*`; `spikes/parked/README.md` | The check of active files; a listing of `spikes/parked/` against section 6.1. | Small |
 | 32 | Guides: `docs/scopes.md`, `docs/testing.md`, a new `docs/platform.md`, the READMEs. Measurement. The deltas note and the delivery note. The gate, once. | `docs/*`; `notes/2026-10-0x-i3-*.md`; `scripts/measure-tests.sh` | `npm run gate`; `scripts/measure-tests.sh` | Small for the guides. The builder writes the delivery note. |
 
 ### 8.7 Parallel groups, in short
@@ -1143,7 +1143,7 @@ M1 should not be joined with anything: it changes the turn.
 **Reading coverage.**
 
 - The commission: in full.
-- `AGENTS.md`, `docs/testing.md`, `parked/README.md`, the I2
+- `AGENTS.md`, `docs/testing.md`, `spikes/parked/README.md`, the I2
   implementation plan and the I2 delivery note: in full.
 - The I2 deltas note: sections 16, 19 and 23 in full; the rest by search.
 - The authority note: sections 11, 11.1, 11.2, 12, 12.1 to 12.1.6,

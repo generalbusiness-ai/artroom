@@ -56,7 +56,7 @@ test("initialization guidance needs complete initial rules and no live or retire
     expect(await initializationStillCurrent(room, initial)).toBe(true);
   }
   if (!initial || initial.state !== "not-initialized") throw new Error("Expected retained rules4 initial proof");
-  expect(initializationMessage(initial.state)).toBe("This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used.");
+  expect(initializationMessage(initial.state)).toBe("This room is not initialized yet. Its creator initializes it before issues, changes and rules can be used.");
   for (const [definition, flag] of [["platform:rules@4", false], ["platform:rules@3", true], ["platform:rules@4", undefined], ["platform:rules@99", false]] as const) {
     rulesDefinition = definition; ownerMayReview = flag;
     const unknown = await roomInitialization(room);

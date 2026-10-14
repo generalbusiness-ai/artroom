@@ -10,7 +10,7 @@
 import type { ReservationSnapshot, SignedIntent, Entry, FactRef, FieldValue, KeyId, OperationId, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, isOperationId, isFactRef, verifySignedIntent, parseStrict, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, valueDigest, type Item, type Operation } from "@generalbusiness/dap-derive";
-import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
+import { DESTINATION_KINDS, READ_TOKEN_HOURS, destinationBranch, destinationMint, destinationRead, destinationReceipt, destinationRevokedMint, destinationSends, destinationStatement, destinationTarget, destinationWrite, editObjects, editTree, manifestCommit, editPath, fileOf, sourcesOf, manifestFiles, fileSound, firstHeadCommit, foundingOf, isOf, isRecordedJudgeEvidence, revokedToken, filePublicationCause, filePublicationCurrent, filePublicationCommit, type DestinationObject, type EditFile, type ObjectFormat, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
 import { GitRefusal, READ_BOUNDS, Reader, type GitSource } from "@generalbusiness/artroom-git";
 import type { CredentialPosition, CredentialStore, RevocationPosition } from "./credential-store.ts";
 import type { OutsideGiven } from "./object.ts";
@@ -78,10 +78,10 @@ export class DestinationHost implements Outside {
   #revokeCursor: RevocationPosition | null = null;
   constructor(given: OutsideGiven, options: DestinationHostOptions) { this.#given = given; this.#options = options; }
 
-  accepts(owner: string, kind: string): boolean { return isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
+  accepts(owner: string, kind: string): boolean { return owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && ([...Object.values(DESTINATION_KINDS), "check-judge", "reservation-stage", "reservation-delete"] as string[]).includes(kind); }
   /** Repeating these reads never repeats a host mutation. The driver keeps the same attempt. */
   readonly recovery = {
-    accepts: (owner: string, kind: string): boolean => isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
+    accepts: (owner: string, kind: string): boolean => owner === "platform:destination@4" && kind === "file-judge" || isOf(owner, OWNER) && [DESTINATION_KINDS.judge, DESTINATION_KINDS.read, DESTINATION_KINDS.adoptRead, "check-judge"].includes(kind as "judge" | "read" | "adopt-read" | "check-judge"),
     read: (request: EffectRequest): Promise<EffectAnswer | null> => this.recovery.accepts(request.owner, request.kind) ? this.send(request) : Promise.resolve(null),
   };
 
@@ -177,7 +177,9 @@ export class DestinationHost implements Outside {
         if (reply?.["id"] !== token || typeof reply["revoked"] !== "boolean") return null;
         return answer(reply["revoked"] ? "confirmed" : "refused", { token });
       }
-      if (operation.kind === DESTINATION_KINDS.judge) {
+      if (operation.kind === DESTINATION_KINDS.judge || operation.owner === "platform:destination@4" && operation.kind === "file-judge") {
+        const publication = this.#judging();
+        if (publication?.type === "file-publication") return this.#inspectFile(repository, ref, publication);
         const list = this.#list(this.#judging());
         if (list) return await this.#inspectList(repository, ref, list);
         const edit = this.#edit(this.#judging());
@@ -253,7 +255,7 @@ export class DestinationHost implements Outside {
     const reader = this.#options.snapshotReader;
     const scope = this.#given.scope();
     const intent = asked?.intent;
-    if (!reader || scope?.at.kind !== "destination" || this.#given.genesis()?.seed.definition !== "platform:destination@3" || !verifySignedIntent(asked)
+    if (!reader || scope?.at.kind !== "destination" || !["platform:destination@3", "platform:destination@4"].includes(this.#given.genesis()?.seed.definition ?? "") || !verifySignedIntent(asked)
       || intent.kind !== "git-read@1:job-read" || intent.on !== null || Object.keys(intent.expected).length || Object.keys(intent.fields).length !== 1 || !isFactRef(intent.fields["job"])) return null;
     const jobFact = intent.fields["job"];
     if (!intent.to || canonicalize(intent.to) !== canonicalize(jobFact.at)) return null;
@@ -421,6 +423,18 @@ export class DestinationHost implements Outside {
       if (!built || built.commit !== target.values["integration"] || built.tree !== target.values["tree"]) return null;
       old = null; commit = built.commit; expectedTree = built.tree;
       objects = [...new Map([...base, ...built.objects].map((object) => [object.id, object])).values()];
+    } else if (target?.type === "file-publication") {
+      const head = target.values["base"], integration = target.values["integration"], tree = target.values["tree"];
+      const reservedAt = target.values["reservedAt"];
+      const time = typeof reservedAt === "number" ? own(reservedAt)?.entry.time : undefined;
+      if (!objectId(head) || !objectId(integration) || !objectId(tree) || time === undefined) return null;
+      // A stale attempt already marked by the driver stays unknown; it is
+      // never retroactively labelled as a known unsent supersession.
+      if (!filePublicationCurrent(state, target)) return null;
+      const base = await this.#options.provider.objects(repository, head);
+      const built = this.#buildFile(format, base, target, head, time);
+      if (!built || built.commit !== integration || built.tree !== tree) return null;
+      old = head; commit = built.commit; objects = [...new Map([...base, ...built.objects].map(object => [object.id, object])).values()]; expectedTree = tree;
     } else {
       const head = destinationBranch(state)?.values["head"];
       const integration = target?.values["integration"];
@@ -456,10 +470,10 @@ export class DestinationHost implements Outside {
     }
     // Async preparation may have let a read or compromise close the target.
     const live = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-    if (!destinationSends(state, own, write, request.attempt) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
+    if (!destinationSends(state, own, write, request.attempt) || target?.type === "file-publication" && !filePublicationCurrent(state, target) || live?.id !== credential.id || live?.plaintext !== credential.plaintext) return request.sentAt === undefined ? answer("refused", { send: "not-sent", seen: await this.#seen(repository, binding.ref) }) : null;
     const allowed = () => {
       const held = this.#options.custody.live(binding.mint, 1, this.#given.clock.read());
-      return destinationSends(state, own, write, request.attempt) && held?.id === credential.id && held?.plaintext === credential.plaintext;
+      return destinationSends(state, own, write, request.attempt) && (target?.type !== "file-publication" || filePublicationCurrent(state, target)) && held?.id === credential.id && held?.plaintext === credential.plaintext;
     };
     const reply = members(await this.#options.provider.send({ repository, ref: binding.ref, old, commit, objects, ...(expectedTree === undefined ? {} : { expectedTree }), ...(request.sentAt === undefined ? {} : { sentAt: request.sentAt }), requireParentless, token: live.plaintext!, binding, allowed }), ["send"]);
     const sent = reply?.["send"];
@@ -494,6 +508,22 @@ export class DestinationHost implements Outside {
   #judging(): Item | null {
     const id = destinationBranch(this.#given.state)?.refs["judging"];
     return typeof id === "number" ? this.#given.state.item(id) : null;
+  }
+  #buildFile(format: ObjectFormat, base: readonly DestinationObject[], publication: Item, head: string, time: Entry["time"]) {
+    const scope = this.#given.scope(), cause = filePublicationCause(publication);
+    const path = publication.values["path"], content = publication.values["content"], digest = publication.values["contentDigest"];
+    if (!scope || !cause || typeof path !== "string" || typeof content !== "string" || typeof digest !== "string") return null;
+    const objects = new Map(base.map(object => [object.id, object]));
+    const made = editTree(format, id => objects.get(id) ?? null, head, [{ path, bytes: utf8(content) }]);
+    if (!made) return null;
+    const commit = filePublicationCommit(format, scope.at.scope, time, made.tree, head, path, cause, digest);
+    return { commit: commit.id, tree: made.tree, objects: [...made.objects, commit] };
+  }
+  async #inspectFile(repository: DestinationRepository, ref: string, publication: Item): Promise<EffectAnswer | null> {
+    const head = await this.#options.provider.ref(repository, ref);
+    if (!objectId(head)) return null;
+    const built = this.#buildFile(await this.#options.provider.format(repository), await this.#options.provider.objects(repository, head), publication, head, this.#given.clock.read());
+    return answer("confirmed", { head, present: built !== null, tree: built?.tree ?? null });
   }
   /** The one-file manifest of a publication, from the manifest's entry that its `reserve` retained, with its base and operation; null for any other manifest. */
   #edit(publication: Item | null): { file: EditFile; base: string; operation: FactRef } | null {

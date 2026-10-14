@@ -7,9 +7,6 @@ what each command printed. It does not verify hardware identity. The
 captures script then takes pictures of the room's page. Run both the
 evening before a recording, and again on the morning of it.
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 ## What the runner does
 
 `scripts/demo-run.ts` runs 27 shots in order by default. Each ordinary shot
@@ -47,7 +44,7 @@ take effect before the controlled publication; the second merge follows it. The 
 from invoking that merge command to its expected `out-of-date` return,
 using `performance.now()`. They label the date, service and Git host. This
 includes CLI work and round-trip waiting, excludes the fresh proposal and
-publication, and is not server-only latency or a native history fact.
+publication, and is not server-only latency or a native journal fact.
 Injected test clocks are labelled separately. The freeze route uses a
 new change lane; same-lane manifest replacement remains separate work
 under plan 029.

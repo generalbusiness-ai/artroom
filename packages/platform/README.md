@@ -7,9 +7,25 @@ recorded inputs supplied by the runtime or independent replay.
 The root export includes `platform(named)` and `VERSIONS`, with each exact
 supported `platform:<name>@<version>` pin's data, rules and available observation,
 membership and rules-reference functions. A missing version returns `null`.
-`APPLICATION_COHORT` names the explicit supporting application cohort;
-`NEWEST` describes the existing default founding cohort. Neither changes a
-scope's genesis pin or selects a version for an existing history.
+`APPLICATION_COHORT` names the original supporting application cohort;
+`FILE_PUBLICATION_COHORT` names the additive register@9, directory@8,
+membership@4, rules@3, destination@4 and inbox@1 cohort.
+`NEWEST` describes the existing default founding cohort. None of these selects a
+new version for an existing scope or history.
+
+Destination@4 admits `publish-file` from an application whose native origin
+proves creation by its own directory. File and change publications share one
+slot. The file receipt binds the sender's full reference, sending entry and
+send ordinal, path and content digest to the commit or superseded result.
+Source order is kept across retained final publications; an unknown push
+holds the slot and is never resent.
+
+An application may overwrite any path, including the rules extent. Change
+review rules do not govern these writes. The room controls applications
+through `rules.activate` and `application.establish`.
+Directory@8 reserves the genesis `destination` field and supplies its own
+recorded full reference when the declaration requests type `scope`, kind
+`destination`. Old factories and cohort pins retain their original behavior.
 
 ```js
 import { platform } from "@generalbusiness/dap-platform";

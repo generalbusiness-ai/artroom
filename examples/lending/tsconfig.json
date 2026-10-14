@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "types": ["node"],
+    "paths": {
+      "@generalbusiness/dap-contract": ["../../packages/contract/src/index.ts"],
+      "@generalbusiness/artroom-bytes": ["../../packages/bytes/src/index.ts"],
+      "@generalbusiness/dap-derive": ["../../packages/derive/src/index.ts"],
+      "@generalbusiness/dap-derive/rule": ["../../packages/derive/src/rule/index.ts"],
+      "@generalbusiness/dap-derive/testing": ["../../packages/derive/test/fixtures.ts"]
+    }
+  },
+  "include": ["*.ts", "browser/model.ts", "browser/model.test.ts", "browser/custody.ts", "browser/custody.test.ts", "browser/publication.test.ts"]
+}

@@ -12,7 +12,7 @@ by a run in this container, **[inferred]** not run or read directly.
 ## 1. What is built
 
 `packages/cli` is new. The old model's command line is under
-`parked/cli`; it was read for the shape of its output only, and is not
+`spikes/parked/cli`; it was read for the shape of its output only, and is not
 touched. No `packages/cli` existed on main. [code]
 
 | Command | Function | What it does |

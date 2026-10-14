@@ -1,6 +1,6 @@
 # Durable Object rows written by the spike, checked every hour against the
-# budget (request 8bd623cc; parked/room/measure/rows.mjs and
-# parked/room/measure/README.md).
+# budget (request 8bd623cc; spikes/parked/room/measure/rows.mjs and
+# spikes/parked/room/measure/README.md).
 #
 # Inert until enabled: the job runs only when the repository variable
 # ARTROOM_ROW_MONITOR is "true", which is set after hugh installs the
@@ -40,4 +40,4 @@ jobs:
         env:
           ARTROOM_CF_ANALYTICS_TOKEN: ${{ secrets.ARTROOM_CF_ANALYTICS_TOKEN }}
           ARTROOM_ROW_ALERT_WEBHOOK_URL: ${{ secrets.ARTROOM_ROW_ALERT_WEBHOOK_URL }}
-        run: node parked/room/measure/rows.mjs --worker artroom-spike-room
+        run: node spikes/parked/room/measure/rows.mjs --worker artroom-spike-room

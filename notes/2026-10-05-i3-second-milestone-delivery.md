@@ -502,7 +502,7 @@ were already from this lockfile.
 
 ## 8. Removal
 
-Deleted from `parked/` since F: 42 files (`git diff --name-only
+Deleted from `spikes/parked/` since F: 42 files (`git diff --name-only
 --diff-filter=D 2ad870f3b...HEAD`, counted). No file moved as it was.
 Each removal followed a written review.
 
@@ -517,16 +517,16 @@ The parked tests of the removed files stay, unrun, and still import
 them. Step 31 reconciles the directory.
 
 **The retained paths** (the plan's section 6.2). Present at the head, by
-`test -e`: `parked/room/wrangler.spike.jsonc`,
-`parked/checkers/wrangler.spike.jsonc`, `parked/room/scripts/`,
-`parked/room/src/mcp.ts`, `.github/workflows/row-writes.yml`, and the
-three `measure/` directories. The counts of `parked/README.md` match
+`test -e`: `spikes/parked/room/wrangler.spike.jsonc`,
+`spikes/parked/checkers/wrangler.spike.jsonc`, `spikes/parked/room/scripts/`,
+`spikes/parked/room/src/mcp.ts`, `.github/workflows/row-writes.yml`, and the
+three `measure/` directories. The counts of `spikes/parked/README.md` match
 `git ls-files` for the three packages it changed: `room` 103, `git` 55,
 `checkers` 10 (counted).
 
 **The active-source check passed.** `scripts/active-source.test.mjs` ran
 in the gate, in Node's runner: 6 tests passed. It checks that no active
-file imports from `parked/` or names a removed format, that no platform
+file imports from `spikes/parked/` or names a removed format, that no platform
 package depends on the lanes package, and what the checkers package may
 name. One test file of the lanes package reaches the checkers package by
 path, and the check allows that one (entry EW11).

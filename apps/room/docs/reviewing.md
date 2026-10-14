@@ -2,10 +2,7 @@
 
 For a reviewer using an already configured dap source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
 
-**Source guide. Cited source `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. All commands below are UNRUN for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
-
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
+**Status. This guide cites the code at `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8`, which is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. Its commands have not been run for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
 
 First read the change and the actual entries that hold its content:
 
@@ -20,7 +17,7 @@ Replace placeholders with recorded identities. A manifest is a recorded version 
 
 ## Record one verdict for one requirement
 
-An extent is a named part of the repository with its own reviews and checks. Read the room's actual rules and touched paths before choosing one. The default source requirement uses `change.review`; infrastructure uses `change.merge`; authority files such as `AGENTS.md` use `rules.publish`. A repository may add patterns and requirements. [Extent definitions](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L48)
+An extent is a named part of the repository with its own reviews and checks. Read the room's actual rules and touched paths before choosing one. The default source requirement uses `change.review`; infrastructure uses `change.merge`; authority files such as `AGENTS.md` use `rules.publish`. A repository may add patterns and requirements. [Extent definitions](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L48)
 
 For an extent actually named `source`, an eligible independent reviewer can record:
 
@@ -31,7 +28,7 @@ dap act review-verdict --on <change-scope> \
 
 Use `request-changes` instead of `approve` to record that judgment. It is not an approval and does not supply a universal veto independent of the room's rules. A comment or a passed machine check is not a review verdict.
 
-The current declaration needs `change.review` to record the act. The destination also checks the action required by the named extent when deciding whether an approval counts. A wrong or omitted extent counts for no extent. Mixed changes need the union of their touched requirements; one verdict names one extent. [Verdict declaration](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L907), [Native counting](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L429)
+The current declaration needs `change.review` to record the act. The destination also checks the action required by the named extent when deciding whether an approval counts. A wrong or omitted extent counts for no extent. Mixed changes need the union of their touched requirements; one verdict names one extent. [Verdict declaration](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L907), [Native counting](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L429)
 
 ## Keep the subject and reviewer independent
 
@@ -45,12 +42,12 @@ The approval default remains 1. This setting grants no new role or action.
 
 The prospective web founding cohort selects `platform:register@8`,
 `platform:directory@7`, `platform:membership@2`, `platform:rules@4` and
-`platform:destination@3`. This is Source support. Its actual installation,
+`platform:destination@3`. The code supports it. Its actual installation,
 deployed configuration and Start integration remain pending. These added
 versions do not change the existing ordinary CLI founding default or old pins.
 
 
-A declared single-controller exception is a separate merge rule. It applies only when the actual observed rules, controller count and author/controller relationship meet all its conditions. It does not turn an author's verdict into independent review or remove checks. Missing relationship/count evidence cannot justify assuming the exception. [Independence and exception](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L436)
+A declared single-controller exception is a separate merge rule. It applies only when the actual observed rules, controller count and author/controller relationship meet all its conditions. It does not turn an author's verdict into independent review or remove checks. Missing relationship/count evidence cannot justify assuming the exception. [Independence and exception](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/platform/src/extents.ts#L436)
 
 A job label such as reviewer grants no authority. The default native `agent` role cannot review or merge. Use the independently authorized member and actual role/policy setup, with its own key; never borrow someone else's identity to make the judgment count.
 
@@ -64,9 +61,9 @@ dap act review-verdict --on <change-scope> \
   --set verdict=request-changes --set extent=source
 ```
 
-The replacement supersedes the earlier review. It does not preserve both extent approvals. Do not expect one reviewer to fill several required extents by making duplicate submissions; plan the qualified reviewers or an explicitly adopted policy. A review of another manifest cannot be silently replaced through this field. No approval carries automatically to a new version merely because its title is the same. The current `review-verdict` declaration has no `scope`, `dependsOn` or `carry` field. Earlier workroom vocabulary is not an extra argument to this act; use its actual declared subjects and retain older review evidence at its original version. [Duplicate and replacement guards](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L926)
+The replacement supersedes the earlier review. It does not preserve both extent approvals. Do not expect one reviewer to fill several required extents by making duplicate submissions; plan the qualified reviewers or an explicitly adopted policy. A review of another manifest cannot be silently replaced through this field. No approval carries automatically to a new version merely because its title is the same. The current `review-verdict` declaration has no `scope`, `dependsOn` or `carry` field. Earlier workroom vocabulary is not an extra argument to this act; use its actual declared subjects and retain older review evidence at its original version. [Duplicate and replacement guards](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L926)
 
-An anchored question can name the exact manifest, path, optional line and side through the declared `open-thread` act. Its reference stays with that version; a later version needs deliberate reading and judgment. This manuscript supplies no browser annotation or rendered-diff proof. [Thread declaration](https://github.com/generalbusiness-ai/artroom/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L1139)
+An anchored question can name the exact manifest, path, optional line and side through the declared `open-thread` act. Its reference stays with that version; a later version needs deliberate reading and judgment. This manuscript supplies no browser annotation or rendered-diff proof. [Thread declaration](https://github.com/generalbusiness-ai/dap/blob/0e5954ecfca23f531cfa2ec42be1524bef3bc9a8/packages/lanes/src/change.ts#L1139)
 
 ## If the review cannot proceed
 

@@ -908,7 +908,7 @@ sessions bound to one repository (`scope/src/sessions.ts`,
 the parked limiter (`scope/src/limits.ts`;
 `notes/2026-10-05-i3-limits-review.md`), and the operator's record with
 the two lists of requests that wait (`scope/src/operator.ts`, three reads
-in `scope/src/reads.ts`). `parked/room/src/requests.ts` and `ratelimit.ts`
+in `scope/src/reads.ts`). `spikes/parked/room/src/requests.ts` and `ratelimit.ts`
 are deleted. The adopted texts are the authority note at revision 21
 (`f9ec25e4`) and the scope contract at revision 16 (`54420b41`).
 

@@ -1,7 +1,7 @@
 /** Navigation and room identity shared by the browser shell and its tests. */
 import type { MemberRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
-export type Destination = "issues" | "changes" | "rules" | "join" | "invitation" | "config";
+export type Destination = "issues" | "changes" | "rules" | "join" | "invitation" | "config" | "start";
 export interface Route { destination: Destination; scope: string | null }
 
 /** State-sensitive presentation only; the scope still judges each offered act. */
@@ -23,7 +23,7 @@ export function routeOf(hash: string): Route {
   const [path, query] = hash.replace(/^#/, "").split("?");
   const [, kind, scope] = (path || "/").split("/");
   if (kind === "settings" || kind === "join") return { destination: "join", scope: null };
-  if (kind === "invitation" || kind === "config" || kind === "rules") return { destination: kind, scope: null };
+  if (kind === "invitation" || kind === "config" || kind === "start" || kind === "rules") return { destination: kind, scope: null };
   if (kind === "issue" && scope) return { destination: "issues", scope };
   if (kind === "change" && scope) return { destination: "changes", scope };
   return { destination: new URLSearchParams(query).get("kind") === "change" ? "changes" : "issues", scope: null };
@@ -71,5 +71,5 @@ export class ScopeSending {
 
 /** Initialization guidance is shown only for positive native absence evidence. */
 export function initializationMessage(state: "not-initialized" | "configured" | "unknown"): string | null {
-  return state === "not-initialized" ? "This room is not initialized yet. Its founder initializes it before issues, changes and rules can be used." : null;
+  return state === "not-initialized" ? "This room is not initialized yet. Its creator initializes it before issues, changes and rules can be used." : null;
 }

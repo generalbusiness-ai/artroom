@@ -1,47 +1,16 @@
 # Documentation
 
-A programmable coordination fabric for people and agents. These pages
-cover the dap framework first, then the three applications built on it,
+A durable action platform for people and agents. These pages
+cover the dap framework first, then the four applications built on it,
 then the guides for operating a deployment. Within each group, pages go
 from learning to understanding, then doing, then looking up.
-
-## Names in transition
-
-These pages use the final names: the `dap` command and the
-`@generalbusiness/dap-*` packages. The rename has not landed at this
-commit. It lands as its own change. Until it does, the command is
-`artroom`, and the packages carry the names in their `package.json`
-files:
-
-| Final name in these pages | Name at this commit |
-|---|---|
-| `dap` | `artroom`, from `packages/cli` |
-| `@generalbusiness/dap-contract` | `@generalbusiness/artroom-contract` |
-| `@generalbusiness/dap-bytes` | `@generalbusiness/artroom-bytes` |
-| `@generalbusiness/dap-derive` | `@generalbusiness/artroom-derive` |
-| `@generalbusiness/dap-scope` | `@generalbusiness/artroom-scope` |
-| `@generalbusiness/dap-client` | `@generalbusiness/artroom-client` |
-| `@generalbusiness/dap-replay` | `@generalbusiness/artroom-replay` |
-| `@generalbusiness/dap-git` | `@generalbusiness/artroom-git` |
-| `@generalbusiness/dap-checkers` | `@generalbusiness/artroom-checkers` |
-| `@generalbusiness/dap-cli` | `@generalbusiness/artroom-cli` |
-| `@generalbusiness/dap-room` | `@generalbusiness/artroom-platform`, with `@generalbusiness/artroom-lanes` |
-| `@generalbusiness/dap-room-page` | `@generalbusiness/artroom-page` |
-
-To run a command from these pages at this commit, type `artroom` where
-the page says `dap`, and use the package name in the right column. The
-command's own output also says `artroom` until the rename lands. Three
-names stay as they are at this commit, because the rename has not set
-their new form: the replay command `artroom-replay`, the import path
-`@generalbusiness/artroom-lanes` in [Lanes](../apps/room/docs/lanes.md),
-and the source values that keep the name artroom, such as
-`ARTROOM_HOME`, Worker names and `refs/artroom/`.
 
 ## The framework
 
 | Page | What it gives you |
 |---|---|
 | [Build a counter](build-a-counter.md) | A tutorial: write a small definition and watch each act take effect. |
+| [Build a lending library](build-a-lending-library.md) | A second tutorial: items with states, a final state, bounded text and grants. |
 | [What is dap?](what-is-dap.md) | The framework, its actor model and the applications built on it. |
 | [The architecture of a dap application](architecture.md) | Scopes, acts, entries, delivery, authority and where the record is kept. |
 | [The ten terms](manual/ten-terms.md) | The word list that every other page uses. |
@@ -82,8 +51,23 @@ A shared count that people and agents take turns to speak.
 | Page | What it gives you |
 |---|---|
 | [Build a counter](build-a-counter.md) | A tutorial on a smaller version of the Counter's definition. |
-| [The Counter source](../examples/counting/README.md) | What the Counter's definition owns, and its evidence and limits. |
+| [The Counter](../examples/counting/README.md) | The Counter's items, the acts each participant can attempt, its grants and its files. |
 | [Counting commitments: deployed stage and device setup](../examples/counting/browser/startup.md) | Set up the deployed Counter page and its devices. |
+
+### dap-library
+
+A lending library for kitchenware and tools. Members donate, borrow and
+return things; staff remove a thing that is lost or broken. Each act
+publishes the thing's shelf page. Publication is built and not yet run
+on a deployed room.
+
+| Page | What it gives you |
+|---|---|
+| [Build a lending library](build-a-lending-library.md) | A tutorial that writes the library's first definition in four steps, and says what publication adds. |
+| [The lending library](../examples/lending/README.md) | Where it runs, its files, its rules and its tests. |
+| [Provision and run the lending library](../examples/lending/runbook.md) | The operator's commands, and the record of the rehearsal run. |
+| [The demo script](../examples/lending/demo-script.md) | The story of Nasruddin and the pot, shot by shot. |
+| [Taking part through MCP](mcp.md#taking-part-in-the-lending-library) | An agent's tool calls to donate, borrow and return. |
 
 ### dap-jam
 
@@ -95,6 +79,7 @@ its design is in the [jam room note](../notes/2026-10-01-jam-room.md).
 
 | Page | What it gives you |
 |---|---|
+| [Run dap in 10 minutes](self-host.md) | Do: deploy a Worker, create a room, and invite another device. |
 | [Deploy the scope Worker](deploy.md) | Service settings and the deployment procedure. |
 | [Configure a Git host](hosts.md) | Repository host configuration and credentials. |
 | [Rehearse the demo](demo.md) | Run and record the observed repository story. |

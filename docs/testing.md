@@ -43,7 +43,7 @@ Put each test at the cheapest boundary that can show its property.
 | The order of two things that race | against a real scope, with the test's gate and clock, never with sleeps |
 | What passes between scopes: creation, delivery, a diagnosis | against real scopes in one namespace, in the workerd tests of `scope` |
 | The Worker's routes and the service binding | in workerd, once for each; do not run a whole suite over both |
-| What a verifier reports for a history | over histories in memory, in `replay`; that replay agrees with the runtime, once, in `scope` |
+| What a verifier reports for a journal | over journals in memory, in `replay`; that replay agrees with the runtime, once, in `scope` |
 | What a client builds, signs and accepts as an answer | as plain functions in `client`; the handle against the real Worker, in `scope` |
 | A form of a definition: that the validator accepts or refuses it, and what the judges derive from it | as a plain function in `derive`, on a small made-up definition, in the `forms-*.test.ts` file of its family |
 | That a lane definition is exactly its pinned bytes and digest, meets its bounds, and passes the validator whole | as plain functions in `lanes`, once for both definitions. Do not write a test for one row, one field or one guard of a lane definition. |
@@ -52,7 +52,7 @@ Put each test at the cheapest boundary that can show its property.
 A stand-in proves only the boundary it exposes. A retry, an order of events or a
 restart is shown against the thing that really retries, orders or restarts.
 
-The scripted capability of `@generalbusiness/dap-scope/testing` is a
+The scripted capability of `@generalbusiness/artroom-scope/testing` is a
 stand-in for the code of `hold@1` and `git-read@1`. The derive package
 has that code, and the production ports hold it. A test that uses the stand-in says so in its name or its first comment.
 It shows what a definition does once a capability has answered, and
@@ -73,14 +73,14 @@ and receipt duties with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
 stand-in for the membership scope and for the reference to it that a
-scope's genesis will record. The test writes each answer, and no history
+scope's genesis will record. The test writes each answer, and no journal
 stands behind the head it names. With one, the scope's authority is the
 real observation read, with the real guards and windows. A test that uses
 it says so in its name or its first comment. It shows the observing
 scope's side of a read, and nothing about membership.
 
 Membership has two stand-ins of its own, in
-`@generalbusiness/dap-room/testing`. `office` is a made-up
+`@generalbusiness/dap-platform/testing`. `office` is a made-up
 directory that creates one membership scope: it stands for the real
 directory and the register. `Roster` is a membership scope in memory
 below such an office. A test that uses one says so. It shows
@@ -126,7 +126,7 @@ below reads that answer from the rules scope.
 `packages/scope/test/values.test.ts` separately shows the generic match,
 SQLite retention and domain read routes, with derive's made-up `gate`
 data and rules. Its outcome witness also shows an owner-declared evidence
-value across a restart: bad bytes write nothing, the valid history replays
+value across a restart: bad bytes write nothing, the valid journal replays
 over HTTP, and missing bytes make that replay `incomplete`. Its grants and
 outside system remain stand-ins.
 
@@ -168,8 +168,8 @@ runner runs. The decision uses the accepted checker key and a fresh
 source read metadata and the passed outcome. The Git host is `OutsideDouble`,
 a scripted port whose replies name the package's computed target IDs;
 no host runs. Reads use the test readers except for the separate real
-read-session witness. All five runtime histories replay `consistent` over
-HTTP, with their authority derived from membership history and only the
+read-session witness. All five runtime journals replay `consistent` over
+HTTP, with their authority derived from the membership journal and only the
 four scripted source facts anchored. Publication updates to that scripted
 lane remain pending. This shows the creation and destination's first
 publication through these boundaries. It proves no deployment, production
@@ -180,10 +180,10 @@ request `cc570904`. The current judge checks entries.
 The bound-request tests in `packages/derive/test/forms-binding.test.ts`
 use the real holder ledger: counts are taken and added, a bound deciding
 entry draws one even when refused, its requests draw on the holder, and a
-final item releases its decisions. Folding the history derives the same
+final item releases its decisions. Folding the journal derives the same
 counts. The platform data and rules remain made up. The replay witness in
 `packages/replay/test/decisions.test.ts` runs the real verifier on a judged
-receiver history, with the sender's entries written by hand and anchored.
+receiver journal, with the sender's entries written by hand and anchored.
 It checks that the taking entry fits its decision reservation. These tests
 show no behavior of a dap platform definition. The marker-duty tests
 in `forms-settles.test.ts` also use made-up platform data and rules.
@@ -197,7 +197,7 @@ now state their own rows, separately from these fixtures. Each
 observation of that file is written by hand. A test that uses it says so.
 It shows where a subject comes from, what the judges retain and what a verifier derives,
 and nothing about a rule of a destination or of a rules scope.
-`Controls.rulebook`, of `@generalbusiness/dap-scope/testing`, is a
+`Controls.rulebook`, of `@generalbusiness/artroom-scope/testing`, is a
 scripted rules scope, beside the scripted membership: the test writes
 each answer and the bytes that are said to come beside it, and where the
 scope is said to record that reference. The platform rules scope has its
@@ -226,11 +226,11 @@ gateway, a fork or a push. The sealed entries of
 `packages/git/test/host.test.ts` are made by hand, and no scope judged
 them (`notes/2026-10-05-i3-contract-deltas.md`, entry ET12).
 
-A replay of a history that the test authority wrote says so:
+A replay of a journal that the test authority wrote says so:
 `grants: "as-recorded"`. Its grants hold no freshness proof, and the
 report lists them as trusted. The replay command never takes that option.
 
-The replay package has two histories with stand-ins of their own, in
+The replay package has two journals with stand-ins of their own, in
 `packages/replay/test/staging.ts`. `Lane` is a staging lane and `Gate` a
 scope under made-up platform data. Derive's judges wrote every entry of
 both, with the code of `hold@1` and `git-read@1` or with made-up rules.
@@ -238,7 +238,7 @@ Three things are stand-ins, and the file labels each: the two entries of
 the lane's creator, each observation of membership, and every answer of
 the outside system. A replay of them is given an anchor for each of the
 first two. Their grants hold a freshness proof, so they are replayed as
-`proven`. Such a test shows what a verifier derives from a history. It
+`proven`. Such a test shows what a verifier derives from a journal. It
 shows nothing about a creation, about membership or about a Git host.
 
 `codeLost`, of the same module, supplies each platform definition with
@@ -333,7 +333,7 @@ answers, and nothing about a real host, a real tree or a runner.
 
 ## While you work
 
-Root `npm test` and `npm run test:changed` first apply the narrow Cloudflare
+At the repository root, `npm test` and `npm run test:changed` first apply the narrow Cloudflare
 pool compatibility backport in `scripts/cloudflare-pool-compat.mjs`. It accepts
 only the pinned 0.22.0 package and complete known bundle hashes. Cache-linked
 views receive a private physical copy; the shared cache is never patched.
@@ -342,8 +342,9 @@ keeping native introspection and RPC behavior. It changes no pool settings.
 Before a direct package or Vitest invocation, run this same script from the
 repository root. Unknown package versions or bytes stop preparation.
 
-The package names in the commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
+The names on this page match the repository workspace manifests. Internal
+workspace test exports are not the public six-package SDK. In particular,
+`@generalbusiness/dap-platform/testing` is available only in this checkout.
 
 Run the tests of what you changed, not the repository.
 
@@ -432,7 +433,7 @@ the repository (`vitest.config.ts` at the root, one project for each of
 checks in `scripts/active-source.test.mjs` and `scripts/cloudflare-pool-compat.test.mjs`.
 The compatibility witness uses the guarded actual pool factory and private-copy
 workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
-active file imports from `parked/` or names a removed format, and that no
+active file imports from `spikes/parked/` or names a removed format, and that no
 platform package depends on the lanes package or imports from it. It prints the head, the tree and
 each step's elapsed and CPU time. It also fails on a whitespace error in
 what the branch changed. `npm run gate -- --ci` reinstalls first.
@@ -457,8 +458,8 @@ test runtime. It does not fix that native helper bug or prove mixed-cohort
 cleanup or physical draining. Captured frames locate IncomingRequest task
 cancellation through the native abort, but do not identify the actor or
 context. The extra Worker startup costs time and memory; the denial project
-starts no clone fixture or Git server. Current full-gate cost and complete
-exact-head Source acceptance remain separate obligations.
+starts no clone fixture or Git server. Current full-gate cost and the approval
+of the exact commit under review remain separate obligations.
 
 The command line's story, `packages/cli/test/*.scope.test.ts`, runs from
 the root inside the `scope` project too, and has no Worker of its own. Its
@@ -498,7 +499,7 @@ copy of a fixture or change to the native Worker classes. The lanes package keep
 files alone, in a Worker of its own with the same classes: for `npm test`
 in the package, for `scripts/control.mjs` and for
 `scripts/measure-tests.sh`. A scenario's client calls the scope service's
-own operations, `api` of `@generalbusiness/dap-scope/worker`, in the
+own operations, `api` of `@generalbusiness/artroom-scope/worker`, in the
 test's isolate. A few acts go over the Worker's HTTP routes, where the
 scenario is about a route. The reason is cost: in the workerd pool a call
 through the Worker's entrypoint takes longer the more of them one run has
@@ -517,8 +518,8 @@ Two sets of generated files follow the lane definitions:
 by `packages/lanes/scripts/reference.mjs`. The pins test fails while
 either is stale.
 
-Nothing under `parked/` is installed, typechecked or tested.
-[parked/README.md](../parked/README.md) says what is there.
+Nothing under `spikes/parked/` is installed, typechecked or tested.
+[spikes/parked/README.md](../spikes/parked/README.md) says what is there.
 
 Do not run it again for a commit that changes only documents; say that the
 source and tests are unchanged, and give the two tree hashes.

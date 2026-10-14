@@ -5,7 +5,8 @@ import type { Bounds, DeclaredDefinition } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, parseStrict } from "@generalbusiness/artroom-bytes";
 import { capabilitiesOf, counted, derivable, gitRead, holdCapability, validateDefinition, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { reference } from "../scripts/reference.mjs";
-import { DEMO_DIGESTS, DIGESTS, LANE_FORMS, change, changeDemo, definitions, issue, issueDemo } from "../src/index.ts";
+import { ISSUE_LANE_DIGESTS, PUBLISHING_LANE_DIGESTS } from "@generalbusiness/dap-platform";
+import { DEMO_DIGESTS, DIGESTS, MANIFEST_DIGESTS, LANE_FORMS, change, changeDemo, definitions, issue, issueDemo } from "../src/index.ts";
 
 const lanes = { issue, change } as const;
 const names = ["issue", "change"] as const;
@@ -29,6 +30,10 @@ describe("the two lane definitions, as data (lane forms, revision 14)", () => {
       expect([definitionDigest(lanes[name]), definitionDigest(parseStrict(file(name)) as DeclaredDefinition)], name).toEqual([DIGESTS[name], DIGESTS[name]]);
     }
     expect(DIGESTS.issue).not.toBe(DIGESTS.change);
+    expect([PUBLISHING_LANE_DIGESTS, ISSUE_LANE_DIGESTS]).toEqual([
+      [DIGESTS.change, DEMO_DIGESTS.change, MANIFEST_DIGESTS.change, MANIFEST_DIGESTS.demo],
+      [DIGESTS.issue, DEMO_DIGESTS.issue],
+    ]);
     // The generated reference is exactly what its generator writes from the two values, stamp and rows. A changed row with an old guide fails here.
     expect(readFileSync(new URL("../../../docs/lanes-reference.md", import.meta.url), "utf8") === reference(), "docs/lanes-reference.md is stale; run scripts/reference.mjs").toBe(true);
   });

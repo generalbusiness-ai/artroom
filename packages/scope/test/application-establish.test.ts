@@ -3,9 +3,9 @@ import { expect, onTestFinished, test } from "vitest";
 import type { DeclaredDefinition, Intent, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, intentDigest, isSeed, scopeIdOf, seedDigest, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { requestSession, sessionRequest, type Fetch } from "@generalbusiness/artroom-client";
-import { command, memoryStore, type Context } from "../../cli/src/index.ts";
+import { command, issueInvitation, memoryStore, type Context } from "../../cli/src/index.ts";
 import { keys } from "@generalbusiness/dap-derive/testing";
-import { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
+import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, FIRST_ACTIONS_OF, platform, repositoryName } from "@generalbusiness/dap-platform";
 import { httpSource, verify } from "@generalbusiness/artroom-replay";
 import { counting } from "../../../examples/counting/definition.ts";
 import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
@@ -19,12 +19,12 @@ import { siteFixtureLifetime } from "./support/site-fixture-lifetime.ts";
 
 const SERVICE = "https://scopes.test";
 
-// One real native graph and real production membership/creation/replay. Git host,
+// Each selected cohort runs one real native graph and production membership/creation/replay. Git host,
 // clock, local memoryStore and read inspector are labelled stand-ins. The CLI
 // selects the explicit application cohort over the real routed transport.
 // The SQL trigger is an explicit
 // retention-fault control; it writes no invented native entry or authority.
-test("explicit supporting cohort establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant", async () => {
+test.each([{ name: "application", cohort: APPLICATION_COHORT }, { name: "application-publication", cohort: FILE_PUBLICATION_COHORT }])("$name establishes Counting with native authority and atomic retained provenance; unknown creation recovers once and Initialize requires an explicit domain grant", async ({ name, cohort }) => {
   const lifetime = siteFixtureLifetime();
   const settle = (...nodes: readonly Platform[]) => dispatchFixture(nodes, lifetime.wait);
   let releaseRegister = () => {};
@@ -55,13 +55,13 @@ test("explicit supporting cohort establishes Counting with native authority and 
   const context: Context = { store, fetch, trustedFoundingService: { service: SERVICE, fetch },
     now: () => { lifetime.active(); return timeMs(soon(0))!; } };
   const run = (...argv: string[]) => lifetime.wait(() => command(context, argv));
-  const planned = await run("install", "--plan", SERVICE, "--cohort", "application", "--host", "git.example", "--namespace", "application");
+  const planned = await run("install", "--plan", SERVICE, "--cohort", name, "--host", "git.example", "--namespace", "application");
   expect(planned.code, planned.lines.join("\n")).toBe(0);
   const pending = await lifetime.wait(() => store.config());
   const plan = pending?.plan;
   if (!plan) throw new Error("The CLI must retain the original application install plan.");
-  expect([pending?.register, plan.definition, plan.founding.intent.actor]).toEqual([undefined, "platform:register@5", rita.key]);
-  expect(plan.register).toBe(scopeIdOf({ v: 1, kind: "register", definition: APPLICATION_COHORT.register, creator: null, cause: intentDigest(plan.founding.intent), ordinal: 0 }));
+  expect([pending?.register, plan.definition, plan.founding.intent.actor]).toEqual([undefined, cohort.register, rita.key]);
+  expect(plan.register).toBe(scopeIdOf({ v: 1, kind: "register", definition: cohort.register, creator: null, cause: intentDigest(plan.founding.intent), ordinal: 0 }));
   const R = new OwnedPlatform(plan.register);
   let D: Platform | undefined, C: Platform | undefined;
   try {
@@ -70,17 +70,17 @@ test("explicit supporting cohort establishes Counting with native authority and 
     wired.set(R.name, ports);
     releaseRegister = () => { if (wired.get(R.name) === ports) wired.delete(R.name); };
     expect((await R.stub.summary(reader)).ok).toBe(false);
-    const installed = await run("install", "--planned", "--cohort", "application");
+    const installed = await run("install", "--planned", "--cohort", name);
     expect(installed.code, installed.lines.join("\n")).toBe(0);
     const kept = await lifetime.wait(() => store.config());
     expect(kept?.register).toEqual(await R.at());
     expect(kept?.plan).toMatchObject({ ...plan, acknowledged: { status: "service-acknowledged", service: SERVICE } });
-    expect((await R.summary()).value).toMatchObject({ definition: "platform:register@5", status: "active" });
+    expect((await R.summary()).value).toMatchObject({ definition: cohort.register, status: "active" });
     const founding = (await R.entries())[0]!.input;
     if (founding.type !== "genesis") throw new Error("The CLI install must produce a native genesis.");
     expect(founding.founding).toEqual(plan.founding);
     const claim = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
-    const directorySeed: Seed = { v: 1, kind: "directory", definition: APPLICATION_COHORT.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
+    const directorySeed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(claim.intent), ordinal: 0 };
     D = new OwnedPlatform(scopeIdOf(directorySeed));
     host.answer("1:0", 1, { result: "confirmed", evidence: { basis: "own-answer", body: { name: repositoryName(seedDigest(directorySeed), 1), id: "application-fixture" } } });
     expect(await R.stub.submit(claim, [])).toMatchObject({ answer: "accepted" });
@@ -89,12 +89,12 @@ test("explicit supporting cohort establishes Counting with native authority and 
     const creates = (await D.entries())[0]!.sends.filter((send) => send.message.class === "request" && send.message.type === "create");
     expect(creates).toHaveLength(3);
     const creator = await D.at();
-    const cohort = [
-      { kind: "membership", definition: APPLICATION_COHORT.membership },
-      { kind: "rules", definition: APPLICATION_COHORT.rules },
-      { kind: "destination", definition: APPLICATION_COHORT.destination },
+    const siblings = [
+      { kind: "membership", definition: cohort.membership },
+      { kind: "rules", definition: cohort.rules },
+      { kind: "destination", definition: cohort.destination },
     ] as const;
-    const [M, Q, G] = cohort.map(({ kind, definition }, ordinal) => {
+    const [M, Q, G] = siblings.map(({ kind, definition }, ordinal) => {
       const selected = creates.filter((send) => isSeed(send.to) && send.to.kind === kind);
       expect(selected).toHaveLength(1);
       const send = selected[0];
@@ -106,13 +106,13 @@ test("explicit supporting cohort establishes Counting with native authority and 
     });
     if (!M || !Q || !G) throw new Error("the complete three-child cohort is required");
     await settle(R, D, M, Q, G);
-    expect((await D.summary()).value.definition).toBe(APPLICATION_COHORT.directory);
-    expect([(await M.summary()).value.definition, (await Q.summary()).value.definition, (await G.summary()).value.definition]).toEqual([APPLICATION_COHORT.membership, APPLICATION_COHORT.rules, APPLICATION_COHORT.destination]);
+    expect((await D.summary()).value.definition).toBe(cohort.directory);
+    expect([(await M.summary()).value.definition, (await Q.summary()).value.definition, (await G.summary()).value.definition]).toEqual([cohort.membership, cohort.rules, cohort.destination]);
     const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
     await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
     const membership = await M.at();
 
-    // Actual authenticated birth-session reads must select directory@5 even
+    // Actual authenticated birth-session reads must select the exact directory pin even
     // though its destination@2 pin is also used by the legacy directory@2.
     const issued = await lifetime.wait(() => requestSession(SERVICE, M.name, sessionRequest(membership, rita.secret, soon(60), crypto.randomUUID()), { fetch: routed as unknown as Fetch }));
     expect(issued.ok, issued.ok ? undefined : `Read session refused: ${issued.reason}`).toBe(true);
@@ -190,7 +190,7 @@ test("explicit supporting cohort establishes Counting with native authority and 
     expect(await C.stub.retained(reader, "definition", COUNTING_DEFINITION)).toMatchObject({ ok: true, value: { bytes } });
     expect((await C.entries())[0]!.input).toMatchObject({ type: "genesis", seed: childSeed, source: accepted.receipt.fact });
     expect((await C.act(rita, "initialize", { expected: await C.expected({ configuration: 0 }) })).answer).toBe("refused");
-    await M.did(rita, "set-actions", { on: 0, expected: await M.expected({ on: 0 }), fields: { role: "admin", actions: [...FIRST_ACTIONS_OF[APPLICATION_COHORT.membership]!.admin, "counting.control"] } });
+    await M.did(rita, "set-actions", { on: 0, expected: await M.expected({ on: 0 }), fields: { role: "admin", actions: [...FIRST_ACTIONS_OF[cohort.membership]!.admin, "counting.control"] } });
     lifetime.advance(301); // The old grant reuse window must end; no immediate-revocation claim.
     await C.did(rita, "initialize", { expected: await C.expected({ configuration: 0 }) });
     expect((await C.summary()).value.items.find((item) => item.type === "board")).toMatchObject({ state: "paused", values: { target: 7 } });
@@ -215,8 +215,37 @@ test("explicit supporting cohort establishes Counting with native authority and 
       expect(await D.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
       expect(await A.stub.retained(reader, "definition", digest)).toMatchObject({ ok: true, value: { bytes: value } });
     }
+    const publicationChildren: Platform[] = [];
+    if (name === "application-publication") {
+      const directory = await D.at();
+      await lifetime.wait(() => store.save({ ...kept!, handle: "@rita", repository: { directory, membership, rules: Q.name, destination: G.name } }));
+      const invite = await lifetime.wait(() => issueInvitation(context, { kind: "person", handle: "@reader", hours: 1, role: "member" }, { privateRequests: [], mode: "new", operation: crypto.randomUUID(), current: () => { lifetime.active(); return true; } }));
+      expect(invite.state).toBe("verified");
+      const published: DeclaredDefinition = { ...counting,
+        items: { ...counting.items, configuration: { ...counting.items["configuration"]!, refs: { ...counting.items["configuration"]!.refs, destination: { fixed: true, required: true, to: { type: "scope", kind: "destination" } } } } },
+        acts: { ...counting.acts, establish: { ...counting.acts["establish"]!, fields: { ...counting.acts["establish"]!.fields, destination: { type: "scope", kind: "destination", required: true } }, effects: [...counting.acts["establish"]!.effects, { ref: { slot: "destination", from: { field: "destination" } } }] } } };
+      const digest = definitionDigest(published), content = canonicalize(published), destination = await G.at();
+      expect(await Q.stub.submit(await Q.intent(rita, "activate", { fields: { digest, name: published.name } }), [], { values: [content] })).toMatchObject({ answer: "accepted" });
+      const values = { definition: digest, values: '{"target":7}', execution: "recorded-do" };
+      const before = (await D.summary()).at;
+      expect((await D.stub.submit(await ask({ ...values, values: canonicalize({ target: 7, destination }) }), [], { values: [content] })).answer).toBe("refused");
+      expect((await D.summary()).at).toEqual(before);
+      const original = await ask(values), accepted = await D.stub.submit(original, [], { values: [content] });
+      expect(accepted.answer).toBe("accepted");
+      if (accepted.answer !== "accepted") throw new Error("Native publication factory must create the application");
+      const parent = (await D.entries())[accepted.receipt.fact.seq]!;
+      expect(parent.sends[0]!.message).toMatchObject({ class: "request", type: "create", body: { fields: { destination }, directory: await D.at(), membership, creationContext: { v: 1 } } });
+      const child = await D.created(accepted.receipt.fact.seq);
+      await settle(D, child);
+      expect((await child.item(0)).refs["destination"]).toEqual(destination);
+      expect((await child.entries())[0]!.input).toMatchObject({ type: "genesis", source: accepted.receipt.fact, seed: { creator: await D.at(), cause: intentDigest(original.intent), ordinal: 0 } });
+      await lifetime.wait(() => child.restart());
+      expect((await child.item(0)).refs["destination"]).toEqual(destination);
+      expect(await D.stub.submit(original, [], { values: [content] })).toEqual(accepted);
+      publicationChildren.push(child);
+    }
     const replayFetch: Fetch = (url, init) => lifetime.wait(() => routed(url, init));
-    for (const node of [D, C, A, nested]) {
+    for (const node of [D, C, A, nested, ...publicationChildren]) {
       const head = (await node.summary()).at;
       const replay = await lifetime.wait(() => verify(httpSource(SERVICE, { fetch: replayFetch, reader: issued.session.reader() }), { mode: "replay", platform, grants: "proven", scope: node.name, head }));
       expect([replay.report.result, replay.why]).toEqual(["consistent", null]);

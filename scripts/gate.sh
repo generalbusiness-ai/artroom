@@ -1,6 +1,6 @@
 #!/bin/bash
 # The complete gate, run once at the head you will send for review:
-# install (only if the lock file changed since the last install), typecheck, test.
+# verify the installed/adopted dependency view (install if the lock changed), typecheck, test.
 # It prints the head, the tree and each step's cost, and exits non-zero if any step fails.
 #
 #   npm run gate            the gate
@@ -28,7 +28,7 @@ echo "head $(git rev-parse HEAD)  tree $(git rev-parse 'HEAD^{tree}')  changed f
 if [ "$force" = "--ci" ] || [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$lock" ]; then
   step install npm ci && echo "$lock" > "$stamp"
 else
-  echo "install    skipped: node_modules was installed from this package-lock.json"
+  echo "install    skipped: dependency view was verified against this package-lock.json"
 fi
 # Whitespace errors in what this branch changed, if the base is known.
 # -B: a path whose file was rewritten whole is read as a new file, so only this branch's lines are checked.

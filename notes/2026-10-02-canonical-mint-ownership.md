@@ -80,7 +80,7 @@ of what the code reads, not a description of the provider.
 | Property | Binding page | REST page | This repository |
 |---|---|---|---|
 | Create takes | `createToken(scope?, ttl?)` | `repo`, `scope`, `ttl` (60 s to 1 year) | The same |
-| Create answers | `plaintext` and `expiresAt` are named; an ID is not | `id`, `plaintext`, `scope`, `expires_at` | The code reads `id` from the binding, and the live spike revoked a lane token by its recorded ID (`notes/deploy-spike.md`, step 9) |
+| Create answers | `plaintext` and `expiresAt` are named; an ID is not | `id`, `plaintext`, `scope`, `expires_at` | The code reads `id` from the binding, and the live spike revoked a lane token by its recorded ID (`notes/2026-10-01-deploy-spike.md`, step 9) |
 | A listing gives | `total` and `tokens`; no record fields named, and no creation time | `id`, `scope`, `state`, `created_at`, `expires_at`; filter by `state`; paged, 100 at most | `completeInventory` (plan 001) checks `id`, `scope`, `state`, `expiresAt` and `total` |
 | Revoke | `revokeToken(tokenOrId)`, a boolean | by ID | By ID; by text in `snapshot/repos.ts:341–344` |
 | Errors that mean nothing changed | Not documented | Not documented | `REFUSED_UNCHANGED` (`artifacts.ts:95`), from lane B's review |

@@ -1,20 +1,17 @@
 # The dap command
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](README.md#names-in-transition).
-
 `dap` is a command-line client for the new model. Each command is a
 thin function over two things: a scope service's base URL and a signing
 key. The command builds and signs intents and reads the service's routes.
 It judges nothing: whether an act takes effect is the scope's decision,
 and the command prints the scope's actual answer category. A refusal exits
-1 with its reason. An unavailable answer confirms no acceptance; timed
-entries may already have been written. Inspect the history before another
+1 with its reason. An unavailable answer does not say whether the act took effect; timed
+entries may already have been written. Inspect the journal before another
 mutation. Recovery needs the original signed envelope; repeating a generic
 command signs a new request.
 
 The source is `packages/cli`. In this repository it runs as
-`packages/cli/bin/artroom.js` under Node 22.0.0 or later, using the CLI's
+`packages/cli/bin/dap.js` under Node 22.0.0 or later, using the CLI's
 installed `tsx` 4.21.0 dependency. The launcher resolves that loader beside
 the package, so it works from another directory and fetches no tool when
 it runs. The launcher is checked on Node 22.0.0 and 26.10.0. Nothing is
@@ -50,7 +47,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
 creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -62,7 +59,7 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]`**
+**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
 signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will create,
@@ -79,7 +76,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`dap install --planned [--cohort application|counting-commitments]`** creates the planned register, with the kept
+**`dap install --planned [--cohort application|application-publication|counting-commitments]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -94,18 +91,17 @@ or delete the original config or keys.
 
 For example, set `ARTROOM_HOME` to a new private directory, then run
 `dap install --plan <base-url> --cohort <cohort> --host <host>
---namespace <namespace>`, using `application` or `counting-commitments`
+--namespace <namespace>`, using `application`, `application-publication` or `counting-commitments`
 for `<cohort>`. After configuring the new register ID,
 run `dap install --planned --cohort <cohort>` with the same
 `ARTROOM_HOME`. This creates separate custody and a new operator key; it
 does not renew or replace the expired original.
 
 An attempted or acknowledged original must instead be reconciled from its
-original directory with `install --planned`. Expiry does not prove that a
-request was never accepted and does not authorize a replacement. After
+original directory with `install --planned`. Expiry does not prove that a request never took effect and does not authorize a replacement. After
 creation, the receipt must match the original planned register, definition
 and intent. Its acceptance is a service acknowledgement; independent
-history verification remains separate.
+journal verification remains separate.
 
 ```
 Installed: register sc_4kq2v7..., under platform:register@2, as planned.
@@ -119,11 +115,22 @@ Omitting `--cohort` keeps the legacy default. `--cohort application` selects
 `APPLICATION_COHORT`: register@5, directory@5, membership@4, rules@3,
 destination@2 and inbox@1, each with the `platform:` prefix.
 `--cohort counting-commitments` retains its separate register@6,
-directory@6 and membership@5 lineage. Both choices use the existing exact
+directory@6 and membership@5 lineage. `--cohort application-publication`
+selects `FILE_PUBLICATION_COHORT`: register@9, directory@8, membership@4,
+rules@3, destination@4 and inbox@1. All three choices use the existing exact
 planned-install custody. Unknown or multiple choices, another retained
 cohort, service, host or namespace refuse before signing or sending.
 `install --planned` may omit the selection: it uses the saved definition
 and signature. It never upgrades a plan to a newer catalog version.
+
+Choose `application-publication` for a new application room whose acts tell
+the destination `publish-file`. Configure the host with that exact planned
+register ID before installing. Existing rooms retain their original pins.
+Directory@8 supplies its own destination when the application's genesis
+declares `destination` with type `scope` and kind `destination`; callers
+cannot include that reserved field in `values`. See
+[Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
+for the write authority and publication outcomes.
 
 For an application such as Jam, use a separate owner-only `ARTROOM_HOME`
 and a deployed service that supports all six exact application pins:
@@ -132,7 +139,7 @@ and a deployed service that supports all six exact application pins:
 dap install --plan <base-url> --cohort application --host <configured-host> --namespace <configured-namespace>
 # Configure that host's registerScope with the printed planned ID.
 dap install --planned --cohort application
-dap claim <label> --handle @operator
+dap create <label> --handle @operator
 ```
 
 Keep the operator key and pending envelopes in that private directory;
@@ -149,17 +156,16 @@ required declaration dependencies in the actual rules scope. The authorized
 `establish-application` act on directory@5 names that digest, bounded
 canonical genesis `values` and `execution=recorded-do`. Supply declaration
 bytes beside it; the factory supplies the trusted opener and membership.
-Keep the exact signed creation request before submission and reconcile its
-accepted fact and confirmed child seed after an unknown answer. Do not
+Keep the exact signed creation request before submission and reconcile its recorded fact and confirmed child seed after an unknown answer. Do not
 create a second application to replace an uncertain first one.
 
 Membership must explicitly grant the declaration's domain actions to the
 intended role or agent. Enrollment and a read session alone grant no domain
 act. Respect the deployed grant reuse window after permission changes.
-Provision each verifier reader for the target and every foreign history it
+Provision each verifier reader for the target and every foreign journal it
 needs; a room session may not read another root or membership. Retain the
 actual deployed bounds, exact platform catalog, capability versions and
-parameters with the public configuration. Missing history or unsupported
+parameters with the public configuration. A missing journal or unsupported
 pins remain verification failures. Jam must consume genuine published SDK
 packages; this CLI bootstrap proves no registry, deployment, microphone,
 model, playback or distributed-user acceptance.
@@ -182,28 +188,32 @@ normal Page build passed and reproduced the unchanged generated module.
 An initial tool-hash guard typo stopped before any build; that outcome is
 retained. The native application case was unchanged and was not repeated.
 The corrected Counter parent remains intact. A new ordinary gate and
-independent Source review are still required for this successor.
+an independent review of the code are still required for this follow-up.
 
-**`dap claim <name> [--handle @you] [--branch main] [--again]`**
-signs the register's `found` act. It then waits until the directory,
-membership, the rules scope and the destination are created and
-confirmed. Then it takes the founder's seat and first key in membership,
+**`dap create <name> [--handle @you] [--branch main] [--again]`**
+
+`found` remains an alias for one release and prints `dap create` as the new
+command name. The existing `claim` command remains compatible with retained
+workflows. All three commands use the same creation and recovery code.
+
+The command signs the register's recorded `found` act. It waits until the
+directory, membership, the rules scope and the destination are created and
+confirmed. Then it takes the founder's seat, their member item, and first key in
+membership,
 which makes the founder the first admin. `<name>` is a label for this
 output only: the register's `found` act has no name field (see "What it
 does not do yet").
 
 Before each creation step, the command saves its exact signed envelope:
-`found`, then `seat`, then `first-key`. It saves accepted fact references
-as each step completes. These records contain no private signing key.
+`found`, then `seat`, then `first-key`. It saves the recorded fact references as each step completes. These records contain no private signing key.
 A refusal, unavailable reply or lost answer leaves the request pending;
-a later run keeps the same signature and deadline. An accepted marker is
-checked against the receipt for that exact envelope before reuse.
+a later run keeps the same signature and deadline. A marker that the act took effect is checked against the receipt for that exact envelope before reuse.
 
 ```
-Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap claim demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
+Gave up waiting for the directory after 120 reads. What was asked may still take effect; run dap create demo again to go on waiting for this claim, or with --again to sign a new one, which creates a second repository.
 ```
 
-Run `dap claim <name>` again to continue the saved claim. The command
+Run `dap create <name>` again to continue the saved claim. The command
 reads or retries the exact saved steps, then waits for their confirmed
 scopes. It checks child identities against the actual directory seed and
 full reference. It does not extend a saved deadline or invent a replacement
@@ -219,7 +229,7 @@ when deliberately starting another claim. An expired envelope stays saved
 until this explicit replacement.
 
 ```
-Claimed demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
+Created demo: directory sc_hs5f27fz..., membership sc_p6xp2lmd..., rules sc_sfbjwioy..., destination sc_e5xgdizd...; each created and confirmed.
 You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 ```
 
@@ -233,20 +243,55 @@ Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
 Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
 ```
 
-**`dap join <link>`** is membership's `join`, signed by a new key
+With `--keep`, the invitation is kept before it is sent: the command
+makes the secret, signs `invite-member`, and saves both in an owner-only
+private file first. The link names the membership's exact definition,
+for example `platform:membership@4` in a room of the application cohort.
+If the answer is lost, run `dap invite --check`, which reads the outcome
+and sends nothing, or `dap invite --continue`, which resumes the exact
+original request. While one kept invitation is unresolved, a new one is
+refused, so a lost answer is never replaced by a second invitation. A
+verified or refused invitation is released, and its link is printed once.
+
+```
+Invited @una: the invitation is recorded and verified.
+Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox...
+```
+
+**`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
-is absent from public config. It saves the accepted fact and inbox progress
+is absent from public config. It saves the recorded fact and inbox progress
 before waiting for the member's inbox. After a lost reply or an interrupted
 wait, run `dap join` with the original link again. This reuses the same
-key, request and deadline. An accepted request is confirmed by a read-only
-settlement, even after its deadline. A missing private request or a different
+key, request and deadline. A request that took effect is confirmed by a read-only settlement, even after its deadline. A missing private request or a different
 link stops the retry; it never signs a replacement automatically.
 
 ```
 Joined as @una on key key_H1bY2Hml....
 Your inbox: sc_zbtu7vax....
 ```
+
+**`dap join <artroom-agent-key:…>`** enrolls a genuine agent key with
+membership's `enrol`. A verified room controller first creates an agent
+member with `add-member`, then invites its key with `invite-key`. The private
+handoff carries that invitation and full native references. It carries no
+signing key. A person invitation with the role `agent` is still a person;
+it cannot substitute for this agent-key protocol.
+
+Use a separate empty owner-only `ARTROOM_HOME` for the receiving agent. The
+command generates and retains an independent key and saves the exact private
+enrollment envelope before delivery. After an unknown answer, use the same
+link with `--check` to settle and follow the original without submitting a
+mutation. Run the same command without `--check` only to Continue explicitly.
+It retains the original signature, idempotency key and deadline.
+
+The command saves a usable connection only after it verifies the recorded enrollment, genuine agent and key kinds, controller, recorded directory
+siblings, and active inbox incarnation. A missing private request, changed
+link, person/agent mismatch or definite native refusal keeps the original;
+it does not generate a replacement key or request. Existing `artroom-invite:`
+links and pending person joins retain their original behavior. Treat either
+invitation link as private.
 
 **`dap acts [<scope>]`** lists the acts of the scope's definition
 that the caller's role holds now, with each act's fields. The role and
@@ -283,7 +328,7 @@ example, an admin activates the demo profile's change definition with
 `packages/lanes/src/digests.ts`.
 
 **`dap log <scope> [--limit n]`** and **`dap show <entry>`**
-read the history and one entry over the read routes.
+read the journal and one entry over the read routes.
 
 ```
 sc_p6xp2lmd...:8  2099-01-01T00:00:00Z  act add-member by key_baqzbaDy...; 6 effects, 1 sends
@@ -296,7 +341,7 @@ routes, with the platform package's rules and the code of the two lane
 capabilities, `hold@1` and `git-read@1`, so it replays a lane too. It reads with the caller's
 session, and a read that the session is refused goes again as a signed
 read by the caller's key. It prints the verifier's report: the result,
-what it covered, and what it takes on trust. A history whose first page
+what it covered, and what it takes on trust. A journal whose first page
 cannot be read has no report; the command prints
 `... cannot be read: <reason>` and exits 1.
 
@@ -309,9 +354,9 @@ Mode: replay. Within the coverage stated below, the history was folded from its 
 room: the register, the directory, and every scope that the directory
 created and each of those created (membership, the rules scope, the
 destination, each lane, each inbox), reached by the creations in their
-histories. It prints one line for each scope: its kind, its ID, the entry
+journals. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
-scopes.`, or the first finding, and then the command exits 1. A history
+scopes.`, or the first finding, and then the command exits 1. A journal
 that cannot be read is a finding. The example is from
 `packages/lanes/test/issues.scope.test.ts`, after two issues were closed by
 two published changes:
@@ -585,8 +630,8 @@ session a member can read the scopes that record their membership, and,
 at the register, its genesis and the entries that come from the claim
 that created the repository. A signed read reads the entries that the
 key signed, the entries that come from one of those within 15 minutes of
-it (the intent window), and the retained inputs those entries carry. History and log pages can
-be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-history trust.
+it (the intent window), and the retained inputs those entries carry. Journal and log pages can
+be filtered; a sparse page is not complete replay evidence. Replay still states its actual coverage and foreign-journal trust.
 
 ## What it does not do yet
 

@@ -19,7 +19,7 @@
 import type { Digest, EffectForm, OutcomeMark, PlatformData, Send, SendForm } from "@generalbusiness/dap-contract";
 import { intentDigest } from "@generalbusiness/artroom-bytes";
 import { deriveEffects } from "./effects.ts";
-import type { Reading } from "./fields.ts";
+import type { Own, Reading } from "./fields.ts";
 import type { Fetched, Judging } from "./guards.ts";
 import { overMax } from "./handlers.ts";
 import type { EvidenceValueDomain, OperationRules, OutcomeDerived, OutcomeInput, Owner, Owners } from "./ledger.ts";
@@ -82,6 +82,8 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // The driver asks this outside a commit, as it asks `unknown`: the rule reads the state only.
         ...(r.ready ? { ready: (view: StateView, operation: Operation, attempt: number) => answer(run(mark, () => r.ready!(view, operation, attempt))) } : {}),
+        ...(r.beforeSend ? { beforeSend: (view: StateView, operation: Operation, attempt: number, own: Own) => run(mark, () => r.beforeSend!(view, operation, attempt, own)) } : {}),
+        ...(r.publicationOrigin ? { publicationOrigin: (view: StateView, operation: Operation, own: Own) => run(mark, () => r.publicationOrigin!(view, operation, own)) } : {}),
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
         retries: (result, operation, view, outcome) => answer(run(mark, () => r.retries(result, operation, givenTo(judging(view, outcome))))),
         ...(r.holds ? { holds: (view: StateView, operation: Operation, outcome: OutcomeInput) => answer(run(mark, () => r.holds!(givenTo(judging(view, outcome)), operation))) } : {}),

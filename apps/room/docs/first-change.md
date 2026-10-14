@@ -14,9 +14,6 @@ operator permission or new-room bootstrap.
 
 ## Join with your invitation
 
-The commands on this page use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 In a terminal with a fresh dap user context, run:
 
 ```sh
@@ -38,8 +35,7 @@ invitation cannot replace a pending Join. Missing private records or keys
 stop recovery; they do not authorize a new enrollment as the same member.
 See [the command reference](../../../docs/cli.md) for custody and refusal details.
 
-`acts` lists the actions your current role holds. An offered action can
-still be refused by the room's rules or state. A member can propose and
+`acts` lists the acts your current role allows. An offered act can still be refused by the room's rules or state. A member can propose and
 review changes, but the default member role cannot merge; a maintainer or
 admin with `change.merge` performs publication.
 
@@ -121,8 +117,8 @@ permission to create another merge request blindly.
 The Page link and Pages navigation use `/site/<directory>/HEAD/...` for the
 latest published branch. Opening that address later may show a newer change.
 It does not preserve the earlier version. `verify` reports consistency only
-for the histories, coverage and trusted inputs it states; it does not prove
-that all external effects are finished or that unobserved history is complete.
+for the journals, coverage and trusted inputs it states; it does not prove
+that all external effects are finished or that an unobserved journal is complete.
 
 ## If you cannot continue
 
@@ -144,7 +140,7 @@ that all external effects are finished or that unobserved history is complete.
 
 Commands match current [CLI help](../../../packages/cli/src/line.ts).
 [CLI story](../../../packages/cli/test/story.scope.test.ts) covers native
-creation, enrollment, authority refusals and history reads with labelled
+creation, enrollment, authority refusals and journal reads with labelled
 Git host, scheduler and clock stand-ins. The existing
 [one-file scenario](../../../packages/lanes/test/edit.scope.test.ts) and
 [demo rehearsal](../../../scripts/demo/rehearse.ts) supply contribution,

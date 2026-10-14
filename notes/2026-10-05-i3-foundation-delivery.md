@@ -179,7 +179,7 @@ and `change` `sha256:4ff0c7f681c664a3c2dae22bd0df4a9a1bb239e19bc185db41f7f140d4d
 
 **No deployed scope exists under this source.** This is a search of the
 repository's tracked files, and not proof that nothing is deployed anywhere.
-Outside `parked/`, the deploy configurations are `packages/scope/wrangler.jsonc`
+Outside `spikes/parked/`, the deploy configurations are `packages/scope/wrangler.jsonc`
 (its comment says nothing in the repository deploys it), two test-pool
 configurations (`packages/scope/wrangler.test.jsonc` and
 `packages/lanes/wrangler.test.jsonc`) and three under `spikes/`. The spikes
@@ -190,20 +190,20 @@ revisions, and which Git ignores, so they name no package of this workspace.
 
 ## 5. Removal
 
-Deleted from `parked/` in this milestone (13 files, `git diff --name-status`):
+Deleted from `spikes/parked/` in this milestone (13 files, `git diff --name-status`):
 
-- `parked/log/`, whole: 7 files. Successor: `packages/git`.
-- Six files of `parked/git/src/publisher/`: `gitops.ts`, `push-outcome.ts`,
+- `spikes/parked/log/`, whole: 7 files. Successor: `packages/git`.
+- Six files of `spikes/parked/git/src/publisher/`: `gitops.ts`, `push-outcome.ts`,
   `ref-fence.ts`, `client.ts`, `container.ts`, `git-publisher.ts`.
   Successor: `packages/git`.
 
 **Retained-paths check** (the plan's section 6.2). Present at the head, by
-`test -e`: `parked/room/wrangler.spike.jsonc`,
-`parked/checkers/wrangler.spike.jsonc`, `parked/room/scripts/`,
-`parked/room/src/mcp.ts`, `.github/workflows/row-writes.yml`, and the three
+`test -e`: `spikes/parked/room/wrangler.spike.jsonc`,
+`spikes/parked/checkers/wrangler.spike.jsonc`, `spikes/parked/room/scripts/`,
+`spikes/parked/room/src/mcp.ts`, `.github/workflows/row-writes.yml`, and the three
 `measure/` directories (`checkers`, `git`, `room`). No deleted path is on the
-list. `parked/git/src/publisher/log-push.ts` stays for step 27.
-File counts in `parked/README.md` match `git ls-files` (checked).
+list. `spikes/parked/git/src/publisher/log-push.ts` stays for step 27.
+File counts in `spikes/parked/README.md` match `git ls-files` (checked).
 
 Still parked, and for which step: `room` (10, 13, 15, 19, 31; `mcp.ts` to I5;
 `measure/` to I4; the spike files to E1); `policy` (13); `contract` (25, 28);

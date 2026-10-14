@@ -107,7 +107,7 @@ Result at the head: `239 relative links checked, 0 broken.` Exit 0.
 
 The script reads every Markdown file in the repository except
 `node_modules`, `.git`, `notes/`, and every `test/` directory, whose
-Markdown files are fixtures. It also skips `plans/` and `parked/` by
+Markdown files are fixtures. It also skips `plans/` and `spikes/parked/` by
 default: both are history that this head may not edit, and they hold 70
 broken links (`node scripts/check-doc-links.mjs --history`). At main
 `d309b6b9`, the same script reports 6 broken links outside history and 76

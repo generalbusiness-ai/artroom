@@ -6,7 +6,7 @@ runs in a browser. It reads a room over the scope service's HTTP routes,
 and it signs acts with a key that the browser keeps. It judges nothing:
 whether an act takes effect is the scope's decision, and the page shows the
 scope's answer and refusal reason. An unavailable answer confirms no acceptance;
-timed entries may already have been written. Inspect the history before another
+timed entries may already have been written. Inspect the journal before another
 act. Recovery requires the same original signed envelope, which generic Page
 submission does not retain.
 
@@ -17,9 +17,6 @@ the test Worker's recorded answers. They do not establish live enrollment;
 current delivery evidence is reported separately.
 
 ## Build it
-
-The package name in this command is the final dap name. To run it at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
 
 From the root of a checkout, after `npm ci`:
 
@@ -119,13 +116,12 @@ context cannot be verified.
 
 **Actions.** Create issue opens a dialog with Title and Description. The title
 also states the completion condition, matching the CLI's issue command.
-Comments appear with the conversation. A change has one prominent next action
-from its offered native actions; other actions remain under Inspect. Review
+Comments appear with the conversation. A change has one prominent next act from the native acts it offers; other acts remain under Inspect. Review
 uses the selected version and held extent choices. Merge uses that version's
 selected issue-report facts in their native order, not checker jobs. Missing
 technical facts make the task unavailable instead of asking for guessed IDs.
 
-The page computes offered actions with the same function as `dap acts`;
+The page computes the offered acts with the same function as `dap acts`;
 native guards remain decisive. Signing fences the visible controls locally
 and preserves the subject. The actual answer appears before the optional
 observation refresh. The page shows the
@@ -164,8 +160,7 @@ resolve it. Checking the original request verifies its receipt and exact
 signed entry without rekeying or reenrolling.
 
 The Rules editor changes approval counts and preserves complete checks,
-extents, labels and exception values. Only an actually offered `publish`
-action exposes it. Changes require before/after confirmation; cancellation
+extents, labels and exception values. Only an actually offered `publish` act exposes it. Changes require before/after confirmation; cancellation
 and unchanged values sign nothing.
 
 When an explicitly supplied command-line config contains a full register

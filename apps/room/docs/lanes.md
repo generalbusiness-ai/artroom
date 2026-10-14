@@ -280,12 +280,9 @@ comparison outside a test run, and exits 1 when the file is stale.
 The client package has one handle that is typed from any declared
 definition. It names no lane.
 
-The package names in this example use the final dap names. To run them at this commit, read
-[Names in transition](../../../docs/README.md#names-in-transition).
-
 ```ts
 import { ScopeHandle, declaredHandle, httpTransport } from "@generalbusiness/dap-client";
-import { issue } from "@generalbusiness/artroom-lanes";
+import { issue } from "@generalbusiness/dap-lanes";
 
 const scope = new ScopeHandle(httpTransport("https://scopes.example"), scopeId, reader);
 const opened = await declaredHandle(scope, issue);

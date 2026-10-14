@@ -7,8 +7,8 @@
 // checked. Fenced code and inline code are not read.
 //
 // Skipped: node_modules, .git, and every test/ directory, whose Markdown
-// files are fixtures. notes/, plans/ and parked/ are history and keep their
-// links as written; --history adds plans/ and parked/ to the check.
+// files are fixtures. notes/, plans/ and spikes/parked/ are history and keep their
+// links as written; --history adds plans/ and spikes/parked/ to the check.
 //
 // A heading's anchor keeps the text of its inline code, with the backticks
 // removed, as GitHub's does: "Host `artifacts`" is #host-artifacts.
@@ -26,13 +26,14 @@ const args = process.argv.slice(2);
 const history = args.includes("--history");
 const selfTest = args.includes("--self-test");
 const root = resolve(args.find((arg) => !arg.startsWith("--")) ?? new URL("..", import.meta.url).pathname);
-const skipAtRoot = new Set(history ? ["notes"] : ["notes", "plans", "parked"]);
+const skipAtRoot = new Set(history ? ["notes"] : ["notes", "plans"]);
 const skipAnywhere = new Set(["node_modules", ".git", "test"]);
 
 function* markdown(dir) {
 	for (const name of readdirSync(dir)) {
 		if (skipAnywhere.has(name) || (dir === root && skipAtRoot.has(name))) continue;
 		const path = join(dir, name);
+		if (!history && relative(root, path) === "spikes/parked") continue;
 		const stat = statSync(path);
 		if (stat.isDirectory()) yield* markdown(path);
 		else if (name.endsWith(".md")) yield path;

@@ -32,7 +32,7 @@ const reader = "a test reader";
 // | The test's own reads | The test, and the scheduler stand-in, read what each scope holds with a reader that the command never presents (the fixture inspector), past the read sessions. |
 // | Who may install | Nothing checks it: that is the installation design's. |
 describe("the artroom command on real scopes with the real read sessions. The Git host and the scheduler are STAND-INs", () => {
-  test("install, claim by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it", async () => {
+  test("install, create by signed reads, seat and session, invite and join over the Worker's routes; acts lists what the role holds; one act takes effect and one is refused by name with nothing written; after the destination's founding publication, log, show and remote read the histories back with the founder's session, and verify reports each of the six consistent over the live read surface after the signed-read window; a key of another register reads none of it", async () => {
     const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
     const lifetime = nativeFixtureLifetime(owner);
     try {
@@ -97,7 +97,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   // claim: the register's `found`; the command waits until the four scopes are created and confirmed, then takes the seat. Until
   // the seat it holds no session: each read is a signed read by the founder key, which the scopes answer because the key signed
   // `install`, or because the scope's cause chain leads to its claim.
-  const claimed = await run(rita, "claim", "demo", "--handle", "@rita");
+  const claimed = await run(rita, "create", "demo", "--handle", "@rita");
   expect(claimed.code, claimed.lines.join("\n")).toBe(0);
   const repository = (await rita.store.config())!.repository!;
   const D = node(repository.directory.scope);
@@ -106,7 +106,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   expect((await D.item(0)).refs).toMatchObject({ membership: repository.membership, rules: { scope: repository.rules }, destination: { scope: repository.destination } });
   for (const scope of [D, M, node(repository.rules), node(repository.destination), node(repository.inbox!)]) expect((await scope.summary()).value.status).toBe("active");
   expect(claimed.lines).toEqual([
-    `Claimed demo: directory ${D.name}, membership ${M.name}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
+    `Created demo: directory ${D.name}, membership ${M.name}, rules ${repository.rules}, destination ${repository.destination}; each created and confirmed.`,
     "Definitions: platform:directory@3, platform:membership@2, platform:rules@2, platform:destination@3.",
     expect.stringMatching(new RegExp(`^You are @rita, an admin, on key key_\\S+; your inbox is ${repository.inbox}\\.$`)),
   ]);
