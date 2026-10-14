@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5b8ab05742b70e5101576a8110413ba2098b7abb","text":"Merge retired a covered predecessor; the successor is at examples/lending/definition.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:5c226305e8875654bea433675144183b42cf0cd9","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/operations.ts."}
