@@ -103,3 +103,46 @@ export function publishingLaneOrigin(from: FactRef, directory: ScopeRef, destina
     return same(born.message.body["fields"]["destination"], destination);
   } catch { return false; }
 }
+
+/**
+ * Own-room applications prove the actual native factory, independently of the
+ * application's declared name. The Directory genesis pins the factory that
+ * reserves destination; a historical Directory alias alone proves no version.
+ * Null means that immutable proof is not yet available, not a refusal.
+ */
+export function applicationPublicationOrigin(from: FactRef, directory: ScopeRef, destination: ScopeRef, facts: readonly Fetched[]): boolean | null {
+  try {
+    const genesis = facts.find(copy => copy.fact.seq === 0 && same(copy.fact.at, from.at));
+    if (!genesis) return null;
+    if (!isEntryOf(genesis.entry, genesis.fact) || genesis.entry.input.type !== "genesis") return false;
+    const born = genesis.entry.input, seed = born.seed;
+    if (!isSeed(seed) || !isDigest(seed.definition) || !isFactRef(born.source)) return false;
+    if (from.at.kind !== "lane" || born.decision !== "applied" || born.inc !== from.at.inc
+      || seed.kind !== "lane" || seed.ordinal !== 0 || scopeIdOf(seed) !== from.at.scope
+      || directory.kind !== "directory" || destination.kind !== "destination"
+      || !same(seed.creator, directory) || !same(born.source.at, directory)) return false;
+    const creator = facts.find(copy => same(copy.fact, born.source));
+    const directoryGenesis = facts.find(copy => copy.fact.seq === 0 && same(copy.fact.at, directory));
+    if (!creator || !directoryGenesis) return null;
+    if (creator.under !== "platform:directory" || directoryGenesis.under !== "platform:directory"
+      || !isEntryOf(creator.entry, creator.fact) || creator.entry.input.type !== "act"
+      || !isEntryOf(directoryGenesis.entry, directoryGenesis.fact) || directoryGenesis.entry.input.type !== "genesis") return false;
+    const office = directoryGenesis.entry.input;
+    if (!isSeed(office.seed) || office.seed.definition !== "platform:directory@8" || office.seed.kind !== "directory"
+      || office.decision !== "applied" || office.inc !== directory.inc || scopeIdOf(office.seed) !== directory.scope) return false;
+    const made = creator.entry.input;
+    if (made.signed.intent.kind !== "establish-application" || !same(made.signed.intent.to, directory)
+      || !verifySignedIntent(made.signed) || made.signed.intent.fields["definition"] !== seed.definition
+      || intentDigest(made.signed.intent) !== seed.cause || born.n === null
+      || !born.message || born.message.class !== "request" || born.message.type !== "create") return false;
+    const body = born.message.body;
+    if (!isObject(body) || !same(body["directory"], directory) || !isObject(body["fields"])
+      || !isScopeRef(body["membership"]) || body["membership"].kind !== "membership"
+      || !same(body["creationContext"], { v: 1 })) return false;
+    // An application need not declare destination. If it does, this exact
+    // factory injects the room reference, and caller values cannot choose it.
+    const fields = body["fields"];
+    if ("destination" in fields && !same(fields["destination"], destination)) return false;
+    return sentBy(creator.entry, { from: born.source, n: born.n, to: seed, message: born.message });
+  } catch { return false; }
+}

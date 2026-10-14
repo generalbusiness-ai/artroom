@@ -1,0 +1,163 @@
+import { env } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
+import { expect, test } from "vitest";
+import type { DeclaredDefinition, FactRef, Intent, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { b64url, canonicalize, definitionDigest, factRefOf, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
+import { FILE_PUBLICATION_COHORT, platform } from "@generalbusiness/dap-platform";
+import { httpSource, verify } from "@generalbusiness/artroom-replay";
+import { SqliteStore } from "../src/index.ts";
+import { namespace } from "../src/namespace.ts";
+import { site } from "../src/site/route.ts";
+import { ownHost } from "./hosts.ts";
+import { soon } from "./net.ts";
+import { Platform, rita, routed, sam } from "./repository.ts";
+import { reader } from "./support.ts";
+import { beginSessionFixture } from "./session-settings.ts";
+import { dispatchFixture, driveFixture, nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
+
+// A made-up declared publisher deliberately uses the reserved word change.
+// Its acts and native factory are real; no change-lane role is granted.
+const publisher: DeclaredDefinition = {
+  format: "artroom-definition-1", name: "change", profile: { name: "restricted", version: 1 }, capabilities: [], genesis: "establish",
+  items: { library: { many: false, max: 1, states: { open: { final: false } }, initial: "open", parties: {},
+    refs: { destination: { fixed: true, required: true, to: { type: "scope", kind: "destination" } }, other: { fixed: true, required: false, to: { type: "scope", kind: "destination" } } }, values: {} } },
+  acts: {
+    establish: { step: "open", on: "library", grant: "application.establish", also: {}, fields: { destination: { type: "scope", kind: "destination", required: true }, other: { type: "scope", kind: "destination", required: false } }, guards: [],
+      effects: [{ ref: { slot: "destination", from: { field: "destination" } } }, { ref: { slot: "other", from: { field: "other" } } }], sends: [], attention: [] },
+    write: { step: "transition", on: "library", grant: "application.establish", also: {},
+      fields: { path: { type: "text", max: 1024, required: true }, content: { type: "text", max: 65536, required: true } }, guards: [], effects: [],
+      sends: [{ tell: { to: { slot: "destination" }, message: "publish-file", fields: { path: { field: "path" }, content: { field: "content" } }, result: {} } }], attention: [] },
+    elsewhere: { step: "transition", on: "library", grant: "application.establish", also: {},
+      fields: { path: { type: "text", max: 1024, required: true }, content: { type: "text", max: 65536, required: true } }, guards: [], effects: [],
+      sends: [{ tell: { to: { slot: "other" }, message: "publish-file", fields: { path: { field: "path" }, content: { field: "content" } }, result: {} } }], attention: [] },
+  }, receives: {}, timed: {}, rules: {},
+};
+const bytes = canonicalize(publisher), digest = definitionDigest(publisher);
+const SERVICE = "https://scopes.test";
+
+// Actual native R9/D8/M4/Q3/G4, application authority, factory, delivery,
+// SQLite, restart, Git object building and Site selection. OwnGit is a
+// LABELLED host stand-in using maps and decoded wire packs. The clock,
+// inspector readers and finite driver are fixture controls, not a provider.
+test("a native application publishes once after missing proof, keeps later source order across restart, and cannot publish into another room", async () => {
+  const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });
+  const life = nativeFixtureLifetime(owner, { required: false });
+  const cohort = FILE_PUBLICATION_COHORT;
+  const rooms: Platform[] = [];
+  const setup = async () => {
+    const host = ownHost();
+    const install: Intent = { v: 1, to: null, actor: rita.key, kind: "install", on: null, expected: {}, fields: { host: host.host, namespace: host.namespace, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
+    const R = life.platform(scopeIdOf({ v: 1, kind: "register", definition: cohort.register, creator: null, cause: intentDigest(install), ordinal: 0 }));
+    const bindings = host.bindings(R.name);
+    const wire = (node: Platform) => life.outside(node.name, (given, sql) => host.outside(given, sql, bindings));
+    wire(R);
+    expect(await R.stub.found(signIntent(install, rita.secret), cohort.register)).toMatchObject({ answer: "accepted" });
+    const found = await R.intent(rita, "found", { expected: await R.expected({ register: 0 }), fields: { branch: "main", founderHandle: "@rita", recoveryKey: sam.key } });
+    const seed: Seed = { v: 1, kind: "directory", definition: cohort.directory, creator: await R.at(), cause: intentDigest(found.intent), ordinal: 0 };
+    const D = life.platform(scopeIdOf(seed));
+    expect(await R.stub.submit(found, [])).toMatchObject({ answer: "accepted" });
+    await driveFixture([R, D], life.wait);
+    const initial = (await D.entries())[0]!;
+    const sibling = (kind: ScopeRef["kind"]) => {
+      const send = initial.sends.find(row => "definition" in row.to && row.to.kind === kind);
+      if (!send || !("definition" in send.to)) throw new Error("the actual Directory creates each sibling");
+      return life.platform(scopeIdOf(send.to));
+    };
+    const M = sibling("membership"), Q = sibling("rules"), G = sibling("destination");
+    wire(G);
+    await driveFixture([R, D, M, Q, G], life.wait);
+    const seat = await M.did(rita, "seat", { expected: await M.expected({ roster: 0 }) });
+    await M.did(rita, "first-key", { fields: { member: seat }, expected: await M.expected({ roster: 0, member: seat }) });
+    expect(await Q.stub.submit(await Q.intent(rita, "activate", { fields: { digest, name: publisher.name } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
+    const signed = await D.intent(rita, "establish-application", { expected: await D.expected({ repository: 0 }), fields: { definition: digest, values: "{}", execution: "recorded-do" } });
+    const child = await D.stub.submit(signed, [], { values: [bytes] });
+    expect(child.answer).toBe("accepted");
+    if (child.answer !== "accepted") throw new Error("the native application creation is accepted");
+    const C = await D.created(child.receipt.fact.seq);
+    await driveFixture([R, D, M, Q, G, C], life.wait);
+    expect((await C.item(0)).refs["destination"]).toEqual(await G.at());
+    const genesis = factRefOf((await C.entries())[0]!);
+    const peer = await life.wait(() => namespace(env.PLATFORM).resolver.read(genesis, 30, true));
+    expect(peer && "entry" in peer ? peer.origin?.length : null).toBe(3);
+    expect(peer && "entry" in peer ? peer.under : null).toBe("declared:change");
+    rooms.push(R, D, M, Q, G, C);
+    return { host, bindings, R, D, M, Q, G, C };
+  };
+  const state = (G: Platform) => life.wait(() => runInDurableObject(G.object, (_object, storage) => {
+    const store = new SqliteStore({ exec: (sql, ...args) => storage.storage.sql.exec(sql, ...args), transaction: run => storage.storage.transactionSync(run) });
+    return store.all();
+  }));
+  const envelope = async (C: Platform, seq: number) => {
+    const entry = (await C.entries())[seq]!, send = entry.sends[0]!;
+    return { from: factRefOf(entry), n: send.n, to: send.to, message: send.message };
+  };
+  try {
+    const a = await setup();
+    let proofAvailable = false;
+    const actual = namespace(env.PLATFORM).resolver;
+    life.wire(a.G.name, () => ({ resolver: { read: async (fact, seconds, origin) => {
+      const found = await life.wait(() => actual.read(fact, seconds, origin));
+      return found && "entry" in found && origin && !proofAvailable ? { ...found, origin: found.origin?.slice(0, 2) ?? [] } : found;
+    } } }));
+    await a.G.restart();
+    const before = (await a.G.summary()).at;
+    const first = await a.C.did(rita, "write", { on: 0, expected: await a.C.expected({ on: 0 }), fields: { path: "shelf/native.md", content: "# First shelf\n" } });
+    await dispatchFixture([a.C, a.G], life.wait);
+    expect((await a.G.summary()).at).toEqual(before);
+    expect((await state(a.G)).items.filter(item => item.type === "file-publication")).toHaveLength(0);
+    proofAvailable = true;
+    life.advance(2000);
+    await driveFixture(rooms, life.wait);
+    let written = (await state(a.G)).items.filter(item => item.type === "file-publication");
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ state: "published", values: { sourceSeq: first, sourceOrdinal: 0, path: "shelf/native.md" } });
+    const once = a.host.stand.pushes.filter(push => push.ref === "refs/heads/main").length;
+    const finalHead = (await a.G.summary()).at;
+    proofAvailable = false;
+    expect(await a.G.stub.deliver(await envelope(a.C, first))).toMatchObject({ answer: "recorded" });
+    expect((await a.G.summary()).at).toEqual(finalHead);
+    expect(a.host.stand.pushes.filter(push => push.ref === "refs/heads/main")).toHaveLength(once);
+    proofAvailable = true;
+    // Hold the earlier actual tell while admitting and publishing the later
+    // actual entry. No source fact is scripted or re-signed at release.
+    let held: FactRef | null = null;
+    life.setHold(delivery => !!held && canonicalize(delivery.from) === canonicalize(held));
+    const oldIntent = await a.C.intent(rita, "write", { on: 0, expected: await a.C.expected({ on: 0 }), fields: { path: "shelf/native.md", content: "# Older delayed shelf\n" } });
+    // Hold every send from this scope until its accepted immutable cause is
+    // known. Then keep only that original send behind the transport gate.
+    life.setHold(delivery => delivery.from.at.scope === a.C.name);
+    const old = await a.C.stub.submit(oldIntent, []);
+    if (old.answer !== "accepted") throw new Error("the older actual entry is accepted");
+    held = old.receipt.fact;
+    life.setHold(delivery => canonicalize(delivery.from) === canonicalize(held));
+    const later = await a.C.did(rita, "write", { on: 0, expected: await a.C.expected({ on: 0 }), fields: { path: "shelf/native.md", content: "# Later shelf wins\n" } });
+    await driveFixture(rooms, life.wait);
+    await a.G.restart();
+    const newerMain = a.host.stand.refs.get("refs/heads/main");
+    const beforeRelease = a.host.stand.pushes.filter(push => push.ref === "refs/heads/main").length;
+    life.setHold(() => false);
+    life.advance(2000);
+    await driveFixture(rooms, life.wait);
+    written = (await state(a.G)).items.filter(item => item.type === "file-publication");
+    expect(written.find(item => item.values["sourceSeq"] === old.receipt.fact.seq)?.state).toBe("superseded");
+    expect(written.find(item => item.values["sourceSeq"] === later)?.state).toBe("published");
+    expect(a.host.stand.refs.get("refs/heads/main")).toBe(newerMain);
+    expect(a.host.stand.pushes.filter(push => push.ref === "refs/heads/main")).toHaveLength(beforeRelease);
+    const response = await life.wait(() => site(new Request(`${SERVICE}/site/${a.D.name}/${newerMain}/shelf/native.md`), { SCOPES: env.PLATFORM, ...a.bindings }, a.host.stand.fetch));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Later shelf wins");
+    const checkedHead = (await a.G.summary()).at;
+    const replay = await life.wait(() => verify(httpSource(SERVICE, { fetch: routed, reader }), { mode: "replay", platform, grants: "proven", scope: a.G.name, head: checkedHead }));
+    expect([replay.report.result, replay.why]).toEqual(["consistent", null]);
+    const b = await setup();
+    const signed = await a.D.intent(rita, "establish-application", { expected: await a.D.expected({ repository: 0 }), fields: { definition: digest, values: canonicalize({ other: await b.G.at() }), execution: "recorded-do" } });
+    const creation = await a.D.stub.submit(signed, [], { values: [bytes] });
+    if (creation.answer !== "accepted") throw new Error("a real own-room app can declare an arbitrary outside destination");
+    const crossApp = await a.D.created(creation.receipt.fact.seq);
+    await driveFixture([a.D, crossApp], life.wait);
+    const cross = await crossApp.did(rita, "elsewhere", { on: 0, expected: await crossApp.expected({ on: 0 }), fields: { path: "README.md", content: "# Foreign room\n" } });
+    const foreignHead = (await b.G.summary()).at;
+    expect(await b.G.stub.deliver(await envelope(crossApp, cross))).toEqual({ answer: "source-unverified" });
+    expect((await b.G.summary()).at).toEqual(foreignHead);
+  } finally { life.release(); }
+});

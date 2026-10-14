@@ -24,13 +24,13 @@
  */
 
 import type { FactRef, FieldValue, KeyId, Observation, OperationId, PlatformData, PlatformDefinition, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, factRefOf, isDigest, isFactRef, isScopeRef, timeOf, timeMs, utf8, textDigest } from "@generalbusiness/artroom-bytes";
 import type { Item, Opening, Operation, Own, PlatformRule, PublicationOrigin, RecordedRef, RuleEffect, RuleGiven, RuleRequest, Rules, StateView } from "@generalbusiness/dap-derive";
 import { DESTINATION_CHANGED_SET, isJudgeChanges, isRecordedJudgeEvidence, isObjectId, judgeReservation, fileSound, type ReservationRead, type Statement } from "./reservation.ts";
 import { referenceOf } from "./rules-scope.ts";
 import { isExtents, classify } from "./extents.ts";
 import { PROPOSE_FILE, decidingKeys, fileOf, manifestAuthors, readLane, sourcesOf, manifestFiles } from "./destination-reading.ts";
-import { editCommit, editPath, manifestCommit, foundingObjects, receiptObjects, receiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
+import { editCommit, editPath, manifestCommit, foundingObjects, receiptObjects, receiptRef, filePublicationCommit, fileReceiptObjects, fileReceiptRef, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 import { isOf, pinnedBy, pinnedOf } from "./versions.ts";
 
 /**
@@ -611,7 +611,11 @@ export const destination3: PlatformData = {
 
 
 /** The one branch item of a destination scope. */
-export const branchOf = (state: Pick<StateView, "page">): Item | null => state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
+export const branchOf = (state: Pick<StateView, "page">): Item | null => {
+  const branch = state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
+  // Version 4 stores heterogeneous item IDs as optional integer values.
+  return branch && Object.hasOwn(branch.values, "slot") ? { ...branch, refs: { ...branch.refs, slot: branch.values["slot"] ?? null, judging: branch.values["judging"] ?? null } } : branch;
+};
 
 /** The scope ID that the item `branch` holds in that value: a text that the genesis set from the creation's fields, and that no entry changes. */
 const heldId = (state: Pick<StateView, "page">, slot: "membership" | "rules"): ScopeId | null => {
@@ -654,7 +658,9 @@ function nextJudge(state: Pick<StateView, "page">, after: { slot?: boolean; judg
   const empty = (slot: "slot" | "judging") => after[slot] ?? (branch.refs[slot] ?? null) === null;
   if (!empty("slot") || !empty("judging") || !(after.ready ?? branch.state === "ready")) return null;
   // The lowest ID of those that are still `queued`: one more than the one that the entry ends is enough to read.
-  const queued = state.page("publication", ["queued"], null, 2).items.find((item) => item.id !== after.ended);
+  const queued = [...state.page("publication", ["queued"], null, 2).items,
+    ...(Object.hasOwn(branch.values, "slot") ? state.page("file-publication", ["queued"], null, 2).items : [])]
+    .filter(item => item.id !== after.ended).sort((a, b) => a.id - b.id)[0];
   return queued?.id ?? after.opens ?? null;
 }
 
@@ -674,13 +680,14 @@ function openedIn(state: Pick<StateView, "operation">, seq: number): Operation[]
 /** The publication with that item ID, or none. */
 const publicationAt = (state: Pick<StateView, "item">, id: unknown): Item | null => {
   const item = typeof id === "number" ? state.item(id) : null;
-  return item?.type === "publication" ? item : null;
+  return item?.type === "publication" || item?.type === "file-publication" ? item : null;
 };
 
 /** The receipt with that item ID, or none. */
 const receiptAt = (state: Pick<StateView, "item">, id: unknown): Item | null => {
   const item = typeof id === "number" ? state.item(id) : null;
-  return item?.type === "receipt" ? item : null;
+  return item?.type === "receipt" ? Object.hasOwn(item.values, "publication")
+    ? { ...item, refs: { ...item.refs, publication: item.values["publication"] ?? null } } : item : null;
 };
 
 /** This scope's own entry at a position before the one that is written. A rule that needs one and is given none has a fault: nothing is judged from a history that is not at hand. */
@@ -705,7 +712,7 @@ function pushesOf(state: Pick<StateView, "operation">, own: Own, publication: It
   const found: Operation[] = [];
   for (let seq = from; seq < before; seq += 1) {
     const { input } = ownEntry(own, seq);
-    const checked = pinnedOf(own) === "platform:destination@3" && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
+    const checked = ["platform:destination@3", "platform:destination@4"].includes(pinnedOf(own) ?? "") && ((input.type === "delivery" && input.message.class === "request" && input.message.type === "tell" && isObject(input.message.body) && input.message.body["message"] === "checked") || (input.type === "outcome" && ["check-judge", "reservation-stage"].includes(input.kind)));
     const about = seq === from || checked || (input.type === "act" && input.signed.intent.kind === "resend" && input.signed.intent.on === publication.id);
     if (about) found.push(...openedIn(state, seq).filter((operation) => isOf(operation.owner, NAME_OF) && operation.kind === DESTINATION_KINDS.push && (!checked || operation.for === publication.id)));
   }
@@ -811,8 +818,8 @@ export function targetOf(state: Pick<StateView, "item" | "page">, own: Own, writ
   const { input, effects } = ownEntry(own, at);
   if (write.kind === DESTINATION_KINDS.receipt) return receiptAt(state, input.type === "act" ? input.signed.intent.fields["receipt"] : at);
   if (input.type === "act") return publicationAt(state, input.signed.intent.on);
-  if (write.owner === "platform:destination@3" && write.kind === "reservation-delete") return publicationAt(state, write.for);
-  if (write.owner === "platform:destination@3" && (input.type === "delivery" || input.type === "outcome")) return publicationAt(state, write.for);
+  if (["platform:destination@3", "platform:destination@4"].includes(write.owner) && write.kind === "reservation-delete") return publicationAt(state, write.for);
+  if (["platform:destination@3", "platform:destination@4"].includes(write.owner) && (input.type === "delivery" || input.type === "outcome")) return publicationAt(state, write.for);
   const change = effects.find((effect) => effect.effect === "state" && effect.state === "reserved");
   return change?.effect === "state" ? publicationAt(state, change.item) : null;
 }
@@ -832,12 +839,12 @@ export function targetOf(state: Pick<StateView, "item" | "page">, own: Own, writ
 export function closed(target: Item | null): boolean {
   if (target === null) return true;
   if (target.type === "branch") return target.state !== "empty";
-  if (target.type === "publication") return !HELD.includes(target.state) || target.values["aborting"] === true;
+  if (target.type === "publication" || target.type === "file-publication") return !HELD.includes(target.state) || target.values["aborting"] === true;
   return target.state !== "owed" && target.state !== "unknown";
 }
 
 /** Whether an item is in a final state of its type, as the data states it. No effect changes such an item (the contract's section 6.6). */
-const isFinal = (item: Item): boolean => destination.items[item.type]?.states[item.state]?.final === true;
+const isFinal = (item: Item): boolean => (item.type === "file-publication" ? destination4 : destination).items[item.type]?.states[item.state]?.final === true;
 
 /**
  * Rule T4 of a token, for one outcome entry of an attempt of a write (the
@@ -1042,8 +1049,8 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
       const [compromised, next] = [publication.values["aborting"] === true, andNext(given, state, { slot: true })];
       const reason = compromised ? "compromised" : "host-refused";
       return {
-        effects: [{ effect: "state", item: id, state: pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
-        opens: [...next.opens, ...(pinnedBy(given) === "platform:destination@3" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
+        effects: [{ effect: "state", item: id, state: ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? "cleanup-aborted" : "aborted" }, { effect: "ref", item: branch.id, slot: "slot", to: null }, { effect: "value", item: id, slot: "reason", value: reason }, ...next.effects],
+        opens: [...next.opens, ...(["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && publication.type === "publication" && publication.values["tree"] ? [opening(given, "reservation-delete", 3, id), opening(given, "mint", 1, id)] : [])],
         update: { publication, state: "aborted", outcome: compromised ? "aborted" : "refused", reason },
       };
     }
@@ -1069,7 +1076,7 @@ function seenDecides(given: RuleGiven, publication: Item, seen: unknown, at: Pus
  */
 function pushOf({ state, own, input }: RuleGiven, push: Operation): { publication: Item; seen: unknown; allows: boolean } {
   const publication = targetOf(state, own, push);
-  if (input.type !== "outcome" || publication?.type !== "publication") throw new Error("a push is of one publication");
+  if (input.type !== "outcome" || !(publication?.type === "publication" || publication?.type === "file-publication")) throw new Error("a push is of one publication");
   const seen = isObject(input.evidence.body) ? input.evidence.body["seen"] : null;
   return { publication, seen, allows: !closed(publication) && isObjectId(seen) && seen === branchOf(state)?.values["head"] };
 }
@@ -1136,7 +1143,15 @@ export function destinationReceipt(state: Pick<StateView, "item" | "page">, own:
   const entry = ownEntry(own, receipt.id);
   const commit = receipt.values["commit"];
   if (!isObjectId(commit)) throw new Error("a receipt holds the published commit");
-  const publication = publicationAt(state, receipt.refs["publication"]);
+  const publication = publicationAt(state, receipt.refs["publication"] ?? receipt.values["publication"]);
+  if (publication?.type === "file-publication") {
+    const cause = filePublicationCause(publication);
+    if (!cause) throw new Error("A file receipt holds its immutable sending cause");
+    const supersededBy = receipt.values["supersededBy"];
+    const file = { v: 1, publication: factRefOf(entry), cause, path: publication.values["path"], contentDigest: publication.values["contentDigest"], commit,
+      ...(supersededBy == null ? {} : { supersededBy }) };
+    return { ...fileReceiptObjects(format, entry.at.scope, entry.time, cause, file), ref: fileReceiptRef(cause), file };
+  }
   let operation: FactRef;
   let file: unknown;
   if (publication) {
@@ -1409,7 +1424,7 @@ function reportsBound(given: Pick<RuleGiven, "uses" | "own">, statement: Stateme
   const commits = reportCommits(given, statement);
   if (!manifest || commits === undefined) return undefined;
   // i5 edit: a one-file manifest selects no report.
-  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (pinnedOf(given.own) === "platform:destination@3" && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
+  const selected = manifest.input.type !== "act" ? null : manifest.input.signed.intent.kind === PROPOSE_FILE || (["platform:destination@3", "platform:destination@4"].includes(pinnedOf(given.own) ?? "") && sourcesOf(manifest)) ? [] : manifest.input.signed.intent.fields["selected"];
   if (!Array.isArray(selected) || selected.length !== statement.reports.length) return null;
   const same = selected.every((record, place) => isObject(record) && isFactRef(record["report"]) && canonicalize(record["report"]) === canonicalize(statement.reports[place]!));
   return same && commits.every((commit): commit is string => commit !== null) ? commits : null;
@@ -1668,7 +1683,7 @@ const WRITTEN: Rules = {
     place: "effect", most: 3,
     run: (given) => {
       const { state, resolved } = given;
-      const expiredSlot = pinnedBy(given) === "platform:destination@3" && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
+      const expiredSlot = ["platform:destination@3", "platform:destination@4"].includes(pinnedBy(given)) && branchOf(state)?.refs["slot"] !== undefined && ["cleanup-aborted", "cleanup-owed", "cleaned"].includes(state.item(branchOf(state)!.refs["slot"] as number)?.state ?? "");
       const [branch, publication] = [branchOf(state), nextJudge(state, { opens: resolved.self, ...(expiredSlot ? { slot: true } : {}) })];
       return branch && publication !== null ? [...(expiredSlot ? [{ effect: "ref", item: branch.id, slot: "slot", to: null } as const] : []), ...opened(given, 0, DESTINATION_KINDS.judge, DESTINATION_ATTEMPTS.judge, publication), { effect: "ref", item: branch.id, slot: "judging", to: publication }] : [];
     },
@@ -1874,9 +1889,9 @@ const WRITTEN: Rules = {
         if (!served) throw new Error("a mint is of one attempt of a write");
         const target = targetOf(state, own, served.write);
         const attempt = served.write.attempts.find((opened) => opened.attempt === served.attempt);
-        if (target === null || (closed(target) && !(served.write.owner === "platform:destination@3" && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
+        if (target === null || (closed(target) && !(["platform:destination@3", "platform:destination@4"].includes(served.write.owner) && served.write.kind === "reservation-delete" && ["published", "cleanup-aborted", "cleanup-owed"].includes(target.state))) || (attempt?.outcomes.length ?? 0) > 0) return { effects: [], sends: [], opens: [opening(given, DESTINATION_KINDS.revoke, DESTINATION_ATTEMPTS.revoke, mint.for!)] };
         return {
-          effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...(target.type === "publication" && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
+          effects: [{ effect: "value", item: target.id, slot: "token", value: mint.id }, ...((target.type === "publication" || target.type === "file-publication") && target.state === "reserved" && served.write.kind === DESTINATION_KINDS.push ? [{ effect: "state", item: target.id, state: "publishing" } as const] : [])],
           sends: [], opens: [],
         };
       },
@@ -2088,7 +2103,7 @@ export function publicationOrigin(state: StateView, operation: Operation, own: O
     const publicationFor = (target: Item | null): Item | false | null => {
       if (!target) return false;
       if (target.type === "publication") return target;
-      if (target.type === "receipt") return target.refs["publication"] == null ? null : publicationAt(state, target.refs["publication"]) ?? false;
+      if (target.type === "receipt") { const id = target.refs["publication"] ?? target.values["publication"]; return id == null ? null : publicationAt(state, id) ?? false; }
       return target.type === "branch" ? null : false;
     };
     let publication: Item | false | null;
@@ -2338,7 +2353,7 @@ export const destinationRules3: Rules = (() => {
     const base = receiptPrior.rules.derives!(given, operation, selected);
     const written = base.effects.find((effect) => effect.effect === "state" && effect.state === "written");
     if (!written || written.effect !== "state") return base;
-    const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"];
+    const receipt = given.state.item(written.item), publicationId = receipt?.refs["publication"] ?? receipt?.values["publication"];
     const publication = typeof publicationId === "number" ? given.state.item(publicationId) : null;
     if (!publication) return base;
     if (!publication.values["tree"] || !stagedOwn(given, publication, given.resolved.self)) return { ...base, effects: [...base.effects, { effect: "state", item: publication.id, state: "cleaned" }] };
@@ -2467,4 +2482,224 @@ export const destinationRules3: Rules = (() => {
       },
     } },
   });
+})();
+
+// ---------------------------------------------------------------- file publication, version 4 only
+
+const FILE_STATES = ["queued", "reserved", "publishing", "unresolved", "published", "aborted", "superseded"] as const;
+const ITEM_ID = { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER } as const;
+const fileCauseType = { type: "record", of: {
+  from: { type: "record", required: true, of: {
+    at: { type: "scope", kind: "lane", required: true }, seq: { ...ITEM_ID, required: true }, hash: { type: "digest", required: true },
+  } }, n: { ...ITEM_ID, required: true },
+} } as const;
+const branch3 = destination3.items["branch"]!, receipt3 = destination3.items["receipt"]!;
+const { slot: _slot4, judging: _judging4, ...branchRefs4 } = branch3.refs;
+const { publication: _publication4, ...receiptRefs4 } = receipt3.refs;
+/** Additive application publication version. No catalog entry or old data is replaced. */
+export const destination4: PlatformData = {
+  ...destination3,
+  items: { ...destination3.items,
+    branch: { ...branch3, refs: branchRefs4, values: { ...branch3.values,
+      slot: { fixed: false, required: false, of: ITEM_ID }, judging: { fixed: false, required: false, of: ITEM_ID },
+    } },
+    "file-publication": {
+      many: true, max: 64, initial: "queued",
+      holds: { operations: { judge: 1, push: 1, mint: 6, revoke: 6, read: 3, receipt: 1 }, items: 1 },
+      states: { queued: { final: false }, reserved: { final: false }, publishing: { final: false }, unresolved: { final: false },
+        published: { final: true }, aborted: { final: true }, superseded: { final: true } }, parties: {},
+      refs: { sender: { fixed: true, required: true, to: { type: "scope", kind: "lane" } } },
+      values: {
+        sourceSeq: { fixed: true, required: true, of: ITEM_ID }, sourceHash: { fixed: true, required: true, of: { type: "digest" } },
+        sourceOrdinal: { fixed: true, required: true, of: ITEM_ID },
+        path: { fixed: true, required: true, of: { type: "text", max: 1024 } },
+        content: { fixed: true, required: true, of: { type: "text", max: 65536 } },
+        contentDigest: { fixed: true, required: true, of: { type: "digest" } },
+        base: { fixed: false, required: false, of: { type: "commit" } }, tree: { fixed: false, required: false, of: { type: "commit" } },
+        integration: { fixed: false, required: false, of: { type: "commit" } },
+        reservedAt: { fixed: false, required: false, of: ITEM_ID },
+        reason: { fixed: false, required: false, of: { type: "text", max: 1024 } },
+        token: { fixed: false, required: false, of: TOKEN },
+      },
+    },
+    receipt: { ...receipt3, max: RECEIPTS_OWED + 128 + 1, refs: receiptRefs4,
+      values: { ...receipt3.values, publication: { fixed: true, required: false, of: ITEM_ID },
+        supersededBy: { fixed: true, required: false, of: fileCauseType } } },
+  },
+  receives: { ...destination3.receives,
+    "publish-file": { message: "publish-file", class: "tell", from: { kind: "lane" }, opens: "file-publication", also: BRANCH,
+      fields: { path: { type: "text", max: 1024, required: true }, content: { type: "text", max: 65536, required: true } },
+      guards: [{ code: "file-cause-new", row: "P18" }, { code: "file-receipt-room", row: "P18" }],
+      effects: [{ code: "file-source", row: "P16" }, { code: "open-judge", row: "P16" }], sends: [], attention: [],
+    },
+  },
+};
+
+/** The actual typed item ID; zero is a valid ID and null is an empty slot. */
+export function destinationPublicationAt(state: Pick<StateView, "item">, id: unknown): Item | null {
+  return typeof id === "number" && Number.isSafeInteger(id) && id >= 0 ? publicationAt(state, id) : null;
+}
+/** The immutable source position of one file send. */
+export function filePublicationCause(item: Item): import("./destination-objects.ts").FilePublicationCause | null {
+  const from = { at: item.refs["sender"], seq: item.values["sourceSeq"], hash: item.values["sourceHash"] };
+  const n = item.values["sourceOrdinal"];
+  return item.type === "file-publication" && isFactRef(from) && typeof n === "number" && Number.isSafeInteger(n) && n >= 0 ? { from, n } : null;
+}
+/** Full sender (including incarnation) and path high-water over all retained rows. */
+export function newestFilePublication(state: Pick<StateView, "page">, item: Item): Item | null {
+  const cause = filePublicationCause(item);
+  if (!cause) return null;
+  let latest: Item | null = null, cursor: number | null = null;
+  for (;;) {
+    const page = state.page("file-publication", FILE_STATES, cursor, 64);
+    for (const row of page.items) {
+      const next = filePublicationCause(row), best = latest && filePublicationCause(latest);
+      if (!next || canonicalize(next.from.at) !== canonicalize(cause.from.at) || row.values["path"] !== item.values["path"]) continue;
+      if (!best || next.from.seq > best.from.seq || next.from.seq === best.from.seq && next.n > best.n) latest = row;
+    }
+    if (!page.more) return latest;
+    const last = page.items.at(-1);
+    if (!last || cursor !== null && last.id <= cursor) throw new Error("File high-water page made no progress");
+    cursor = last.id;
+  }
+}
+export function filePublicationCurrent(state: Pick<StateView, "page">, item: Item): boolean {
+  const newest = newestFilePublication(state, item);
+  return newest !== null && canonicalize(filePublicationCause(newest)) === canonicalize(filePublicationCause(item));
+}
+/** Driver-only before-mark result: sent/unknown attempts never call this hook. */
+export function fileSupersededOutcome(state: StateView, operation: Operation, own: Own): import("@generalbusiness/dap-contract").Evidence | null {
+  if (operation.owner !== "platform:destination@4" || operation.kind !== "push") return null;
+  const item = targetOf(state, own, operation), head = branchOf(state)?.values["head"];
+  if (item?.type !== "file-publication" || !isObjectId(head) || closed(item) || filePublicationCurrent(state, item)) return null;
+  // An earlier unknown outcome is never proof of a send that did not leave.
+  if (operation.attempts.some(attempt => attempt.outcomes.some(outcome => outcome.result !== "refused"))) return null;
+  const newest = newestFilePublication(state, item), cause = newest && filePublicationCause(newest);
+  return cause ? { basis: "own-answer", body: { send: "not-sent", seen: head, supersededBy: cause as unknown as FieldValue } } : null;
+}
+
+function fileEnd(given: RuleGiven, item: Item, supersededBy: import("./destination-objects.ts").FilePublicationCause | null): Decided {
+  const branch = branchOf(given.state)!, head = branch.values["head"];
+  if (!isObjectId(head)) throw new Error("A file receipt needs the recorded branch head");
+  const next = andNext(given, given.state, { judging: true, slot: true, ended: item.id }, true);
+  return { effects: [
+    { effect: "state", item: item.id, state: supersededBy ? "superseded" : "aborted" },
+    { effect: "value", item: item.id, slot: "reason", value: supersededBy ? "superseded" : "path-invalid" },
+    { effect: "ref", item: branch.id, slot: "slot", to: null },
+    { effect: "open", item: given.resolved.self, type: "receipt", state: "owed" },
+    { effect: "ref", item: given.resolved.self, slot: "publication", to: item.id },
+    { effect: "value", item: given.resolved.self, slot: "commit", value: head },
+    ...(supersededBy ? [{ effect: "value", item: given.resolved.self, slot: "supersededBy", value: supersededBy as unknown as FieldValue } as const] : []), ...next.effects,
+  ], opens: [opening(given, "receipt", 3, item.id), opening(given, "mint", 1, item.id), ...next.opens], update: null };
+}
+/** Only version 4 translates heterogeneous pointer writes into integer values. */
+function fileEffects(effects: readonly RuleEffect[], state: Pick<StateView, "page">): readonly RuleEffect[] {
+  const branch = branchOf(state);
+  return effects.map(effect => effect.effect === "ref" && ((effect.item === branch?.id && ["slot", "judging"].includes(effect.slot)) || effect.slot === "publication")
+    ? { effect: "value", item: effect.item, slot: effect.slot, value: effect.to } : effect);
+}
+function fileJudge(given: RuleGiven): Decided {
+  const branch = branchOf(given.state)!, item = destinationPublicationAt(given.state, branch.refs["judging"]);
+  if (item?.type !== "file-publication" || given.input.type !== "outcome") throw new Error("The file judge names one file publication");
+  if (item.state !== "queued") return NOTHING;
+  if (!filePublicationCurrent(given.state, item)) return fileEnd(given, item, filePublicationCause(newestFilePublication(given.state, item)!)!);
+  const body = given.input.evidence.body;
+  if (!isObject(body) || !isObjectId(body["head"]) || body["head"] !== branch.values["head"]) throw new Error("The file judge needs the actual current published base");
+  if (editPath(item.values["path"]) === null || body["present"] === false) return fileEnd(given, item, null);
+  const cause = filePublicationCause(item), path = item.values["path"], digest = item.values["contentDigest"], tree = body["tree"];
+  if (!cause || typeof path !== "string" || typeof digest !== "string" || !isObjectId(tree)) throw new Error("The file judge needs its exact content and tree");
+  const commit = filePublicationCommit(formatOf(tree)!, given.resolved.at.scope, given.time, tree, body["head"], path, cause, digest);
+  return { effects: [
+    { effect: "state", item: item.id, state: "reserved" }, { effect: "ref", item: branch.id, slot: "slot", to: item.id },
+    { effect: "ref", item: branch.id, slot: "judging", to: null }, { effect: "value", item: item.id, slot: "reservedAt", value: given.resolved.self },
+    { effect: "value", item: item.id, slot: "base", value: body["head"] }, { effect: "value", item: item.id, slot: "tree", value: tree },
+    { effect: "value", item: item.id, slot: "integration", value: commit.id },
+  ], opens: [opening(given, "push", 1, item.id), opening(given, "mint", 1, item.id)], update: null };
+}
+
+export const destinationRules4: Rules = (() => {
+  const oldJudge = destinationRules3["judge"] as Extract<PlatformRule, { place: "outcome" }>;
+  const oldPush = destinationRules3["push"] as Extract<PlatformRule, { place: "outcome" }>;
+  const isFileJudge = (given: RuleGiven) => destinationPublicationAt(given.state, branchOf(given.state)?.refs["judging"])?.type === "file-publication";
+  const push4 = { ...oldPush, rules: { ...oldPush.rules,
+    beforeSend: (state: StateView, operation: Operation, _attempt: number, own: Own) => fileSupersededOutcome(state, operation, own),
+    retries: (result: "refused" | "unknown", operation: Operation, given: RuleGiven) => targetOf(given.state, given.own, operation)?.type === "file-publication" ? false : oldPush.rules.retries!(result, operation, given),
+    wellFormed: (result: "confirmed" | "refused" | "unknown", evidence: import("@generalbusiness/dap-contract").Evidence, given: RuleGiven) => {
+      const item = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
+      if (!item || targetOf(given.state, given.own, item)?.type !== "file-publication") return oldPush.rules.wellFormed!(result, evidence, given);
+      return record(evidence.body, { send: value => SENDS[result]!.includes(value as string), seen: isSeen }, { supersededBy: value => isObject(value) && isFactRef(value["from"]) && typeof value["n"] === "number" && Number.isSafeInteger(value["n"]) && value["n"] >= 0 });
+    },
+    derives: (given: RuleGiven, operation: Operation, selected: boolean | null) => {
+      const item = targetOf(given.state, given.own, operation);
+      if (item?.type !== "file-publication") return oldPush.rules.derives!(given, operation, selected);
+      if (given.input.type !== "outcome") throw new Error("File push has an outcome");
+      const superseded = isObject(given.input.evidence.body) ? given.input.evidence.body["supersededBy"] : null;
+      const token = tokenStep(given, operation);
+      if (superseded != null) {
+        const expected = fileSupersededOutcome(given.state, operation, given.own)?.body;
+        if (given.input.result !== "refused" || !isObject(expected) || canonicalize(expected) !== canonicalize(given.input.evidence.body)) throw new Error("A superseded file push is the exact unsent high-water decision");
+        const ended = fileEnd(given, item, superseded as unknown as import("./destination-objects.ts").FilePublicationCause);
+        return { effects: [...token.effects, ...ended.effects], sends: [], opens: [...token.opens, ...ended.opens] };
+      }
+      const seen = isObject(given.input.evidence.body) ? given.input.evidence.body["seen"] : null;
+      const ended = seenDecides(given, item, seen, { push: operation, attempt: given.input.attempt, result: given.input.result, next: false });
+      return { effects: [...token.effects, ...ended.effects], sends: [], opens: [...token.opens, ...ended.opens] };
+    },
+  } };
+  const rules: Rules = { ...destinationRules3, push: push4,
+    "file-cause-new": { place: "guard", refusals: ["already-published"], run: ({ input, state }) => {
+      if (input.type !== "delivery") return { holds: false, name: "already-published" };
+      let cursor: number | null = null;
+      for (;;) { const page = state.page("file-publication", FILE_STATES, cursor, 64);
+        if (page.items.some(item => canonicalize(filePublicationCause(item)) === canonicalize({ from: input.from, n: input.n }))) return { holds: false, name: "already-published" };
+        if (!page.more) return { holds: true };
+        const last = page.items.at(-1); if (!last || cursor !== null && last.id <= cursor) throw new Error("File cause scan made no progress"); cursor = last.id;
+      }
+    } },
+    "file-receipt-room": { place: "guard", refusals: ["receipts-owed"], run: ({ state }) => ({ holds: state.count("receipt", "owed") <= RECEIPTS_OWED, name: "receipts-owed" }) },
+    "file-source": { place: "effect", most: 7, run: ({ input, resolved }) => {
+      if (input.type !== "delivery" || typeof resolved.fields["path"] !== "string" || typeof resolved.fields["content"] !== "string") throw new Error("File publication is an exact source delivery");
+      return [{ effect: "ref", item: resolved.self, slot: "sender", to: input.from.at },
+        ...Object.entries({ sourceSeq: input.from.seq, sourceHash: input.from.hash, sourceOrdinal: input.n, path: resolved.fields["path"], content: resolved.fields["content"], contentDigest: textDigest(resolved.fields["content"]) }).map(([slot, value]) => ({ effect: "value", item: resolved.self, slot, value } as const))];
+    } },
+    judge: { ...oldJudge, rules: { ...oldJudge.rules, most: { effects: 10, requests: 1, operations: 3 },
+      subjects: (given, operation, row, first) => isFileJudge(given) ? [] : oldJudge.rules.subjects!(given, operation, row, first),
+      wellFormed: (result, evidence, given) => isFileJudge(given) ? result === "confirmed" && record(evidence.body, { head: isObjectId, present: value => typeof value === "boolean", tree: value => value === null || isObjectId(value) }) : oldJudge.rules.wellFormed!(result, evidence, given),
+      derives: (given, operation, selected) => {
+        if (!isFileJudge(given)) return oldJudge.rules.derives!(given, operation, selected);
+        const decided = fileJudge(given); return { effects: decided.effects, sends: [], opens: decided.opens };
+      },
+    } },
+    receipt: { ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>), rules: {
+      ...(destinationRules3["receipt"] as Extract<PlatformRule, { place: "outcome" }>).rules,
+      derives: (given, operation, selected) => {
+        const receipt = targetOf(given.state, given.own, operation), id = receipt?.refs["publication"] ?? receipt?.values["publication"];
+        const rule = (destinationPublicationAt(given.state, id)?.type === "file-publication" ? destinationRules2 : destinationRules3)["receipt"] as Extract<PlatformRule, { place: "outcome" }>;
+        return rule.rules.derives!(given, operation, selected);
+      },
+    } },
+    "publication-update": { place: "send", run: (given) => {
+      const operation = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
+      if (operation && (operation.kind === "judge" ? isFileJudge(given) : targetOf(given.state, given.own, operation)?.type === "file-publication")) return null;
+      const old = destinationRules3["publication-update"]!; return old.place === "send" ? old.run(given) : null;
+    } },
+  };
+  return Object.fromEntries(Object.entries(rules).map(([name, rule]) => {
+    if (rule.place === "effect") return [name, { ...rule, run: (given: RuleGiven) => fileEffects(rule.run(given), given.state) }];
+    if (rule.place !== "outcome") return [name, rule];
+    return [name, { ...rule, rules: { ...rule.rules,
+      publicationOrigin: (state: StateView, operation: Operation, own: Own) => {
+        let item = typeof operation.for === "number" ? state.item(operation.for) : null;
+        if (item?.type === "receipt") item = destinationPublicationAt(state, item.values["publication"] ?? item.refs["publication"]);
+        if (item?.type !== "file-publication") return publicationOrigin(state, operation, own);
+        if (["revoke", "reservation-delete", "first-head", "adopt-read", "mint-read"].includes(operation.kind)) return null;
+        const cause = filePublicationCause(item), directory = branchOf(state)?.refs["directory"], destination = state.scope()?.at;
+        return cause && isScopeRef(directory) && destination ? { from: cause.from, directory, destination, mode: "application" } : false;
+      },
+      derives: rule.rules.derives ? (given: RuleGiven, operation: Operation, selected: boolean | null) => {
+        const result = rule.rules.derives!(given, operation, selected);
+        return { ...result, effects: fileEffects(result.effects, given.state) };
+      } : undefined,
+    } }];
+  }));
 })();

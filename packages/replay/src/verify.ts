@@ -143,6 +143,8 @@ export interface Coded {
    * Null means that required origin proof is missing; anchored copies remain
    * explicitly trusted. This metadata changes no pinned data or judgment. */
   sourceName?: ((named: Digest | PlatformDefinition, declaredName: string, origin?: readonly Fetched[]) => string | null) | undefined;
+  /** File publication admission uses the supplied version's application factory policy. */
+  applicationPublicationOrigin?: ((from: FactRef, directory: ScopeRef, destination: ScopeRef, facts: readonly Fetched[]) => boolean | null) | undefined;
   /**
    * Where a scope under this version records its membership reference,
    * when that is not its genesis entry (authority note, section 3.3, "Where
@@ -399,6 +401,7 @@ class Verifier {
   readonly #owners: Owners | undefined;
   readonly #platform: Options["platform"];
   #sourceName: Coded["sourceName"];
+  #applicationPublicationOrigin: Coded["applicationPublicationOrigin"];
   readonly #grants: "proven" | "as-recorded";
   readonly #runs = new Map<ScopeId, Run>();
   readonly #trusts = new Set<Trust>();
@@ -776,6 +779,10 @@ class Verifier {
     if (supplied.sourceName) {
       if (this.#sourceName && this.#sourceName !== supplied.sourceName) throw new Stop("unsupported-definition", "the supplied native versions disagree on their source-identity policy", where);
       this.#sourceName = supplied.sourceName;
+    }
+    if (supplied.applicationPublicationOrigin) {
+      if (this.#applicationPublicationOrigin && this.#applicationPublicationOrigin !== supplied.applicationPublicationOrigin) throw new Stop("unsupported-definition", "the supplied native versions disagree on their application publication policy", where);
+      this.#applicationPublicationOrigin = supplied.applicationPublicationOrigin;
     }
     run.platform = { named, rules: supplied.rules };
     run.observed = supplied.observed;
@@ -1160,6 +1167,30 @@ class Verifier {
     return identity;
   }
 
+  /** Origin facts come from checked histories, never from a retained alias or synthetic registration. */
+  async #applicationOrigin(from: FactRef, directory: ScopeRef, destination: ScopeRef, where: FactRef, depth: number): Promise<void> {
+    if (!this.#applicationPublicationOrigin) throw new Stop("unsupported-definition", "the destination version supplies no application publication policy", where);
+    await this.#prove(from, where, depth);
+    const source = this.#runs.get(from.at.scope);
+    const first = source?.sealed[0];
+    const facts: Fetched[] = [];
+    if (source?.at && sameScope(source.at, from.at) && first?.entry.input.type === "genesis") {
+      facts.push({ fact: { at: first.entry.at, seq: 0, hash: first.hash }, entry: first.entry, under: this.#sourceIdentity(source, where) });
+      const cause = first.entry.input.source;
+      if (cause) {
+        await this.#prove(cause, where, depth);
+        const creator = this.#runs.get(cause.at.scope), made = creator?.sealed[cause.seq], genesis = creator?.sealed[0];
+        if (creator?.at && sameScope(creator.at, cause.at) && made?.hash === cause.hash && genesis) {
+          const under = this.#sourceIdentity(creator, where);
+          facts.push({ fact: cause, entry: made.entry, under }, { fact: { at: genesis.entry.at, seq: 0, hash: genesis.hash }, entry: genesis.entry, under });
+        }
+      }
+    }
+    const proof = this.#applicationPublicationOrigin(from, directory, destination, facts);
+    if (proof === null) throw new Stop("incomplete", "the application's required native factory proof is missing", where);
+    if (!proof) throw new Stop("mismatch", "the file publication source is no native application of this room", where);
+  }
+
   async #replay(run: Run, entry: Entry, hash: Digest, bytes: string, where: FactRef, depth: number): Promise<void> {
     const mismatch = (why: string): Stop => new Stop("mismatch", why, where);
     const input = entry.input;
@@ -1312,6 +1343,12 @@ class Verifier {
         // The address is the one the sender wrote: the source entry's send at that ordinal.
         const to = source?.entry.sends.find((send) => send.n === input.n)?.to;
         if (!source || to === undefined) throw mismatch("the source entry holds no send at that ordinal");
+        if (run.named === "platform:destination@4" && input.message.class === "request" && input.message.type === "tell"
+          && isObject(input.message.body) && input.message.body["message"] === "publish-file") {
+          const directory = state.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
+          if (!isScopeRef(directory) || !run.at) throw mismatch("the destination records no full Directory reference");
+          await this.#applicationOrigin(input.from, directory, run.at, where, depth);
+        }
         const origin = input.message.class === "result" && isObject(input.message.of) && isObject(input.message.of.from) ? sealed(input.message.of.from.seq) : null;
         // Sections 4.1 and 16.1: a delivery of a result may retain observations, each of the ten-second kind. Each is derived again,
         // and the judge is given the recorded ones: its clause's rules read them, and it derives an input with those that were read.
@@ -1367,6 +1404,9 @@ class Verifier {
         // `unsupported-definition` at that entry, and never `consistent`.
         if (!owners?.rules(owner, kind)) throw new Stop("unsupported-definition", `entry ${entry.seq} is an outcome, and this replay has no rules of the owner of its operation`, where);
         const valueOwner = owners.rules(owner, kind);
+        const publication = run.named === "platform:destination@4" && operation ? valueOwner?.publicationOrigin?.(state, operation, reading.own!) : null;
+        if (publication === false) throw mismatch("the operation has malformed publication provenance");
+        if (publication && publication.mode === "application") await this.#applicationOrigin(publication.from, publication.directory, publication.destination, where, depth);
         if (valueOwner?.values !== undefined && valueOwner.valueDomains === undefined) throw new Stop("unsupported-definition", "the outcome owner has a value reader but no static domain declaration for this pinned version and kind", where);
         this.#trusts.add("outcomes");
         await this.#snapshots(run, input, owners, owner, kind, where);
