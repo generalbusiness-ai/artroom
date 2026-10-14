@@ -33,7 +33,7 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";

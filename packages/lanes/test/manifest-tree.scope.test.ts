@@ -196,7 +196,7 @@ test("a valid custom required rules input is activated natively but stops the fi
   try { await story(ownHost(), wired, false, false, false, false, false, undefined, false, false, undefined, "custom-required"); }
   finally { owner.close(); net.hold = null; for (const name of wired) platformOutside.delete(name); }
 }, 120_000);
-async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false, checkpointMeta?: Record<string, unknown>): Promise<void> {
+async function story(at: Stand, wired: Set<ScopeId>, startedOnly = false, unknownStageOnly = false, unknownDeleteOnly = false, oneFileOnly = false, refusePushOnly = false, linkFault?: "summary" | "request" | "reply" | "unavailable" | "accepted", exhaustCleanup: false | "ref" | "token" | "token-unknown" = false, unknownMintOnly = false, nonemptyProfile?: "production" | "demo", proposalFault?: "source-reply" | "source-unavailable" | "source-refused" | "source-mismatch" | "manifest-reply" | "rules-read" | "custom-required", receiptRecoveryOnly = false, checkpointMeta?: object): Promise<void> {
   const activeChange = nonemptyProfile === "production" ? change3 : changeDemo3;
   const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
   const now = () => timeMs(net.clock.now)!;

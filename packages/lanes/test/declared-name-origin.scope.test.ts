@@ -160,10 +160,15 @@ test("a genuine Native change extension cannot reserve another room's destinatio
   const A = await nativeRoom({ roster: [] }), B = await nativeRoom({ roster: [] });
   const definition = {
     ...changeDemo,
+    items: { ...changeDemo.items, merge: {
+      ...changeDemo.items.merge,
+      refs: { ...changeDemo.items.merge.refs, foreign: { fixed: true, required: true, to: { type: "scope", kind: "destination" } } },
+    } },
     acts: { ...changeDemo.acts, merge: {
       ...changeDemo.acts.merge,
       fields: { ...changeDemo.acts.merge.fields, foreign: { type: "scope", kind: "destination", required: true } },
-      sends: changeDemo.acts.merge.sends.map(form => ({ tell: { ...form.tell, to: { field: "foreign" } } })),
+      effects: [...changeDemo.acts.merge.effects, { ref: { slot: "foreign", from: { field: "foreign" } } }],
+      sends: changeDemo.acts.merge.sends.map(form => ({ tell: { ...form.tell, to: { slot: "foreign" } } })),
     } },
   } as const satisfies DeclaredDefinition;
   const digest = definitionDigest(definition);
