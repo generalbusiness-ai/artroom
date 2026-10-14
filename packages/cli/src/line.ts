@@ -3,7 +3,7 @@
  * no state of a process, so a test runs the same lines as a person types.
  */
 
-import { enrolAgentKey } from "./invitations.ts";
+import { enrolAgentKey, invitePerson } from "./invitations.ts";
 import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
 import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type InstallCohort, type Outcome } from "./commands.ts";
 
@@ -13,7 +13,8 @@ export const USAGE = [
   "  dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|counting-commitments]",
   "  dap install --planned [--cohort application|counting-commitments]",
   "  dap create <name> [--handle @you] [--branch main] [--again]",
-  "  dap invite <@member> --role <role> [--hours 24]",
+  "  dap invite <@member> --role <role> [--hours 24] [--keep]",
+  "  dap invite --check | --continue",
   "  dap join <link> [--check for an agent-key invitation]",
   "  dap acts [<scope>]",
   "  dap act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
@@ -37,7 +38,7 @@ export const USAGE = [
 ].join("\n");
 
 /** The flags that take no value. */
-const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned", "check"]);
+const SWITCHES: ReadonlySet<string> = new Set(["again", "all", "plan", "planned", "check", "keep", "continue"]);
 
 /** The words of a command line: the positional ones, each `--name value`, and each switch; `--set` may be given more than once. */
 export function parse(argv: readonly string[]): { words: string[]; flags: Map<string, string[]> } | null {
@@ -61,7 +62,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours", "keep", "check", "continue"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -92,7 +93,12 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
       const outcome = first === undefined ? needs("a name") : await claim(ctx, first, { ...(flag("handle") ? { handle: flag("handle")! } : {}), ...(flag("branch") ? { branch: flag("branch")! } : {}), ...(flag("again") ? { again: true } : {}) });
       return name === "found" ? { ...outcome, lines: ["Use dap create instead of dap found. The found alias remains for one release.", ...outcome.lines] } : outcome;
     }
-    case "invite": return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
+    case "invite":
+      if (flag("check") !== undefined && flag("continue") !== undefined) return { code: 2, lines: ["invite takes --check or --continue, not both.", USAGE] };
+      if (flag("check") !== undefined || flag("continue") !== undefined) return first !== undefined || flag("role") || flag("keep") !== undefined || flag("hours") !== undefined || flag("acts") !== undefined ? { code: 2, lines: ["invite --check and --continue take no handle, role, hours or acts: the retained invitation holds them.", USAGE] } : invitePerson(ctx, undefined, { mode: flag("check") !== undefined ? "check" : "continue" });
+      if (flag("keep") !== undefined && flag("acts") !== undefined) return { code: 2, lines: ["invite --keep takes no --acts: a role's actions are the roster's.", USAGE] };
+      if (flag("keep") !== undefined) return first === undefined ? needs("a member's handle") : invitePerson(ctx, first, { mode: "new", ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
+      return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : flag("check") !== undefined ? first.startsWith(AGENT_KEY_LINK) ? enrolAgentKey(ctx, first, { mode: "check" }) : needs("an explicitly tagged agent-key invitation for --check") : join(ctx, first);
     case "acts": return acts(ctx, first);
     case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [], value: parsed.flags.get("value") ?? [] });
