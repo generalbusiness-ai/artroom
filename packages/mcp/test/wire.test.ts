@@ -10,7 +10,7 @@ import { b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { McpService, MODERN, MODERN_RESULT_EXTRA, LEGACY, Wire, memoryStore, type McpConfig } from "../src/index.ts";
+import { McpService, MODERN, MODERN_RESULT_EXTRA, LEGACY, Wire, memoryStore, newSession, type McpConfig } from "../src/index.ts";
 import { serveHttp, serveStdio, type HttpServing } from "../src/node.ts";
 import { StandIn } from "./support/standin.ts";
 
@@ -377,6 +377,24 @@ describe("both MCP wire revisions, each by its own rules", () => {
     release();
     expect(await pending).toBeNull();
     expect([subscribed, wire.listening, sent]).toEqual([0, 0, []]);
+  });
+
+  // Invariant: a stdio server dispatches every line of one read in the same turn; with no persistence hook the live
+  // initialized marker moves at once, so a tools/list dispatched right after notifications/initialized is served, not refused.
+  test("notifications/initialized and tools/list dispatched in one turn, with no hook: the list is served", async () => {
+    const fake = { snapshot: async () => ({ generation: "sha256:x" }), page: async () => ({ generation: "sha256:x", tools: [] }), subscribe: () => () => {} } as unknown as McpService;
+    const wire = new Wire(fake);
+    const session = newSession(null);
+    const send = () => {};
+    const owner = {};
+    expect((await wire.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "t", version: "0" } } }, session, send, owner))?.error).toBeUndefined();
+    // Dispatched in the same turn, as one read of two lines is.
+    const initialized = wire.handle({ jsonrpc: "2.0", method: "notifications/initialized" }, session, send, owner);
+    const listed = wire.handle({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, session, send, owner);
+    expect(await initialized).toBeNull();
+    const reply = await listed;
+    expect(reply?.error, JSON.stringify(reply)).toBeUndefined();
+    expect(Array.isArray((reply?.result as { tools?: unknown[] })?.tools)).toBe(true);
   });
 
   // Invariant: frames are told apart by JSON-RPC's rules, an invalid ID is never echoed, and nothing a client sends is repeated

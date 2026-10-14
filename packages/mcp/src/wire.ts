@@ -213,23 +213,28 @@ export class Wire {
         try { await this.hooks.changed?.(session); } catch (thrown) { if ((thrown as Error).name === "SessionFull" || /No room for another session/.test(String((thrown as Error).message))) return error(id, SESSION_FULL, "No room for another session."); throw thrown; }
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
-      case "notifications/initialized":
+      case "notifications/initialized": {
         // The durable row is written with the prospective state first; the live session changes only once that succeeded. The
-        // hook sees the live session, so one that ended while a request was pending is not persisted again.
-        await this.hooks.changed?.(session, { initialized: true });
+        // hook sees the live session, so one that ended while a request was pending is not persisted again. With no hook
+        // (stdio, loopback) the live marker moves at once, before any other message of the same read is dispatched.
+        const persist = this.hooks.changed;
+        if (persist) await persist(session, { initialized: true });
         session.initialized = true;
         this.watchLegacy(session);
         return null;
+      }
       case "notifications/cancelled": return null;
       case "ping": return notification ? null : reply(id, {});
       case "tools/list": {
         // A client that lists without having sent notifications/initialized is taken as initialized; like the listed marker,
         // that is durable first: the row is written with both prospective values before either live marker moves.
         const initialized = session.initialized || (!notification && session.version !== null);
+        const persist = this.hooks.changed;
+        if (!persist) session.initialized = initialized;
         const page = await this.service.page(params["cursor"]);
         // The listed generation is durable: the row is written with the prospective value before the response is emitted, and
         // the live marker moves only once that write succeeded, so a failed write leaves live and durable truth the same.
-        await this.hooks.changed?.(session, { initialized, listed: page.generation });
+        if (persist) await persist(session, { initialized, listed: page.generation });
         session.initialized = initialized;
         session.listed = page.generation;
         return reply(id, { tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
