@@ -863,7 +863,9 @@ main's Lending route beside this head's hosted route in the Worker's
 fetch and kept both; each merge regenerated the page, counting and
 lending Worker modules and their built assets, since each bundles the
 bytes package this head changes. At the head, `git diff --name-only
-origin/main...HEAD` lists this head's own 29 paths and no other.
+origin/main...HEAD` lists this head's own 30 paths and no other (the
+thirtieth is the room fixture of the MCP stories, which now names the
+fixture's inspector reader).
 
 ## What is owed
 
