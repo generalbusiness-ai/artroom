@@ -1,12 +1,13 @@
+import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { Entry, Observation, ObservationUse } from "@generalbusiness/dap-contract";
-import { textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeRef, textDigest } from "@generalbusiness/artroom-bytes";
 import { grantFrom } from "@generalbusiness/dap-derive";
 import { MEMBERSHIP, actionsIn, platform } from "@generalbusiness/dap-platform";
 import { grantOf } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, TRUSTS, httpSource, platformCode, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { later, net, soon } from "./net.ts";
-import { copied, notify, office, repository, rewritten, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
+import { copied, inboxConfirmation, notify, office, repository, rewritten, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
 import { reader } from "./support.ts";
 import { platformNet } from "./worker.ts";
 
@@ -24,14 +25,31 @@ const said = (answer: { answer: string; reason?: string; name?: string }) => [an
 
 describe("authority on real scopes, under the production wiring (authority note, sections 3.1, 3.3, 3.5 and 12.1.3; the contract's section 16.1)", () => {
   // The plan's T11 (the proof plan's V7, I3's part), with the inbox of step 11 and the plan's T40.
-  test("an act at an inbox is judged on a real observation of the signing key, read from the membership scope that the inbox's genesis records; after the key is revoked the next act on a fresh read is refused, and another member's key is not", async () => {
-    const { M, ritasInbox, unasInbox, unasKey } = await repository();
+  test("an act at an inbox is judged on a real observation of the signing key, read from the membership scope that the inbox's genesis records; after the key is revoked the next act on a fresh read is refused, and another member's key is not", async ({ task }) => {
+    const { O, M, ritasInbox, unasInbox, unasKey } = await repository();
     const m = await M.at();
 
     // Step 11: membership created each inbox by the entry that made its member active, with the membership scope in the body of the
     // creation. The inbox's genesis records it, and its owner is the member.
     const genesis = (await unasInbox.entries())[0]!.input as Extract<Entry["input"], { type: "genesis" }>;
-    expect([(genesis.message!.body as { membership: unknown }).membership, (await unasInbox.summary()).value.status, (await unasInbox.item(0)).parties["owner"], (await ritasInbox.item(0)).parties["owner"]])
+    const inbox = await unasInbox.summary();
+    if (inbox.value.status !== "active") {
+      // Failure-only diagnosis: record bounded protocol metadata, never bodies,
+      // signing keys, invitation fields or raw errors. The active assertion stays.
+      const scopes = await Promise.all([O, M, ritasInbox, unasInbox].map(async node => {
+        const summary = await node.summary(), outbox = await node.stub.outbox(reader);
+        const sealed = await node.sealed();
+        const alarm = await runInDurableObject(node.object, (_instance, state) => state.storage.getAlarm());
+        return { scope: summary.value.scope, head: summary.at, status: summary.value.status, alarm,
+          duties: outbox.ok ? outbox.value.slice(0, 8).map(duty => ({ duty: duty.duty, class: duty.class, held: duty.held, acknowledged: duty.acknowledged, result: duty.result,
+            attemptCount: duty.attempts.length, attempts: duty.attempts.slice(-4).map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
+          dutyCount: outbox.ok ? outbox.value.length : null,
+          entries: sealed.slice(-4).map(({ entry, hash }) => ({ seq: entry.seq, hash, type: entry.input.type,
+            ...(entry.input.type === "delivery" ? { class: entry.input.message.class } : {}) })) };
+      }));
+      Object.assign(task.meta, { inboxConfirmationFailure: { observed: { scope: inbox.value.scope, head: inbox.at, status: inbox.value.status }, clock: net.clock.now, scopes } });
+    }
+    expect([(genesis.message!.body as { membership: unknown }).membership, inbox.value.status, (await unasInbox.item(0)).parties["owner"], (await ritasInbox.item(0)).parties["owner"]])
       .toEqual([m, "active", { membership: m, member: "@una" }, { membership: m, member: "@rita" }]);
 
     // Membership's own acts were judged on its own head (section 3.3): `invite-member` records rita's grant, built from the state
@@ -198,4 +216,45 @@ describe("authority on real scopes, under the production wiring (authority note,
     ];
     for (const [name, change, expected] of rows) expect([name, await said(change)]).toEqual([name, expected]);
   });
+
+  test("a withheld original inbox confirmation completes only at its retained retry time, without changing genesis or adding another confirmation", async ({ task }) => {
+    let before: Awaited<ReturnType<typeof inboxConfirmation>> | null = null;
+    const made = await repository({ withholdUnaConfirmationOnce: true, beforeInboxCompletion: async pending => {
+      before = await inboxConfirmation(pending);
+      const child = before.inboxes.find(inbox => inbox.scope.scope === pending.unasInbox.name)!;
+      const membership = await pending.M.at();
+      const retry = before.retries.find(row => row.class === "control"
+        && canonicalize(row.scope) === canonicalize(membership)
+        && canonicalize(row.inbox) === canonicalize(child.scope)
+        && canonicalize(row.genesis) === canonicalize(child.genesis))!;
+      Object.assign(task.meta, { beforeInboxConfirmation: before });
+      expect(child.status).toBe("provisional");
+      expect(child.controls).toEqual([]);
+      expect(retry, "The original confirmation must have an actual retained unanswered retry").toBeDefined();
+      expect(retry.attempts.map(attempt => attempt.answer)).toEqual(["none"]);
+      expect(retry.next).toBeGreaterThan(before.clock);
+      expect(retry.alarm).toBe(retry.next);
+    } });
+    const after = await inboxConfirmation(made), original = before as Awaited<ReturnType<typeof inboxConfirmation>> | null;
+    if (!original) throw new Error("The actual pending confirmation was not captured");
+    Object.assign(task.meta, { afterInboxConfirmation: after });
+    const genesis = (await made.unasInbox.entries())[0]!.input as Extract<Entry["input"], { type: "genesis" }>;
+    const membership = await made.M.at();
+    // This is the original authority witness's active/owner assertion. Omitting
+    // only fixture completion must fail here, before later protocol assertions.
+    expect([(genesis.message!.body as { membership: unknown }).membership, (await made.unasInbox.summary()).value.status, (await made.unasInbox.item(0)).parties["owner"], (await made.ritasInbox.item(0)).parties["owner"]])
+      .toEqual([membership, "active", { membership, member: "@una" }, { membership, member: "@rita" }]);
+    const child = after.inboxes.find(inbox => inbox.scope.scope === made.unasInbox.name)!;
+    const earlier = original.inboxes.find(inbox => inbox.scope.scope === made.unasInbox.name)!;
+    expect([child.scope, child.genesis, child.controls.length]).toEqual([earlier.scope, earlier.genesis, 1]);
+    expect(after.clock - original.clock).toBeGreaterThan(0);
+    expect(after.clock - original.clock).toBeLessThanOrEqual(8000);
+    const outbox = await made.M.stub.outbox(reader);
+    expect(outbox.ok).toBe(true);
+    if (!outbox.ok) throw new Error("Completed confirmation outbox unavailable");
+    const confirmation = outbox.value.find(duty => duty.class === "control" && isScopeRef(duty.to) && canonicalize(duty.to) === canonicalize(child.scope))!;
+    expect(confirmation.attempts.map(attempt => attempt.answer)).toEqual(["none", "acknowledged"]);
+    expect(confirmation.acknowledged).toEqual(child.controls[0]);
+  });
+
 });

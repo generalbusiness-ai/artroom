@@ -199,7 +199,7 @@ test("Invitation paste joins automatically once; Back and reload keep unknown en
     values.set("SCRIPTED-original", b64url(new Uint8Array([1]))); // Public fixture presence only; no real secret or envelope.
     location.hash = "#/join";
     redraw();
-    expect(root.textContent).toContain("How would you like to join?");
+    expect(root.all().find(e => e.tag === "h1")?.textContent).toBe("Join or create a room");
     finish({
       ...publicOriginal,
       reason: "The original enrollment remains unknown.",
