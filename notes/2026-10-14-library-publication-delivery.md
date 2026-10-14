@@ -53,16 +53,15 @@ runs. They are not a combined gate or borrowed whole-candidate verification.
 
 | Contribution | Reported evidence and limits |
 |---|---|
-| A: destination schema, lifecycle and objects | Pure schema, ID-zero, retained-order and SHA-1/SHA-256 object witnesses passed. Memory judges accepted 65,536-byte content, refused 65,537 bytes, and distinguished 64 from 65 owed receipts across both publication kinds. Causes, origin, authority and host answers in these cheap tests are scripted. Latest reported head: `e013c358`. |
+| A: destination schema, lifecycle and objects | Pure schema, ID-zero, retained-order and SHA-1/SHA-256 object witnesses passed. The content body accepted 65,536 bytes and refused 65,537 within an overall failed run at `cd69b3fb`. The corrected receipt body separately passed at `e013c358`, distinguishing 64 from 65 owed receipts across both kinds; its content body was skipped. No whole bounds-file pass is claimed before the final gate. Causes, origin, authority and host answers in these cheap tests are scripted. Latest reported head: `e013c358`. |
 | B: origin, operations, Replay and Site | Native case `93599` passed: missing proof, exact repeat, admitted stale work before send, an actual lost answer and restart with no resend, late settlement, delayed old delivery, two send ordinals, nested non-directory creation and foreign-room refusal. Actual receipt refs were read through the Git Reader. Immutable Site and proven Replay passed. Git maps, clock, inspector and scheduler are stand-ins. Both origin controls distinguished their faults. The later available-clock expiry metadata check `35978` and its control passed. |
-| C: factory and explicit CLI protocols | Reported unit factory/CLI, invitation and catalog checks passed. The old application case passed within run `80303`, whose other new fixture case failed; that overall run remains failed. The repaired new-cohort case `46312` passed. Exact destination 4 CLI support compiled; cleanup diagnostics had six Node passes, and retained factory UI compatibility had four. The later golden update is not presented as a rerun. These are reported checks, with no provider or browser claim. |
+| C: factory and explicit CLI protocols | Reported unit factory/CLI, invitation and catalog checks passed. The old application case passed within run `80303`, whose other new fixture case failed; that overall run remains failed. The repaired new-cohort case `46312` passed. Exact destination 4 CLI support compiled; cleanup diagnostics had six Node passes, and retained editor compatibility had four. The later golden update is not presented as a rerun. These are reported checks, with no provider or browser claim. |
 | D: Lending and shared-slot integration | Two compiler configurations passed. Sixteen pure/model/custody cases passed, with the new renderer-text witness separately passing. Both path controls distinguished their faults. Native Lending `61375` passed every original story, role, capacity, recovery and proven Replay assertion, plus causal outbox results and gone-page repair. Mixed case `46681` passed with the real CLI change and Lending scopes, one held OwnGit answer, both receipts, commit ancestry and both immutable Site pages. |
 
-D's compact public summaries are
-[pure and compiler](../../artroom-diagnostics/pub-lending-assets-one/pure-and-compiler.public.json),
-[Native Lending](../../artroom-diagnostics/pub-lending-assets-one/native-61375.public.json),
-[mixed publication](../../artroom-diagnostics/pub-lending-assets-one/mixed-46681.public.json)
-and [local browser fixture](../../artroom-diagnostics/pub-lending-assets-one/local-qa.public.json).
+D's compact public summaries are in the local diagnostics packet
+`/Users/hughpyle/play/artroom-diagnostics/pub-lending-assets-one/`:
+`pure-and-compiler.public.json`, `native-61375.public.json`,
+`mixed-46681.public.json` and `local-qa.public.json`.
 They were written retrospectively from terminal tool results; raw runner
 stdout was not redirected. They do not claim independently sealed input
 closures. Committed Source representations are `c78a9ca1`, `f564de20` and
