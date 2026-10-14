@@ -222,7 +222,11 @@ describe("authority on real scopes, under the production wiring (authority note,
     const made = await repository({ withholdUnaConfirmationOnce: true, beforeInboxCompletion: async pending => {
       before = await inboxConfirmation(pending);
       const child = before.inboxes.find(inbox => inbox.scope.scope === pending.unasInbox.name)!;
-      const retry = before.retries.find(row => row.class === "control" && row.scope.scope === pending.M.name)!;
+      const membership = await pending.M.at();
+      const retry = before.retries.find(row => row.class === "control"
+        && canonicalize(row.scope) === canonicalize(membership)
+        && canonicalize(row.inbox) === canonicalize(child.scope)
+        && canonicalize(row.genesis) === canonicalize(child.genesis))!;
       Object.assign(task.meta, { beforeInboxConfirmation: before });
       expect(child.status).toBe("provisional");
       expect(child.controls).toEqual([]);

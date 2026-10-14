@@ -15,11 +15,14 @@ when no dispatch is due. The repository fixture additionally checks its actual
 inbox creation results and sealed confirmations. When a matching retained
 creation duty awaits a retry, it follows that duty's recorded next time only
 when the native stored alarm agrees, within four rounds and eight logical
-seconds. It changes no production data, authority, history or delivery rule.
+seconds. The stored alarm is a cross-check; the fixture then uses normal
+dispatch, rather than invoking the alarm callback. It changes no production
+data, authority, history or delivery rule.
 
 One new native case withholds the original confirmation once through the test
 transport. Before completion it requires a provisional inbox, an unanswered
-original attempt and its recorded backoff. After completion it requires the
+original attempt and its recorded backoff, bound to Una's actual full inbox
+reference and genesis. After completion it requires the
 same genesis and full reference, one sealed confirmation and the acknowledged
 original duty. Its control omits only the fixture completion call and must fail
 the original active/owner assertion. The original authority body retains its
