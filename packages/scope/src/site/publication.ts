@@ -125,7 +125,7 @@ export function sitePublishedCommit(store: import("../sqlite.ts").SqliteStore, d
           const reservedAt = published.values["reservedAt"];
           if (typeof reservedAt !== "number") continue;
           const reservation = own(reservedAt);
-          if (!reservation || reservation.entry.input.type !== "outcome" || reservation.entry.input.kind !== "judge"
+          if (!reservation || reservation.entry.input.type !== "outcome" || reservation.entry.input.kind !== (published.type === "file-publication" ? "file-judge" : "judge")
             || !reservation.entry.effects.some(e => e.effect === "state" && e.item === publicationId && e.state === "reserved")) continue;
           judged = reservation;
         } else {
