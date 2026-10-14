@@ -82,6 +82,7 @@ export function ownersOf(definition: ValidDefinition, platform: PlatformRules | 
         selects: r.selects === true, read: r.read === true, ...(r.closure === undefined ? {} : { closure: r.closure }), ...(r.most === undefined ? {} : { most: r.most }),
         // The driver asks this outside a commit, as it asks `unknown`: the rule reads the state only.
         ...(r.ready ? { ready: (view: StateView, operation: Operation, attempt: number) => answer(run(mark, () => r.ready!(view, operation, attempt))) } : {}),
+        ...(r.beforeSend ? { beforeSend: (view: StateView, operation: Operation, attempt: number, own: Own) => run(mark, () => r.beforeSend!(view, operation, attempt, own)) } : {}),
         ...(r.publicationOrigin ? { publicationOrigin: (view: StateView, operation: Operation, own: Own) => run(mark, () => r.publicationOrigin!(view, operation, own)) } : {}),
         // Revision 19, section 6.1 (row I3-35): the rule that decides a further attempt is given what every rule is given.
         retries: (result, operation, view, outcome) => answer(run(mark, () => r.retries(result, operation, givenTo(judging(view, outcome))))),

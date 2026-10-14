@@ -10,14 +10,14 @@
  * it.
  */
 
-import { APPLICATION_COHORT, directory5, directoryRules5 } from "./application.ts";
-export { APPLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, directory5, directoryRules5 } from "./application.ts";
+import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
+export { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, applicationPublicationValues, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
-import { sourceName } from "./publishing-provenance.ts";
-import { destination, destination2, destination3, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRulesScope } from "./destination.ts";
+import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";
+import { destination, destination2, destination3, destination4, destinationMembership, destinationRules, destinationRules2, destinationRules3, destinationRules4, destinationRulesScope } from "./destination.ts";
 import { inbox, inboxRules } from "./inbox.ts";
 import { MEMBERSHIP, MEMBERSHIP_1, membership, membership5, membershipRules, standingOf } from "./membership.ts";
 import { DEMO_REGISTER, WEB_DEMO_COHORT, WEB_DEMO_REGISTER, demoRegister, demoRegisterRules, webDemoRegister } from "./demo-register.ts";
@@ -28,7 +28,7 @@ import type { RecordedRef, Rules, StateView } from "@generalbusiness/dap-derive"
 import { RULES } from "./rules.ts";
 import { PUBLISH, RULES_SCOPE, RULES_SCOPE_1, rulesAnswer, rulesMembership, rulesObservedValues, rulesScope, rulesScope2, rulesScope3, rulesScope4, rulesScopeRules, rulesScopeRules3 } from "./rules-scope.ts";
 
-export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2 };
+export { inbox, membership, membership5, register, directory, directory2, directory7, destination, destination2, destination4, destinationRules4 };
 export { isOf, pinnedBy, pinnedOf, versionOf } from "./versions.ts";
 export { ACTIONS_MOST, FIRST_ACTIONS, FIRST_ACTIONS_OF, MEMBERSHIP, MEMBERSHIP_1, NO_MEMBER, ROLE_LISTS, ROLE_TABLE, ROLE_TABLE_OF, actionsIn, isActions, isHandle, standingOf, type Role } from "./membership.ts";
 export { CREATION_ATTEMPTS, DIRECTORY_OF, REGISTER, REPOSITORY, directoryIdOf, directorySeed, registerRules, repositoryName } from "./register.ts";
@@ -37,7 +37,9 @@ export { COLLECT_MOST, DESTINATION, DESTINATION_1, DESTINATION_ATTEMPTS, DESTINA
 export { foundingObjects, readmeText, receiptObjects, receiptRef, importRef, type Readme, type DestinationObject, type DestinationCommit, type ObjectFormat } from "./destination-objects.ts";
 export { EDIT_PATH_BYTES, editCommit, editObjects, editPath, editTree, manifestCommit } from "./destination-objects.ts";
 export { PROPOSE_FILE, fileOf, sourcesOf, manifestFiles } from "./destination-reading.ts";
-export { sourceName, publishingLaneOrigin, publishingLaneAffiliation, PUBLISHING_LANE_DIGESTS, ISSUE_LANE_DIGESTS } from "./publishing-provenance.ts";
+export { sourceName, applicationPublicationOrigin, publishingLaneOrigin, publishingLaneAffiliation, PUBLISHING_LANE_DIGESTS, ISSUE_LANE_DIGESTS } from "./publishing-provenance.ts";
+export { filePublicationCause, filePublicationCurrent, newestFilePublication, fileSupersededOutcome, destinationPublicationAt } from "./destination.ts";
+export { filePublicationCommit, fileReceiptObjects, fileReceiptRef, type FilePublicationCause } from "./destination-objects.ts";
 export type { LaneRead } from "./destination.ts";
 // The host port reads the same recorded operation context as the rules.
 export { branchOf as destinationBranch, mintOf as destinationMint, servedBy as destinationWrite, statementOf as destinationStatement, targetOf as destinationTarget, writeSends as destinationSends, readFor as destinationRead } from "./destination.ts";
@@ -61,6 +63,8 @@ export interface Platform {
   readonly data: PlatformData;
   readonly rules: Rules;
   readonly sourceName?: typeof sourceName;
+  /** New destination admission/replay policy; old platform versions retain their original identities. */
+  readonly applicationPublicationOrigin?: typeof applicationPublicationOrigin;
   /**
    * What a scope under this version answers to an observation read, from
    * its folded state at one head (authority note, section 3.3): a pure
@@ -123,6 +127,9 @@ const VERSION_DATA: Readonly<Record<string, Platform>> = {
   [WEB_DEMO_REGISTER]: { data: webDemoRegister, rules: demoRegisterRules },
   [WEB_DEMO_COHORT.directory]: { data: directory7, rules: directoryRules, membership: directoryMembership, rulesScope: directoryRulesScope },
   "platform:inbox@1": { data: inbox, rules: inboxRules },
+  [FILE_PUBLICATION_COHORT.destination]: { data: destination4, rules: destinationRules4, membership: destinationMembership, rulesScope: destinationRulesScope, applicationPublicationOrigin },
+  [FILE_PUBLICATION_COHORT.register]: { data: register, rules: registerRules },
+  [FILE_PUBLICATION_COHORT.directory]: { data: directory8, rules: directoryRules8, membership: directoryMembership, rulesScope: directoryRulesScope },
   [APPLICATION_COHORT.register]: { data: register, rules: registerRules },
   [APPLICATION_COHORT.directory]: { data: directory5, rules: directoryRules5, membership: directoryMembership, rulesScope: directoryRulesScope },
   [APPLICATION_COHORT.membership]: { data: membership, rules: membershipRules, observed: (state, asked) => standingOf(state, asked, APPLICATION_COHORT.membership) },

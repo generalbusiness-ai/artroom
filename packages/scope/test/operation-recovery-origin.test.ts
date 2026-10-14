@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { OperationId, Read } from "@generalbusiness/dap-contract";
 import { timeMs } from "@generalbusiness/dap-derive";
-import { scriptedOrigin } from "../../platform/test/support-origin.ts";
+import { scriptedApplicationOrigin, scriptedOrigin } from "../../platform/test/support-origin.ts";
 import type { EffectAnswer, EffectRequest, OperationStatus, Outside } from "../src/index.ts";
 import type { LateAnswers } from "../src/operations.ts";
 import { owners, wired } from "./outside.ts";
@@ -13,16 +13,16 @@ import { START, at, found, reader, rita } from "./support.ts";
 // outside answer, opening and verification signal are SCRIPTED. This tests
 // the driver's metadata boundary on a generic scope, not native
 // Destination authority or a native migration; those have separate witnesses.
-test("a sent recovery and its late original answer stay pending without publication origin proof, then an accepted act resumes that same answer", async () => {
+test.each(["change", "application"] as const)("%s: a sent recovery and its late original answer stay pending without publication origin proof, then an accepted act resumes that same answer", async mode => {
   const s = await found({ deliveryBatch: 1 });
   const sent: EffectRequest[] = [], recovered: EffectRequest[] = [];
   let sourceVerified = true;
-  const proof = scriptedOrigin();
+  const proof = mode === "application" ? scriptedApplicationOrigin() : scriptedOrigin();
   let deliver: LateAnswers | undefined;
   const rules: typeof owners = { rules: (owner, kind) => kind === "read" ? {
     selects: false, read: true, retries: () => false,
     wellFormed: result => result === "confirmed",
-    publicationOrigin: () => ({ from: proof.from, directory: proof.directory, destination: proof.destination }),
+    publicationOrigin: () => ({ from: proof.from, directory: proof.directory, destination: proof.destination, ...(mode === "application" ? { mode } : {}) }),
   } : owners.rules(owner, kind) };
   const outside: Outside = {
     accepts: () => true,
@@ -34,7 +34,7 @@ test("a sent recovery and its late original answer stay pending without publicat
     },
   };
   wired.set(s.name, () => ({ outside, owners: rules, resolver: {
-    read: async () => sourceVerified ? { entry: proof.merge, under: "change", origin: proof.origin } : null,
+    read: async () => sourceVerified ? { entry: proof.merge, under: mode === "application" ? "declared:change" : "change", origin: proof.origin } : null,
   } }));
   const surface = () => s.object as unknown as {
     effect(): Promise<number>;
