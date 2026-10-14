@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b258fe730c1449ca02ad77f532eec1018f3fbb61","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:b4a337648bcd07922e6ffbb88768d90dd9d755fa","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-01-laneG-checkers.md."}
