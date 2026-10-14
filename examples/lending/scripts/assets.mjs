@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { build } from "esbuild";
 
 const here = path => fileURLToPath(new URL(path, import.meta.url));
-export const MODULE = here("../../../packages/scope/src/lending-assets.ts");
+export const MODULE = here("../worker/assets.ts");
 export const OUTPUT = here("../browser-build/");
 const TYPES = { "index.html": "text/html; charset=utf-8", "lending.js": "text/javascript; charset=utf-8", "lending.css": "text/css; charset=utf-8" };
 const digest = text => createHash("sha256").update(text, "utf8").digest("hex");

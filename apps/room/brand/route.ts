@@ -1,5 +1,5 @@
 /** Same-origin public brand files. This route reads no scope, session or credential. */
-import { BRAND_ASSETS } from "./brand-assets.ts";
+import { BRAND_ASSETS } from "./assets.ts";
 const headers = (type: string): Record<string, string> => ({
   "content-type": type, "content-security-policy": "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "cache-control": "no-cache",

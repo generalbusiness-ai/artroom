@@ -24,14 +24,14 @@
 // - GitHub, for a register installed with `--host github.com`: the
 //   variable GITHUB_APP_CONFIG and the secrets GITHUB_APP_PRIVATE_KEY,
 //   GITHUB_CREATION_TOKEN and GITHUB_READ_TOKEN (see
-//   src/github-wiring.ts).
+//   ../../packages/scope/src/github-wiring.ts).
 //
 // Set ARTIFACTS_NAMESPACE to the namespace of the ARTIFACTS binding when
 // using a namespace other than artroom-demo. docs/self-host.md gives the steps.
 // An operator sets the variables and secrets; this file holds no secret.
 {
   "name": "artroom-scope",
-  "main": "src/worker.ts",
+  "main": "worker.ts",
   "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {

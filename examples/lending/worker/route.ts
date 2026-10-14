@@ -1,5 +1,5 @@
 /** Same-origin public lending library interface. No scope, session or credential is served by this route. */
-import { LENDING_ASSETS } from "./lending-assets.ts";
+import { LENDING_ASSETS } from "./assets.ts";
 const POLICY = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const headers = (type: string): Record<string, string> => ({ "content-type": type, "content-security-policy": POLICY, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "cache-control": "no-cache" });
 export const isLending = (request: Request): boolean => { const path = new URL(request.url).pathname; return path === "/lending" || path.startsWith("/lending/"); };

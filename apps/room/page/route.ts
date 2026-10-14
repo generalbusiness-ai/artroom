@@ -1,5 +1,5 @@
 /**
- * The page route: `GET /page/`, the room's page (`packages/page`), served
+ * The page route: `GET /page/`, the room's page (`apps/room/page`), served
  * by this Worker so that the page and the routes it reads share one
  * origin. No second deployment serves it, and no cross-origin header is
  * needed.
@@ -11,7 +11,7 @@
  * | `/page/page.js` | The page's one script. |
  * | any other path under `/page/` | `not-found`. |
  *
- * The two files are `page-assets.ts`, which the page package's build
+ * The two files are `assets.ts`, which the page package's build
  * writes from its source; the page's test fails while the module is older
  * than that source. The route reads no scope, no session and no secret:
  * the page itself asks for a session, with the key that the browser keeps.
@@ -21,7 +21,7 @@
  * script by a policy that allows this origin's scripts only, and the site
  * route's pages, on the same origin, allow no script at all.
  */
-import { PAGE_HTML, PAGE_JS } from "./page-assets.ts";
+import { PAGE_HTML, PAGE_JS } from "./assets.ts";
 
 /** Scripts of this origin only; reads and acts to this origin only; no frame, no form sent elsewhere, no base address. */
 const PAGE_POLICY = "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
