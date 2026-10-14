@@ -1,13 +1,13 @@
 import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { Entry, Observation, ObservationUse } from "@generalbusiness/dap-contract";
-import { textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isScopeRef, textDigest } from "@generalbusiness/artroom-bytes";
 import { grantFrom } from "@generalbusiness/dap-derive";
 import { MEMBERSHIP, actionsIn, platform } from "@generalbusiness/dap-platform";
 import { grantOf } from "@generalbusiness/dap-derive/testing";
 import { MemorySource, TRUSTS, httpSource, platformCode, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import { later, net, soon } from "./net.ts";
-import { copied, notify, office, repository, rewritten, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
+import { copied, inboxConfirmation, notify, office, repository, rewritten, rita, routed, settle, una, vic, type Platform } from "./repository.ts";
 import { reader } from "./support.ts";
 import { platformNet } from "./worker.ts";
 
@@ -216,4 +216,41 @@ describe("authority on real scopes, under the production wiring (authority note,
     ];
     for (const [name, change, expected] of rows) expect([name, await said(change)]).toEqual([name, expected]);
   });
+
+  test("a withheld original inbox confirmation completes only at its retained retry time, without changing genesis or adding another confirmation", async ({ task }) => {
+    let before: Awaited<ReturnType<typeof inboxConfirmation>> | null = null;
+    const made = await repository({ withholdUnaConfirmationOnce: true, beforeInboxCompletion: async pending => {
+      before = await inboxConfirmation(pending);
+      const child = before.inboxes.find(inbox => inbox.scope.scope === pending.unasInbox.name)!;
+      const retry = before.retries.find(row => row.class === "control" && row.scope.scope === pending.M.name)!;
+      Object.assign(task.meta, { beforeInboxConfirmation: before });
+      expect(child.status).toBe("provisional");
+      expect(child.controls).toEqual([]);
+      expect(retry, "The original confirmation must have an actual retained unanswered retry").toBeDefined();
+      expect(retry.attempts.map(attempt => attempt.answer)).toEqual(["none"]);
+      expect(retry.next).toBeGreaterThan(before.clock);
+      expect(retry.alarm).toBe(retry.next);
+    } });
+    const after = await inboxConfirmation(made), original = before as Awaited<ReturnType<typeof inboxConfirmation>> | null;
+    if (!original) throw new Error("The actual pending confirmation was not captured");
+    Object.assign(task.meta, { afterInboxConfirmation: after });
+    const genesis = (await made.unasInbox.entries())[0]!.input as Extract<Entry["input"], { type: "genesis" }>;
+    const membership = await made.M.at();
+    // This is the original authority witness's active/owner assertion. Omitting
+    // only fixture completion must fail here, before later protocol assertions.
+    expect([(genesis.message!.body as { membership: unknown }).membership, (await made.unasInbox.summary()).value.status, (await made.unasInbox.item(0)).parties["owner"], (await made.ritasInbox.item(0)).parties["owner"]])
+      .toEqual([membership, "active", { membership, member: "@una" }, { membership, member: "@rita" }]);
+    const child = after.inboxes.find(inbox => inbox.scope.scope === made.unasInbox.name)!;
+    const earlier = original.inboxes.find(inbox => inbox.scope.scope === made.unasInbox.name)!;
+    expect([child.scope, child.genesis, child.controls.length]).toEqual([earlier.scope, earlier.genesis, 1]);
+    expect(after.clock - original.clock).toBeGreaterThan(0);
+    expect(after.clock - original.clock).toBeLessThanOrEqual(8000);
+    const outbox = await made.M.stub.outbox(reader);
+    expect(outbox.ok).toBe(true);
+    if (!outbox.ok) throw new Error("Completed confirmation outbox unavailable");
+    const confirmation = outbox.value.find(duty => duty.class === "control" && isScopeRef(duty.to) && canonicalize(duty.to) === canonicalize(child.scope))!;
+    expect(confirmation.attempts.map(attempt => attempt.answer)).toEqual(["none", "acknowledged"]);
+    expect(confirmation.acknowledged).toEqual(child.controls[0]);
+  });
+
 });
