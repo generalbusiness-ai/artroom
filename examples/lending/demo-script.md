@@ -3,19 +3,28 @@
 A script for recording the lending library. The story is Nasruddin and the
 pot. It takes two people, or one person with two browser profiles.
 
-**Run status: the story's seven acts, the refused cancel and `dap verify`
-ran in a rehearsal room on 14 October 2026, without publication; the
-[runbook's rehearsal section](runbook.md#the-rehearsal-run-14-october-2026)
-records what was seen.** The rehearsal room does not publish. Publication
-is built (main `5e11ca03`) and runs in the final room, which is not yet
-provisioned; until then, the published shelf, shot 10 and the shelf
-parts of shots 1, 8b and 9 are unrun. In the rehearsal room, show a
-lending act's acceptance on its own and label its page unpublished. Do
-not make browser page edits to simulate automatic publication.
+**Run status: final automated browser run `9377` passed the exact script.**
+The seven lending acts and their destination publications completed. The
+Small pot description is exactly "Baby born when the big pot was with me";
+the cancellation reason is exactly "Nasruddin says the pot died". Both
+original-answer checks completed without second acts. This is a machine-run
+browser witness, not human or separate physical-device acceptance.
+
+The earlier publication run is retained as a rehearsal because its Small pot
+description differed. Its browser and Git extraction results remain real,
+separate evidence. Local Git history extraction passed. Curated public-history publication
+and homepage hosting remain pending.
+
+The [runbook](runbook.md) records the cohort, exact declaration, and original
+failures. Its earlier nonpublishing rehearsal remains separate. Show each
+act taking effect separately from the destination receipt and immutable page.
+Do not edit a repository file or recorded description to impersonate the
+approved story. Nasruddin's quoted line and Small pot description below
+remain exact.
 
 ## The point
 
-The record holds what each person did, in order, and the rules decide
+The journal holds what each person did, in order, and the application rules decide
 what can be done. A person's account of why is kept as their own signed
 words, in a description or a reason. The library judges none of it: the
 birth and the death are recorded the same way.
@@ -24,9 +33,12 @@ birth and the death are recorded the same way.
 
 - A room is provisioned as [the runbook](runbook.md) says, with the library
   established and empty.
-- The neighbour has joined as the room's founder. The neighbour is staff.
-- Nasruddin has joined as a member, with an invitation that the
-  neighbour issued with `dap invite --keep`.
+- The final founder is `@library-operator`. The neighbour joined as admin
+  and played the staff acts in the final room.
+- Nasruddin joined as a member. The final join that took effect and Small pot
+  donation each had a lost answer reconciled by **Check**, without a second
+  act. Their keys remain distinct and nonextractable in separate browser
+  profiles; neither profile is a separate physical-device claim.
 - Each has the member interface open. A third window shows the published
   shelf.
 - At least five minutes have passed since the roles were granted.
@@ -71,7 +83,7 @@ decide. (revision-moved)". Either way the pot has one borrower.
 | 11 | The record, in the interface or with `dap log`: seven acts in order, each with its signer. The refused cancel is not among them. | "The record is the authority. Seven acts took effect. The one that was refused changed nothing." |
 | 12 | `dap verify` on the lending scope. | "And anyone with the record can check it again." |
 
-## What is in the record at the end
+## What is in the journal at the end
 
 The lending scope's journal, after its genesis and the confirmation of
 its creation:
@@ -86,18 +98,24 @@ its creation:
 
 ## Record the actual run
 
-Keep actual control labels, recorded facts, refusal reasons, item numbers,
+Keep actual control labels, facts of acts that took effect, refusal reasons, item numbers,
 and publication receipts with each shot. If a current list offers no borrow for a lent thing, show the retained native refusal beside it. Do not fabricate
 an interactive control or substitute a local refusal for a scope judgment.
 
-Record interrupted donation and invitation recovery as separate acceptance
-witnesses. The participant reuses the original kept request after a reload.
-Do not let that witness add an extra donation to the seven-act story.
+If an actual donation or join has an unknown answer, record recovery beside
+its original request. Reuse that kept request after a reload. Do not add an
+extra donation or join to replace it. The retained rehearsal contains both
+Check recoveries; do not present them as observations of the fresh final room.
 
-For the public closing shot, use an unseated browser. It must read all three
-shelf pages and commit history. Show the cancelled page's reason and the
-lending scope it names. Match its commit to the `cancel` entry in the
-member's lending journal through the destination's receipt, which names the
-sending entry. The journal remains
-for members; its private session is never part of a public link.
-Publication and this public-history witness have not run yet.
+For the public closing shot, use an unseated browser. Read all three shelf
+pages and commit history. Show the cancelled page's reason and the lending
+scope and incarnation named by its text. Match its commit to the member's
+`cancel` journal entry through the destination receipt, which names the sending entry
+and ordinal. The journal stays member-only; no private session belongs in a
+public link.
+
+All three final anonymous pages are observed at
+`bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction
+verified actual Git commits, linear parents, page blobs, and receipt bytes.
+Curated public-history publication and homepage hosting remain pending.
+No whole judgment Replay or human/physical-device acceptance is inferred.
