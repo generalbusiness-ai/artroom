@@ -26,7 +26,7 @@ export function journalRows(entries: readonly Entry[]): { seq: number; kind: str
     const { intent } = entry.input.signed;
     const id = intent.kind === "publish" ? intent.fields["thing"] : intent.on;
     const name = typeof id === "number" ? names.get(id) : undefined;
-    const label = name ? `${name} (thing ${id})` : `Unknown thing ${id ?? "(no ID)"}`;
+    const label = name === undefined ? `Unknown thing ${id ?? "(no ID)"}` : `${name || "Unnamed"} (thing ${id})`;
     const what = intent.kind === "donate" ? words(intent.fields["name"])
       : intent.kind === "cancel" ? `${label}: ${words(intent.fields["reason"])}` : label;
     return [{ seq, kind: intent.kind, signer: entry.input.authority[0]?.subject.member ?? "", what }];

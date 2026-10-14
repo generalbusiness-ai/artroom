@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { type Entry, type Summary } from "@generalbusiness/dap-contract";
 import { grantOf, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
-import { make as makeLedger, submit } from "../test-support.ts";
+import { donation, make as makeLedger, submit } from "../test-support.ts";
 import { actsFor, journalRows, lendingView, propose, refusalWords } from "./model.ts";
 
 // The summary here is made by hand from the fold's own state (a STAND-IN for the scope's read).
@@ -99,4 +99,19 @@ test("publish repairs a gone page on the library with the retained thing revisio
  expect(draws).toBe(1); expect(p.ok && p.proposal.fields).toMatchObject({page:"shelf/0102030405060708.md"});
  expect(p.ok && p.proposal.fields["content"]).not.toMatch(/entry [0-9]|hash sha256/);
  expect(s.item(0).revision).toBe(1);
+});
+
+// The declaration accepts empty text; the browser's authoring validator rejects it.
+test("a retained donation with an empty name remains known in the journal", async () => {
+  const { s, send, view } = make();
+  expect(propose(view(), "donate", { name: "", description: "Copper." })).toEqual({ ok: false, reason: "Give the thing a name." });
+  const grants = { grants: [keys.rita, keys.una].map((who) => ({ grant: grantOf(who, s.at, ["lending.member", "lending.staff"]), current: true })) };
+  expect((await submit(s, keys.rita, "donate", donation(s, "", "Copper."), grants)).result).toBe("write");
+  const thing = view().things[0]!;
+  expect(thing.name).toBe("");
+  expect((await send(keys.una, view(), "borrow", { thing: thing.id })).result).toBe("write");
+  const retained = read(s).entries, unchanged = JSON.stringify(retained);
+  expect(journalRows(retained).at(-1)?.what).toBe(`Unnamed (thing ${thing.id})`);
+  expect(journalRows(retained.slice(-1)).at(-1)?.what).toBe(`Unknown thing ${thing.id}`);
+  expect(JSON.stringify(retained)).toBe(unchanged);
 });
