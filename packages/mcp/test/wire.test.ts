@@ -10,7 +10,7 @@ import { b64url } from "@generalbusiness/artroom-bytes";
 import { secretSigner } from "@generalbusiness/artroom-client";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { McpService, MODERN, MODERN_RESULT_EXTRA, LEGACY, Wire, memoryStore, type McpConfig } from "../src/index.ts";
+import { McpService, MODERN, MODERN_RESULT_EXTRA, LEGACY, Wire, memoryStore, newSession, type McpConfig } from "../src/index.ts";
 import { serveHttp, serveStdio, type HttpServing } from "../src/node.ts";
 import { StandIn } from "./support/standin.ts";
 
@@ -54,6 +54,19 @@ async function http(mode: "default" | "generic" = "default"): Promise<HttpServin
   return { ...serving, mcp, tick: async () => { tick(); await new Promise((r) => setTimeout(r, 200)); } };
 }
 const bearer = (s: HttpServing) => ({ requestInit: { headers: { authorization: `Bearer ${s.bearer}` } } });
+/** The headers the 2026-07-28 transport requires beside a request, derived from the body as a conforming client sends them. */
+function modernHeaders(body: unknown): Record<string, string> {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return {};
+  const m = body as { method?: unknown; params?: { name?: unknown; _meta?: Record<string, unknown> } };
+  const version = m.params?._meta?.["io.modelcontextprotocol/protocolVersion"];
+  if (typeof version !== "string") return {};
+  const h: Record<string, string> = { "mcp-protocol-version": version.length > 256 ? MODERN : version };
+  if (typeof m.method === "string" && m.method.length <= 256) h["mcp-method"] = m.method;
+  const name = m.params?.name;
+  if (m.method === "tools/call" && typeof name === "string" && name.length <= 256) h["mcp-name"] = /^[\x20-\x7e]*$/.test(name) ? name : `=?base64?${Buffer.from(name, "utf8").toString("base64")}?=`;
+  return h;
+}
+
 const until = async (check: () => boolean, ms = 3000) => { for (let t = 0; t < ms && !check(); t += 25) await new Promise((r) => setTimeout(r, 25)); return check(); };
 
 describe("both MCP wire revisions, each by its own rules", () => {
@@ -99,7 +112,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
   test("2026-07-28 over loopback HTTP: no handshake, discover, unsupported version, listen, tagged notification", async () => {
     const s = await http();
     try {
-      const post = (body: unknown) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify(body) });
+      const post = (body: unknown) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...modernHeaders(body) }, body: JSON.stringify(body) });
       const meta = (version: string) => ({ "io.modelcontextprotocol/protocolVersion": version, "io.modelcontextprotocol/clientCapabilities": {} });
       // The first request carries its version in _meta; there is no initialize.
       const listed = await (await post({ jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: meta(MODERN) } })).json() as { result: Record<string, unknown> };
@@ -202,7 +215,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
       const bytes = Buffer.from(JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name, arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }), "utf8");
       const split = bytes.indexOf(Buffer.from("é", "utf8")) + 1;
       const reply = await new Promise<string>((resolve, reject) => {
-        const req = request(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", "content-length": bytes.length } }, (res) => { let out = ""; res.setEncoding("utf8"); res.on("data", (d: string) => { out += d; }); res.on("end", () => resolve(out)); });
+        const req = request(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", "content-length": bytes.length, "mcp-protocol-version": MODERN, "mcp-method": "tools/call", "mcp-name": `=?base64?${Buffer.from(name, "utf8").toString("base64")}?=` } }, (res) => { let out = ""; res.setEncoding("utf8"); res.on("data", (d: string) => { out += d; }); res.on("end", () => resolve(out)); });
         req.on("error", reject);
         req.write(bytes.subarray(0, split));
         setTimeout(() => { req.end(bytes.subarray(split)); }, 30);
@@ -230,8 +243,9 @@ describe("both MCP wire revisions, each by its own rules", () => {
       const listen = () => {
         const abort = new AbortController();
         const seen: string[] = [];
-        const opened = fetch(s.url, { method: "POST", signal: abort.signal, headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "subscriptions/listen", params: { notifications: { toolsListChanged: true }, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }) })
+        const body = { jsonrpc: "2.0", id: 0, method: "subscriptions/listen", params: { notifications: { toolsListChanged: true }, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } };
+        const opened = fetch(s.url, { method: "POST", signal: abort.signal, headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...modernHeaders(body) },
+          body: JSON.stringify(body) })
           .then(async (res) => { const reader = res.body!.getReader(); for (;;) { const r = await reader.read(); if (r.done) break; seen.push(Buffer.from(r.value).toString("utf8")); } }).catch(() => {});
         return { seen, abort, opened, text: () => seen.join("") };
       };
@@ -285,7 +299,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
       const c = client("modern");
       await c.connect(new StreamableHTTPClientTransport(new URL(s.url), bearer(s)));
       const healthy = async () => expect((await c.callTool({ name: "room", arguments: {} })).structuredContent).toMatchObject({ key: signer.key });
-      const raw = (body: unknown, session?: string) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...(session ? { "mcp-session-id": session } : {}) }, body: JSON.stringify(body) });
+      const raw = (body: unknown, session?: string) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...(session ? { "mcp-session-id": session } : {}), ...modernHeaders(body) }, body: JSON.stringify(body) });
       const opened = await raw({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "raw", version: "0" } } });
       const legacy = opened.headers.get("mcp-session-id")!;
       expect(legacy).toBeTruthy();
@@ -335,8 +349,8 @@ describe("both MCP wire revisions, each by its own rules", () => {
   test("a 2026-07-28 tool result: the CallResult and a stated overhead", async () => {
     const s = await http();
     try {
-      const answer = await fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "room", arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } }) });
+      const body = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "room", arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {} } } };
+      const answer = await fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...modernHeaders(body) }, body: JSON.stringify(body) });
       const result = (await answer.json() as { result: Record<string, unknown> }).result;
       const { resultType, _meta, ...callResult } = result;
       expect([resultType, Object.keys(_meta as object)]).toEqual(["complete", ["io.modelcontextprotocol/serverInfo"]]);
@@ -365,6 +379,24 @@ describe("both MCP wire revisions, each by its own rules", () => {
     expect([subscribed, wire.listening, sent]).toEqual([0, 0, []]);
   });
 
+  // Invariant: a stdio server dispatches every line of one read in the same turn; with no persistence hook the live
+  // initialized marker moves at once, so a tools/list dispatched right after notifications/initialized is served, not refused.
+  test("notifications/initialized and tools/list dispatched in one turn, with no hook: the list is served", async () => {
+    const fake = { snapshot: async () => ({ generation: "sha256:x" }), page: async () => ({ generation: "sha256:x", tools: [] }), subscribe: () => () => {} } as unknown as McpService;
+    const wire = new Wire(fake);
+    const session = newSession(null);
+    const send = () => {};
+    const owner = {};
+    expect((await wire.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: LEGACY, capabilities: {}, clientInfo: { name: "t", version: "0" } } }, session, send, owner))?.error).toBeUndefined();
+    // Dispatched in the same turn, as one read of two lines is.
+    const initialized = wire.handle({ jsonrpc: "2.0", method: "notifications/initialized" }, session, send, owner);
+    const listed = wire.handle({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, session, send, owner);
+    expect(await initialized).toBeNull();
+    const reply = await listed;
+    expect(reply?.error, JSON.stringify(reply)).toBeUndefined();
+    expect(Array.isArray((reply?.result as { tools?: unknown[] })?.tools)).toBe(true);
+  });
+
   // Invariant: frames are told apart by JSON-RPC's rules, an invalid ID is never echoed, and nothing a client sends is repeated
   // past 256 characters: large IDs, versions and methods get bounded errors, and a healthy call is served after each.
   test("IDs, methods and versions: invalid frames rejected, reflections bounded", async () => {
@@ -373,7 +405,7 @@ describe("both MCP wire revisions, each by its own rules", () => {
       const c = client("modern");
       await c.connect(new StreamableHTTPClientTransport(new URL(s.url), bearer(s)));
       const healthy = async () => expect((await c.callTool({ name: "room", arguments: {} })).structuredContent).toMatchObject({ key: signer.key });
-      const raw = (body: unknown) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify(body) });
+      const raw = (body: unknown) => fetch(s.url, { method: "POST", headers: { authorization: `Bearer ${s.bearer}`, "content-type": "application/json", accept: "application/json, text/event-stream", ...modernHeaders(body) }, body: JSON.stringify(body) });
       const meta = (version: string) => ({ "io.modelcontextprotocol/protocolVersion": version, "io.modelcontextprotocol/clientCapabilities": {} });
       const big = "x".repeat(20_000);
       for (const id of [{ a: 1 }, [1], true, null, big]) {

@@ -25,6 +25,7 @@
  */
 
 import type { Digest } from "@generalbusiness/dap-contract";
+import { utf8 } from "@generalbusiness/artroom-bytes";
 import { INSTRUCTIONS, ListRestart, SERVER_NAME, SERVER_VERSION, type McpService } from "./service.ts";
 
 export const LEGACY = "2025-11-25";
@@ -35,6 +36,10 @@ export const SUBSCRIPTION_META = "io.modelcontextprotocol/subscriptionId";
 export const SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
 /** The error a 2026-07-28 server answers for a protocol version it does not serve. */
 export const UNSUPPORTED_VERSION = -32022;
+/** The error a transport answers when its store admits no more session state (the hosted endpoint's control budget). */
+export const SESSION_FULL = -32001;
+/** The most canonical bytes a 2025-11-25 client's declared capabilities may hold. */
+export const CAPABILITIES_MOST = 16 * 1024;
 export const TOOLS_TTL_MS = 30_000;
 
 export type Id = string | number;
@@ -53,15 +58,30 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 const reply = (id: Id, result: unknown): Message => ({ jsonrpc: "2.0", id, result });
 const error = (id: Id | null, code: number, message: string, data?: unknown): Message => ({ jsonrpc: "2.0", id, error: { code, message, ...(data !== undefined ? { data } : {}) } });
 
-/** The state of one 2025-11-25 session: the agreed version, whether it is initialized, what the client declared, and what it was last told. */
+/**
+ * One stream of a 2025-11-25 session: where its server-to-client messages go (the stdio stream, or the session's `GET` stream),
+ * and `notified`, the generation last written to this stream. A stream write is not a receipt, so `notified` lives with the
+ * stream, in memory, and is never persisted.
+ */
+export interface Stream { send: Send; notified: Digest | null; close(final: boolean): void }
+
+/**
+ * The state of one 2025-11-25 session: its ID (null on stdio), the agreed version, whether it is initialized, what the client
+ * declared, and `listed`, the generation the client last listed, set by `tools/list` alone and persisted by the transport's
+ * hook (`Wire.hooks.changed`) before the response is emitted. `told` was one field for both a list and a delivery; it is split.
+ */
 export interface LegacySession {
+  id: string | null;
+  created: number;
   version: string | null;
   initialized: boolean;
   capabilities: Record<string, unknown>;
-  told: Digest | null;
-  /** Where its server-to-client messages go: the stdio stream, or the session's `GET` stream; null while there is none. */
-  stream: Send | null;
+  listed: Digest | null;
+  /** The session's open stream; null while there is none. */
+  stream: Stream | null;
   unsubscribe: (() => void) | null;
+  /** Set once the session has ended (deleted, evicted, retired, or discarded with its layer): nothing of it is persisted again. */
+  ended: boolean;
 }
 
 /**
@@ -95,8 +115,8 @@ export function frameOf(v: unknown): "request" | "notification" | "response" | "
 /** Whether a value is a JSON-RPC 2.0 frame this server reads. Null, scalars, arrays and malformed objects are not. */
 export const isFrame = (v: unknown): v is Message => frameOf(v) !== "invalid";
 
-export function newSession(): LegacySession {
-  return { version: null, initialized: false, capabilities: {}, told: null, stream: null, unsubscribe: null };
+export function newSession(id: string | null = null): LegacySession {
+  return { id, created: 0, version: null, initialized: false, capabilities: {}, listed: null, stream: null, unsubscribe: null, ended: false };
 }
 
 /** The revision a request is served by. */
@@ -115,15 +135,25 @@ export class Wire {
   ignored = 0;
   /** Open listen subscriptions, by the client stream they belong to, then by request ID. */
   readonly listens = new Map<object, Map<string, Listen>>();
+  /**
+   * `changed`: a session's persisted fields are about to change (issue, initialization, a listing); the transport writes the
+   * row with the prospective state before the response, and the live session takes that state only once the write succeeded.
+   */
+  readonly hooks: { changed?: (session: LegacySession, next?: Partial<Pick<LegacySession, "initialized" | "listed">>) => void | Promise<void> } = {};
   constructor(readonly service: McpService) {}
 
-  /** Watch the service's list for one 2025-11-25 session, while it has a stream. */
+  /**
+   * Watch the service's list for one 2025-11-25 session. A stream is told of a generation once, and only while the client has
+   * not listed it: a change is written to a stream when the generation differs from both the stream's `notified` and the
+   * session's `listed`. The watch stays with the session; the stream it writes to is whichever the session holds now.
+   */
   watchLegacy(session: LegacySession): void {
-    if (session.unsubscribe || !session.stream) return;
+    if (session.unsubscribe) return;
     session.unsubscribe = this.service.subscribe((generation) => {
-      if (session.told === generation || !session.stream) return;
-      session.told = generation;
-      session.stream({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+      const stream = session.stream;
+      if (!stream || stream.notified === generation || session.listed === generation) return;
+      stream.notified = generation;
+      stream.send({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
     });
   }
 
@@ -176,19 +206,38 @@ export class Wire {
       case "initialize": {
         const asked = typeof params["protocolVersion"] === "string" ? params["protocolVersion"] : LEGACY;
         session.version = asked === LEGACY ? LEGACY : LEGACY;
-        session.capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
+        const capabilities = isRecord(params["capabilities"]) ? params["capabilities"] : {};
+        // The declared capabilities are kept with the session, so they are bounded: a session is bounded control state.
+        if (utf8(JSON.stringify(capabilities)).length > CAPABILITIES_MOST) return error(id, -32602, `The client's capabilities exceed ${CAPABILITIES_MOST} bytes.`);
+        session.capabilities = capabilities;
+        try { await this.hooks.changed?.(session); } catch (thrown) { if ((thrown as Error).name === "SessionFull" || /No room for another session/.test(String((thrown as Error).message))) return error(id, SESSION_FULL, "No room for another session."); throw thrown; }
         return reply(id, { protocolVersion: session.version, capabilities: { tools: { listChanged: true } }, serverInfo: SERVER_INFO, instructions: INSTRUCTIONS });
       }
-      case "notifications/initialized":
+      case "notifications/initialized": {
+        // The durable row is written with the prospective state first; the live session changes only once that succeeded. The
+        // hook sees the live session, so one that ended while a request was pending is not persisted again. With no hook
+        // (stdio, loopback) the live marker moves at once, before any other message of the same read is dispatched.
+        const persist = this.hooks.changed;
+        if (persist) await persist(session, { initialized: true });
+        if (session.ended) return null;   // ended while the row was written: no live marker, no watcher
         session.initialized = true;
         this.watchLegacy(session);
         return null;
+      }
       case "notifications/cancelled": return null;
       case "ping": return notification ? null : reply(id, {});
       case "tools/list": {
-        if (!session.initialized && !notification) session.initialized = session.version !== null;
+        // A client that lists without having sent notifications/initialized is taken as initialized; like the listed marker,
+        // that is durable first: the row is written with both prospective values before either live marker moves.
+        const initialized = session.initialized || (!notification && session.version !== null);
+        const persist = this.hooks.changed;
+        if (!persist) session.initialized = initialized;
         const page = await this.service.page(params["cursor"]);
-        session.told = page.generation;
+        // The listed generation is durable: the row is written with the prospective value before the response is emitted, and
+        // the live marker moves only once that write succeeded, so a failed write leaves live and durable truth the same.
+        if (persist) await persist(session, { initialized, listed: page.generation });
+        session.initialized = initialized;
+        session.listed = page.generation;
         return reply(id, { tools: page.tools, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) });
       }
       case "tools/call": {
@@ -270,6 +319,12 @@ export class Wire {
     const of = this.listens.get(owner);
     of?.delete(key);
     if (of && of.size === 0) this.listens.delete(owner);
+  }
+
+  /** End every listen of a client stream gracefully: each completes with its result on that stream, and its watchers are removed. */
+  endStream(owner: object): void {
+    for (const listen of [...(this.listens.get(owner)?.values() ?? [])]) listen.end();
+    this.listens.delete(owner);
   }
 
   /** End every listen of a client stream that closed: no result is sent, as for an abrupt close; its watchers are removed. */

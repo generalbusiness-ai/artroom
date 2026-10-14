@@ -9,8 +9,8 @@
  * A signed read is built the same way under its own tag, `artroom-read-1`.
  */
 
-import { SESSION_DOMAINS } from "@generalbusiness/dap-contract";
-import type { Digest, ReadRequest, RetainedInput, SessionRequest, SignedRead, SignedSessionRequest } from "@generalbusiness/dap-contract";
+import { CONTROL_DOMAIN, SESSION_DOMAINS } from "@generalbusiness/dap-contract";
+import type { ControlRequest, Digest, ReadRequest, RetainedInput, SessionRequest, SignedControl, SignedRead, SignedSessionRequest } from "@generalbusiness/dap-contract";
 import { canonicalBytes, utf8 } from "./canonical.ts";
 import { sign, verify } from "./sign.ts";
 import { digestBytes } from "./hash.ts";
@@ -56,6 +56,22 @@ export function signRead(request: ReadRequest, secret: Uint8Array): SignedRead {
 export function verifySignedRead(signed: SignedRead): boolean {
   try {
     return verify(signed.request.actor, signed.sig, readBytes(signed.request));
+  } catch {
+    return false;
+  }
+}
+
+const controlBytes = (request: ControlRequest): Uint8Array => taggedBytes(CONTROL_DOMAIN, canonicalBytes(request));
+
+/** Sign a hosted MCP control request with a member's own key. */
+export function signControl(request: ControlRequest, secret: Uint8Array): SignedControl {
+  return { request, sig: sign(secret, controlBytes(request)) };
+}
+
+/** True when the signature is by the request's `actor` over the request's bytes under the control tag. Malformed input is false. Never throws. */
+export function verifyControl(signed: SignedControl): boolean {
+  try {
+    return verify(signed.request.actor, signed.sig, controlBytes(signed.request));
   } catch {
     return false;
   }
