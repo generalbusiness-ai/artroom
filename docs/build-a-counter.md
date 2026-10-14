@@ -495,6 +495,8 @@ state. That is what a verifier does with a real scope's history.
   commitment that the participant then fulfills, and adds activity, pause,
   reset and a deadline. Its page has diagrams of every act. Its source and
   tests belong to a repository checkout, not the published SDK packages.
+- [Build a lending library](build-a-lending-library.md) is a second
+  tutorial, on items with states, a final state and grants.
 - [Write an application](write-an-application.md) shows how to declare,
   validate and pin a definition of your own.
 - [The architecture of a dap application](architecture.md) explains what
