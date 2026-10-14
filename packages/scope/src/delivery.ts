@@ -24,7 +24,7 @@
 
 import type { Bounds, Digest, Entry, FactRef, Incarnation, ScopeId, Seed, UnavailableReason } from "@generalbusiness/dap-contract";
 import { canonicalize, isDigest, isPlatformDefinition, newIncarnation, parseStrict, platformName } from "@generalbusiness/artroom-bytes";
-import { publishingLaneAffiliation } from "@generalbusiness/dap-platform";
+import { applicationPublicationOrigin, publishingLaneAffiliation } from "@generalbusiness/dap-platform";
 import { clockOf, creationFields, factsNamed, isEntryOf, isFactRef, isLocalId, isObject, isScopeRef, judgeDelivery, judgeGenesis, messageFacts, messageTexts, own, prepareRules, readFields, textsNamed } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Creation, Delivered, DeliveryContext, Fetched, Judgment, PlatformRules, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
 import { NO_INCARNATION, Observes, Received, ownOf, retainedFacts, snapshotsOf, used, valuesOf, type Scope } from "./core.ts";
@@ -132,7 +132,9 @@ export class Deliveries {
     const receiving = this.#scope.pinned();
     const reserve = receiving && isPlatformDefinition(receiving.named) && platformName(receiving.named) === "platform:destination"
       && message.class === "request" && message.type === "tell" && isObject(message.body) && message.body["message"] === "reserve";
-    const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds, !!reserve), bounds.fetchSeconds);
+    const file = receiving?.named === "platform:destination@4" && message.class === "request" && message.type === "tell"
+      && isObject(message.body) && message.body["message"] === "publish-file";
+    const read = await within(() => this.#ports.resolver.read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
     if (read === LATE || read === null) return retry("dependency-unavailable");
     if (!("entry" in read) || !isEntryOf(read.entry, from)) return UNVERIFIED;
     const source: Fetched = { fact: from, entry: read.entry, under: read.under };
@@ -158,6 +160,14 @@ export class Deliveries {
     // the judge finds it too. A repeated creation is under the same rule: its scope has a genesis, so the founding branch below,
     // which reads a creation's texts, is not taken.
     const known = store.decided(from.at, from.seq, delivered.n) !== null;
+    if (file && !known) {
+      const directory = store.page("branch", ["empty", "ready"], null, 1).items[0]?.refs["directory"];
+      const destination = store.scope()?.at;
+      if (!isScopeRef(directory) || !destination) return retry("dependency-unavailable");
+      const native = applicationPublicationOrigin(from, directory, destination, read.origin ?? []);
+      if (native === null) return retry("dependency-unavailable");
+      if (!native) return UNVERIFIED;
+    }
     // A legitimate activated extension may choose an arbitrary send target.
     // Verify its immutable room before new reserve admission. This is a source
     // check, not a changed historical judgment or a manufactured refusal entry.

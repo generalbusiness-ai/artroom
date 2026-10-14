@@ -38,7 +38,7 @@
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, isEntryOf, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type Operation, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
-import { publishingLaneOrigin } from "@generalbusiness/dap-platform";
+import { applicationPublicationOrigin, publishingLaneOrigin } from "@generalbusiness/dap-platform";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
 import { report } from "./diag.ts";
 import type { Wakes } from "./outbox.ts";
@@ -284,9 +284,10 @@ export class Operations {
     if (asked === false) return false;
     try {
       const read = await within(() => this.#resolver.read(asked.from, this.#bounds.fetchSeconds, true), this.#bounds.fetchSeconds);
-      return read !== LATE && read !== null && "entry" in read && read.under === "change"
-        && isEntryOf(read.entry, asked.from)
-        && publishingLaneOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []);
+      if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, asked.from)) return false;
+      return asked.mode === "application"
+        ? applicationPublicationOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []) === true
+        : read.under === "change" && publishingLaneOrigin(asked.from, asked.directory, asked.destination, read.origin ?? []);
     } catch { return false; }
   }
 
@@ -402,6 +403,18 @@ export class Operations {
       if (!await this.#publicationReady(operation) || rules.ready && !rules.ready(store, operation, attempt)) {
         if (row.next !== null) store.postpone(id, attempt, null);
         this.#waiting = true;
+        continue;
+      }
+      // A stale file is judged as known not sent, before the durable mark.
+      // Recovery and late answers above concern an original request that may
+      // already have left and never enter this branch.
+      const local = rules.beforeSend?.(store, operation, attempt, ownOf(store));
+      if (local) {
+        const recorded = await this.#record({ type: "outcome", operation: id, attempt, result: "refused", evidence: local });
+        if (recorded.recorded === "unavailable" || recorded.recorded === "refused") {
+          if (row.next !== null) store.postpone(id, attempt, null);
+          this.#waiting = true;
+        }
         continue;
       }
       // Durable before the send: from here on the request may have left. A scope that stops here is woken, by the alarm set below,

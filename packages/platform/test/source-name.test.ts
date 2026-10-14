@@ -2,8 +2,8 @@ import { expect, test } from "vitest";
 import type { Digest, Entry, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { factRefOf, intentDigest, newIncarnation, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { d, keys, T0, t } from "@generalbusiness/dap-derive/testing";
-import { sourceName, publishingLaneOrigin, publishingLaneAffiliation } from "../src/publishing-provenance.ts";
-import { scriptedOrigin } from "./support-origin.ts";
+import { applicationPublicationOrigin, sourceName, publishingLaneOrigin, publishingLaneAffiliation } from "../src/publishing-provenance.ts";
+import { scriptedApplicationOrigin, scriptedOrigin } from "./support-origin.ts";
 
 test("supported change and issue pins acquire native names only through their authenticated native factories", () => {
   for (const name of ["change", "issue"] as const) {
@@ -31,6 +31,23 @@ test("native publishing origin binds full Directory and destination incarnations
   expect(publishingLaneAffiliation(native.from, native.directory, native.destination, native.origin)).toBe(true);
   expect(publishingLaneAffiliation(native.from, { ...native.directory, inc: otherInc }, native.destination, native.origin)).toBe(false);
   expect(publishingLaneAffiliation(native.from, native.directory, { ...native.destination, inc: otherInc }, native.origin)).toBe(false);
+});
+
+test("application publication requires its own exact native Directory8 factory and treats missing immutable proof as pending", () => {
+  // Coherent SCRIPTED immutable birth facts; actual Native admission is a Scope witness.
+  const native = scriptedApplicationOrigin(), legacy = scriptedApplicationOrigin("platform:directory@5");
+  expect(applicationPublicationOrigin(native.from, native.directory, native.destination, native.origin)).toBe(true);
+  const noField = scriptedApplicationOrigin("platform:directory@8", false);
+  expect(applicationPublicationOrigin(noField.from, noField.directory, noField.destination, noField.origin)).toBe(true);
+  expect(applicationPublicationOrigin(legacy.from, legacy.directory, legacy.destination, legacy.origin)).toBe(false);
+  expect(applicationPublicationOrigin(native.from, native.directory, native.destination, native.origin.slice(0, 2))).toBeNull();
+  const other = newIncarnation(new Uint8Array(16).fill(31));
+  expect(applicationPublicationOrigin(native.from, { ...native.directory, inc: other }, native.destination, native.origin)).toBe(false);
+  expect(applicationPublicationOrigin(native.from, native.directory, { ...native.destination, inc: other }, native.origin)).toBe(false);
+  expect(applicationPublicationOrigin(native.from, native.directory, native.destination,
+    native.origin.map((copy, index) => index === 1 ? { ...copy, under: "declared:platform:directory" } : copy))).toBe(false);
+  const change = scriptedOrigin();
+  expect(applicationPublicationOrigin(change.from, change.directory, change.destination, change.origin)).not.toBe(true);
 });
 
 test("activated extension digests require the same authenticated native factory role rather than a catalog match", () => {
