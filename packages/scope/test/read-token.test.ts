@@ -24,7 +24,7 @@ const NAMESPACE = "artroom-demo";
 const HOST = "service.invalid";
 
 /**
- * STAND-IN: the binding of the hosting's own Git service, as `artifacts-wiring.test.ts` scripts it. Each read token it mints has a
+ * STAND-IN: the binding of Cloudflare Artifacts, as `artifacts-wiring.test.ts` scripts it. Each read token it mints has a
  * new plaintext and ends `ttl` seconds after the scripted clock's reading. No repository or token exists.
  */
 function binding() {
@@ -65,7 +65,7 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
     onTestFinished(owner.close);
     net.hold = net.deaf = null;
     const fetch = ((url: string, init?: RequestInit) => routed(url, init)) as unknown as Fetch;
-    // A register on the hosting's own Git service, and a claim whose creation the stand-in answers.
+    // A register on Artifacts, and a claim whose creation the stand-in answers.
     const install: Intent = { v: 1, to: null, actor: paul.key, kind: "install", on: null, expected: {}, fields: { host: "artifacts", namespace: NAMESPACE, policy: "keys", founders: [rita.key] }, idempotencyKey: crypto.randomUUID(), notAfter: soon(60) };
     const R = new Platform(scopeIdOf({ v: 1, kind: "register", definition: REGISTER, creator: null, cause: intentDigest(install), ordinal: 0 }));
     const host = outsideOf(R.name);
@@ -92,7 +92,7 @@ describe("a member's read token on real scopes (the planner's decision for I5). 
     await M.did(una, "join", { fields: { invitation, secret } });
     await settle(M);
 
-    // The destination's port: the real wiring of the hosting's own Git service, pinned to this register, over the scripted binding.
+    // The destination's port: the real wiring of Artifacts, pinned to this register, over the scripted binding.
     const service = binding();
     platformOutside.set(G.name, (given, sql) => onlyMintRead(artifactsOutside(given, sql, { ARTIFACTS_CONFIG: canonicalize({ registerScope: R.name, namespace: NAMESPACE, host: HOST, maxBytes: 1024 * 1024, credentialIdentity: "adapter-attempt" }), ARTIFACTS: service.ns })));
     await G.restart();

@@ -30,10 +30,11 @@ The lead claim: dap is a programmable, general-purpose coordination
 fabric. The verifier line, "nothing you saw depends on trusting our
 database", stays as the supporting proof, not the way in.
 
-The hosting surface, said once in one line, never as a service count: the
-hosting's own Git service holds one repository per hold, the Worker runs
-the room, the published pages are the record, and the same record runs
-on GitHub.
+The hosting surface, said once, never as a service count: Cloudflare
+Artifacts holds one repository per destination, the Worker runs the room,
+and the same journal runs on GitHub. Published pages are copies of the
+journal. A fork for each hold remains the unbuilt design in plan 029;
+the original per-hold repository wording described that intended design.
 
 ## The order of the video
 
@@ -178,8 +179,7 @@ rename; the jam to the procedural page as it is.
 ## Four changes after the second entrant sweep
 
 Direction from Hugh, 11 October 18:45 Eastern, recorded in planner request
-`5b61978d` after the second sweep of the field (a code search on the
-hosting's Git service identifiers found about twenty more entrants; the
+`5b61978d` after the second sweep of the field (a code search on Artifacts identifiers found about twenty more entrants; the
 strongest ones read well because they use one plain vocabulary, and one of
 them leads with a results table and a long video).
 
@@ -213,9 +213,10 @@ them leads with a results table and a long video).
    three is the honest number: two is a handoff, three is the smallest
    count that shows a contested turn, a bystander tracking the shared
    state, and a restart at once; more adds nothing the record does not
-   already show. The hosting surface is one line, not a service count: the
-   hosting's Git service holds one repository per hold, the Worker runs
-   the room, the pages are the record, and the same record runs on GitHub.
+   already show. The hosting surface is one line, not a service count:
+   Artifacts holds one repository per destination, the Worker runs the
+   room, the pages are copies of the journal, and the same journal runs
+   on GitHub. Per-hold forks remain the unbuilt plan 029 design.
 
 The practice script is amended by a builder request filed with this
 section: the no-merge sentence verbatim in section 1, the Counter line in

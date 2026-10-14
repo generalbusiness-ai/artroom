@@ -1,5 +1,5 @@
 /**
- * Opt-in wiring of the hosting's own Git service. It takes effect only with
+ * Opt-in wiring of Cloudflare Artifacts. It takes effect only with
  * the `ARTIFACTS` binding and the explicit setting `ARTIFACTS_CONFIG`, and
  * only for the one register pinned there, whose recorded host is
  * `artifacts` and whose namespace is the configured one, and for the

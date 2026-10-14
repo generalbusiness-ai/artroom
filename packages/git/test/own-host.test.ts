@@ -5,7 +5,7 @@ import { decodePack, SmartHttpSource } from "../src/http-read.ts";
 import { GitRefusal } from "../src/names.ts";
 import { Reader } from "../src/reader.ts";
 
-// The answers of the hosting's own Git service, captured live by the planner (fixtures/own-host/README.md): its ref
+// The answers of Cloudflare Artifacts, captured live by the planner (fixtures/own-host/README.md): its ref
 // advertisement, the request body our client sent, and its upload-pack answer, which is NAK, a pack, and then one flush packet
 // after the pack's trailer. The fetch below replays those bytes; no service runs.
 

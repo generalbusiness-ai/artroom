@@ -179,7 +179,7 @@ as the specification's runner sets it.
   checked before `304 Not Modified`; a matching tag never bypasses a refusal.
   The versions page's tag covers only the recorded published refs and commits,
   whose commit objects are validated before 304.
-- Each page read on the hosting's own Git service mints a read token for
+- Each page read on Cloudflare Artifacts mints a read token for
   two minutes and attempts to revoke it after the read. A failed revocation
   remains unconfirmed; Site does not turn that into confirmed cleanup.
 
@@ -211,7 +211,7 @@ room judges it by its rules, as any change: a page in an extent that asks
 no approval is published on the merger's own act, and one in the rules
 extent waits for the rules scope's controller. On merge the destination
 writes the published tree with that one file and pushes the new commit,
-on the hosting's own Git service and on GitHub the same way. The command
+on Artifacts and on GitHub the same way. The command
 prints the commit and the page's address, `<base-url>/site/<directory>/HEAD/<path>`,
 which then serves the file. A page is text: a file of more than 65,536
 bytes, or one that is not UTF-8, cannot be edited this way.
@@ -227,7 +227,7 @@ needed, including for files published from a private backing repository.
 an eligible immutable URL continues to name that published result. Arbitrary
 or unproved commits and provider-only branches or tags are refused before
 acquiring provider access. The Worker reads only the selected commit with its
-existing host credentials: a temporary read token on the hosting's own Git service, or
+existing host credentials: a temporary read token on Artifacts, or
 the deployment's existing GitHub read token. GitHub's stable repository ID
 must match the room's record before any Git source is acquired. Knowing a
 room address does not publish its private repository's other branches.

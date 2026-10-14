@@ -20,13 +20,13 @@ import companion from "./site/completeness/companion.md?raw";
 import diagram from "./site/completeness/diagram.svg?raw";
 
 // The site route on a real register and directory, under the deployed class in the namespace `PLATFORM`, with the platform
-// package's rules. The register's claim creates the repository through the production wiring of the hosting's own Git service,
+// package's rules. The register's claim creates the repository through the production wiring of Cloudflare Artifacts,
 // and the directory records it.
 //
 // | Part | Is |
 // |---|---|
 // | The register and the directory | Real scopes. The directory's children are created and have no Git host. |
-// | The hosting's own Git service | A STAND-IN: `Scripted`, a binding double whose every answer the test writes, and a scripted fetch for its smart-HTTP upload-pack. Its refs and objects are a map; no repository exists. |
+// | Artifacts | A STAND-IN: `Scripted`, a binding double whose every answer the test writes, and a scripted fetch for its smart-HTTP upload-pack. Its refs and objects are a map; no repository exists. |
 // | The clock and the readers | The namespace's scripted clock and the test readers, as in every test of `PLATFORM`. The site route reads no session. |
 //
 // Tests that only read share the one founding. The cache test moves one branch of the stand-in host, which no other test reads.
@@ -89,7 +89,7 @@ async function wantedObject(request: Request): Promise<string> {
   return objectId(want[1], "fixture wanted object");
 }
 
-/** STAND-IN for the hosting's own Git service: the binding and its smart-HTTP upload-pack, over a map of refs and objects. */
+/** STAND-IN for Artifacts: the binding and its smart-HTTP upload-pack, over a map of refs and objects. */
 class Scripted {
   name: string | null = null;
   readonly refs = new Map<string, string>();

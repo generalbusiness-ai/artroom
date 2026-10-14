@@ -16,7 +16,7 @@ import type { SmartHttpOptions } from "./http.ts";
 export interface DecodedObject { id: ObjectId; type: ObjectType; data: Uint8Array }
 /**
  * `flushAfter`: one flush packet (`0000`) may follow the pack's trailer, as an
- * upload-pack answer of the hosting's own Git service sends it. Any other byte
+ * upload-pack answer of Cloudflare Artifacts sends it. Any other byte
  * after the trailer is refused.
  */
 export interface PackReadOptions { maxBytes: number; bounds?: ReadBounds; flushAfter?: boolean }

@@ -413,7 +413,7 @@ a read token of the caller's own:
    `git -c http.extraHeader=...`, but it is in no argument, so no process
    list shows it. The token is in no printed line and in no file the
    command writes, and git does not keep it in the clone's config. The
-   header is `Bearer <token>` on the hosting's own Git service, and
+   header is `Bearer <token>` on Cloudflare Artifacts, and
    GitHub's form for an installation token, `Basic` with the user
    `x-access-token`, on GitHub.
 

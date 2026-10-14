@@ -1,14 +1,14 @@
 # Plan 029: a fork for each hold
 
 Planner, 11 October 2026, 14:00 Eastern. Direction from Hugh, recorded in
-planner request `06089f04`: build a detailed plan for the forks work on the
-hosting's own Git service. This plan is a document. It names the builder
+planner request `06089f04`: build a detailed plan for the forks work on
+Cloudflare Artifacts. This plan is a document. It names the builder
 requests to file, with the witness that accepts each, and says which items
 fit before the freeze and which follow the submission.
 
-Public wording in this plan and in everything it commissions: "the
-hosting's own Git service", and the operations of its binding by name.
-No product name but GitHub.
+Public wording in this plan and in everything it commissions: name
+Cloudflare Artifacts at the first mention, then Artifacts, and name the
+operations of its binding.
 
 ## What is true on main today (`2614a82a`)
 
@@ -21,7 +21,7 @@ No product name but GitHub.
   the hold ends, the hold's epoch passes 1, or its instance is past
   (`useEnded`). The production ports record these operations and send
   none of them to a host: no fork and no token exists at a real host.
-- The destination port for the hosting's own Git service
+- The destination port for Artifacts
   (`packages/scope/src/artifacts-host.ts`) performs create, delete,
   revoke, one write token per push with a 900-second TTL, one read token
   per read with a 120-second TTL, and `inspect`, which reads the
@@ -97,7 +97,7 @@ destination.
 
 Mapping of the `hold@1` records to host operations:
 
-| `hold@1` kind | On the hosting's own Git service | On GitHub |
+| `hold@1` kind | On Artifacts | On GitHub |
 |---|---|---|
 | `fork` | `repository.fork(<destination name>-h<hold id>-<attempt>, {defaultBranchOnly: true, readOnly: false})`; the outcome records `{host, namespace, name, id}` and the time `info` reported the status left `forking` | A repository fork by the App into the organization, named the same way. Where the installation cannot fork, the hold gets no workspace at the host: the outcome records `fork: none`, the performer pushes to a repository of their own, and the report names that repository with the commit (item 2 reads it by the App's read of the named repository). No branch on the destination's repository and no token to it, ever: the governing rule has no exception |
 | `mint` | `fork.createToken("write", seconds until the hold ends)`; the outcome records the handle and the end the service reported, never the token; plaintext to the hold's custody, given once to the holder's session | An installation token restricted to the fork's ID with contents write; GitHub fixes one hour, so a hold longer than an hour gets a new mint at each epoch, recorded as a new `mint` attempt |
