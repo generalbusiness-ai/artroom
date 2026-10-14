@@ -42,3 +42,11 @@ MCP composition. No geometry or human acceptance is claimed.
 
 Before review, run the doc-link check, the owning checks for changed test
 comments, and one gate on the final composed candidate. These remain unrun.
+
+Plan 030's repeated claim of one repository per hold was also corrected.
+The current destination uses one repository; per-hold forks remain the
+unbuilt plan 029 design. Its original intended-design wording is identified
+as such. Support is `docs/hosts.md:150`, the retained operation kinds in
+`packages/derive/src/capability/hold.ts:51`, and the destination repository
+selection in `packages/scope/src/artifacts-host.ts:248`. No runtime behavior
+or host identifier changed for this wording correction.

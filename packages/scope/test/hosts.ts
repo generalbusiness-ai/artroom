@@ -1,5 +1,5 @@
 /**
- * STAND-INs for the two Git hosts, for a story that runs the production wiring of each host's ports over them: `OwnGit` for the
+ * STAND-INs for the two Git hosts, for a story that runs the production wiring of each host's ports over them: `OwnGit` for
  * Cloudflare Artifacts, its binding and its smart HTTP; `Hub` for GitHub's REST API and its smart HTTP. Refs and objects are
  * maps; a read serves every object, and a push applies its one compare-and-swap command and keeps the objects of its pack, decoded
  * by the git package. Neither is a Git host: the git package's own tests send the same pack bytes to real local Git. A `Stand` is

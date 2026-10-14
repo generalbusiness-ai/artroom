@@ -339,8 +339,9 @@ cases passed and three were skipped; the Node groups passed 10 and 55 cases.
 The later receiving commit `12a99599de2c2514a50be22f6194d1813d5c38d0`
 preserves that candidate while composing separately approved Main MCP
 changes. That correspondence is separate from the original gate; no gate
-on the combined commit is claimed. Homepage publication `89750` completed separately with all 13 static
-readbacks matching. The full six-output request awaits its final review. Keep each rehearsal's original results, failures,
+on the combined commit is claimed. Homepage publication `89750` completed
+separately with all 13 static readbacks matching. The full six-output request
+awaits its final review. Keep each rehearsal's original results, failures,
 and uncertainties separate from the completed final run.
 
 | Output | Evidence to record |

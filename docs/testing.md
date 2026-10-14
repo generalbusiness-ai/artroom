@@ -477,7 +477,8 @@ The page's story, `packages/page/test/story.scope.test.ts`, runs from the
 root inside the `scope` project too. Its room is `packages/page/test/support/demo.ts`:
 created by the command line over the Worker's HTTP routes, with the real
 read sessions under a TEST SECRET, and the site route for addresses under
-`/site/`; the Git host (`OwnGit` under the production wiring of Artifacts) and the scheduler are labelled stand-ins there. Its reads
+`/site/`; the Git host (`OwnGit` under the production wiring of Artifacts)
+and the scheduler are labelled stand-ins there. Its reads
 and acts are the page's own data functions. The `page` project is its Node
 tests: the states of a change, and that the scope Worker's page module
 (`packages/scope/src/page-assets.ts`) is the page's build of its source.

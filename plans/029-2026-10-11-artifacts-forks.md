@@ -1,7 +1,8 @@
 # Plan 029: a fork for each hold
 
 Planner, 11 October 2026, 14:00 Eastern. Direction from Hugh, recorded in
-planner request `06089f04`: build a detailed plan for the forks work on Cloudflare Artifacts. This plan is a document. It names the builder
+planner request `06089f04`: build a detailed plan for the forks work on
+Cloudflare Artifacts. This plan is a document. It names the builder
 requests to file, with the witness that accepts each, and says which items
 fit before the freeze and which follow the submission.
 
