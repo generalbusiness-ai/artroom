@@ -166,7 +166,7 @@ From the repository root, with dependencies installed:
 
 ```sh
 node node_modules/vitest/vitest.mjs run --project counting
-node node_modules/typescript/bin/tsc -p examples/counting/tsconfig.json
+node node_modules/typescript/bin/tsc -p apps/counter/tsconfig.json
 ```
 
 The first command runs both definitions' tests: eight tests in two files.

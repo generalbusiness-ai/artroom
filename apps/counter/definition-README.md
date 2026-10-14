@@ -106,7 +106,7 @@ With dependencies already prepared, run only this example from the repository ro
 
 ```sh
 node node_modules/vitest/vitest.mjs run --project counting
-node node_modules/typescript/bin/tsc -p examples/counting/tsconfig.json
+node node_modules/typescript/bin/tsc -p apps/counter/tsconfig.json
 ```
 
 The ordinary root test run includes the `counting` Node project in its existing

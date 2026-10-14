@@ -19,7 +19,7 @@ const dependencyRoots=[];
 for(const name of readdirSync(resolve(root,"node_modules"))){if(name.startsWith("." )||name==="@generalbusiness")continue;const candidates=name.startsWith("@")?readdirSync(resolve(root,"node_modules",name)).map(child=>name+"/"+child):[name];
   for(const name of candidates){const supplied=resolve(root,"node_modules",name),manifest=resolve(supplied,"package.json");if(!existsSync(manifest))continue;const pkg=JSON.parse(await readFile(manifest,"utf8"));if(lockData.packages?.["node_modules/"+name]?.version===pkg.version)dependencyRoots.push(realpathSync(supplied));}}
 const names=["client","voice-controller","app","device-key"];
-const entries=names.map(name=>resolve(root,`examples/counting/browser/${name}.test.ts`));
+const entries=names.map(name=>resolve(root,`apps/counter/browser/${name}.test.ts`));
 const output=realpathSync(await mkdtemp(resolve(tmpdir(),"artroom-counting-node-")));
 const aliases=Object.fromEntries(["client","bytes","contract"].map(name=>[`@generalbusiness/${name === "contract" ? "dap" : "artroom"}-${name}`,resolve(root,`packages/${name}/src/index.ts`)]));
 const result=await build({entryPoints:entries,absWorkingDir:root,bundle:true,platform:"node",format:"esm",outdir:output,outExtension:{".js":".mjs"},alias:aliases,metafile:true,write:true,logLevel:"silent"});
@@ -32,7 +32,7 @@ for(const name of inputs){const supplied=resolve(root,name),path=realpathSync(su
   if(inside(root,path)&&!inside(resolve(root,"node_modules"),supplied))source.add(path);
   else if(!dependencyRoots.some(base=>inside(base,path)))throw new Error("Counting witness input is outside the current source and locked dependencies.");
 }
-for(const name of ["packages/client/src/observe.ts","packages/client/src/head-stream.ts","packages/client/src/index.ts","packages/client/src/intent.ts","packages/bytes/src/index.ts","packages/contract/src/index.ts","examples/counting/commitments.ts","examples/counting/commitments-pin.ts",...entries.map(path=>relative(root,path))])if(!source.has(realpathSync(resolve(root,name))))throw new Error("Counting witness omitted a current source dependency.");
+for(const name of ["packages/client/src/observe.ts","packages/client/src/head-stream.ts","packages/client/src/index.ts","packages/client/src/intent.ts","packages/bytes/src/index.ts","packages/contract/src/index.ts","apps/counter/commitments.ts","apps/counter/commitments-pin.ts",...entries.map(path=>relative(root,path))])if(!source.has(realpathSync(resolve(root,name))))throw new Error("Counting witness omitted a current source dependency.");
 const files=outputs.map(([name,info])=>{const path=realpathSync(resolve(root,name));if(!inside(output,path)||!info.entryPoint||!entries.includes(realpathSync(resolve(root,info.entryPoint))))throw new Error("Unexpected Counting witness entry or output.");return path;});
 if(new Set(files.map(path=>basename(path))).size!==names.length||new Set(outputs.map(([,info])=>info.entryPoint)).size!==names.length)throw new Error("Duplicate Counting witness output.");
 
