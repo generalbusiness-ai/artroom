@@ -491,9 +491,10 @@ state. That is what a verifier does with a real scope's history.
 
 ## Where to go next
 
-- [The full Counter](../examples/counting) adds leave, pause, reset, and
-  timed turns. Its source and tests belong to a repository checkout, not
-  the published SDK packages.
+- [The full Counter](../examples/counting) replaces `spoken` with a
+  commitment that the participant then fulfills, and adds activity, pause,
+  reset and a deadline. Its page has diagrams of every act. Its source and
+  tests belong to a repository checkout, not the published SDK packages.
 - [Write an application](write-an-application.md) shows how to declare,
   validate and pin a definition of your own.
 - [The architecture of a dap application](architecture.md) explains what

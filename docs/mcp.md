@@ -146,9 +146,11 @@ fit, the description keeps whole sentences only and names the guards it
 left out, by position and name, with a pointer to `inspect` with
 `describe`, which returns the complete text.
 
-The five worked examples of plan 031, section 4, as `tools/list` sends
-them. The first is for a member of the demo room, the third for an admin;
-the others are for a member who holds the action named.
+Five worked examples, as `tools/list` sends them. The first three are
+those of plan 031, section 4. The first is for a member of the demo room,
+the third for an admin; the others are for a member who holds the action
+named. The last two are acts of the Counter's definition,
+`counting-commitments`.
 
 `issue.comment`, the issue lane's `comment`:
 
@@ -162,14 +164,14 @@ the others are for a member who holds the action named.
 
 > open-issue: opens a lane; needs issue.open, which your role (admin) holds. Fields: definition (required): the digest of a value in the definition domain, up to 262144 bytes, with its bytes in values or read from the rules scope; choices from the rules scope: change sha256:d86c64ae0a570165660a6eb4d75153b8c2f59c9cdaec2ecc789e2c38524a17a2, issue sha256:82a938c8f54ddcac7974ca688ebea7d51c35d2aa70f4e3729965e9f915bc464e. title (required): text up to 256 bytes. body: text up to 65536 bytes, kept apart from the entry: give the text itself, or its digest with the text in texts. conditions (required): a list of up to 16, each text up to 4096 bytes. Guards: the definition is active in the rules scope, and its bytes and the definitions it names are at hand (not-activated, unsupported-definition).
 
-`counting.join`, the Counter's `join`:
+`counting-commitments.participate`, the Counter's `participate`:
 
-> join: opens a participant; needs counting.join, which your role (member) holds. Fields: none. Guards: between 0 and 7 participants are joined; no participant is joined where the participant's agent equals you.
+> participate: opens a participant; needs counting.participate, which your role (member) holds. Fields: none. Guards: no participant is inactive or active where the participant's agent equals you.
 
-`counting.spoken`, the Counter's `spoken`, whose last guard is a rule too
-long for the description:
+`counting-commitments.commit`, the Counter's `commit`, whose last guard is a
+rule too long for the description:
 
-> spoken: moves a board; needs counting.spoken, which your role (member) holds; from running, to finished. Fields: generation (required): a whole number from 0 to 1000000. serial (required): a whole number from 1 to 1000000. n (required): a whole number from 1 to 100. nextN (required): a whole number from 1 to 100. nextSerial (required): a whole number from 1 to 1000000. basis (required): a list of up to 8, each a record of id (required): the ID of a participant item on this scope; member (required): a member, as @handle. next (required): the ID of a participant item on this scope. Guards: this board is running; you are this board's speaker; some participant is joined where the participant's agent equals you; the next is joined; the p.id of each p in the act's basis are exactly the participant items that are joined matched by the participant's agent equals p.member, in order. Guards 6 to 6 of 6 are left out; see inspect with describe: "spoken".
+> commit: opens a promise; needs counting.commit, which your role (member) holds. Fields: participant (required): the ID of a participant item on this scope. generation (required): a whole number from 0 to 1000000. serial (required): a whole number from 1 to 1000000. n (required): a whole number from 1 to 100. basis (required): a list of up to 16, each a record of id (required): the ID of a participant item on this scope; member (required): a member, as @handle. Guards: the board is open; the board's pledge is not set; no promise is pledged; the participant is active; you are the participant's agent; the p.id of each p in the act's basis are exactly the participant items that are active matched by the participant's agent equals p.member, in order; one of: [between 0 and 1 participants are active] or [you are not the board's lastSpeaker]. Guards 8 to 8 of 8 are left out; see inspect with describe: "commit".
 
 ### Each act tool's input
 
@@ -1348,23 +1350,29 @@ version as `source-shape`; the recipe test asserts that refusal too.
 A Counter is an application the room's application factory creates
 (`application.create`, the directory's `establish-application`). The
 agent is handed no scope ID and no `--scope`: `room` lists the Counter
-among its applications, with its definition name (`counting`), digest,
-scope and state, and the list holds the Counter's act tools from then on.
+among its applications, with its definition name
+(`counting-commitments`), digest, scope and state, and the list holds the
+Counter's act tools from then on.
 `packages/mcp/test/counter.scope.test.ts` runs this recipe on the real
 test Worker in both modes, after an admin has initialized the board, and
 checks the tools called and their count against this table (observed).
-The count covers taking part, from finding the Counter to leaving; the
-room's setup, the board's initialization and the story's final reading
-of the steps are not counted. In `--generic` mode the story's second
+The count covers taking part, from finding the Counter to deactivating;
+the room's setup, the board's initialization and the story's final
+readings of the board and the steps are not counted. The story's one
+member holds every grant, so the same member starts the board and takes
+the turn; in a room with several members the controller starts. In `--generic` mode the story's second
 connection shares the first one's key and configuration: the same member,
 not a second admitted one.
 
 | Activity | Default | --generic |
 |---|---|---|
-| Take part in a Counter: find it, join, start, speak once, leave | `room`, whose applications name the Counter's scope; `counting.join`; `inspect` on the Counter for the board, `counting.start`; `inspect`, `counting.spoken`; `inspect`, `counting.leave`: 8 | `room`; `actions` on the Counter, `act` join; `inspect`, `act` start; `inspect`, `act` spoken; `inspect`, `act` leave: 9 |
+| Take part in a Counter: find it, participate, activate, start, commit to a number, fulfill it, deactivate | `room`, whose applications name the Counter's scope; `counting-commitments.participate`; `counting-commitments.activate`; `inspect` on the Counter for the board, `counting-commitments.start`; `inspect`, `counting-commitments.commit`; `counting-commitments.fulfill`; `counting-commitments.deactivate`: 9 | `room`; `actions` on the Counter, `act` participate; `act` activate; `inspect`, `act` start; `inspect`, `act` commit; `act` fulfill; `act` deactivate: 10 |
 
-Each further turn is one `inspect` and one `counting.spoken` (one `act` in
-`--generic` mode).
+Each further turn is one `inspect`, one `counting-commitments.commit` and
+one `counting-commitments.fulfill` (one `act` each in `--generic` mode).
+When more than one participant is active, the last speaker cannot commit
+next. [The Counter](../examples/counting/README.md) has diagrams of every
+act and who may attempt it.
 
 The commitments Counter (`examples/counting/commitments.ts`, the one the
 target-100 recording runs) grants differently from the Counter above: an
