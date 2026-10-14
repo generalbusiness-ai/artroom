@@ -78,7 +78,9 @@ A scope judges each intent against its definition, its state and what
 the signer is allowed to do. An act **takes effect** when the scope
 writes its entry. The scope then returns a **receipt**, which names the
 entry by scope, position and hash. If the act cannot take effect, the
-scope **refuses** it, names the reason, and writes nothing.
+scope **refuses** it, names the reason, and writes no entry for the refused
+act. Due deadlines can take effect first, so the journal's head can still
+advance before the refusal.
 
 Tools and commands report these outcomes in their own words. The answer
 `accepted`, from the command line and MCP, and the judgment `write`,

@@ -2,7 +2,7 @@
 
 For a reviewer using an already configured dap source CLI, this page helps you record a judgment about the exact content you read and the repository requirement it satisfies.
 
-**Status. This guide cites the code at `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. Its commands have not been run for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
+**Status. This guide cites the code at `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8`, which is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. Its commands have not been run for this page.** No public package installation or completed browser review is established here. Use only a CLI already supplied for that source and a room whose actual declaration supports these acts.
 
 First read the change and the actual entries that hold its content:
 

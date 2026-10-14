@@ -2,7 +2,7 @@
 
 For a maintainer or admin using an already configured source CLI, this page helps you tell a recorded proposal or reservation from the destination's confirmed publication.
 
-**Status. This guide cites the code at `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8` is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. Its commands have not been run for this page.** No public package release, hosted tutorial or rendered acceptance is established. Your room keeps its original definition pins; activating new declarations alone does not upgrade an older native destination.
+**Status. This guide cites the code at `0e5954ecfca23f531cfa2ec42be1524bef3bc9a8`, which is incorporated in main `a1277d9c43bdaff1873e61f0a3d2444fc5f72b53`. Its commands have not been run for this page.** No public package release, hosted tutorial or rendered acceptance is established. Your room keeps its original definition pins; activating new declarations alone does not upgrade an older native destination.
 
 Read the intended version, content and required evidence before the mutation:
 
