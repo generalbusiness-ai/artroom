@@ -87,6 +87,26 @@ page called it. This head adds the command:
 - `examples/lending/runbook.md` now names the command in place of the gap.
   `docs/cli.md` documents it.
 
+### Answer to review fe63415c
+
+- **Bounded record.** The shared issuance engine no longer writes a new
+  snapshot when it resends a stage that is already attempted. A chain now
+  holds at most one snapshot for each change of state: four for a person
+  invitation, seven for an agent key, within the reader's limit of 16.
+  This changes the page's custody the same way; its bundle is
+  regenerated.
+- **Boundary witness.** Twenty `--continue` runs with every answer lost
+  leave one signed `invite-member` of `@rex`. A `--check` whose directory
+  read is interrupted says nothing was read and keeps the original. A
+  second `--check` verifies it without moving the membership's head, and
+  there is one invitation of `@rex`. Control: with the engine change
+  removed, the same story stops with "The retained invitation's private
+  record is unavailable".
+- **Modes.** `--check` with `--continue`, either with `--hours` or
+  `--acts`, and `--keep` with `--acts` are refused with a usage message.
+- Main `26d2bc8a` merged, including the publication-origin repair; the
+  page bundle is regenerated from the merged source.
+
 ## Witnesses
 
 `packages/cli/test/agent-key.scope.test.ts`, one scenario on real scopes

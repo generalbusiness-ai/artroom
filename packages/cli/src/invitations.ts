@@ -248,7 +248,9 @@ export async function issueInvitation(ctx: Context, input: InvitationIssueInput,
         if (!stage.attempted || !stage.receipt) { stage.attempted = true; stage.receipt = settled.value; await persist(); }
         return "verified";
       }
-      stage.attempted = true; await persist();
+      // An already attempted stage is sent again unchanged and keeps no new snapshot, so a chain holds at most one snapshot for each
+      // change of state: root, prepared, attempted and settled for each stage (seven for an agent key, four for a person).
+      if (!stage.attempted) { stage.attempted = true; await persist(); }
       let answer: Answer;
       try { answer = await wait(options, async () => (await membershipHandle()).submit(stage.signed)); } catch { check(options); return "unknown"; }
       if (answer.answer === "refused") { stage.refused = answer; await persist(); return "refused"; }
@@ -415,6 +417,7 @@ async function retainedIssue(ctx: Context, pointer: PendingInvitationIssue): Pro
   const names: string[] = [];
   let request: string | undefined = pointer.request, input: InvitationIssueInput | null = null;
   while (request !== undefined) {
+    // Sixteen is more than the seven snapshots the engine writes for the longest issuance, so a lawful chain is always readable.
     if (names.includes(request) || names.length >= 16) return null;
     const bytes = await ctx.store.private(request);
     if (!bytes) return null;

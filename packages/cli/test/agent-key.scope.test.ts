@@ -214,6 +214,35 @@ async function story(lifetime: Lifetime): Promise<void> {
   const next = await run(lia, "invite", "@quin", "--role", "member", "--keep");
   expect([next.code, next.lines[0]], next.lines.join("\n")).toEqual([0, "Invited @quin: the invitation is recorded and verified."]);
 
+  // Twenty Continues whose answers are all lost: each resends the same signed invite-member and keeps no new snapshot, so the
+  // retained record stays readable. Then a Check whose directory read is interrupted stays unknown, and a second Check settles
+  // the original: one native invitation of @rex, signed once.
+  const dropping = (match: (url: string, body: string) => boolean) => (async (url: string, init?: RequestInit) => {
+    const response = await (fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    if (match(url, typeof init?.body === "string" ? init.body : "")) throw new Error("the answer was lost");
+    return response;
+  }) as unknown as Fetch;
+  const invites = dropping((url, body) => new URL(url).pathname.endsWith("/acts") && body.includes('"invite-member"'));
+  expect((await run({ ...lia, fetch: invites }, "invite", "@rex", "--role", "member", "--keep")).code).toBe(1);
+  for (let i = 0; i < 20; i++) {
+    const again = await run({ ...lia, fetch: invites }, "invite", "--continue");
+    expect([again.code, again.lines[0]], again.lines.join("\n")).toEqual([1, expect.stringMatching(/^The invitation of @rex is unknown\./)]);
+  }
+  const signedOnce = (await library.M.entries()).filter((entry) => entry.input.type === "act" && entry.input.signed.intent.kind === "invite-member" && (entry.input.signed.intent.fields as { handle?: string }).handle === "@rex");
+  expect(signedOnce, "one invite-member of @rex, however often it was continued").toHaveLength(1);
+  const headBefore = (await library.M.summary()).at;
+  const directoryScope = library.repository.directory.scope;
+  const interrupted = await run({ ...lia, fetch: dropping((url) => url.includes(directoryScope)) }, "invite", "--check");
+  expect([interrupted.code, interrupted.lines[0]], interrupted.lines.join("\n")).toEqual([1, expect.stringMatching(/Nothing was read; the read may be made again\. The original invitation is retained/)]);
+  const settled = await run(lia, "invite", "--check");
+  expect([settled.code, settled.lines[0]], settled.lines.join("\n")).toEqual([0, "Invited @rex: the invitation is recorded and verified."]);
+  expect((await library.M.summary()).at, "Check sends nothing").toEqual(headBefore);
+  expect((await library.M.summary()).value.items.filter((item) => item.type === "member" && item.values["handle"] === "@rex")).toHaveLength(1);
+  // The three modes stay distinct on the command line.
+  expect((await run(lia, "invite", "--check", "--continue")).code).toBe(2);
+  expect((await run(lia, "invite", "--check", "--hours", "2")).code).toBe(2);
+  expect((await run(lia, "invite", "@sam", "--role", "member", "--keep", "--acts", "x")).code).toBe(2);
+
   // ---- Refusals. Each leaves the receiving configuration without a repository and the rooms' heads unchanged by the refusal.
   const relabel = (text: string, over: Partial<AgentKeyInvitation>): string => encodeAgentKeyInvitation({ ...agentKeyInvitationOf(text)!, ...over });
   /**

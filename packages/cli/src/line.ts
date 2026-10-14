@@ -94,7 +94,9 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
       return name === "found" ? { ...outcome, lines: ["Use dap create instead of dap found. The found alias remains for one release.", ...outcome.lines] } : outcome;
     }
     case "invite":
-      if (flag("check") !== undefined || flag("continue") !== undefined) return first !== undefined || flag("role") || flag("keep") !== undefined ? { code: 2, lines: ["invite --check and --continue take no handle or role: the retained invitation holds them.", USAGE] } : invitePerson(ctx, undefined, { mode: flag("check") !== undefined ? "check" : "continue" });
+      if (flag("check") !== undefined && flag("continue") !== undefined) return { code: 2, lines: ["invite takes --check or --continue, not both.", USAGE] };
+      if (flag("check") !== undefined || flag("continue") !== undefined) return first !== undefined || flag("role") || flag("keep") !== undefined || flag("hours") !== undefined || flag("acts") !== undefined ? { code: 2, lines: ["invite --check and --continue take no handle, role, hours or acts: the retained invitation holds them.", USAGE] } : invitePerson(ctx, undefined, { mode: flag("check") !== undefined ? "check" : "continue" });
+      if (flag("keep") !== undefined && flag("acts") !== undefined) return { code: 2, lines: ["invite --keep takes no --acts: a role's actions are the roster's.", USAGE] };
       if (flag("keep") !== undefined) return first === undefined ? needs("a member's handle") : invitePerson(ctx, first, { mode: "new", ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
       return first === undefined ? needs("a member's handle") : invite(ctx, first, { ...(flag("role") ? { role: flag("role")! } : {}), ...(flag("acts") !== undefined ? { acts: flag("acts")! } : {}), ...(flag("hours") ? { hours: number("hours")! } : {}) });
     case "join": return first === undefined ? needs("a link") : flag("check") !== undefined ? first.startsWith(AGENT_KEY_LINK) ? enrolAgentKey(ctx, first, { mode: "check" }) : needs("an explicitly tagged agent-key invitation for --check") : join(ctx, first);
