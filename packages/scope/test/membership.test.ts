@@ -41,8 +41,8 @@ describe("authority on real scopes, under the production wiring (authority note,
         const sealed = await node.sealed();
         const alarm = await runInDurableObject(node.object, (_instance, state) => state.storage.getAlarm());
         return { scope: summary.value.scope, head: summary.at, status: summary.value.status, alarm,
-          duties: outbox.ok ? outbox.value.slice(0, 8).map(duty => ({ seq: duty.seq, n: duty.n, class: duty.class, result: duty.result,
-            attempts: duty.attempts.map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
+          duties: outbox.ok ? outbox.value.slice(0, 8).map(duty => ({ duty: duty.duty, class: duty.class, held: duty.held, acknowledged: duty.acknowledged, result: duty.result,
+            attemptCount: duty.attempts.length, attempts: duty.attempts.slice(-8).map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
           dutyCount: outbox.ok ? outbox.value.length : null,
           entries: sealed.slice(-4).map(({ entry, hash }) => ({ seq: entry.seq, hash, type: entry.input.type,
             ...(entry.input.type === "delivery" ? { class: entry.input.message.class } : {}) })) };
