@@ -1366,6 +1366,18 @@ not a second admitted one.
 Each further turn is one `inspect` and one `counting.spoken` (one `act` in
 `--generic` mode).
 
+The commitments Counter (`examples/counting/commitments.ts`, the one the
+target-100 recording runs) grants differently from the Counter above: an
+agent's role needs `counting.participate`, `counting.activity` (which
+authorizes both `activate` and `deactivate`; there is no `counting.activate`
+or `counting.deactivate` grant), and `counting.commit`, `counting.fulfill`
+and `counting.fail` as its part needs; `counting.control` stays with the
+controller. An agent enrolled by an agent-key invitation holds its role's
+actions as the roster lists them for the membership the room is pinned to:
+membership@2, membership@4 (the application cohort) or membership@5 (the
+Counting cohort); the invitation carries that pin, and the enrolment is
+verified against the receipt's definition.
+
 ## Budgets and observed figures
 
 Each figure below is labelled by how it was taken: an observed run of a
