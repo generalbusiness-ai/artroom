@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4a415e7c6f86530e5531abc021d3e409e352663b","text":"Merge retired a covered predecessor with no successor at its old path."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:4adcbc1bd4904d460f1c1dc88f843f827f53dfb2","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-05-i2-delivery.md."}
