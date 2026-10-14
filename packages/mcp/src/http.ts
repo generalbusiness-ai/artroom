@@ -98,12 +98,16 @@ type Body = { status: "ok"; value: unknown } | { status: "too-large" } | { statu
 export class McpHttp {
   /** The 2025-11-25 sessions, oldest first. */
   readonly sessions = new Map<string, LegacySession>();
-  /** Every open stream, legacy and listen, and a slot reserved for one being opened: the count is taken before any await. */
+  /**
+   * Every holder of a stream slot: each listen stream by its owner, and each 2025-11-25 session that has a live stream or an
+   * opening pending. A session holds one slot however many replacements of its stream are being opened at once, so live
+   * capacity has one owner across generations; the count is taken before any await.
+   */
   readonly #open = new Set<object>();
   /** The listen streams by their owner, so a graceful ending can complete each one. */
   readonly #listens = new Map<object, { end: (final: boolean) => void }>();
-  /** How many replacements of a session's stream are being opened: the incumbent's slot is theirs until the last of them exits. */
-  readonly #replacing = new Map<LegacySession, number>();
+  /** How many openings of a session's stream are pending: the session keeps its slot until the last of them exits with no stream. */
+  readonly #pending = new Map<LegacySession, number>();
   constructor(readonly port: HttpPort) {
     // Issuance persists a new session; an update persists only a session that is still live. One that ended while its request
     // was pending (deleted, evicted, retired, or discarded with its layer) is never written again: an ended session's row stays
@@ -257,49 +261,39 @@ export class McpHttp {
 
   /**
    * The 2025-11-25 session's stream. A second `GET` replaces the first, which closes without detaching its replacement. The
-   * stream's slot is owned before anything is awaited: a fresh open takes a new slot or is refused, and a replacement takes
-   * over the incumbent's slot at once, so the incumbent's cancellation during the await frees nothing for another session. A
-   * client that went away while the snapshot was read (`signal`) opens no stream: its slot is released and nothing watches. A
-   * replacement that does not open gives the slot back to its incumbent, which is still live and still the session's stream:
-   * live capacity is owned across every exit, so four live incumbents are never counted as three.
+   * session owns its one slot from the moment an opening is admitted, across every opening pending for it and the stream it
+   * holds, until it has no stream and no opening pending: a fresh open takes the session's slot or is refused, a replacement
+   * takes nothing new, the incumbent's cancellation during a pending opening frees nothing, and however many replacements
+   * overlap and abort in whatever order, a session with a live stream is counted exactly once.
    */
   async #stream(session: LegacySession, signal?: AbortSignal): Promise<Response> {
-    const slot = {};
-    const incumbent = session.stream;
-    if (incumbent === null) {
-      if (this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
-    } else {
-      this.#open.delete(incumbent);   // the slot passes to the replacement now
-      this.#replacing.set(session, (this.#replacing.get(session) ?? 0) + 1);
-    }
-    this.#open.add(slot);
-    // When a replacement exits without opening: the incumbent takes its slot back if it is still the session's live stream and
-    // no later replacement holds it; otherwise nothing is owed, since the incumbent is gone or another replacement will close it.
-    const exit = (opened: boolean) => {
-      if (incumbent === null) return;
-      const left = (this.#replacing.get(session) ?? 1) - 1;
-      if (left > 0) this.#replacing.set(session, left); else this.#replacing.delete(session);
-      if (!opened && left === 0 && session.stream === incumbent) this.#open.add(incumbent);
+    const fresh = session.stream === null && !this.#pending.has(session);
+    if (fresh && this.#open.size >= STREAMS_MOST) return json(409, rpcError(null, TOO_MANY_STREAMS, `At most ${STREAMS_MOST} streams are open at once.`));
+    this.#open.add(session);
+    this.#pending.set(session, (this.#pending.get(session) ?? 0) + 1);
+    // Every exit of this opening: the session keeps its slot while it has a live stream or another opening pending.
+    const exit = () => {
+      const left = (this.#pending.get(session) ?? 1) - 1;
+      if (left > 0) this.#pending.set(session, left); else this.#pending.delete(session);
+      if (left === 0 && session.stream === null) this.#open.delete(session);
     };
     // Reconciliation before the stream is attached: a change made while no stream was open, or while the object was evicted, is
     // told once now, unless the client has listed since.
     let generation: Digest | null = null;
     try { generation = (await this.port.wire.service.snapshot()).generation; } catch { generation = null; }
-    this.#open.delete(slot);
-    // The session may have ended, or the client gone, while the snapshot was read: then no stream opens, and the slot is released.
-    if (session.id !== null && !this.sessions.has(session.id)) { exit(false); return bare(404); }
-    if (signal?.aborted) { exit(false); return bare(204); }
+    // The session may have ended, the layer been discarded, or the client gone, while the snapshot was read: then no stream opens.
+    if (session.ended || (session.id !== null && !this.sessions.has(session.id))) { exit(); return bare(404); }
+    if (signal?.aborted) { exit(); return bare(204); }
     const old = session.stream;
-    const sse = this.#sse(() => { if (session.stream === stream) { this.#open.delete(stream); this.port.wire.endLegacy(session); } });
+    const sse = this.#sse(() => { if (session.stream === stream) { this.port.wire.endLegacy(session); if (!this.#pending.has(session)) this.#open.delete(session); } });
     const stream: Stream = {
       notified: null,
       send: (message) => sse.send(`event: message\ndata: ${JSON.stringify(message)}\n\n`),
       close: (final) => { if (final) sse.send("event: end\ndata: {}\n\n"); sse.close(); },
     };
-    if (old) { this.#open.delete(old); old.close(false); }
-    this.#open.add(stream);
     session.stream = stream;
-    exit(true);
+    if (old) old.close(false);   // its cancellation finds another stream on the session, and releases nothing
+    exit();
     sse.send(": stream\n\n");
     // A session that has listed is told once of a generation it has not listed; one that never listed has nothing to reconcile.
     if (generation !== null) {
@@ -340,7 +334,8 @@ export class McpHttp {
     const stream = session.stream;
     session.ended = true;
     this.port.wire.endLegacy(session);
-    if (stream) { this.#open.delete(stream); stream.close(final); }
+    if (stream) stream.close(final);
+    if (!this.#pending.has(session)) this.#open.delete(session);   // a pending opening of it exits 404 and releases the slot then
     if (session.id !== null) { this.sessions.delete(session.id); await this.port.remove?.(session.id); }
     return bare(200);
   }
@@ -355,8 +350,9 @@ export class McpHttp {
       const stream = session.stream;
       session.ended = true;
       this.port.wire.endLegacy(session);
-      if (stream) { this.#open.delete(stream); stream.close(false); }
+      if (stream) stream.close(false);
     }
+    this.#pending.clear();
     for (const listen of [...this.#listens.values()]) listen.end(false);
     this.#open.clear();
   }

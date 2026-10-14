@@ -170,8 +170,12 @@ export type HeldBack =
   | { held: "full"; reason: "budget"; bytes: number }
   | { held: "locked"; stale?: string }
   | { held: "unreadable" }
-  /** The envelope was sent and answered, and the store could not keep the outcome: the act may have taken effect; the record stays `sent`. */
-  | { held: "unkept"; answer: Answer["answer"] | "lost" }
+  /**
+   * The envelope was sent and answered (or its reply was lost), and the store could not keep the outcome: the act may have taken
+   * effect; the record stays `sent`. For a preparation step, `step` names it: the step was sent and the resource answered, and
+   * the same step under the same key and arguments is the recovery, not the act's settlement.
+   */
+  | { held: "unkept"; answer: Answer["answer"] | "lost"; step?: { resource: string; capability: string; step: string } }
   | { held: "too-large" };
 
 export class CustodyError extends Error {
@@ -441,8 +445,15 @@ export class Custody {
       if (entry.answers.length > OUTCOMES_INLINE) entry.answers.splice(1, entry.answers.length - OUTCOMES_INLINE);
       // A standalone record is settled, and terminal, when every step it holds is decided; until then it stays unresolved.
       if (fresh.standalone) fresh.phase = Object.values(fresh.steps).every((st) => st.phase === "answered") ? "settled" : "unknown";
-      fresh.updated = this.now();
-      await this.#write(id, fresh);
+      // The step was sent and answered before this write: a store that fails here keeps the step `sent`, and what is reported
+      // says so, with the step's identity, never that nothing was sent (the same rule as a dispatch's outcome).
+      try {
+        fresh.updated = this.now();
+        await this.#write(id, fresh);
+      } catch (error) {
+        if (error instanceof CustodyError && error.why.held === "too-large") throw error;
+        throw new CustodyError({ held: "unkept", answer: answer === null ? "lost" : answer.answer, step: { resource: resource.scope, capability, step } });
+      }
       return { record: fresh, step: entry, answer, retained: false };
     });
   }

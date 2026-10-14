@@ -6,7 +6,7 @@
  */
 import { env } from "cloudflare:test";
 import { expect, test } from "vitest";
-import type { ControlRequest, FactRef, KeyId, MemberId, ScopeRef } from "@generalbusiness/dap-contract";
+import type { ControlRequest, Digest, FactRef, KeyId, MemberId, ScopeRef } from "@generalbusiness/dap-contract";
 import { b64url, canonicalize, digestBytes, keyIdOfSecret, newIncarnation, signControl, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import { encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF, firstExtents } from "@generalbusiness/dap-platform";
@@ -187,7 +187,7 @@ function stream(bearer: string, session: string): { text: () => string; stop: ()
 }
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const until = async (check: () => boolean, ms = 3000) => { for (let t = 0; t < ms && !check(); t += 25) await new Promise((r) => setTimeout(r, 25)); return check(); };
-const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }>; used(): Promise<number>; durableFacts(): Promise<{ key: string | null; state: string | null; enrol: string | null; bearer: boolean }>; custodyRecord(key: string): Promise<{ intent: string; attempt: number; outcomes: number; phase: string } | null> };
+const agentStub = (id: string) => env.AGENTS.get(env.AGENTS.idFromString(id)) as unknown as { reset(): Promise<void>; tick(): Promise<boolean>; counts(): Promise<{ streams: number; sessions: number }>; heldAnswers(): Promise<{ control: { op: string; answer: boolean }[]; agent: boolean }>; used(): Promise<number>; durableFacts(): Promise<{ key: string | null; state: string | null; enrol: string | null; bearer: boolean }>; custodyRecord(key: string): Promise<{ intent: string; attempt: number; outcomes: number; phase: string; steps: string[]; reserved: number } | null> };
 const intentDigestOf = (intent: unknown) => digestBytes(utf8(canonicalize(intent as never)));
 const registryStub = (membership: string) => env.REGISTRIES.get(env.REGISTRIES.idFromName(membership)) as unknown as { agents(): Promise<{ agent: string; handle: string; state: string }[]>; heldAnswers(): Promise<{ op: string; answer: boolean }[]> };
 /** A 2026-07-28 listen, read in the background: its events so far. */
@@ -510,6 +510,11 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     expect(wholeThenContiguous(stepSeqs), "the steps paged through are the whole history, each once, in order").toBe(true);
     // Against the scope's own head, as the last read reported it: every position through the head, and nothing past it.
     expect(stepSeqs.length, "the steps reach the scope's head").toBeGreaterThanOrEqual(stepsHead!.seq + 1);
+    // And against the native fixture's own reading of the directory, taken apart from any MCP implementation: the native head
+    // at the time of the first read is within what was paged, and the pages end at or before the native head now.
+    const nativeNow = (await room.platform(rita.config.repository!.directory.scope).summary()).at.seq;
+    expect(stepSeqs.length - 1, "the pages end at or before the directory's native head").toBeLessThanOrEqual(nativeNow);
+    expect(stepSeqs.length - 1, "and at or past the head the first page reported").toBeGreaterThanOrEqual(stepsHead!.seq);
     // The record, whose entries are larger than steps, actually continues: more than one page within the bound, the last
     // without a cursor, and the pages together are the whole history, each entry once and in order.
     const recordPages: { seq: number }[][] = [];
@@ -527,6 +532,7 @@ test("H5, H6 and H7: eviction and reconciliation, custody across a lost reply an
     const recorded = recordPages.flat().map((entry) => entry.seq ?? (entry as { entry?: { seq: number } }).entry?.seq ?? -1);
     expect(wholeThenContiguous(recorded), `the record's pages together are the whole history, each entry once, in order: ${JSON.stringify(recorded)} for ${JSON.stringify(whole)}`).toBe(true);
     expect(recorded.length, "the record reaches the scope's head as the last read reported it").toBeGreaterThanOrEqual(recordHead!.seq + 1);
+    expect(recorded.length - 1, "the record's pages end at or before the directory's native head").toBeLessThanOrEqual((await room.platform(rita.config.repository!.directory.scope).summary()).at.seq);
   } finally { done(room); }
 });
 
@@ -814,6 +820,71 @@ test("H6 through the endpoint: a write that fails while a result is written is r
     const repeat = await result(await room.wait(() => modernCall(bot.bearer, "issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "written late", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "late" })));
     expect([repeat["answer"], repeat["retained"]], JSON.stringify(repeat)).toEqual(["accepted", true]);
     expect(((await rita.ok("steps", { scope: "directory" }))["steps"] as { kind: string | null; signer: string | null }[]).filter((e) => e.kind === "open-issue" && e.signer === bot.key).length, "never signed twice").toBe(1);
+  } finally { done(room); }
+});
+
+test("H6 through the endpoint: a preparation step whose answer the store could not keep is reported as such, with the step's identity and its own recovery; the step stays sent, the same step under the same key is sent again and kept, one preparation entry", async () => {
+  const { room, rita } = await roomWithIssues();
+  hostedTest.custodyBounds = { budget: 1024 * 1024 * 1024, identityMost: 64 * 1024 * 1024, terminalMost: 1024, ageDays: 30 };
+  try {
+    const bot = await hosted(room, rita, "@bot", "create-bot");
+    const stub = agentStub(bot.agent);
+    const result = async (r: Response) => (await r.json() as { result: { structuredContent: Record<string, unknown> } }).result.structuredContent;
+    // A lane with a commitment the agent holds: rita opens an issue and offers it to the agent, who takes it and takes a hold.
+    const opened = await rita.ok("issue.create", { fields: { definition: DEMO_DIGESTS.issue, title: "a held issue", conditions: ["done"] }, values: [canonicalize(issueDemo)], idempotencyKey: "held-issue" });
+    expect(opened["answer"], JSON.stringify(opened)).toBe("accepted");
+    const created = await rita.ok("wait", { scope: "directory", entry: (opened["fact"] as FactRef).seq });
+    const lane = (created["created"] as { scope: string; kind: string }[]).find((c) => c.kind === "lane")!.scope;
+    const offer = await rita.ok("issue.offer", { target: lane, fields: { offeree: "@bot" }, idempotencyKey: "offer-bot" });
+    expect(offer["answer"], JSON.stringify(offer)).toBe("accepted");
+    const commitment = (offer["fact"] as FactRef).seq;
+    const filed = await rita.ok("step", { scope: lane, seq: 0 });
+    const terms: FactRef = { at: (offer["fact"] as FactRef).at, seq: 0, hash: filed["hash"] as Digest };
+    const taken = await result(await room.wait(() => modernCall(bot.bearer, "issue.take", { target: lane, on: commitment, fields: { terms }, idempotencyKey: "take-bot" })));
+    expect(taken["answer"], JSON.stringify(taken)).toBe("accepted");
+    const worked = await result(await room.wait(() => modernCall(bot.bearer, "issue.work", { target: lane, fields: { commitment }, idempotencyKey: "work-bot" })));
+    expect(worked["answer"], JSON.stringify(worked)).toBe("accepted");
+    const hold = (worked["fact"] as FactRef).seq;
+    const laneRef = (await rita.ok("inspect", { scope: lane }))["ref"] as { scope: string; inc: string; kind: string };
+    const entriesBy = async () => (await allSteps(rita, lane)).filter((e) => e.signer === bot.key && e.kind !== null && e.kind.includes("instance")).length;
+    // Standalone: a hold instance step, a step with no act. The lane accepts it; the store fails as the answer is written.
+    const standalone = { resource: lane, capability: "hold@1", step: "instance", fields: { hold, task: { ...laneRef, kind: "task" }, instance: "i-1" }, idempotencyKey: "instance-bot" };
+    hostedTest.failWrite = "result";
+    const unkept = await result(await room.wait(() => modernCall(bot.bearer, "prepare", standalone)));
+    expect(unkept["error"], JSON.stringify(unkept)).toBe("custody");
+    expect(String(unkept["message"]), JSON.stringify(unkept)).toMatch(new RegExp(`^Step instance of hold@1 for key instance-bot was sent to ${lane} and ${lane} answered accepted, and the server could not keep that answer\\. The step may have changed the resource`));
+    expect(String(unkept["message"])).not.toMatch(/nothing was sent/);
+    expect(String(unkept["next"])).toMatch(/Call prepare again with the same idempotencyKey, resource, capability and step/);
+    expect(String(unkept["next"])).toMatch(/Do not use a new key or settle/);
+    const kept = (await stub.custodyRecord("instance-bot"))!;
+    expect([kept.phase, kept.steps], "the step is kept as sent, under a record that is still unresolved").toEqual(["sent", ["sent"]]);
+    expect(await entriesBy(), "the lane admitted the step once").toBe(1);
+    // The same step under the same key and arguments: the same signed step is sent again, the lane repeats its answer, the
+    // answer is kept, the record settles and its capacity is released; the lane holds one preparation entry.
+    const again = await result(await room.wait(() => modernCall(bot.bearer, "prepare", standalone)));
+    expect((again["step"] as { phase: string; answer: { answer: string } }), JSON.stringify(again)).toMatchObject({ phase: "answered", answer: { answer: "accepted" } });
+    const settled = (await stub.custodyRecord("instance-bot"))!;
+    expect([settled.intent, settled.phase, settled.steps, settled.reserved], "the same intent, settled, nothing reserved").toEqual([kept.intent, "settled", ["answered"], 0]);
+    expect(await entriesBy(), "one preparation entry").toBe(1);
+    // Ordinary: an act prepared at a resource, the report staged at the lane, then its check step. The lane answers the check;
+    // the store fails as that answer is written (the write of a prepared act's record, which the store's fault names `keep`);
+    // the act's record stays prepared with the check step sent, and the same prepare is the recovery.
+    const report = { target: lane, kind: "report", fields: { commitment, terms, commit: "c".repeat(40), tree: "d".repeat(40) }, idempotencyKey: "report-bot", resource: lane, capability: "hold@1" };
+    const staged = await result(await room.wait(() => modernCall(bot.bearer, "prepare", { ...report, step: "stage" })));
+    expect((staged["step"] as { phase: string; answer: { answer: string } }), JSON.stringify(staged)).toMatchObject({ phase: "answered", answer: { answer: "accepted" } });
+    const held = (await stub.custodyRecord("report-bot"))!;
+    hostedTest.failWrite = "keep";
+    const checked = await result(await room.wait(() => modernCall(bot.bearer, "prepare", { ...report, step: "check" })));
+    expect(checked["error"], JSON.stringify(checked)).toBe("custody");
+    expect(String(checked["message"]), JSON.stringify(checked)).toMatch(new RegExp(`^Step check of hold@1 for key report-bot was sent to ${lane} and ${lane} answered (accepted|refused), and the server could not keep that answer\\. The step may have changed the resource; the step is kept as sent, and the act is not submitted by this`));
+    expect(String(checked["message"])).not.toMatch(/nothing was sent/);
+    const unkeptCheck = (await stub.custodyRecord("report-bot"))!;
+    expect([unkeptCheck.intent, unkeptCheck.phase, unkeptCheck.steps.sort()], "the act is not submitted; its check step is kept as sent beside the answered stage").toEqual([held.intent, "prepared", ["answered", "sent"]]);
+    const checkedAgain = await result(await room.wait(() => modernCall(bot.bearer, "prepare", { ...report, step: "check" })));
+    expect((checkedAgain["step"] as { phase: string }).phase, JSON.stringify(checkedAgain)).toBe("answered");
+    expect((checkedAgain["act"] as { phase: string }).phase).toBe("prepared");
+    const heldAgain = (await stub.custodyRecord("report-bot"))!;
+    expect([heldAgain.intent, heldAgain.phase, heldAgain.steps.sort()], "the same act envelope, both steps answered").toEqual([held.intent, "prepared", ["answered", "answered"]]);
   } finally { done(room); }
 });
 

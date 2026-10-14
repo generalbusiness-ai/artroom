@@ -20,6 +20,8 @@ let service: string;
 let s: HttpServing;
 /** A test holds the service's configuration read, and with it every snapshot, while it opens streams concurrently. */
 let hold: Promise<void> | null = null;
+/** Holds taken one per read, in the order the reads arrive: a test can release one opening's snapshot and keep another's. */
+const holds: Promise<void>[] = [];
 
 beforeAll(async () => {
   standIn = new StandIn(signer.key);
@@ -34,7 +36,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => scopes.listen(0, "127.0.0.1", resolve));
   service = `http://127.0.0.1:${(scopes.address() as { port: number }).port}`;
   const config: McpConfig = { ...standIn.config(), service };
-  const mcp = new McpService({ service, signer, config: { read: async () => { if (hold) await hold; return config; }, addRoot: async () => {} }, custody: memoryStore(), every: () => () => {} });
+  const mcp = new McpService({ service, signer, config: { read: async () => { if (hold) await hold; const next = holds.shift(); if (next) await next; return config; }, addRoot: async () => {} }, custody: memoryStore(), every: () => () => {} });
   s = await serveHttp(mcp, "127.0.0.1", 0, () => {});
 });
 afterAll(async () => { await s.close(); scopes.close(); });
@@ -290,6 +292,52 @@ describe("a replacement that goes away while its snapshot is held", () => {
     const fifth = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[4]! });
     expect(await fifth.opened, "no fifth stream").toBe(409);
     for (const st of held) st.abort.abort();
+    expect(await until(() => s.http.streams === 0)).toBe(true);
+    for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
+  });
+});
+
+describe("overlapping replacement generations", () => {
+  test("R1 and R2 replace A; R1 installs B; R3 replaces B and goes away; R2 goes away last: B stays counted, a fifth is refused", async () => {
+    const sessions = [await legacySession(), await legacySession(), await legacySession(), await legacySession(), await legacySession()];
+    const held = sessions.slice(0, 4).map((id) => openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": id }));
+    for (const st of held) expect(await until(() => st.text().includes(": stream"))).toBe(true);
+    expect(s.http.streams).toBe(STREAMS_MOST);
+    const session = s.http.sessions.get(sessions[0]!)!;
+    const A = session.stream;
+    const gate = () => { let release!: () => void; const p = new Promise<void>((r) => { release = r; }); holds.push(p); return release; };
+    // R1 and R2 both replace A; each takes its own hold as its snapshot is read.
+    const release1 = gate();
+    const R1 = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[0]! });
+    await new Promise((r) => setTimeout(r, 100));
+    const release2 = gate();
+    const R2 = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[0]! });
+    await new Promise((r) => setTimeout(r, 100));
+    // R1 finishes and installs B, closing A; R2 is still held.
+    release1();
+    expect(await until(() => R1.text().includes(": stream")), "R1 opened").toBe(true);
+    const B = session.stream;
+    expect(B !== null && B !== A, "B replaced A").toBe(true);
+    // R3 replaces B, is held, and goes away; its hold is then released.
+    const release3 = gate();
+    const R3 = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[0]! });
+    await new Promise((r) => setTimeout(r, 100));
+    R3.abort.abort();
+    await new Promise((r) => setTimeout(r, 100));
+    release3();
+    await R3.opened;
+    // R2 goes away last; its hold is released.
+    R2.abort.abort();
+    await new Promise((r) => setTimeout(r, 100));
+    release2();
+    await R2.opened;
+    await new Promise((r) => setTimeout(r, 200));
+    // B is live and counted: four streams, the session's stream is B, and a fifth session is refused.
+    expect([s.http.streams, session.stream === B], "B stays counted once").toEqual([STREAMS_MOST, true]);
+    const fifth = openStream({ "mcp-protocol-version": LEGACY, "mcp-session-id": sessions[4]! });
+    expect(await fifth.opened, "no fifth stream").toBe(409);
+    expect(await until(() => R1.text().includes(": stream")), "B still serves").toBe(true);
+    for (const st of [...held, R1]) st.abort.abort();
     expect(await until(() => s.http.streams === 0)).toBe(true);
     for (const id of sessions) await send("DELETE", { "mcp-protocol-version": LEGACY, "mcp-session-id": id });
   });

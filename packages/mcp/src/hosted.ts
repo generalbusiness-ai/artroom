@@ -574,7 +574,7 @@ export class HostedAgent {
    * A test's read of the custody record kept under an idempotency key, live or archived: the digest of its envelope's intent,
    * its attempt and how many outcomes it holds; null when there is none. What a witness compares across a repeat and a resubmit.
    */
-  custodyOf(key: string): { intent: string; attempt: number; outcomes: number; phase: string } | null {
+  custodyOf(key: string): { intent: string; attempt: number; outcomes: number; phase: string; steps: string[]; reserved: number } | null {
     const hasStore = this.sql.exec(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'record'`).toArray().length > 0;
     if (!hasStore) return null;
     const live = this.sql.exec(`SELECT id, chunks FROM record WHERE key = ?`, key).toArray()[0];
@@ -584,8 +584,9 @@ export class HostedAgent {
     const whole = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
     let at = 0;
     for (const p of parts) { whole.set(p, at); at += p.length; }
-    const record = JSON.parse(new TextDecoder().decode(whole)) as { envelope: { signed: { intent: unknown } }; attempt: number; count: number; phase: string };
-    return { intent: digestBytes(utf8(canonicalize(record.envelope.signed.intent as never))), attempt: record.attempt, outcomes: record.count, phase: record.phase };
+    const record = JSON.parse(new TextDecoder().decode(whole)) as { envelope: { signed: { intent: unknown } }; attempt: number; count: number; phase: string; steps: Record<string, { phase: string }> };
+    const identity = this.sql.exec(`SELECT reserved FROM identity WHERE id = ?`, String(found["id"])).toArray()[0];
+    return { intent: digestBytes(utf8(canonicalize(record.envelope.signed.intent as never))), attempt: record.attempt, outcomes: record.count, phase: record.phase, steps: Object.values(record.steps ?? {}).map((st) => st.phase), reserved: identity ? Number(identity["reserved"]) : 0 };
   }
 }
 
