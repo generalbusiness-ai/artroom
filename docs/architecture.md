@@ -5,16 +5,13 @@ keeps the record, and how someone else can check it. It follows the
 logical parts first and ends with how they are deployed today. For the
 full contract of each part, read [Scopes](scopes.md).
 
-```mermaid
-flowchart LR
-  P[Person or agent] -->|Signed act| S[Scope judges against its definition]
-  S -->|Takes effect| E[Entry and receipt]
-  S -->|Refused| R[Reason and head]
-  E --> F[Fold into items]
-  E --> M[Messages to other scopes]
-  M --> S2[Receiving scope judges in its own turn]
-  E --> V[Replay derives the entry again]
-```
+![The dap model. A person or an agent signs an act and sends it over the command line, MCP or HTTP. A scope judges it against its pinned definition, with guards, rule expressions in a restricted JSONata, and the signer's grants. An act that takes effect becomes an entry in the journal, and its declared effects are folded into the scope's items. The journal can be replayed, entries send messages to other scopes, and published files go to a Git repository on Cloudflare Artifacts or GitHub, which serves pages.](assets/dap-architecture.svg)
+
+The diagram shows the intended model. Two parts of it are planned and not
+yet built: the dashed line that writes items to the repository, and the
+archive of the journal in Git. Today a room's destination scope publishes
+changes to the repository, as "How it is deployed today" describes. A
+refused act gets a reason and the head at which it was judged.
 
 ## A scope is an actor with one definition
 
@@ -31,7 +28,10 @@ A definition is a JSON value, not code. It declares:
   take, its guards, its effects and its sends;
 - handlers for messages from other scopes;
 - timed rules, which apply when a deadline held in an item passes;
-- named rules, which are restricted expressions that a guard evaluates.
+- named rules, which a guard evaluates. A rule is an expression in a
+  restricted JSONata. It reads the act's fields and the items the act
+  names, and answers true or false. It cannot write: only declared
+  effects change states and slots.
 
 Because the definition is data, one runtime runs every application. The
 room's issue lane and the Counter's board differ only in the definitions
