@@ -614,7 +614,7 @@ export const destination3: PlatformData = {
 export const branchOf = (state: Pick<StateView, "page">): Item | null => {
   const branch = state.page("branch", ["empty", "ready"], null, 1).items[0] ?? null;
   // Version 4 stores heterogeneous item IDs as optional integer values.
-  return branch && Object.hasOwn(branch.values, "slot") ? { ...branch, refs: { ...branch.refs, slot: branch.values["slot"], judging: branch.values["judging"] } } : branch;
+  return branch && Object.hasOwn(branch.values, "slot") ? { ...branch, refs: { ...branch.refs, slot: branch.values["slot"] ?? null, judging: branch.values["judging"] ?? null } } : branch;
 };
 
 /** The scope ID that the item `branch` holds in that value: a text that the genesis set from the creation's fields, and that no entry changes. */
@@ -687,7 +687,7 @@ const publicationAt = (state: Pick<StateView, "item">, id: unknown): Item | null
 const receiptAt = (state: Pick<StateView, "item">, id: unknown): Item | null => {
   const item = typeof id === "number" ? state.item(id) : null;
   return item?.type === "receipt" ? Object.hasOwn(item.values, "publication")
-    ? { ...item, refs: { ...item.refs, publication: item.values["publication"] } } : item : null;
+    ? { ...item, refs: { ...item.refs, publication: item.values["publication"] ?? null } } : item : null;
 };
 
 /** This scope's own entry at a position before the one that is written. A rule that needs one and is given none has a fault: nothing is judged from a history that is not at hand. */
@@ -2623,7 +2623,7 @@ export const destinationRules4: Rules = (() => {
   const isFileJudge = (given: RuleGiven) => destinationPublicationAt(given.state, branchOf(given.state)?.refs["judging"])?.type === "file-publication";
   const push4 = { ...oldPush, rules: { ...oldPush.rules,
     beforeSend: (state: StateView, operation: Operation, _attempt: number, own: Own) => fileSupersededOutcome(state, operation, own),
-    retries: (result: "confirmed" | "refused" | "unknown", operation: Operation, given: RuleGiven) => targetOf(given.state, given.own, operation)?.type === "file-publication" ? false : oldPush.rules.retries!(result, operation, given),
+    retries: (result: "refused" | "unknown", operation: Operation, given: RuleGiven) => targetOf(given.state, given.own, operation)?.type === "file-publication" ? false : oldPush.rules.retries!(result, operation, given),
     wellFormed: (result: "confirmed" | "refused" | "unknown", evidence: import("@generalbusiness/dap-contract").Evidence, given: RuleGiven) => {
       const item = given.input.type === "outcome" ? given.state.operation(given.input.operation) : null;
       if (!item || targetOf(given.state, given.own, item)?.type !== "file-publication") return oldPush.rules.wellFormed!(result, evidence, given);

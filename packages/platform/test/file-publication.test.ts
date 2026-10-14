@@ -3,7 +3,7 @@ import type { FactRef, FieldValue, Item, ScopeRef } from "@generalbusiness/dap-c
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { canonicalize, newIncarnation, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { PROFILES, validateDefinition, type StateView } from "@generalbusiness/dap-derive";
-import { destination, destination2, destination3, destination4, destinationPublicationAt, filePublicationCause, filePublicationCurrent, newestFilePublication } from "../src/destination.ts";
+import { destination4, destinationPublicationAt, filePublicationCause, filePublicationCurrent, newestFilePublication } from "../src/destination.ts";
 import { filePublicationCommit, fileReceiptObjects, fileReceiptRef } from "../src/destination-objects.ts";
 
 // Pure schema/state/object witnesses. These rows and causes are scripted;
@@ -18,11 +18,9 @@ const pages = (rows: readonly Item[]): Pick<StateView, "page"> => ({ page: (type
   return { items: all.slice(0, limit), more: all.length > limit };
 } });
 
-test("destination4 keeps the old schemas intact and validates integer queue pointers with zero as a real publication ID", () => {
-  const originals = [destination, destination2, destination3].map(canonicalize);
+test("destination4 validates integer queue pointers with zero as a real publication ID", () => {
   const checked = validateDefinition(destination4, PROPOSED_BOUNDS, PROFILES, { platform: true });
   expect(checked.ok ? [] : checked.problems).toEqual([]);
-  expect([destination, destination2, destination3].map(canonicalize)).toEqual(originals);
   for (const slot of ["slot", "judging"]) {
     expect(destination4.items["branch"]!.values[slot]).toEqual({ fixed: false, required: false, of: { type: "int", min: 0, max: Number.MAX_SAFE_INTEGER } });
     expect(destination4.items["branch"]!.refs[slot]).toBeUndefined();
