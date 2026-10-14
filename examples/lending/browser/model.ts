@@ -18,6 +18,21 @@ export interface LendingView {
   behind: boolean;
 }
 
+/** Labels from the retained donation journal, including things no longer in the live summary. */
+export function journalRows(entries: readonly Entry[]): { seq: number; kind: string; signer: string; what: string }[] {
+  const names = new Map(thingsOf(entries).map((thing) => [thing.id, thing.name]));
+  return entries.flatMap((entry, seq) => {
+    if (entry.input.type !== "act") return [];
+    const { intent } = entry.input.signed;
+    const id = intent.kind === "publish" ? intent.fields["thing"] : intent.on;
+    const name = typeof id === "number" ? names.get(id) : undefined;
+    const label = name ? `${name} (thing ${id})` : `Unknown thing ${id ?? "(no ID)"}`;
+    const what = intent.kind === "donate" ? words(intent.fields["name"])
+      : intent.kind === "cancel" ? `${label}: ${words(intent.fields["reason"])}` : label;
+    return [{ seq, kind: intent.kind, signer: entry.input.authority[0]?.subject.member ?? "", what }];
+  });
+}
+
 export const NAME_BYTES = 80, DESCRIPTION_BYTES = 1000, REASON_BYTES = 280;
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
 const handle = (party: unknown): string | null =>

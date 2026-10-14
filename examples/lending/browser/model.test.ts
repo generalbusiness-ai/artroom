@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { type Entry, type Summary } from "@generalbusiness/dap-contract";
 import { grantOf, keys, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { make as makeLedger, submit } from "../test-support.ts";
-import { actsFor, lendingView, propose, refusalWords } from "./model.ts";
+import { actsFor, journalRows, lendingView, propose, refusalWords } from "./model.ts";
 
 // The summary here is made by hand from the fold's own state (a STAND-IN for the scope's read).
 const read = (s: Ledger): { summary: Summary; at: { seq: number; hash: string }; entries: Entry[] } => ({
@@ -31,6 +31,7 @@ test("the view lists every thing in order, live from the summary and gone from t
   expect((await send(keys.una, view(), "borrow", { thing: big!.id })).result).toBe("write");
   expect(view().things[0]).toMatchObject({ state: "lent", borrower: "@una" });
   expect(actsFor(view().things[0]!)).toEqual(["return", "cancel", "publish"]);
+  expect((await send(keys.una, view(), "return", { thing: big!.id })).result).toBe("write");
   expect((await send(keys.rita, view(), "cancel", { thing: big!.id, reason: "Nasruddin says the pot died" })).result).toBe("write");
   const after = view();
   expect(after.things.map((thing) => [thing.id, thing.state, thing.state === "gone"])).toEqual([[big!.id, "gone", true], [small!.id, "available", false]]);
@@ -38,6 +39,21 @@ test("the view lists every thing in order, live from the summary and gone from t
   expect(actsFor(after.things[0]!)).toEqual(["publish"]);
   expect(after.record).toEqual({ scope: s.at.scope, incarnation: s.at.inc, seq: s.last.seq, hash: s.entries.at(-1)!.hash });
   expect(after.behind).toBe(false);
+  expect((await send(keys.rita, after, "publish", { thing: big!.id })).result).toBe("write");
+  const retained = read(s).entries;
+  const beforeLabels = JSON.stringify(retained);
+  const rows = journalRows(retained);
+  expect(rows.filter((row) => ["borrow", "return", "cancel", "publish"].includes(row.kind)).map((row) => row.what)).toEqual([
+    `Big pot (thing ${big!.id})`, `Big pot (thing ${big!.id})`,
+    `Big pot (thing ${big!.id}): Nasruddin says the pot died`, `Big pot (thing ${big!.id})`,
+  ]);
+  expect(rows.find((row) => row.kind === "cancel")).toMatchObject({ signer: "@rita" });
+  // A partial journal cannot supply the donation name; keep the ID explicit.
+  expect(journalRows(retained.slice(-2)).map((row) => row.what)).toEqual([
+    `Unknown thing ${big!.id}: Nasruddin says the pot died`, `Unknown thing ${big!.id}`,
+  ]);
+  expect(JSON.stringify(retained)).toBe(beforeLabels);
+
   // A record read that stops before the summary's head is marked as behind.
   const { summary, at, entries } = read(s);
   expect(lendingView(summary, at, entries.slice(0, -1)).behind).toBe(true);

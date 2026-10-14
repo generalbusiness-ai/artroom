@@ -10,7 +10,7 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import type { Entry } from "@generalbusiness/dap-contract";
 import { lendingGateway, type ActOutcome, type LendingGateway, type LendingState, type Pending } from "./client.ts";
 import { deviceSigner, findLending, joining, newDeviceKey, readInvitation, type DeviceKey, type JoinOutcome, type Seat } from "./join.ts";
-import { actsFor, type LendingAct, type LendingView, type ShownThing } from "./model.ts";
+import { actsFor, journalRows, type LendingAct, type LendingView, type ShownThing } from "./model.ts";
 import { shelfPage } from "../shelf.ts";
 import { readPage, type PublishedPage } from "./publication.ts";
 import { actStore, browserLock, joinStore, remembered, type Remembered } from "./storage.ts";
@@ -190,12 +190,11 @@ function drawThing(thing: ShownThing, view: LendingView): Node {
 
 function drawRecord(entries: readonly Entry[]): Node {
   const body = h("tbody");
-  entries.forEach((entry, seq) => {
-    if (entry.input.type !== "act") return;
-    const { intent } = entry.input.signed;
-    body.append(h("tr", {}, h("td", {}, String(seq)), h("td", {}, intent.kind), h("td", {}, entry.input.authority[0]?.subject.member ?? ""),
-      h("td", {}, intent.kind === "donate" ? String(intent.fields["name"] ?? "") : intent.kind === "cancel" ? `thing ${intent.on}: ${String(intent.fields["reason"] ?? "")}` : `thing ${intent.kind === "publish" ? intent.fields["thing"] : intent.on}`)));
-  });
+  for (const row of journalRows(entries)) {
+    const what = h("td");
+    what.textContent = row.what;
+    body.append(h("tr", {}, h("td", {}, String(row.seq)), h("td", {}, row.kind), h("td", {}, row.signer), what));
+  }
   return h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Entry"), h("th", {}, "Act"), h("th", {}, "Signed by"), h("th", {}, "What"))), body);
 }
 
