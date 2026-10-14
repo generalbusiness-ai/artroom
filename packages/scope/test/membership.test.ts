@@ -1,3 +1,4 @@
+import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { Entry, Observation, ObservationUse } from "@generalbusiness/dap-contract";
 import { textDigest } from "@generalbusiness/artroom-bytes";
@@ -24,14 +25,31 @@ const said = (answer: { answer: string; reason?: string; name?: string }) => [an
 
 describe("authority on real scopes, under the production wiring (authority note, sections 3.1, 3.3, 3.5 and 12.1.3; the contract's section 16.1)", () => {
   // The plan's T11 (the proof plan's V7, I3's part), with the inbox of step 11 and the plan's T40.
-  test("an act at an inbox is judged on a real observation of the signing key, read from the membership scope that the inbox's genesis records; after the key is revoked the next act on a fresh read is refused, and another member's key is not", async () => {
-    const { M, ritasInbox, unasInbox, unasKey } = await repository();
+  test("an act at an inbox is judged on a real observation of the signing key, read from the membership scope that the inbox's genesis records; after the key is revoked the next act on a fresh read is refused, and another member's key is not", async ({ task }) => {
+    const { O, M, ritasInbox, unasInbox, unasKey } = await repository();
     const m = await M.at();
 
     // Step 11: membership created each inbox by the entry that made its member active, with the membership scope in the body of the
     // creation. The inbox's genesis records it, and its owner is the member.
     const genesis = (await unasInbox.entries())[0]!.input as Extract<Entry["input"], { type: "genesis" }>;
-    expect([(genesis.message!.body as { membership: unknown }).membership, (await unasInbox.summary()).value.status, (await unasInbox.item(0)).parties["owner"], (await ritasInbox.item(0)).parties["owner"]])
+    const inbox = await unasInbox.summary();
+    if (inbox.value.status !== "active") {
+      // Failure-only diagnosis: record bounded protocol metadata, never bodies,
+      // signing keys, invitation fields or raw errors. The active assertion stays.
+      const scopes = await Promise.all([O, M, ritasInbox, unasInbox].map(async node => {
+        const summary = await node.summary(), outbox = await node.stub.outbox(reader);
+        const sealed = await node.sealed();
+        const alarm = await runInDurableObject(node.object, (_instance, state) => state.storage.getAlarm());
+        return { scope: summary.value.scope, head: summary.at, status: summary.value.status, alarm,
+          duties: outbox.ok ? outbox.value.slice(0, 8).map(duty => ({ seq: duty.seq, n: duty.n, class: duty.class, result: duty.result,
+            attempts: duty.attempts.map(attempt => ({ at: attempt.at, answer: attempt.answer })) })) : null,
+          dutyCount: outbox.ok ? outbox.value.length : null,
+          entries: sealed.slice(-4).map(({ entry, hash }) => ({ seq: entry.seq, hash, type: entry.input.type,
+            ...(entry.input.type === "delivery" ? { class: entry.input.message.class } : {}) })) };
+      }));
+      Object.assign(task.meta, { inboxConfirmationFailure: { observed: { scope: inbox.value.scope, head: inbox.at, status: inbox.value.status }, clock: net.clock.now, scopes } });
+    }
+    expect([(genesis.message!.body as { membership: unknown }).membership, inbox.value.status, (await unasInbox.item(0)).parties["owner"], (await ritasInbox.item(0)).parties["owner"]])
       .toEqual([m, "active", { membership: m, member: "@una" }, { membership: m, member: "@rita" }]);
 
     // Membership's own acts were judged on its own head (section 3.3): `invite-member` records rita's grant, built from the state
