@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fdb569797b4c49cbf1ea9a289f35beebe4324fd9","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/hosted.scope.test.ts."}
+{"kind":"artifact","text":"README.md at exact f33a7d7feadeda092151aab5a993be37fb24edae on request/library-publication-final-compose, under promise git:sha1…c5860d1 on request git:sha1…d19cf6f","body":{"commit":"f33a7d7feadeda092151aab5a993be37fb24edae","path":"README.md"}}
