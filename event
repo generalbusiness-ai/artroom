@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"packages/scope/test/support/native-fixture-lifetime.ts at exact 38b2aec6c202720367924544e980cc38e828ebd8 on request/security-origin-compatible-2a, under promise git:sha1…8d8b253 on request git:sha1…2e3fe6e","body":{"commit":"38b2aec6c202720367924544e980cc38e828ebd8","path":"packages/scope/test/support/native-fixture-lifetime.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:032b30586c38963df65e20a1c54018e4bacd30ef","text":"Merge retired a covered predecessor; the successor is at examples/lending/pin.ts."}
