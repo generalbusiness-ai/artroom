@@ -5,12 +5,14 @@ keeps the record, and how someone else can check it. It follows the
 logical parts first and ends with how they are deployed today. For the
 full contract of each part, read [Scopes](scopes.md).
 
-![The dap model. A person or an agent signs an act and sends it over the command line, MCP or HTTP. A scope judges it against its pinned definition, with guards, rule expressions in a restricted JSONata, and the signer's grants. An act that takes effect becomes an entry in the journal, and its declared effects are folded into the scope's items. The journal can be replayed, entries send messages to other scopes, and published files go to a Git repository on Cloudflare Artifacts or GitHub, which serves pages.](assets/dap-architecture.svg)
+![The dap model. A person or an agent signs an act and sends it over the command line, MCP or HTTP. A scope judges it against its pinned definition, with guards, rule expressions in a restricted JSONata, and the signer's grants. An act that takes effect becomes an entry in the journal, and its declared effects are folded into the scope's items. The journal can be replayed, entries send messages to other scopes, and a destination scope publishes the files it is sent to a Git repository on Cloudflare Artifacts or GitHub, which serves pages. Dashed lines are planned.](assets/dap-architecture.svg)
 
 The diagram shows the intended model. Two parts of it are planned and not
-yet built: the dashed line that writes items to the repository, and the
-archive of the journal in Git. Today a room's destination scope publishes
-changes to the repository, as "How it is deployed today" describes. A
+yet built, and are drawn dashed: writing items to the repository, and the
+archive of the journal in Git. Today a destination scope publishes to the
+repository: a room's merged changes, as "How it is deployed today"
+describes, and files that an application's acts send it, such as the
+lending library's shelf pages. A
 refused act gets a reason and the head at which it was judged.
 
 ## A scope is an actor with one definition
