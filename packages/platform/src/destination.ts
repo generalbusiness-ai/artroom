@@ -2571,7 +2571,7 @@ export function filePublicationCurrent(state: Pick<StateView, "page">, item: Ite
 export function fileSupersededOutcome(state: StateView, operation: Operation, own: Own): import("@generalbusiness/dap-contract").Evidence | null {
   if (operation.owner !== "platform:destination@4" || operation.kind !== "push") return null;
   const item = targetOf(state, own, operation), head = branchOf(state)?.values["head"];
-  if (item?.type !== "file-publication" || !isObjectId(head) || closed(item) || filePublicationCurrent(state, item)) return null;
+  if (item?.type !== "file-publication" || branchOf(state)?.refs["slot"] !== item.id || !isObjectId(head) || closed(item) || filePublicationCurrent(state, item)) return null;
   // An earlier unknown outcome is never proof of a send that did not leave.
   if (operation.attempts.some(attempt => attempt.outcomes.some(outcome => outcome.result !== "refused"))) return null;
   const newest = newestFilePublication(state, item), cause = newest && filePublicationCause(newest);
