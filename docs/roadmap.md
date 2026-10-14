@@ -20,11 +20,24 @@ below refer to.
 | dap-room: membership, rules, issues, changes, reviews of an exact version, and publication to a Git host with a recorded outcome. Two changes on one base are settled by reservation and judgement. | [apps/room/docs](../apps/room/docs/first-change.md), [Rehearse the demo](demo.md) |
 | Two Git hosts: Cloudflare Artifacts and GitHub. | [Configure a Git host](hosts.md) |
 | A declared application: you write a definition as data, validate it, pin it, and create a scope under it in a room. Guards, grants, timed rules and detached texts are available to it. | [Write an application](write-an-application.md) |
-| dap-counter, a declared application in which people and agents take turns. | [The Counter source](../examples/counting/README.md) |
+| dap-counter, a declared application in which people and agents take turns. | [The Counter source](../examples/counting/README.md), [Build a counter](build-a-counter.md) |
+| dap-library, a declared lending library. Each act that changes a thing also publishes that thing's shelf page through the room's destination. | [The lending library](../examples/lending/README.md), [Build a lending library](build-a-lending-library.md) |
+| Agents act in a room through MCP: a local server over stdio or loopback HTTP, and a hosted endpoint on the scope Worker. | [MCP](mcp.md), [The hosted endpoint](mcp.md#the-hosted-endpoint) |
+| A room created from the served page, with no email; or a whole service run on your own account. | [Run dap in 10 minutes](self-host.md) |
 | Published repositories served as pages. | [Pages](pages.md) |
 
 Each of those pages states its own evidence and limits. The table in
 [Scopes](scopes.md) under "What runs" is the most exact account.
+
+### Publication from a fold
+
+When an act takes effect in an application's scope, the same act can say
+"this text is the content of this path", and the room's destination
+commits and publishes that file. The destination checks that the request
+comes from an application of its own room. The lending library uses this
+for its shelf pages. The scope does not check the page's text against
+the record; the journal shows who stated it. The design is
+[the fold publication note](../notes/2026-10-13-fold-publication.md).
 
 Three limits shape everything below:
 
@@ -32,8 +45,11 @@ Three limits shape everything below:
   bound to a repository, not to a participant's part of it.
 - **A definition is pinned when its scope is created.** A scope does not
   change its rules afterwards.
-- **A declared application uses no capabilities.** It cannot yet declare
-  its own operation on an outside system.
+- **A declared application has no operation of its own on an outside
+  system.** It can list the fixed capability forms that the contract
+  declares, `hold@1` and `git-read@1`, when their code is supplied. It
+  cannot declare an application-specific operation, and no host adapter
+  for one exists.
 
 ## What is not yet built
 
@@ -41,10 +57,9 @@ In order, nearest first.
 
 | Capability | State | Use cases that need it |
 |---|---|---|
-| [An application's own messages between scopes](#an-applications-own-messages-between-scopes) | Can be declared; no application uses it yet | 25, 31, 32, 33 |
-| [Publication from a fold](#publication-from-a-fold) | Designed; in review | The lending library |
-| [Durability levels](#durability-levels) | Designed; in review | 36, 44, and the live part of every case |
-| [A fork for each hold](#a-fork-for-each-hold) | Planned; cost measurement requested | 34 |
+| [An application's own messages between scopes](#an-applications-own-messages-between-scopes) | Can be declared; no application has two scopes of its own yet | 25, 31, 32, 33 |
+| [Durability levels](#durability-levels) | Designed; not built | 36, 44, and the live part of every case |
+| [A fork for each hold](#a-fork-for-each-hold) | Planned; a first measurement ran | 34 |
 | [Offline work and propose from a branch](#offline-work-and-propose-from-a-branch) | Direction set; not designed | 34 |
 | [Private views in one record](#private-views-in-one-record) | Not designed in dap; tested in the dap-spike | 21, 32, 37, 39, 40, 41, 42, and parts of 08, 18, 19, 24, 25, 33 |
 | [Evidence capture and private custody](#evidence-capture-and-private-custody) | Not designed | 01, 02, 04 to 19, 23, 24, 27, 28, and the custody part of every case |
@@ -65,9 +80,10 @@ scope and returns a result to the sale.
 
 **Today.** The mechanism runs: dap-room's register, directory, membership,
 rules, destination and lanes all work by messages. A declared definition
-may also declare a send to a scope that one of its slots holds. No
-declared application does so yet: the Counter is one scope and sends
-nothing.
+may also declare a send to a scope that one of its slots holds. The
+lending library sends one kind of message, to its room's destination, to
+publish a page. No declared application yet consists of scopes of its own
+that ask one another.
 
 **Not offered.** One act that takes effect in two scopes at once. A
 request, its result and the sender's result clause are the form.
@@ -78,27 +94,16 @@ owner
 ([boundaries and composition](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-14-evolving-spaces-design.md)).
 It also separates three ways to cross a boundary: link to an outside act,
 admit a result from an exact position of another record, and join. The
-spike ran none of these across two records.
+spike ran these in one bounded fixture: an inspection's result is
+imported into the sale from an exact position, and a later fulfilment
+joins the two
+([ordering report, goal 1](https://github.com/generalbusiness-ai/dap-spike/blob/9d738e2e/spike/ORDERING-REPORT.md#goal-1-executed-lifecycle-and-proof-boundary)).
+That fixture had one trusted writer, and the report states its limits on
+proof, disclosure and availability. It is not free composition of two
+records.
 
 **Next.** A two-scope declared application with one owner of a shared
 amount, with replay of both scopes.
-
-### Publication from a fold
-
-**What it is.** When an act takes effect in an application's scope, the
-same entry states "this text is the content of this path", and the room's
-destination commits and publishes that file.
-
-**Today.** dap-room's change lane publishes one file this way. The
-destination accepts that request only from a change lane, and an
-application scope does not hold a reference to its destination.
-
-**Use case.** The [lending library](use-cases.md#a-lending-library). Its
-first version writes each shelf page from the member's interface after
-the act, so a page can fall behind the record.
-
-**State.** A design note is in review on the branch
-`planner/fold-publication-design`.
 
 ### Durability levels
 
@@ -116,9 +121,9 @@ hypotheses during an incident (36); the drafts and tentative options in
 every card of the catalogue.
 
 **State.** Designed in
-[the volatile acts note](../notes/2026-10-09-shared-language-volatile-acts.md);
-the sections on levels and the journal archive are in review on the
-branch `planner/journal-archive-design`.
+[the volatile acts note](../notes/2026-10-09-shared-language-volatile-acts.md),
+whose sections on levels and the journal archive are reviewed and on
+main. Not built.
 
 ### A fork for each hold
 
@@ -129,9 +134,10 @@ fork. The performer never holds a token to the destination.
 **Today.** Each destination has one repository
 ([Configure a Git host](hosts.md)).
 
-**State.** [Plan 029](../plans/029-2026-10-11-artifacts-forks.md). The
-measurement of what a fork costs on Cloudflare Artifacts is requested and
-comes first.
+**State.** [Plan 029](../plans/029-2026-10-11-artifacts-forks.md). A
+first measurement created a fork on Cloudflare Artifacts and committed to
+it; what a fork costs in storage is not yet measured
+([the measurement](../notes/2026-10-13-fork-cost-measurement.md)).
 
 ### Offline work and propose from a branch
 
@@ -262,8 +268,10 @@ can change several rows.
 restricted JSONata, with arithmetic, conditionals, and functions such as
 `$sum`, `$count`, `$max`, `$lookup` and `$substring`. A rule reads the
 act's fields and the items the act names, and it answers true or false:
-it is a guard. An effect copies a value into a slot and computes nothing.
-So a computed value enters as a proposal. The signer sends the new value
+it is a guard. An effect is one of a fixed set of forms, such as copying a
+field into a slot or setting a time at a declared offset from the commit
+clock. No effect writes a value that an expression computed, so a
+computed value enters as a proposal. The signer sends the new value
 as a field, a rule checks it against the state, and an effect copies it.
 The Counter works this way: the signer proposes the next number and the
 next speaker, and
@@ -310,8 +318,11 @@ duty to another.
 known weakness stated: a join can block after one side releases and
 before the other activates
 ([ordering note](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-14-ordering.md)).
-A planned handover of the writer ran in its fixture
-([ordering report](https://github.com/generalbusiness-ai/dap-spike/blob/main/spike/ORDERING-REPORT.md)).
+A planned handover of the writer ran in its fixture, and the same
+fixture imported an inspection's result into the sale and later joined
+fulfilment and delivery in a new record, with one trusted writer and the
+limits its report states
+([ordering report, goal 1](https://github.com/generalbusiness-ai/dap-spike/blob/9d738e2e/spike/ORDERING-REPORT.md#goal-1-executed-lifecycle-and-proof-boundary)).
 
 ### An authoring language
 
@@ -366,5 +377,6 @@ Where dap stands on each idea:
 ## Source
 
 Written 13 October 2026 against main `d1b845f8` and dap-spike main
-`9d738e2e`. The states come from reading the documentation, the
-definitions and the spike's reports. Nothing was run for this page.
+`9d738e2e`, and revised 14 October 2026 against main `f20df342` after
+review. The states come from reading the documentation, the definitions
+and the spike's reports. Nothing was run for this page.

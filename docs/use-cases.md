@@ -8,7 +8,7 @@ built today. The [roadmap](roadmap.md) describes each missing capability
 that this page names.
 
 The cases are proposals. A case in the first group is buildable; only the
-two that say **Built** exist. No case claims that an institution has
+three that say **Built** exist. No case claims that an institution has
 adopted dap, that an outcome is fair or lawful, or that money is saved.
 Cases 01 to 10 extend ten examples from a public thread by Jim Prosser
 ([opening](https://x.com/jimprosser/status/2108279507660726766),
@@ -18,7 +18,7 @@ of those cards links the reply it extends.
 | Group | Cases | What it needs |
 |---|---|---|
 | [1. Buildable today](#1-buildable-today) | A lending library, 03, 20, 22, 26, 29, 30, 34, 36, 38, 43, 44 | Nothing more for the shared record |
-| [2. Nearly buildable](#2-nearly-buildable) | 25, 31, 33, 35 | An application's own messages between scopes, or an outside operation it declares |
+| [2. Nearly buildable](#2-nearly-buildable) | 25, 31, 33, 35 | An application's own messages between scopes, or an outside operation it declares; 25 and 33 also need private views for one part |
 | [3. Private views](#3-private-views) | 21, 32, 37, 39, 40, 41, 42 | One record that participants read in part |
 | [4. Episodes across organisations](#4-episodes-across-organisations) | 01, 02, 04 to 19, 23, 24, 27, 28 | A personal account, captured evidence in private custody, and parties outside the room |
 | [5. Changing rules and boundaries](#5-changing-rules-and-boundaries) | From the dap-spike's sweep, and Tailapps | Rules that change, expressions that compute effects, and scopes that join |
@@ -33,7 +33,7 @@ Keep three records distinct: **personal assertion; imported unchanged source byt
 
 **Prepared, approved, submitted, received, accepted and externally completed differ.** Reviewer completion can leave findings open; merchant refund approval can leave the customer awaiting funds. Someone can close active pursuit as denied, withdrawn, partial or disputed while retaining disagreement. Closure needs a named actor and scope, not universal assent or perfect success. Reopening names new evidence or a changed undertaking without rewriting earlier closure.
 
-Private views can differ. A shared decision rule needs a declared basis readable by the people it binds. Hidden means unreadable, not absent or false. Shared guarantees concern attributable acts, ordering and constraints; they do not establish external truth, fairness, undisclosed perspectives or signing-key holders' competence. the dap-spike's [standing boundary](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-20-direction-and-next-steps.md) and [late seller view](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-15-sale-as-experienced.md) motivate these limits.
+Private views can differ. A shared decision rule needs a declared basis readable by the people it binds. Hidden means unreadable, not absent or false. Shared guarantees concern attributable acts, the order in which they take effect, and constraints; they do not establish external truth, fairness, undisclosed perspectives or signing-key holders' competence. The dap-spike's [standing boundary](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-20-direction-and-next-steps.md) and [late seller view](https://github.com/generalbusiness-ai/dap-spike/blob/main/notes/2026-09-15-sale-as-experienced.md) motivate these limits.
 
 ### Durability has two axes
 
@@ -76,14 +76,13 @@ in every group, so the notes below name them only where they matter most.
 Neighbours share kitchenware and tools. A member donates a thing; any
 member borrows a thing that is on the shelf; any member returns a thing
 that is lent; staff cancel a thing that is broken or lost and write the
-reason. One definition declares two item types and five acts, and it uses
-no messages, timed rules or capabilities. The shelf is one page for each
-thing in the room's repository, published as a site. In the first version
-the member's interface writes the page after the act takes effect, so the
-page can fall behind the record. The design note is in review on the
-branch `planner/lending-library-design`.
+reason. One definition declares the things and their acts, with no timed
+rules or capabilities. The shelf is one page for each thing in the room's
+repository, published as a site. Each act that changes a thing also
+publishes its page through the room's destination, by
+[publication from a fold](roadmap.md#publication-from-a-fold).
 
-**Also needs:** [publication from a fold](roadmap.md#publication-from-a-fold), so that the lending act itself causes the page commit.
+**Built:** this is [dap-library](../examples/lending/README.md); [Build a lending library](build-a-lending-library.md) walks through it.
 
 ### 44 Agents counting with attributed turns and speech
 
@@ -160,6 +159,8 @@ A discussion channel; a kanban board whose cards everyone reads; a task workflow
 These need a piece that is designed or partly built: an application that
 uses messages between its own scopes, or an outside operation that an
 application declares. The mechanism runs today in dap-room's own scopes.
+"Nearly" describes the shared record: 25 and 33 also need private views
+for one part, as their cards say.
 
 ### 33 Room or equipment booking and event dependencies
 
@@ -384,7 +385,8 @@ Case 44 uses one turn rule in live practice or a retained session. Live acknowle
 
 ## Source
 
-Written from a draft of 9 October 2026 and regrouped on 13 October 2026
-against main `d1b845f8`. The grouping is a design judgement from reading
-the documentation and the definitions; no case in it was built or run for
-this page, except the two marked **Built**.
+Written from a draft of 9 October 2026, regrouped on 13 October 2026
+against main `d1b845f8`, and revised on 14 October 2026 against main
+`f20df342`. The grouping is a design judgement from reading the
+documentation and the definitions; no case in it was built or run for
+this page, except the three marked **Built**.
