@@ -36,4 +36,3 @@ export async function delegatedRoom() {
   await r.settle();
   return { r, reviewer };
 }
-
