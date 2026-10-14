@@ -1357,7 +1357,11 @@ Draft 4 answers the checker's report `7e549a27` of 14 October 2026: the
 ref and path spelling (15.4), the frozen input set of a pass (15.3 and
 15.5), the receipt confirmed at its own position (15.6), and in section 16
 the acyclic live identity (16.2) and the bounded host reads (16.3, 16.4).
-Draft 4 was read against main `70729eac`, merged into this branch.
+Draft 4 was read against main `70729eac`, merged into this branch. Draft 5
+answers report `f4066bc5` on Draft 4: the dependency inventory of a pass
+is the replay's, exhaustive by input variant (15.3), and the Mark row's
+rebuild reads only named, immutable dependencies under a missing-data
+contract (15.5), with the witnesses of A2 and A3 extended.
 
 ### 15.1 The decision
 
@@ -1484,16 +1488,33 @@ today.
 
 **The input set of a pass is closed under a cutoff.** A pass archives
 the entries from `archivedThrough + 1` to a cutoff `through`, and
-exactly the retained inputs those entries name: for each entry, the
-foreign entries its `uses` cite, the rule and snapshot digests its
-judgment recorded, and the definition and value digests its act's fields
-name, each read from the retained store by digest. A retained
-input is immutable by digest and an entry by position, so the selection
-is a pure function of the cutoff. An input that a later turn retains
-belongs to an entry past the cutoff and is not in the set. The kinds and
-domains left out (`text`, and any domain J2 excludes) are listed in the
-pass's manifest as omissions, so a reader of the archive can tell "left
-out by rule" from "missing".
+exactly the retained inputs a replay of those entries reads. The
+inventory is the replay's own (`packages/replay/src/verify.ts`, each
+`#retained` and `source.retained` call at main `70729eac`), listed here
+by input variant so that the archiver and the verifier share one list:
+
+| Entry input | Retained inputs the replay reads | Kind |
+|---|---|---|
+| Any | The declaration the genesis seed names (`seed.definition`), read once per history by `#pin`; and every declaration a declaration or a field names in the definition domain, followed to closure | `definition` |
+| Any that records `uses` | Each foreign entry a use cites, by its content digest | `entry` |
+| Any that records `prepared` | The input of each rule evaluated | `rule` |
+| `act` | The snapshot of staged refs, when the act records one; the value or declaration each field names, by its place's domain and digest; and the values the recorded observations name, under the definition's retained domains | `snapshot`, `value`, `definition` |
+| `timed` | As `prepared` above | `rule` |
+| `outcome` | The values the outcome's evidence names under its owner declaration, by domain and digest; and the values its recorded observations name | `value` |
+| `delivery`, `checkpoint` | None beyond `uses` and `prepared` | |
+| Any | A detached text | `text`: never archived (15.1, point 4) |
+
+The closure is transitive: a declaration that names another declaration
+brings it in, and an archived foreign entry brings in nothing further,
+since its own inputs belong to its own scope's archive. A retained input
+is immutable by digest and an entry by position, so the selection is a
+pure function of the cutoff. An input that a later turn retains belongs
+to an entry past the cutoff and is not in the set. The kinds and domains
+left out (`text`, and any domain J2 excludes) are listed in the pass's
+manifest as omissions by kind, domain and digest, so a reader of the
+archive can tell "left out by rule" from "missing". A1 keeps this table
+and the verifier's reads in step: a `#retained` call the table does not
+cover fails the slice.
 
 The archive is in the room's own repository at its destination's host.
 Whoever can fetch that repository's refs can read the archive. Reads of
@@ -1582,12 +1603,24 @@ delays an answer.
    the commit of 15.4 on the last confirmed commit.
 3. **Mark.** It writes one bookkeeping row before any request leaves: the
    parent, the cutoff, the manifest's bytes, the commit ID and the time.
-   At most one commit is outstanding for a scope. From this row the same
-   commit can be built again, byte for byte, without reading the scope's
-   storage: a restart, a lost reply or a resend rebuilds from the marked
-   manifest, never from "whatever is retained now". If a rebuild from the
-   row gives another commit ID, the archiver stops and reports
-   `rebuild-mismatch`; that is a fault in the builder, not in the history.
+   At most one commit is outstanding for a scope. The row holds no entry
+   or input bytes; it names them. A rebuild after a restart, a lost reply
+   or a resend reads exactly the dependencies the manifest names, and
+   nothing else: each entry by its position from the scope's own journal,
+   each retained input by its kind, domain and digest from the retained
+   store. Both are immutable for what an entry names: an entry is never
+   rewritten or removed below the head, and the retained store keeps an
+   input of the kinds archived for as long as an entry names it (a text,
+   which it may tombstone, is never in the set). A rebuild never
+   enumerates "what is retained now", so a turn after Mark cannot change
+   it. A named dependency that cannot be read is `missing-input`: the
+   archiver stops, reports the kind, domain and digest, and substitutes
+   nothing; that is a fault of the store, not of the history. A rebuild
+   that reads every dependency and gives another commit ID stops as
+   `rebuild-mismatch`, a fault of the builder. The commit and its objects
+   are kept in the object's memory for the pass only; they are not
+   persisted, because they are a function of the row and the immutable
+   dependencies, and the row is enough to make them again.
 4. **Send.** It sends the objects and one ref update with the expected old
    value, through the provider's existing `send`
    (`packages/scope/src/destination-host.ts`). It never forces.
@@ -1745,8 +1778,8 @@ judgment, a receipt or a publication.
 |---|---|---|
 | A0. Declaration | The `level` member in the contract and the validator; the room's permission at its claim; the refusal `archive-unavailable`; the level in discovery. | Every existing definition keeps its digest. A declaring definition validates, and is refused where the room does not permit it or has no destination. A runtime without the member answers `unsupported-definition`. |
 | A1. Layout | A pure function from a manifest (15.3) to the objects and commit of 15.4, for both object formats; the path encoding and its decoder. | The same manifest on the same parent gives the same commit ID, built twice. Segment and fan-out boundaries at their limits. A text is never written; an omitted input is listed. Every domain name the platform defines and an adversarial name (`../x`, a slash, a NUL, 300 bytes) round-trip through the encoding or are refused. The ref name is the native `sc_` spelling. Real local Git reads the tree back byte for byte. |
-| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, or reported `mismatch` or `behind`. |
-| A3. Archiver | Target resolution, the manifest and the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. With the parent still not updated on the host and a new input retained after Mark, a restart resends the identical commit, and the next pass archives the new entry on top. A rebuild that differs stops as `rebuild-mismatch`. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
+| A2. Git source | `gitSource`, the `--git`, `--texts` and `--receipt` options, and the untrusted resolution of 15.7. | One fixture history replayed from HTTP and from a clone gives the same report, apart from `trusts`. Two histories replay in replay mode from the clone alone, with no service and no anchor: a scope whose only entry is a declared genesis (its declaration is in the archive), and a scope whose pass first introduces a value named by outcome evidence (that value is in the archive). A changed line, a cut segment and a wrong `head.json` are each `mismatch`. A missing foreign ref is `missing-dependency`. A clone with a symlink, a submodule or an out-of-grammar path under `journal/v1/` is refused without touching the filesystem. A receipt is confirmed from the clone at its own position, after the clone's own integrity and continuity are checked, or reported `mismatch` or `behind`. |
+| A3. Archiver | Target resolution, the manifest and the bookkeeping row, the provider's archive token, send and read-back, on real object storage with a scripted host. | A lost reply resolves by read-back with no second commit. A reset after Mark and before any object reached the host, then a turn that retains a new input, then a restart: the archiver rebuilds the original commit, byte for byte, reading only the dependencies the row names (the store is instrumented to refuse any read the manifest does not name), and sends it; the next pass archives the new entry on top. A named dependency made unreadable stops as `missing-input` with no substitution. A rebuild that differs stops as `rebuild-mismatch`. An unexpected ref value stops as `conflict`. A pass writes no entry: the head is the same before and after. A flood of turns is not delayed. |
 | A4. Read and client | `Summary.archive` and `followArchived`. | Each row of 15.6: `n` equal to `through` and `n` below it are `archived` when the service's entry `n` carries the receipt's hash; a receipt of another incarnation is `not-this-history`; a differing hash is `mismatch`, not waited on; no archive is `not-archived`; a stopped or conflicting archive reports its state; a receipt past `through` waits. `through` is shown to be the last read-back, not a fresh remote read. |
 | A5. Live run | One deployed room on the hosting service: archive, clone, replay offline. | A recorded run, bound to its source and deployment, with measured lag and push duration. |
 
@@ -1765,6 +1798,7 @@ review ([docs/testing.md](../docs/testing.md)).
 | J7 | How a creation learns the room's permission. | Decided (15.2): the directory holds the permission in its genesis and refuses a `create` of a declaring definition without it. Not backward compatible. The exact new versions are owed in slice A0. |
 | J8 | The acknowledgement barrier, if it is ever built. | It would be a fourth level, declared the same way, with a new `level` name. Nothing here reserves its meaning. |
 | J6 | Histories that reach the scope's entry budget. | Unchanged: the archive follows the history that exists. Archival that frees service storage is not designed. |
+| J9 | Witnesses the checker named for the build, beyond the slices above. | Owed to A1 to A4, not decided here: a value domain that is legal but longer than a path segment allows stops the pass as `stopped` with its reason, never truncated or silently omitted; the receipt check from a clone establishes the clone's integrity and continuity before it claims prefix membership; the J2 disclosures are made to the room before any byte is exported. |
 
 This amendment ran no product tests, gate, provider or deployment probes.
 The provider's `send`, the `log` and `retained` reads, the `HistorySource`
@@ -1946,6 +1980,7 @@ Nothing about sessions changes.
 | L4 | A live definition has no genesis act. | The member `genesis` is absent for level Live, and the validator requires that. |
 | L5 | Sections 5 to 9 were written for one object. | Read against this section for this amendment; a line-by-line pass is owed before phase 2, and any conflict found is decided for this section. The pass must carry the bound of 16.4 into section 5's reads of membership and section 9's observations. |
 | L6 | Where the locator travels. | Discovery on the host lists it with each established live scope (L3); a client keeps it with the live reference; a request to a live object carries it. It is bounded (one `ScopeRef`, two integers) and checked against the ID, never trusted. |
+| L7 | Witnesses the checker named for the build. | Owed to phase 1, not decided here: a locator validates only through an establishing entry that an authorized act wrote (an entry of another kind, or one a judgment refused, validates nothing); the host's read admission counts the start's reads before G is minted and the membership and watch reads of 16.4 in one budget with every other reader's. |
 
 This section ran no product tests, gate or probes. The seed's members,
 the scope kinds and the single object class were read in source at main
