@@ -33,30 +33,39 @@ The authored changes are `packages/page/src/main.ts`,
 `packages/page/test/start-ui.test.ts`, plus the existing chooser expectations
 in `packages/page/test/join-ui.test.ts` and `packages/page/test/settings.test.ts`.
 They are now composed on receiving main
-`a5d25fd6330f9535ab305dbac0ca7ecd1736d9cb`, whose tree is
+`11e3c72bb16045f02757ab2d2a74600b3968cbf9`, whose tree is
 `713623ee3385d41be447e41c43f7dbb49fc50441`. This receiving tree preserves
 the security landing, Lending baseline, tagged agent enrollment cohort and
 Counter documentation landing. The five authored code and test files retain
 their exact bytes from `d80d5432`; this note updates their receiving provenance.
 
-At `30a69505`, both Page compiler configurations passed. The two whole owning
-test files passed their existing coherent cases. They cover both chooser
-variants, navigation without creation, unavailable discovery without custody,
-retained Check errors, and the existing Start recovery and connection flow.
+At `ff10c5c9`, both Page compiler configurations and all four whole chooser
+owning files passed their five existing coherent cases in original run `13603`.
+They cover both chooser variants, navigation without creation, unavailable
+discovery without custody, retained Check errors, invitation enrollment,
+config/key admission, and the existing Start recovery and connection flow.
 Their DOM, discovery, custody and room ports are scripted; these are not
-browser or hosted admission witnesses. The original run is `3836`, with
-complete Source and dependency guards passing before and after it.
+browser or hosted admission witnesses. Source and dependency guards passed
+before and after the run.
 
-The normal Page producer ran once at that Source, in run `25077`. Its generated
-HTML exactly equals the Source HTML. The generated module contains exactly
-that HTML and the emitted script. Only `packages/scope/src/page-assets.ts`
-changed among tracked files. The script has SHA-256
-`55c63beb4bf960d0e862e638cfdc10a3bc1122f88cd10107543253e7190ba806`.
-Those compiler, owning and producer results are historical evidence for
-`30a69505`; they do not establish this composed head. The candidate initially
-inherits the receiving main page bundle. Its normal Page producer and one
-ordinary gate remain unrun. The Page compiler pair and all four whole chooser
-owning files must run against the new receiving cohort before that gate.
+The normal Page producer ran once at that Source, in original run `56955`.
+Its generated HTML exactly equals the Source HTML. The generated module
+contains exactly that HTML and the emitted script. Only
+`packages/scope/src/page-assets.ts` changed among tracked files. The script
+is 628,940 bytes with SHA-256
+`6907f527f7b55709d9823eb8ac42a50803ca5fe68469cfb5861ed5a016b2641a`.
+The producer preserved the prior dist directory and files physically in its
+evidence directory. Its complete guards passed before and after generation.
+
+The original compiler/owning run `3836` and producer `25077` at `30a69505`
+remain historical evidence only. They were not transferred to this composition.
+The receiving main successor `11e3c72b` adds the enrollment landing receipt
+and has exactly the same full tree as `a5d25fd6`.
+
+The ordinary review gate runs once at the final committed Source. Its actual
+terminal, phase results and retained evidence are supplied separately with
+the review request; this note does not predict a pass. No compiler, focused
+test or producer pass replaces that gate.
 
 ## Hosted acceptance still owed
 
