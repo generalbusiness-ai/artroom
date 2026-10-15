@@ -5,7 +5,6 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "apps/room/definitions",
     "apps/room/lanes",
     "apps/room/page"
   ],

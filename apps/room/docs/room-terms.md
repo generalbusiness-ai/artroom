@@ -56,7 +56,7 @@ records of a hold's workspace.
 
 A **plan** is one way to split a goal into parts, and a **concern** is
 one part of a plan. Both are items of the room's issue definition, in
-[issue.ts](../../../packages/lanes/src/issue.ts). A plan is `open` while
+[issue.ts](../lanes/src/issue.ts). A plan is `open` while
 concerns are added, then `sealed` as the goal's current plan. Adding a
 concern sends a `create` for a new lane under the same definition, and
 the concern's state follows that request: `creating`, then `created`,
@@ -111,8 +111,8 @@ native item names in the definitions did not all change with them.
 ## Sources
 
 Written against main `d309b6b9`. Sources:
-[membership](../../../apps/room/definitions/src/membership.ts),
-[the inbox](../../../apps/room/definitions/src/inbox.ts),
+[membership](../../../packages/platform/src/membership.ts),
+[the inbox](../../../packages/platform/src/inbox.ts),
 [the issue definition](../../../apps/room/lanes/src/issue.ts),
 [the change definition](../../../apps/room/lanes/src/change.ts), and
 [the command line's help](../../../packages/cli/src/line.ts). This page

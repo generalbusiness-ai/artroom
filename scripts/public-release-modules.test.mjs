@@ -4,17 +4,13 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { PLAN, nameOf, sourceNameOf, sourceDirectoryOf, sourceInputOf, rewritePublishedRefs, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
+import { PLAN, nameOf, sourceNameOf, rewritePublishedRefs, outputClosure, productionInputs, publishManifest, references, rewriteDeclarationRefs } from "./public-release-lib.mjs";
 import { browserRuntimeEdge } from "./check-public-release.mjs";
 
 const root = new URL("../", import.meta.url);
 test("SDK module references preserve genuine imports and rewrite declarations without treating capability data as modules", () => {
   assert.deepEqual(["contract", "derive", "lanes", "page", "platform", "cli", "bytes", "client", "replay", "scope", "git", "checkers"].map(sourceNameOf), ["@generalbusiness/dap-contract", "@generalbusiness/dap-derive", "@generalbusiness/dap-lanes", "@generalbusiness/dap-page", "@generalbusiness/dap-platform", "@generalbusiness/dap-cli", "@generalbusiness/artroom-bytes", "@generalbusiness/artroom-client", "@generalbusiness/artroom-replay", "@generalbusiness/artroom-scope", "@generalbusiness/artroom-git", "@generalbusiness/artroom-checkers"]);
   assert.deepEqual(PLAN.packages.map(spec => nameOf(spec.dir)), ["@generalbusiness/dap-contract", "@generalbusiness/dap-bytes", "@generalbusiness/dap-client", "@generalbusiness/dap-derive", "@generalbusiness/dap-platform", "@generalbusiness/dap-replay"]);
-  assert.deepEqual(PLAN.packages.map(spec => sourceDirectoryOf(spec.dir)), ["packages/contract", "packages/bytes", "packages/client", "packages/derive", "apps/room/definitions", "packages/replay"]);
-  assert.deepEqual(sourceInputOf("apps/room/definitions/src/index.ts"), { dir: "platform", relativeName: "src/index.ts" });
-  assert.deepEqual(sourceInputOf("packages/derive/test/fixtures.ts"), { dir: "derive", relativeName: "test/fixtures.ts" });
-  assert.throws(() => sourceInputOf("packages/platform/src/index.ts"), /input-path/);
   const capability = readFileSync(new URL("packages/contract/src/capability.ts", root), "utf8");
   assert.deepEqual(references(capability), []); // Actual three quoted 'from' rows.
   const source = [
@@ -53,10 +49,10 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     // The six-package amendment omits only the known source-only boundaries.
     const platform = PLAN.packages.find(spec => spec.dir === "platform");
     const replay = PLAN.packages.find(spec => spec.dir === "replay");
-    const platformManifest = JSON.parse(readFileSync(new URL("apps/room/definitions/package.json", root), "utf8"));
+    const platformManifest = JSON.parse(readFileSync(new URL("packages/platform/package.json", root), "utf8"));
     const published = publishManifest(platform, platformManifest, "0.1.0-dev.2");
     assert.equal(published.name, "@generalbusiness/dap-platform");
-    assert.deepEqual(published.repository, { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: "apps/room/definitions" });
+    assert.deepEqual(published.repository, { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: "packages/platform" });
     assert.equal(published.homepage, "https://dap.generalbusiness.ai/");
     assert.deepEqual(Object.keys(published.exports), [".", "./membership-actions"]);
     assert.deepEqual(published.exports["./membership-actions"], { types: "./dist/src/membership-actions.d.ts", default: "./dist/src/membership-actions.js" });

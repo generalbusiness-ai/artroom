@@ -28,7 +28,7 @@
  * refusing one of `production()`.
  */
 
-import { demoFoundingOffer, type DemoFoundingConfig } from "../../../apps/room/demo-founding.ts";
+import { demoFoundingOffer, type DemoFoundingConfig } from "./demo-founding.ts";
 import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";

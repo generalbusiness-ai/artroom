@@ -12,14 +12,6 @@ export const PLAN = JSON.parse(readFileSync(new URL("./public-release.json", imp
 const DAP_PACKAGES = new Set(["contract", "derive", "lanes", "page", "platform", "cli"]);
 export const sourceNameOf = (dir) => `@generalbusiness/${DAP_PACKAGES.has(dir) ? "dap" : "artroom"}-${dir}`;
 export const nameOf = (dir) => `@generalbusiness/dap-${dir}`;
-/** Physical checkout directory; package and staged-output identities stay unchanged. */
-export const sourceDirectoryOf = (dir) => dir === "platform" ? "apps/room/definitions" : `packages/${dir}`;
-/** Map one selected SDK Source input to its existing staged package directory. */
-export function sourceInputOf(path) {
-  const spec = PLAN.packages.find(spec => path.startsWith(sourceDirectoryOf(spec.dir) + "/"));
-  if (!spec) refusal("input-path");
-  return { dir: spec.dir, relativeName: path.slice(sourceDirectoryOf(spec.dir).length + 1) };
-}
 const publishedDependency = (name) => {
   const spec = PLAN.packages.find(spec => name === sourceNameOf(spec.dir));
   return spec ? nameOf(spec.dir) : name;
@@ -116,7 +108,7 @@ export function publishManifest(spec, source, selected) {
   return {
     name: nameOf(spec.dir), version: version(selected), description: source.description, license: source.license,
     type: "module", sideEffects: false, engines: source.engines,
-    repository: { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: sourceDirectoryOf(spec.dir) }, homepage: "https://dap.generalbusiness.ai/",
+    repository: { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: `packages/${spec.dir}` }, homepage: "https://dap.generalbusiness.ai/",
     exports: Object.fromEntries(Object.entries(spec.exports).map(([key, path]) => [key, path.endsWith(".d.ts")
       ? { types: `./dist/${path}` } : { types: `./dist/${path}.d.ts`, default: `./dist/${path}.js` }])),
     files: ["dist", "README.md", "LICENSE", "NOTICE"], publishConfig: { access: "public" },
@@ -127,7 +119,7 @@ export function publishManifest(spec, source, selected) {
 export function productionInputs(spec, tracked) {
   const excluded = spec.excludedInputs ?? [];
   if (JSON.stringify(excluded) !== JSON.stringify(spec.dir === "replay" ? ["src/bin.ts"] : [])) refusal("source-input-exclusions");
-  const omitted = excluded.map(path => `${sourceDirectoryOf(spec.dir)}/${path}`);
+  const omitted = excluded.map(path => `packages/${spec.dir}/${path}`);
   if (omitted.some(path => !tracked.includes(path))) refusal("missing-excluded-source");
   return { names: tracked.filter(path => !omitted.includes(path)), omitted };
 }

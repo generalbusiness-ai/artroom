@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ROOT, PLAN, sourceDirectoryOf, sourceInputOf, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, productionInputs, publishManifest, references, refusal, rewriteDeclarationRefs, rewritePublishedRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
+import { ROOT, PLAN, args, childEnv, compilerTool, compile, contained, copiedDependency, copyFileVerified, digest, json, outputClosure, productionInputs, publishManifest, references, refusal, rewriteDeclarationRefs, rewritePublishedRefs, sourceIdentity, version, writeJson } from "./public-release-lib.mjs";
 
 export function produce(options) {
   const source = realpathSync(options.source), selected = version(options.version);
@@ -25,7 +25,7 @@ export function produce(options) {
   for (const spec of PLAN.packages) {
     const input = join(output, "inputs", spec.dir), stage = join(output, "packages", spec.dir);
     mkdirSync(input, { recursive: true }); mkdirSync(stage, { recursive: true });
-    const tracked = execFileSync("git", ["ls-files", "-z", `${sourceDirectoryOf(spec.dir)}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
+    const tracked = execFileSync("git", ["ls-files", "-z", `packages/${spec.dir}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: source, encoding: "utf8" }).split("\0").filter(Boolean);
     const { names, omitted } = productionInputs(spec, tracked);
     for (const path of omitted) {
       const copy = join(output, "excluded", path);
@@ -33,18 +33,18 @@ export function produce(options) {
     }
     if (!names.length || names.some(name => !name.endsWith(".ts"))) refusal("unplanned-input");
     for (const name of names) {
-      const relativeName = name.slice((sourceDirectoryOf(spec.dir) + "/").length);
+      const relativeName = name.slice(`packages/${spec.dir}/`.length);
       const original = join(output, "source-inputs", spec.dir, relativeName);
       inputs.push({ path: name, copy: original, ...copyFileVerified(join(source, name), original) });
       const copied = join(input, relativeName);
       mkdirSync(dirname(copied), { recursive: true });
       writeFileSync(copied, rewritePublishedRefs(readFileSync(original, "utf8")), { flag: "wx" });
     }
-    const sourceManifest = json(join(source, `${sourceDirectoryOf(spec.dir)}/package.json`));
+    const sourceManifest = json(join(source, `packages/${spec.dir}/package.json`));
     const manifest = publishManifest(spec, sourceManifest, selected);
     // Refuse unplanned source dependencies before the compiler can resolve them.
     for (const name of names) {
-      const copied = join(input, name.slice((sourceDirectoryOf(spec.dir) + "/").length));
+      const copied = join(input, name.slice(`packages/${spec.dir}/`.length));
       for (const ref of references(readFileSync(copied, "utf8"))) {
         if (ref.startsWith(".")) {
           const target = resolve(dirname(copied), ref);
@@ -58,13 +58,13 @@ export function produce(options) {
     const namespace = join(output, "node_modules/@generalbusiness");
     if (lstatSync(namespace).isSymbolicLink() || JSON.stringify(readdirSync(namespace).sort()) !== JSON.stringify(packages.map(pkg => pkg.name.split("/")[1]).sort())) refusal("compiled-ancestor-set");
     writeJson(join(stage, "package.json"), manifest);
-    for (const [from, to] of [[`${sourceDirectoryOf(spec.dir)}/package.json`, "source-package.json"], [`${sourceDirectoryOf(spec.dir)}/README.md`, "README.md"], ["LICENSE", "LICENSE"], ["NOTICE", "NOTICE"]]) {
+    for (const [from, to] of [[`packages/${spec.dir}/package.json`, "source-package.json"], [`packages/${spec.dir}/README.md`, "README.md"], ["LICENSE", "LICENSE"], ["NOTICE", "NOTICE"]]) {
       const target = to === "source-package.json" ? join(input, to) : join(stage, to);
       inputs.push({ path: from, copy: target, ...copyFileVerified(join(source, from), target) });
     }
     // Build inputs have their own module marker, never an inherited workspace manifest.
     writeJson(join(input, "package.json"), { private: true, type: "module" });
-    const files = names.map(name => join(input, name.slice((sourceDirectoryOf(spec.dir) + "/").length)));
+    const files = names.map(name => join(input, name.slice(`packages/${spec.dir}/`.length)));
     if (["client", "derive", "platform", "replay"].includes(spec.dir)) files.push(join(output, "packages/bytes/dist/src/web.d.ts"));
     const config = join(input, "tsconfig.build.json");
     writeJson(config, { compilerOptions: {
@@ -91,8 +91,8 @@ export function produce(options) {
   sourceIdentity(source, options.head);
   if ([...inputs, ...excludedInputs].some(input => digest(readFileSync(join(source, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256)) refusal("input-changed");
   for (const input of inputs.filter(input => /\.ts$/.test(input.path))) {
-    const { dir, relativeName } = sourceInputOf(input.path);
-    if (readFileSync(join(output, "inputs", dir, relativeName), "utf8") !== rewritePublishedRefs(readFileSync(input.copy, "utf8"))) refusal("renamed-input-changed");
+    const [, dir, ...parts] = input.path.split("/");
+    if (readFileSync(join(output, "inputs", dir, ...parts), "utf8") !== rewritePublishedRefs(readFileSync(input.copy, "utf8"))) refusal("renamed-input-changed");
   }
   const result = { format: "artroom-public-sdk-release-1", status: "producer-output-only-not-published", source: identity, version: selected,
     lockSha256: digest(readFileSync(join(source, "package-lock.json"))), planSha256: digest(readFileSync(join(ROOT, "scripts/public-release.json"))),

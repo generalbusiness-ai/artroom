@@ -11,13 +11,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, normalize } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { moduleSpecifierSpans } from "./public-release-modules.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Preserve the existing dependency checks at their relocated physical paths.
-const packagePath = (file) => file.replace(/^apps\/room\/definitions\//, "packages/platform/").replace(/^apps\/room\/lanes\//, "packages/lanes/").replace(/^apps\/room\/page\//, "packages/page/");
+const packagePath = (file) => file.replace(/^apps\/room\/lanes\//, "packages/lanes/").replace(/^apps\/room\/page\//, "packages/page/");
 const INACTIVE = /^apps\/counter\/|^(notes|plans|examples|spikes|\.github)\/|^docs\/(protocol|policy-pack|release)\.md$|^scripts\/active-source\.test\.mjs$/;
 const files = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter((f) => f !== "" && !INACTIVE.test(packagePath(f)));
 const text = (file) => { try { return readFileSync(join(root, file), "utf8"); } catch { return ""; } };   // a file deleted and not yet committed
@@ -60,7 +61,7 @@ test("no platform package depends on the lanes package or imports from it", () =
 // runs the verifier with the platform's rules; the page, which reads a platform definition's acts as the command line does; and the
 // MCP server, which derives the act tools of the platform's scopes from those acts.
 test("the platform package depends only on contract, bytes and derive, and only scope, replay, lanes, cli, page and mcp name it", () => {
-  assert.ok(files.includes("apps/room/definitions/package.json"), "the platform package was listed");
+  assert.ok(files.includes("packages/platform/package.json"), "the platform package was listed");
   const source = (f) => packagePath(f).startsWith("packages/") && !f.endsWith(".md");
   const inside = files.filter((f) => source(f) && packagePath(f).startsWith("packages/platform/"));
   assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(scope|replay|client|lanes)/.test(text(f))), []);
@@ -91,7 +92,7 @@ test("the checkers package depends only on contract, bytes and git, and no packa
   assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(derive|platform|scope|replay|client|lanes)/.test(text(f))), []);
   const named = files.filter((f) => source(f) && !packagePath(f).startsWith("packages/checkers/"));
   assert.deepEqual(named.filter((f) => /artroom-checkers/.test(text(f))), []);
-  const reaches = files.filter((f) => source(f) && !packagePath(f).startsWith("packages/checkers/") && /[.\/]\/checkers\//.test(text(f)));
+  const reaches = files.filter((f) => source(f) && !packagePath(f).startsWith("packages/checkers/") && /(?:[.\/]\/|packages\/)checkers\//.test(text(f)));
   assert.deepEqual(reaches, ["apps/room/lanes/test/checks.scope.test.ts", "apps/room/lanes/test/manifest-tree.scope.test.ts"]);
 });
 
@@ -108,4 +109,14 @@ test("the MCP server's source imports only contract, bytes, client, platform and
   assert.deepEqual(inside.filter((f) => /(?:artroom|dap)-(lanes|page|checkers|scope|replay|git)|examples\/|\.\.\//.test(text(f))), []);
   const mcp = JSON.parse(text("packages/mcp/package.json") || "{}");
   assert.deepEqual(Object.keys(mcp.dependencies ?? {}).filter((d) => !/^@generalbusiness\/(artroom-(bytes|client)|dap-(contract|platform|derive))$/.test(d)), []);
+});
+
+// Invariant: reusable runtime modules never require application source or page assets.
+test("framework runtime modules do not import application source", () => {
+  const runtime = files.filter(file => /^packages\/[^/]+\/src\/.*\.(ts|mjs)$/.test(file));
+  const reaches = runtime.flatMap(file => moduleSpecifierSpans(text(file)).flatMap(({ value }) => {
+    const target = value.startsWith(".") ? normalize(join(dirname(file), value)) : value;
+    return target.startsWith("apps/") || /^@generalbusiness\/dap-page(?:\/|$)/.test(target) ? [`${file}: ${value}`] : [];
+  }));
+  assert.deepEqual(reaches, []);
 });

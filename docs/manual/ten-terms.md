@@ -104,7 +104,7 @@ install of a register and is its one founder key. The founder's
 named at the claim, is not a member's key. It can still invite and remove
 members and revoke keys, so a room whose admins have lost their keys can
 be recovered. Membership is in
-[membership.ts](../../apps/room/definitions/src/membership.ts).
+[membership.ts](../../packages/platform/src/membership.ts).
 
 ## 8. Rules
 
@@ -112,7 +112,7 @@ Two things share the word. The **rules scope** holds a room's published
 configuration: which reviews and checks each part of a repository
 needs, and which definitions are active. Its revisions are recorded, and
 other scopes observe a revision when they judge against it. It is in
-[rules-scope.ts](../../apps/room/definitions/src/rules-scope.ts).
+[rules-scope.ts](../../packages/platform/src/rules-scope.ts).
 
 A definition's **rule expressions** are named expressions, in a
 restricted form of JSONata, that a `rule` guard evaluates. They belong
@@ -126,7 +126,7 @@ changes, after it has judged their reviews and checks against the rules
 scope. It also publishes the files that an application's acts send it
 with `publish-file`, such as the lending library's shelf pages. Each
 publication writes a receipt that names the entry that asked for it. It
-is in [destination.ts](../../apps/room/definitions/src/destination.ts).
+is in [destination.ts](../../packages/platform/src/destination.ts).
 
 ## 10. Replay
 

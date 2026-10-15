@@ -39,7 +39,7 @@ Because the definition is data, one runtime runs every application. The
 room's issue lane and the Counter's board differ only in the definitions
 they pin. The platform's own definitions, such as membership and the
 destination, are data with marks whose rules are code in
-`apps/room/definitions`. A verifier needs that code too, and its report
+`packages/platform`. A verifier needs that code too, and its report
 lists it under what it trusts. A change to a definition makes a new
 definition with a new digest. Scopes created under the old one keep it.
 [Write an application](write-an-application.md) shows how to declare one.
@@ -239,9 +239,9 @@ Written against main `d309b6b9`. Sources:
 [the judges](../packages/derive/src/index.ts),
 [authority](../packages/scope/src/authority.ts),
 [outside operations](../packages/scope/src/operations.ts),
-[destination objects](../apps/room/definitions/src/destination-objects.ts),
+[destination objects](../packages/platform/src/destination-objects.ts),
 [replay](../packages/replay/README.md), and
-[platform versions](../apps/room/definitions/src/index.ts). This page claims
+[platform versions](../packages/platform/src/index.ts). This page claims
 no run. Independent review and acceptance of this version are owed. The
 [ledger](../apps/room/docs/ledger.md) keeps the review history of the
 earlier version.

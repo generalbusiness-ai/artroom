@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { platform } from "../src/index.ts";
-import { board } from "../../../../packages/derive/test/fixtures-f.ts";
+import { board } from "../../derive/test/fixtures-f.ts";
 import { validateDefinition } from "@generalbusiness/dap-derive";
 const destination3 = platform("platform:destination@3")!.data;
 

@@ -4,7 +4,7 @@ import { canonicalize, digestBytes, entryHash, intentDigest, newIncarnation, sco
 import { MemoryState, PROFILES, clockOf, judgeGenesis, judgeOutcome, validateDefinition } from "@generalbusiness/dap-derive";
 import { Ledger, T0, d } from "@generalbusiness/dap-derive/testing";
 import { DEMO_REGISTER, WEB_DEMO_REGISTER, DESTINATION, DIRECTORY, REGISTER, directoryIdOf, platform, repositoryName } from "@generalbusiness/dap-platform";
-import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../apps/room/definitions/test/support-founding.ts";
+import { installing, paul, registerDefinition, registerPlatform, rita, sam } from "../../../packages/platform/test/support-founding.ts";
 import { gitHubOutside, type GitHubBindings } from "../src/github-wiring.ts";
 import { outsideOf } from "../src/worker.ts";
 import type { OutsideGiven } from "../src/object.ts";

@@ -86,6 +86,7 @@ import { within } from "./turn.ts";
 import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./artifacts-wiring.ts";
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
+import { isSite, site } from "./site/route.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -431,11 +432,14 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-/**
- * `GET /site/...` is a room's published pages (`site/route.ts`); `GET /page/` is the room's page, its static files bundled into
- * this Worker (`page.ts`); every other path is a route of the table above.
- */
-export { default } from "../../../apps/room/fetch.ts";
+/** Generic Scope, Site and MCP dispatch. Application pages and demo offers belong to apps/room. */
+export default {
+  fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
+    if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    const hosted = await mcpRoute(request, env);
+    return hosted ?? (isSite(request) ? site(request, env) : route(request, env.SCOPES));
+  },
+};
 
 // ---------------------------------------------------------------- the hosted MCP endpoint
 

@@ -63,7 +63,7 @@ Dap was built with the help of several concurrent coding agents, using
   [Join a room and publish one text change](apps/room/docs/first-change.md)
   and [Lanes](apps/room/docs/lanes.md).
   [Concurrent changes are settled by reservation and judgment, not by merging.](docs/demo.md#what-the-concurrency-shots-show)
-  Its definitions are in [apps/room/definitions](apps/room/definitions) and
+  Its definitions are in [packages/platform](packages/platform) and
   [apps/room/lanes](apps/room/lanes).
 - **dap-counter** keeps a shared count. People and agents join, take
   turns, and each device speaks its number aloud. The source is in

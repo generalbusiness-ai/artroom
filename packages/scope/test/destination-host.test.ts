@@ -3,7 +3,7 @@ import type { Digest, OperationId, RetainedInput, ScopeId } from "@generalbusine
 import { canonicalize, entryHash, factRefOf, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { t } from "@generalbusiness/dap-derive/testing";
 import { destinationReceipt, foundingObjects, type DestinationObject, type RecordedJudgeEvidence } from "@generalbusiness/dap-platform";
-import { Branch, HEAD, NEXT, OTHER, TREE, handMade, rita } from "../../../apps/room/definitions/test/support-destination.ts";
+import { Branch, HEAD, NEXT, OTHER, TREE, handMade, rita } from "../../../packages/platform/test/support-destination.ts";
 import { CredentialStore } from "../src/credential-store.ts";
 import { DestinationHost, type DestinationBinding, type DestinationHostOptions, type DestinationInspection, type DestinationProvider, type DestinationRepository } from "../src/destination-host.ts";
 import type { OutsideGiven } from "../src/object.ts";

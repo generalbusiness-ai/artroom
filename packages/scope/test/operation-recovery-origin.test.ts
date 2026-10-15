@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { OperationId, Read } from "@generalbusiness/dap-contract";
 import { timeMs } from "@generalbusiness/dap-derive";
-import { scriptedApplicationOrigin, scriptedOrigin } from "../../../apps/room/definitions/test/support-origin.ts";
+import { scriptedApplicationOrigin, scriptedOrigin } from "../../../packages/platform/test/support-origin.ts";
 import type { EffectAnswer, EffectRequest, OperationStatus, Outside } from "../src/index.ts";
 import type { LateAnswers } from "../src/operations.ts";
 import { owners, wired } from "./outside.ts";

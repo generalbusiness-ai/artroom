@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLAN, ROOT, sourceDirectoryOf, sourceInputOf, args, childEnv, compile, compilerTool, contained, digest, inventory, json, nameOf, outputClosure, productionInputs, publishManifest, references, rewritePublishedRefs, refusal, sourceIdentity, writeJson } from "./public-release-lib.mjs";
+import { PLAN, ROOT, args, childEnv, compile, compilerTool, contained, digest, inventory, json, nameOf, outputClosure, productionInputs, publishManifest, references, rewritePublishedRefs, refusal, sourceIdentity, writeJson } from "./public-release-lib.mjs";
 
 /** esbuild 0.28.1's parser inserts its already-resolved helper import. Only
  * this exact edge of the pinned copied JSONata input is synthetic metadata.
@@ -26,19 +26,19 @@ export function check(manifestFile, captureFile, captureSha256, browserTool, bro
   if (JSON.stringify(release.producerInputs?.map(input => input.path)) !== JSON.stringify(producerPaths)) refusal("producer-input-set");
   for (const input of release.producerInputs) if (digest(readFileSync(join(ROOT, input.path))) !== input.sha256) refusal("producer-input-integrity");
   for (const input of release.inputs) {
-    if (!/^(?:LICENSE|NOTICE|packages\/(?:contract|bytes|client|derive|replay)\/(?:src\/[^\n]+\.ts|package\.json|README\.md)|apps\/room\/definitions\/(?:src\/[^\n]+\.ts|package\.json|README\.md)|packages\/derive\/test\/fixtures\.ts)$/.test(input.path) || input.path === "packages/replay/src/bin.ts" || !contained(output, realpathSync(input.copy))) refusal("input-path");
+    if (!/^(?:LICENSE|NOTICE|packages\/(?:contract|bytes|client|derive|platform|replay)\/(?:src\/[^\n]+\.ts|package\.json|README\.md)|packages\/derive\/test\/fixtures\.ts)$/.test(input.path) || input.path === "packages/replay/src/bin.ts" || !contained(output, realpathSync(input.copy))) refusal("input-path");
     if (digest(readFileSync(join(ROOT, input.path))) !== input.sha256 || digest(readFileSync(input.copy)) !== input.sha256) refusal("input-integrity");
     if (/\.ts$/.test(input.path)) {
-      const { dir, relativeName } = sourceInputOf(input.path);
-      const compiledInput = join(output, "inputs", dir, relativeName);
+      const [, dir, ...parts] = input.path.split("/");
+      const compiledInput = join(output, "inputs", dir, ...parts);
       if (readFileSync(compiledInput, "utf8") !== rewritePublishedRefs(readFileSync(input.copy, "utf8"))) refusal("renamed-input-integrity");
     }
   }
   const expectedExcluded = [];
   for (const spec of PLAN.packages) {
-    const tracked = execFileSync("git", ["ls-files", "-z", `${sourceDirectoryOf(spec.dir)}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: ROOT, encoding: "utf8" }).split("\0").filter(Boolean);
+    const tracked = execFileSync("git", ["ls-files", "-z", `packages/${spec.dir}/src`, ...(spec.dir === "derive" ? ["packages/derive/test/fixtures.ts"] : [])], { cwd: ROOT, encoding: "utf8" }).split("\0").filter(Boolean);
     const selected = productionInputs(spec, tracked);
-    const copied = release.inputs.filter(input => input.path.startsWith(`${sourceDirectoryOf(spec.dir)}/src/`) || spec.dir === "derive" && input.path === "packages/derive/test/fixtures.ts").map(input => input.path).sort();
+    const copied = release.inputs.filter(input => input.path.startsWith(`packages/${spec.dir}/src/`) || spec.dir === "derive" && input.path === "packages/derive/test/fixtures.ts").map(input => input.path).sort();
     if (JSON.stringify(copied) !== JSON.stringify(selected.names.slice().sort())) refusal("copied-source-set");
     expectedExcluded.push(...selected.omitted);
   }
@@ -60,7 +60,7 @@ export function check(manifestFile, captureFile, captureSha256, browserTool, bro
   for (let i = 0; i < PLAN.packages.length; i++) {
     const spec = PLAN.packages[i], packed = release.packages[i], stage = join(output, "packages", spec.dir);
     if (packed.name !== nameOf(spec.dir) || packed.version !== release.version || realpathSync(join(namespace, packed.name.split("/")[1])) !== realpathSync(stage)) refusal("compiled-stage-binding");
-    const expected = publishManifest(spec, json(join(ROOT, `${sourceDirectoryOf(spec.dir)}/package.json`)), release.version);
+    const expected = publishManifest(spec, json(join(ROOT, `packages/${spec.dir}/package.json`)), release.version);
     if (JSON.stringify(json(join(stage, "package.json"))) !== JSON.stringify(expected) || JSON.stringify(packed.manifest) !== JSON.stringify(expected)) refusal("publish-manifest");
     const files = outputClosure(stage, spec, release.version);
     if (JSON.stringify(files) !== JSON.stringify(packed.files) || !/^[a-z0-9._-]+\.tgz$/.test(packed.tarball)) refusal("stage-inventory");

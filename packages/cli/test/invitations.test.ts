@@ -7,7 +7,7 @@ import type { Receipt, SignedIntent, Summary, Entry, DutyId, Item } from "@gener
 import { b64url, canonicalize, entryHash, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, type Fetch } from "@generalbusiness/artroom-client";
 import { MEMBERSHIP } from "@generalbusiness/dap-platform";
-import { Roster, rita, rules } from "../../../apps/room/definitions/test/support.ts";
+import { Roster, rita, rules } from "../../../packages/platform/test/support.ts";
 import { command, enrolAgentKey, issueInvitation, linkOf, memoryStore, type Context, type Config, type Store } from "../src/index.ts";
 
 // Real SDK/envelopes/followReceipt/CLI Store and native M2 rules in memory.

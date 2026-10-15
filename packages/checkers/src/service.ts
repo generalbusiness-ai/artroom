@@ -56,7 +56,7 @@
  * **A checker that the rules do not name** gets nothing. At the rules scope
  * a `publish` that names a member who is not an active member with the role
  * `checker` is refused `not-a-checker`, so no rules name such a member
- * (`apps/room/definitions/src/rules-scope.ts`). At the lane, a signer without
+ * (`packages/platform/src/rules-scope.ts`). At the lane, a signer without
  * `change.check` is refused `unauthorized`; a signer who holds it and is not
  * the checker that the lane's copy of the rules names for that check is
  * refused the read token, and its `check` or `check-error` is refused

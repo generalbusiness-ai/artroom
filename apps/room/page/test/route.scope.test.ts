@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import worker, { type Env } from "../../worker.ts";
+import frameworkWorker from "@generalbusiness/artroom-scope/worker";
 import { PAGE_HTML, PAGE_JS } from "../assets.ts";
 
 // Invariant: the deployed Worker's one entry serves the room's page at `/page/`, its HTML and its one script, from the module that
@@ -7,6 +8,10 @@ import { PAGE_HTML, PAGE_JS } from "../assets.ts";
 // a write is refused, and a path outside it still reaches the scope routes. The page route reads no scope, so no binding is given.
 test("the Worker serves the page at /page/: its HTML and script under a same-origin script policy; /page redirects; another file is not-found; a POST is refused; /v1 is not the page's", async () => {
   const get = (path: string, method = "GET") => worker.fetch(new Request(`https://scopes.test${path}`, { method }), {} as Env);
+
+  // The framework remains reusable: only the app entry serves its static page.
+  const generic = await frameworkWorker.fetch(new Request("https://scopes.test/page/"), {} as Env);
+  expect([generic.status, await generic.json()]).toEqual([404, { error: "not-found" }]);
 
   const html = await get("/page/");
   expect([html.status, html.headers.get("content-type"), await html.text()]).toEqual([200, "text/html; charset=utf-8", PAGE_HTML]);

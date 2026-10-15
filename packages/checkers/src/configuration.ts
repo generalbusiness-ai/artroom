@@ -21,7 +21,7 @@
 import type { Digest, DomainTag } from "@generalbusiness/dap-contract";
 import { canonicalBytes, canonicalize, digestBytes, digestOfHash, domainBytes, isDigest, isRecord, parseStrict, sha256, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 
-/** The byte domain of a configuration's digest (section 3.11). The rules definition declares it (`apps/room/definitions/src/rules-scope.ts`). */
+/** The byte domain of a configuration's digest (section 3.11). The rules definition declares it (`packages/platform/src/rules-scope.ts`). */
 export const CONFIGURATION_DOMAIN = "artroom-check-configuration-1";
 
 /** The most canonical bytes of one configuration that this service reads: the rules scope's own bound on one (I3 deltas, entry EQ2). */

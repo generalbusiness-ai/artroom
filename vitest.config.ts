@@ -34,7 +34,7 @@ export default defineConfig({
     projects: [
       project("bytes", "packages/bytes", "vitest.config.ts", 0),
       project("derive", "packages/derive", "vitest.config.ts", 0),
-      project("platform", "apps/room/definitions", "vitest.config.ts", 0),
+      project("platform", "packages/platform", "vitest.config.ts", 0),
       project("git", "packages/git", "vitest.config.ts", 0),
       project("checkers", "packages/checkers", "vitest.config.ts", 0),
       project("replay", "packages/replay", "vitest.config.ts", 0),

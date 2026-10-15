@@ -68,7 +68,7 @@ rule is a stand-in that a test scripts. A test that uses one says so. It
 shows where a count is taken, drawn and released, and nothing about a
 count or a rule of a platform definition. The destination now states
 `holds` for its branch and publication types;
-`apps/room/definitions/test/destination-creates.test.ts` checks their cleanup
+`packages/platform/test/destination-creates.test.ts` checks their cleanup
 and receipt duties with the package's real rules.
 
 A scripted membership, `Controls.membership` of the same module, is a
@@ -95,7 +95,7 @@ rules: a test of real authority runs there, in the namespace `PLATFORM`
 
 The register and the directory have no stand-in rule: every mark of the
 data of each has its rule in the platform package. Two fixtures are in
-`apps/room/definitions/test/support-founding.ts`. `Register` is a register in
+`packages/platform/test/support-founding.ts`. `Register` is a register in
 memory, created by an install intent. `Directory` is a directory in memory
 that such a register created by its own rules: the claim, the selecting
 outcome with its `create`, the directory's genesis and the register's
@@ -110,7 +110,7 @@ every mark, including `first-head` and `receipt`; its creation no longer needs s
 creation and publication witness is described below.
 
 The rules scope has four stand-ins, in
-`apps/room/definitions/test/support-rules.ts`. `registrar` is a made-up
+`packages/platform/test/support-rules.ts`. `registrar` is a made-up
 directory that creates one rules scope. `asker` is a made-up lane that
 tells it `rules-wanted`. `Rulebook` is a rules scope in memory below such
 a registrar, whose acts are judged on the test authority of derive's
@@ -131,7 +131,7 @@ over HTTP, and missing bytes make that replay `incomplete`. Its grants and
 outside system remain stand-ins.
 
 The destination has stand-ins of its own, in
-`apps/room/definitions/test/support-destination.ts`. `bureau` is a made-up
+`packages/platform/test/support-destination.ts`. `bureau` is a made-up
 directory that creates one destination scope. `Branch.read` supplies the
 observations and copies of lane entries at hand for a reservation. The
 lane's and register's entries, the observations, and each Git host answer
@@ -140,7 +140,7 @@ bureau; derive's judges write its entries. Every destination mark has its
 rule in the platform package. No substitute `first-head` or `receipt` rule
 is supplied. `Branch` still replaces the lane reader with a scripted
 `LaneRead`, rather than reading a lane's entries. The package's production
-reader is tested in `apps/room/definitions/test/destination-reading.test.ts`
+reader is tested in `packages/platform/test/destination-reading.test.ts`
 on entries written by hand: its author and deciding-key lists, and its
 checks of each job and verdict's provenance. The rows of `judge`, its
 changed-set value and its holder counts are the package's code. These

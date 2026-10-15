@@ -204,7 +204,7 @@ dap's MCP server and speak with their own voices, as
   presence can reset. Git can keep a chosen run and the definition. It
   does not need a commit per number.
 
-**Built:** this is [dap-counter](../examples/counting/README.md). **Also needs:** [durability levels](roadmap.md#durability-levels), for practice that keeps no record.
+**Built:** this is [dap-counter](../apps/counter/README.md). **Also needs:** [durability levels](roadmap.md#durability-levels), for practice that keeps no record.
 
 ### 34 Software change review and landing
 

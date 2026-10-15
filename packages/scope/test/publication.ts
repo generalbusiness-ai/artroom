@@ -17,7 +17,7 @@ import { runInDurableObject } from "cloudflare:test";
 import type { Entry, OperationId } from "@generalbusiness/dap-contract";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { destinationReceipt, foundingOf, revokedToken } from "@generalbusiness/dap-platform";
-import { targetOf } from "../../../apps/room/definitions/src/destination.ts";
+import { targetOf } from "../../../packages/platform/src/destination.ts";
 import { SqliteStore } from "../src/index.ts";
 import { net } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
