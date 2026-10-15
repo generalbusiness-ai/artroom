@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:cf840bc9799842f14e81a73def6989c5ad4a3228","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/namespace.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d6dab29223fdc3d9a14490280417454bb0558208","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-bounded-session-preparation.md."}
