@@ -32,3 +32,25 @@ links, capture records and application ownership, then one gate at the final
 candidate and one complete exact-head checker review. Historical captures
 must keep their original provenance. This checkpoint does not claim browser
 playback, a new Jam build, hosted acceptance or completion of the parent task.
+
+The later checkpoint preserves Main `1d2572d8`, including bounded session
+preparation, query codecs and the planner's hosted-agent design note. The
+relocated Room fixture now imports the public platform destination at its
+correct path. All affected workspace and supplementary root types passed;
+five native Room wiring cases, three focused application route cases and
+12 static source, framework-boundary, Home, Jam and SDK checks passed.
+The documentation audit found 455 relative links and no broken target.
+The normal local Page and Counter builds ran; their two exact generated
+asset comparison cases passed. An initial extra Counter test filter named
+a nonexistent path and selected only the Page case; the real Counter case
+was then selected explicitly. Historical capture records remain unchanged.
+
+Room's new source overview and Counter's README state the existing shared
+Worker owner. Counter has no independent Worker today; the preserved
+configuration is under `apps/room`. The planner has been asked to confirm
+that this explicit shared owner meets the per-app configuration condition,
+or to identify the desired Counter-local shared deployment entry point.
+No duplicate or unused Wrangler configuration was added. Jam's recorded
+managed-assets configuration remains app-local. No final gate or complete
+Source review has run for this branch. Priority 1 work still preempts it,
+and Hugh's no-Cloudflare-deployment hold remains in force.
