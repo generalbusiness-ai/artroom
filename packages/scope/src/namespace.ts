@@ -37,6 +37,8 @@ export interface Peer {
   source(seq: number, origin?: boolean): Promise<Sourced | null>;
   /** Optional: unsupported native senders never fall back to source(). */
   proofSource?(fact: FactRef, maxBytes: number): Promise<ProofBody | null>;
+  /** Optional bounded native directory witness; never fall back to summary. */
+  sessionReference?(request: string): Promise<string | null>;
   declared(digest: Digest): Promise<string | null>;
   text(seq: number, digest: Digest): Promise<string | null>;
   observe(asked: ObservationRequest): Promise<unknown>;
