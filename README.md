@@ -16,7 +16,7 @@ agent guidance, and even CI.
 Examples of these rules: You can't close an issue if it's already closed.  You can't close
 without choosing a reason.  You can't merge into main if the branch is protected. Every 
 change needs a performance budget. You can't add this file without linting it.  If you
-change the database, Joe and Kate needs to approve.  And so on.
+change the database, Joe and Kate need to approve.  And so on.
 
 Dap is a way to build these rules around the whole of a git repo, so that they are
 an integral part of it.  Every act is signed and checked against the rules that you
@@ -76,7 +76,7 @@ Dap was built with the help of several concurrent coding agents, using
   [examples/lending](examples/lending), and the tutorial
   [Build a lending library](docs/build-a-lending-library.md) writes its
   first definition. Each act also publishes the thing's page to the
-  room's repository; that is built, and not yet run on a deployed room.
+  room's repository.
 - **dap-jam** lets musicians improvise together in a room. Its source and
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).
