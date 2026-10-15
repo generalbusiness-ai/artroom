@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:d6dab29223fdc3d9a14490280417454bb0558208","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-bounded-session-preparation.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e9cf8485ee92442a1d0d85cdd3b73c1091e5939e","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/read-preparation.test.ts."}
