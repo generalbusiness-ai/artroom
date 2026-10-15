@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"G2s final F1 successor8d05a0b4e. Bounded current metadata for cold/warm callbacks, explicit absent/unavailable,18focused/types pass; original3f gate retained,no fullgate repeat.","body":{"commit":"8d05a0b4e","path":"packages/scope/src/outbox.ts"}}
+{"kind":"artifact","text":"G2s final F1 successor8d05a0b4e. Bounded current metadata for cold/warm callbacks, explicit absent/unavailable,18focused/types pass; original3f gate retained,no fullgate repeat.","body":{"commit":"8d05a0b4e","path":"packages/scope/src/signed-reads.ts"}}
