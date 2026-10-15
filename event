@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:fecd1533fbeace4dba85ca17123ebc8307663a4f"}
+{"kind":"assert","text":"Completed /Users/hughpyle/Movies/2026-10-14-demo.mp4. Concatenated selected introduction, counting8pctfaster, lendingtrimmed and workroomtrimmed in requestedorder. Duration592.017448s (9:52.02);2974×1612,H264/AAC. Compatible streams copied without re-encoding. Full decode passed and frames after all3joins inspected. All inputfiles preserved.","body":{"no_git_artifact":"true"}}
