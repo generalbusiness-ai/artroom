@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f8fcd380f78e8e44bbff256899164e702d0d29dc","text":"Merge retired a covered predecessor; the successor is at docs/write-an-application.md."}
+{"kind":"promise","text":"I will check the proposed isolated-object negotiation and allowance contract against Git's primary protocol/filter documentation and the existing SmartHttpSource/pack decoder, then give an explicit pre-Source decision. Preserve full-closure mode, host-support uncertainty, no production probe, and all G1/current native closure duties."}
