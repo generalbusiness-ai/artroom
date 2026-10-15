@@ -2,7 +2,9 @@
  * SHA-1 smart-HTTP upload-pack as a Web-only GitSource. Protocol sources:
  * git-scm.com/docs/gitprotocol-http, gitprotocol-pack, gitformat-pack and
  * gitprotocol-capabilities; zlib framing: RFC 1950/1951. No thin pack,
- * sideband, shallow history, retry or inference of absence from an error.
+ * sideband, retry or inference of absence from an error. Default reads fetch
+ * closures; explicit isolated reads require shallow/filter and return only
+ * the wanted commit/tree/blob, with no ancestry claim.
  * The caller's maxBytes bounds wire, inflated and retained object bytes;
  * it is a transport allowance, not an adopted platform quota.
  */
@@ -19,7 +21,20 @@ export interface DecodedObject { id: ObjectId; type: ObjectType; data: Uint8Arra
  * upload-pack answer of Cloudflare Artifacts sends it. Any other byte
  * after the trailer is refused.
  */
-export interface PackReadOptions { maxBytes: number; bounds?: ReadBounds; flushAfter?: boolean }
+export interface PackReadOptions {
+  maxBytes: number; bounds?: ReadBounds; flushAfter?: boolean;
+  /** Exact one non-delta commit/tree/blob. Enforced at the header before inflation. */
+  singleObjectBytes?: number;
+  /** Absolute deadline for isolated framing and inflation; default closure decoding is unchanged. */
+  deadline?: number;
+}
+/** Isolation is explicit. Its conservative payload reservation excludes engine/stream metadata and is not measured peak memory. */
+export interface IsolatedObjectReads { ownedBytes: number }
+export interface SmartHttpReadOptions extends SmartHttpOptions { isolateObjects?: IsolatedObjectReads }
+// Includes wire chunks/concats, advertisement strings, pack/Blob copies,
+// inflate chunks/concat, retained bytes and one returned copy. Metadata is
+// separately finite by packet, ref and exact-one-object counts.
+const ISOLATED_WORKING_MULTIPLE = 16;
 const fail = (what: string) => new GitRefusal("unreadable", what);
 const large = (what: string) => new GitRefusal("too-large", what);
 const utf8 = new TextEncoder();
@@ -41,14 +56,23 @@ function checked(options: PackReadOptions): { maxBytes: number; bounds: ReadBoun
 }
 const typeLimit = (type: ObjectType, bounds: ReadBounds) => type === "commit" ? bounds.commitBytes : type === "tree" ? bounds.treeBytes : bounds.blobBytes;
 
-async function readBytes(stream: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
+function beforeDeadline(deadline: number | undefined): void {
+  if (deadline !== undefined && (!Number.isSafeInteger(deadline) || Date.now() >= deadline)) throw fail("read deadline");
+}
+async function readBytes(stream: ReadableStream<Uint8Array> | null, limit: number, deadline?: number): Promise<Uint8Array> {
   if (stream === null) throw fail("read body");
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
   try {
+    beforeDeadline(deadline);
+    if (deadline !== undefined) timer = setTimeout(() => { expired = true; void reader.cancel().catch(() => undefined); }, deadline - Date.now());
     for (;;) {
       const next = await reader.read();
+      if (expired) throw fail("read deadline");
+      beforeDeadline(deadline);
       if (next.done) return concat(chunks);
       total += next.value.length;
       if (total > limit) throw large("read bytes");
@@ -58,20 +82,22 @@ async function readBytes(stream: ReadableStream<Uint8Array> | null, limit: numbe
     await reader.cancel().catch(() => undefined);
     if (e instanceof GitRefusal) throw e;
     throw fail("read body");
-  } finally { reader.releaseLock(); }
+  } finally { if (timer !== undefined) clearTimeout(timer); reader.releaseLock(); }
 }
 
 /** DEFLATE framing only; the Web decompressor validates/inflates the slice. */
 class Bits {
   position: number;
-  constructor(readonly data: Uint8Array, at: number) { this.position = at * 8; }
+  constructor(readonly data: Uint8Array, at: number, readonly deadline?: number) { this.position = at * 8; }
   take(n: number): number {
+    beforeDeadline(this.deadline);
     if (this.position + n > this.data.length * 8) throw fail("deflate framing");
     let out = 0;
     for (let i = 0; i < n; i++, this.position++) out |= ((this.data[Math.floor(this.position / 8)]! >>> (this.position % 8)) & 1) << i;
     return out;
   }
   skip(n: number): void {
+    beforeDeadline(this.deadline);
     if (this.position + n > this.data.length * 8) throw fail("deflate framing");
     this.position += n;
   }
@@ -113,11 +139,11 @@ const CODE_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1
 const FIXED = huffman(Array.from({ length: 288 }, (_, s) => s < 144 ? 8 : s < 256 ? 9 : s < 280 ? 7 : 8));
 const FIXED_DIST = huffman(new Array<number>(32).fill(5));
 
-function zlibEnd(data: Uint8Array, start: number, expected: number): number {
+function zlibEnd(data: Uint8Array, start: number, expected: number, deadline?: number): number {
   const cmf = data[start];
   const flg = data[start + 1];
   if (cmf === undefined || flg === undefined || (cmf & 15) !== 8 || (cmf >>> 4) > 7 || ((cmf * 256 + flg) % 31) !== 0 || (flg & 32) !== 0) throw fail("zlib header");
-  const bits = new Bits(data, start + 2);
+  const bits = new Bits(data, start + 2, deadline);
   let output = 0;
   let final = false;
   while (!final) {
@@ -239,6 +265,7 @@ interface Entry { offset: number; raw: Uint8Array; object?: DecodedObject; depen
  */
 export async function decodePack(input: Uint8Array, options: PackReadOptions): Promise<DecodedObject[]> {
   const { bounds, maxBytes } = checked(options);
+  beforeDeadline(options.deadline);
   if (input.length > maxBytes) throw large("pack bytes");
   const pack = new Uint8Array(input);
   if (pack.length < 32 || ascii(pack.subarray(0, 4)) !== "PACK") throw fail("pack header");
@@ -247,6 +274,7 @@ export async function decodePack(input: Uint8Array, options: PackReadOptions): P
   const count = header.getUint32(8);
   if (version !== 2 && version !== 3) throw fail("pack version");
   if (count > bounds.closureObjects) throw large("pack objects");
+  if (options.singleObjectBytes !== undefined && (!Number.isSafeInteger(options.singleObjectBytes) || options.singleObjectBytes < 0 || count !== 1)) throw large("isolated pack objects");
   const cursor = new Cursor(pack, 12);
   const offsets = new Map<number, Entry>();
   const waiting = new Map<string, Entry[]>();
@@ -261,6 +289,10 @@ export async function decodePack(input: Uint8Array, options: PackReadOptions): P
     const type = types[kind];
     if (type === undefined && kind !== 6 && kind !== 7) throw new GitRefusal("wrong-type", "pack entry");
     const size = first < 128 ? first & 15 : cursor.variable(first & 15, 16);
+    if (options.singleObjectBytes !== undefined) {
+      if (type === undefined || type === "tag") throw new GitRefusal("wrong-type", "isolated pack entry");
+      if (size > options.singleObjectBytes) throw large("isolated object allowance");
+    }
     if (size > (type === undefined ? maxBytes : typeLimit(type, bounds)) || inflated + size > maxBytes) throw large("inflated bytes");
     let baseOffset: number | undefined;
     let baseId: string | undefined;
@@ -279,8 +311,8 @@ export async function decodePack(input: Uint8Array, options: PackReadOptions): P
       baseId = objectId(hex(pack.subarray(cursor.at, cursor.at + 20)), "delta base");
       cursor.at += 20;
     }
-    const end = zlibEnd(pack, cursor.at, size);
-    const raw = await readBytes(new Blob([pack.slice(cursor.at, end)]).stream().pipeThrough(new DecompressionStream("deflate")), size);
+    const end = zlibEnd(pack, cursor.at, size, options.deadline);
+    const raw = await readBytes(new Blob([pack.slice(cursor.at, end)]).stream().pipeThrough(new DecompressionStream("deflate")), size, options.deadline);
     if (raw.length !== size) throw new GitRefusal("wrong-size", "pack entry");
     cursor.at = end;
     inflated += size;
@@ -351,18 +383,50 @@ export class SmartHttpSource implements GitSource {
   readonly #timeoutMs: number;
   readonly #objects = new Map<string, DecodedObject>();
   #retainedBytes = 0;
-  constructor(options: SmartHttpOptions) {
+  readonly #isolation: IsolatedObjectReads | undefined;
+  #busy = false;
+  #issuedBytes = 0;
+  #deadline: number | null = null;
+  constructor(options: SmartHttpReadOptions) {
     this.#remote = remoteUrl(options.remote, options.transport ?? "https").replace(/\/$/, "");
     if (!this.#remote.startsWith("https://") && !this.#remote.startsWith("http://")) throw new GitRefusal("bad-remote", "HTTP read remote");
     this.#authorization = options.authorization;
     this.#fetch = options.fetch ?? ((request) => fetch(request));
     this.#options = checked(options);
+    this.#isolation = options.isolateObjects === undefined ? undefined : { ...options.isolateObjects };
+    const working = ISOLATED_WORKING_MULTIPLE * this.#options.maxBytes;
+    if (this.#isolation && (!Number.isSafeInteger(working) || !Number.isSafeInteger(this.#isolation.ownedBytes) || this.#isolation.ownedBytes < working)) throw large("isolated payload allowance");
     this.#timeoutMs = options.timeoutMs ?? COMMAND_MS;
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs <= 0) throw large("read deadline");
   }
+  #timely(): void {
+    if (this.#deadline !== null && Date.now() >= this.#deadline) throw fail("isolated read deadline");
+  }
+  #output(bytes: number): void {
+    if (!this.#isolation) return;
+    if (bytes > this.#isolation.ownedBytes - this.#retainedBytes - this.#issuedBytes) throw large("isolated returned payload");
+    // Conservatively charge every caller-owned result for this source's lifetime:
+    // no guess that a caller released its previous copy.
+    this.#issuedBytes += bytes;
+  }
+  async #isolated<T>(read: () => Promise<T>): Promise<T> {
+    if (!this.#isolation) return read();
+    if (this.#busy) throw large("concurrent isolated read");
+    if (ISOLATED_WORKING_MULTIPLE * this.#options.maxBytes > this.#isolation.ownedBytes - this.#retainedBytes - this.#issuedBytes) throw large("isolated working payload");
+    const deadline = Date.now() + this.#timeoutMs;
+    if (!Number.isSafeInteger(deadline)) throw large("isolated read deadline");
+    this.#busy = true;
+    this.#deadline = deadline;
+    try { const result = await read(); this.#timely(); return result; }
+    finally { this.#busy = false; this.#deadline = null; }
+  }
   async #request(path: string, media: string, body?: Uint8Array): Promise<Uint8Array> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
+    this.#timely();
+    if (body !== undefined && body.length > this.#options.maxBytes) throw large("upload request");
+    const duration = this.#deadline === null ? this.#timeoutMs : Math.min(this.#timeoutMs, this.#deadline - Date.now());
+    if (duration <= 0) throw fail("isolated read deadline");
+    const timer = setTimeout(() => controller.abort(), duration);
     try {
       const url = `${this.#remote}/${path}`;
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
@@ -374,7 +438,9 @@ export class SmartHttpSource implements GitSource {
         await response.body?.cancel().catch(() => undefined);
         throw fail("HTTP read response");
       }
-      return await readBytes(response.body, this.#options.maxBytes);
+      const result = await readBytes(response.body, this.#options.maxBytes, this.#deadline ?? undefined);
+      this.#timely();
+      return result;
     } catch (e) {
       if (e instanceof GitRefusal) throw e;
       throw fail("HTTP read request");
@@ -383,13 +449,18 @@ export class SmartHttpSource implements GitSource {
   async #advertisement(): Promise<Advertisement> {
     const data = await this.#request("info/refs?service=git-upload-pack", "application/x-git-upload-pack-advertisement");
     const lines: (string | null)[] = [];
-    for (let at = 0; at < data.length;) { const p = readPacket(data, at); lines.push(p.line); at = p.next; }
+    for (let at = 0; at < data.length;) {
+      if (this.#isolation && lines.length >= this.#options.bounds.refs + 3) throw large("upload advertisement packets");
+      this.#timely();
+      const p = readPacket(data, at); lines.push(p.line); at = p.next;
+    }
     if (lines[0] !== "# service=git-upload-pack" || lines[1] !== null || lines.at(-1) !== null || lines.length < 3) throw fail("upload advertisement");
     const refs: RefTarget[] = [];
     const ids = new Set<string>();
     const names = new Set<string>();
     const capabilities: string[] = [];
     for (let i = 2; i < lines.length - 1; i++) {
+      this.#timely();
       const line = lines[i];
       if (line === null || line === undefined) throw fail("upload advertisement");
       const nul = line.indexOf("\0");
@@ -416,19 +487,41 @@ export class SmartHttpSource implements GitSource {
     refs.sort((a, b) => a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0);
     return { refs, ids, capabilities };
   }
-  async object(id: ObjectId, limit: number): Promise<StoredObject> {
+  object(id: ObjectId, limit: number): Promise<StoredObject> {
+    return this.#isolated(() => this.#object(id, limit));
+  }
+  async #object(id: ObjectId, limit: number): Promise<StoredObject> {
     objectId(id, "read object");
     if (!Number.isSafeInteger(limit) || limit < 0) throw large("object allowance");
     if (!this.#objects.has(id)) {
       const ad = await this.#advertisement();
-      if (!ad.ids.has(id) && !ad.capabilities.some((c) => c === "allow-tip-sha1-in-want" || c === "allow-reachable-sha1-in-want")) throw fail("unadvertised want");
-      const selected = ad.capabilities.includes("ofs-delta") ? " ofs-delta" : "";
-      const body = concat([packet(`want ${id}${selected}\n`), utf8.encode("0000"), packet("done\n")]);
+      if (this.#isolation && (!ad.capabilities.includes("shallow") || !ad.capabilities.includes("filter"))) throw fail("isolated object capabilities");
+      // allow-tip alone does not authorize an arbitrary non-tip tree/blob.
+      const allowed = this.#isolation ? ad.capabilities.includes("allow-reachable-sha1-in-want")
+        : ad.capabilities.some(c => c === "allow-tip-sha1-in-want" || c === "allow-reachable-sha1-in-want");
+      if (!ad.ids.has(id) && !allowed) throw fail("unadvertised want");
+      const selected = this.#isolation ? " shallow filter" : ad.capabilities.includes("ofs-delta") ? " ofs-delta" : "";
+      const body = concat([packet(`want ${id}${selected}\n`), ...(this.#isolation ? [packet("deepen 1\n"), packet("filter tree:0\n")] : []), utf8.encode("0000"), packet("done\n")]);
       if (body.length > this.#options.maxBytes) throw large("upload request");
       const answer = await this.#request("git-upload-pack", "application/x-git-upload-pack-result", body);
-      const nak = readPacket(answer, 0);
+      let offset = 0, boundary: string | null = null;
+      if (this.#isolation) {
+        for (let count = 0; ; count++) {
+          if (count > 1) throw fail("isolated shallow packets");
+          const line = readPacket(answer, offset); offset = line.next;
+          if (line.line === null) break;
+          const match = /^shallow ([0-9a-f]{40})$/.exec(line.line);
+          if (!match || boundary !== null || objectId(match[1], "shallow object") !== id) throw fail("isolated shallow boundary");
+          boundary = match[1]!;
+        }
+      }
+      const nak = readPacket(answer, offset);
       if (nak.line !== "NAK") throw fail("upload negotiation");
-      const objects = await decodePack(answer.subarray(nak.next), { ...this.#options, flushAfter: true });
+      const objects = await decodePack(answer.subarray(nak.next), { ...this.#options, flushAfter: true,
+        ...(this.#isolation ? { bounds: { ...this.#options.bounds, closureObjects: 1 }, singleObjectBytes: Math.min(limit, this.#options.maxBytes), deadline: this.#deadline! } : {}),
+      });
+      this.#timely();
+      if (boundary !== null && objects[0]?.type !== "commit") throw fail("isolated shallow object");
       if (!objects.some((o) => o.id === id)) throw fail("wanted object omitted");
       const additions = objects.filter((o) => !this.#objects.has(o.id));
       const bytes = additions.reduce((n, o) => n + o.data.length, 0);
@@ -437,16 +530,25 @@ export class SmartHttpSource implements GitSource {
       this.#retainedBytes += bytes;
     }
     const object = this.#objects.get(id)!;
+    if (object.data.length <= limit) this.#output(object.data.length);
     return { type: object.type, size: object.data.length, data: object.data.length > limit ? null : new Uint8Array(object.data) };
   }
-  async ref(name: string): Promise<string | null> {
-    refName(name, "read ref");
-    return (await this.#advertisement()).refs.find((r) => r.ref === name)?.target ?? null;
+  ref(name: string): Promise<string | null> {
+    return this.#isolated(async () => {
+      refName(name, "read ref");
+      const target = (await this.#advertisement()).refs.find(r => r.ref === name)?.target ?? null;
+      this.#output(target === null ? 0 : target.length * 2);
+      return target;
+    });
   }
-  async refs(prefix: string, limit: number): Promise<readonly RefTarget[]> {
-    if (!prefix.endsWith("/")) throw new GitRefusal("bad-ref-name", "read prefix");
-    refName(`${prefix}x`, "read prefix");
-    if (!Number.isSafeInteger(limit) || limit < 0) throw large("ref allowance");
-    return (await this.#advertisement()).refs.filter((r) => r.ref.startsWith(prefix)).slice(0, limit + 1);
+  refs(prefix: string, limit: number): Promise<readonly RefTarget[]> {
+    return this.#isolated(async () => {
+      if (!prefix.endsWith("/")) throw new GitRefusal("bad-ref-name", "read prefix");
+      refName(`${prefix}x`, "read prefix");
+      if (!Number.isSafeInteger(limit) || limit < 0) throw large("ref allowance");
+      const refs = (await this.#advertisement()).refs.filter(r => r.ref.startsWith(prefix)).slice(0, limit + 1);
+      this.#output(refs.reduce((bytes, r) => bytes + 2 * (r.ref.length + r.target.length), 0));
+      return refs;
+    });
   }
 }
