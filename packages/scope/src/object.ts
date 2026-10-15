@@ -34,7 +34,7 @@ import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
-import { isEntryOf, timeMs, type Item } from "@generalbusiness/dap-derive";
+import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
 import type { Delivered, StateView } from "@generalbusiness/dap-derive";
@@ -45,6 +45,7 @@ import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
+import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
 import { READ_BOUNDS, Reads, type ReadBounds, type Summary } from "./reads.ts";
@@ -104,6 +105,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #deliveries: Deliveries;
   readonly #dispatcher: Dispatcher | null;
   readonly #operations: Operations;
+  readonly #wakes: Wakes;
   readonly #clock: Clock;
   readonly #transport: Transport | null;
   readonly #seconds: number;
@@ -139,6 +141,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const given: Ports = { ...production(), alarm, ...wiring.ports };
     // The one alarm serves the earliest deadline, the next attempt of an outside operation and, with a transport, the next dispatch.
     const wakes = new Wakes(store, given.alarm, given.transport !== null);
+    this.#wakes = wakes;
     // The authority of a deployed scope reads this scope's own genesis entry, for the membership scope that it records.
     const genesis = (): Extract<Input, { type: "genesis" }> | null => {
       const kept = store.stored(0);
@@ -209,6 +212,13 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     this.#sessions = wiring.sessions ?? (() => null);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
+    // Only bounded control initialization happened above. No read runs a
+    // migration quantum; an activated legacy object schedules its owner.
+    const pending = store.localSigners.pending(), maintenance = store.signerMaintenance();
+    if (pending || maintenance !== null) {
+      // Preserve a durable earlier wake across repeated activation.
+      ctx.waitUntil(Promise.resolve(wakes.maintenance.set(pending ? maintenance ?? this.#maintenanceAt() : null)));
+    }
   }
 
   /**
@@ -361,13 +371,26 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   dispatch(): Promise<number> { this.#first(); return this.#dispatcher ? this.#dispatcher.run() : Promise.resolve(0); }
   /** A pass of the operations driver now, or the one in flight. Resolves when it ends, with the number of requests it sent and outcomes it offered. */
   effect(): Promise<number> { this.#fresh = false; return this.#operations.run(); }
+  #maintenanceAt() {
+    let now = Date.now();
+    try { now = Math.max(now, timeMs(this.#clock.read()) ?? now); } catch { /* scheduler retry grants no authority */ }
+    return timeOf(now + SIGNER_INDEX_BOUNDS.retryMs);
+  }
   /** The alarm: a turn with no waiting input, at the earliest deadline (section 5.2), then a dispatch pass, then a pass of the operations driver. */
   override async alarm(): Promise<void> {
     this.#fresh = false;
-    await this.#scope.alarm();
-    await this.dispatch();
-    await this.effect();
-    this.#followed();
+    try {
+      // One synchronous bounded quantum gets a turn before potentially
+      // asynchronous native owners. A backlog never drains in one alarm.
+      try { this.#store.localSigners.maintain(); }
+      catch { /* A storage retry must not prevent the other native owners. */ }
+      try { await this.#wakes.maintenance.set(this.#store.localSigners.pending() ? this.#maintenanceAt() : null); }
+      catch { /* The final arbitration retries without hiding native work. */ }
+      await this.#scope.alarm();
+      await this.dispatch();
+      await this.effect();
+      this.#followed();
+    } finally { await this.#wakes.set(); }
   }
 
   /**
