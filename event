@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a6713a0935199590b4b9423d27513aa63536e3ed","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-item-metadata-seeks.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:a6d446720873f5c22e20614a528aca8c33f90675","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/item-candidates.test.ts."}
