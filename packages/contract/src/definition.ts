@@ -15,8 +15,16 @@
 import type { Digest, PlatformDefinition, ScopeKind } from "./scope.ts";
 import type { FieldValue } from "./intent.ts";
 
+/** One pinned durability requirement. Unsupported levels refuse whole-definition admission. */
+export interface DurabilityLevel {
+  name: "live" | "recorded" | "archived";
+  version: 1;
+}
+
 export interface DeclaredDefinition {
   format: "artroom-definition-1";
+  /** Absent means recorded. Explicit recorded has its own bytes and digest; live/archived execution is not yet supported. */
+  level?: DurabilityLevel;
   name: string;                          // what `under` compares with
   profile: { name: string; version: number };
   capabilities: readonly { name: "hold" | "git-read"; version: number }[];

@@ -1,5 +1,9 @@
+import { env } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
-import type { Entry } from "@generalbusiness/dap-contract";
+import type { Entry, Seed } from "@generalbusiness/dap-contract";
+import { canonicalize, definitionDigest, intentDigest, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { variant } from "@generalbusiness/dap-derive/testing";
 import { TRUSTS, httpSource, verify } from "@generalbusiness/artroom-replay";
 import type { Checkpointed } from "../src/index.ts";
 import { HOLD, definition } from "./support.ts";
@@ -67,4 +71,32 @@ describe("replay of histories the runtime wrote, read through the Worker's read 
     expect(linked.trusts).toEqual([TRUSTS.clock, TRUSTS.sources, TRUSTS.minted, TRUSTS.held, TRUSTS.delivered, TRUSTS.authority, TRUSTS.bounds]);
     expect([linked.dependencies.verified, linked.dependencies.anchored, linked.anchors]).toEqual([7, 0, []]);
   });
+});
+
+// Invariant: an explicit Recorded pin is retained and replayed unchanged;
+// unsupported durability never creates a recorded history or operation.
+// NET uses the fixture authority, a stand-in, over real Durable Object SQLite.
+test("explicit recorded durability has its own native pin and replay; unsupported levels write no entries or operations", async () => {
+  const implicitBytes = canonicalize(definition.declared), implicitPin = definition.digest;
+  const explicit = variant(definition.declared, def => { def.level = { name: "recorded", version: 1 }; });
+  expect(explicit.digest).not.toBe(implicitPin);
+  const fields = { title: "A recorded lane", opener: rita.member };
+  const { signed, name } = founding(explicit, fields);
+  const L = new Node(name, explicit.declared);
+  expect(await L.stub.found(signed, explicit.declared)).toMatchObject({ answer: "accepted", receipt: { definition: explicit.digest, fact: { seq: 0 } } });
+  const retained = await source.retained(name, "definition", explicit.digest, { bytes: 1024 * 1024 });
+  expect(retained.ok && retained.input.bytes).toBe(canonicalize(explicit.declared));
+  const replayed = await verify(source, { mode: "replay", scope: name, grants: "as-recorded" });
+  expect(replayed.report).toMatchObject({ result: "consistent", target: { seq: 0 }, coverage: [{ scope: await L.at(), from: 0, through: 0 }] });
+  expect([canonicalize(definition.declared), definitionDigest(definition.declared), Object.hasOwn(definition.declared, "level")]).toEqual([implicitBytes, implicitPin, false]);
+
+  for (const level of ["live", "archived"] as const) {
+    const declared = { ...explicit.declared, level: { name: level, version: 1 as const } };
+    const seed: Seed = { v: 1, kind: "directory", definition: definitionDigest(declared), creator: null, cause: intentDigest(signed.intent), ordinal: 0 };
+    const rejected = new Node(scopeIdOf(seed), declared);
+    expect(await rejected.stub.found(signed, declared)).toEqual({ answer: "refused", reason: "unsupported-definition" });
+    expect(await rejected.stub.summary("a test reader")).toEqual({ ok: false, reason: "not-found" });
+    const counts = await runInDurableObject(env.NET.get(env.NET.idFromName(rejected.name)), (_instance, state) => state.storage.sql.exec("SELECT (SELECT COUNT(*) FROM entry) AS entries, (SELECT COUNT(*) FROM operation) AS operations").toArray());
+    expect(counts).toEqual([{ entries: 0, operations: 0 }]);
+  }
 });

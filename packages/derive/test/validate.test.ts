@@ -24,6 +24,14 @@ const pausing = (change: Change): Change => (d) => {
 const rows: readonly (readonly [string, DeclaredDefinition, Change, ProblemCode | null])[] = [
   ["the lane passes", lane, () => {}, null],
   ["the small definition passes", small, () => {}, null],
+  // A0a invariant: only absent or exact recorded@1 levels can reach recorded execution.
+  ["explicit recorded durability passes", small, (d) => { d.level = { name: "recorded", version: 1 }; }, null],
+  ["live durability cannot use recorded execution", small, (d) => { d.level = { name: "live", version: 1 }; }, "unsupported-definition"],
+  ["archived durability cannot use recorded execution", small, (d) => { d.level = { name: "archived", version: 1 }; }, "unsupported-definition"],
+  ["an unknown durability version", small, (d) => { d.level = { name: "recorded", version: 2 }; }, "unsupported-definition"],
+  ["an unknown durability name", small, (d) => { d.level = { name: "eventual", version: 1 }; }, "unsupported-definition"],
+  ["extra durability settings are not ignored", small, (d) => { d.level = { name: "recorded", version: 1, archive: true }; }, "shape"],
+  ["a durability level missing its version", small, (d) => { d.level = { name: "recorded" }; }, "shape"],
   ["the desk passes", desk, () => {}, null],
   ["the ticket passes, with a rule guard that names a rule it declares", ticket, () => {}, null],
   ["a rule guard that names no declared rule", ticket, (d) => { d.rules = {}; }, "rule"],
