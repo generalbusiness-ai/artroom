@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/proof-bytes.test.ts","body":{"commit":"c271745abe790332fee073467c05b58b9c5d1b22","path":"packages/scope/test/proof-bytes.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:02916ca65809a2123d1c4392f4b75940bb0bfc12","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/signed-reads.ts."}
