@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/git/test/journal-path.test.ts","body":{"commit":"74384558f2b9373260406f2aaefafdd6fb57a32f","path":"packages/git/test/journal-path.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0a925eb3a31b311da6f858b23f33c87084ff7bf4","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-archive-path-grammar.md."}
