@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-isolated-git-object-reads.md","body":{"commit":"b686384a813b7ed607ec88ee263cc4fb27157998","path":"notes/2026-10-15-isolated-git-object-reads.md"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/git/src/http-read.ts","body":{"commit":"b686384a813b7ed607ec88ee263cc4fb27157998","path":"packages/git/src/http-read.ts"}}
