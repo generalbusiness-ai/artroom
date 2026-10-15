@@ -19,12 +19,13 @@
  */
 
 import type { Digest, Entry, FactRef, ObservationRequest, ObservedScope, RoutingRefusal, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, isDigest, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isDigest, isFactRef, isKeyId, isMemberId, isPlatformDefinition, isScopeId, parseStrict, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, isObject, isScopeRef, type Delivered, type Fetched, type ScopeState } from "@generalbusiness/dap-derive";
 import { isOf, platform, sourceName } from "@generalbusiness/dap-platform";
 import type { Membership } from "./authority.ts";
 import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
+import { PROOF_BYTE_BOUNDS, type ProofBody, type ProofSource } from "./proof-bytes.ts";
 import type { Store } from "./store.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
@@ -34,6 +35,8 @@ export interface Sourced { at: ScopeRef; under: string; bytes: string | null; or
 export interface Peer {
   deliver(envelope: Delivered): Promise<Delivery>;
   source(seq: number, origin?: boolean): Promise<Sourced | null>;
+  /** Optional: unsupported native senders never fall back to source(). */
+  proofSource?(fact: FactRef, maxBytes: number): Promise<ProofBody | null>;
   declared(digest: Digest): Promise<string | null>;
   text(seq: number, digest: Digest): Promise<string | null>;
   observe(asked: ObservationRequest): Promise<unknown>;
@@ -202,9 +205,18 @@ export function observedAt(store: Store, pinned: Pinned | null, asked: unknown):
  * namespace binding. A call that fails is no answer: the entry cannot be
  * read now, or the attempt is unanswered.
  */
-export function namespace(binding: Binding): { resolver: Resolver; transport: Transport; definitions: Definitions; texts: SentTexts } {
+export function namespace(binding: Binding): { resolver: Resolver; proofs: ProofSource; transport: Transport; definitions: Definitions; texts: SentTexts } {
   const peer = (name: ScopeId): Peer => binding.get(binding.idFromName(name)) as Peer;
   return {
+    proofs: {
+      async read(fact, maxBytes) {
+        if (!isFactRef(fact) || !Number.isSafeInteger(maxBytes) || maxBytes <= 0) return null;
+        try {
+          const source = peer(fact.at.scope);
+          return typeof source.proofSource === "function" ? await source.proofSource(fact, Math.min(maxBytes, PROOF_BYTE_BOUNDS.body)) : null;
+        } catch { return null; }
+      },
+    },
     resolver: {
       async read(fact, _seconds, origin = false) {
         let answer: Sourced | null;

@@ -45,6 +45,8 @@ import { JoinLimits, isJoin, type LimitConfig } from "./limits.ts";
 import { Operations, type Outside } from "./operations.ts";
 import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operator.ts";
 import { Dispatcher, Wakes } from "./outbox.ts";
+import { GenesisProofs } from "./genesis-proof.ts";
+import { ProofBytes } from "./proof-bytes.ts";
 import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
@@ -100,6 +102,8 @@ export interface Wiring {
 export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #name: ScopeId | null;
   readonly #store: SqliteStore;
+  readonly #proofBytes: ProofBytes;
+  readonly #genesisProofs: GenesisProofs;
   readonly #scope: Scope;
   readonly #reads: Reads;
   readonly #deliveries: Deliveries;
@@ -177,6 +181,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const record = new OperatorRecord({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, ports.clock, () => store.scope()?.at ?? null);
     this.#name = isScopeId(name) ? name : null;
     this.#store = store;
+    this.#proofBytes = new ProofBytes({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
+    this.#genesisProofs = new GenesisProofs(this.#proofBytes, ports.proofs ?? null);
     this.#scope = new Scope(this.#name, store, ports, bounds);
     // A signed read is judged on this scope's clock, within the authority window of an intent (`signed-reads.ts`).
     // An entry that an entry of a cause chain names: one of this scope's own, one it retains, or one read from its own scope.
@@ -329,6 +335,12 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     }
     return sourced(this.#store, pinned, seq, origin, proof);
   }
+  /** Native query preparation only. The caller supplies fresh validated request checks; no HTTP route invokes this. */
+  protected genesisEligibility(request: () => { key: import("@generalbusiness/dap-contract").KeyId; since: number } | null) {
+    return this.#genesisProofs.eligible(request);
+  }
+  /** Exact internal causal-proof bytes. Read-only: deliberately bypasses #first/sourceOrigin. */
+  proofSource(fact: unknown, maxBytes: number) { return this.#proofBytes.exact(fact, maxBytes); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
   demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }
