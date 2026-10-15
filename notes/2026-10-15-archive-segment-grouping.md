@@ -48,8 +48,8 @@ passed typechecks, whitespace, 1,255 Vitest cases (three skipped), 13 Node
 checks and 55 Counter checks. It had started before the checker's reminder
 exposed the builder's mistaken trailing-LF framing. The corrected successor
 changes segment encoding, byte accounting, the boundary cases and this note;
-four focused cases, Git source/test typechecks and the three controls passed
-with the restored source. The full suite was not repeated, and that original
+four focused cases and Git source/test typechecks passed, and all three
+controls distinguished their faults. The full suite was not repeated, and that original
 gate is not a whole-successor result. Exact evidence pins are filed separately.
 
 This module has no public package export and no runtime caller. It reads
