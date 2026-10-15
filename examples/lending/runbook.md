@@ -44,8 +44,10 @@ seat. The operator key signs installation and setup, and is kept separately
 from each browser's nonextractable device key.
 
 Keep the operator key and each original request in a separate, owner-only
-`ARTROOM_HOME` outside the checkout. Do not expose invitation links, private
-keys, session headers, or pending envelopes in public evidence.
+`DAP_HOME` outside the checkout. Existing `ARTROOM_HOME` settings remain
+accepted, but the two variables must name the same directory when both are
+set. Do not expose invitation links, private keys, session headers, or
+pending envelopes in public evidence.
 
 ```sh
 node packages/cli/bin/dap.js install --plan "https://dap-library-publication-final-1014.inguz.workers.dev" --cohort application-publication --host artifacts --namespace "dap-library-publication-final-1014"
@@ -98,9 +100,9 @@ The current canonical input is 4,458 bytes, not the 4,459-byte authoring file.
 
 ```sh
 umask 077
-node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set name=lending --value "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set 'values={}' --set execution=recorded-do --value "$ARTROOM_HOME/lending.json"
+node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$DAP_HOME/lending.json"
+node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set name=lending --value "$DAP_HOME/lending.json"
+node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set 'values={}' --set execution=recorded-do --value "$DAP_HOME/lending.json"
 ```
 
 Keep the exact signed establishment request before submission. Reconcile
