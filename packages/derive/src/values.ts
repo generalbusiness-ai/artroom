@@ -1,7 +1,7 @@
 /** Values of the field types of section 6.2, as they appear in an intent, a slot and an effect. */
 
 import type { Bounds, FieldType, MemberRef } from "@generalbusiness/dap-contract";
-import { SCOPE_KINDS, canonicalize, isDigest, isFactRef, isLocalId, isMemberRef, isRecord, isScopeRef, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
+import { SCOPE_KINDS, byteOrder, canonicalize, isDigest, isFactRef, isLocalId, isMemberRef, isRecord, isScopeRef, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { timeMs } from "./time.ts";
 
 /** The scope kinds, from the bytes package, which holds the one guard of each identifier. */
@@ -80,9 +80,4 @@ export function same(a: unknown, b: unknown): boolean {
 }
 
 /** Byte order of two strings: by their UTF-8 bytes (section 5.2). */
-export function byteOrder(a: string, b: string): number {
-  const x = utf8(a);
-  const y = utf8(b);
-  for (let i = 0; i < x.length && i < y.length; i++) if (x[i] !== y[i]) return x[i]! - y[i]!;
-  return x.length - y.length;
-}
+export { byteOrder };

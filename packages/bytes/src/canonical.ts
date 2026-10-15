@@ -29,6 +29,14 @@ export function utf8(text: string): Uint8Array {
   return encoder.encode(text);
 }
 
+/** Byte order of two strings: by their UTF-8 bytes (section 5.2). */
+export function byteOrder(a: string, b: string): number {
+  const x = utf8(a);
+  const y = utf8(b);
+  for (let i = 0; i < x.length && i < y.length; i++) if (x[i] !== y[i]) return x[i]! - y[i]!;
+  return x.length - y.length;
+}
+
 /** True when the string has no lone surrogate. RFC 8785 section 3.2.2.2 makes one an error. */
 export function wellFormed(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
