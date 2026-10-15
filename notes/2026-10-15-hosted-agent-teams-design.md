@@ -1,8 +1,9 @@
 # Hosted agent teams for dap applications
 
-15 October 2026. Discussion draft. Not independently reviewed.
+15 October 2026. Discussion draft, revision 2. Not independently reviewed.
 
 Draft request `4b236bb2`, planner promise `4852347a`.
+Counter-first revision: request `2b90849c`, promise `65a39bbf`.
 Preceding investigation: `cf79fef5`, reported in `65267d24`.
 Source baseline: main `3f1c9b2fae26b46d62d66dc53f6366fff7f18b93`.
 
@@ -11,6 +12,12 @@ small choice: how many agents, in which roles, attached to which dap app.
 Each role selects a model and a system prompt. Room agents need individual
 forks that they can initialize and dispose of without manual infrastructure
 work. Hugh selected automatic pickup of eligible work within role and budget.
+
+The initial version uses **Workers AI only**, through the trusted host's AI
+binding. External inference providers, API-key setup, and AI Gateway are
+outside this version. The first demo is a repository-free Counter. The
+second is a Room with automatic individual forks and merge-back into the
+room's main repository destination.
 
 This note records that direction, a proposed design, the existing platform
 basis, and the contracts still needed. It commissions no implementation,
@@ -27,10 +34,10 @@ The proposed **Add agents** form contains these choices:
 
 | Choice | Example | Default behaviour |
 |---|---|---|
-| App | This room | Use the current app, with its identity visible |
-| Roles and counts | One planner, three builders, one reviewer | Choose reusable role presets and desired counts |
-| Role configuration | Model and system prompt | Reuse a saved role revision; editing creates another revision |
-| Budget | Team allowance and per-agent limits | Show the applicable allowance before starting |
+| App | This Counter | Use the current app, with its identity visible |
+| Roles and counts | One or two roles, each with a quantity | Choose role presets and desired counts within app capacity |
+| Role configuration | Workers AI model and system prompt | Choose from the app's allowed models; editing creates another revision |
+| Budget | Total allowance for each role | Constrain allocations by the app-wide budget and show the remaining balance |
 
 **Attach team** creates the missing agents, enrolls them under authorized
 control, and makes them available for eligible work. Agents sleep when
@@ -51,6 +58,65 @@ discard of saved work is a separate, explicit choice under retention rules.
 For a room, each agent reaches issues, commitments, changes, and evidence
 through their canonical records. For a library, counter, or unfamiliar
 application, agents use that app's declared operations. Git is optional.
+
+### Demo 1: configure agents in a Counter
+
+The installer or administrator first sets the Counter's allowed Workers AI
+models and total inference budget. Those are app settings with an explicit
+authority and revision. They are not arbitrary preferences supplied by an
+agent or a user's setup form.
+
+A user opens **Agents** in that Counter and configures one role, with an
+optional second role. Each role has a quantity, an allowed model, a system
+prompt, and a total role budget. Label the budget as covering all agents
+in that role, so increasing quantity does not multiply the allowance.
+The user sees how those allocations fit within the Counter's remaining
+budget before selecting **Attach team**.
+
+The app exposes these proposed settings and effective constraints:
+
+| Setting | Authority and enforcement |
+|---|---|
+| Allowed model IDs | Installer or administrator selects exact Workers AI IDs from a host-supported, compatible catalog |
+| Total inference budget and accounting unit | Installer or administrator sets one shared ceiling for this app instance, across all roles, agents, users, and teams |
+| Role quantity | User chooses within app participant capacity and deployment limits |
+| Role model and system prompt | User configures behaviour; the model must remain allowed and compatible |
+| Total role budget | User allocates a bounded part of the app allowance, shared by that role's agents |
+
+Who may configure agents is itself an app permission. Permission to run the
+Counter or configure a role does not grant permission to raise its ceiling
+or add an allowed model. One person may hold both administrative and user
+permissions, but the operations retain their different authority.
+
+The trusted host intersects the app's allowlist with its supported Workers
+AI catalog. It checks the effective policy at setup and before every new
+inference call. An empty intersection leaves the setup unavailable, with
+no external fallback. Changing a prompt, bypassing the form, or calling a
+runtime route directly cannot bypass these checks.
+
+The hosted agents join the Counter as distinct participants and take
+eligible turns through its admitted acts. The model receives actual app
+context and uses the agent's permitted tools. A scripted counting loop
+without real Workers AI calls does not establish the hosted-agent demo.
+Race losers reread the board instead of inventing a successful turn.
+
+This demo provisions no repository, Git fork, checkout, or Linux container.
+The app's identity, membership, configuration, and work records remain
+native dap state. A current installation path that happens to create a
+repository is a platform gap, not a Counter requirement or a reason to
+create an empty repository for the agents.
+
+The [current Counter](../examples/counting/README.md) uses a commitment to
+say a number and a later report of completion. Its browser owns speech
+completion separately from model output. The demo design must either supply
+a genuine supported output adapter or use an explicitly reviewed headless
+Counter definition. A generated number alone must not be reported as
+completed speech. This choice does not introduce a repository requirement.
+
+The current commitments definition permits at most 16 non-removed
+participants, including humans. Validate configured quantities against the
+selected definition and current population. Two role rows do not imply
+unlimited agents or grant permission to change the Counter's native rules.
 
 ## 2. Separate the identities without making users manage them
 
@@ -88,10 +154,11 @@ role revision also declares its name, purpose, compatible tool needs,
 workspace requirement, and defaults for execution limits. The setup form
 can keep those defaults behind an inspectable role summary.
 
-Record the provider and model identifier, supported settings, exact prompt
+Record Workers AI as the fixed inference target, the exact model ID,
+supported settings, exact prompt
 bytes or a retrievable content identity, revision author, and provenance.
 Resolve settings at assignment start and retain the effective revision.
-Do not put provider credentials in prompts or public configuration records.
+No external provider credential is part of initial role configuration.
 
 Changing a role creates a new revision. By default, new assignments use
 the selected new revision and active assignments retain their current one.
@@ -116,9 +183,10 @@ or change host-enforced limits. The host owns credential use and dispatch.
 An app package does not acquire the agent's signing power through a prompt,
 presentation component, or executable plugin.
 
-Unavailable models leave visible pending or failed work. Fallback requires
-an explicitly configured policy, with the actual model recorded. A fallback
-must not silently change the selected role, cost ceiling, or tool authority.
+Unavailable or newly disallowed models leave visible pending work. The
+initial version has no automatic model substitution. An authorized user can
+select another currently allowed Workers AI model through a new role
+revision. That change does not raise the app budget or alter tool authority.
 
 ## 4. Provision desired counts and recover partial setup
 
@@ -160,8 +228,10 @@ and budget. A role prompt alone cannot define a reliable work queue.
 An app must expose enough information to answer four questions: what work
 is available, who may undertake it, how it is claimed, and what counts as a
 result. Use the app's existing claim or commitment where possible. If an
-app has no corresponding operation, its adapter needs a reviewed claim
-contract before it supports automatic pickup.
+app has no corresponding operation, its adapter needs a reviewed admission
+contract before it supports automatic pickup. A Counter's native turn or
+promise is sufficient ownership for that unit of work. Do not require a
+repository issue, a room hold, or another generic claim to count.
 
 The initial dispatch sequence is:
 
@@ -229,41 +299,76 @@ behaviour. Do not invent operator impersonation or automatic owner transfer.
 Preserve existing session-expiry semantics rather than promising a stronger
 revocation guarantee without the necessary protocol change.
 
-### Shared allowances require admission before a call
+### The app ceiling governs all role and agent allowances
 
 Set finite limits for active agents, concurrent assignments, model calls,
 input and output tokens, execution time, workspace resources, and cumulative
 spending. The team view shows used, reserved, and remaining allowance, plus
 usage whose provider outcome is unresolved.
 
-All concurrent agents reserve from the same authoritative team allowance.
-Per-agent limits cannot each spend the full team balance. Retries, model
-fallback, container work, and pending cleanup count under declared policies.
+All concurrent agents reserve against one authoritative app-wide allowance,
+with nested role and optional per-agent limits. User and team boundaries
+cannot each spend the full app balance. Allocations, spent usage, unresolved
+reservations, and releases must be reconciled without allocating the same
+remaining balance twice. Retries each need their own admitted reservation.
+For the initial allocation model, each role budget includes that role's
+spent usage and pending reservations. Total role allocations across the
+app cannot exceed the app ceiling. Before a call, spent usage plus pending
+reservations plus the new reservation must fit both the role allocation
+and the app ceiling. Do not add spent usage to an allocation again when
+displaying the app's allocated total.
 Bound retries and queue them with backoff. Idle agents do not call a model
 merely to decide whether to remain idle.
 
-A strict currency ceiling requires a defensible upper charge bound before
-dispatch, including outstanding calls and price-version assumptions. If a
-provider cannot supply that basis, label currency figures as estimates and
-enforce the available token, call, time, and concurrency ceilings. Do not
-claim an exact cost cap from delayed provider usage reports.
+A budget has one explicit accounting unit and period. The initial schema
+must select that unit, such as a fixed inference-credit unit with a
+versioned conservative model-cost schedule. Workers AI's published
+[pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)
+uses model-specific rates and Neuron accounting. Its account-wide free
+allocation is not a fresh free allowance for each Counter.
 
-The app controller selects the payer and allowance. Agents cannot extend
-their own allowance. An exhausted allowance leaves work saved and visibly
-waiting. Resume needs a new authorized allowance or a later budget period
-defined by the policy.
+Reserve a defensible upper cost before dispatch from bounded input and
+output limits and the selected model's schedule. Reconcile actual usage
+where available. A lost inference reply retains an unresolved charge
+reservation. An agent cannot repeat the call for free. Until a strict
+currency bound is established, label currency displays as estimates and
+enforce the chosen credit, token, call, time, and concurrency ceilings.
+Delayed account usage reports cannot be the only enforcement mechanism.
+
+The installer or administrator sets the app ceiling. A user distributes
+allowance within that ceiling. Agents cannot extend either limit. Reducing
+the ceiling below spent or reserved usage fences new inference, preserves
+the outstanding charges, and requires an explicit administrative decision.
+Removing a model blocks new calls without erasing in-flight results or
+their costs. Revalidate policy revisions at the host dispatch boundary.
+
+Counter reset, agent restart, role replacement, detach, and reattachment do
+not reset spending. Replenishment or a new budget period is an authorized,
+recorded operation. An exhausted allowance leaves work saved and visibly
+waiting. Inference budgets are distinct from hosting or sandbox resource
+limits; the first Counter demo has no workspace cost to hide in its budget.
 
 ## 7. Coding workspaces are isolated and disposable
 
-For a room, initialize one private Cloudflare Artifacts fork and Linux
-execution workspace per active coding assignment or hold. An agent with
-several sequential assignments gets separate workspaces. Reuse requires an
-explicit handoff with a new current instance and credentials.
+For the second demo, every configured Room agent automatically receives
+access to its own private Cloudflare Artifacts fork of the room's main
+repository destination. Provision the initial fork as part of attaching
+the agent. Show the agent as preparing until its workspace is ready.
+The user does not manually create repositories or distribute tokens.
+
+Bind access to the current assignment or workspace instance and the
+agent's actual role. Create a Linux checkout for coding or command work as
+needed. Preserve workspace ownership when an initial hold is attached, so
+that a hold does not accidentally allocate a second fork. A different
+unrelated coding assignment gets a fresh workspace unless an explicit
+handoff preserves prior work with a new current instance and credentials.
 
 This is a source fork, not a copy of room membership, rules, issues, or
 changes. It is also distinct from a conversation fork and the proposed
 portable dap clone. The participants collaborate through the shared app.
-Non-coding assignments need no source fork or Linux container.
+The Counter has no source fork or Linux container. Other non-repository
+apps need neither. The Room demo's automatic per-agent forks do not make
+Git a prerequisite for the common agent runtime.
 
 The agent-facing operations are conceptually **Start workspace** and
 **Dispose workspace**. These are proposed capabilities, not current command
@@ -275,6 +380,10 @@ progress. Retrying it refers to the same resource and operation.
 Before calling a provider, record the app, assignment, agent, hold where
 applicable, current instance generation, exact base commit, intended fork
 name, and creation attempt. A mutable branch name alone is not the base.
+Resolve that base from the room's configured main destination and recorded
+head. Do not fork a cached unrelated repository or an arbitrary model URL.
+Room provisioning must define a workspace owner before the first business
+assignment, then bind the selected assignment without duplicating ownership.
 
 Create the fork, establish readiness through the actual provider contract,
 verify the selected base, and account for the fork's initial write token.
@@ -332,7 +441,45 @@ and readiness probe do not match this lifecycle or the observed API. The
 through successful access and found no status in `info`. Its small run is
 neither a provisioning SLA nor a measurement of large-fork storage cost.
 
+### Demo 2 must merge fork work into the main destination
+
+Creating a fork and showing an agent's diff is insufficient. The Room must
+consume that fork's contribution and publish an admitted integration into
+its canonical main destination. The required flow is:
+
+1. An agent edits and commits in its own fork. Its report names the exact
+   fork, commit, tree, base, and current workspace ownership.
+2. The host reads and verifies that contribution and retains the required
+   Git closure. Fork access remains distinct from canonical write authority.
+3. An authorized integration process combines selected contributions against
+   the current canonical base and constructs an exact integration commit.
+   The implementation must supply merge computation and object transfer;
+   Artifacts is not assumed to perform a server-side merge.
+4. The Room applies its review, check, reservation, and publication rules to
+   the exact selected content and integration. Evidence must match the final
+   commit and tree under the applicable rules.
+5. The trusted publication owner writes the admitted integration and verifies
+   the canonical result. A lost response remains unresolved until reconciled.
+6. Required source and evidence stay readable after workspace disposal.
+
+Main advancing after the fork was created requires explicit integration or
+conflict resolution against the newer base. It cannot justify overwriting
+main or silently reusing checks for changed content. Conflict or unavailable
+evidence leaves work waiting for the relevant person or agent.
+
+The demo's terminal witness is a verified canonical head containing the
+agent's intended change and a Room publication receipt linked to its fork
+report and qualifying evidence. A fresh authorized read of main must show
+the result. A push to the agent's fork, a local merge, or an unverified
+publication request does not satisfy that outcome.
+
 ## 8. Cloudflare execution and storage choices
+
+The initial inference path is the trusted Worker's
+[Workers AI binding](https://developers.cloudflare.com/workers-ai/configuration/bindings/),
+using the selected allowed model through `env.AI.run()`. No external API
+provider, custom inference endpoint, provider-key form, gateway route, or
+gateway-dependent budget service belongs in these two demos.
 
 The proposed separation is a trusted host for identity, control, and
 dispatch, with optional isolated execution for coding. The host must not
@@ -342,8 +489,10 @@ operations on its behalf while preserving operation custody.
 
 Current [Cloudflare harness documentation](https://developers.cloudflare.com/agents/harnesses/)
 separates the model-and-tool loop from durable runtime services. It lists
-Think, Pi in beta, and OpenCode as experimental. Compare pinned candidates
-against dap's inherited runtime contracts before choosing one. The old Pi
+Think, Pi in beta, and OpenCode as experimental. Compare only candidates
+that can use Workers AI directly and meet dap's inherited runtime contracts.
+Keep the first Counter harness small, with bounded app tools and no shell.
+The old Pi
 spike is useful evidence about a bounded harness, not production autonomy.
 
 [Durable execution](https://developers.cloudflare.com/agents/runtime/execution/durable-execution/)
@@ -369,7 +518,7 @@ release status during the implementation design.
 | Agent control, assignment ownership, cursors, and operation status | Durable Object storage | Bounded rows, indexes, history growth, and completion reserve |
 | Git source, submitted commits, and retained source closure | Artifacts, with explicit retained roots | Exact identity, read authority, verified closure, and deletion policy |
 | Large private logs, saved files, and checkpoint payloads | R2 where needed | Access control, integrity, retention, and references kept in control records |
-| Provider and app credentials | Trusted host custody | Narrow use, expiry, revocation, and no inclusion in public records |
+| Workers AI binding and app signing authority | Trusted host custody | Host-enforced model and budget policy; no authority exported to model-controlled code |
 | Running processes and temporary checkout | Sandbox container | Isolated execution, resource limits, and recoverable saved work |
 
 R2 storage is not Git reachability. Private runtime data is not automatically
@@ -377,12 +526,13 @@ part of a room journal archive or portable clone. Those features need their
 own explicit export, access, privacy, and retention decisions. Keeping data
 in a Durable Object also does not make its history unlimited.
 
-Workers AI and external model providers can fit behind the runtime's model
-port. For external providers, examine [AI Gateway stored keys](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/)
-without handing a sandbox a general gateway credential. Cloudflare's
-[gateway authentication](https://developers.cloudflare.com/ai-gateway/configuration/authentication/)
-documents broad account-level run authority. Dap must enforce the selected
-app, role, and allowance before using that authority.
+The host maintains a compatible subset of the
+[Workers AI model catalog](https://developers.cloudflare.com/workers-ai/models/).
+Catalog availability is distinct from the Counter's allowed-model setting.
+The app administrator chooses within host support; a catalog update cannot
+silently add models to an app's allowlist. Model-specific input, output,
+structured-result, and tool-use behaviour need adapter validation before
+a model becomes selectable. An arbitrary model name is not sufficient.
 
 The implementation design must name finite CPU, memory, disk, concurrency,
 model-rate, request, and storage budgets. Recheck current provider limits
@@ -409,12 +559,21 @@ current hosted deployment or a completed acceptance journey.
 |---|---|---|
 | Agent identity | [Hosted registry and agent](../packages/mcp/src/hosted.ts) allocate distinct keys, enrollment, configuration, and SQLite custody | Model loop, runtime supervision, team counts, and role revisions |
 | Hosted controls | [Worker routes](../packages/scope/src/worker.ts) serve create, bearer rotation, retirement, and MCP traffic | Public authorized roster, team reconciliation, and pause or drain controls |
-| App operations | [MCP inventory](../packages/mcp/src/inventory.ts) discovers configured repository and application scopes | Explicit generic-app enrollment and attachment authority; roots alone do not grant it |
+| App operations | [MCP inventory](../packages/mcp/src/inventory.ts) discovers configured repository and application scopes | Repository-free Counter enrollment and attachment authority; roots alone do not grant it |
+| Counter settings | [Current commitments definition](../examples/counting/commitments.ts) has a fixed controller and target, board state, participants, and promises | No allowed-model list or inference budget today; add versioned app-owned settings and trusted runtime enforcement without changing old pins |
 | Permissions | [Membership](../packages/platform/src/membership.ts) records agent controllers and permission roles | Friendly role presets must map to effective authority without changing its meaning |
 | Task opening | [Directory](../packages/platform/src/directory.ts) records `open-task` | Its source explicitly says the `platform:task@1` child is not runnable in this package |
 | Workspace records | Hold capability records instances, tokens, and retirement conditions | Fork creation and head-read outcome rules, provider wiring, and autonomous cleanup remain incomplete |
 | Artifacts provider | [Current adapter](../packages/scope/src/artifacts-host.ts) implements repository and destination operations | No production per-hold fork adapter in its exposed namespace interface |
 | Earlier runtime research | [Pi spike](../spikes/pi-durable/README.md) and browser-cloud plans | Caller-driven fake-provider evidence does not establish real autonomous execution |
+
+Existing hosted creation consumes a repository-bound agent invitation.
+Configured MCP roots do not turn it into repository-free Counter enrollment.
+The first demo therefore needs an explicit supported app identity and
+enrollment path, plus protected app settings that the runtime can validate.
+This is a required platform change, not merely a different setup screen.
+New settings require a new supported Counter definition or app version.
+Do not edit the meaning of existing immutable definition pins.
 
 Hosted MCP retirement invalidates its bearer and ends sessions. It does
 not itself revoke the membership key, delete custody, dispose a workspace,
@@ -447,20 +606,24 @@ are not new promises or a change to current builder priorities.
 
 | Step | Owner role | Output | Readiness condition |
 |---|---|---|---|
-| Reconcile the runtime basis | Planner with runtime owner; checker | Current owner map, carried contracts, source inventory, and exact unresolved boundaries | No stale engine or spike is credited as production capability |
-| Specify roles and team setup | Planner with platform and client owners; checker | Versioned role schema, exact app attachment, effective access, ensure-count operations, roster, and control semantics | Repeated and interrupted provisioning accounts for every identity without duplicate enrollment |
-| Specify automatic work | Runtime owner with app authors; checker | Bounded discovery, claims, input retention, wake and catch-up rules, reassignment, and result semantics | Two contenders cannot both own an exclusive assignment; stale and incomplete inputs remain explicit |
-| Specify budgets and custody | Runtime and platform owners; checker | Shared reservations, finite limits, private credential ports, control and settlement reserves | Concurrent dispatch, lost replies, retries, and model fallback preserve stated limits |
-| Refresh the fork design | Git and runtime owners; checker | Revised plan 029, exact-base setup, provider operations, retention, and disposal duties | The only copy of required evidence survives disposal; unknown creation and late completion remain owned |
-| Compare runtime candidates | Runtime owner; checker | Pinned, bounded scratch comparison against the same recovery and tool contract | Selection is supported by actual evidence, with beta dependencies and unproved cases named |
-| Design and commission a vertical pilot | Planner/requester with builder; checker | Separate reviewed implementation requests and a real acceptance journey | Platform dependencies, success criteria, and recovery obligations are explicit before implementation |
+| Establish Counter demo contracts | Planner with Counter and platform owners; checker | Repository-free enrollment, policy-settings authority, selected Counter definition and output semantics, one or two role rows | No repository dependency; existing immutable definitions remain unchanged; settings have an exact owner and revision |
+| Specify Counter model and budget enforcement | Runtime and Counter owners; checker | Direct Workers AI adapter, compatible catalog, app allowlist, app-wide ledger, nested role allocations, and conservative call reservations | Direct API bypass, concurrent teams, model removal, and budget reduction cannot bypass app constraints |
+| Specify Counter runtime and controls | Runtime and client owners; checker | Role revisions, desired counts, roster, native turn pickup, durable inputs, recovery, pause, and stop | Genuine Workers AI agents participate within the selected Counter rules and current capacity without duplicated identities or turns |
+| Commission and demonstrate Counter | Planner/requester with builder; checker | Separate reviewed implementation requests and a real deployed Counter journey | One-role setup and optional second-role setup work under app constraints; interruption, budget exhaustion, and browser-off recovery are demonstrated |
+| Refresh Room fork and integration contracts | Git, Room, and runtime owners; checker | Revised plan 029, automatic per-agent forks of the main destination, scoped access, cross-fork reads, merge computation, exact evidence, and cleanup | Fork creation, verified merge-back, and retained evidence are specified as one complete journey |
+| Commission and demonstrate Room | Planner/requester with builder; checker | Separate reviewed implementation requests reusing the Workers AI runtime, with real source edits and canonical publication | A contribution from an automatically provisioned agent fork reaches the verified main destination under Room rules |
 
-The pilot starts with a small mixed-role team in a room and a second,
-non-coding app. The second app proves that attachment and automatic work
-are application capabilities rather than Git-specific assumptions. Build
-the first complete ordinary journey before expanding team size or adding
+Counter is the first demo and readiness milestone. Room follows it as the
+second demo. Forks, Linux coding environments, and merge-back are not gates
+for demonstrating the repository-free Counter. Runtime and lifecycle
+contracts already planned under C1 and IA still apply, with their ownership
+reconciled before implementation. Selecting a harness is a bounded part of
+the Counter runtime design, not a cross-provider platform project.
+
+Build these two complete journeys before expanding to additional apps,
 agent-created subteams, cross-app memory, or multiple concurrent tasks per
-agent.
+agent. An unfamiliar-app fixture can test separation later, but it does
+not replace either named demo.
 
 The acceptance journey needs the following distinguishing cases:
 
@@ -478,14 +641,24 @@ The acceptance journey needs the following distinguishing cases:
   unresolved attempt and does not automatically repeat its external effects.
 - Exhaust a shared allowance with concurrent agents. Further dispatch stops
   within the stated reservation policy, while settlement and saved work remain.
-- Initialize two coding assignments from an exact base. Their forks and
-  working files stay separate; their issue and review records stay shared.
+- Reject a model outside the Counter's allowlist through both the setup
+  form and a direct runtime request. Remove a model during work and verify
+  that no new call uses it under the old policy.
+- Use two roles or teams against one Counter budget. Their combined spent,
+  reserved, and unspent allocated allowance cannot exceed the app policy. Counter
+  reset and reattachment do not grant new spending.
+- Show the Counter's complete journey with genuine Workers AI calls and
+  no created repository, Git token, fork, or coding container.
+- Attach Room agents and automatically initialize their separate forks
+  from the configured main destination. Their issue and review records
+  stay shared, and their canonical write authority remains host-held.
+- Commit a real change in an agent fork and merge it through the Room.
+  Verify the canonical result, qualifying evidence, and publication receipt.
+  Move main meanwhile and demonstrate explicit integration or conflict handling.
 - Dispose during creation, during an unknown push, and after an unmerged
   report. Cleanup stays pending where necessary, and retained evidence survives.
 - Revoke an agent or remove its controller. New affected operations stop
   under the specified session and controller policy; earlier outcomes persist.
-- Attach to an unfamiliar app with the declared work contract. No Git
-  assumption or room-only action is required. Unsupported contracts say so.
 
 Synthetic fixtures can inform the design. They do not establish deployment,
 model quality, actual provider cleanup, workspace durability, or usability.
@@ -496,21 +669,29 @@ before review. This draft contains no runtime change to test.
 ## 11. Decisions still needed before implementation
 
 The discussion direction is settled: Cloudflare hosting, role-based counts,
-model and system prompt per role, app attachment, automatic eligible pickup
-within budget, and individual coding forks with convenient lifecycle tools.
+Workers AI as the only initial inference target, model and system prompt
+per role, and automatic eligible pickup within budget. Counter comes first,
+with one or two user-configured roles constrained by app-admin allowed models
+and an app-wide total budget. Counter has no repository. Room comes second,
+with automatic individual forks and a verified merge-back to its main
+destination. External providers and gateways are deferred.
 
 The following choices remain design work:
 
-- The first runtime and model adapter, supported settings, fallback policy,
-  deployment pins, and acceptable dependency release status.
-- Exact enrollment and controller authority for standalone apps, including
-  apps whose membership arrangement differs from a room.
-- Work discovery, claim expiry, fairness, and reassignment for the first
-  generic app and for room commitments.
+- The first direct Workers AI harness, supported model subset and settings,
+  deployment pins, and acceptable dependency release status. The initial
+  version has no automatic model fallback.
+- Exact repository-free Counter enrollment, controller and settings authority,
+  selected definition, and genuine output-completion semantics.
+- Native Counter turn pickup and deadlines, and later discovery, claim expiry,
+  fairness, and reassignment for Room commitments.
 - Whether runtime and signer share an object or use a restricted internal
   port, with one custody owner and no broad bearer inside the sandbox.
-- Payer configuration, budget periods, conservative charge bounds, and
-  treatment of unresolved provider usage.
+- Budget unit and period, app-wide allocation and reservation schema,
+  conservative Workers AI charge bounds, and unresolved inference usage.
+- Initial per-agent Room workspace ownership before the first assignment,
+  attachment to holds without duplicate forks, cross-fork transfer and merge
+  computation, canonical staging, and exact review or check reuse conditions.
 - Saved-work format, checkpoint timing, private conversation access, export,
   retention duration, and preservation of never-merged contributions.
 - The authority and liveness mechanism for eventual cleanup after pause,
