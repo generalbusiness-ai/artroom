@@ -25,7 +25,7 @@ import { ScopeHandle, declaredHandle } from "@generalbusiness/artroom-client";
 import { validateDefinition, valueDigest, type ValidDefinition } from "@generalbusiness/dap-derive";
 import { keys, type Actor } from "@generalbusiness/dap-derive/testing";
 import { DESTINATION_CHANGED_SET, DIRECTORY, REGISTER, destinationReceipt, foundingObjects, repositoryName, revokedToken } from "@generalbusiness/dap-platform";
-import { targetOf } from "../../../definitions/src/destination.ts";
+import { targetOf } from "../../../../../packages/platform/src/destination.ts";
 import { SqliteStore, type Transport as NativeTransport } from "../../../../../packages/scope/src/index.ts";
 import { api } from "@generalbusiness/artroom-scope/worker";
 import { outsideOf, wired } from "../../../../../packages/scope/test/outside.ts";
