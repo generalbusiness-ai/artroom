@@ -429,8 +429,11 @@ It installs only if `package-lock.json` changed since the last install,
 typechecks every workspace, and runs every test: one vitest process for
 the repository (`vitest.config.ts` at the root, one project for each of
 `bytes`, `derive`, `platform`, `git`, `checkers`, `replay`, `client`,
-`scope`, `scope-denial`, `lanes`, `cli` and `page`), then the built-in Node
-checks in `scripts/active-source.test.mjs` and `scripts/cloudflare-pool-compat.test.mjs`.
+`scope`, `scope-denial`, `lanes`, `cli`, `page`, `mcp`, `counting`, and
+`lending`), then the built-in Node checks in `scripts/active-source.test.mjs`,
+`scripts/cloudflare-pool-compat.test.mjs`, `homepage/test/home.test.mjs`, and
+`packages/cli/test/config-dir.test.mjs`. The existing Counting browser check
+in `examples/counting/scripts/test-browser.mjs` follows those Node checks.
 The compatibility witness uses the guarded actual pool factory and private-copy
 workflow; its plain Node base class is not native authority evidence. The active-source script checks that no
 active file imports from `spikes/parked/` or names a removed format, and that no
@@ -469,6 +472,14 @@ stand-ins in the file. Its readers are the real read sessions and signed
 reads, under a session secret that the test generates; the test's own reads
 of what a scope holds go past them by `platformNet.inspector`, a reader that
 the command never presents. The `cli` project is its Node test of the key files.
+
+The separate built-in Node resolver file, `packages/cli/test/config-dir.test.mjs`,
+contains three cases and is outside Vitest's `*.test.ts` selection. The root
+`npm test` command runs that file once in its explicit Node test list, so
+`npm run gate` runs it once. `npm test --workspace @generalbusiness/dap-cli`
+runs the package's Vitest tests, then those same three resolver cases once.
+The gate does not invoke the CLI package's test script separately.
+
 `scripts/control.mjs` cannot select a root project, so a control of the
 story is run by hand: change the line, run
 `npx vitest run --project scope story`, restore the file.

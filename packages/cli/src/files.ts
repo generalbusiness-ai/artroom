@@ -1,6 +1,7 @@
 /**
- * The store on disk, under Node. The directory is `$ARTROOM_HOME`, or
- * `artroom` under `$XDG_CONFIG_HOME`, or `~/.config/artroom`. It is made
+ * The store on disk, under Node. `configDir` selects `$DAP_HOME`, its
+ * compatible `$ARTROOM_HOME` alias, occupied legacy custody, or a new `dap`
+ * default under `$XDG_CONFIG_HOME` or `~/.config`. The directory is made
  * with mode 0700, and every file in it is written with mode 0600 and then
  * set to 0600, so a key file is readable only by its owner whatever the
  * umask. A key file holds the 32-byte secret as unpadded base64url, and
@@ -10,16 +11,11 @@
 
 import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { b64url, unb64url } from "@generalbusiness/artroom-bytes";
 import type { Config, Store } from "./store.ts";
 
-/** Where the command keeps its config and keys. */
-export function configDir(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  if (env["ARTROOM_HOME"]) return env["ARTROOM_HOME"];
-  return join(env["XDG_CONFIG_HOME"] || join(homedir(), ".config"), "artroom");
-}
+export { configDir } from "./config-dir.ts";
 
 const NAME = /^[a-z][a-z0-9-]{0,31}$/;
 
