@@ -54,13 +54,21 @@ One absolute deadline covers advertisement, body transfer, framing and
 inflation. It is not renewed for the POST. Inflation reads cancel at the
 deadline, and synchronous framing checks the same deadline.
 
+The caller's deadline does not wait for cancellation to settle. On expiry,
+the source requests abort and becomes permanently unavailable, retaining
+its working reservation. Later calls refuse before work. Late fetch and
+cleanup continuations cannot insert cache data or charge or return output.
+A late response is cancelled without consuming its body. This bounds one
+abandoned operation per source; it does not prove physical cleanup or make
+the reservation reusable.
+
 This is an owned-payload model. Engine objects, platform stream buffers,
 allocator behavior and garbage collection need separate measurement.
 No measured peak-memory or deployed-host capacity result is claimed.
 
 ## Validation and remaining work
 
-Seven focused checks passed, including the unchanged full-mode cases.
+Nine focused checks passed, including the unchanged full-mode cases.
 Git source and test compilers passed after two test-only type corrections.
 The new cases use a labelled HTTP adapter stand-in backed by real local
 Git. Four explicit object reads each return one pack object and transfer
@@ -74,10 +82,26 @@ wrong-kind objects, byte and pre-inflation limits, tags, concurrent
 reservation pressure, caller-copy charging and a deadline advanced at an
 actual response boundary. No test sleeps on the wall clock.
 
+The original gate at `88dd5011fde88dc95d1175871af2a16039df2cc1`
+passed typechecks, whitespace, 1,249 Vitest cases (three skipped), 13 Node
+checks and 55 Counter checks. The checker then found that pending stream
+cancellation could keep the caller waiting indefinitely. The successor
+adds terminal abandonment and two fake-clock cases: stalled reading and
+bad-response cleanup whose cancellation never settles, plus late fetch
+and cleanup settlement. All entry points remain unavailable afterwards;
+the late valid pack body is never pulled. The corrected source and tests
+passed the nine focused cases and Git source/test compilers. The whole
+suite was not repeated; the original gate is not a successor gate result.
+
 One distinguishing control removes only the caller's inflated-size guard.
 The existing malformed-zlib boundary then fails because inflation is
 reached instead of the required allowance refusal. The original source
-bytes are restored. The final gate result is filed separately.
+bytes are restored. A second control removes only the outer completion
+race while retaining expiry, abort and terminal state. The pending-cancel
+case then fails its caller-settled assertion at the fake-clock deadline
+while bad-response cancellation remains pending.
+The original source bytes are restored. Exact heads and evidence pins are
+filed separately.
 
 No provider, credential, namespace, deployed Worker or publication changes.
 Current first-head, staging, checker snapshot and ancestry paths keep their

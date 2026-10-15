@@ -385,6 +385,8 @@ export class SmartHttpSource implements GitSource {
   #retainedBytes = 0;
   readonly #isolation: IsolatedObjectReads | undefined;
   #busy = false;
+  #abandoned = false;
+  #abort: (() => void) | null = null;
   #issuedBytes = 0;
   #deadline: number | null = null;
   constructor(options: SmartHttpReadOptions) {
@@ -400,10 +402,12 @@ export class SmartHttpSource implements GitSource {
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs <= 0) throw large("read deadline");
   }
   #timely(): void {
+    if (this.#abandoned) throw fail("isolated source abandoned");
     if (this.#deadline !== null && Date.now() >= this.#deadline) throw fail("isolated read deadline");
   }
   #output(bytes: number): void {
     if (!this.#isolation) return;
+    this.#timely();
     if (bytes > this.#isolation.ownedBytes - this.#retainedBytes - this.#issuedBytes) throw large("isolated returned payload");
     // Conservatively charge every caller-owned result for this source's lifetime:
     // no guess that a caller released its previous copy.
@@ -411,14 +415,28 @@ export class SmartHttpSource implements GitSource {
   }
   async #isolated<T>(read: () => Promise<T>): Promise<T> {
     if (!this.#isolation) return read();
+    if (this.#abandoned) throw fail("isolated source abandoned");
     if (this.#busy) throw large("concurrent isolated read");
     if (ISOLATED_WORKING_MULTIPLE * this.#options.maxBytes > this.#isolation.ownedBytes - this.#retainedBytes - this.#issuedBytes) throw large("isolated working payload");
     const deadline = Date.now() + this.#timeoutMs;
     if (!Number.isSafeInteger(deadline)) throw large("isolated read deadline");
     this.#busy = true;
     this.#deadline = deadline;
-    try { const result = await read(); this.#timely(); return result; }
-    finally { this.#busy = false; this.#deadline = null; }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        // Cancellation is a request, not proof that an upstream or its
+        // cleanup settled. Keep this source and its reservation terminal.
+        this.#abandoned = true;
+        try { this.#abort?.(); } catch { /* never reuse abandoned work */ }
+        reject(fail("isolated read deadline"));
+      }, this.#timeoutMs);
+    });
+    try { const result = await Promise.race([read(), expired]); this.#timely(); return result; }
+    finally {
+      if (timer !== undefined) clearTimeout(timer);
+      if (!this.#abandoned) { this.#busy = false; this.#deadline = null; }
+    }
   }
   async #request(path: string, media: string, body?: Uint8Array): Promise<Uint8Array> {
     const controller = new AbortController();
@@ -427,6 +445,7 @@ export class SmartHttpSource implements GitSource {
     const duration = this.#deadline === null ? this.#timeoutMs : Math.min(this.#timeoutMs, this.#deadline - Date.now());
     if (duration <= 0) throw fail("isolated read deadline");
     const timer = setTimeout(() => controller.abort(), duration);
+    if (this.#isolation) this.#abort = () => controller.abort();
     try {
       const url = `${this.#remote}/${path}`;
       const headers = new Headers({ accept: media, "cache-control": "no-cache" });
@@ -434,6 +453,10 @@ export class SmartHttpSource implements GitSource {
       if (body !== undefined) headers.set("content-type", "application/x-git-upload-pack-request");
       const init: RequestInit & { credentials: "omit" } = { method: body === undefined ? "GET" : "POST", headers, redirect: "manual", credentials: "omit", signal: controller.signal, ...(body === undefined ? {} : { body }) };
       const response = await this.#fetch(new Request(url, init));
+      if (this.#isolation && (this.#abandoned || Date.now() >= this.#deadline!)) {
+        void response.body?.cancel().catch(() => undefined);
+        this.#timely();
+      }
       if (response.status !== 200 || response.redirected || (response.url !== "" && response.url !== url) || response.headers.get("content-type")?.split(";", 1)[0]?.trim() !== media) {
         await response.body?.cancel().catch(() => undefined);
         throw fail("HTTP read response");
@@ -444,7 +467,7 @@ export class SmartHttpSource implements GitSource {
     } catch (e) {
       if (e instanceof GitRefusal) throw e;
       throw fail("HTTP read request");
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); if (this.#isolation) this.#abort = null; }
   }
   async #advertisement(): Promise<Advertisement> {
     const data = await this.#request("info/refs?service=git-upload-pack", "application/x-git-upload-pack-advertisement");

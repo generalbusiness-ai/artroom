@@ -271,3 +271,84 @@ test("an isolated operation cannot renew its deadline between advertisement and 
     expect(posts).toBe(0);
   } finally { clock.mockRestore(); }
 });
+
+
+// Both are standard streams whose cancellation work never settles. The
+// fake clock advances the deadline; no wall-clock sleep or cleanup drain
+// is inferred. One source may retain one abandoned operation, never more.
+test("isolated deadlines return despite pending read/refusal cancellation and permanently refuse source reuse", async () => {
+  const { remote, head } = repository(); allowIsolation(remote);
+  const host = new Host(remote, TOKEN);
+  const ad = await host.upstream(new Request("http://127.0.0.1/repo.git/info/refs?service=git-upload-pack", { headers: { authorization: `Bearer ${TOKEN}` } }));
+  const advertisement = await ad.arrayBuffer();
+  vi.useFakeTimers();
+  try {
+    for (const status of [403, 200]) {
+      let requests = 0, cancels = 0, posted!: () => void, signal: AbortSignal | undefined;
+      const began = new Promise<void>(resolve => { posted = resolve; });
+      const never = new Promise<void>(() => undefined);
+      const body = new ReadableStream<Uint8Array>({ pull: () => never, cancel: () => { cancels++; return never; } });
+      const source = new SmartHttpSource({ ...isolatedOptions, timeoutMs: 100, fetch: async request => {
+        requests++;
+        if (request.method === "GET") return new Response(advertisement, { headers: ad.headers });
+        signal = request.signal; posted();
+        return new Response(body, { status, headers: { "content-type": "application/x-git-upload-pack-result" } });
+      } });
+      let settled = false;
+      const outcome = source.object(head, maxBytes).then(() => "unexpected success", error => error).finally(() => { settled = true; });
+      await began;
+      await vi.advanceTimersByTimeAsync(101);
+      expect(settled).toBe(true);
+      expect(await outcome).toMatchObject({ reason: "unreadable", what: "isolated read deadline" });
+      expect(cancels).toBe(1);
+      expect(signal?.aborted).toBe(true);
+      for (const again of [() => source.object(head, maxBytes), () => source.ref(REF), () => source.refs("refs/heads/", 10)]) {
+        await expect(again()).rejects.toMatchObject({ reason: "unreadable", what: "isolated source abandoned" });
+      }
+      expect(requests).toBe(2); // no hidden retry, cache result or new reservation
+    }
+  } finally { vi.useRealTimers(); }
+});
+
+// A valid response may arrive after an upstream ignored abort. Cancellation
+// may also finish late. Neither continuation restores the source's capacity.
+test("isolated abandonment survives late fetch and cleanup settlement without consuming the late body", async () => {
+  const { remote, head } = repository(); allowIsolation(remote);
+  const host = new Host(remote, TOKEN);
+  const ad = await host.upstream(new Request("http://127.0.0.1/repo.git/info/refs?service=git-upload-pack", { headers: { authorization: `Bearer ${TOKEN}` } }));
+  const advertisement = await ad.arrayBuffer();
+  const answer = new Uint8Array(await isolatedAnswer(onePack(remote, head)).arrayBuffer());
+  vi.useFakeTimers();
+  try {
+    for (const late of ["fetch", "cleanup"]) {
+      let requests = 0, pulls = 0, cancels = 0, posted!: () => void, release!: () => void;
+      const began = new Promise<void>(resolve => { posted = resolve; });
+      const held = new Promise<void>(resolve => { release = resolve; });
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) { pulls++; controller.enqueue(answer); controller.close(); },
+        cancel() { cancels++; return held; },
+      }, { highWaterMark: 0 });
+      const source = new SmartHttpSource({ ...isolatedOptions, timeoutMs: 100, fetch: async request => {
+        requests++;
+        if (request.method === "GET") return new Response(advertisement, { headers: ad.headers });
+        posted();
+        if (late === "fetch") await held;
+        return new Response(body, { status: late === "fetch" ? 200 : 403, headers: { "content-type": "application/x-git-upload-pack-result" } });
+      } });
+      let settled = false;
+      const outcome = source.object(head, maxBytes).then(() => "unexpected success", error => error).finally(() => { settled = true; });
+      await began;
+      await vi.advanceTimersByTimeAsync(101);
+      expect(settled).toBe(true);
+      expect(await outcome).toMatchObject({ reason: "unreadable", what: "isolated read deadline" });
+      release();
+      await vi.advanceTimersByTimeAsync(0); // flush the actual late continuation
+      expect(pulls).toBe(0);
+      expect(cancels).toBe(1);
+      for (const again of [() => source.object(head, maxBytes), () => source.ref(REF), () => source.refs("refs/heads/", 10)]) {
+        await expect(again()).rejects.toMatchObject({ reason: "unreadable", what: "isolated source abandoned" });
+      }
+      expect(requests).toBe(2);
+    }
+  } finally { vi.useRealTimers(); }
+});
