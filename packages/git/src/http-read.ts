@@ -389,6 +389,8 @@ export class SmartHttpSource implements GitSource {
   #abort: (() => void) | null = null;
   #issuedBytes = 0;
   #deadline: number | null = null;
+  /** Fixed per-source payload allowance; null identifies the full-closure mode. */
+  get isolatedPayloadAllowance(): number | null { return this.#isolation?.ownedBytes ?? null; }
   constructor(options: SmartHttpReadOptions) {
     this.#remote = remoteUrl(options.remote, options.transport ?? "https").replace(/\/$/, "");
     if (!this.#remote.startsWith("https://") && !this.#remote.startsWith("http://")) throw new GitRefusal("bad-remote", "HTTP read remote");
