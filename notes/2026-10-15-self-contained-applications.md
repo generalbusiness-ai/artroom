@@ -1,7 +1,7 @@
 # Self-contained applications: the destination and the work to reach it
 
-15 October 2026. Design direction for review. Draft 2 answers checker review
-`9a293839` (findings F1 to F4).
+15 October 2026. Design direction for review. Draft 2 answered checker review
+`9a293839` (findings F1 to F4); draft 3 answers review `949a9010` (F3a).
 
 Source baseline: main `bc95110e1`, dap-spike main `9d738e2e`. This note is
 for the request that carries it. It commissions no implementation. A
@@ -284,8 +284,16 @@ Upgrades come in three steps, in this order.
      or has an unknown outcome stays with the scope that opened it. It
      is never reissued by the new scope. Open holds and duties either
      block the cutoff or move under a declared rule.
-   - **One owner for each right.** At every position, each carried right
-     has exactly one scope that can exercise it.
+   - **At most one exerciser for each right.** The two scopes keep
+     separate orders, and no act takes effect in both at once. So the
+     handoff is asynchronous, and the requirement is that at most one
+     scope can exercise a carried right, never two. Between the cutoff
+     and the new scope's activation, neither can. During that interval
+     the right is pending handoff. The old scope's journal records it as
+     transferred to the named successor. It is unavailable, not lost.
+     The new scope activates the right only after it verifies the exact
+     authorized cutoff that its genesis cites. This needs no global
+     position and no simultaneous availability.
 3. **Change inside a running scope.** A package is attached at an exact
    position, with a declared migration and refusal of stale signed acts.
    This is the dap-spike's composition and extensibility work, and the
@@ -348,26 +356,37 @@ URI. *Done when* both of these hold:
 version 2 of an installed application is adopted, new scopes use it, and
 an existing scope carries forward under the four obligations of gap 10.
 The witness must tell a valid carry-forward apart from duplicated
-authority. It must show four things. After the cutoff, the old scope
-refuses an act that exercises a carried right. The same right can't be
-exercised in both scopes. An outside operation with an unknown outcome is
-not reissued by the new scope. And the new scope's genesis cites the old
-scope's exact position and hash. Then both journals must replay, and the
-link between them must check.
+authority from safe temporary unavailability. It must show six things:
+
+- After the cutoff, the old scope refuses an act that exercises a carried
+  right.
+- Before the new scope activates, an act on the carried right is refused
+  in both scopes. The old scope's journal shows the right as pending
+  handoff to the named successor.
+- The new scope refuses to activate when its cited cutoff is missing, is
+  not authorized, or doesn't match the old scope's entry.
+- After activation, only the new scope accepts the act.
+- An outside operation with an unknown outcome is not reissued by the new
+  scope.
+- The new scope's genesis cites the old scope's exact position and hash.
+
+Then both journals must replay, and the link between them must check.
 
 **M4. Change inside a running scope.** Covers gap 10, step 3. Its design is
 owed, and it depends first on the dap-spike's composition and
-extensibility results. *Done when* a package attached at an exact position
-N meets five conditions:
+extensibility results. As in the dap-spike's design (section 6), the
+attaching entry at position N is itself judged under the earlier
+definition. A successful attachment activates from N+1. *Done when* such an
+attachment meets five conditions:
 
-- Every entry before N replays unchanged under its original definition.
-  Nothing is backfilled.
-- After N, acts are judged under the new definition, starting from the
+- Every entry up to and including N replays unchanged under its original
+  definition. Nothing is backfilled.
+- From N+1, acts are judged under the new definition, starting from the
   state its declared migration derives.
 - An act signed under the old binding and submitted after N is refused as
   stale.
-- A failed migration leaves the earlier state and definition exactly as
-  they were.
+- A failed attachment or migration leaves the earlier state and
+  definition exactly as they were, and later acts keep the old meaning.
 - The whole journal replays across the boundary.
 
 Private views and an authoring language follow, in the roadmap's order.
