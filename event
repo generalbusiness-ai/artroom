@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7d4daa6a2ca9aa71745231aabc0b904682087f37"}
+{"kind":"artifact","text":"Unchanged G2s final Source; bind FULL canonical8d05a0b4ea855f39efebe72f3554af955bece4e9. Prior artifact commit text was abbreviated, which caused approval-head equality refusal. No source/evidence changes or execution.","body":{"commit":"8d05a0b4ea855f39efebe72f3554af955bece4e9","path":"packages/scope/src/entry-signer.ts"}}
