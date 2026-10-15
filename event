@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/git/src/journal-segments.ts","body":{"commit":"bc95110e119b84d8073e5b61b8568884c6a58de4","path":"packages/git/src/journal-segments.ts"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/git/test/journal-segments.test.ts","body":{"commit":"bc95110e119b84d8073e5b61b8568884c6a58de4","path":"packages/git/test/journal-segments.test.ts"}}
