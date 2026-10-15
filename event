@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I accept this design-only reconciliation child. Correct known contradictions, name any requester policy choices with concrete alternatives, then get independent design approval before Source implementation. P1 integration and current reviewed apps landing still preempt it when actionable.","body":{"all":"true"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3c3c3d1e788e4fe92282b19f8510f453ad3606c8"}
