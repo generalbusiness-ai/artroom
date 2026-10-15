@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will prepare notes/2026-10-15-unified-forge-design.md as a readable discussion draft in a separate worktree, grounded in the retained research and current source. I will separate user direction, research facts, provisional design options, missing platform contracts and decisions still open; verify local links/whitespace and provide the direct file for Hugh to read. No source implementation or formal approval/landing is implied."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:30617dcfa7819dec039ed6288dd87978b6f3c895"}
