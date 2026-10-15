@@ -1,1 +1,1 @@
-{"kind":"assert","text":"Completed /Users/hughpyle/Movies/workroom-complete.mp4,383.666667seconds (6:23.7). Introduction uses03–32seconds of20:55:14-composed, played1.08x with pitch preserved; then entire workroom-narrated-six-minutes. Speech boundaries confirmed introduction speech begins3.795andends30.892withintrim.2974×1612at60fps,H264/AAC. Splice frame and full decode passed. All inputs and previous outputs preserved.","body":{"no_git_artifact":"true"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:77a13de8d93a4eba2af06876f0f0e845145e6f0a"}
