@@ -33,7 +33,7 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isScopeId, retainedReadArgument, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
@@ -226,7 +226,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     // One bounded immutable-content cache per object. These callbacks are
     // the existing pure whole-support validators, never pinned()/genesis.
     this.#readPreparation = new ReadPreparation({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, {
-      policy: () => "native-read-support-v1",
+      policy: () => `native-read-support-v1:${digestBytes(utf8(canonicalize(bounds)))}`,
       declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
     });
     this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);

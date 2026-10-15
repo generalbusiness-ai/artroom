@@ -5,7 +5,8 @@ import { SIBLINGS_OF } from "@generalbusiness/dap-platform";
 import { Scope } from "../src/core.ts";
 import { production } from "../src/ports.ts";
 import { ReadPreparation } from "../src/read-preparation.ts";
-import { SessionReferences, SESSION_REFERENCE_BOUNDS as B, sessionReferenceReply } from "../src/session-reference.ts";
+import { SessionReferences, SESSION_REFERENCE_BOUNDS as B, encodeSessionReference, sessionReferenceReply, sessionReferenceRequest } from "../src/session-reference.ts";
+import { sessionReferencesIn } from "../src/namespace.ts";
 import { mintSession, readerOf, sessionsOf } from "../src/sessions.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { testPorts } from "../src/testing.ts";
@@ -110,4 +111,24 @@ test("reference completion refuses head drift, elapsed final storage and expiry 
     });
     expect(got).toEqual({ answer: null, metadata: 3 });
   }
+});
+
+test("native sender clamps request and reply bytes and optional capability without summary or source fallback", async () => {
+  const scope = await found();
+  const got = await scope.inside(async state => {
+    const f = fixture(scope, state); let lookups = 0, calls = 0, fallback = 0, supported = true, answer: unknown = "{}";
+    const source = sessionReferencesIn({ idFromName(name) { expect(name).toBe(f.directory.scope); return "opaque fixture ID" as unknown as DurableObjectId; }, get() {
+      lookups++;
+      return { ...(supported ? { async sessionReference(raw: string) { calls++; const parsed = sessionReferenceRequest(raw); expect(parsed).toMatchObject({ milliseconds: B.milliseconds, maxBytes: B.reply }); return answer; } } : {}), summary() { fallback++; }, source() { fallback++; } };
+    } });
+    const request = encodeSessionReference({ v: 1, to: f.directory, reader: f.token(), milliseconds: Number.MAX_SAFE_INTEGER, maxBytes: Number.MAX_SAFE_INTEGER })!;
+    const rejected = [];
+    rejected.push(await source.read(f.directory, "x".repeat(B.request + 1)));
+    rejected.push(await source.read({ ...f.directory, inc: newIncarnation(new Uint8Array(16).fill(9)) }, request));
+    const beforeLookup = lookups, small = await source.read(f.directory, request);
+    for (const raw of ["x".repeat(B.reply + 1), "é".repeat(B.reply), {}, null]) { answer = raw; rejected.push(await source.read(f.directory, request)); }
+    supported = false; rejected.push(await source.read(f.directory, request));
+    return { rejected, beforeLookup, small, calls, fallback };
+  });
+  expect(got).toEqual({ rejected: Array(7).fill(null), beforeLookup: 0, small: "{}", calls: 5, fallback: 0 });
 });
