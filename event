@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:dd23fcd1ebb2d8726e6357b26fd38c5ee49a985c","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/genesis-proof.ts."}
+{"kind":"artifact","text":"G2p-a packages/scope/src/proof-bytes.ts: exact frozen d42756ad723fae440e8d230b0fa0fa2e87891021, internal bounded preparation support only. No public/session caller switch or parent completion.","body":{"commit":"d42756ad723fae440e8d230b0fa0fa2e87891021","path":"packages/scope/src/proof-bytes.ts"}}
