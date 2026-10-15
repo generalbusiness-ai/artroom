@@ -17,6 +17,20 @@ shows an agent taking part through MCP tools. An earlier definition,
 `counting`, is also kept here; see
 [The first definition](#the-first-definition).
 
+## Build and deployment ownership
+
+The Counter's browser source, build script and generated assets live here.
+From the repository root, `node apps/counter/scripts/assets.mjs` builds its
+three public assets and the module served by the application Worker.
+
+Counter shares Room's existing `artroom-scope` Worker. Its deployment
+configuration is [Room's wrangler.jsonc](../room/wrangler.jsonc), and its
+route is included by [Room's application dispatch](../room/fetch.ts).
+There is no independent Counter Worker. A shared Worker deployment also
+publishes Room and the other routes it owns. This consolidation changes no
+Worker name or served URL and runs no deployment. Hugh's current hold
+prohibits Cloudflare infrastructure deployments until further notice.
+
 ## Items
 
 The scope holds four types of item:
