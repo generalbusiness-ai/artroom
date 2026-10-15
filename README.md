@@ -81,6 +81,8 @@ Dap was built with the help of several concurrent coding agents, using
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).
 
+You can [try them out](https://dap.generalbusiness.ai/) on the hosted service.
+
 dap runs on Cloudflare Workers, Durable Objects and Artifacts.
 
 ## Where to read next
