@@ -219,7 +219,7 @@ Without either, the script says it skipped and makes no picture.
 With `--recorded` in place of the base URL and the two files, the script
 runs the rehearsal on the test Worker (`DEMO_RECORD=1`, see below) and
 answers the browser with the Worker's recorded answers, as
-`packages/page/test/screens.mjs` does for the page's own screenshots.
+`apps/room/page/test/screens.mjs` does for the page's own screenshots.
 
 ## The order on the recording day
 
@@ -238,7 +238,7 @@ answers the browser with the Worker's recorded answers, as
 
 ## In the tests
 
-`packages/lanes/test/demo.scope.test.ts` runs the same rehearsal on the
+`apps/room/lanes/test/demo.scope.test.ts` runs the same rehearsal on the
 test Worker, on real scopes, and asserts that every row of the table says
 "yes" and that the transcript holds no secret. It covers both host paths
 through their production wiring. Its stand-ins are the Git host (`OwnGit`

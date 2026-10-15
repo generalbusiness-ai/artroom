@@ -7,7 +7,7 @@ import { secretSigner, signedIntent } from "@generalbusiness/artroom-client";
 import { DEMO_PURPOSE, DEMO_REGISTER, WEB_DEMO_REGISTER } from "@generalbusiness/dap-platform";
 import type { Seed } from "@generalbusiness/dap-contract";
 import type { Binding } from "../src/namespace.ts";
-import { demoFoundingConfig, demoFoundingRoute, type DemoFoundingOffer } from "../src/demo-founding.ts";
+import { demoFoundingConfig, demoFoundingRoute, type DemoFoundingOffer } from "../../../apps/room/demo-founding.ts";
 import { beginSessionFixture } from "./session-settings.ts";
 import { nativeFixtureLifetime } from "./support/native-fixture-lifetime.ts";
 import { routed } from "./repository.ts";

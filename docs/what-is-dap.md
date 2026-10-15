@@ -91,7 +91,7 @@ pages are in [apps/room/docs](../apps/room/docs), starting with
 **dap-counter** keeps a shared count. Participants join a board, commit
 to say the next number, and speak it aloud. The scope checks every proposal:
 the full roster, the arithmetic and whose turn it is. The source is in
-[examples/counting](../examples/counting). The tutorial
+[apps/counter](../apps/counter). The tutorial
 [Build a counter](build-a-counter.md) builds a smaller version of its
 definition.
 
@@ -147,7 +147,7 @@ Written against main `d309b6b9`; the dap-library paragraph against main
 [the entry and its inputs](../packages/contract/src/entry.ts),
 [the four answers](../packages/contract/src/result.ts),
 [the judges](../packages/derive/src/index.ts),
-[the Counter definition](../examples/counting/definition.ts),
+[the Counter definition](../apps/counter/definition.ts),
 [the lending definition](../examples/lending/definition.ts), and
 [the jam room design](../notes/2026-10-01-jam-room.md). This page claims
 no run. Independent review and acceptance of this version are owed. The

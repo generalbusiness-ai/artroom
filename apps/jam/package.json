@@ -1,0 +1,14 @@
+{
+  "name": "@generalbusiness/dap-jam",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build:managed": "node scripts/build-managed-assets.mjs"
+  }
+}

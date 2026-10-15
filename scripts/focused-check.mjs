@@ -35,7 +35,7 @@ function guard(plan) {
     sources.set(path, file.sha256);
   }
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-  const activeInputs = tracked.filter(path => /^(packages|scripts|examples|docs)\//.test(path) || /^(package(-lock)?\.json|tsconfig.*\.json|vitest\.config\.ts)$/.test(path));
+  const activeInputs = tracked.filter(path => /^(packages|apps|scripts|examples|docs)\//.test(path) || /^(package(-lock)?\.json|tsconfig.*\.json|vitest\.config\.ts)$/.test(path));
   requireFact(activeInputs.every(path => sources.has(realpathSync(resolve(root, path)))), "The active source/configuration/fixture inventory is incomplete");
   const inputs = new Map();
   for (const file of plan.inputs) {
@@ -53,8 +53,12 @@ function guard(plan) {
     const owned = lstatSync(resolve(root, path));
     requireFact(owned.isDirectory() && !owned.isSymbolicLink(), "Dependency namespace and Vite state must be owned real directories");
   }
-  const actualPackages = readdirSync(resolve(root, "packages")).filter(name => existsSync(resolve(root, "packages", name, "package.json"))).map(name => {
-    const directory = realpathSync(resolve(root, "packages", name));
+  const workspaceDirectories = json(resolve(root, "package.json")).workspaces.flatMap(pattern => {
+    requireFact(typeof pattern === "string" && !pattern.includes("..") && !pattern.startsWith("/") && (!pattern.includes("*") || pattern.endsWith("/*") && pattern.indexOf("*") === pattern.length - 1), "Unsupported workspace directory pattern");
+    return pattern.endsWith("/*") ? readdirSync(resolve(root, pattern.slice(0, -2))).map(name => resolve(root, pattern.slice(0, -2), name)) : [resolve(root, pattern)];
+  });
+  const actualPackages = workspaceDirectories.filter(directory => existsSync(resolve(directory, "package.json"))).map(path => {
+    const directory = realpathSync(path);
     return { ...json(resolve(directory, "package.json")), directory };
   });
   requireFact(sameSet(plan.workspaces.map(w => w.name), actualPackages.map(w => w.name)), "The complete current workspace set is required");

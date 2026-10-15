@@ -1,0 +1,9 @@
+/* dap fonts. Paths are relative to this file; copy fonts/ alongside. */
+@font-face { font-family: "Open Runde"; font-weight: 400; src: url("fonts/OpenRunde-Regular.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Open Runde"; font-weight: 500; src: url("fonts/OpenRunde-Medium.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Open Runde"; font-weight: 600; src: url("fonts/OpenRunde-Semibold.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Open Runde"; font-weight: 700; src: url("fonts/OpenRunde-Bold.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Teletype33"; src: url("fonts/Teletype33-Narrow.ttf") format("truetype"); font-display: swap; }   /* advance 528, condensed 3%: the kit's label face */
+@font-face { font-family: "Teletype33 Wide"; src: url("fonts/Teletype33.ttf") format("truetype"); font-display: swap; }   /* the original 614 advance, for terminal emulation only */
+@font-face { font-family: "Sometype Mono"; font-weight: 400; src: url("fonts/SometypeMono-Regular.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Sometype Mono"; font-weight: 500; src: url("fonts/SometypeMono-Medium.woff2") format("woff2"); font-display: swap; }

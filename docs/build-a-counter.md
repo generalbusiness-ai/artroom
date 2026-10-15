@@ -4,7 +4,7 @@ In this tutorial we build a small counter application on dap and watch
 each act take effect. The counter has a controller who sets a target,
 participants who join, and a board that hands the turn from one
 participant to the next until the count reaches its target. It is a
-smaller version of the Counter in [examples/counting](../examples/counting).
+smaller version of the Counter in [apps/counter](../apps/counter).
 
 We write the definition in four steps and run the count in a fifth.
 After each step we run it in a
@@ -493,7 +493,7 @@ besides; [The record](manual/record.md) says what its report covers.
 
 ## Where to go next
 
-- [The full Counter](../examples/counting) replaces `spoken` with a
+- [The full Counter](../apps/counter) replaces `spoken` with a
   commitment that the participant then fulfills, and adds activity, pause,
   reset and a deadline. Its page has diagrams of every act. Its source and
   tests belong to a repository checkout, not the published SDK packages.

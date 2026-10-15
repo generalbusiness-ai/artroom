@@ -334,8 +334,8 @@ definition states, by its digest: the bytes of a definition for the rules
 scope's `activate` and the directory's `open-issue` and `open-pr`. For
 example, an admin activates the demo profile's change definition with
 `dap act activate --on rules --set digest=<digest> --set name=change
---value packages/lanes/definitions/change-demo.json`, whose digest is in
-`packages/lanes/src/digests.ts`.
+--value apps/room/lanes/definitions/change-demo.json`, whose digest is in
+`apps/room/lanes/src/digests.ts`.
 
 **`dap log <scope> [--limit n]`** and **`dap show <entry>`**
 read the journal and one entry over the read routes.
@@ -368,7 +368,7 @@ journals. It prints one line for each scope: its kind, its ID, the entry
 the replay reached and the result. The last line is `All consistent: <n>
 scopes.`, or the first finding, and then the command exits 1. A journal
 that cannot be read is a finding. The example is from
-`packages/lanes/test/issues.scope.test.ts`, after two issues were closed by
+`apps/room/lanes/test/issues.scope.test.ts`, after two issues were closed by
 two published changes:
 
 ```
@@ -509,7 +509,7 @@ The demonstration uses two text files.
 **`dap edit <path> --file <local file> [--title <text>]`** writes one
 file of the repository through the room. The person never writes the
 repository: the room judges the change and its destination writes it. The
-examples have the form that `packages/lanes/test/edit.scope.test.ts`
+examples have the form that `apps/room/lanes/test/edit.scope.test.ts`
 asserts, with IDs cut short; the numbers in them are illustrative.
 
 1. It reads the local file. A file that is no UTF-8 text, or that has more
@@ -567,7 +567,7 @@ change's author may sign `link-own`; the demo profile has no `link-any`.
 So a member who opens a change can link it, but cannot merge it: members
 do not hold `change.merge`. The member's change waits, linked, and an
 admin or a maintainer merges it. The examples from here on have the form
-that `packages/lanes/test/issues.scope.test.ts` asserts, with IDs cut
+that `apps/room/lanes/test/issues.scope.test.ts` asserts, with IDs cut
 short; the numbers and hashes in them are illustrative.
 
 ```
@@ -592,7 +592,7 @@ one condition is its title, because the lane refuses an issue with no
 condition. The directory numbers issues and changes in one sequence. An
 admin activates the demo profile's issue definition as for the change
 definition: `--set name=issue --value
-packages/lanes/definitions/issue-demo.json`.
+apps/room/lanes/definitions/issue-demo.json`.
 
 ```
 Opened issue #1: The handbook has no start page. Its lane is sc_4bbosp5k....

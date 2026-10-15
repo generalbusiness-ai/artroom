@@ -142,7 +142,7 @@ Commands match current [CLI help](../../../packages/cli/src/line.ts).
 [CLI story](../../../packages/cli/test/story.scope.test.ts) covers native
 creation, enrollment, authority refusals and journal reads with labelled
 Git host, scheduler and clock stand-ins. The existing
-[one-file scenario](../../../packages/lanes/test/edit.scope.test.ts) and
+[one-file scenario](../../../apps/room/lanes/test/edit.scope.test.ts) and
 [demo rehearsal](../../../scripts/demo/rehearse.ts) supply contribution,
 extent-review and publication examples. This documentation change runs no
 new tests or hosted commands and claims no new fixture result.

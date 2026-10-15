@@ -37,7 +37,7 @@ outside credential.
 
 What it needs:
 
-- The binding `ARTIFACTS` in `packages/scope/wrangler.jsonc`, for the
+- The binding `ARTIFACTS` in `apps/room/wrangler.jsonc`, for the
   namespace `artroom-demo`.
 - One setting, the variable `ARTIFACTS_CONFIG`. It is nonsecret JSON with
   exactly these fields:

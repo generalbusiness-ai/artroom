@@ -3,10 +3,8 @@ import type { Head, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
 import { isScopeRef } from "@generalbusiness/dap-derive";
 import { DEMO_PURPOSE, DEMO_REGISTER, WEB_DEMO_REGISTER } from "@generalbusiness/dap-platform";
-import type { Binding } from "./namespace.ts";
 import type { Store } from "./store.ts";
 const ORIGINS = new Set(["https://artroom-scope.inguz.workers.dev", "https://artroom-rehearsal.inguz.workers.dev"]);
-export const DEMO_OFFER_PATH = "/v1/demo/founding-offer";
 export interface DemoFoundingBindings { DEMO_START_CONFIG?: string; DEPLOYMENT?: string }
 export interface DemoFoundingConfig { v: 1; origin: string; deployment: string; register: ScopeRef; definition: typeof DEMO_REGISTER | typeof WEB_DEMO_REGISTER }
 interface DemoFoundingSettings { current: DemoFoundingConfig; legacy: DemoFoundingConfig | null }
@@ -15,7 +13,7 @@ export interface DemoFoundingOffer extends Omit<DemoFoundingConfig, "deployment"
   registerItem: { id: number; revision: number; state: "open"; host: string; namespace: string; policy: "open"; purpose: typeof DEMO_PURPOSE };
 }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
-const registerRef = (value: unknown): value is ScopeRef => record(value) && Object.keys(value).length === 3 && isScopeRef(value) && value.kind === "register";
+export const registerRef = (value: unknown): value is ScopeRef => record(value) && Object.keys(value).length === 3 && isScopeRef(value) && value.kind === "register";
 export function demoFoundingConfig(raw: string | undefined, deployment: string | undefined): DemoFoundingSettings | null {
   try {
     if (!raw || utf8(raw).length > 4096) return null;
@@ -41,22 +39,4 @@ export function demoFoundingOffer(store: Pick<Store, "scope" | "page">, pinned: 
   if (page.more || page.items.length !== 1 || !item || item.type !== "register" || item.state !== "open" || item.values["purpose"] !== DEMO_PURPOSE || item.values["policy"] !== "open" || typeof item.values["host"] !== "string" || typeof item.values["namespace"] !== "string") return null;
   const offer: DemoFoundingOffer = { v: 1, origin: config.origin, register: structuredClone(config.register), definition: config.definition, at: structuredClone(scope.head), registerItem: { id: item.id, revision: item.revision, state: "open", host: item.values["host"], namespace: item.values["namespace"], policy: "open", purpose: DEMO_PURPOSE } };
   return utf8(canonicalize(offer)).length <= 16 * 1024 ? offer : null;
-}
-export async function demoFoundingRoute(request: Request, env: DemoFoundingBindings & { SCOPES: Binding }): Promise<Response> {
-  const url = new URL(request.url), settings = demoFoundingConfig(env.DEMO_START_CONFIG, env.DEPLOYMENT);
-  const reply = (status: number, value: unknown) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-  if (url.pathname !== DEMO_OFFER_PATH || !settings || url.origin !== settings.current.origin || url.hash) return reply(404, { error: "not-found" });
-  let config = settings.current;
-  if (url.search) {
-    if ([...url.searchParams.keys()].sort().join(",") !== "inc,register") return reply(404, { error: "not-found" });
-    const selected = { scope: url.searchParams.get("register"), inc: url.searchParams.get("inc"), kind: "register" };
-    if (!registerRef(selected)) return reply(404, { error: "not-found" });
-    const match = canonicalize(selected) === canonicalize(config.register) ? config : settings.legacy && canonicalize(selected) === canonicalize(settings.legacy.register) ? settings.legacy : null;
-    if (!match) return reply(404, { error: "not-found" });
-    config = match;
-  }
-  if (request.method !== "GET") return reply(405, { error: "method-not-allowed" });
-  const stub = env.SCOPES.get(env.SCOPES.idFromName(config.register.scope)) as unknown as { demoFoundingOffer(config: DemoFoundingConfig): DemoFoundingOffer | null | Promise<DemoFoundingOffer | null> };
-  const offer = await stub.demoFoundingOffer(config);
-  return offer ? reply(200, offer) : reply(404, { error: "not-found" });
 }

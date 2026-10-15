@@ -1384,10 +1384,10 @@ not a second admitted one.
 Each further turn is one `inspect`, one `counting-commitments.commit` and
 one `counting-commitments.fulfill` (one `act` each in `--generic` mode).
 When more than one participant is active, the last speaker cannot commit
-next. [The Counter](../examples/counting/README.md) has diagrams of every
+next. [The Counter](../apps/counter/README.md) has diagrams of every
 act and who may attempt it.
 
-The commitments Counter (`examples/counting/commitments.ts`, the one the
+The commitments Counter (`apps/counter/commitments.ts`, the one the
 target-100 recording runs) grants differently from the Counter above: an
 agent's role needs `counting.participate`, `counting.activity` (which
 authorizes both `activate` and `deactivate`; there is no `counting.activate`

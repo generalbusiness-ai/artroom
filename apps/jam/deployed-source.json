@@ -1,0 +1,586 @@
+{
+  "v": 1,
+  "classification": "Recorded deployed Jam Source and managed assets; no new deployment",
+  "origin": {
+    "repository": "artroom-jam",
+    "head": "b4b7c764199e5b9758771e43f8132c618858bf32",
+    "tree": "6f4e999396d719205c1834de24602dac69925959",
+    "activeVersionId": "8f53e237-b1c8-4d5b-b309-7ac2b5a3c99c",
+    "workerName": "artroom-jam",
+    "publicResult": {
+      "path": "/Users/hughpyle/play/artroom-diagnostics/jam-wordmark-managed-deploy-source/deploy-one/public-result.json",
+      "bytes": 12996,
+      "sha256": "5692ad7dc7f319cf41b92a910d3e5ab4aed7b95a6459b735b7f547a9d3f5b404"
+    },
+    "originalManagedConfigSHA256": "5d2e8b45a3f506db0986d827f94247f5a573d25b4d90cce914242bc9bfe943a4",
+    "runtimeCanonicalSHA256": "61d236cba115ea1af3393e19545772939341466324f9acbd309d2e39bc8e1fd9",
+    "assetRuntimeCanonicalSHA256": "6223993a2ee74ba06f45591db7545b30d19dd151b8ed108648eccef303ca2161",
+    "usageModelCanonicalSHA256": "cb2842d6687d19c69a6c0d4eb6a0f1af02951cef170de56ab331046ea5baac08",
+    "tools": {
+      "node": "26.11.1",
+      "esbuildAuthoring": "0.28.1",
+      "wranglerDeployment": "4.147.0",
+      "wranglerPackageSHA256": "75c3ccb272cabfbb1e1c555ddad7479d0b31a83a325b40859125941301d49865"
+    },
+    "qualification": "One existing managed-assets deployment with no code bundle change. Exact retained2ba before or stop; complete runtime/bindings/routing/security/usage unchanged after,19exact asset bytes +literal prior managed MIME +headers. Only staticHTMLwordmark link differs, no native/audio/model/browser/secret/resources/test/build. Staging literal committedHTML+18verifiedunchangedassets only; no retries."
+  },
+  "source": [
+    {
+      "path": "page/app.ts",
+      "bytes": 5089,
+      "sha256": "ef445bc4796539804fe245d055b6eeb8dbc849af4a5a8aff7932ab3cdbd76629"
+    },
+    {
+      "path": "page/captions.ts",
+      "bytes": 652,
+      "sha256": "c21043158fce4d97f9d3957d394f9f120e15d192fb5ba5445b670fbd8abad01a"
+    },
+    {
+      "path": "page/live.ts",
+      "bytes": 1463,
+      "sha256": "8d1347d0610ff123099f37b3c149c388bb06d853b64e6dca32ea86b73a67ee64"
+    },
+    {
+      "path": "page/view.ts",
+      "bytes": 2492,
+      "sha256": "e0175a0a5b07dd657a61f4fdf4c75e4f2109bb982d0df3975ff1f779316fbe71"
+    },
+    {
+      "path": "src/band.ts",
+      "bytes": 4426,
+      "sha256": "d221f4332ed8fe90366be604328ee09afae28d538a9a9037a36c5172c098d93f"
+    },
+    {
+      "path": "src/interpret.ts",
+      "bytes": 7325,
+      "sha256": "ef2c1bd77c922a23aaf534437ae889f97c689ec60fb9c8e4d29324d07a2f9f3c"
+    },
+    {
+      "path": "src/mood.ts",
+      "bytes": 6667,
+      "sha256": "3b94046430001467c5c1873b568834209b92d15e78a6f4fff09fe87a5ddadb49"
+    },
+    {
+      "path": "src/music.ts",
+      "bytes": 2576,
+      "sha256": "9a802cad2b5b01146c9723a5ea9f2287ecf02ad9364a42371560b28038766fa8"
+    },
+    {
+      "path": "src/phrases.ts",
+      "bytes": 1390,
+      "sha256": "b1a8a93e2cb3d263ff1a63b991eb2eb3193112e047f7e0337ca567e631c46d45"
+    },
+    {
+      "path": "src/players/bass.ts",
+      "bytes": 811,
+      "sha256": "8e28fe15356adc993381f9deea294308a44fb1d2cc64ef492bf9f50bc4bad45e"
+    },
+    {
+      "path": "src/players/index.ts",
+      "bytes": 462,
+      "sha256": "769092ddd3264eb1ab9d19c614689d2a95fee535ee1da21bf3c148023436360f"
+    },
+    {
+      "path": "src/players/lead.ts",
+      "bytes": 9791,
+      "sha256": "a4c132b744d2e23c8db3f4280d001eb2b5f914165023e4108be3a40663430dc1"
+    },
+    {
+      "path": "src/players/percussion.ts",
+      "bytes": 3761,
+      "sha256": "7a1b615e640f3d768c5e55b32ee409e482f3c0e2d309626e55a96fdfb905a3f5"
+    },
+    {
+      "path": "src/players/player.ts",
+      "bytes": 2975,
+      "sha256": "702f674c66fb1adcedcaf1d4acb1e1debe2508edc4d5d775890f81012d0318e5"
+    },
+    {
+      "path": "src/players/synth.ts",
+      "bytes": 5967,
+      "sha256": "cacc8e0c8f20930626923fa0451d4adde87c1ddce20bc5c51db1a38b064763e4"
+    },
+    {
+      "path": "src/record.ts",
+      "bytes": 9603,
+      "sha256": "4de1fbca151f4cecadaddf54a2381415cf87eaa2c0dbc0196370b4746e46c0d1"
+    },
+    {
+      "path": "src/render.ts",
+      "bytes": 13834,
+      "sha256": "71b9cd88f70ad3bad9813ff5c67091c1e7048b438f7497d1938d467627bcd42f"
+    },
+    {
+      "path": "page/index.html",
+      "bytes": 8291,
+      "sha256": "ba8a98398d500f2e8912b1f0e562c3712c6f2d7b4b305c334b274b8b22c25c39"
+    },
+    {
+      "path": "scripts/build-static-worker.mjs",
+      "bytes": 3745,
+      "sha256": "da9eae49321c667a4712c38da2b63fdc9e188f151e11e765d596b047438aa9ef"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11366,
+      "sha256": "b6567cd11b91b44ae72f597494c4404aa2fae8b97beb011306559718df679cae"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 53,
+      "sha256": "a7b426197215b7cc9a5ae72fa6d44719db1163d8c02e47f9683966d993a47ab1"
+    },
+    {
+      "path": "page/brand/tokens.css",
+      "bytes": 1710,
+      "sha256": "f757efbd09fa66cbabb504eeb7d0ffc54e754ef92f7c9d2322f9d3d041cf7933"
+    },
+    {
+      "path": "page/brand/fonts.css",
+      "bytes": 1275,
+      "sha256": "4f857e12ea4690e8c2726e8dcebb4c190486d7b84c1309791acddb6732cf7725"
+    },
+    {
+      "path": "page/brand/fonts/LICENSE-OpenRunde.txt",
+      "bytes": 4380,
+      "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+    },
+    {
+      "path": "page/brand/fonts/LICENSE-Teletype33.txt",
+      "bytes": 7483,
+      "sha256": "4df75f6b45b502302aff2a8ac9adafaf65a32dcabaddbcb39830a09382ed4808"
+    },
+    {
+      "path": "page/brand/fonts/LICENSE-SometypeMono.txt",
+      "bytes": 4399,
+      "sha256": "6a33c4248d9f120a2059d0e66a7084bf64e89cc19f048ccbdc21e47313d37367"
+    },
+    {
+      "path": "page/brand/dap-wordmark-green.svg",
+      "bytes": 607,
+      "sha256": "b7a21194cb1de0125fcfe19a1aa8c21ebb459a260cf76810bb27fb7923895f8e"
+    },
+    {
+      "path": "page/brand/dap-wordmark-white.svg",
+      "bytes": 645,
+      "sha256": "2f2d138ef9994f6461be20f87a98a0d1c6b94dbc606768a7ca57136a4121796d"
+    },
+    {
+      "path": "page/brand/favicon.svg",
+      "bytes": 396,
+      "sha256": "00633187018816060ded139e2614fe0b6ec1f445ce87384a1d1f4fcbd117ef6c"
+    },
+    {
+      "path": "page/brand/favicon.ico",
+      "bytes": 1985,
+      "sha256": "bc92acf0369446112bb4f0bc40d87c6dc8a525dd674676565c71ea23d98328a5"
+    },
+    {
+      "path": "page/brand/fonts/OpenRunde-Regular.woff2",
+      "bytes": 154604,
+      "sha256": "da42a03569a63e4ae09ea2943bd530fce8bbf72ea4609618232c86f54c705e76"
+    },
+    {
+      "path": "page/brand/fonts/OpenRunde-Medium.woff2",
+      "bytes": 165396,
+      "sha256": "169d786a5984c8a9d6f5ee4b019ae882a3a2e9896a44e2c28f8d5b9bab12555e"
+    },
+    {
+      "path": "page/brand/fonts/OpenRunde-Semibold.woff2",
+      "bytes": 162732,
+      "sha256": "51bb1591ab0b4b4c423165ce00b424293e0d87839a3b22027077b03323c097ae"
+    },
+    {
+      "path": "page/brand/fonts/OpenRunde-Bold.woff2",
+      "bytes": 162468,
+      "sha256": "9a64eabe53890050c4606ca2def75c0f7b78e5bfb1e45b1ee59951f30ceae79a"
+    },
+    {
+      "path": "page/brand/fonts/SometypeMono-Regular.woff2",
+      "bytes": 25160,
+      "sha256": "322438bb49920a9106249e2bb99f02d1b15fb8da6c407b30ce7fdd733171ef57"
+    },
+    {
+      "path": "page/brand/fonts/SometypeMono-Medium.woff2",
+      "bytes": 25060,
+      "sha256": "f1dfafac36dbc4358e754c1369b2f1a139548573aaf825e223880f915829db03"
+    },
+    {
+      "path": "page/brand/fonts/Teletype33-Narrow.ttf",
+      "bytes": 28212,
+      "sha256": "75581f051d43b42444911ffaa944fe5b2b61a5de6bf7a865253c105e489e69b7"
+    },
+    {
+      "path": "page/brand/fonts/Teletype33.ttf",
+      "bytes": 28520,
+      "sha256": "88c98c0fb16550f515d8765e0ef1cf421ca16d793a0605381e30da3675f352e1"
+    }
+  ],
+  "runtimeImports": [
+    {
+      "from": "page/app.ts",
+      "to": "page/captions.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "page/live.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "page/view.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "src/band.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "src/phrases.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "page/app.ts",
+      "to": "src/render.ts"
+    },
+    {
+      "from": "page/captions.ts",
+      "to": "page/view.ts"
+    },
+    {
+      "from": "page/live.ts",
+      "to": "src/band.ts"
+    },
+    {
+      "from": "page/live.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "page/view.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "page/view.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/band.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/band.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/band.ts",
+      "to": "src/players/index.ts"
+    },
+    {
+      "from": "src/band.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/band.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/interpret.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/interpret.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/mood.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/mood.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/phrases.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/bass.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/bass.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/players/bass.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/players/bass.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/players/bass.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/players/lead.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/players/percussion.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/players/synth.ts"
+    },
+    {
+      "from": "src/players/index.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/players/lead.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/lead.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/players/lead.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/players/lead.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/players/lead.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/players/percussion.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/percussion.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/players/percussion.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/players/percussion.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/players/percussion.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/players/player.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/player.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/players/player.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/players/player.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/players/synth.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/players/synth.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/players/synth.ts",
+      "to": "src/music.ts"
+    },
+    {
+      "from": "src/players/synth.ts",
+      "to": "src/players/player.ts"
+    },
+    {
+      "from": "src/players/synth.ts",
+      "to": "src/record.ts"
+    },
+    {
+      "from": "src/record.ts",
+      "to": "src/interpret.ts"
+    },
+    {
+      "from": "src/record.ts",
+      "to": "src/mood.ts"
+    },
+    {
+      "from": "src/render.ts",
+      "to": "src/record.ts"
+    }
+  ],
+  "assets": [
+    {
+      "path": "index.html",
+      "route": "/",
+      "contentType": "text/html",
+      "bytes": 8291,
+      "sha256": "ab2aeef1bd34e82f0d364b90695c542ee84b0453b186104461186e15a83520e5"
+    },
+    {
+      "path": "app.js",
+      "route": "/app.js",
+      "contentType": "text/javascript",
+      "bytes": 48745,
+      "sha256": "8637e95407834c75c47dbd0052471261674824b5e9e3dfb9cfbf2da941dd45e2"
+    },
+    {
+      "path": "brand/tokens.css",
+      "route": "/brand/tokens.css",
+      "contentType": "text/css",
+      "bytes": 1710,
+      "sha256": "f757efbd09fa66cbabb504eeb7d0ffc54e754ef92f7c9d2322f9d3d041cf7933"
+    },
+    {
+      "path": "brand/fonts.css",
+      "route": "/brand/fonts.css",
+      "contentType": "text/css",
+      "bytes": 1275,
+      "sha256": "4f857e12ea4690e8c2726e8dcebb4c190486d7b84c1309791acddb6732cf7725"
+    },
+    {
+      "path": "brand/fonts/LICENSE-OpenRunde.txt",
+      "route": "/brand/fonts/LICENSE-OpenRunde.txt",
+      "contentType": "text/plain",
+      "bytes": 4380,
+      "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+    },
+    {
+      "path": "brand/fonts/LICENSE-Teletype33.txt",
+      "route": "/brand/fonts/LICENSE-Teletype33.txt",
+      "contentType": "text/plain",
+      "bytes": 7483,
+      "sha256": "4df75f6b45b502302aff2a8ac9adafaf65a32dcabaddbcb39830a09382ed4808"
+    },
+    {
+      "path": "brand/fonts/LICENSE-SometypeMono.txt",
+      "route": "/brand/fonts/LICENSE-SometypeMono.txt",
+      "contentType": "text/plain",
+      "bytes": 4399,
+      "sha256": "6a33c4248d9f120a2059d0e66a7084bf64e89cc19f048ccbdc21e47313d37367"
+    },
+    {
+      "path": "brand/dap-wordmark-green.svg",
+      "route": "/brand/dap-wordmark-green.svg",
+      "contentType": "image/svg+xml",
+      "bytes": 607,
+      "sha256": "b7a21194cb1de0125fcfe19a1aa8c21ebb459a260cf76810bb27fb7923895f8e"
+    },
+    {
+      "path": "brand/dap-wordmark-white.svg",
+      "route": "/brand/dap-wordmark-white.svg",
+      "contentType": "image/svg+xml",
+      "bytes": 645,
+      "sha256": "2f2d138ef9994f6461be20f87a98a0d1c6b94dbc606768a7ca57136a4121796d"
+    },
+    {
+      "path": "brand/favicon.svg",
+      "route": "/brand/favicon.svg",
+      "contentType": "image/svg+xml",
+      "bytes": 396,
+      "sha256": "00633187018816060ded139e2614fe0b6ec1f445ce87384a1d1f4fcbd117ef6c"
+    },
+    {
+      "path": "brand/favicon.ico",
+      "route": "/brand/favicon.ico",
+      "contentType": "image/vnd.microsoft.icon",
+      "bytes": 1985,
+      "sha256": "bc92acf0369446112bb4f0bc40d87c6dc8a525dd674676565c71ea23d98328a5"
+    },
+    {
+      "path": "brand/fonts/OpenRunde-Regular.woff2",
+      "route": "/brand/fonts/OpenRunde-Regular.woff2",
+      "contentType": "font/woff2",
+      "bytes": 154604,
+      "sha256": "da42a03569a63e4ae09ea2943bd530fce8bbf72ea4609618232c86f54c705e76"
+    },
+    {
+      "path": "brand/fonts/OpenRunde-Medium.woff2",
+      "route": "/brand/fonts/OpenRunde-Medium.woff2",
+      "contentType": "font/woff2",
+      "bytes": 165396,
+      "sha256": "169d786a5984c8a9d6f5ee4b019ae882a3a2e9896a44e2c28f8d5b9bab12555e"
+    },
+    {
+      "path": "brand/fonts/OpenRunde-Semibold.woff2",
+      "route": "/brand/fonts/OpenRunde-Semibold.woff2",
+      "contentType": "font/woff2",
+      "bytes": 162732,
+      "sha256": "51bb1591ab0b4b4c423165ce00b424293e0d87839a3b22027077b03323c097ae"
+    },
+    {
+      "path": "brand/fonts/OpenRunde-Bold.woff2",
+      "route": "/brand/fonts/OpenRunde-Bold.woff2",
+      "contentType": "font/woff2",
+      "bytes": 162468,
+      "sha256": "9a64eabe53890050c4606ca2def75c0f7b78e5bfb1e45b1ee59951f30ceae79a"
+    },
+    {
+      "path": "brand/fonts/SometypeMono-Regular.woff2",
+      "route": "/brand/fonts/SometypeMono-Regular.woff2",
+      "contentType": "font/woff2",
+      "bytes": 25160,
+      "sha256": "322438bb49920a9106249e2bb99f02d1b15fb8da6c407b30ce7fdd733171ef57"
+    },
+    {
+      "path": "brand/fonts/SometypeMono-Medium.woff2",
+      "route": "/brand/fonts/SometypeMono-Medium.woff2",
+      "contentType": "font/woff2",
+      "bytes": 25060,
+      "sha256": "f1dfafac36dbc4358e754c1369b2f1a139548573aaf825e223880f915829db03"
+    },
+    {
+      "path": "brand/fonts/Teletype33-Narrow.ttf",
+      "route": "/brand/fonts/Teletype33-Narrow.ttf",
+      "contentType": "font/ttf",
+      "bytes": 28212,
+      "sha256": "75581f051d43b42444911ffaa944fe5b2b61a5de6bf7a865253c105e489e69b7"
+    },
+    {
+      "path": "brand/fonts/Teletype33.ttf",
+      "route": "/brand/fonts/Teletype33.ttf",
+      "contentType": "font/ttf",
+      "bytes": 28520,
+      "sha256": "88c98c0fb16550f515d8765e0ef1cf421ca16d793a0605381e30da3675f352e1"
+    }
+  ],
+  "headers": {
+    "path": "_headers",
+    "bytes": 356,
+    "sha256": "04b257c39c3b83bbfb353447ac4b6657e0f7af7008cee2143b1244f87ab9c414"
+  },
+  "config": {
+    "name": "artroom-jam",
+    "compatibility_date": "2026-10-11",
+    "assets": {
+      "directory": "./deploy/assets",
+      "not_found_handling": "none",
+      "run_worker_first": false
+    }
+  }
+}

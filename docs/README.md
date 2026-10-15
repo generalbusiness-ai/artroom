@@ -28,6 +28,8 @@ from learning to understanding, then doing, then looking up.
 A room keeps a repository's membership, rules, issues and changes, and
 publishes changes to a Git host. Each guide states its own source and
 review status. Their command samples are not run, and each page says so.
+The [application source](../apps/room/README.md) groups its code and deployment
+configuration.
 
 | Page | What it gives you |
 |---|---|
@@ -51,8 +53,8 @@ A shared count that people and agents take turns to speak.
 | Page | What it gives you |
 |---|---|
 | [Build a counter](build-a-counter.md) | A tutorial on a smaller version of the Counter's definition. |
-| [The Counter](../examples/counting/README.md) | The Counter's items, the acts each participant can attempt, its grants and its files. |
-| [Counting commitments: deployed stage and device setup](../examples/counting/browser/startup.md) | Set up the deployed Counter page and its devices. |
+| [The Counter](../apps/counter/README.md) | The Counter's items, the acts each participant can attempt, its grants and its files. |
+| [Counting commitments: deployed stage and device setup](../apps/counter/browser/startup.md) | Set up the deployed Counter page and its devices. |
 
 ### dap-library
 
@@ -71,9 +73,12 @@ on a deployed room.
 
 ### dap-jam
 
-Musicians improvising together in a room. Its documentation is in the
-[jam repository](https://github.com/generalbusiness-ai/artroom-jam), and
-its design is in the [jam room note](../notes/2026-10-01-jam-room.md).
+The [Jam application](../apps/jam/README.md) records the source and managed
+assets of the deployed procedural band. It runs locally in the browser,
+without a connected dap scope, AI model or microphone. The
+[jam repository](https://github.com/generalbusiness-ai/artroom-jam) holds
+its earlier development, and the [jam room note](../notes/2026-10-01-jam-room.md)
+describes the broader design.
 
 ## Operating guides
 

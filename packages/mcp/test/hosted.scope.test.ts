@@ -1,7 +1,7 @@
 /**
  * The hosted MCP endpoint on real scopes (notes/2026-10-13-hosted-mcp-endpoint.md, section 6): the registry and the agent
- * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the Worker's own
- * routes (`mcpRoute`), with the pinned MCP client where a client is named. rita founds the room through her own MCP service
+ * objects of the test Worker (`packages/scope/test/worker.ts`, over the namespace PLATFORM), reached through the production app
+ * Worker's default fetch, with the pinned MCP client where a client is named. rita founds the room through her own MCP service
  * and performs the admin's acts; the agent is created by a control request she signs.
  */
 import { env } from "cloudflare:test";
@@ -11,18 +11,19 @@ import { b64url, canonicalize, digestBytes, keyIdOfSecret, newIncarnation, signC
 import { encodeAgentKeyInvitation, type AgentKeyInvitation } from "@generalbusiness/artroom-client";
 import { FIRST_ACTIONS_OF, firstExtents } from "@generalbusiness/dap-platform";
 import { DEMO_DIGESTS, changeDemo, issueDemo } from "@generalbusiness/dap-lanes";
-import { counting } from "../../../examples/counting/definition.ts";
-import { COUNTING_DEFINITION } from "../../../examples/counting/pin.ts";
+import { counting } from "../../../apps/counter/definition.ts";
+import { COUNTING_DEFINITION } from "../../../apps/counter/pin.ts";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-import { mcpRoute } from "../../scope/src/worker.ts";
+import worker from "../../../apps/room/worker.ts";
 import { hostedTest } from "../../scope/test/worker.ts";
 import { BOUNDS, COMPLETION_BYTES, MODERN, MODERN_RESULT_EXTRA } from "../src/index.ts";
 import { INVITATION_LINK } from "@generalbusiness/artroom-client";
 import { mcpRoom, SERVICE, type Agent, type Room } from "./support/room.ts";
 import { founded } from "./support/story.ts";
 
-/** The Worker's routes, as a client's fetch: every request of the story goes through `mcpRoute`, in this isolate. */
-const routed = (url: string | URL, init?: RequestInit): Promise<Response> => mcpRoute(new Request(url, init), env).then((r) => r ?? new Response(null, { status: 404 }));
+/** Production default dispatch, in this isolate. The actual native PLATFORM namespace is this fixture's Scope binding;
+ * REGISTRIES and AGENTS keep their existing native subclasses, clocks, custody and control fences. */
+const routed = (url: string | URL, init?: RequestInit): Promise<Response> => worker.fetch(new Request(url, init), { ...env, SCOPES: env.PLATFORM });
 const fetchLike = ((url: string | URL | Request, init?: RequestInit) => routed(url instanceof Request ? url.url : url, init)) as unknown as typeof fetch;
 
 /** Every step of a scope, across the steps tool's pages. */

@@ -5,7 +5,7 @@
  * rehearsal records what was printed, how long it took and whether it matches.
  *
  * It runs in any runtime: `scripts/demo-run.ts` gives it Node's files, `git` and `fetch` against a deployment, and
- * `packages/lanes/test/demo.scope.test.ts` gives it the test Worker's routes on real scopes, with the stand-ins that test names.
+ * `apps/room/lanes/test/demo.scope.test.ts` gives it the test Worker's routes on real scopes, with the stand-ins that test names.
  *
  * A secret is never in what it records: an invitation link is cut to its first letters wherever a line or a typed command holds
  * one, and nothing else that it prints holds a secret (a read token is never printed by `dap clone`; a key is printed by its ID).

@@ -66,7 +66,6 @@
  * observation read of a membership scope. It has no route here.
  */
 
-import { DEMO_OFFER_PATH, demoFoundingRoute } from "./demo-founding.ts";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { CONTROL_BODY_BYTES, HostedAgent, HostedRegistry, controlOf, type AgentPorts, type ControlAnswer, type RegistryPorts } from "@generalbusiness/dap-mcp";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
@@ -88,10 +87,6 @@ import { ARTIFACTS_HOST, artifactsOutside, type ArtifactsBindings } from "./arti
 import { recordedHost } from "./host-wiring.ts";
 import { NO_OUTSIDE, type Outside } from "./operations.ts";
 import { isSite, site } from "./site/route.ts";
-import { isPage, page } from "./page.ts";
-import { isCounting, countingPage } from "./counting.ts";
-import { isLending, lendingPage } from "./lending.ts";
-import { isBrand, brand } from "./brand.ts";
 
 /**
  * The bindings of the deployed Worker (`wrangler.jsonc`): the one scope
@@ -437,16 +432,12 @@ export class ScopeService<E extends Env = Env> extends WorkerEntrypoint<E> imple
   retained(scope: string, reader: unknown, kind: RetainedInput["kind"], digest: Digest, domain?: string): Promise<Read<RetainedInput>> { return api(this.scopes()).retained(scope, reader, kind, digest, domain); }
 }
 
-/**
- * `GET /site/...` is a room's published pages (`site/route.ts`); `GET /page/` is the room's page, its static files bundled into
- * this Worker (`page.ts`); every other path is a route of the table above.
- */
+/** Generic Scope, Site and MCP dispatch. Application pages and demo offers belong to apps/room. */
 export default {
   fetch: async (request: Request, env: Env & Partial<Pick<McpEnv, "REGISTRIES" | "AGENTS">>): Promise<Response> => {
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
     const hosted = await mcpRoute(request, env);
-    if (hosted) return hosted;
-    return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);
+    return hosted ?? (isSite(request) ? site(request, env) : route(request, env.SCOPES));
   },
 };
 

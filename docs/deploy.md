@@ -1,7 +1,7 @@
 # Deploy the scope Worker
 
 `npm run deploy:scope` deploys the scope Worker from
-`packages/scope/wrangler.jsonc` with Wrangler 4.147.0. Follow
+`apps/room/wrangler.jsonc` with Wrangler 4.147.0. Follow
 [Run dap in 10 minutes](self-host.md) to deploy it on your own account,
 create a room, and invite another device. This page describes the service
 settings and the GitHub setup order.
@@ -145,12 +145,12 @@ No additional setting or token is required. See [pages.md](pages.md).
 ## The page
 
 The scope Worker serves the room's page at `/page/` from
-`packages/scope/src/page-assets.ts`, which is committed and which the
+`apps/room/page/assets.ts`, which is committed and which the
 page package's build writes ([The page](../apps/room/docs/page.md)). Deploying the Worker
 deploys the page; it needs no binding, setting or secret of its own.
 
 The same Worker serves the lending library's member interface at
-`/lending/`, from `packages/scope/src/lending-assets.ts`, which
+`/lending/`, from `examples/lending/worker/assets.ts`, which
 `examples/lending/scripts/assets.mjs` writes. Like the page, it needs no
 binding, setting or secret of its own. Serving it does not create a
 library: a room creates one with its application factory, as the
@@ -160,10 +160,10 @@ library's [runbook](../examples/lending/runbook.md) describes.
 
 The project's library runs on its own deployment of the scope Worker,
 `dap-lending`, at <https://dap-lending.inguz.workers.dev>. Its
-configuration is `packages/scope/wrangler.lending.jsonc`: its own
+configuration is `apps/room/wrangler.lending.jsonc`: its own
 Durable Object namespace, the Artifacts namespace `dap-lending`, and an
 `ARTIFACTS_CONFIG` that names the library room's register. Deploy it from
-`packages/scope`:
+`apps/room`:
 
 ```sh
 npx -y wrangler@4.147.0 deploy --config wrangler.lending.jsonc

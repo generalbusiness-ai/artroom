@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import worker, { type Env } from "../src/worker.ts";
-import { isLending } from "../src/lending.ts";
-import { LENDING_ASSETS } from "../src/lending-assets.ts";
+import worker, { type Env } from "../../../apps/room/worker.ts";
+import { isLending } from "../../../examples/lending/worker/route.ts";
+import { LENDING_ASSETS } from "../../../examples/lending/worker/assets.ts";
 
 // The production Worker entry serves static generated files without a scope binding.
 // This witnesses route/security behavior, not browser startup, joining or a lending act.
