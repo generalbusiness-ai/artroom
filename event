@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/src/page-assets.ts","body":{"commit":"a0cfba4febb81bc9d2a3a8bb890a6a78ee1fca04","path":"packages/scope/src/page-assets.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:07b7758f16ca8aa585421166149b30f35b96de40","text":"Merge retired a covered predecessor; the successor is at packages/bytes/src/edit-path.ts."}
