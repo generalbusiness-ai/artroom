@@ -10,16 +10,19 @@ the server reports that judgment as the scope gave it.
 
 The server is the package `packages/mcp` (`@generalbusiness/dap-mcp`).
 For one release, `artroom mcp` runs the same server through the command
-line's `artroom` alias; the config directory is still `ARTROOM_HOME`. Plan
-031 is its design; the
+line's `artroom` alias. `DAP_HOME` selects the config directory, with
+`ARTROOM_HOME` retained as a compatible alias. The CLI and MCP server use
+one resolved directory; conflicting variables refuse before either store
+is accessed. [The CLI guide](cli.md) describes new defaults and discovery of
+legacy custody. Plan 031 is its design; the
 delivery note `notes/2026-10-13-mcp-generic-delivery.md` says what was built
 and what ran.
 
 ## Connect an agent host
 
 The server runs where the command line runs, with the same config
-directory (`ARTROOM_HOME`). Set the room up first with `dap install`
-and `dap create`; or start the server with an empty config directory
+directory (`DAP_HOME`, or the legacy `ARTROOM_HOME`). Set the room up first
+with `dap install` and `dap create`; or start the server with an empty config directory
 and call its `join` tool with an invitation link, which records the room
 there as `dap join` does. The link holds the invitation's secret.
 `join`'s own result never repeats it. The join that membership admits
@@ -37,7 +40,7 @@ dap mcp
 ```
 
 An agent host's configuration names the command and its arguments, for
-example `{"command": "artroom", "args": ["mcp"]}`, with `ARTROOM_HOME` in
+example `{"command": "artroom", "args": ["mcp"]}`, with `DAP_HOME` in
 its environment when the config directory is not the default one. Messages
 are one JSON object per line. Diagnostics go to standard error.
 
@@ -266,9 +269,10 @@ caller's `idempotencyKey`, in the config directory's
   reading it again; a release removes only the releaser's own holding.
   A reclaim lock is never broken: if the process holding it died, every
   call that needs that lock is refused as `locked` until an operator
-  removes the reclaim file once no process of this `ARTROOM_HOME` runs.
+  removes the reclaim file after all processes using this config directory
+  have stopped.
   The refusal's next step names the file once, whole, relative to
-  `ARTROOM_HOME` (for example
+  the selected config directory (for example
   `private/mcp-custody/capacity.lease.reclaim`), so its length does not
   depend on the home's. Archival reads each record again under its lock and
   skips one that is no longer terminal.

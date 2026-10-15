@@ -221,7 +221,7 @@ mutation. A missing reply leaves the outcome unknown and a cleanup duty
 open. The driver does not send the same mutation again. Private
 credentials are kept apart from the public journal. Deleting a token's
 plaintext does not prove that the provider revoked the token.
-[Configure a Git host](hosts.md#the-hostings-own-git-service-host-artifacts)
+[Configure a Git host](hosts.md#cloudflare-artifacts-host-artifacts)
 says how each host keeps and revokes its tokens. A Git commit does not
 itself become a dap act, and a recorded act does not itself prove that a
 Git write finished.

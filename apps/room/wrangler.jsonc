@@ -14,7 +14,7 @@
 // the Worker routes each host operation by that recorded host. With no host
 // configured, every outside effect stays recorded and unsent.
 //
-// - The hosting's own Git service, for a register installed with
+// - Cloudflare Artifacts, for a register installed with
 //   `--host artifacts --namespace artroom-demo`: the `artifacts` binding
 //   below, and the variable ARTIFACTS_CONFIG, nonsecret JSON with exactly
 //   the fields registerScope (the install's register scope ID), namespace
@@ -46,7 +46,7 @@
     { "tag": "v1", "new_sqlite_classes": ["DeployedScope"] },
     { "tag": "v2", "new_sqlite_classes": ["McpRegistry", "McpAgent"] }
   ],
-  // The hosting's own Git service: one namespace, reached by the binding
+  // Artifacts: one namespace, reached by the binding
   // ARTIFACTS. It takes effect only with ARTIFACTS_CONFIG set as above.
   "artifacts": [{ "binding": "ARTIFACTS", "namespace": "artroom-demo", "remote": true }]
 }

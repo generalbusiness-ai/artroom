@@ -9,7 +9,9 @@ export async function readPage(origin: string, directory: string, thing: Thing, 
   if(!response.headers.get("content-type")?.startsWith("text/html")) return {status:"unreadable",reason:"The site did not answer with a page."};
   const text=await response.text();
   if(text.length>128*1024) return {status:"unreadable",reason:"The published page is too large to compare."};
-  const doc=new DOMParser().parseFromString(text,"text/html"), main=doc.querySelector("main"), commit=doc.querySelector("footer > code")?.textContent ?? "";
+  // Template content stays inert: the site's styles and embedded resources never apply here.
+  const template=document.createElement("template"); template.innerHTML=text;
+  const doc=template.content, main=doc.querySelector("main"), commit=doc.querySelector("footer > code")?.textContent ?? "";
   if(!main || !/^[0-9a-f]{40}$/.test(commit)) return {status:"unreadable",reason:"The site did not identify the rendered commit."};
   const expected=expectedPage(thing,scope), children=[...main.children];
   const tags=children.map(c=>c.tagName).join(","), allowed=expected.description ? "H1,P,UL" : "H1,UL";

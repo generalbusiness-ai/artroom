@@ -13,7 +13,7 @@ import { NO_OUTSIDE, type EffectAnswer, type EffectRequest } from "../src/operat
 import { outsideOf } from "../src/worker.ts";
 import { found } from "./support.ts";
 
-// The hosting's own Git service is a STAND-IN here: a scripted binding
+// Cloudflare Artifacts is a STAND-IN here: a scripted binding
 // double whose every answer the test writes. No repository or token exists.
 // The register's judgments are real, in memory; SQLite is a test object's.
 

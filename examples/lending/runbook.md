@@ -2,7 +2,13 @@
 
 **Run status: the final room completed the exact-script automated browser
 story and all seven publications.** The curated public Git history is now published and anonymously verified.
-Homepage hosting and the final validation gate remain pending. Two earlier rehearsals are retained.
+Homepage publication completed; the original f33 gate and later receiving
+MCP correspondence remain separate, as recorded below. Two earlier rehearsals are retained.
+The member interface offers **Cancel this thing** and its reason box only
+after membership confirms that the signer's role holds `lending.staff`.
+The control is hidden while that read is loading or unavailable. The scope
+still refuses an unauthorized cancel if the observed role is stale.
+
 The publication rehearsal produced real browser acts, written receipts, and
 anonymous immutable pages. Its Small pot description differed from the
 approved script, so its mechanical completion is not final story acceptance.
@@ -38,8 +44,10 @@ seat. The operator key signs installation and setup, and is kept separately
 from each browser's nonextractable device key.
 
 Keep the operator key and each original request in a separate, owner-only
-`ARTROOM_HOME` outside the checkout. Do not expose invitation links, private
-keys, session headers, or pending envelopes in public evidence.
+`DAP_HOME` outside the checkout. Existing `ARTROOM_HOME` settings remain
+accepted, but the two variables must name the same directory when both are
+set. Do not expose invitation links, private keys, session headers, or
+pending envelopes in public evidence.
 
 ```sh
 node packages/cli/bin/dap.js install --plan "https://dap-library-publication-final-1014.inguz.workers.dev" --cohort application-publication --host artifacts --namespace "dap-library-publication-final-1014"
@@ -92,9 +100,9 @@ The current canonical input is 4,458 bytes, not the 4,459-byte authoring file.
 
 ```sh
 umask 077
-node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set name=lending --value "$ARTROOM_HOME/lending.json"
-node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set 'values={}' --set execution=recorded-do --value "$ARTROOM_HOME/lending.json"
+node -e 'process.stdout.write(require("fs").readFileSync("examples/lending/definition.json", "utf8").replace(/\n$/, ""))' > "$DAP_HOME/lending.json"
+node packages/cli/bin/dap.js act activate --on rules --set digest=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set name=lending --value "$DAP_HOME/lending.json"
+node packages/cli/bin/dap.js act establish-application --on directory --set definition=sha256:6fff876ce1c64afedfe9b5ba2864aa31a7a7d5e7e05d7b83619c00e168786ee7 --set 'values={}' --set execution=recorded-do --value "$DAP_HOME/lending.json"
 ```
 
 Keep the exact signed establishment request before submission. Reconcile
@@ -230,6 +238,24 @@ ordinary written receipt and the child's published result after normal
 cleanup. This does not prove judgment Replay, independently fetched new
 history Git objects, or human acceptance.
 
+The completed history publication retained an original merge refusal:
+`guard-failed`, naming `approvals-needed`, at child entry 20. The operator
+published a replacement policy at rules entry 7, changing the global
+approval floor from 1 to 0 while preserving all four extent requirements.
+The existing change requested those rules at entry 21. Checkpoint `68996`
+verified the rules reply at entry 8 and its application at child entry 22;
+the original manifest at child entry 20 stayed unchanged. The fresh merge
+at child entry 24 took effect. Nonhistory lanes can now pass early admission,
+but the destination still requires their explicit extent approval of 1;
+the history extent requires 0.
+
+That ordinary merge published history commit
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Destination publication 66
+reached its published transition at 73, produced written receipt 77, and
+was normally cleaned at 81. These are observations of a completed run,
+not instructions to repeat policy changes or merge in the existing room.
+Keep the original refusal and correction with their original journal facts.
+
 Members can inspect the lending journal with the actual full scope reference:
 
 ```sh
@@ -252,14 +278,21 @@ verification:
 | Published shelf | Anonymous read of the final room's shelf pages and current public history. |
 | Members' journal | Verified member interface journal view or documented route for a member with a seat. No invitation or credential in the URL. |
 
-The existing member-interface and members' journal links target the older
-`https://dap-lending.inguz.workers.dev/lending/` rehearsal. Those links landed
-at `26d2bc8a`. Preserve their historical record. Final publication-room link
-changes are prepared separately and remain unhosted in this draft. Replace unavailable text only with the new room's
-verified destinations in the final commit, then run the homepage's own test
-and one final gate. Publish the homepage only after that commit is approved
-and landed. Retain its original build,
-deployment version, and byte, MIME, cache, and link readbacks.
+The earlier member-interface and members' journal links targeted the
+`https://dap-lending.inguz.workers.dev/lending/` rehearsal and landed at
+`26d2bc8a`. Preserve that historical record. The final Library links now
+serve from [the public homepage](https://dap.generalbusiness.ai/library/):
+the open-library button and member-interface link use the final service,
+and the shelf and public-history links use its verified Site routes.
+The member journal remains in the member interface after joining.
+
+Original Home publication `89750` completed with exit 0. Version
+`08166185-ce73-473a-b3f7-1684c038ff83` serves 100% of traffic. All 13
+anonymous static reads matched the retained build's bytes, MIME types,
+cache policy, titles, and anchors; all four Library hrefs matched. The
+existing domain and protected resources were preserved. This upload reused
+the original 14-file build `55847`; it did not run another build or gate.
+These readbacks do not prove rendered geometry or human acceptance.
 
 ## The rehearsal run, 14 October 2026
 
@@ -290,9 +323,10 @@ Corrections found in the run:
   the digest of the bytes without it. `--value` sends a file as it is, so
   the runbook's first commands were refused `bad-field`. The commands
   above now send a copy without the newline.
-- The demo script's shot 8a said not to claim that the member interface
-  offers a cancel button to a member. It does, and the scope refuses it.
-  The script now shows that refusal.
+- During this rehearsal, the interface offered a cancel button to an
+  ordinary member, and the scope refused the act. Shot 8a was changed to
+  show that refusal. The current interface hides the button unless the
+  signer's observed role holds `lending.staff`.
 
 Not done in this run: publication, the published shelf, the public
 history witness, and a second physical device.
@@ -307,10 +341,16 @@ original-answer checks, and three anonymous pages at commit
 `bd724ee1d21486dbe822faf740312318be38cb5d`. The original clone and extraction passed, including actual parents, page
 blobs, and receipt bytes. The curated public history was published and its index, raw companions,
 and current shelf pages were anonymously verified at
-`14401f8bd851ce525ac1526ed57d2bceaf36d360`. Homepage hosting and the
-final validation gate remain pending; the six-output parent stays open. Keep each
-rehearsal's original results, failures, and uncertainties separate from the
-future final run.
+`14401f8bd851ce525ac1526ed57d2bceaf36d360`. The original gate at
+`f33a7d7feadeda092151aab5a993be37fb24edae` completed: 1,197 Vitest
+cases passed and three were skipped; the Node groups passed 10 and 55 cases.
+The later receiving commit `12a99599de2c2514a50be22f6194d1813d5c38d0`
+preserves that candidate while composing separately approved Main MCP
+changes. That correspondence is separate from the original gate; no gate
+on the combined commit is claimed. Homepage publication `89750` completed
+separately with all 13 static readbacks matching. The full six-output request
+awaits its final review. Keep each rehearsal's original results, failures,
+and uncertainties separate from the completed final run.
 
 | Output | Evidence to record |
 | --- | --- |

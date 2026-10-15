@@ -58,7 +58,8 @@ test("SDK module references preserve genuine imports and rewrite declarations wi
     assert.equal(published.name, "@generalbusiness/dap-platform");
     assert.deepEqual(published.repository, { type: "git", url: "git+https://github.com/generalbusiness-ai/dap.git", directory: "apps/room/definitions" });
     assert.equal(published.homepage, "https://dap.generalbusiness.ai/");
-    assert.deepEqual(Object.keys(published.exports), ["."]);
+    assert.deepEqual(Object.keys(published.exports), [".", "./membership-actions"]);
+    assert.deepEqual(published.exports["./membership-actions"], { types: "./dist/src/membership-actions.d.ts", default: "./dist/src/membership-actions.js" });
     assert.deepEqual(published.dependencies, { "@generalbusiness/dap-bytes": "0.1.0-dev.2", "@generalbusiness/dap-contract": "0.1.0-dev.2", "@generalbusiness/dap-derive": "0.1.0-dev.2" });
     const bytes = PLAN.packages.find(spec => spec.dir === "bytes");
     const bytesManifest = JSON.parse(readFileSync(new URL("packages/bytes/package.json", root), "utf8"));

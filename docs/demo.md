@@ -30,6 +30,15 @@ fresh config directory.
 | 22, 23 | `dap issues` shows #1 closed; `dap verify --all` reports fourteen scopes consistent | 8, 12 |
 | 24 to 27 | The site's front page, the two published pages, and the room's page at `/page/` | 7, 9, 11 |
 
+### What the concurrency shots show
+
+Two changes are proposed on the same published base. The first publishes.
+The second is refused `out-of-date`, and its lane stays in the journal.
+The room settles the race by reservation and judgment at the destination.
+Both changes target the destination's one repository; only the first is
+published on that base. A fork for each hold is not built
+([hosts](hosts.md)).
+
 Each shot states the exit code and the lines it expects. The isolated
 GitHub rehearsal `github27-freeze-two`, run on 12 October 2026 UTC,
 observed the new stale-base row at source `c8cb6c538`. All 27 shots ran;

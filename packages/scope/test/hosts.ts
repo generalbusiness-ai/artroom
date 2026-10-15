@@ -1,6 +1,6 @@
 /**
- * STAND-INs for the two Git hosts, for a story that runs the production wiring of each host's ports over them: `OwnGit` for the
- * hosting's own Git service, its binding and its smart HTTP; `Hub` for GitHub's REST API and its smart HTTP. Refs and objects are
+ * STAND-INs for the two Git hosts, for a story that runs the production wiring of each host's ports over them: `OwnGit` for
+ * Cloudflare Artifacts, its binding and its smart HTTP; `Hub` for GitHub's REST API and its smart HTTP. Refs and objects are
  * maps; a read serves every object, and a push applies its one compare-and-swap command and keeps the objects of its pack, decoded
  * by the git package. Neither is a Git host: the git package's own tests send the same pack bytes to real local Git. A `Stand` is
  * one host as a test wires it: the install's host and namespace, the bindings of a deployment's setting, and the production wiring.
@@ -70,7 +70,7 @@ class OwnedPack {
 }
 
 /**
- * STAND-IN for the hosting's own Git service: its binding, and smart HTTP over a map of refs and objects. A read serves every
+ * STAND-IN for Artifacts: its binding, and smart HTTP over a map of refs and objects. A read serves every
  * object; a push applies its one compare-and-swap command and keeps the objects of its pack, decoded. It is no Git host: the git
  * package's own tests send the same pack bytes to real local Git.
  */

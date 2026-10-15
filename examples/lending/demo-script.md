@@ -3,7 +3,7 @@
 A script for recording the lending library. The story is Nasruddin and the
 pot. It takes two people, or one person with two browser profiles.
 
-**Run status: final automated browser run `9377` passed the exact script.**
+**Run status: final automated browser run `9377` passed the approved seven-act story.**
 The seven lending acts and their destination publications completed. The
 Small pot description is exactly "Baby born when the big pot was with me";
 the cancellation reason is exactly "Nasruddin says the pot died". Both
@@ -13,7 +13,10 @@ browser witness, not human or separate physical-device acceptance.
 The earlier publication run is retained as a rehearsal because its Small pot
 description differed. Its browser and Git extraction results remain real,
 separate evidence. Local Git history extraction passed. The curated public history is now published and anonymously verified.
-Homepage hosting and the final validation gate remain pending.
+Homepage publication `89750` and the original gate at `f33a7d7f` completed.
+The [completion note](../../notes/2026-10-14-library-publication-completion.md)
+keeps that gate separate from the later MCP composition. The journal and
+staff-control follow-up still awaits its own validation, gate, and deployment.
 
 The [runbook](runbook.md) records the cohort, exact declaration, and original
 failures. Its earlier nonpublishing rehearsal remains separate. Show each
@@ -54,9 +57,16 @@ birth and the death are recorded the same way.
 | 5 | Nasruddin | Donates "Small pot", description "Baby born when the big pot was with me". | The small pot, available, donated by @nasruddin, with his description. | "So he donates it. The description is his. The library keeps his words and judges none of them." |
 | 6 | Nasruddin | Borrows the big pot again. | Lent to @nasruddin. | "He borrows the big pot again." |
 | 7 | Nasruddin | Says the pot died. Does nothing in the interface. | No change. | "This time he comes back empty-handed. The pot, he says, has died." |
-| 8a | Nasruddin | Cancels the big pot, reason "The pot died". The member interface offers **Cancel this thing** to members too. | "Only staff can cancel a thing. (unauthorized)" The pot is still lent. | "He cannot strike it from the library himself. Only staff can." |
+| 8a | Nasruddin | Looks at the big pot as an ordinary member. Sends no cancel act. | No cancel reason box or **Cancel this thing** button. The pot is still lent. | "He cannot strike it from the library himself. Only staff can." |
 | 8b | Neighbour | Cancels the big pot, reason "Nasruddin says the pot died". | The pot is gone. The reason is on its page and in the record, under the neighbour's name. | "The neighbour records it, in the neighbour's own words." |
 | 9 | Neighbour | Donates "New big pot", description "Copper, eight litres." | Two things on the shelf: the small pot and the new big pot. The old pot's page stays, marked gone. | "And the shelf is replenished." |
+
+Shot 8a describes the updated staff-only control. The earlier rehearsal
+used an interface that offered **Cancel this thing** to an ordinary member.
+Its original cancel was refused "Only staff can cancel a thing.
+(unauthorized)" and changed nothing; the [runbook](runbook.md) retains that
+result. Show that retained refusal separately from the updated control
+being absent. No new recording of the updated interface is claimed here.
 
 Nasruddin's line at shot 4, spoken and not written to any record (a
 traditional telling):
@@ -80,7 +90,7 @@ decide. (revision-moved)". Either way the pot has one borrower.
 | Shot | Show | Say |
 |---|---|---|
 | 10 | The published shelf: three pages. The old big pot reads "gone: Nasruddin says the pot died". Each page names the lending scope it came from, and the commit history shows each page's changes. | "The shelf is a published copy of the library's record. Each change to a page is a commit, and the library's record says which act made it." |
-| 11 | The record, in the interface or with `dap log`: seven acts in order, each with its signer. The refused cancel is not among them. | "The record is the authority. Seven acts took effect. The one that was refused changed nothing." |
+| 11 | The record, in the interface or with `dap log`: seven acts in order, each with its signer. Show the earlier rehearsal's retained cancel refusal beside it. | "The record is the authority. Seven acts took effect. The earlier refused cancel changed nothing." |
 | 12 | `dap verify` on the lending scope. | "And anyone with the record can check it again." |
 
 ## What is in the journal at the end
@@ -104,8 +114,11 @@ an interactive control or substitute a local refusal for a scope judgment.
 
 If an actual donation or join has an unknown answer, record recovery beside
 its original request. Reuse that kept request after a reload. Do not add an
-extra donation or join to replace it. The retained rehearsal contains both
-Check recoveries; do not present them as observations of the fresh final room.
+extra donation or join to replace it. The final run `9377` separately
+reconciled its lost join answer and lost Small pot donation answer with
+**Check**, without second acts. The earlier
+rehearsal also contains two Check recoveries; keep each run's evidence
+with its own room.
 
 For the public closing shot, use an unseated browser. Read all three shelf
 pages and commit history. Show the cancelled page's reason and the lending
@@ -120,5 +133,8 @@ verified actual Git commits, linear parents, page blobs, and receipt bytes.
 The later history publication is commit
 `14401f8bd851ce525ac1526ed57d2bceaf36d360`. Its index, 14 raw companions,
 shelf folder, and three current pages passed anonymous readback. Homepage
-hosting and the final validation gate remain pending.
+publication `89750` verified all 13 static readbacks and the four final Library
+links. The original gate at `f33a7d7f` passed; it does not cover the later MCP
+composition or this journal and staff-control follow-up. The follow-up
+validation, gate, and deployment remain pending.
 No whole judgment Replay or human/physical-device acceptance is inferred.

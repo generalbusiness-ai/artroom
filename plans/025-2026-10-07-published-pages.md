@@ -16,7 +16,7 @@ yet. Versions are branches and tags, as a documentation site shows them.
 - **Room.** A claimed repository with its directory, membership, rules
   scope and destination, as today.
 - **Repository.** The room's Git repository at its host. With the room's
-  own host (the hosting's Git service, gate 1b) it needs no outside
+  own host (Cloudflare Artifacts, gate 1b) it needs no outside
   credential; with GitHub it needs the App.
 - **Page.** A markdown file in the published branch. Its address is its
   path. An image or other file next to it is an **asset**.

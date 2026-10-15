@@ -6,6 +6,10 @@
     "types": ["node"],
     "paths": {
       "@generalbusiness/dap-contract": ["../../../packages/contract/src/index.ts"],
+      "@generalbusiness/dap-platform": ["../../../packages/platform/src/index.ts"],
+      "@generalbusiness/dap-platform/membership-actions": ["../../../packages/platform/src/membership-actions.ts"],
+      "@generalbusiness/dap-derive": ["../../../packages/derive/src/index.ts"],
+      "@generalbusiness/dap-derive/rule": ["../../../packages/derive/src/rule/index.ts"],
       "@generalbusiness/artroom-bytes": ["../../../packages/bytes/src/index.ts"],
       "@generalbusiness/artroom-client": ["../../../packages/client/src/index.ts"]
     }

@@ -17,7 +17,7 @@ const reader = "a test reader";
 const NAMESPACE = "artroom-demo";
 const HOST = "service.invalid";
 
-/** STAND-IN: the binding of the hosting's own Git service, scripted. Each read token has a new plaintext and the lifetime asked. */
+/** STAND-IN: the binding of Cloudflare Artifacts, scripted. Each read token has a new plaintext and the lifetime asked. */
 function binding(lifetime: ReturnType<typeof nativeFixtureLifetime>) {
   const minted: string[] = [];
   const ns: ArtifactsNamespace = {
@@ -89,7 +89,7 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
   const run = (who: Context, ...argv: string[]): Promise<Outcome> => lifetime.wait(() => command(who, argv));
   const ok = (outcome: Outcome) => { expect(outcome.code, outcome.lines.join("\n")).toBe(0); return outcome; };
 
-  // A room on the hosting's own Git service.
+  // A room on Artifacts.
   ok(await run(rita, "install", SERVICE, "--host", "artifacts", "--namespace", NAMESPACE));
   const R = lifetime.platform((await lifetime.wait(() => rita.store.config()))!.register!.scope);
   lifetime.wire(R.name, () => ({ outside: outsideOf(R.name) }));

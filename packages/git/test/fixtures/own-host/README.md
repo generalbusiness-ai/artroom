@@ -1,4 +1,4 @@
-# Captured smart-HTTP responses of the hosting's own Git service
+# Captured smart-HTTP responses of Cloudflare Artifacts
 
 Captured by the planner on 2026-10-07 at 11:36 Eastern from the live
 repository `artroom-demo/lm2piehzm5ujqyctjecrjthjwcg73u2v5ryz4gyqehvrlglyzrfa-1`

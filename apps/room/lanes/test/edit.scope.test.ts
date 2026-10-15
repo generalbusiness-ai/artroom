@@ -79,12 +79,12 @@ async function publicationCheckpoint(node: Platform) {
 // |---|---|
 // | The commands, their keys and their intents | Real: `command` of the cli package's `src/line.ts`, with a store in memory for each person. |
 // | The scopes, the routes and the readers | Real, as in `story.scope.test.ts`: the namespace `PLATFORM`, the Worker's HTTP routes, and the real read sessions under a TEST SECRET. The change lane is created by the real directory under the demo profile's digest, which the real rules scope activated. |
-// | The Git host | The production wiring of each host's ports, `artifacts-wiring.ts` and `github-wiring.ts`, for the register and the destination, over a STAND-IN of `packages/scope/test/hosts.ts`: `OwnGit` for the hosting's own Git service, `Hub` for GitHub. Refs and objects are maps. Every write is a real push of a pack that the stand-in decodes. |
+// | The Git host | The production wiring of each host's ports, `artifacts-wiring.ts` and `github-wiring.ts`, for the register and the destination, over a STAND-IN of `packages/scope/test/hosts.ts`: `OwnGit` for Cloudflare Artifacts, `Hub` for GitHub. Refs and objects are maps. Every write is a real push of a pack that the stand-in decodes. |
 // | The site route | Real: `site` of the scope package, called as the Worker calls it, over the same stand-in. Its answer is read as text; no page is rendered in a browser. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of the scopes it waits on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces. |
 describe("dap edit on real scopes, through the production wiring of each Git host's ports. The Git hosts and the scheduler are STAND-INs", () => {
-  for (const [label, made] of [["the hosting's own Git service", async () => ownHost()], ["GitHub", gitHub]] as const) {
+  for (const [label, made] of [["Artifacts", async () => ownHost()], ["GitHub", gitHub]] as const) {
     test(`on ${label}: found a room; edit README.md: the change is judged, the destination pushes the published tree with that file and the site route serves it; a second edit replaces it; an edit of AGENTS.md by a maintainer waits until the rules scope's controller approves, then publishes; a path no tree may hold is refused path-invalid with nothing pushed; and the destination replays consistent`, async ({ task }) => {
       net.hold = net.deaf = null;
       const owner = beginSessionFixture({ secret: b64url(crypto.getRandomValues(new Uint8Array(32))), sessions: true, inspector: reader });

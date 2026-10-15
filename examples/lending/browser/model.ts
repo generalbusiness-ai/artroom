@@ -2,7 +2,9 @@
  * What the member interface shows and what it may ask for. Plain functions over
  * a summary and a record that were read together; nothing here signs or sends.
  */
-import type { Entry, FieldValue, Item, Summary } from "@generalbusiness/dap-contract";
+import type { Entry, FieldValue, Item, KeyId, MemberRef, Summary } from "@generalbusiness/dap-contract";
+import { canonicalize, isMemberRef } from "@generalbusiness/artroom-bytes";
+import { ROLE_LISTS, isActions, type Role } from "@generalbusiness/dap-platform/membership-actions";
 import { shelfPage, shelfPath, thingsOf, type RecordPointer, type Thing } from "../shelf.ts";
 
 export type LendingAct = "donate" | "borrow" | "return" | "cancel" | "publish";
@@ -16,6 +18,21 @@ export interface LendingView {
   record: RecordPointer;
   /** True when the record read is older than the summary: the list of gone things may be behind. */
   behind: boolean;
+}
+
+/** Labels from the retained donation journal, including things no longer in the live summary. */
+export function journalRows(entries: readonly Entry[]): { seq: number; kind: string; signer: string; what: string }[] {
+  const names = new Map(thingsOf(entries).map((thing) => [thing.id, thing.name]));
+  return entries.flatMap((entry, seq) => {
+    if (entry.input.type !== "act") return [];
+    const { intent } = entry.input.signed;
+    const id = intent.kind === "publish" ? intent.fields["thing"] : intent.on;
+    const name = typeof id === "number" ? names.get(id) : undefined;
+    const label = name === undefined ? `Unknown thing ${id ?? "(no ID)"}` : `${name || "Unnamed"} (thing ${id})`;
+    const what = intent.kind === "donate" ? words(intent.fields["name"])
+      : intent.kind === "cancel" ? `${label}: ${words(intent.fields["reason"])}` : label;
+    return [{ seq, kind: intent.kind, signer: entry.input.authority[0]?.subject.member ?? "", what }];
+  });
 }
 
 export const NAME_BYTES = 80, DESCRIPTION_BYTES = 1000, REASON_BYTES = 280;
@@ -49,6 +66,33 @@ export function lendingView(summary: Summary, at: { seq: number; hash: string },
 /** The acts a thing's state allows. Whether the signer may cancel is membership's to say; the scope answers. */
 export function actsFor(thing: ShownThing): LendingAct[] {
   return thing.state === "available" ? ["borrow", "cancel", "publish"] : thing.state === "lent" ? ["return", "cancel", "publish"] : ["publish"];
+}
+
+/** Presentation from the complete authenticated roster, following Page's key-to-member projection. This issues no grant. */
+export function membershipActions(summary: Summary, who: MemberRef, key: KeyId): readonly string[] | null {
+  if (canonicalize(summary.scope) !== canonicalize(who.membership)) return null;
+  const roster = summary.items.find(item => item.type === "roster" && item.state === "open");
+  const ownKey = summary.items.find(item => item.type === "key" && item.state === "active" && item.values["id"] === key);
+  const seat = summary.items.find(item => item.type === "member" && item.state === "active" && item.id === ownKey?.refs["member"]);
+  if (!roster || !seat || !isMemberRef(seat.parties["member"]) || canonicalize(seat.parties["member"]) !== canonicalize(who)
+    || seat.values["handle"] !== who.member) return null;
+  const role = seat.values["role"];
+  if (typeof role !== "string" || !Object.hasOwn(ROLE_LISTS, role)) return null;
+  const actions = roster.values[ROLE_LISTS[role as Role]];
+  if (!isActions(actions)) return null;
+  // An agent's controller must remain an active member with an active key, as in Page.
+  const controller = seat.parties["controller"];
+  if (seat.values["kind"] === "agent") {
+    if (!isMemberRef(controller) || canonicalize(controller.membership) !== canonicalize(who.membership)) return null;
+    const owner = summary.items.find(item => item.type === "member" && item.state === "active" && item.values["handle"] === controller.member);
+    if (!owner || !summary.items.some(item => item.type === "key" && item.state === "active" && item.refs["member"] === owner.id)) return [];
+  } else if (!["person", "checker"].includes(String(seat.values["kind"])) || controller != null) return null;
+  return [...actions];
+}
+
+/** Unknown or stale standing offers no cancellation. Native authority still decides every submitted act. */
+export function offeredActs(thing: ShownThing, actions: readonly string[] | null): LendingAct[] {
+  return actsFor(thing).filter(kind => kind !== "cancel" || actions?.includes("lending.staff") === true);
 }
 
 export interface Proposal { kind: LendingAct; on: number | null; expected: Record<string, number>; fields: Record<string, FieldValue> }

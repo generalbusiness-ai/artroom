@@ -309,7 +309,7 @@ export async function route(request: Request, binding: Binding): Promise<Respons
 
 /**
  * The outside port of a deployment: one wiring for each Git host that is
- * configured, GitHub and the hosting's own Git service, and each call routed
+ * configured, GitHub and Cloudflare Artifacts, and each call routed
  * by the host that the object's own history records, the register's or its
  * destination's. A scope whose recorded host matches no configured wiring,
  * or that records none, gets `NO_OUTSIDE`. Each wiring still checks its own
@@ -371,7 +371,7 @@ export function sessionWiring(sessions: () => Sessions | null, binding?: Binding
  * against the membership reference that the scope itself records, which is
  * the one that its authority reads, and against the scope's own clock. A
  * membership scope also issues sessions. Explicit configuration of GitHub or
- * of the hosting's own Git service (`ARTIFACTS_CONFIG`) enables the outside
+ * of Artifacts (`ARTIFACTS_CONFIG`) enables the outside
  * factory (`outsideOf`), which reads them at each call; with neither, outside
  * effects remain unsent.
  *

@@ -11,7 +11,7 @@
  * destinations may use the host (`host-wiring.ts`, `hostBound`).
  *
  * The repository is read over smart HTTP, as the destinations read it: on
- * the hosting's own Git service with a read token minted for the read and
+ * Cloudflare Artifacts with a read token minted for the read and
  * revoked after; on GitHub with the deployment's `GITHUB_READ_TOKEN`, or
  * with none when the setting says reads are public.
  */

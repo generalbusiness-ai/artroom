@@ -227,7 +227,8 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     const scopeOfLending = await L.at(), skew = { ms: 0 };
     const countThings = async () => (await things()).length;
     const his = browser(nasruddin, "@nasruddin"), g = his.open();
-    { const seen = await g.look(); if (seen.status !== "current") throw new Error(`look: ${JSON.stringify(seen).slice(0, 300)}`); }
+    { const seen = await g.look(); if (seen.status !== "current") throw new Error(`look: ${JSON.stringify(seen).slice(0, 300)}`);
+      expect(seen.actions).toContain("lending.member"); expect(seen.actions).not.toContain("lending.staff"); }
     expect(await g.look()).toMatchObject({ status: "current", view: { things: [{ id: big, state: "gone", reason: "Nasruddin says the pot died", revision: lent + 1 }, { id: small, state: "available" }, { id: fresh, state: "available" }] } });
     // A proposal the view rules out signs and sends nothing.
     expect(await g.act("return", { thing: small })).toEqual({ status: "nothing-sent", reason: "That thing is not lent." });
@@ -284,10 +285,11 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
     reloaded.dispose(); g.dispose();
 
     // A summary reply captured before a newer confirmed view cannot roll that view back.
-    let holdSummary = true, releaseSummary!: () => void, enteredSummary!: () => void;
+    let holdSummary = true, unreadableMembership = false, releaseSummary!: () => void, enteredSummary!: () => void;
     const entered = new Promise<void>(resolve => { enteredSummary = resolve; });
     const released = new Promise<void>(resolve => { releaseSummary = resolve; });
     const delayed: Fetch = async (url, init) => {
+      if (unreadableMembership && new URL(url).pathname === `/v1/scopes/${encodeURIComponent(membership.scope)}`) return new Response("unavailable", { status: 503 }) as never;
       const response = await fetch(url, init);
       if (holdSummary && new URL(url).pathname === `/v1/scopes/${encodeURIComponent(L.name)}`) {
         holdSummary = false; enteredSummary(); await released;
@@ -302,11 +304,15 @@ test("the lending library on real scopes: Nasruddin and the pot, its refusals, a
       await L.did(neighbour, "borrow", await on(small));
       const newer = await reader.look();
       expect(newer).toMatchObject({ status: "current" });
+      if (newer.status === "current") expect(newer.actions).toContain("lending.staff");
       releaseSummary();
       const late = await older;
       expect(late).toMatchObject({ status: "current" });
       if (late.status !== "current") throw Error("The older read did not preserve the newer view");
       expect(late.view.things.find(thing => thing.id === small)?.state).toBe("lent");
+      // An existing session and formerly observed staff actions cannot stand in for a failed roster read.
+      unreadableMembership = true;
+      expect(await reader.look()).toMatchObject({ status: "current", actions: null });
       await L.did(neighbour, "return", await on(small));
       sameView = false;
       await expect(reader.act("donate", { name: "Old view", description: "Must not be sent." })).rejects.toThrow("no longer current");

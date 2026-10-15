@@ -29,10 +29,10 @@ scope ID. Only that register, and the destinations born of that register's
 claims, can use the host. Another register on the same host and namespace
 gets nothing.
 
-## The hosting's own Git service (host `artifacts`)
+## Cloudflare Artifacts (host `artifacts`)
 
 This is the host of the demo: "creation only on dap". The Worker
-reaches the hosting's own Git service through its binding, and needs no
+reaches Artifacts through its binding, and needs no
 outside credential.
 
 What it needs:
@@ -127,7 +127,7 @@ The remote is `https://github.com/<organization>/<name>.git`.
 On either host a member runs `dap clone`. It signs the destination's
 `read-token` act, which any active member may sign, with a lifetime from
 1 to 24 hours. The destination opens one host operation, `mint-read`. On
-the hosting's own Git service the port mints a read token for the
+Artifacts the port mints a read token for the
 repository through the binding, `createToken("read", hours * 3600)`. On
 GitHub it mints an installation token restricted to the repository's ID
 with contents read; GitHub fixes its lifetime at one hour. The outcome
@@ -146,8 +146,11 @@ host's form.
 - A sweep of read tokens that were minted and never read. Each ends at
   its end; its plaintext stays in custody until it is read or the read is
   refused at its end.
-- Public repositories on the hosting's own Git service.
-- A fork for each lane. Each destination has the one repository.
+- Public repositories on Artifacts.
+- A fork for each hold. Each destination has the one repository. The room
+  records a hold's fork and token operations. The design is plan 029; the
+  measured cost of a fork is in
+  [the measurement note](../notes/2026-10-13-fork-cost-measurement.md).
 - A sweep for a repository whose creation answer was lost. Its outcome
   stays unknown, the next attempt uses a new name, and the earlier
   repository and its write token are not cleaned up.

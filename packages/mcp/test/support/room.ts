@@ -6,7 +6,7 @@
  * |---|---|
  * | The server, its tools, custody and reads | Real: `McpService` of this package, called in the test's isolate, as a transport would call it. |
  * | The scopes, the routes and the readers | Real: the namespace `PLATFORM`, the Worker's HTTP routes (`routed`), and the read sessions of `sessions.ts` under a TEST SECRET that this file generates. |
- * | The Git host | A STAND-IN: `OwnGit` of `packages/scope/test/hosts.ts`, under the production wiring of the hosting own Git service's ports, as `apps/room/page/test/support/demo.ts` wires it. |
+ * | The Git host | A STAND-IN: `OwnGit` of `packages/scope/test/hosts.ts`, under the production wiring of the ports of Cloudflare Artifacts, as `apps/room/page/test/support/demo.ts` wires it. |
  * | hold@1's outside | A STAND-IN: the lanes' `Host` (`apps/room/lanes/test/support/graph.ts`) answers each attempt hold@1's code opens: a mint, a revocation, a staged ref and the ancestry read. No repository is staged and no commit is walked. |
  * | The scheduler | A STAND-IN: the service's `pause`, between two polls of `wait`, runs the operations drivers and dispatchers of the scopes waited on, and of the register and the destination, as a deployment's alarms would. |
  * | The watch's timer | A STAND-IN: the test fires it (`tick`), in place of 30 seconds passing. |
@@ -81,7 +81,7 @@ export function mcpRoom(): Room {
   const known: Platform[] = [];
   const bindings = () => at.bindings(register!);
   // hold@1's operations (mints, revocations, staged refs, the ancestry read) are answered by the lanes' Host STAND-IN; the
-  // register's and the destination's by the hosting's own Git service, as wired above.
+  // register's and the destination's by Artifacts, as wired above.
   const hold = new Host();
   const wire = (name: ScopeId) => lifetime.outside(name, (given, sql) => {
     const outside = at.outside(given, sql, bindings());

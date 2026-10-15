@@ -26,7 +26,7 @@ const reader = "a test reader";
 // |---|---|
 // | The commands, their keys and their intents | Real: `command` of the cli package's `src/line.ts`, with a store in memory for each person. |
 // | The scopes, the routes and the readers | Real, as in `edit.scope.test.ts`: the namespace `PLATFORM`, the Worker's HTTP routes, and the real read sessions under a TEST SECRET. Each lane is created by the real directory under the demo profile's digests, which the real rules scope activated. |
-// | The Git host | The production wiring of the ports of the hosting's own Git service, `artifacts-wiring.ts`, over the STAND-IN `OwnGit` of `packages/scope/test/hosts.ts`. Refs and objects are maps; every write is a real push of a pack that the stand-in decodes. GitHub's provider is not run here: `edit.scope.test.ts` runs the same publication on both. |
+// | The Git host | The production wiring of the ports of Cloudflare Artifacts, `artifacts-wiring.ts`, over the STAND-IN `OwnGit` of `packages/scope/test/hosts.ts`. Refs and objects are maps; every write is a real push of a pack that the stand-in decodes. GitHub's provider is not run here: `edit.scope.test.ts` runs the same publication on both. |
 // | The scheduler | A STAND-IN: while a command waits, its `pause` runs the operations drivers and the dispatchers of the scopes it waits on, as a deployment's alarms would. |
 // | The clock | The scripted clock of the namespaces. |
 describe("dap issue and issues, edit --closes and verify --all on real scopes. The Git host and the scheduler are STAND-INs", () => {

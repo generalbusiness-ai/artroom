@@ -1205,12 +1205,12 @@ function verifyAll(ctx: Context): Promise<Outcome> {
 /** The repository record of the destination's branch item: `{ host, namespace, name, id }`. */
 interface Recorded { host: string; namespace: string; name: string; id: string }
 
-/** The host of the hosting's own Git service, as a register records it. */
+/** The host of Cloudflare Artifacts, as a register records it. */
 const OWN_HOST = "artifacts";
 
 /**
  * The remote URL of a recorded repository, in its host's form, or null where the room's record does not give it. GitHub's is
- * whole. The hosting's own Git service names its hostname in the Worker's setting, which no scope records: a clone learns it
+ * whole. Artifacts names its hostname in the Worker's setting, which no scope records: a clone learns it
  * from the credential's answer, and the config keeps it.
  */
 function remoteOf(config: Config, repository: Recorded): string | null {

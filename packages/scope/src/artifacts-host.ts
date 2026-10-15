@@ -1,5 +1,5 @@
 /**
- * Ports for the hosting's own Git service, reached through the Worker's
+ * Ports for Cloudflare Artifacts, reached through the Worker's
  * `ARTIFACTS` binding, with no outside credential. The binding is described
  * here by structural types, so this package needs no Workers types.
  *

@@ -13,7 +13,7 @@ import { ScopeHandle, completeSummary, httpTransport, observeScope, openHttpHead
 import { lending } from "../definition.ts";
 import { LENDING_DEFINITION } from "../pin.ts";
 import { advance, envelopeKey, lendingBinding, validKept, type CustodyLock, type Envelope, type Kept, type KeptStore, type LendingIdentity, type Ports, type Settled } from "./custody.ts";
-import { lendingView, propose, refusalWords, type LendingAct, type LendingView } from "./model.ts";
+import { lendingView, membershipActions, propose, refusalWords, type LendingAct, type LendingView } from "./model.ts";
 
 /** How long after an intent's deadline a "not found" is taken as final. */
 export const SETTLED_AFTER_MS = 120_000;
@@ -28,7 +28,7 @@ export type ActOutcome =
 export interface Pending { kind: string; thing: number | null; name: string | null; notAfter: string; unsent: boolean }
 export type LendingState =
   | { status: "loading" }
-  | { status: "current"; view: LendingView; entries: readonly Entry[] }
+  | { status: "current"; view: LendingView; entries: readonly Entry[]; /** Separately observed membership actions, or unknown after a failed read. */ actions: readonly string[] | null }
   | { status: "behind"; reason: string; view?: LendingView };
 
 export interface LendingGateway {
@@ -63,6 +63,7 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
   const lifetime = new AbortController();
   let readVersion = 0;
   let alive = true, session: Session | null = null, observer: Observation | undefined, view: LendingView | undefined, fresh = false, currentEntries: readonly Entry[] = [];
+  let currentActions: readonly string[] | null = null;
   const usable = () => alive && options.current();
   const current = () => { if (!usable()) throw new Error("This device context is no longer current."); };
   const transport = httpTransport(identity.origin, { fetch: options.fetch ?? ((url, init) =>
@@ -79,6 +80,14 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
   };
   /** The reads that settle a kept request need a session; a reloaded page has none yet. */
   const ready = async (): Promise<void> => { if (!session) await signIn(); };
+
+  /** Existing authenticated membership summary route. A failed or incomplete read cannot retain old standing. */
+  const readActions = async (): Promise<readonly string[] | null> => {
+    try {
+      const read = completeSummary(await new ScopeHandle(transport, identity.membership.scope, session?.reader() ?? null).summary()); current();
+      return read.ok ? membershipActions(read.value.value, identity.member, signer.key) : null;
+    } catch { return null; }
+  };
 
   /** The record up to `seq`, read page by page until the read is complete. */
   const record = async (seq: number): Promise<Entry[]> => {
@@ -134,16 +143,18 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         open: (next, signal) => openHttpHeadStream(identity.origin, identity.scope, next, signal, options.headFetch ? { fetch: options.headFetch } : {}),
         emit: (state) => {
           if (!usable()) return;
-          if (state.status !== "current") { readVersion++; fresh = false; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
+          if (state.status !== "current") { readVersion++; fresh = false; currentActions = null; emit(state.status === "connecting" ? { status: "loading" } : { status: "behind", reason: "reason" in state && typeof state.reason === "string" ? state.reason : state.status, ...(view ? { view } : {}) }); return; }
           const snapshot: CompleteSnapshot<Summary> = state.snapshot;
           // One coherent view: the summary, its head, and the record up to that head.
           const version = ++readVersion;
-          void record(snapshot.at.seq).then((entries) => {
+          currentActions = null;
+          emit({ status: "behind", reason: "Reading current membership actions.", ...(view ? { view } : {}) });
+          void Promise.all([record(snapshot.at.seq), readActions()]).then(([entries, actions]) => {
             if (!usable() || version !== readVersion) return;
             const next = lendingView(snapshot.value, snapshot.at, entries);
             if (view && next.record.seq < view.record.seq) return;
-            view = next; fresh = !view.behind; currentEntries = entries;
-            emit(view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries });
+            view = next; fresh = !view.behind; currentEntries = entries; currentActions = actions;
+            emit(view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries, actions });
           }).catch((error: unknown) => { if (usable() && version === readVersion) { fresh = false; emit({ status: "behind", reason: error instanceof Error ? error.message : "The record could not be read.", ...(view ? { view } : {}) }); } });
         },
       });
@@ -151,7 +162,8 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
     },
     async look() {
       const version = ++readVersion;
-      const superseded = (): LendingState => view && fresh ? { status: "current", view, entries: currentEntries } : { status: "behind", reason: "A newer read replaced this one.", ...(view ? { view } : {}) };
+      currentActions = null;
+      const superseded = (): LendingState => view && fresh ? { status: "current", view, entries: currentEntries, actions: currentActions } : { status: "behind", reason: "A newer read replaced this one.", ...(view ? { view } : {}) };
       try {
         current();
         const refusal = await signIn();
@@ -160,12 +172,12 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         const read = completeSummary(await handle().summary()); current();
         if (version !== readVersion) return superseded();
         if (!read.ok) { fresh = false; return { status: "behind", reason: `The library could not be read: ${read.reason}.`, ...(view ? { view } : {}) }; }
-        const entries = await record(read.value.at.seq);
+        const [entries, actions] = await Promise.all([record(read.value.at.seq), readActions()]);
         if (version !== readVersion) return superseded();
         const next = lendingView(read.value.value, read.value.at, entries);
         if (view && next.record.seq < view.record.seq) return superseded();
-        view = next; fresh = !view.behind; currentEntries = entries;
-        return view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries };
+        view = next; fresh = !view.behind; currentEntries = entries; currentActions = actions;
+        return view.behind ? { status: "behind", reason: "The record is behind the list.", view } : { status: "current", view, entries, actions };
       } catch (error) { if (version !== readVersion) return superseded(); fresh = false; return { status: "behind", reason: error instanceof Error ? error.message : "The library could not be read.", ...(view ? { view } : {}) }; }
     },
     act(kind, input = {}) {
@@ -237,6 +249,6 @@ export function lendingGateway(configured: LendingIdentity, signer: Signer, opti
         return true;
       });
     },
-    dispose() { alive = false; readVersion++; lifetime.abort(); observer?.cancel(); session = null; view = undefined; fresh = false; },
+    dispose() { alive = false; readVersion++; lifetime.abort(); observer?.cancel(); session = null; view = undefined; fresh = false; currentActions = null; },
   };
 }

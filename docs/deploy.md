@@ -61,7 +61,7 @@ register exists. Plan first, then set the setting, then install:
    over and was never attempted is refused as `plan-expired`. For a
    definitely unsent legacy plan, plan again and set the new ID. A selected
    application or Counting plan stays exact: preserve its original directory
-   and use a separate empty `ARTROOM_HOME` for a new plan, host configuration and
+   and use a separate empty `DAP_HOME` for a new plan, host configuration and
    subsequent commands ([cli.md](cli.md)). An attempted or acknowledged
    original needs reconciliation from its original directory; expiry
    cannot authorize a replacement.
@@ -71,7 +71,7 @@ register exists. Plan first, then set the setting, then install:
    nothing new. `--again` signs a second claim, which creates a second
    repository.
 
-The same order holds for the hosting's own Git service, with `--host
+The same order holds for Cloudflare Artifacts, with `--host
 artifacts`, `--namespace artroom-demo` and `ARTIFACTS_CONFIG`
 ([hosts.md](hosts.md)).
 

@@ -13,7 +13,7 @@ export async function buildHome(output = resolve(home, "assets")) {
       const source = file === "jam/index.html" ? resolve(root, "apps/jam/landing/index.html") : resolve(home, "src", file);
       await cp(source, resolve(staging, file));
     }
-    const masters = { "dap-wordmark-green.svg": "dap.svg", "dist/favicon.svg": "favicon.svg", "dist/favicon.ico": "favicon.ico", "fonts/OpenRunde-Regular.woff2": "fonts/OpenRunde-Regular.woff2", "fonts/OpenRunde-Semibold.woff2": "fonts/OpenRunde-Semibold.woff2", "fonts/OpenRunde-Bold.woff2": "fonts/OpenRunde-Bold.woff2", "fonts/LICENSE-OpenRunde.txt": "fonts/LICENSE-OpenRunde.txt" };
+    const masters = { "dap-wordmark-green.svg": "dap.svg", "dist/favicon.svg": "favicon.svg", "dist/favicon.ico": "favicon.ico", "dist/dap-card-1200x630.png": "dap-card-1200x630.png", "fonts/OpenRunde-Regular.woff2": "fonts/OpenRunde-Regular.woff2", "fonts/OpenRunde-Semibold.woff2": "fonts/OpenRunde-Semibold.woff2", "fonts/OpenRunde-Bold.woff2": "fonts/OpenRunde-Bold.woff2", "fonts/LICENSE-OpenRunde.txt": "fonts/LICENSE-OpenRunde.txt" };
     for (const [master, name] of Object.entries(masters)) {
       await mkdir(dirname(resolve(staging, "brand", name)), { recursive: true });
       await cp(resolve(root, "brand", master), resolve(staging, "brand", name));
