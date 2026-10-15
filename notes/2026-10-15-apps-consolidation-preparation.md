@@ -26,11 +26,11 @@ Counter shares the existing Room application Worker. Its README names
 `apps/room/wrangler.jsonc` as its actual deployment configuration and links
 the application dispatch that serves it. There is no independent Counter
 Worker. This is an explicit shared deployment owner, not a duplicate or
-unused Wrangler file. The planner has been asked to confirm this reading
-of the per-app configuration condition. This candidate claims preservation
-of the actual shared deployment; it does not claim a new independent
-Counter deployment or an adopted future split. Jam's recorded managed
-assets have their own app-local configuration.
+unused Wrangler file. Requester adoption `f31290f2` explicitly replaces the
+separate Counter-local configuration condition with this existing shared
+owner. It preserves the actual deployment and adopts no independent Counter
+Worker or future split. Jam's recorded managed assets have their own
+app-local configuration.
 
 Workspaces, lock entries, Vitest projects, TypeScript configurations,
 package scripts, build recipes, generated asset destinations, SDK/module
@@ -92,6 +92,14 @@ and the previously unrun 16 Node and 55 Counter browser-module cases pass.
 No full gate or whole suite was repeated. The original failed gate remains
 failed; the successor is supported by these focused checks, not a claimed
 full successor gate pass.
+
+Requester adoption `f31290f2` explicitly accepts that qualified successor
+validation for this source move, replacing the original whole-gate-passes
+condition. It requires no repeat gate and grants no Source approval. The
+complete independent review at `8ad35298` found no blocking code or move
+defect. Its nonblocking guide typo now names the actual build workspace,
+`@generalbusiness/dap-page`; that one-line guide change and this acceptance
+report are the only deltas for final review.
 
 The later merge of Main `7a6a1b55` adds only the already reviewed private
 query executor, its tests and note. Those three files match their landed
