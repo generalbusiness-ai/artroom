@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/replay.test.ts","body":{"commit":"e987350d3031ed7f5ee707874f24671734a84d49","path":"packages/scope/test/replay.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:06834aa9bb19dca4ea99d8f18b3ae217bea7900a","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-durability-recorded-declaration.md."}
