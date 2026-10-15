@@ -48,7 +48,7 @@ import { Dispatcher, Wakes } from "./outbox.ts";
 import { GenesisProofs } from "./genesis-proof.ts";
 import { ProofBytes } from "./proof-bytes.ts";
 import { ReadPreparation } from "./read-preparation.ts";
-import { SessionReferences } from "./session-reference.ts";
+import { SessionReferences, type SessionReferenceSource } from "./session-reference.ts";
 import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
 import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
@@ -97,6 +97,7 @@ export interface Wiring {
   readers?: (given: Given) => Readers;
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
+  sessionReferenceSource?: SessionReferenceSource;
   limits?: LimitConfig;
   /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
   signedReadObserver?: SignedReadObserver;
@@ -229,7 +230,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
     });
     this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);
-    this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock);
+    this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock, wiring.sessionReferenceSource ?? null);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
     // Only bounded control initialization happened above. No read runs a

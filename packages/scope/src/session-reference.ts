@@ -6,11 +6,13 @@ import { platform, SIBLINGS_OF } from "@generalbusiness/dap-platform";
 import type { Clock } from "./ports.ts";
 import { ReadPreparation } from "./read-preparation.ts";
 import { PREPARATION_MILLISECONDS } from "./preparation-flight.ts";
+import { PreparationBudget, PREPARATION_BOUNDS } from "./preparation-budget.ts";
 import { authenticateSession, sessionClock, type Sessions } from "./sessions.ts";
 
 export const SESSION_REFERENCE_BOUNDS = { request: 8192, reply: 2048, milliseconds: PREPARATION_MILLISECONDS, peers: 1 } as const;
 export interface SessionReferenceRequest { v: 1; to: ScopeRef; reader: string; maxBytes: number; milliseconds: number }
 export interface SessionReference { v: 1; directory: ScopeRef; definition: PlatformDefinition; membership: ScopeRef; rules: ScopeRef | null }
+export interface SessionReferenceSource { read(directory: ScopeRef, request: string): Promise<unknown> }
 const only = (value: object, names: string) => Object.keys(value).sort().join() === names;
 const reference = (value: ScopeRef): ScopeRef => ({ scope: value.scope, inc: value.inc, kind: value.kind });
 const parsed = (raw: unknown, limit: number): unknown => {
@@ -56,7 +58,7 @@ export class SessionReferences {
       if (!active()) return null;
       const authentic = authenticateSession(this.sessions, request.reader);
       if (!("claims" in authentic) || !authentic.claims.reads.includes("summary") || !active()) return null;
-      const frame = this.preparation.capture();
+      const frame = this.preparation.capture(new PreparationBudget(PREPARATION_BOUNDS, active));
       if (!frame || !active() || !same(frame.scope.at, request.to) || frame.scope.status !== "active" || !isPlatformDefinition(frame.pinned.named) || !SIBLINGS_OF[frame.pinned.named]) return null;
       const page = frame.view.page("repository", ["open"], null, 1);
       // The lookahead is a cardinality proof, never a truncated inventory.

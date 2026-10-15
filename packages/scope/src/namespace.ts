@@ -27,6 +27,7 @@ import type { Pinned } from "./core.ts";
 import type { Definitions, Delivery, Resolver, SentTexts, Transport } from "./ports.ts";
 import { PROOF_BYTE_BOUNDS, type ProofBody, type ProofSource } from "./proof-bytes.ts";
 import type { Store } from "./store.ts";
+import { encodeSessionReference, sessionReferenceRequest, type SessionReferenceSource } from "./session-reference.ts";
 
 /** What the object at a name answers to a read of one of its entries. `bytes` null: it has no entry at that sequence number. */
 export interface Sourced { at: ScopeRef; under: string; bytes: string | null; origin?: readonly { fact: FactRef; under: string; bytes: string }[] }
@@ -48,6 +49,22 @@ export interface Peer {
 export interface Binding {
   idFromName(name: string): DurableObjectId;
   get(id: DurableObjectId): unknown;
+}
+
+/** One optional native capability, addressed only by validated birth. No
+ * summary/source fallback, separate timeout, peer discovery or retries. */
+export function sessionReferencesIn(binding: Binding): SessionReferenceSource {
+  return { async read(directory, request) {
+    if (!isScopeRef(directory) || directory.kind !== "directory") return null;
+    const parsed = sessionReferenceRequest(request);
+    if (!parsed || canonicalize(parsed.to) !== canonicalize(directory)) return null;
+    const bytes = encodeSessionReference(parsed);
+    if (!bytes) return null;
+    try {
+      const peer = binding.get(binding.idFromName(directory.scope)) as Peer;
+      return typeof peer.sessionReference === "function" ? await peer.sessionReference(bytes) : null;
+    } catch { return null; }
+  } };
 }
 
 /** The name a send is addressed to: a reference's scope ID, or for a creation the digest of its seed. Null: it names nothing. */
