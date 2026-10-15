@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/git/test/http-read.test.ts","body":{"commit":"b686384a813b7ed607ec88ee263cc4fb27157998","path":"packages/git/test/http-read.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:421ba97be0b11f2f579402d7349f1c6c232018bb","text":"Merge retired a covered predecessor; the successor is at packages/git/test/http-read.test.ts."}
