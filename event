@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:22b65c394a135c984d3b707448f548125970b826","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-item-query-codecs.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:23db83e6add81a906bccd2309cea84504529c8d0","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/values.ts."}
