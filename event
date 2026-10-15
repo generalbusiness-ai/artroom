@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-hosted-agent-teams-design.md","body":{"commit":"c464426c7bbbe1f0f8b40c14568076bd0b3fcf5d","path":"notes/2026-10-15-hosted-agent-teams-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:7993b635b5b549019c027810b107679775f705a7","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-hosted-agent-teams-design.md."}
