@@ -6,7 +6,7 @@ import { ScopeHandle, httpTransport, requestSession, secretSigner, sessionReques
 import { net } from "@generalbusiness/artroom-scope/testing";
 import { beginSessionFixture } from "../../../../packages/scope/test/session-settings.ts";
 import { platformOutside } from "@generalbusiness/artroom-scope/testing/worker";
-import worker, { type Env } from "../../../../packages/scope/src/worker.ts";
+import worker, { type Env } from "../../worker.ts";
 import { site } from "../../../../packages/scope/src/site/route.ts";
 import { gitHub, Hub, ownHost, type Stand } from "../../../../packages/scope/test/hosts.ts";
 import { Platform, routed, settle } from "../../../../packages/scope/test/repository.ts";

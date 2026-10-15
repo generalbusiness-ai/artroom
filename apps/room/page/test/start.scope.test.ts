@@ -8,7 +8,7 @@ import type { Seed, SignedIntent, ScopeId } from "@generalbusiness/dap-contract"
 import { b64url, canonicalize, intentDigest, keyIdOfSecret, newIncarnation, scopeIdOf, unb64url } from "@generalbusiness/artroom-bytes";
 import { agentKeyInvitationOf, foundingOffer, secretSigner, signedIntent, type Fetch, type FoundingOfferFetch } from "@generalbusiness/artroom-client";
 import { DEMO_REGISTER, WEB_DEMO_REGISTER, WEB_DEMO_COHORT, DEMO_PURPOSE } from "@generalbusiness/dap-platform";
-import worker from "../../../../packages/scope/src/worker.ts";
+import worker from "../../worker.ts";
 import { beginSessionFixture } from "../../../../packages/scope/test/session-settings.ts";
 import { nativeFixtureLifetime, driveFixture } from "../../../../packages/scope/test/support/native-fixture-lifetime.ts";
 import { TEST_DEPLOYMENT } from "../../../../packages/scope/test/worker.ts";

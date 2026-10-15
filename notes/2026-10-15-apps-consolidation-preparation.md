@@ -1,7 +1,7 @@
 # Application source consolidation
 
 Request `38064e13`, promise `5c6c1cbb`. This Source candidate preserves Main
-`1d2572d8`, including the bounded-read prerequisites and the planner's
+`7a6a1b55`, including the bounded-read prerequisites and the planner's
 hosted-agent design note. It completes the application path move; it
 implements none of that design note's proposed hosted-agent features.
 
@@ -80,9 +80,30 @@ only the Page case; the actual Counter asset case was then selected once.
 These are local preparation corrections, not passing executions of the
 mistaken filters. No whole gate or mutation sweep ran during preparation.
 
-The final candidate runs one gate before exact-head Source review. Its
-finite public evidence records that gate and the final changed-path/hash
-inventory. Source consolidation does not establish browser playback,
+The one frozen gate at `01cebef0` passed installation, whitespace and all
+types, then failed five native cases in two files: 1,324 Vitest cases passed
+and three were skipped. The demo rehearsal and Page Start fixtures still
+imported the now-generic Scope Worker for app routes, so `/page/` and the
+founding offer returned 404. Those imports, and the same future recorder
+import, now select Room's real application entry. No assertion or native
+behavior was weakened. The affected native run passes six cases; two
+recorder cases remain skipped. Both affected workspace typechecks pass,
+and the previously unrun 16 Node and 55 Counter browser-module cases pass.
+No full gate or whole suite was repeated. The original failed gate remains
+failed; the successor is supported by these focused checks, not a claimed
+full successor gate pass.
+
+The later merge of Main `7a6a1b55` adds only the already reviewed private
+query executor, its tests and note. Those three files match their landed
+Source exactly and affect no application import or asset. Its own exact
+gate passed 1,335 Vitest cases, 13 Node and 55 Counting cases; that separate
+gate is not substituted for this branch's gate. The original native
+cross-object `RefcountedCanceler` diagnostic, scripted reset/retention
+faults and Git body-text warnings remain disclosed. Passing focused checks
+do not resolve that diagnostic or prove physical cancellation or draining.
+
+The finite public evidence records both gate qualifications and the final
+changed-path/hash inventory. Source consolidation does not establish browser playback,
 credential custody, hosted acceptance, a new deployment or completion of
 separate durability, bounded-query, library or Jam implementation tasks.
 Hugh's no-Cloudflare-infrastructure-deployment hold remains in force.
