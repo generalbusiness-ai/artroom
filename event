@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:58d50233d270af39e67cca32e6e48016d188f1e8","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-archive-segment-grouping.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:99f8414bbdc47cbbe0d899e6bc5e6a38e55d2b93","text":"Merge retired a covered predecessor; the successor is at packages/git/test/journal-segments.test.ts."}
