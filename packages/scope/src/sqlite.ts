@@ -18,6 +18,7 @@ import { canonicalize } from "@generalbusiness/artroom-bytes";
 import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import { LocalSigners } from "./local-signers.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -113,6 +114,7 @@ const orNull = <T>(text: SqlValue | undefined): T | null => (text === null || te
 
 export class SqliteStore implements Store {
   readonly #sql: Sql;
+  readonly localSigners: LocalSigners;
   /** For each item type, the slots a `where` reads. */
   #covered = new Map<string, readonly string[]>();
 
@@ -124,6 +126,7 @@ export class SqliteStore implements Store {
     this.#sql = sql;
     this.#spacing = spacing;
     this.#run(SCHEMA);
+    this.localSigners = new LocalSigners(sql, () => this.scope());
   }
 
   #all(query: string, ...bindings: SqlValue[]): Row[] { return this.#sql.exec(query, ...bindings).toArray(); }
@@ -371,6 +374,7 @@ export class SqliteStore implements Store {
 
   append(entry: Entry, hash: Digest, bytes: string, size: number): void {
     this.#run("INSERT INTO entry (seq, hash, time, bytes, size) VALUES (?, ?, ?, ?, ?)", entry.seq, hash, entry.time, bytes, size);
+    this.localSigners.appended(entry, hash);
     for (const send of entry.sends) {
       // A new send is due at once: its first attempt may start at its entry's time.
       this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
@@ -480,6 +484,11 @@ export class SqliteStore implements Store {
   setDeadline(at: Timestamp | null): void {
     if (at === null) this.#run("DELETE FROM meta WHERE k = 'deadline'");
     else this.#run("INSERT INTO meta (k, v) VALUES ('deadline', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", at);
+  }
+  signerMaintenance(): Timestamp | null { return (this.#one("SELECT v FROM meta WHERE k = 'signer-maintenance'")?.["v"] as Timestamp | undefined) ?? null; }
+  setSignerMaintenance(at: Timestamp | null): void {
+    if (at === null) this.#run("DELETE FROM meta WHERE k = 'signer-maintenance'");
+    else this.#run("INSERT INTO meta (k,v) VALUES ('signer-maintenance',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", at);
   }
 }
 

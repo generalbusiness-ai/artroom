@@ -89,6 +89,7 @@ import { canonicalize, intentDigest, isKeyId, isScopeId, isSignature, parseStric
 import { isObject, same, timeMs, type ScopeState } from "@generalbusiness/dap-derive";
 import type { Clock, ReadName } from "./ports.ts";
 import type { Store } from "./store.ts";
+import { signerOf } from "./entry-signer.ts";
 
 /** How a reader presents a signed read: the `Authorization` header's value. */
 const SCHEME = "Signed ";
@@ -163,11 +164,7 @@ export interface SignedReading {
 export const CHAIN_STEPS = 4;
 
 /** The key that signed an entry, or null: it has no signer (see the head of this file). */
-export function signerOf(entry: Entry): KeyId | null {
-  const input = entry.input;
-  if (input.type === "act" || input.type === "preparation") return input.signed.intent.actor;
-  return input.type === "genesis" && input.decision === "applied" && input.founding ? input.founding.intent.actor : null;
-}
+export { signerOf } from "./entry-signer.ts";
 
 /**
  * The root of an entry's cause chain (see the head of this file), or null:
