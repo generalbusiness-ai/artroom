@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/src/lending-assets.ts","body":{"commit":"479f63521e9e7f6e902fd8e922687309716598e0","path":"packages/scope/src/lending-assets.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:218270d53b71dd0df82c23eb31eff06dfb529318","text":"Merge retired a covered predecessor; the successor is at examples/lending/browser/publication.ts."}
