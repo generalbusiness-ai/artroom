@@ -27,8 +27,8 @@ const META = "seq, CASE WHEN octet_length(hash) = 71 THEN hash ELSE NULL END AS 
 
 export class LocalSigners {
   readonly #sql: Sql;
-  readonly #scope: () => ScopeState | null;
-  constructor(sql: Sql, scope: () => ScopeState | null) {
+  readonly #scope: () => Pick<ScopeState, "at" | "head" | "time"> | null;
+  constructor(sql: Sql, scope: () => Pick<ScopeState, "at" | "head" | "time"> | null) {
     this.#sql = sql; this.#scope = scope;
     sql.exec(SCHEMA).toArray();
     if (this.#load() === null) {

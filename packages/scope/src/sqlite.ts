@@ -14,11 +14,11 @@
  */
 
 import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Held, Incarnation, KeyId, OperationId, ScopeId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
+import { canonicalize, isDigest, isScopeRef, parseStrict } from "@generalbusiness/artroom-bytes";
+import { isObject, MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
-import { LocalSigners } from "./local-signers.ts";
+import { LocalSigners, SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -126,7 +126,7 @@ export class SqliteStore implements Store {
     this.#sql = sql;
     this.#spacing = spacing;
     this.#run(SCHEMA);
-    this.localSigners = new LocalSigners(sql, () => this.scope());
+    this.localSigners = new LocalSigners(sql, () => this.#signerScope());
   }
 
   #all(query: string, ...bindings: SqlValue[]): Row[] { return this.#sql.exec(query, ...bindings).toArray(); }
@@ -141,6 +141,19 @@ export class SqliteStore implements Store {
     const covered = new Map<string, string[]>();
     for (const { type, slots } of indexes) covered.set(type, [...new Set([...(covered.get(type) ?? []), ...slots])]);
     this.#covered = covered;
+  }
+
+  /** Index control never loads arbitrary legacy scope metadata. */
+  #signerScope(): Pick<ScopeState, "at" | "head" | "time"> | null {
+    const row = this.#one("SELECT CASE WHEN octet_length(v)<=? THEN v ELSE NULL END AS v FROM meta WHERE k='scope'", SIGNER_INDEX_BOUNDS.controlBytes);
+    if (typeof row?.["v"] !== "string") return null;
+    try {
+      const value: unknown = parseStrict(row["v"]);
+      if (!isObject(value) || !isScopeRef(value["at"]) || !isObject(value["head"]) || typeof value["time"] !== "string" || timeMs(value["time"]) === null) return null;
+      const head = value["head"], seq = head["seq"], hash = head["hash"];
+      return typeof seq === "number" && Number.isSafeInteger(seq) && seq >= 0 && isDigest(hash)
+        ? { at: value["at"], head: { seq, hash }, time: value["time"] } : null;
+    } catch { return null; }
   }
 
   // ---------------------------------------------------------------- the view (derive's StateView)

@@ -217,3 +217,26 @@ test("signer maintenance owns one wake, migrates on activation and yields to nat
     await wakes.maintenance.set(null); expect(seen).toBeNull();
   });
 });
+
+
+test("legacy scope metadata is admitted before index construction or proof materializes it", async () => {
+  const scope = await found();
+  const got = await scope.inside(state => {
+    const actual = sqlOf(state);
+    const original = state.storage.sql.exec("SELECT v FROM meta WHERE k='scope'").one()["v"] as string;
+    const value = JSON.parse(original); value.padding = "x".repeat(B.controlBytes + 1);
+    state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", canonicalize(value));
+    state.storage.sql.exec("DELETE FROM local_signer_control; DELETE FROM latest_local_signer");
+    const transferred: (number | null)[] = [];
+    const sql: Sql = { ...actual, exec(query, ...args) {
+      const rows = actual.exec(query, ...args).toArray();
+      if (/FROM meta WHERE k\s*=\s*'scope'/.test(query)) transferred.push(typeof rows[0]?.["v"] === "string" ? utf8(rows[0]["v"]).length : null);
+      return { toArray: () => rows };
+    } };
+    const store = new SqliteStore(sql);
+    const proof = store.localSigners.proof(rita.key, timeMs(at(0))!);
+    return { transferred, proof, pending: store.localSigners.pending() };
+  });
+  expect(got.transferred).toEqual([null]);
+  expect(got.proof).toEqual({ state: "unknown" }); expect(got.pending).toBe(false);
+});

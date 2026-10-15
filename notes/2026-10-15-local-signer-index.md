@@ -35,7 +35,11 @@ signature, target, resource, clock, window, and root-authority checks.
 ## Fixed legacy prefix and bounded work
 
 Construction creates schema and captures one fixed legacy cutoff, full
-scope reference, version, and tail. It reads no history bodies. An empty
+scope reference, version, and tail. A private callback admits at most 4 KiB
+of the scope metadata row with direct-column size metadata before transfer
+and parsing. It extracts validated own reference, head, and time without
+calling the unbounded general `scope()` reader. An oversized or malformed
+scope row leaves this proof unavailable. It reads no history bodies. An empty
 new store becomes ready only through its normal genesis append. Later
 appends advance the maintained tail without moving the cutoff.
 
@@ -59,7 +63,8 @@ proof path. No replay judgment, resolver, foreign fetch, native entry, or
 outside operation belongs to backfill.
 
 The body allowance is not a total heap bound. Each call also reads at most
-4 KiB of control, up to three anchor metadata rows, and at most 128 bounded
+4 KiB of control, 4 KiB of scope metadata, up to three anchor metadata rows,
+and at most 128 bounded
 metadata rows. Lookup adds one actor row, one entry metadata row, and at
 most one admitted body. Fixed-size scope/head data and SQL calls add fixed
 cost. JSON parsing, validation, canonicalization, and hashing make bounded
@@ -90,7 +95,7 @@ so this slice does not bound the whole alarm or `Chains.update`.
 
 ## Validation and limits
 
-Six focused tests run in the actual isolated Durable Object SQLite runtime.
+Seven focused tests run in the actual isolated Durable Object SQLite runtime.
 Native founding, hold, and commitment entries establish classifier/time
 behavior and a genuine post-cutoff append that remains newer than backfill.
 Pure constructed variants cover unsigned inputs and preparation; these
@@ -104,20 +109,28 @@ judgments or public authority for those records. The 260-row witness commits
 and append transaction, missing/corrupt/backward entries, generation/version
 and cutoff faults, unknown negatives, a forged actor row, byte deferral,
 an oversized row, and an oversized body with a forged small legacy size.
+An oversized synthetic scope metadata row is refused before body transfer.
 The alarm witness checks first activation, durable wake preservation,
 one-quantum fairness before a failing native owner, and independent clears.
 Existing signed-read and restart checks also pass (11 cases).
 
-Three targeted controls fail by assertions: removing the greater-sequence
+Four targeted controls fail by assertions: removing the greater-sequence
 condition changes the native actor proof from sequence 5 to 2; substituting
 legacy size for truthful metadata causes four body-query attempts where
 zero are allowed; omitting maintenance from alarm arbitration leaves no
-activation wake. Original source bytes are restored. An initial byte-control
+activation wake. Removing scope-metadata admission transfers the oversized
+row where null is required. Original source bytes are restored. An initial byte-control
 command selected no tests; that result is inconclusive and excluded.
 The initial new-test run also found a mutable trace snapshot in the test;
 copying the trace at the observation boundary fixed that test defect.
-Exact hashes, final focused results, and the single frozen gate are filed
-separately for Source review.
+The original frozen `3f4cdcc3` gate passed 1,271 tests with 3 skips,
+13 Node checks, and 55 Counting browser checks. Self-review then found that
+the original index callback loaded the whole scope metadata row before
+extracting small fields. The successor adds the bounded private callback
+and its native SQLite witness/control. All 18 selected signer-index,
+signed-read, and restart cases and Scope compilers pass after that fix.
+The whole gate is not repeated, and its original pass is not a successor
+full-gate claim. Exact hashes and results are filed separately for review.
 
 Full G2 still owes bounded genesis-root preparation, authorized query/session
 integration, exact signed argument binding, cursors, synchronous body and
