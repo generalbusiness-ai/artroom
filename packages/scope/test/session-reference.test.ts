@@ -36,7 +36,7 @@ function fixture(scope: Lane, state: DurableObjectState, named: PlatformDefiniti
   const receiver = new SessionReferences(loader, () => sessions, { read: () => clock }, () => now);
   const claims: SessionClaims = { v: 1, deployment: sessions.deployment, membership, member: rita.member.member, key: rita.key, reads: ["summary", "items"], ends: at(60) };
   const token = (over: Partial<SessionClaims> = {}) => readerOf(mintSession(sessions, { ...claims, ...over }));
-  const request = (reader = token(), to = directory, maxBytes: number = B.reply) => canonicalize({ v: 1, to, reader, maxBytes });
+  const request = (reader = token(), to = directory, maxBytes: number = B.reply, milliseconds: number = B.milliseconds) => canonicalize({ v: 1, to, reader, maxBytes, milliseconds });
   return { receiver, store, queries, repository, directory, membership, rules, claims, token, request, hook: (work: (query: string) => void) => { queryHook = work; }, clock: (value: ReturnType<typeof at>) => { clock = value; }, now: (value: number) => { now = value; } };
 }
 
@@ -94,7 +94,7 @@ test("reference request and reply caps, oversized metadata/body and unsupported 
 });
 
 test("reference completion refuses head drift, elapsed final storage and expiry after preparation", async () => {
-  for (const fault of ["head", "deadline", "expiry"] as const) {
+  for (const fault of ["head", "deadline", "expiry", "remaining"] as const) {
     const scope = await found();
     const got = await scope.inside(state => {
       const f = fixture(scope, state); let metadata = 0;
@@ -102,10 +102,11 @@ test("reference completion refuses head drift, elapsed final storage and expiry 
         if (!query.includes("FROM meta WHERE k='scope'")) return;
         if (++metadata !== 3) return; // final current(), after capture plus ProofBytes identity
         if (fault === "deadline") f.now(B.milliseconds);
+        if (fault === "remaining") f.now(1);
         if (fault === "expiry") f.clock(f.claims.ends);
         if (fault === "head") { const current = f.store.scope()!; f.store.setScope({ ...current, head: { ...current.head, seq: 1 } }); }
       });
-      return { answer: f.receiver.read(f.request()), metadata };
+      return { answer: f.receiver.read(f.request(f.token(), f.directory, Number.MAX_SAFE_INTEGER, fault === "remaining" ? 1 : Number.MAX_SAFE_INTEGER)), metadata };
     });
     expect(got).toEqual({ answer: null, metadata: 3 });
   }

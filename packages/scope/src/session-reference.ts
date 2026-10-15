@@ -1,14 +1,15 @@
 /** Small deployment-internal session reference witness; no public route. */
 import type { PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, isPlatformDefinition, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isPlatformDefinition, parseStrict, utf8, wellFormed } from "@generalbusiness/artroom-bytes";
 import { isObject, isScopeRef, same, type StateView } from "@generalbusiness/dap-derive";
 import { platform, SIBLINGS_OF } from "@generalbusiness/dap-platform";
 import type { Clock } from "./ports.ts";
 import { ReadPreparation } from "./read-preparation.ts";
+import { PREPARATION_MILLISECONDS } from "./preparation-flight.ts";
 import { authenticateSession, sessionClock, type Sessions } from "./sessions.ts";
 
-export const SESSION_REFERENCE_BOUNDS = { request: 8192, reply: 2048, milliseconds: 10_000, peers: 1 } as const;
-export interface SessionReferenceRequest { v: 1; to: ScopeRef; reader: string; maxBytes: number }
+export const SESSION_REFERENCE_BOUNDS = { request: 8192, reply: 2048, milliseconds: PREPARATION_MILLISECONDS, peers: 1 } as const;
+export interface SessionReferenceRequest { v: 1; to: ScopeRef; reader: string; maxBytes: number; milliseconds: number }
 export interface SessionReference { v: 1; directory: ScopeRef; definition: PlatformDefinition; membership: ScopeRef; rules: ScopeRef | null }
 const only = (value: object, names: string) => Object.keys(value).sort().join() === names;
 const reference = (value: ScopeRef): ScopeRef => ({ scope: value.scope, inc: value.inc, kind: value.kind });
@@ -16,10 +17,19 @@ const parsed = (raw: unknown, limit: number): unknown => {
   if (typeof raw !== "string" || raw.length > limit || utf8(raw).length > limit) return null;
   try { const value: unknown = parseStrict(raw); return canonicalize(value) === raw ? value : null; } catch { return null; }
 };
+/** Native sender preflights fields before serialization. Numeric inputs can
+ * only reduce the receiver's fixed hard caps, never increase them. */
+export function encodeSessionReference(request: SessionReferenceRequest): string | null {
+  if (request.v !== 1 || !isScopeRef(request.to) || request.to.kind !== "directory" || typeof request.reader !== "string" || request.reader.length > 4104 || !wellFormed(request.reader)
+    || !Number.isSafeInteger(request.maxBytes) || request.maxBytes < 1 || !Number.isSafeInteger(request.milliseconds) || request.milliseconds < 1) return null;
+  const bytes = canonicalize({ v: 1, to: reference(request.to), reader: request.reader, maxBytes: Math.min(request.maxBytes, SESSION_REFERENCE_BOUNDS.reply), milliseconds: Math.min(request.milliseconds, SESSION_REFERENCE_BOUNDS.milliseconds) });
+  return bytes.length <= SESSION_REFERENCE_BOUNDS.request && utf8(bytes).length <= SESSION_REFERENCE_BOUNDS.request ? bytes : null;
+}
 export function sessionReferenceRequest(raw: unknown): SessionReferenceRequest | null {
   const value = parsed(raw, SESSION_REFERENCE_BOUNDS.request);
-  return isObject(value) && only(value, "maxBytes,reader,to,v") && value["v"] === 1 && isScopeRef(value["to"]) && value["to"].kind === "directory"
+  return isObject(value) && only(value, "maxBytes,milliseconds,reader,to,v") && value["v"] === 1 && isScopeRef(value["to"]) && value["to"].kind === "directory"
     && typeof value["reader"] === "string" && value["reader"].length <= 4104 && typeof value["maxBytes"] === "number" && Number.isSafeInteger(value["maxBytes"]) && value["maxBytes"] > 0
+    && typeof value["milliseconds"] === "number" && Number.isSafeInteger(value["milliseconds"]) && value["milliseconds"] > 0
     ? value as unknown as SessionReferenceRequest : null;
 }
 export function sessionReferenceReply(raw: unknown): SessionReference | null {
@@ -35,11 +45,15 @@ export function sessionReferenceReply(raw: unknown): SessionReference | null {
 export class SessionReferences {
   constructor(readonly preparation: ReadPreparation, readonly sessions: () => Sessions | null, readonly clock: Clock, readonly now: () => number = () => Date.now()) {}
   read(raw: unknown): string | null {
-    const began = this.now(), ends = began + SESSION_REFERENCE_BOUNDS.milliseconds;
+    const began = this.now(); let ends = began + SESSION_REFERENCE_BOUNDS.milliseconds;
     const active = () => Number.isFinite(began) && Number.isFinite(ends) && this.now() < ends;
     try {
       const request = sessionReferenceRequest(raw);
       if (!request || !active()) return null;
+      // Relative remaining time, not a cross-isolate clock epoch. Parsing
+      // and all receiver work consume this same subordinate allowance.
+      ends = Math.min(ends, began + request.milliseconds);
+      if (!active()) return null;
       const authentic = authenticateSession(this.sessions, request.reader);
       if (!("claims" in authentic) || !authentic.claims.reads.includes("summary") || !active()) return null;
       const frame = this.preparation.capture();

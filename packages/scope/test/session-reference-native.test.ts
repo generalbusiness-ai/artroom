@@ -37,7 +37,7 @@ test("native directory reference RPC reads no legacy bodies or activation turn a
     const membership = await life.wait(() => children[0]!.at()), rules = await life.wait(() => children[1]!.at()), directory = await life.wait(() => D.at());
     const claims: SessionClaims = { v: 1, deployment: TEST_DEPLOYMENT, membership, member: rita.member.member, key: rita.key, reads: ["summary"], ends: soon(60) };
     const reader = readerOf(mintSession(sessionsOf(secret, TEST_DEPLOYMENT)!, claims));
-    const request = canonicalize({ v: 1, to: directory, reader, maxBytes: 2048 });
+    const request = canonicalize({ v: 1, to: directory, reader, maxBytes: 2048, milliseconds: 10_000 });
     const direct = await life.wait(() => runInDurableObject(D.object, (instance, state) => {
       const snapshot = () => canonicalize([state.storage.sql.exec("SELECT * FROM meta ORDER BY k").toArray(), state.storage.sql.exec("SELECT seq,hash FROM entry ORDER BY seq").toArray(), state.storage.sql.exec("SELECT id,record FROM item ORDER BY id").toArray(), state.storage.sql.exec("SELECT * FROM outbox ORDER BY seq,n").toArray(), state.storage.sql.exec("SELECT * FROM operation ORDER BY seq,k").toArray()]);
       const before = snapshot(), old = { scope: SqliteStore.prototype.scope, stored: SqliteStore.prototype.stored, retained: SqliteStore.prototype.retained, page: SqliteStore.prototype.page };
