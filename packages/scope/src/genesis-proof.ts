@@ -25,16 +25,18 @@ export class GenesisProofs {
   constructor(bytes: ProofBytes, source: ProofSource | null, timer: ProofTimer = realTimer) { this.#bytes = bytes; this.#source = source; this.#timer = timer; }
 
   root(): Promise<GenesisProof> {
+    const began = this.#timer.now(), ends = began + GENESIS_PROOF_BOUNDS.milliseconds;
+    if (!Number.isFinite(began) || !Number.isFinite(ends)) return Promise.resolve(unknown());
     const own = this.#bytes.identity()?.genesis;
-    if (!own) return Promise.resolve(unknown());
+    if (!own || this.#timer.now() >= ends) return Promise.resolve(unknown());
     const id = canonicalize([1, own]); // helper and causal-policy version
     if (this.#flight) return this.#flight.id === id ? this.#flight.answer.then(copy) : Promise.resolve(unknown());
     if (this.#cache?.id === id) return Promise.resolve(copy(this.#cache.proof));
     let complete!: (proof: GenesisProof) => void;
     const answer = new Promise<GenesisProof>(resolve => { complete = resolve; });
-    const flight: Flight = { id, ends: this.#timer.now() + GENESIS_PROOF_BOUNDS.milliseconds, abandoned: false, answer };
+    const flight: Flight = { id, ends, abandoned: false, answer };
     this.#flight = flight;
-    const cancel = this.#timer.after(GENESIS_PROOF_BOUNDS.milliseconds, () => { flight.abandoned = true; complete(unknown()); });
+    const cancel = this.#timer.after(Math.max(0, ends - this.#timer.now()), () => { flight.abandoned = true; complete(unknown()); });
     void Promise.resolve().then(() => this.#run(own, flight)).then(proof => {
       if (flight.abandoned || this.#timer.now() >= flight.ends) { complete(unknown()); return; }
       const current = this.#bytes.identity()?.genesis;

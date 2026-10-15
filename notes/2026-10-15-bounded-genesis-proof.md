@@ -69,7 +69,8 @@ the trusted native sender and its tests, not post-hoc receiver validation.
 
 ## Fixed work and one owned flight
 
-The helper supports these operation limits:
+The absolute deadline starts before the initial scope metadata read. The
+helper supports these operation limits:
 
 - Four causal steps and at most 16 distinct canonical entry bodies,
   including the own genesis.
@@ -99,7 +100,9 @@ share its answer. At deadline, callers finish with unknown, but unresolved
 source ownership stays occupied. Repeated callers cannot start another
 flight by timing out the first. A late reply cannot continue the walk or
 install a cache. The slot releases only when the owned task settles.
-No physical cancellation, draining, cross-isolate cleanup, or global source
+The timer does not preempt synchronous SQL or parsing; bounded phases check
+the clock before further I/O or returning evidence. No physical cancellation,
+draining, cross-isolate cleanup, or global source
 pool bound is established. The ownership model is one live native ScopeObject;
 this is not a deployment-wide concurrency or dormant-object claim.
 
@@ -125,8 +128,8 @@ from a global capacity claim.
 
 ## Validation
 
-Eleven new focused cases run in the actual isolated Durable Object SQLite
-runtime. With the existing signed-read and restart tests, 22 selected cases
+Twelve new focused cases run in the actual isolated Durable Object SQLite
+runtime. With the existing signed-read and restart tests, 23 selected cases
 pass, and Scope source/test compilers pass. Native founding and commitment
 entries supply genuine signed content. The native RPC witness leaves a
 parked outside attempt unsent after restart; its outside service and opening
@@ -146,7 +149,8 @@ complete no-root caching; missing-dependency recovery; conflicting content;
 new-incarnation invalidation; mutable returned-cache protection; actor/time
 and fresh-request checks; exact versus excessive distinct bodies; repeated
 cached uses and bounded search; cumulative bytes; and an injected absolute
-deadline with an uncooperative then late source. No test waits ten seconds.
+deadline with an uncooperative then late source. The initial scope metadata
+read also counts against that deadline. No test waits ten seconds.
 
 Targeted controls fail by assertions for these boundaries:
 
@@ -163,8 +167,17 @@ All changed source bytes are restored. The read-only control is repeated
 only after adding the native per-object helper owner, to bind that final
 source. Intermediate compiler errors for a missing type import, an unused
 import, and literal widening were corrected before the final focused checks.
-Exact hashes and the single frozen gate are filed separately. No whole-suite
-or mutation sweep is used.
+The original frozen `bfd3b6e7` gate passed 1,283 tests with 3 skips,
+13 Node checks, 55 Counting browser checks, and all workspace types.
+Self-review then found that the initial scope metadata read preceded the
+deadline start. A new injected-time witness failed on that original Source
+by returning a root after the allowance was exhausted. The successor starts
+the deadline before that read and offers only remaining time to the timer.
+All 23 selected cases and Scope compilers pass after the correction. The
+completion and occupied-slot controls bind the final helper hash; earlier
+byte/freshness controls bind the prior helper bytes and retain that limit.
+The original gate is not a successor full-gate claim and is not repeated.
+Exact hashes are filed separately. No whole-suite or mutation sweep is used.
 
 Full G2 still owes authorized query/session preparation, exact signed query
 binding, cursor/head rules, synchronous body/envelope assembly, and bounded

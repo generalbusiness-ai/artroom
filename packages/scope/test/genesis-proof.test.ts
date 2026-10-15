@@ -173,3 +173,18 @@ test("remaining cumulative bytes are offered to the source before another body c
   expect(got.result).toEqual({ kind: "unknown" });
   expect(got.asked).toBe(got.expected); expect(got.asked).toBeLessThan(500_000); expect(got.sourceBodies).toBe(0);
 });
+
+test("absolute proof deadline includes the initial bounded scope metadata read", async () => {
+  const scope = await found();
+  const got = await scope.inside(async state => {
+    const actual = sqlOf(state), clock = new Timer(); let initial = true, bodies = 0;
+    const bytes = new ProofBytes({ exec(query, ...args) {
+      if (query.includes("FROM meta WHERE k='scope'") && initial) { initial = false; clock.advance(B.milliseconds); }
+      if (query.startsWith("SELECT bytes FROM entry")) bodies++;
+      return actual.exec(query, ...args);
+    } });
+    const result = await new GenesisProofs(bytes, null, clock).root();
+    return { result, bodies };
+  });
+  expect(got.result).toEqual({ kind: "unknown" }); expect(got.bodies).toBe(0);
+});
