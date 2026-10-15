@@ -56,6 +56,22 @@ test("missing declarations can arrive later and cached content rechecks current 
   expect(got).toEqual({ absent: true, arrived: true, unsupported: true, restored: true, declarations: 1 });
 });
 
+test("an elapsed preparation latches unavailable and installs no late immutable declaration cache", async () => {
+  const scope = await found();
+  const got = await scope.inside(state => {
+    const actual = sqlOf(state), store = new SqliteStore(actual), native = support(scope, store);
+    let active = true, expire = true, bodies = 0;
+    const loader = new ReadPreparation({ exec(query, ...args) { if (query.startsWith("SELECT bytes FROM retained_input")) bodies++; return actual.exec(query, ...args); } }, {
+      ...native, declared: bytes => { const definition = native.declared(bytes); if (expire) active = false; return definition; },
+    });
+    const budget = new PreparationBudget(B, () => active), overdue = loader.capture(budget);
+    const ended = budget.available; active = true; expire = false;
+    const latched = budget.available, fresh = loader.capture();
+    return { overdue: overdue !== null, ended, latched, fresh: fresh !== null, bodies };
+  });
+  expect(got).toEqual({ overdue: false, ended: false, latched: false, fresh: true, bodies: 2 });
+});
+
 test("scope metadata distinguishes missing, malformed and oversized before genesis or definition transfer", async () => {
   for (const fault of ["missing", "malformed", "oversized"] as const) {
     const scope = await found();
