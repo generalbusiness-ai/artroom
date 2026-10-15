@@ -21,7 +21,7 @@ current delivery evidence is reported separately.
 From the root of a checkout, after `npm ci`:
 
 ```
-npm run build --workspace @generalbusiness/dap-room-page
+npm run build --workspace @generalbusiness/dap-page
 ```
 
 This bundles the page with esbuild and writes three files:
