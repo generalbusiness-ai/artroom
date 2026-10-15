@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:6c756fc6f4b6aa24406c6e6278cc12a14ba458ac","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-item-query-page.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bff59f525790e3107157603cd0d42c40e50709cc","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/item-query-page.test.ts."}
