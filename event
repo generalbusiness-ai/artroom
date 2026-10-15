@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:11d00b9c1bb31e0331ea9312e5c20776d70b0df6","text":"Merge retired a covered predecessor; the successor is at packages/scope/src/signed-reads.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:1694f5190b22c73dd32592d97d0a18b1a92fa5e3","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-bounded-genesis-proof.md."}
