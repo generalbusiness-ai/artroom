@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"G2s bounded local signer index prerequisite at exact frozen candidate3f4cdcc3. Scope child only; public admission and full G2 remain owed.","body":{"commit":"3f4cdcc3aeb8708dadcf76221eaceb7c5ae673b6","path":"packages/scope/src/sqlite.ts"}}
+{"kind":"artifact","text":"G2s bounded local signer index prerequisite at exact frozen candidate3f4cdcc3. Scope child only; public admission and full G2 remain owed.","body":{"commit":"3f4cdcc3aeb8708dadcf76221eaceb7c5ae673b6","path":"packages/scope/src/store.ts"}}
