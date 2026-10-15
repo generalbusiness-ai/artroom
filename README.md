@@ -3,7 +3,7 @@
 A durable action platform for people and agents.
 
 * Web site: [https://dap.generalbusiness.ai](https://dap.generalbusiness.ai/)
-* Blog post: [Software and the Cauldron](https://generalbusiness.ai/blog/2026-10-14-baby-cauldron/), including three demo videos
+* Blog post: [Software and the Cauldron](https://generalbusiness.ai/blog/2026-10-14-baby-cauldron/), ([repo copy](notes/2026-10-14-blog-post-baby-cauldron.md)), including three demo videos
 * Source code: [https://github.com/generalbusiness-ai/dap](https://github.com/generalbusiness-ai/dap)
 
 Most software development problems are collaboration problems.
@@ -80,6 +80,8 @@ Dap was built with the help of several concurrent coding agents, using
 - **dap-jam** lets musicians improvise together in a room. Its source and
   documentation are in the
   [jam repository](https://github.com/generalbusiness-ai/artroom-jam).
+
+You can [try them out](https://dap.generalbusiness.ai/) on the hosted service.
 
 dap runs on Cloudflare Workers, Durable Objects and Artifacts.
 

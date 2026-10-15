@@ -151,7 +151,7 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   const { problems, bad, rec, entries, str } = read;
 
   const platform = options.platform === true;
-  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules", ...(platform ? ["outcomes"] : [])]);
+  const top = rec(input, "", ["format", "name", "profile", "capabilities", "genesis", "items", "acts", "receives", "timed", "rules", ...(platform ? ["outcomes"] : [])], ["level"]);
   if (!top) return { ok: false, problems };
   // Section 6.1: the bound on a definition's canonical bytes limits the validator's work, so it is checked before anything is read.
   // A value with no canonical bytes is refused at the end, as before.
@@ -159,6 +159,14 @@ export function validateDefinition(input: unknown, bounds: Bounds, profiles: Rea
   try { size = utf8(canonicalize(input)).length; } catch { /* refused below */ }
   if (size !== null && size > bounds.definitionBytes) return { ok: false, problems: [{ code: "bound", path: "", message: `has ${size} canonical bytes; at most ${bounds.definitionBytes}` }] };
   if (top["format"] !== "artroom-definition-1") bad("shape", "format", "must be artroom-definition-1");
+  // Durability A0a: omission preserves the original declaration bytes. A level
+  // requiring an executor we do not have must never fall back to recording.
+  if (Object.hasOwn(top, "level")) {
+    const level = rec(top["level"], "level", ["name", "version"]);
+    if (level && (level["name"] !== "recorded" || level["version"] !== 1)) {
+      bad("unsupported-definition", "level", "this runtime implements only recorded durability version 1");
+    }
+  }
   // Section 6.1: a definition states its own name, which `under` is compared with. A name that begins `platform:` is the name of a
   // platform definition, which the platform supplies in code, so no declared definition takes one. The platform package alone passes
   // the option `platform`, for the data of a definition that it supplies.

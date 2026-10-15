@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type Entry, type ObservationUse, type Report } from "@generalbusiness/dap-contract";
-import { canonicalize, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, textDigest } from "@generalbusiness/artroom-bytes";
 import { grantFrom, namedBy, observationOf, validateDefinition } from "@generalbusiness/dap-derive";
 import { founded, keys, notesDefinition, on, otherLane, t, type Actor, type Ledger } from "@generalbusiness/dap-derive/testing";
 import { C, cap, clean } from "../../derive/test/fixtures-hold.ts";
@@ -656,4 +656,20 @@ describe("the rows of `observes`, replayed: the origin, the subject lists, the g
     const why = `a retained input is missing: the value that an observation of the entry names, ${VALUE.digest}`;
     expect([await found(g, without), await found(g, other)]).toEqual([["incomplete", g.outcome, why], ["incomplete", g.outcome, why]]);
   });
+});
+
+// The input journal is untrusted. This synthetic producer bypasses validation;
+// its fixture judge/authority is a stand-in, not a runtime admission witness.
+// Invariant: replay never interprets an unsupported durability pin as Recorded.
+test("a well-hashed journal declaring unsupported durability is unsupported at its genesis", async () => {
+  for (const name of ["live", "archived"] as const) {
+    const declared = { ...notesDefinition.declared, level: { name, version: 1 as const } };
+    const unchecked = { ...notesDefinition, declared, digest: definitionDigest(declared) };
+    const L = founded(unchecked, {}, `unsupported-${name}`);
+    const history = served(L, [L]);
+    const result = await verify(new MemorySource([history]), { mode: "replay", scope: L.at.scope, ...AS_RECORDED });
+    expect([result.report.result, result.report.at?.seq, result.why]).toEqual([
+      "unsupported-definition", 0, "the pinned definition does not pass validation under the bounds given: unsupported-definition at level",
+    ]);
+  }
 });

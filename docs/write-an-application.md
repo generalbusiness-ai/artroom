@@ -27,6 +27,13 @@ Start from a template and remove what your application does not need:
 
 After you remove rows, validate the whole result.
 
+A definition without `level` uses recorded durability: the runtime commits
+its journal before answering with a receipt. You can declare that requirement
+explicitly with `level: { name: "recorded", version: 1 }`. The explicit member
+changes the definition's bytes and digest. It does not change an existing
+scope's pin. Live and Archived levels are not supported yet. Their declarations
+are refused as `unsupported-definition`, without creating a recorded fallback.
+
 ## Declare the item types
 
 Write the item types first, in the definition's `items`.

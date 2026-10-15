@@ -14,10 +14,11 @@
  */
 
 import type { CapabilityName, Digest, Entry, FactRef, FieldValue, Held, Incarnation, KeyId, OperationId, ScopeId, ScopeKind, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize } from "@generalbusiness/artroom-bytes";
-import { MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
+import { canonicalize, isDigest, isScopeRef, parseStrict } from "@generalbusiness/artroom-bytes";
+import { isObject, MemoryState, byteOrder, operationId, operationStanding, pendingOf, slotOf, timeMs } from "@generalbusiness/dap-derive";
 import type { Accepted, Account, Decided, HeldCreation, Holder, Item, ObservedHead, Operation, Outstanding, OwnRequest, Page, PreparedStep, RangeIndex, RecordState, RecordsWhere, Relation, ScopeState, StateSnapshot } from "@generalbusiness/dap-derive";
 import type { Dispatched, Duty, OperationStatus, Outgoing, Retained, Sending, Store, Stored } from "./store.ts";
+import { LocalSigners, SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 
 export type SqlValue = string | number | null | ArrayBuffer;
 export interface Sql {
@@ -113,6 +114,7 @@ const orNull = <T>(text: SqlValue | undefined): T | null => (text === null || te
 
 export class SqliteStore implements Store {
   readonly #sql: Sql;
+  readonly localSigners: LocalSigners;
   /** For each item type, the slots a `where` reads. */
   #covered = new Map<string, readonly string[]>();
 
@@ -124,6 +126,7 @@ export class SqliteStore implements Store {
     this.#sql = sql;
     this.#spacing = spacing;
     this.#run(SCHEMA);
+    this.localSigners = new LocalSigners(sql, () => this.#signerScope());
   }
 
   #all(query: string, ...bindings: SqlValue[]): Row[] { return this.#sql.exec(query, ...bindings).toArray(); }
@@ -138,6 +141,20 @@ export class SqliteStore implements Store {
     const covered = new Map<string, string[]>();
     for (const { type, slots } of indexes) covered.set(type, [...new Set([...(covered.get(type) ?? []), ...slots])]);
     this.#covered = covered;
+  }
+
+  /** Index control never loads arbitrary legacy scope metadata. */
+  #signerScope(): Pick<ScopeState, "at" | "head" | "time"> | null | "unavailable" {
+    const row = this.#one("SELECT CASE WHEN octet_length(v)<=? THEN v ELSE NULL END AS v FROM meta WHERE k='scope'", SIGNER_INDEX_BOUNDS.controlBytes);
+    if (!row) return null;
+    if (typeof row["v"] !== "string") return "unavailable";
+    try {
+      const value: unknown = parseStrict(row["v"]);
+      if (!isObject(value) || !isScopeRef(value["at"]) || !isObject(value["head"]) || typeof value["time"] !== "string" || timeMs(value["time"]) === null) return "unavailable";
+      const head = value["head"], seq = head["seq"], hash = head["hash"];
+      return typeof seq === "number" && Number.isSafeInteger(seq) && seq >= 0 && isDigest(hash)
+        ? { at: value["at"], head: { seq, hash }, time: value["time"] } : "unavailable";
+    } catch { return "unavailable"; }
   }
 
   // ---------------------------------------------------------------- the view (derive's StateView)
@@ -371,6 +388,7 @@ export class SqliteStore implements Store {
 
   append(entry: Entry, hash: Digest, bytes: string, size: number): void {
     this.#run("INSERT INTO entry (seq, hash, time, bytes, size) VALUES (?, ?, ?, ?, ?)", entry.seq, hash, entry.time, bytes, size);
+    this.localSigners.appended(entry, hash);
     for (const send of entry.sends) {
       // A new send is due at once: its first attempt may start at its entry's time.
       this.#run("INSERT INTO outbox (seq, n, target, class, message, next) VALUES (?, ?, ?, ?, ?, ?)", entry.seq, send.n, canonicalize(send.to), send.message.class, canonicalize(send.message), timeMs(entry.time)!);
@@ -480,6 +498,11 @@ export class SqliteStore implements Store {
   setDeadline(at: Timestamp | null): void {
     if (at === null) this.#run("DELETE FROM meta WHERE k = 'deadline'");
     else this.#run("INSERT INTO meta (k, v) VALUES ('deadline', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", at);
+  }
+  signerMaintenance(): Timestamp | null { return (this.#one("SELECT v FROM meta WHERE k = 'signer-maintenance'")?.["v"] as Timestamp | undefined) ?? null; }
+  setSignerMaintenance(at: Timestamp | null): void {
+    if (at === null) this.#run("DELETE FROM meta WHERE k = 'signer-maintenance'");
+    else this.#run("INSERT INTO meta (k,v) VALUES ('signer-maintenance',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", at);
   }
 }
 
