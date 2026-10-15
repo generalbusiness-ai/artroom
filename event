@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:86c6c44822a53437124e5f659190dcc26c11cd0d","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-unified-forge-design.md."}
+{"kind":"artifact","text":"G2s bounded local signer index prerequisite at exact frozen candidate3f4cdcc3. Scope child only; public admission and full G2 remain owed.","body":{"commit":"3f4cdcc3aeb8708dadcf76221eaceb7c5ae673b6","path":"packages/scope/src/entry-signer.ts"}}
