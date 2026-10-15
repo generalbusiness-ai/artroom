@@ -28,8 +28,9 @@ export function proofEntry(value: ProofBody, fact: FactRef, maxBytes: number, co
 
 export class ProofBytes {
   readonly #sql: Pick<Sql, "exec">;
-  constructor(sql: Pick<Sql, "exec">) { this.#sql = sql; }
-  #one(query: string, ...bindings: SqlValue[]) { return this.#sql.exec(query, ...bindings).toArray()[0] ?? null; }
+  readonly #beforeSql: () => void;
+  constructor(sql: Pick<Sql, "exec">, beforeSql: () => void = () => {}) { this.#sql = sql; this.#beforeSql = beforeSql; }
+  #one(query: string, ...bindings: SqlValue[]) { this.#beforeSql(); return this.#sql.exec(query, ...bindings).toArray()[0] ?? null; }
   /** Admit the entire metadata row, not just the fields later projected. */
   identity(): ProofIdentity | null {
     try {
