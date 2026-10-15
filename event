@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:408ddf8b3b1a0474e1deb26396f5c80039634371","text":"Withdraw the original-host handler question under planner4b5715: original dap-lending stays on its current build; no original upload or handler decision is now required."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:ec8a647f854c831db2c759d67f03f7b18f804b5b","text":"Withdraw the optional legacy room/profile search under planner4b5715. Legacy role runs are skipped and recorded unrun; no new identities or rooms are sought."}
