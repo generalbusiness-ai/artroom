@@ -33,7 +33,7 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { canonicalize, isScopeId, retainedReadArgument } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isScopeId, retainedReadArgument, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
@@ -47,6 +47,9 @@ import { OperatorRecord, sendAgain, type Incident, type Resent } from "./operato
 import { Dispatcher, Wakes } from "./outbox.ts";
 import { GenesisProofs } from "./genesis-proof.ts";
 import { ProofBytes } from "./proof-bytes.ts";
+import { ReadPreparation } from "./read-preparation.ts";
+import { SessionReferences, type SessionReferenceSource } from "./session-reference.ts";
+import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
 import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
@@ -94,6 +97,7 @@ export interface Wiring {
   readers?: (given: Given) => Readers;
   outside?: (given: OutsideGiven) => Outside;
   sessions?: () => Sessions | null;
+  sessionReferenceSource?: SessionReferenceSource;
   limits?: LimitConfig;
   /** Optional passive internal diagnostic; deployed wiring leaves it absent. */
   signedReadObserver?: SignedReadObserver;
@@ -104,6 +108,9 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #store: SqliteStore;
   readonly #proofBytes: ProofBytes;
   readonly #genesisProofs: GenesisProofs;
+  readonly #readPreparation: ReadPreparation;
+  readonly #sessionReferences: SessionReferences;
+  readonly #sessionPreparation: SessionPreparation;
   readonly #scope: Scope;
   readonly #reads: Reads;
   readonly #deliveries: Deliveries;
@@ -216,6 +223,14 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     });
     this.#limits = new JoinLimits(wiring.limits);
     this.#sessions = wiring.sessions ?? (() => null);
+    // One bounded immutable-content cache per object. These callbacks are
+    // the existing pure whole-support validators, never pinned()/genesis.
+    this.#readPreparation = new ReadPreparation({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) }, {
+      policy: () => `native-read-support-v1:${digestBytes(utf8(canonicalize(bounds)))}`,
+      declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
+    });
+    this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);
+    this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock, wiring.sessionReferenceSource ?? null);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
     // Only bounded control initialization happened above. No read runs a
@@ -341,6 +356,10 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   }
   /** Exact internal causal-proof bytes. Read-only: deliberately bypasses #first/sourceOrigin. */
   proofSource(fact: unknown, maxBytes: number) { return this.#proofBytes.exact(fact, maxBytes); }
+  /** Authenticated small directory witness. No HTTP route or activation turn. */
+  sessionReference(request: unknown): string | null { return this.#sessionReferences.read(request); }
+  /** Future bounded query support only; existing public reads are unchanged. */
+  protected sessionEligibility(reader: unknown, visibility: QueryVisibility): Promise<boolean> { return this.#sessionPreparation.eligible(reader, visibility); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
   demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }

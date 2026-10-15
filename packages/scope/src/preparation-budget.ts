@@ -5,17 +5,19 @@ const costs = ["calls", "candidates", "bytes", "metadata", "genesis", "definitio
 export class PreparationUnavailable extends Error { constructor() { super("preparation-unavailable"); } }
 export class PreparationBudget {
   readonly #left: PreparationCost;
+  readonly #active: () => boolean;
   #failed = false;
-  constructor(limits: PreparationCost = PREPARATION_BOUNDS) {
+  constructor(limits: PreparationCost = PREPARATION_BOUNDS, active: () => boolean = () => true) {
     for (const key of costs) {
       if (!Number.isSafeInteger(limits[key]) || limits[key] < 0 || limits[key] > PREPARATION_BOUNDS[key]) throw new PreparationUnavailable();
     }
     this.#left = { calls: limits.calls, candidates: limits.candidates, bytes: limits.bytes, metadata: limits.metadata, genesis: limits.genesis, definition: limits.definition };
+    this.#active = active;
   }
   invalidate(): void { this.#failed = true; }
   stop(): never { this.invalidate(); throw new PreparationUnavailable(); }
   spend(cost: Partial<PreparationCost>): void {
-    if (this.#failed) this.stop();
+    if (this.#failed || !this.#active()) this.stop();
     for (const key of costs) {
       const n = cost[key] ?? 0;
       if (!Number.isSafeInteger(n) || n < 0 || n > this.#left[key]) this.stop();
@@ -23,5 +25,5 @@ export class PreparationBudget {
     for (const key of costs) this.#left[key] -= cost[key] ?? 0;
   }
   get remaining(): PreparationCost { return { ...this.#left }; }
-  get available(): boolean { return !this.#failed; }
+  get available(): boolean { if (!this.#failed && !this.#active()) this.invalidate(); return !this.#failed; }
 }
