@@ -49,6 +49,7 @@ import { GenesisProofs } from "./genesis-proof.ts";
 import { ProofBytes } from "./proof-bytes.ts";
 import { ReadPreparation } from "./read-preparation.ts";
 import { SessionReferences } from "./session-reference.ts";
+import { SessionPreparation, type QueryVisibility } from "./session-preparation.ts";
 import { SIGNER_INDEX_BOUNDS } from "./local-signers.ts";
 import { production, type Alarm, type Authority, type Clock, type Delivery, type Ports, type ReadName, type Readers, type Resolver, type Transport } from "./ports.ts";
 import { SessionRequests, Streams, issueSession, type Opened, type Sessions, type StreamRefusal } from "./sessions.ts";
@@ -108,6 +109,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   readonly #genesisProofs: GenesisProofs;
   readonly #readPreparation: ReadPreparation;
   readonly #sessionReferences: SessionReferences;
+  readonly #sessionPreparation: SessionPreparation;
   readonly #scope: Scope;
   readonly #reads: Reads;
   readonly #deliveries: Deliveries;
@@ -227,6 +229,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
       declared: bytes => this.#scope.validate(bytes), platform: named => this.#scope.platform(named),
     });
     this.#sessionReferences = new SessionReferences(this.#readPreparation, this.#sessions, this.#clock);
+    this.#sessionPreparation = new SessionPreparation(this.#readPreparation, this.#sessions, this.#clock);
     // The session requests that this scope has answered, each until its `notAfter`: one more table that is no part of the store.
     this.#requests = new SessionRequests({ exec: (query, ...bindings) => ctx.storage.sql.exec(query, ...bindings) });
     // Only bounded control initialization happened above. No read runs a
@@ -354,6 +357,8 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
   proofSource(fact: unknown, maxBytes: number) { return this.#proofBytes.exact(fact, maxBytes); }
   /** Authenticated small directory witness. No HTTP route or activation turn. */
   sessionReference(request: unknown): string | null { return this.#sessionReferences.read(request); }
+  /** Future bounded query support only; existing public reads are unchanged. */
+  protected sessionEligibility(reader: unknown, visibility: QueryVisibility): Promise<boolean> { return this.#sessionPreparation.eligible(reader, visibility); }
   /** Site reads publication selection and immutable proof; unlike ordinary reads these start no outside work. */
   demoFoundingOffer(config: DemoFoundingConfig) { return demoFoundingOffer(this.#store, this.#scope.pinned()?.named, config); }
   siteDestination() { return siteDestination(this.#store, this.#scope.pinned()?.named); }

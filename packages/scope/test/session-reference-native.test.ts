@@ -6,6 +6,7 @@ import { DIRECTORY, REGISTER, repositoryName } from "@generalbusiness/dap-platfo
 import { SqliteStore } from "../src/sqlite.ts";
 import { mintSession, readerOf, sessionsOf } from "../src/sessions.ts";
 import { sessionReferenceReply } from "../src/session-reference.ts";
+import type { QueryVisibility } from "../src/session-preparation.ts";
 import { net, soon } from "./net.ts";
 import { outsideOf } from "./outside.ts";
 import { rita, sam } from "./repository.ts";
@@ -36,6 +37,20 @@ test("native directory reference RPC reads no legacy bodies or activation turn a
     await dispatchFixture([R, D, ...children], life.wait);
     const membership = await life.wait(() => children[0]!.at()), rules = await life.wait(() => children[1]!.at()), directory = await life.wait(() => D.at());
     const claims: SessionClaims = { v: 1, deployment: TEST_DEPLOYMENT, membership, member: rita.member.member, key: rita.key, reads: ["summary"], ends: soon(60) };
+    const restricted = await life.wait(() => runInDurableObject(children[0]!.object, async instance => {
+      // Test invokes the protected support entry directly. There is no public
+      // query route or RPC authorization result in the production surface.
+      const local = instance as unknown as { sessionEligibility(reader: unknown, visibility: QueryVisibility): Promise<boolean> };
+      const matrix: boolean[][] = [];
+      for (const reads of [["summary"], ["items"], ["summary", "items"]] as SessionClaims["reads"][]) {
+        const token = readerOf(mintSession(sessionsOf(secret, TEST_DEPLOYMENT)!, { ...claims, reads }));
+        const row = [];
+        for (const visibility of ["live", "final", "mixed"] as const) row.push(await local.sessionEligibility(token, visibility));
+        matrix.push(row);
+      }
+      return matrix;
+    }));
+    expect(restricted).toEqual([[true, false, false], [false, true, false], [true, true, true]]);
     const reader = readerOf(mintSession(sessionsOf(secret, TEST_DEPLOYMENT)!, claims));
     const request = canonicalize({ v: 1, to: directory, reader, maxBytes: 2048, milliseconds: 10_000 });
     const direct = await life.wait(() => runInDurableObject(D.object, (instance, state) => {
