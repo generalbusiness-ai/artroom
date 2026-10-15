@@ -1,1 +1,1 @@
-{"kind":"promise","text":"I will write notes/2026-10-15-self-contained-applications.md on branch planner/self-contained-apps-20261015, grounded in current dap source and the dap-spike notes, and ask checker for an exact-head review.","body":{"branch":"planner/self-contained-apps-20261015"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f09bfc8ba7a2457c9a87a71ffd5aab0d7e65486d"}
