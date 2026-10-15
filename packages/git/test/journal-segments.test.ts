@@ -10,25 +10,30 @@ test("archive segments close at1000 lines and preserve canonical bytes and conti
     { first: 0, last: 999, path: "journal/v1/segments/000000000000.jsonl" },
     { first: 1000, last: 1000, path: "journal/v1/segments/000000001000.jsonl" },
   ]);
-  const decoded = segments.flatMap(s => new TextDecoder().decode(s.bytes).trimEnd().split("\n"));
+  const decoded = segments.flatMap(s => new TextDecoder().decode(s.bytes).split("\n"));
   expect(decoded).toEqual(lines.map(line => line.bytes));
+  expect(segments.every(s => s.bytes.at(-1) === 125)).toBe(true); // final }, no trailing LF
   expect(archiveSegments(lines.slice(0, 1000), 100_000)).toHaveLength(1);
   expect(archiveSegments([], 0)).toEqual([]);
   for (const seq of [-1, 0.5, 1_000_000_000_000]) expect(() => archiveSegments([{ seq, bytes: "{}" }], 10)).toThrow("bad-path");
   for (const seq of [0, 2]) expect(() => archiveSegments([{ seq: 0, bytes: "{}" }, { seq, bytes: "{}" }], 10)).toThrow("journal entry sequence");
-  expect(archiveSegments([{ seq: 999_999_999_999, bytes: "{}" }], 3)[0]?.last).toBe(999_999_999_999);
+  expect(archiveSegments([{ seq: 999_999_999_999, bytes: "{}" }], 2)[0]?.last).toBe(999_999_999_999);
 });
 
-test("archive byte boundaries include final LF, stop oversized lines and enforce the caller total", () => {
-  const exact = canonicalize({ x: "x".repeat(B - 9) });
-  expect(utf8(exact + "\n")).toHaveLength(B);
-  const segments = archiveSegments([{ seq: 0, bytes: exact }, { seq: 1, bytes: "{}" }], B + 3);
-  expect(segments.map(s => s.bytes.length)).toEqual([B, 3]);
-  expect(segments[0]?.bytes.at(-1)).toBe(10);
+test("archive byte boundaries include only separating LF, stop oversized lines and enforce the caller total", () => {
+  const exact = canonicalize({ x: "x".repeat(B - 8) });
+  expect(utf8(exact)).toHaveLength(B);
+  const segments = archiveSegments([{ seq: 0, bytes: exact }, { seq: 1, bytes: "{}" }], B + 2);
+  expect(segments.map(s => s.bytes.length)).toEqual([B, 2]);
+  expect(segments[0]?.bytes.at(-1)).toBe(125);
+  const almost = canonicalize({ x: "x".repeat(B - 11) });
+  const joined = archiveSegments([{ seq: 0, bytes: almost }, { seq: 1, bytes: "{}" }, { seq: 2, bytes: "{}" }], B + 2);
+  expect(joined.map(s => s.bytes.length)).toEqual([B, 2]);
+  expect(new TextDecoder().decode(joined[0]?.bytes)).toBe(almost + "\n{}");
   expect(() => archiveSegments([{ seq: 0, bytes: exact + " " }], B + 1)).toThrow("journal entry line");
   expect(() => archiveSegments([{ seq: 0, bytes: canonicalize({ x: "é".repeat(B / 2) }) }], 2 * B)).toThrow("journal entry line");
-  expect(() => archiveSegments([{ seq: 0, bytes: exact }, { seq: 1, bytes: "{}" }], B + 2)).toThrow("journal segment allowance");
-  expect(archiveSegments([{ seq: 0, bytes: canonicalize({ x: "雪🙂" }) }], 20)[0]?.bytes).toEqual(utf8('{"x":"雪🙂"}\n'));
+  expect(() => archiveSegments([{ seq: 0, bytes: exact }, { seq: 1, bytes: "{}" }], B + 1)).toThrow("journal segment allowance");
+  expect(archiveSegments([{ seq: 0, bytes: canonicalize({ x: "雪🙂" }) }], 15)[0]?.bytes).toEqual(utf8('{"x":"雪🙂"}'));
   for (const bytes of ['{ "x":1}', '{"x":1,"x":1}', '{}\n{}', '"text"', '[]']) expect(() => archiveSegments([{ seq: 0, bytes }], 100)).toThrow("journal entry bytes");
 });
 

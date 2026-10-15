@@ -7,7 +7,8 @@ It follows the landed [path grammar](2026-10-15-archive-path-grammar.md).
 
 `archiveSegments` takes an already selected contiguous cohort, beginning
 at any legal sequence number, and a caller's total output byte allowance.
-It checks canonical JSON objects and adds one final LF per line. A
+It checks canonical JSON objects and joins lines with LF separators,
+without a trailing LF, as R-LOG-17 specifies. A
 segment closes at 1,000 lines or before its next line would exceed 8 MiB.
 A single line over that bound refuses; no partial result is returned.
 The sequence numbers give the existing twelve-digit logical segment paths.
@@ -31,15 +32,25 @@ memory or runtime capacity claim.
 
 Four focused cases and Git source/test typechecks passed. The cases use
 synthetic canonical objects, labelled as such. They check the exact line,
-LF-inclusive UTF-8 byte and aggregate limits, malformed or discontinuous
+separator-inclusive UTF-8 byte and aggregate limits, malformed or discontinuous
 input, both sides of the directory threshold, clustered decimal and hex
 keys, every resulting directory's child count and input-order independence.
 Two targeted controls raise the segment limit to 1,001 and the directory
 limit to 4,097. Their existing cases fail by assertions at the segment
-boundary and required split respectively. Source bytes were restored;
+boundary and required split respectively. A third adds a trailing LF;
+the byte-bound case fails because the exact-B segment becomes B+1.
+Source bytes were restored;
 the restored SHA-256 is
-`209a1da52196cec575de7ba589f4be22363d5285999b6aa1ffe09611b48b377d`.
-The exact frozen-head gate result is filed separately.
+`e690bd5334d2304d40b9229a44ba3a6e9cef2f07197b09445638c4b9b24f0417`.
+
+The original gate at `3777f07e0f2506af93735b6770766e48e0b1cbe5`
+passed typechecks, whitespace, 1,255 Vitest cases (three skipped), 13 Node
+checks and 55 Counter checks. It had started before the checker's reminder
+exposed the builder's mistaken trailing-LF framing. The corrected successor
+changes segment encoding, byte accounting, the boundary cases and this note;
+four focused cases, Git source/test typechecks and the three controls passed
+with the restored source. The full suite was not repeated, and that original
+gate is not a whole-successor result. Exact evidence pins are filed separately.
 
 This module has no public package export and no runtime caller. It reads
 or writes no archive. Full A1 still requires the per-input replay inventory,

@@ -14,7 +14,7 @@ export interface ArchiveSegment { readonly first: number; readonly last: number;
  * Group an already selected contiguous cohort. The caller supplies a total
  * output allowance. Canonical JSON objects are checked here; native entry
  * validity, chain/hash checks and append-to-parent planning belong to the
- * later layout builder. Each line includes its final LF in both bounds.
+ * later layout builder. LF separates lines; there is no trailing LF.
  */
 export function archiveSegments(lines: readonly ArchiveLine[], allowance: number): readonly ArchiveSegment[] {
   if (!Number.isSafeInteger(allowance) || allowance < 0) throw new GitRefusal("too-large", "journal segment allowance");
@@ -25,7 +25,10 @@ export function archiveSegments(lines: readonly ArchiveLine[], allowance: number
     if (parts.length === 0) return;
     const bytes = new Uint8Array(size);
     let at = 0;
-    for (const part of parts) { bytes.set(part, at); at += part.length; }
+    for (const part of parts) {
+      if (at > 0) bytes[at++] = 10;
+      bytes.set(part, at); at += part.length;
+    }
     segments.push({ first, last, path: archiveSegmentPath(first), bytes });
     parts = []; size = 0;
   };
@@ -35,18 +38,19 @@ export function archiveSegments(lines: readonly ArchiveLine[], allowance: number
     if (i > 0 && line.seq !== lines[i - 1]!.seq + 1) throw new GitRefusal("bad-path", "journal entry sequence");
     // UTF-8 is at least as long as the code-unit string for canonical JSON.
     // Refuse obvious overflows before parsing or allocating encoded bytes.
-    if (typeof line.bytes !== "string" || line.bytes.length >= ARCHIVE_OBJECT_BYTES) throw new GitRefusal("too-large", "journal entry line");
+    if (typeof line.bytes !== "string" || line.bytes.length > ARCHIVE_OBJECT_BYTES) throw new GitRefusal("too-large", "journal entry line");
     try {
       const value: unknown = parseStrict(line.bytes);
       if (value === null || typeof value !== "object" || Array.isArray(value) || canonicalize(value) !== line.bytes) throw new Error("noncanonical");
     } catch { throw new GitRefusal("bad-path", "journal entry bytes"); }
-    const bytes = utf8(line.bytes + "\n");
+    const bytes = utf8(line.bytes);
     if (bytes.length > ARCHIVE_OBJECT_BYTES) throw new GitRefusal("too-large", "journal entry line");
-    if (bytes.length > allowance - total) throw new GitRefusal("too-large", "journal segment allowance");
-    total += bytes.length;
-    if (parts.length === SEGMENT_LINES || size + bytes.length > ARCHIVE_OBJECT_BYTES) close();
+    if (parts.length === SEGMENT_LINES || size + (parts.length > 0 ? 1 : 0) + bytes.length > ARCHIVE_OBJECT_BYTES) close();
+    const addition = bytes.length + (parts.length > 0 ? 1 : 0);
+    if (addition > allowance - total) throw new GitRefusal("too-large", "journal segment allowance");
+    total += addition;
     if (parts.length === 0) first = line.seq;
-    parts.push(bytes); size += bytes.length; last = line.seq;
+    parts.push(bytes); size += addition; last = line.seq;
   }
   close();
   return segments;
