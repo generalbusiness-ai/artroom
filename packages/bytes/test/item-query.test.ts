@@ -6,6 +6,7 @@ import { canonicalize, utf8 } from "../src/canonical.ts";
 import * as canonical from "../src/canonical.ts";
 import * as hashing from "../src/hash.ts";
 import { b64url } from "../src/encode.ts";
+import * as encoding from "../src/encode.ts";
 import { encodeItemQuery, encodeItemQueryCursor, itemQueryArgument, itemQueryContinuation, itemQueryDigest, readItemQuery, readItemQueryCursor } from "../src/item-query.ts";
 
 const digest = (letter: string): Digest => `sha256:${letter.repeat(64)}`;
@@ -84,6 +85,13 @@ test("cursor canonical base64url binds full identity/head/order/bounds/query and
 });
 
 test("cursor spelling, schema, UTF8, bound and nesting failures are distinct from valid continuation", () => {
+  const decode = vi.spyOn(encoding, "unb64url");
+  try {
+    const multibyte = ITEM_QUERY_CURSOR_PREFIX + "é".repeat(1100);
+    expect(multibyte.length).toBeLessThan(B.cursorBytes); expect(utf8(multibyte).length).toBeGreaterThan(B.cursorBytes);
+    expect(readItemQueryCursor(multibyte)).toBeNull(); expect(readItemQueryCursor("x".repeat(B.cursorBytes + 1))).toBeNull();
+    expect(decode).not.toHaveBeenCalled();
+  } finally { decode.mockRestore(); }
   const raw = encodeItemQueryCursor(cursor())!;
   const invalid = [null, {}, raw + "=", "iq2." + raw.slice(4), ITEM_QUERY_CURSOR_PREFIX, "x".repeat(B.cursorBytes + 1), ITEM_QUERY_CURSOR_PREFIX + b64url(new Uint8Array([255])), ITEM_QUERY_CURSOR_PREFIX + b64url(utf8(" " + canonicalize(cursor()))), encoded({ ...cursor(), extra: 1 }), encoded({ ...cursor(), v: 2 }), encoded({ ...cursor(), order: "descending" }), encoded({ ...cursor(), bounds: { ...B, payloadBytes: B.payloadBytes + 1 } }), encoded({ ...cursor(), last: -1 }), encoded({ ...cursor(), limit: 101 })];
   for (const value of invalid) expect(readItemQueryCursor(value)).toBeNull();

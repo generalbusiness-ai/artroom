@@ -76,7 +76,11 @@ export function encodeItemQueryCursor(value: ItemQueryCursor): string | null {
 export function readItemQueryCursor(raw: unknown): ItemQueryCursor | null {
   if (typeof raw !== "string" || raw.length > B.cursorBytes || !raw.startsWith(ITEM_QUERY_CURSOR_PREFIX)) return null;
   try {
-    const bytes = unb64url(raw.slice(ITEM_QUERY_CURSOR_PREFIX.length));
+    const body = raw.slice(ITEM_QUERY_CURSOR_PREFIX.length);
+    // Base64url is ASCII, so this admission also makes characters equal
+    // actual UTF-8 bytes before the decoder can allocate its output.
+    if (!/^[A-Za-z0-9_-]+$/.test(body)) return null;
+    const bytes = unb64url(body);
     if (!bytes) return null;
     const json = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes), checked = cursor(parse(json, B.cursorBytes));
     return checked && encodeItemQueryCursor(checked) === raw ? checked : null;
