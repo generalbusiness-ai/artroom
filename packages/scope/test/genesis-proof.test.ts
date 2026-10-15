@@ -188,3 +188,64 @@ test("absolute proof deadline includes the initial bounded scope metadata read",
   });
   expect(got.result).toEqual({ kind: "unknown" }); expect(got.bodies).toBe(0);
 });
+
+test("final scope metadata cannot return or cache an overdue root with queued or inline timeout", async () => {
+  for (const inline of [false, true]) {
+    const scope = await found();
+    const got = await scope.inside(async state => {
+      const actual = sqlOf(state), clock = new Timer(); let scopes = 0, bodies = 0;
+      const bytes = new ProofBytes({ exec(query, ...args) {
+        if (query.includes("FROM meta WHERE k='scope'") && ++scopes === 3) {
+          if (inline) clock.advance(B.milliseconds);
+          else clock.value += B.milliseconds; // the event-loop timer is queued, never preempts synchronous SQL
+        }
+        if (query.startsWith("SELECT bytes FROM entry")) bodies++;
+        return actual.exec(query, ...args);
+      } });
+      const proof = new GenesisProofs(bytes, null, clock), first = await proof.root();
+      await microtasks(); const beforeRetry = bodies;
+      const retry = await proof.root();
+      return { first, beforeRetry, retry: retry.kind, bodies };
+    });
+    expect(got.first).toEqual({ kind: "unknown" }); expect(got.beforeRetry).toBe(1);
+    expect(got.retry).toBe("root"); expect(got.bodies).toBe(2); // an overdue result never installed immutable content
+  }
+});
+
+test("eligibility checks request freshness after final metadata on fresh and cached content", async () => {
+  for (const cached of [false, true]) {
+    const scope = await found();
+    const got = await scope.inside(async state => {
+      const actual = sqlOf(state), clock = new Timer(); let phase = false, reads = 0;
+      const finalRead = cached ? 2 : 4;
+      const bytes = new ProofBytes({ exec(query, ...args) {
+        if (phase && query.includes("FROM meta WHERE k='scope'") && ++reads === finalRead) clock.value += 1000;
+        return actual.exec(query, ...args);
+      } });
+      const proof = new GenesisProofs(bytes, null, clock);
+      if (cached) { await proof.root(); await microtasks(); }
+      phase = true; let checks = 0;
+      const result = await proof.eligible(() => { checks++; return clock.now() < 500 ? { key: rita.key, since: Date.parse(at(0)) } : null; });
+      return { result, checks, reads, finalRead };
+    });
+    expect(got.result).toEqual({ state: "unknown" }); expect(got.checks).toBe(2); expect(got.reads).toBe(got.finalRead);
+  }
+});
+
+test("eligibility final metadata shares the initial operation deadline and stops further authentication work", async () => {
+  const scope = await found();
+  const got = await scope.inside(async state => {
+    const actual = sqlOf(state), clock = new Timer(); let reads = 0;
+    const bytes = new ProofBytes({ exec(query, ...args) {
+      if (query.includes("FROM meta WHERE k='scope'") && ++reads === 4) clock.value += 5000;
+      return actual.exec(query, ...args);
+    } });
+    let checks = 0;
+    const result = await new GenesisProofs(bytes, null, clock).eligible(() => {
+      if (++checks === 1) clock.value += 6000;
+      return { key: rita.key, since: Date.parse(at(0)) };
+    });
+    return { result, checks, reads };
+  });
+  expect(got.result).toEqual({ state: "unknown" }); expect(got.checks).toBe(1); expect(got.reads).toBe(4);
+});

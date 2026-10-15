@@ -24,8 +24,10 @@ export class GenesisProofs {
   #cache: { id: string; proof: GenesisProof } | null = null;
   constructor(bytes: ProofBytes, source: ProofSource | null, timer: ProofTimer = realTimer) { this.#bytes = bytes; this.#source = source; this.#timer = timer; }
 
-  root(): Promise<GenesisProof> {
-    const began = this.#timer.now(), ends = began + GENESIS_PROOF_BOUNDS.milliseconds;
+  root(): Promise<GenesisProof> { return this.#root(); }
+
+  #root(deadline = Infinity): Promise<GenesisProof> {
+    const began = this.#timer.now(), ends = Math.min(began + GENESIS_PROOF_BOUNDS.milliseconds, deadline);
     if (!Number.isFinite(began) || !Number.isFinite(ends)) return Promise.resolve(unknown());
     const own = this.#bytes.identity()?.genesis;
     if (!own || this.#timer.now() >= ends) return Promise.resolve(unknown());
@@ -40,7 +42,7 @@ export class GenesisProofs {
     void Promise.resolve().then(() => this.#run(own, flight)).then(proof => {
       if (flight.abandoned || this.#timer.now() >= flight.ends) { complete(unknown()); return; }
       const current = this.#bytes.identity()?.genesis;
-      if (!current || !same(current, own)) { complete(unknown()); return; }
+      if (flight.abandoned || this.#timer.now() >= flight.ends || !current || !same(current, own)) { complete(unknown()); return; }
       if (proof.kind !== "unknown") this.#cache = { id, proof: copy(proof) };
       complete(copy(proof));
     }, () => { complete(unknown()); }).finally(() => {
@@ -53,12 +55,22 @@ export class GenesisProofs {
 
   /** The callback must repeat the caller's exact request/window checks. */
   async eligible(request: () => { key: KeyId; since: number } | null): Promise<{ state: "positive" | "negative" | "unknown" }> {
+    const began = this.#timer.now(), ends = began + GENESIS_PROOF_BOUNDS.milliseconds;
+    if (!Number.isFinite(began) || !Number.isFinite(ends)) return { state: "unknown" };
     try {
       const first = request();
-      if (!first || !isKeyId(first.key) || !Number.isFinite(first.since)) return { state: "unknown" };
-      const proof = await this.root(), fresh = request(), current = this.#bytes.identity()?.genesis;
-      if (!fresh || !isKeyId(fresh.key) || first.key !== fresh.key || !Number.isFinite(fresh.since) || proof.kind === "unknown" || !current || !same(proof.of, current)) return { state: "unknown" };
-      return { state: proof.kind === "root" && leads(proof.root, fresh.key, fresh.since) ? "positive" : "negative" };
+      if (!first || !isKeyId(first.key) || !Number.isFinite(first.since) || this.#timer.now() >= ends) return { state: "unknown" };
+      // The content flight inherits this operation's remaining time. The
+      // final metadata and fresh authority checks do not start a new budget.
+      const proof = await this.#root(ends);
+      if (proof.kind === "unknown" || this.#timer.now() >= ends) return { state: "unknown" };
+      const current = this.#bytes.identity()?.genesis;
+      if (!current || !same(proof.of, current) || this.#timer.now() >= ends) return { state: "unknown" };
+      // No storage, await or other preparation follows this fresh check.
+      const fresh = request();
+      if (!fresh || !isKeyId(fresh.key) || first.key !== fresh.key || !Number.isFinite(fresh.since)) return { state: "unknown" };
+      const state = proof.kind === "root" && leads(proof.root, fresh.key, fresh.since) ? "positive" : "negative";
+      return { state: this.#timer.now() < ends ? state : "unknown" };
     } catch { return { state: "unknown" }; }
   }
 

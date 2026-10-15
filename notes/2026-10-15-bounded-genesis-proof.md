@@ -128,8 +128,8 @@ from a global capacity claim.
 
 ## Validation
 
-Twelve new focused cases run in the actual isolated Durable Object SQLite
-runtime. With the existing signed-read and restart tests, 23 selected cases
+Fifteen new focused cases run in the actual isolated Durable Object SQLite
+runtime. With the existing signed-read and restart tests, 26 selected cases
 pass, and Scope source/test compilers pass. Native founding and commitment
 entries supply genuine signed content. The native RPC witness leaves a
 parked outside attempt unsent after restart; its outside service and opening
@@ -177,7 +177,27 @@ All 23 selected cases and Scope compilers pass after the correction. The
 completion and occupied-slot controls bind the final helper hash; earlier
 byte/freshness controls bind the prior helper bytes and retain that limit.
 The original gate is not a successor full-gate claim and is not repeated.
-Exact hashes are filed separately. No whole-suite or mutation sweep is used.
+
+Checker review then found two final-phase gaps in `09f07ba4`: the root's
+last identity read followed its last timeout guard, and eligibility checked
+fresh request authority before its final identity read. New witnesses failed
+that source by returning an overdue root and stale positive eligibility.
+The corrected continuation checks abandonment and time again after final
+metadata, before caching or returning content. Eligibility captures its
+absolute deadline before its first request check, passes only that deadline
+to the content flight, and retains it through final metadata and authority.
+The last request callback now follows all storage work; overdue preparation
+stops before further authentication work. No phase starts a new allowance.
+
+Final witnesses cover queued and inline timeout callbacks, no late-cache
+reuse (a fresh retry must read the body again), fresh and cached content
+whose request ends during final metadata, and one deadline across initial
+request work and final metadata. All 26 selected cases and Scope compilers
+pass. Two final-source controls restore the previous final-read ordering
+and fail by assertions for an overdue root and stale positive eligibility.
+Their exact final helper hash is separate from the earlier completion,
+occupied-slot, byte and freshness control hashes. Exact hashes are filed
+separately. No whole-suite or mutation sweep is used.
 
 Full G2 still owes authorized query/session preparation, exact signed query
 binding, cursor/head rules, synchronous body/envelope assembly, and bounded
