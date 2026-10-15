@@ -87,7 +87,24 @@ its independent hash already agreed. An initial nonexistent Derive test-file
 filter selected only the eight Bytes cases; the actual seven timed cases were
 then selected explicitly. Four original controls preceded the final ASCII
 preflight; their raw results are retained, and the final controls were run
-again after that guarded file changed. The single frozen gate is recorded separately.
+again after that guarded file changed.
+
+The one frozen gate at `540e0555` passed installation, whitespace and all
+types, then reported 1,328 passing Vitest cases, three skipped and one failed
+Page asset comparison. Moving the shared byte-order function changed the
+bundle's order. The normal local Page build regenerated the checked-in asset;
+its one comparison case then passed. The previously unrun 13 Node script
+cases and 55 Counting browser-module cases also passed. The final changes
+after the gate are this report and that generated asset; no whole gate or
+whole suite was repeated. The original failed gate remains part of the
+evidence and is not described as a passing gate.
+
+The raw gate includes scripted reset/retention faults, Git HTTP body-text
+warnings and a native `RefcountedCanceler` cross-object I/O diagnostic. The
+previous landed G2p-b gate contains the same diagnostic text and stack site.
+Vitest reports no separate unhandled-errors section, but that does not resolve
+the runtime diagnostic or prove physical cancellation or draining. This pure
+codec slice makes no such claim.
 
 There is no native SQL, deployed runtime, heap, wire-buffer, global resource,
 mutation authority, authentication or full G2 completion claim. `SignedReadName`
