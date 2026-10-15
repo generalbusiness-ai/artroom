@@ -79,6 +79,16 @@ An earlier cohort-control attempt stopped at refusal wording after the
 unwanted fetch; the final witness asserts the fetch count first. Exact
 hashes, heads and the single frozen-head gate are filed separately.
 
+The original gate at `3ca544a6a878b1e0e5962c9009d45de7055b9eef`
+passed typechecks and whitespace, with 1,260 Vitest cases passing and three
+skipped. Its one failed case was generated Page bundle equality: moving
+the shared grammar changed bundle generation. The Page build regenerated
+the served module normally. The three Page asset cases then passed, as did
+the previously unrun 13 Node and 55 Counter checks. Only the generated Page
+module and this note changed after that gate. The original failed result and native
+RefcountedCanceler console trace are retained; no cause is attributed to
+that trace. No whole-suite rerun or whole-successor gate is claimed.
+
 G1 still requires separate verified-content and same-repository retention
 premises under the adopted decision. A ref advertisement or successful
 partial retrieval proves neither. First-head, staging, checker snapshots,
