@@ -144,16 +144,17 @@ export class SqliteStore implements Store {
   }
 
   /** Index control never loads arbitrary legacy scope metadata. */
-  #signerScope(): Pick<ScopeState, "at" | "head" | "time"> | null {
+  #signerScope(): Pick<ScopeState, "at" | "head" | "time"> | null | "unavailable" {
     const row = this.#one("SELECT CASE WHEN octet_length(v)<=? THEN v ELSE NULL END AS v FROM meta WHERE k='scope'", SIGNER_INDEX_BOUNDS.controlBytes);
-    if (typeof row?.["v"] !== "string") return null;
+    if (!row) return null;
+    if (typeof row["v"] !== "string") return "unavailable";
     try {
       const value: unknown = parseStrict(row["v"]);
-      if (!isObject(value) || !isScopeRef(value["at"]) || !isObject(value["head"]) || typeof value["time"] !== "string" || timeMs(value["time"]) === null) return null;
+      if (!isObject(value) || !isScopeRef(value["at"]) || !isObject(value["head"]) || typeof value["time"] !== "string" || timeMs(value["time"]) === null) return "unavailable";
       const head = value["head"], seq = head["seq"], hash = head["hash"];
       return typeof seq === "number" && Number.isSafeInteger(seq) && seq >= 0 && isDigest(hash)
-        ? { at: value["at"], head: { seq, hash }, time: value["time"] } : null;
-    } catch { return null; }
+        ? { at: value["at"], head: { seq, hash }, time: value["time"] } : "unavailable";
+    } catch { return "unavailable"; }
   }
 
   // ---------------------------------------------------------------- the view (derive's StateView)

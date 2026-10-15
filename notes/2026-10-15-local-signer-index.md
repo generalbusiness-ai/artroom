@@ -39,7 +39,8 @@ scope reference, version, and tail. A private callback admits at most 4 KiB
 of the scope metadata row with direct-column size metadata before transfer
 and parsing. It extracts validated own reference, head, and time without
 calling the unbounded general `scope()` reader. An oversized or malformed
-scope row leaves this proof unavailable. It reads no history bodies. An empty
+scope row leaves this proof unavailable, distinct from an absent new scope
+in private diagnostics. It reads no history bodies. An empty
 new store becomes ready only through its normal genesis append. Later
 appends advance the maintained tail without moving the cutoff.
 
@@ -109,7 +110,11 @@ judgments or public authority for those records. The 260-row witness commits
 and append transaction, missing/corrupt/backward entries, generation/version
 and cutoff faults, unknown negatives, a forged actor row, byte deferral,
 an oversized row, and an oversized body with a forged small legacy size.
-An oversized synthetic scope metadata row is refused before body transfer.
+Oversized synthetic scope metadata is refused before transfer. Both cold
+construction and later proof/maintenance checks use the bounded reader.
+Small malformed JSON transfers only its admitted byte before strict parsing
+returns unavailable. Neither fault reads a history body, marks ready, or
+becomes a complete negative. Missing scope metadata remains separately empty.
 The alarm witness checks first activation, durable wake preservation,
 one-quantum fairness before a failing native owner, and independent clears.
 Existing signed-read and restart checks also pass (11 cases).

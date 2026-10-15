@@ -219,24 +219,42 @@ test("signer maintenance owns one wake, migrates on activation and yields to nat
 });
 
 
-test("legacy scope metadata is admitted before index construction or proof materializes it", async () => {
-  const scope = await found();
-  const got = await scope.inside(state => {
-    const actual = sqlOf(state);
-    const original = state.storage.sql.exec("SELECT v FROM meta WHERE k='scope'").one()["v"] as string;
-    const value = JSON.parse(original); value.padding = "x".repeat(B.controlBytes + 1);
-    state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", canonicalize(value));
-    state.storage.sql.exec("DELETE FROM local_signer_control; DELETE FROM latest_local_signer");
-    const transferred: (number | null)[] = [];
-    const sql: Sql = { ...actual, exec(query, ...args) {
-      const rows = actual.exec(query, ...args).toArray();
-      if (/FROM meta WHERE k\s*=\s*'scope'/.test(query)) transferred.push(typeof rows[0]?.["v"] === "string" ? utf8(rows[0]["v"]).length : null);
-      return { toArray: () => rows };
-    } };
-    const store = new SqliteStore(sql);
-    const proof = store.localSigners.proof(rita.key, timeMs(at(0))!);
-    return { transferred, proof, pending: store.localSigners.pending() };
-  });
-  expect(got.transferred).toEqual([null]);
-  expect(got.proof).toEqual({ state: "unknown" }); expect(got.pending).toBe(false);
+test("legacy scope metadata is admitted before construction, proof and maintenance, and malformed is not absent", async () => {
+  for (const fault of ["oversized", "malformed"] as const) {
+    const scope = await found();
+    const got = await scope.inside(state => {
+      const actual = sqlOf(state), original = state.storage.sql.exec("SELECT v FROM meta WHERE k='scope'").one()["v"] as string;
+      const value = JSON.parse(original); value.padding = "x".repeat(B.controlBytes + 1);
+      const broken = fault === "oversized" ? canonicalize(value) : "{";
+      const transferred: (number | null)[] = []; let bodies = 0;
+      const sql: Sql = { ...actual, exec(query, ...args) {
+        const rows = actual.exec(query, ...args).toArray();
+        if (/FROM meta WHERE k\s*=\s*'scope'/.test(query)) transferred.push(typeof rows[0]?.["v"] === "string" ? utf8(rows[0]["v"]).length : null);
+        if (query.startsWith("SELECT bytes FROM entry")) bodies++;
+        return { toArray: () => rows };
+      } };
+      state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", broken);
+      state.storage.sql.exec("DELETE FROM local_signer_control; DELETE FROM latest_local_signer");
+      const constructor = new SqliteStore(sql);
+      const cold = { proof: constructor.localSigners.proof(rita.key, timeMs(at(0))!), pending: constructor.localSigners.pending(), status: constructor.localSigners.status() };
+      const construction = [...transferred];
+      state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", original);
+      resetLegacy(state); // a healthy captured prefix, then bad metadata after construction
+      state.storage.sql.exec("UPDATE meta SET v=? WHERE k='scope'", broken);
+      transferred.length = 0;
+      const warm = new SqliteStore(sql);
+      const proof = warm.localSigners.proof(rita.key, timeMs(at(0))!), batch = warm.localSigners.maintain();
+      const later = { proof, batch, status: warm.localSigners.status(), transferred: [...transferred], bodies };
+      state.storage.sql.exec("DELETE FROM local_signer_control; DELETE FROM meta WHERE k='scope'");
+      const absent = new SqliteStore(actual).localSigners.status();
+      return { construction, cold, later, absent };
+    });
+    const admitted = fault === "oversized" ? null : 1; // small malformed JSON is bounded before strict parsing
+    expect(got.construction).toEqual([admitted, admitted]);
+    expect(got.cold).toEqual({ proof: { state: "unknown" }, pending: false, status: { phase: "unavailable" } });
+    expect(got.later.transferred).toEqual([admitted, admitted]);
+    expect(got.later.proof).toEqual({ state: "unknown" }); expect(got.later.bodies).toBe(0);
+    expect(got.later.batch.pending).toBe(false); expect(got.later.status).toMatchObject({ phase: "stopped", reason: "metadata" });
+    expect(got.absent).toEqual({ phase: "empty" });
+  }
 });

@@ -12,6 +12,7 @@ interface Control {
   cutoff: Head; next: number; prev: Digest | null; time: Timestamp | null;
   tail: Head; tailTime: Timestamp; reason?: Fault;
 }
+type SignerScope = Pick<ScopeState, "at" | "head" | "time"> | null | "unavailable";
 interface Metadata { seq: number; hash: Digest; time: Timestamp; size: number; bytes: number }
 export type LocalSignerProof = { state: "positive"; seq: number; time: Timestamp } | { state: "negative" | "unknown" };
 const integer = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
@@ -27,14 +28,14 @@ const META = "seq, CASE WHEN octet_length(hash) = 71 THEN hash ELSE NULL END AS 
 
 export class LocalSigners {
   readonly #sql: Sql;
-  readonly #scope: () => Pick<ScopeState, "at" | "head" | "time"> | null;
-  constructor(sql: Sql, scope: () => Pick<ScopeState, "at" | "head" | "time"> | null) {
+  readonly #scope: () => SignerScope;
+  constructor(sql: Sql, scope: () => SignerScope) {
     this.#sql = sql; this.#scope = scope;
     sql.exec(SCHEMA).toArray();
     if (this.#load() === null) {
       const current = scope();
       // Fixed control capture only: no constructor history traversal.
-      if (current) this.#save({ v: 1, at: { ...current.at }, phase: "building", cutoff: { ...current.head }, next: 0, prev: null, time: null, tail: { ...current.head }, tailTime: current.time });
+      if (current && current !== "unavailable") this.#save({ v: 1, at: { ...current.at }, phase: "building", cutoff: { ...current.head }, next: 0, prev: null, time: null, tail: { ...current.head }, tailTime: current.time });
     }
   }
   #one(query: string, ...bindings: SqlValue[]): Record<string, SqlValue> | null { return this.#sql.exec(query, ...bindings).toArray()[0] ?? null; }
@@ -103,12 +104,13 @@ export class LocalSigners {
     try { const c = this.#load(); return c !== null && c !== "invalid" && c.phase === "building"; }
     catch { return true; } // transient storage failure re-arms a bounded retry
   }
-  status(): { phase: "empty" | "invalid" | Control["phase"]; next?: number; cutoff?: Head; reason?: Fault } {
+  status(): { phase: "empty" | "unavailable" | "invalid" | Control["phase"]; next?: number; cutoff?: Head; reason?: Fault } {
     const c = this.#load();
-    return c === null ? { phase: "empty" } : c === "invalid" ? { phase: "invalid" } : { phase: c.phase, next: c.next, cutoff: c.cutoff, ...(c.reason ? { reason: c.reason } : {}) };
+    return c === null ? { phase: this.#scope() === "unavailable" ? "unavailable" : "empty" } : c === "invalid" ? { phase: "invalid" } : { phase: c.phase, next: c.next, cutoff: c.cutoff, ...(c.reason ? { reason: c.reason } : {}) };
   }
   #fault(c: Control): Fault | null {
     const s = this.#scope();
+    if (s === "unavailable") return "metadata";
     if (!s || !same(s.at, c.at)) return "generation";
     if (s.head.seq !== c.tail.seq || s.head.hash !== c.tail.hash || s.time !== c.tailTime) return "tail";
     const tail = this.#metadata(this.#one(`SELECT ${META} FROM entry WHERE seq=?`, c.tail.seq));
