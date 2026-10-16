@@ -1,6 +1,6 @@
 /** Pure bounded codecs. A caller authenticates before using cursor/query
  * semantic results or looking up a type, state, scope or current head. */
-import { ITEM_QUERY_ARGUMENT_PREFIX, ITEM_QUERY_BOUNDS as B, ITEM_QUERY_CURSOR_PREFIX, ITEM_QUERY_DOMAINS, ITEM_QUERY_ORDER } from "@generalbusiness/dap-contract";
+import { ITEM_QUERY_ARGUMENT_PREFIX, ITEM_QUERY_BOUNDS as B, ITEM_QUERY_CURSOR_PREFIX, ITEM_QUERY_DOMAINS, ITEM_QUERY_ORDER, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Digest, Head, ItemQuery, ItemQueryCursor, ScopeRef } from "@generalbusiness/dap-contract";
 import { byteOrder, canonicalBytes, canonicalize, parseStrict, utf8, wellFormed } from "./canonical.ts";
 import { b64url, unb64url } from "./encode.ts";
@@ -49,6 +49,19 @@ function admitted(value: ItemQuery): { value: ItemQuery; raw: string } | null {
 /** Typed local producer. Preflight known fields/counts before serialization. */
 export function encodeItemQuery(value: ItemQuery): string | null {
   try { return admitted(value)?.raw ?? null; } catch { return null; }
+}
+/** A local producer encodes the already admitted canonical query, not an arbitrary tree. */
+export function encodeItemQueryParameter(value: ItemQuery): string | null {
+  const raw = encodeItemQuery(value);
+  return raw === null ? null : b64url(utf8(raw));
+}
+/** Remote consumers call this only inside their own admitted operation. */
+export function readItemQueryParameter(encoded: unknown): ItemQuery | null {
+  if (typeof encoded !== "string" || encoded.length === 0 || encoded.length > ITEM_QUERY_WIRE_BOUNDS.encodedChars || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+  const bytes = unb64url(encoded);
+  if (!bytes || bytes.length > B.queryBytes || b64url(bytes) !== encoded) return null;
+  try { return readItemQuery(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes)); }
+  catch { return null; }
 }
 function selection(value: ItemQuery) { return { v: value.v, scope: value.scope, type: value.type, states: value.states, ids: value.ids, limit: value.limit, order: ITEM_QUERY_ORDER, bounds: B }; }
 /** Selection identity excludes the current cursor, avoiding self-reference. */

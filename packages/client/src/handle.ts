@@ -16,9 +16,9 @@
 
 import type {
   Answer, Beside, Cursor, DeclaredDefinition, Digest, Duty, DutyId, Entry, Founded, Grant, Head, Item, PlatformDefinition, Read, ReadRefusal, Receipt, ScopeApi, ScopeId, Sealed, Settlement,
-  SignedIntent, Summary,
+  SignedIntent, Summary, ItemQuery, ItemQueryRead,
 } from "@generalbusiness/dap-contract";
-import { definitionDigest, entryHash, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
+import { definitionDigest, entryHash, encodeItemQueryParameter, readItemQueryParameter, itemQueryReadFor, within, LATE, isDigest, parseStrict, textDigest } from "@generalbusiness/artroom-bytes";
 
 /** How a handle reaches a scope service: the contract's `ScopeApi`. `http.ts` and `binding.ts` each make one. */
 export type Transport = ScopeApi;
@@ -66,6 +66,19 @@ export class ScopeHandle {
   summary(): Promise<Read<Summary>> { return this.#transport.summary(this.scope, this.#reader); }
   /** A page of the retained final items of one type. */
   items(type: string, cursor?: Cursor): Promise<Read<readonly Item[]>> { return this.#transport.items(this.scope, this.#reader, type, cursor); }
+  /** One bounded page. `complete` covers only this selection's suffix at `at`. */
+  async queryItems(query: ItemQuery): Promise<ItemQueryRead> {
+    const encoded = encodeItemQueryParameter(query), checked = readItemQueryParameter(encoded);
+    if (!checked || checked.scope.scope !== this.scope) throw new TransportError("invalid bounded item query");
+    const result = await within(10, async signal => {
+      const reply = await this.#transport.queryItems(this.scope, this.#reader, encoded!);
+      if (signal.aborted) return LATE;
+      if (!itemQueryReadFor(reply, checked)) throw new TransportError("the reply does not match the bounded item query");
+      return reply;
+    });
+    if (result === LATE) throw new TransportError("no whole item query within 10 seconds; coverage is incomplete");
+    return result;
+  }
   history(cursor?: Cursor): Promise<Read<readonly Sealed[]>> { return this.#transport.history(this.scope, this.#reader, cursor); }
   entry(seq: number): Promise<Read<Sealed>> { return this.#transport.entry(this.scope, this.#reader, seq); }
   outbox(cursor?: Cursor): Promise<Read<readonly Duty[]>> { return this.#transport.outbox(this.scope, this.#reader, cursor); }

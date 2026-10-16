@@ -35,7 +35,7 @@ test("invalid retained path keeps its corrected draft through explicit unsent re
     membership:{scope:scopeIdOf({v:1,kind:"membership",definition:"platform:membership@1",creator:directory,cause:opening,ordinal:0}),inc:newIncarnation(new Uint8Array(16).fill(1)),kind:"membership"},
     rules:scopeIdOf({v:1,kind:"rules",definition:"platform:rules@1",creator:directory,cause:opening,ordinal:1}),
     destination:scopeIdOf({v:1,kind:"destination",definition:"platform:destination@1",creator:directory,cause:opening,ordinal:2}),
-    key:keyIdOfSecret(secret),me:null,reader:null,unsessioned:null,definitions:new Map()};
+    key:keyIdOfSecret(secret),me:null,reader:null,unsessioned:null,directoryIndex:null,definitions:new Map()};
   const change={scope:sourceScope.scope,manifests:[{id:4,state:"current",file:{path:"../outside.md",digest:digestBytes(utf8("<script>literal</script>")),size:24,content:"<script>literal</script>"}}]} as unknown as ChangeView;
   let current=true;
   let rendered=retainedEditor(room,change,{current:()=>current}) as unknown as Element;
@@ -178,7 +178,7 @@ test("editor reads the inherited destination4 head for both workflows and still 
     const value: Summary = { scope: at, definition: at === directory ? "platform:directory@3" : at === rules ? "platform:rules@3" : pin as Summary["definition"], status: "active", time: "2099-01-01T00:00:00Z", counts: [], items: at === rules ? [definition] : at === destination ? [{ ...definition, id: 0, type: "branch", state: "ready", values: { head: "b".repeat(40) } }] : [] };
     return Response.json({ ok: true, complete: true, at: { seq: 1, hash: opening }, value });
   };
-  const room = { session: { service: "https://editor.test", secret, fetch }, directory: directory.scope, membership, rules: rules.scope, destination: destination.scope, key: keyIdOfSecret(secret), me: null, reader: null, definitions: new Map() } as Room;
+  const room = { session: { service: "https://editor.test", secret, fetch }, directory: directory.scope, membership, rules: rules.scope, destination: destination.scope, key: keyIdOfSecret(secret), me: null, reader: null, directoryIndex: null, definitions: new Map() } as Room;
   const refresh = vi.spyOn(data, "openRoom").mockResolvedValue(room);
   try {
     for (const [version, workflow, supported] of [[2, "legacy", true], [3, "legacy", true], [4, "legacy", true], [3, "list1", true], [4, "list1", true], [2, "list1", false], [5, "legacy", false], [5, "list1", false]] as const) {

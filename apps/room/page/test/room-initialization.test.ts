@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
 import type { Head, Item, ScopeRef, Summary } from "@generalbusiness/dap-contract";
-import { digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
+import { canonicalize, readItemQueryParameter, itemQueryDigest, itemQueryArgument, digestBytes, keyIdOfSecret, newIncarnation, scopeIdOf } from "@generalbusiness/artroom-bytes";
 import { Session as ReadSession } from "@generalbusiness/artroom-client";
 import { roomInitialization, initializationStillCurrent, type Room } from "../src/data.ts";
 import { initializationMessage } from "../src/shell.ts";
 
 // Scripted authenticated read answers, not native founding or permission evidence.
-// Real client HTTP reads and complete current/retained pagination are exercised.
+// Real client HTTP reads and bounded current/final selection replies are exercised.
 test("initialization guidance needs complete initial rules and no live or retired definitions; read failures and changed context stay unknown", async () => {
   const digest = digestBytes(new Uint8Array([1]));
   const scope = (kind: ScopeRef["kind"], n: number): ScopeRef => ({ scope: scopeIdOf({ v: 1, kind, definition: digest, creator: null, cause: digest, ordinal: n }), inc: newIncarnation(new Uint8Array(16).fill(n)), kind });
@@ -34,19 +34,18 @@ test("initialization guidance needs complete initial rules and no live or retire
       const current = mode === "published" ? { ...initialRule, refs: { ...initialRule.refs, published: 1 } } : mode === "revised" ? { ...initialRule, revision: 2 } : initialRule;
       return Response.json({ ok: true, complete: mode !== "incomplete", at: frontier, value: summary(Q, mode === "missing" ? [] : [current, ...definitions]) });
     }
-    if (path === `/v1/scopes/${Q.scope}/items/definition`) {
+    if (path === `/v1/scopes/${Q.scope}/query-items`) {
       definitionReads++;
       if (denyDefinitionReads) return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
-      const cursor = new URL(url).searchParams.get("cursor");
+      const query = readItemQueryParameter(new URL(url).searchParams.get("q"))!;
       if (mode === "context") { pageEntered(); await new Promise<void>(resolve => { resumePage = resolve; }); }
-      if (mode === "retired" && cursor === null) return Response.json({ ok: true, complete: false, next: "retained-page-two", at: frontier, value: [] });
       const values = mode === "retired" ? [item({ id: 2, type: "definition", state: "retired", values: { name: "issue", digest } })] : [];
-      return Response.json({ ok: true, complete: true, at: mode === "moved" ? { ...head, seq: 2 } : frontier, value: values });
+      return new Response(canonicalize({ ok: true, complete: true, at: mode === "moved" ? { ...head, seq: 2 } : frontier, value: { v: 1, scope: query.scope, query: itemQueryDigest(query), argument: itemQueryArgument(query), items: values } }));
     }
     throw new Error("Unexpected scripted read");
   };
   const secret = new Uint8Array(32), key = keyIdOfSecret(secret);
-  const room: Room = { session: { service: "https://room.test", secret, fetch, now: () => Date.parse("2026-10-12T00:00:00Z") }, directory: D.scope, membership: M, rules: Q.scope, destination: G.scope, key, me: null, reader: new ReadSession("SCRIPTED-private-session", { v: 1, deployment: "SCRIPTED", membership: M, member: "@reader", key, reads: ["summary", "items"], ends: "2026-10-12T00:10:00Z" }), unsessioned: null, definitions: new Map() };
+  const room: Room = { session: { service: "https://room.test", secret, fetch, now: () => Date.parse("2026-10-12T00:00:00Z") }, directory: D.scope, membership: M, rules: Q.scope, destination: G.scope, key, me: null, reader: new ReadSession("SCRIPTED-private-session", { v: 1, deployment: "SCRIPTED", membership: M, member: "@reader", key, reads: ["summary", "items"], ends: "2026-10-12T00:10:00Z" }), unsessioned: null, directoryIndex: null, definitions: new Map() };
   let initial: Awaited<ReturnType<typeof roomInitialization>> | null = null;
   for (const [definition, flag] of [["platform:rules@1", false], ["platform:rules@2", false], ["platform:rules@3", false], ["platform:rules@4", true]] as const) {
     rulesDefinition = definition; ownerMayReview = flag;

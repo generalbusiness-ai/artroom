@@ -1317,7 +1317,9 @@ refused when the server starts.
 
 Every command of the command line and every action of the page, with the
 tool calls that perform it in each launch mode and the count of calls.
-`packages/mcp/test/recipes.scope.test.ts` runs every row through the server
+The public item query is not yet available through MCP. Its marked gap
+row has no execution recipe; all other rows remain covered.
+`packages/mcp/test/recipes.scope.test.ts` runs every recipe row through the server
 on the real test Worker, with complete arguments, in the default and
 `--generic` modes, and checks that the tools called are the ones the row
 names, in order, as many times as it counts. In `--generic` mode, `actions`
@@ -1342,6 +1344,7 @@ works; the count given is the default recipe's.
 | `dap issue assign <issue> <@member>` | `issue.assign` on the issue's intent item with the assignees: 1 | `actions`, `act`: 2 | 1 |
 | `dap issue close <issue>` | `issue.close-own` when the caller opened it (issue.close-any otherwise), with the reason: 1 | `actions`, `act`: 2 | 1 |
 | `dap issues` | `room` for the lanes (paged by bytes), then `inspect` for each issue's own state: 1 + n | `room`, then `inspect` for each issue: 1 + n | 1 + n |
+| `dap items <scope> --query <canonical-item-query-JSON>` (MCP gap: public item query) | Unavailable in MCP; use the SDK, CLI or Page query surface | Unavailable in MCP | Unavailable in MCP |
 | `dap log <scope>` | `steps`, one per page: 1 | `steps`: 1 | 1 |
 | `dap show <scope>:<seq>` | `step`: 1 | `step`: 1 | 1 |
 | `dap verify <scope>` | `record`, one per page; the server verifies nothing, so a verifier outside it replays the canonical bytes, such as dap verify itself: 1 | `record`: 1 | 1 |

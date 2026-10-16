@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from "vitest";
-import { digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, entryHash, intentDigest, isSeed, scopeIdOf, textDigest, timeMs, takeBytes, utf8 } from "@generalbusiness/artroom-bytes";
 import { DEMO_DIGESTS, DIGESTS, change, issue } from "@generalbusiness/dap-lanes";
 import { firstExtents } from "@generalbusiness/dap-platform";
 import { act, actsOn, issueCreation, createdIssue, fieldValue, listLanes, loadChange, loadChangeSelection, loadIssue, loadRules, openRoom, placeOf, type Room } from "../src/index.ts";
@@ -153,7 +153,7 @@ test("native task data supplies active issue choices, detached Description, exac
       await owner.required(async () => { await response.body?.getReader().cancel(); });
       return Response.json({ ok: false, reason: "forbidden" }, { status: 403 });
     }
-    if ((!badSelection && !unavailableExtents && !noCurrent) || init?.method === "POST" || !new URL(url).pathname.match(/\/v1\/scopes\/[^/]+$/)) return response;
+    if ((!badSelection && !unavailableExtents && !noCurrent) || init?.method === "POST" || !new URL(url).pathname.match(/\/v1\/scopes\/[^/]+(?:\/query-items)?$/)) return response;
     const bytes = response.body ? await owner.required(() => takeBytes(response.body!, REPLY_BYTES, AbortSignal.timeout(REPLY_SECONDS * 1000))) : null;
     if (!(bytes instanceof Uint8Array)) throw new Error("The task-data witness received no whole summary reply.");
     const read = JSON.parse(new TextDecoder().decode(bytes)) as { ok?: boolean; value?: { items?: { type: string; values: Record<string, unknown> }[] } };
@@ -162,7 +162,7 @@ test("native task data supplies active issue choices, detached Description, exac
       if (unavailableExtents && item.type === "rules") item.values["extents"] = "unavailable extents";
       if (noCurrent && item.type === "manifest") (item as unknown as { state: string }).state = "superseded";
     }
-    return Response.json(read);
+    return new Response(canonicalize(read), { headers: { "content-type": "application/json" } });
   }, null, { invitation: false, holdIssueCreation: () => holdIssueCreation });
   console.info("native-stage", "task-data", "completed", performance.now() - stageOrigin, lastStarted, lastCompleted = "setup");
   try {

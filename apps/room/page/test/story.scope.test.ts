@@ -1,4 +1,5 @@
 import { beginSessionChild } from "../../../../packages/scope/test/session-settings.ts";
+import type { Fetch } from "@generalbusiness/artroom-client";
 import { expect, test } from "vitest";
 import { timeMs, timeOf } from "@generalbusiness/artroom-bytes";
 import { net } from "@generalbusiness/artroom-scope/testing";
@@ -51,7 +52,7 @@ test("the page's data functions against the Worker's routes as deployed: join wi
       expect([signed.reader, signed.unsessioned, signed.me?.handle]).toEqual([null, "sessions-unavailable", "@rita"]);
       // Limited signed reads do not authorize retained-item enumeration. The
       // page must show that refusal rather than a partial definition list.
-      await expect(loadRules(signed)).rejects.toThrow(new Unreadable(`Cannot read definition items of ${d.rules.name}: forbidden.`));
+      await expect(loadRules(signed)).rejects.toThrow(new Unreadable(`Cannot read definition items of ${d.rules.name}: incomplete (forbidden); items read: 0.`));
       await expect(openRoom(d.as(unas, unavailableSecret), place)).rejects.toThrow(new Unreadable(`Cannot read ${d.D.name}: forbidden.`));
     } finally {
       unavailableSecret.close();
@@ -89,8 +90,15 @@ test("the page's data functions against the Worker's routes as deployed: join wi
     const edited = await d.run(d.rita, "edit", "README.md", "--file", "readme.md", "--title", "Write the handbook");
     expect(edited.code, edited.lines.join("\n")).toBe(0);
     const head1 = d.at.stand.refs.get("refs/heads/main")!;
-    const readme = (await listLanes(forUna)).changes.find((row) => row.title === "Write the handbook")!;
-    expect(readme).toMatchObject({ kind: "pr", state: "merged" });
+    const listed: string[] = [], originalFetch = forUna.session.fetch!;
+    const indexed = { ...forUna, session: { ...forUna.session, fetch: async (url: string, init?: Parameters<Fetch>[1]) => { listed.push(url); return originalFetch(url, init); } } };
+    const readme = (await listLanes(indexed)).changes.find((row) => row.title === "Write the handbook")!;
+    // The bounded listing is explicitly advisory. This fixture's index has
+    // not received a later state notice; opening the record below reads the
+    // actual published merge. No lane summary/detail fan-out supplies rows.
+    expect(readme).toMatchObject({ kind: "pr", state: "open" });
+    expect(listed.filter(url => !url.endsWith("/sessions"))).toHaveLength(1);
+    expect(listed.find(url => url.includes("/query-items?"))).toContain(`/v1/scopes/${d.D.name}/query-items?`);
     let change = await loadChange(forUna, readme.scope);
     expect(change.proposal).toEqual(expect.any(Number));
     expect(change.manifests.map((m) => m.file)).toEqual([{ path: "README.md", digest: expect.stringMatching(/^sha256:/), size: 37, page: `${SERVICE}/site/${d.D.name}/HEAD/README.md`, content: "# The handbook\n\nWritten by the room.\n" }]);

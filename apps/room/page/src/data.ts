@@ -35,9 +35,9 @@ import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
  */
 
 import type { Answer, DeclaredDefinition, Digest, Entry, FactRef, FieldValue, Head, Item, KeyId, MemberRef, ScopeId, ScopeRef, Summary, Read, SignedIntent, Receipt, DutyId } from "@generalbusiness/dap-contract";
-import { LATE, b64url, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { LATE, b64url, byteOrder, canonicalize, definitionDigest, entryHash, intentDigest, isFactRef, isMemberRef, isScopeId, isSeed, scopeIdOf, isScopeRef as fullScopeRef, keyIdOfSecret, takeBytes, textDigest, timeMs, timeOf, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  ScopeHandle, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
+  ScopeHandle, collectItemQuery, declaredHandle, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedReads, type Fetch, type Session as ReadSession, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { LINK, describe, expectedOf, heldActs, linkOf, valueOf, type ActShape, type DefinitionShape, type Standing } from "@generalbusiness/dap-cli";
 import { DEFINITION_DOMAIN, ROLE_LISTS, fileSound, firstExtents, isExtents, platform, type Role } from "@generalbusiness/dap-platform";
@@ -66,6 +66,7 @@ export interface Place { directory: ScopeId; membership: ScopeRef }
 export interface Room {
   session: Session;
   directory: ScopeId;
+  directoryIndex: { scope: ScopeRef; definition: Summary["definition"] } | null;
   membership: ScopeRef;
   rules: ScopeId;
   destination: ScopeId;
@@ -142,11 +143,17 @@ async function pagesOf<T>(request: (cursor?: string) => Promise<Read<readonly T[
   throw new Unreadable(`${what}: page budget exhausted; enumeration incomplete.`);
 }
 
-/** Every item of one type, only when retained-item enumeration completes. */
-async function itemsOf(handle: ScopeHandle, summary: Summary, type: string, at: Head): Promise<Item[]> {
-  const items = new Map<number, Item>(summary.items.filter((item) => item.type === type).map((item) => [item.id, item]));
-  for (const item of await pagesOf((cursor) => handle.items(type, cursor), `Cannot read ${type} items of ${handle.scope}`, 100, at)) if (!items.has(item.id)) items.set(item.id, item);
-  return [...items.values()].sort((a, b) => a.id - b.id);
+/** A finite selected suffix at the same head as its surrounding view.
+ * Incomplete/refused coverage never becomes a complete item inventory. */
+async function itemsOf(room: Room, handle: ScopeHandle, summary: Summary, type: string, at: Head): Promise<Item[]> {
+  const declared = platform(summary.definition)?.data ?? await laneDefinition(room, handle, summary);
+  const selected = declared.items[type];
+  if (!selected) throw new Unreadable(`The definition of ${handle.scope} declares no ${type} items.`);
+  const states = Object.keys(selected.states).sort(byteOrder);
+  const coverage = await collectItemQuery(handle, { v: 1, scope: summary.scope, type, states, ids: null, limit: 100, cursor: null }, { pages: 4, bytes: 1024 * 1024, milliseconds: 10_000 });
+  if (!coverage.complete) throw new Unreadable(`Cannot read ${type} items of ${handle.scope}: incomplete (${coverage.reason ?? "unavailable"}); items read: ${coverage.items.length}.`);
+  if (!coverage.at || coverage.at.seq !== at.seq || coverage.at.hash !== at.hash) throw new Unreadable(`Cannot read ${type} items of ${handle.scope}: head changed; enumeration incomplete.`);
+  return [...coverage.items];
 }
 
 /** A detached text by its digest, or null when the scope holds none (as after a redaction) or the slot is empty. */
@@ -268,8 +275,9 @@ export async function joinRoom(session: Session, typed: string, submitting?: () 
 export async function openRoom(session: Session, place: Place): Promise<Room> {
   const key = keyIdOfSecret(session.secret);
   const asked = await readerFor(session, place.membership);
-  const room: Room = { session, directory: place.directory, membership: place.membership, rules: "" as ScopeId, destination: "" as ScopeId, key, me: null, reader: asked.session, unsessioned: asked.why, definitions: new Map() };
+  const room: Room = { session, directory: place.directory, directoryIndex: null, membership: place.membership, rules: "" as ScopeId, destination: "" as ScopeId, key, me: null, reader: asked.session, unsessioned: asked.why, definitions: new Map() };
   const { summary } = await summaryOf(handleOf(room, place.directory));
+  room.directoryIndex = { scope: summary.scope, definition: summary.definition };
   const repository = summary.items.find((item) => item.type === "repository");
   const M = repository?.refs["membership"];
   const rules = scopeOf(repository?.refs["rules"]);
@@ -295,30 +303,29 @@ async function readerFor(session: Session, membership: ScopeRef): Promise<{ sess
   }
 }
 
-/** One lane as the directory's index row has it, with the state its own main item is in now. */
+/** One advisory directory-index row. Open the lane for its current state. */
 export interface LaneRow { scope: ScopeId; number: number | null; kind: "issue" | "pr" | null; title: string | null; state: string | null; draft: boolean | null }
 
-/** The room's issues and changes: the directory's index rows, in number order, each with its lane's own state. */
+/** One bounded directory-index page. Its notices are advisory; opening a
+ * row reads that lane. Listing never fetches each lane's details. */
 export async function listLanes(room: Room): Promise<{ issues: LaneRow[]; changes: LaneRow[] }> {
   await fresh(room);
-  const { summary } = await summaryOf(handleOf(room, room.directory));
+  const index = room.directoryIndex;
+  if (!index || index.scope.scope !== room.directory) throw new Unreadable("The room has no bound directory index reference. Reopen the room.");
+  const declared = platform(index.definition)?.data.items["lane"];
+  if (!declared) throw new Unreadable("The directory index definition is unsupported.");
+  const handle = handleOf(room, room.directory);
+  const coverage = await collectItemQuery(handle, { v: 1, scope: index.scope, type: "lane", states: Object.keys(declared.states).sort(byteOrder), ids: null, limit: 100, cursor: null });
+  if (!coverage.complete) throw new Unreadable(`Directory index incomplete (${coverage.reason ?? "unavailable"}); rows read: ${coverage.items.length}.`);
   const rows: LaneRow[] = [];
-  for (const item of summary.items.filter((i) => i.type === "lane")) {
+  for (const item of coverage.items) {
     const scope = scopeOf(item.refs["scope"]);
     if (!scope) continue;
-    // The lane's own state, read from it; the index row is the lane's advisory copy. A final main item (a merged change, say)
-    // is no longer in the summary: it is read from the scope's retained final items.
-    const handle = handleOf(room, scope);
-    const { summary: lane, at } = await summaryOf(handle);
-    const type = item.values["kind"] === "issue" ? "intent" : "proposal";
-    const main = lane.items.find((i) => i.type === type) ?? (await itemsOf(handle, lane, type, at))[0];
-    rows.push({
-      scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
-      title: text(main?.values["title"]) ?? text(item.values["title"]), state: main?.state ?? text(item.values["state"]), draft: typeof item.values["draft"] === "boolean" ? item.values["draft"] : null,
-    });
+    rows.push({ scope, number: typeof item.values["number"] === "number" ? item.values["number"] : null, kind: (text(item.values["kind"]) as LaneRow["kind"]) ?? null,
+      title: text(item.values["title"]), state: text(item.values["state"]), draft: typeof item.values["draft"] === "boolean" ? item.values["draft"] : null });
   }
   rows.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
-  return { issues: rows.filter((r) => r.kind === "issue"), changes: rows.filter((r) => r.kind === "pr") };
+  return { issues: rows.filter(row => row.kind === "issue"), changes: rows.filter(row => row.kind === "pr") };
 }
 
 // ---------------------------------------------------------------- one lane
@@ -340,8 +347,8 @@ async function laneDefinition(room: Room, handle: ScopeHandle, summary: Summary)
 
 export interface Comment { id: number; author: string | null; state: string; body: string | null }
 
-const commentsOf = async (handle: ScopeHandle, summary: Summary, at: Head): Promise<Comment[]> =>
-  Promise.all((await itemsOf(handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
+const commentsOf = async (room: Room, handle: ScopeHandle, summary: Summary, at: Head): Promise<Comment[]> =>
+  Promise.all((await itemsOf(room, handle, summary, "comment", at)).map(async (c) => ({ id: c.id, author: memberOf(c.parties["author"]), state: c.state, body: await textOf(handle, c.values["body"]) })));
 
 export interface IssueView {
   /** The actual intent item used by transitions. */
@@ -376,14 +383,14 @@ export async function loadIssue(room: Room, scope: ScopeId): Promise<IssueView> 
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
   if (definition.name !== "issue") throw new Unreadable(`${scope} is a lane under ${definition.name}, not an issue.`);
-  const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(handle, summary, "intent", at))[0];
+  const intent = summary.items.find((item) => item.type === "intent") ?? (await itemsOf(room, handle, summary, "intent", at))[0];
   if (!intent) throw new Unreadable(`${scope} holds no issue.`);
   return {
     scope, ref: structuredClone(summary.scope), definition: summary.definition, head: at, intent: intent.id,
     ...await issueTimes(handle, summary, at),
     number: typeof intent.values["number"] === "number" ? intent.values["number"] : null, title: text(intent.values["title"]), body: await textOf(handle, intent.values["body"]),
     state: intent.state, closeReason: text(intent.values["closeReason"]), requesterRef: isMemberRef(intent.parties["requester"]) ? structuredClone(intent.parties["requester"]) : null, requester: memberOf(intent.parties["requester"]), assignees: membersOf(intent.parties["assignees"]),
-    conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(handle, summary, at),
+    conditions: Array.isArray(intent.values["conditions"]) ? (intent.values["conditions"] as string[]) : [], comments: await commentsOf(room, handle, summary, at),
   };
 }
 
@@ -509,7 +516,7 @@ export async function loadChangeSelection(room: Room, scope: ScopeId): Promise<{
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
   if (definition.name !== "change") throw new Unreadable(`${scope} is not a change lane.`);
-  const manifests = await itemsOf(handle, summary, "manifest", at);
+  const manifests = await itemsOf(room, handle, summary, "manifest", at);
   return { scope: summary.scope, head: at, currentManifest: manifests.find((item) => item.state === "current")?.id ?? null,
     manifests: manifests.map((item) => ({ id: item.id, state: item.state, selectedReports: reportsOf(item, definition) })) };
 }
@@ -583,7 +590,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
   const { summary, at } = await summaryOf(handle);
   const definition = await laneDefinition(room, handle, summary);
   if (definition.name !== "change") throw new Unreadable(`${scope} is a lane under ${definition.name}, not a change.`);
-  const all = (type: string) => itemsOf(handle, summary, type, at);
+  const all = (type: string) => itemsOf(room, handle, summary, type, at);
   const proposal = summary.items.find((item) => item.type === "proposal") ?? (await all("proposal"))[0];
   if (!proposal) throw new Unreadable(`${scope} holds no proposal.`);
   const rulesItem = summary.items.find((item) => item.type === "rules");
@@ -634,7 +641,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
       extents: Array.isArray(rulesItem.values["extents"]) ? (rulesItem.values["extents"] as unknown as Extent[]) : [],
       checks: Array.isArray(rulesItem.values["checks"]) ? (rulesItem.values["checks"] as unknown as { name: string; required: boolean }[]) : [],
     } : null,
-    comments: await commentsOf(handle, summary, at),
+    comments: await commentsOf(room, handle, summary, at),
   };
 }
 
@@ -642,7 +649,7 @@ export async function loadChange(room: Room, scope: ScopeId): Promise<ChangeView
 async function publicationsOf(room: Room, lane: ScopeId): Promise<Map<number, Publication>> {
   const G = handleOf(room, room.destination);
   const { summary, at } = await summaryOf(G);
-  const items = (await itemsOf(G, summary, "publication", at)).filter((item) => (item.refs["operation"] as FactRef | undefined)?.at.scope === lane);
+  const items = (await itemsOf(room, G, summary, "publication", at)).filter((item) => (item.refs["operation"] as FactRef | undefined)?.at.scope === lane);
   if (items.length === 0) return new Map();
   const operations = operationsOf(await historyOf(G, at));
   return new Map(items.map((item) => [
@@ -751,7 +758,7 @@ export async function roomInitialization(room: Room): Promise<RoomInitialization
     if (published !== undefined && published !== null || current.revision > 1 || summary.items.some(item => item.type === "definition")) return { state: "configured" };
     // Proving absence still needs complete coherent current/retained pages:
     // a retired definition also proves that this room has been configured.
-    const definitions = await itemsOf(handle, summary, "definition", at);
+    const definitions = await itemsOf(room, handle, summary, "definition", at);
     if (definitions.length > 0) return { state: "configured" };
     // Known rules1–4 initial item; only the explicit rules4 pin defaults owner review to true.
     if (canonicalize(current.refs["directory"]) !== canonicalize(directory.summary.scope)
@@ -800,7 +807,7 @@ export async function loadRules(room: Room): Promise<RulesView> {
     checks: Array.isArray(rules.values["checks"]) ? (rules.values["checks"] as unknown as RulesView["checks"]) : [],
     labels: Array.isArray(rules.values["labels"]) ? (rules.values["labels"] as string[]) : [],
     extents: Array.isArray(rules.values["extents"]) ? (rules.values["extents"] as unknown as Extent[]) : null,
-    definitions: (await itemsOf(handle, summary, "definition", at)).map((d) => ({ name: String(d.values["name"]), digest: String(d.values["digest"]), state: d.state })),
+    definitions: (await itemsOf(room, handle, summary, "definition", at)).map((d) => ({ name: String(d.values["name"]), digest: String(d.values["digest"]), state: d.state })),
     controllers: holdersOf((await summaryOf(handleOf(room, room.membership.scope))).summary.items, "rules.publish"),
   };
 }

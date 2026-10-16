@@ -13,3 +13,5 @@ export * from "./invitation.ts";
 export * from "./founding-offer.ts";
 export * from "./agent-key-invitation.ts";
 export * from "./invitation-fields.ts";
+
+export * from "./item-query.ts";

@@ -69,7 +69,7 @@ export function roomScreen(room: Room, lanes: { issues: LaneRow[]; changes: Lane
   }
   query.addEventListener("input", () => { context?.changed({ query: query.value, filter }); render(); });
   render();
-  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { class: "toolbar-actions", "data-action-slot": "create" })), content,
+  return h("main", { class: "screen" }, h("h1", { class: "hide" }, label), h("p", { class: "record-meta" }, "Directory index. Open an issue or change for its current state."), h("div", { class: "toolbar" }, h("label", { class: "search" }, query), filters, h("div", { class: "toolbar-actions", "data-action-slot": "create" })), content,
     inspect("Inspect room record", whoLine(room), h("dl", {}, field("Directory", h("code", {}, room.directory)))),
   );
 }

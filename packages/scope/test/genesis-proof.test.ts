@@ -5,6 +5,7 @@ import { useOf } from "@generalbusiness/dap-derive";
 import { GenesisProofs, GENESIS_PROOF_BOUNDS as B, type ProofTimer } from "../src/genesis-proof.ts";
 import { ProofBytes, type ProofBody, type ProofSource } from "../src/proof-bytes.ts";
 import { rootOf } from "../src/signed-reads.ts";
+import { PreparationFlights } from "../src/preparation-flight.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { at, found, rita, una } from "./support.ts";
 
@@ -65,6 +66,46 @@ test("native genesis evidence caches only immutable content and repeats actor/wi
   expect([got.negativeActor, got.old]).toEqual([{ state: "negative" }, { state: "negative" }]);
   expect(got.ended).toEqual({ state: "unknown" }); expect(got.checks).toBe(2);
   expect(got.bodyAtFirst).toBe(1); expect(got.bodyQueries).toBe(1);
+});
+
+// Synthetic canonical chain on real SQLite; the peer is an explicitly gated STAND-IN.
+// The parent owns the deadline/pending slot, and no late helper result performs SQL or caches content.
+test("parent-owned genesis proof inherits remaining time and fences a late peer until its real task settles", async () => {
+  const scope = await found(); await scope.commitment();
+  const got = await scope.inside(async state => {
+    const store = new SqliteStore(sqlOf(state));
+    const entries = chain(JSON.parse(store.stored(0)!.bytes), JSON.parse(store.stored(1)!.bytes), 1), start = entries[1]!;
+    install(state, start);
+    const entered = deferred<void>(), release = deferred<ProofBody | null>(), cleaned = deferred<void>();
+    const clock = new Timer(), nativeAfter = clock.after.bind(clock);
+    clock.after = (ms, work) => { const cancel = nativeAfter(ms, work); return () => { cancel(); cleaned.resolve(); }; };
+    const flights = new PreparationFlights(clock), requests: number[] = [];
+    let sqlCalls = 0, peerCalls = 0;
+    const actual = sqlOf(state), bytes = new ProofBytes({ exec(query, ...args) { sqlCalls++; return actual.exec(query, ...args); } });
+    const source: ProofSource = { async read(_fact, _max, milliseconds) {
+      requests.push(milliseconds ?? -1); peerCalls++;
+      if (peerCalls === 1) { entered.resolve(); return release.promise; }
+      return { fact: factRefOf(entries[0]!), bytes: canonicalize(entries[0]!) };
+    } };
+    const proof = new GenesisProofs(bytes, source, clock);
+    const meter = { attempt() {}, visit() {}, peer(_max: number, milliseconds: number) { if (milliseconds <= 0) throw new Error("unadmitted peer"); } };
+    const run = () => flights.run(async owner => { clock.advance(1000); return proof.owned(factRefOf(start), owner, meter); });
+    const pending = run(); await entered.promise;
+    clock.advance(9000);
+    const expired = await pending, before = sqlCalls;
+    let extraRan = false;
+    const blocked = await flights.run(async () => { extraRan = true; return true; });
+    release.resolve({ fact: factRefOf(entries[0]!), bytes: canonicalize(entries[0]!) });
+    await cleaned.promise;
+    const after = sqlCalls;
+    const fresh = await run();
+    return { expired, blocked, extraRan, before, after, requests, peerCalls, fresh };
+  });
+  expect([got.expired, got.blocked, got.extraRan]).toEqual([null, null, false]);
+  expect(got.after).toBe(got.before);
+  expect(got.requests).toEqual([9000, 9000]);
+  expect(got.peerCalls).toBe(2);
+  expect(got.fresh?.kind).toBe("root");
 });
 
 test("exact genesis chain shares rootOf semantics at four steps and separates complete-none from missing/unsupported", async () => {

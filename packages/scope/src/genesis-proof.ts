@@ -1,9 +1,10 @@
 /** Bounded immutable content evidence; callers still owe fresh read authority. */
 import type { Entry, FactRef, FactUse, KeyId } from "@generalbusiness/dap-contract";
-import { canonicalize, digestBytes, isFactUse, isKeyId, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isFactRef, isFactUse, isKeyId, utf8 } from "@generalbusiness/artroom-bytes";
 import { same } from "@generalbusiness/dap-derive";
 import { CHAIN_STEPS, leads, rootOf, type Root } from "./signed-reads.ts";
 import { ProofBytes, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
+import type { PreparationRun } from "./preparation-flight.ts";
 
 export const GENESIS_PROOF_BOUNDS = { steps: CHAIN_STEPS, bodies: 16, bytes: 1024 * 1024, attempts: 64, visits: 512, milliseconds: 10_000 } as const;
 export type GenesisProof = { kind: "root"; of: FactRef; root: Root } | { kind: "none"; of: FactRef } | { kind: "unknown" };
@@ -11,6 +12,12 @@ export interface ProofTimer { now(): number; after(ms: number, work: () => void)
 const realTimer: ProofTimer = { now: () => Date.now(), after(ms, work) { const timer = setTimeout(work, ms); return () => clearTimeout(timer); } };
 interface Flight { id: string; ends: number; abandoned: boolean; answer: Promise<GenesisProof> }
 const unknown = (): GenesisProof => ({ kind: "unknown" });
+export interface GenesisProofWork {
+  attempt(): void;
+  visit(): void;
+  /** Reserve the trusted exact receiver's work before dispatch. */
+  peer(maxBytes: number, milliseconds: number): void;
+}
 const copy = (proof: GenesisProof): GenesisProof => proof.kind === "unknown" ? unknown() : {
   ...proof, of: { ...proof.of, at: { ...proof.of.at } }, ...(proof.kind === "root" ? { root: { ...proof.root } } : {}),
 };
@@ -26,6 +33,13 @@ export class GenesisProofs {
 
   root(): Promise<GenesisProof> { return this.#root(); }
 
+  /** A parent's one flight/deadline owns the real walk. No nested flight,
+   * joining, timer reset or cross-operation cache read/write occurs here. */
+  owned(own: FactRef, run: PreparationRun, work: GenesisProofWork): Promise<GenesisProof> {
+    if (!isFactRef(own) || !run.active()) return Promise.resolve(unknown());
+    return this.#run(own, run.active, work, run.remaining);
+  }
+
   #root(deadline = Infinity): Promise<GenesisProof> {
     const began = this.#timer.now(), ends = Math.min(began + GENESIS_PROOF_BOUNDS.milliseconds, deadline);
     if (!Number.isFinite(began) || !Number.isFinite(ends)) return Promise.resolve(unknown());
@@ -39,7 +53,7 @@ export class GenesisProofs {
     const flight: Flight = { id, ends, abandoned: false, answer };
     this.#flight = flight;
     const cancel = this.#timer.after(Math.max(0, ends - this.#timer.now()), () => { flight.abandoned = true; complete(unknown()); });
-    void Promise.resolve().then(() => this.#run(own, flight)).then(proof => {
+    void Promise.resolve().then(() => this.#run(own, () => !flight.abandoned && this.#timer.now() < flight.ends)).then(proof => {
       if (flight.abandoned || this.#timer.now() >= flight.ends) { complete(unknown()); return; }
       const current = this.#bytes.identity()?.genesis;
       if (flight.abandoned || this.#timer.now() >= flight.ends || !current || !same(current, own)) { complete(unknown()); return; }
@@ -74,16 +88,16 @@ export class GenesisProofs {
     } catch { return { state: "unknown" }; }
   }
 
-  async #run(own: FactRef, flight: Flight): Promise<GenesisProof> {
+  async #run(own: FactRef, isActive: () => boolean, meter?: GenesisProofWork, remainingMilliseconds?: () => number): Promise<GenesisProof> {
     let bodies = 0, bytes = 0, attempts = 0, visits = 0;
     const cache = new Map<string, { entry: Entry; content: string }>();
     const expected = new Map<string, string>();
     const locals = new Map<number, Entry>();
     const active = () => {
-      if (flight.abandoned || this.#timer.now() >= flight.ends) throw new Error("proof-unavailable");
+      if (!isActive()) throw new Error("proof-unavailable");
     };
-    const attempt = () => { active(); if (++attempts > GENESIS_PROOF_BOUNDS.attempts) throw new Error("proof-unavailable"); };
-    const work = () => { active(); if (++visits > GENESIS_PROOF_BOUNDS.visits) throw new Error("proof-unavailable"); };
+    const attempt = () => { active(); if (++attempts > GENESIS_PROOF_BOUNDS.attempts) throw new Error("proof-unavailable"); meter?.attempt(); };
+    const work = () => { active(); if (++visits > GENESIS_PROOF_BOUNDS.visits) throw new Error("proof-unavailable"); meter?.visit(); };
     const admit = (value: ProofBody, fact: FactRef, content?: string): Entry => {
       active();
       if (bodies >= GENESIS_PROOF_BOUNDS.bodies || typeof value.bytes !== "string" || value.bytes.length > GENESIS_PROOF_BOUNDS.bytes - bytes) throw new Error("proof-unavailable");
@@ -126,10 +140,18 @@ export class GenesisProofs {
       const local = this.#bytes.retained(use, remaining);
       if (local.kind === "body") return admit(local.value, use.fact, use.content);
       if (local.kind !== "missing" || !this.#source) throw new Error("proof-unavailable");
-      const value = await this.#source.read(use.fact, remaining);
+      const milliseconds = remainingMilliseconds ? remainingTime() : undefined;
+      if (milliseconds !== undefined) meter?.peer(remaining, milliseconds);
+      active();
+      const value = milliseconds === undefined ? await this.#source.read(use.fact, remaining) : await this.#source.read(use.fact, remaining, milliseconds);
       active(); // a late source never advances the walk or installs a cache
       if (!value) throw new Error("proof-unavailable");
       return admit(value, use.fact, use.content);
+    };
+    const remainingTime = (): number => {
+      const milliseconds = remainingMilliseconds?.() ?? GENESIS_PROOF_BOUNDS.milliseconds;
+      if (!Number.isFinite(milliseconds) || milliseconds <= 0 || milliseconds > GENESIS_PROOF_BOUNDS.milliseconds) throw new Error("proof-unavailable");
+      return milliseconds;
     };
     try {
       const start = ownEntry(0);

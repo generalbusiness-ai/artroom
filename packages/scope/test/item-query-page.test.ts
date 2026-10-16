@@ -1,14 +1,17 @@
 import { expect, test } from "vitest";
 import { ITEM_QUERY_BOUNDS as B } from "@generalbusiness/dap-contract";
 import type { Item, ItemQuery } from "@generalbusiness/dap-contract";
-import { canonicalize, itemQueryArgument, itemQueryDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, encodeItemQueryParameter, itemQueryArgument, itemQueryDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { secretSigner, signedReader } from "@generalbusiness/artroom-client";
+import type { NativeItemQuery } from "../src/item-queries.ts";
 import { Scope } from "../src/core.ts";
 import { itemQueryPage } from "../src/item-query-page.ts";
+import { ItemQueryBudget } from "../src/item-query-budget.ts";
 import { production } from "../src/ports.ts";
 import { ReadPreparation } from "../src/read-preparation.ts";
 import { SqliteStore, type Sql } from "../src/sqlite.ts";
 import { testPorts } from "../src/testing.ts";
-import { found, type Lane } from "./support.ts";
+import { at, found, rita, type Lane } from "./support.ts";
 
 const sqlOf = (state: DurableObjectState): Sql => ({ exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) });
 function frameOf(lane: Lane, state: DurableObjectState) {
@@ -53,8 +56,12 @@ test("native synchronous pages merge selected states without omissions or duplic
     const frame = frameOf(lane, state), pages = [], measurements = [];
     let query = queryOf(lane);
     for (let n = 0; n < 3; n++) {
-      const watch = watched(state), result = itemQueryPage(watch.sql, frame, query, () => true), read = page(result);
-      pages.push(read); measurements.push(watch.result());
+      const watch = watched(state), budget = new ItemQueryBudget("session", () => true);
+      const result = itemQueryPage(budget.sql("page", watch.sql), frame, query, () => budget.available, {
+        candidates: (count, bytes) => budget.spend("page", { candidates: count, metadata: bytes }),
+        bodies: (count, bytes) => budget.spend("page", { bodies: count, payloadBytes: bytes }),
+      }), read = page(result);
+      pages.push(read); measurements.push({ ...watch.result(), admitted: budget.admitted().total });
       if (read.complete) break;
       query = { ...query, cursor: read.next! };
     }
@@ -76,6 +83,12 @@ test("native synchronous pages merge selected states without omissions or duplic
     expect(measured.candidates).toBeLessThanOrEqual(B.candidates); expect(measured.metadata).toBeLessThanOrEqual(B.metadataBytes);
     expect(measured.rowsRead).toBeLessThanOrEqual(2 * measured.candidates + measured.bodies.length + 16);
     expect(measured.rowsWritten).toBe(0);
+    expect(measured.admitted.calls).toBe(measured.queries.length);
+    expect(measured.admitted.calls).toBeLessThanOrEqual(200);
+    expect(measured.candidates).toBeLessThanOrEqual(measured.admitted.candidates);
+    expect(measured.metadata).toBeLessThanOrEqual(measured.admitted.metadata);
+    expect(measured.admitted.bodies).toBe(measured.bodies.length);
+    expect(measured.admitted.payloadBytes).toBe(utf8(canonicalize(got.pages[n]!)).length);
     expect(measured.plans.every(plan => /SEARCH item USING (INDEX item_by_state|INTEGER PRIMARY KEY)/.test(plan) && !/SCAN|TEMP/i.test(plan))).toBe(true);
   }
   console.log("item-query-native-pages", JSON.stringify(got.measurements.map(({ rowsRead, candidates, metadata, bodies, rowsWritten }) => ({ rowsRead, candidates, metadata, bodies: bodies.length, rowsWritten }))));
@@ -102,8 +115,8 @@ test("native byte admission loads only a fitting nonempty prefix and resumes at 
 
 test("exact full envelope bytes include framing and reclaim the cursor on a complete final prefix", async () => {
   const lane = await found();
-  const got = await lane.inside(state => {
-    const frame = frameOf(lane, state), query = queryOf(lane), second = item(1001, "offered", "");
+  const got = await lane.inside(async (state, instance) => {
+    const frame = frameOf(lane, state), query = queryOf(lane, { states: ["offered"] }), second = item(1001, "offered", "");
     // Independent fixed full-envelope byte target, not the executor's
     // prefix calculation. Small final row costs less than a cursor.
     const first = item(1000, "offered", "");
@@ -112,13 +125,19 @@ test("exact full envelope bytes include framing and reclaim the cursor on a comp
     const padded = { ...first, values: { text: "x".repeat(padding) } };
     write(state, padded); write(state, second);
     const watch = watched(state), final = itemQueryPage(watch.sql, frame, query, () => true);
+    const owned = instance as { queryItems(encoded: unknown, reader: unknown): Promise<NativeItemQuery> };
+    const header = (selected: ItemQuery) => signedReader(secretSigner(rita.secret), lane.name, "query-items", itemQueryArgument(selected)!, { now: () => Date.parse(at(0)) });
+    const publicFinal = await owned.queryItems(encodeItemQueryParameter(query), await header(query));
     // Make a singleton whose full final response exceeds the cap by one.
-    const single = queryOf(lane, { ids: [1000] }), singleShell = { ...shell, value: { ...shell.value, query: itemQueryDigest(single), argument: itemQueryArgument(single), items: [first] } };
+    const single = queryOf(lane, { states: ["offered"], ids: [1000] }), singleShell = { ...shell, value: { ...shell.value, query: itemQueryDigest(single), argument: itemQueryArgument(single), items: [first] } };
     const tooLarge = item(1000, "offered", "x".repeat(B.payloadBytes + 1 - utf8(JSON.stringify(singleShell)).length));
     state.storage.sql.exec("UPDATE item SET record=? WHERE id=?", canonicalize(tooLarge), 1000).toArray();
     const refusedWatch = watched(state), refused = itemQueryPage(refusedWatch.sql, frame, single, () => true);
-    return { final, measured: watch.result(), refused, refusedMeasured: refusedWatch.result() };
+    const publicRefused = await owned.queryItems(encodeItemQueryParameter(single), await header(single));
+    return { publicFinal, publicRefused, final, measured: watch.result(), refused, refusedMeasured: refusedWatch.result() };
   });
+  expect(got.publicFinal).toEqual(got.final);
+  expect(got.publicRefused).toEqual(got.refused);
   expect(got.refusedMeasured.bodies).toEqual([]);
   expect(got.refused).toEqual({ ok: false, reason: "row-too-large" });
   expect(got.final.ok).toBe(true);

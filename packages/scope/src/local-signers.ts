@@ -15,6 +15,9 @@ interface Control {
 type SignerScope = Pick<ScopeState, "at" | "head" | "time"> | null | "unavailable";
 interface Metadata { seq: number; hash: Digest; time: Timestamp; size: number; bytes: number }
 export type LocalSignerProof = { state: "positive"; seq: number; time: Timestamp } | { state: "negative" | "unknown" };
+/** Query-owned admission before native metadata or a historical body. */
+export interface LocalSignerWork { call(metadataBytes: number): void; body(bytes: number): void }
+type One = (query: string, ...bindings: SqlValue[]) => Record<string, SqlValue> | null;
 const integer = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const head = (v: unknown): v is Head => isObject(v) && Object.keys(v).length === 2 && integer(v["seq"]) && isDigest(v["hash"]);
 const faults: readonly string[] = ["generation", "tail", "missing-entry", "metadata", "unfit-entry", "entry", "chain", "cutoff"];
@@ -40,10 +43,10 @@ export class LocalSigners {
   }
   #one(query: string, ...bindings: SqlValue[]): Record<string, SqlValue> | null { return this.#sql.exec(query, ...bindings).toArray()[0] ?? null; }
   #save(c: Control): void { this.#sql.exec("INSERT INTO local_signer_control (id,value) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value", canonicalize(c)).toArray(); }
-  #load(): Control | null | "invalid" {
+  #load(one: One = this.#one.bind(this)): Control | null | "invalid" {
     let row: Record<string, SqlValue> | null;
     try {
-      row = this.#one("SELECT CASE WHEN octet_length(value) <= ? THEN value ELSE NULL END AS value FROM local_signer_control WHERE id=1", SIGNER_INDEX_BOUNDS.controlBytes);
+      row = one("SELECT CASE WHEN octet_length(value) <= ? THEN value ELSE NULL END AS value FROM local_signer_control WHERE id=1", SIGNER_INDEX_BOUNDS.controlBytes);
     } catch (error) {
       if (error instanceof Error && /no such (?:function|table|column)|malformed|corrupt/i.test(error.message)) return "invalid";
       throw error;
@@ -71,9 +74,10 @@ export class LocalSigners {
       || !integer(row["size"]) || !integer(row["bytes"]) || row["size"] !== row["bytes"]) return null;
     return row as unknown as Metadata;
   }
-  #entry(m: Metadata): Entry | null {
+  #entry(m: Metadata, one: One = this.#one.bind(this), admit?: (bytes: number) => void): Entry | null {
     if (m.bytes > SIGNER_INDEX_BOUNDS.bytes) return null;
-    const row = this.#one("SELECT bytes FROM entry WHERE seq=? AND octet_length(bytes)=?", m.seq, m.bytes);
+    admit?.(m.bytes);
+    const row = one("SELECT bytes FROM entry WHERE seq=? AND octet_length(bytes)=?", m.seq, m.bytes);
     if (typeof row?.["bytes"] !== "string" || utf8(row["bytes"]).length !== m.bytes) return null;
     try {
       const e: unknown = parseStrict(row["bytes"]);
@@ -108,14 +112,15 @@ export class LocalSigners {
     const c = this.#load();
     return c === null ? { phase: this.#scope() === "unavailable" ? "unavailable" : "empty" } : c === "invalid" ? { phase: "invalid" } : { phase: c.phase, next: c.next, cutoff: c.cutoff, ...(c.reason ? { reason: c.reason } : {}) };
   }
-  #fault(c: Control): Fault | null {
+  #fault(c: Control, one: One = this.#one.bind(this), beforeScope?: () => void): Fault | null {
+    beforeScope?.(); // Native SqliteStore signerScope selects one bounded 4 KiB row.
     const s = this.#scope();
     if (s === "unavailable") return "metadata";
     if (!s || !same(s.at, c.at)) return "generation";
     if (s.head.seq !== c.tail.seq || s.head.hash !== c.tail.hash || s.time !== c.tailTime) return "tail";
-    const tail = this.#metadata(this.#one(`SELECT ${META} FROM entry WHERE seq=?`, c.tail.seq));
-    const cutoff = this.#metadata(this.#one(`SELECT ${META} FROM entry WHERE seq=?`, c.cutoff.seq));
-    const prefix = c.next === 0 ? null : this.#metadata(this.#one(`SELECT ${META} FROM entry WHERE seq=?`, c.next - 1));
+    const tail = this.#metadata(one(`SELECT ${META} FROM entry WHERE seq=?`, c.tail.seq));
+    const cutoff = this.#metadata(one(`SELECT ${META} FROM entry WHERE seq=?`, c.cutoff.seq));
+    const prefix = c.next === 0 ? null : this.#metadata(one(`SELECT ${META} FROM entry WHERE seq=?`, c.next - 1));
     if (tail === null || cutoff === null || (c.next > 0 && prefix === null)) return "metadata";
     if (tail.hash !== c.tail.hash || tail.time !== c.tailTime) return "tail";
     if (cutoff.hash !== c.cutoff.hash) return "cutoff";
@@ -123,17 +128,18 @@ export class LocalSigners {
     return null;
   }
   /** Tri-state evidence only. Public callers must not receive these diagnostics. */
-  proof(actor: KeyId, since: number): LocalSignerProof {
+  proof(actor: KeyId, since: number, work?: LocalSignerWork): LocalSignerProof {
     try {
-      const c = this.#load();
+      const one: One = (query, ...bindings) => { work?.call(SIGNER_INDEX_BOUNDS.controlBytes); return this.#one(query, ...bindings); };
+      const c = this.#load(one);
       if (!isKeyId(actor) || !Number.isFinite(since) || c === null || c === "invalid" || c.phase === "stopped") return { state: "unknown" };
-      if (this.#fault(c) !== null) return { state: "unknown" };
-      const row = this.#one("SELECT CASE WHEN octet_length(generation)<=512 THEN generation ELSE NULL END AS generation, seq, CASE WHEN octet_length(time)<=32 THEN time ELSE NULL END AS time, CASE WHEN octet_length(hash)=71 THEN hash ELSE NULL END AS hash FROM latest_local_signer WHERE actor=?", actor);
+      if (this.#fault(c, one, () => work?.call(SIGNER_INDEX_BOUNDS.controlBytes)) !== null) return { state: "unknown" };
+      const row = one("SELECT CASE WHEN octet_length(generation)<=512 THEN generation ELSE NULL END AS generation, seq, CASE WHEN octet_length(time)<=32 THEN time ELSE NULL END AS time, CASE WHEN octet_length(hash)=71 THEN hash ELSE NULL END AS hash FROM latest_local_signer WHERE actor=?", actor);
       if (row) {
         if (row["generation"] !== this.#generation(c) || !integer(row["seq"]) || row["seq"] > c.tail.seq || (row["seq"] <= c.cutoff.seq && row["seq"] >= c.next)) return { state: "unknown" };
-        const m = this.#metadata(this.#one(`SELECT ${META} FROM entry WHERE seq=?`, row["seq"]));
+        const m = this.#metadata(one(`SELECT ${META} FROM entry WHERE seq=?`, row["seq"]));
         if (!m || m.hash !== row["hash"] || m.time !== row["time"]) return { state: "unknown" };
-        const e = this.#entry(m);
+        const e = this.#entry(m, one, bytes => work?.body(bytes));
         if (!e || !same(e.at, c.at) || signerOf(e) !== actor) return { state: "unknown" };
         if (timeMs(e.time)! >= since) return { state: "positive", seq: e.seq, time: e.time };
       }

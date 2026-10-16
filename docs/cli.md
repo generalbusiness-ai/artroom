@@ -353,6 +353,22 @@ sc_p6xp2lmd...:9  2099-01-01T00:00:00Z  delivery result from inbox:0; 0 effects,
 10 entries in all.
 ```
 
+**`dap items <scope> --query <canonical-item-query-JSON>`** reads one
+explicit bounded item selection. The canonical JSON has exactly `cursor`,
+`ids`, `limit`, `scope`, `states`, `type` and `v`; `scope` is the full scope
+reference, `cursor` starts as `null`, and `ids: null` selects all matching
+IDs. States and explicit IDs must be sorted and unique. The SDK's
+`encodeItemQuery` produces this spelling. The command checks the query's
+scope against the selected scope before sending it.
+
+This command makes one query, with no per-item detail requests or automatic
+page loop. It prints the head, each item, whether the selected suffix is
+complete, and any next cursor. To continue, put that exact cursor in the
+next query. A refusal exits 1 and says coverage is incomplete. The whole
+reply is limited to 256 KiB and the query wait to 10 seconds. A smaller
+returned prefix is not a complete inventory; a later `row-too-large`
+refusal cannot make it complete.
+
 **`dap verify <scope>`** runs the replay verifier over the read
 routes, with the platform package's rules and the code of the two lane
 capabilities, `hold@1` and `git-read@1`, so it replays a lane too. It reads with the caller's

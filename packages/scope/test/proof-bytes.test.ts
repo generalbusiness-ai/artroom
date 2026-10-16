@@ -14,8 +14,10 @@ test("native proof source returns only exact admitted entry bytes and checks ful
   const scope = await found();
   const got = await scope.inside(async (state, instance) => {
     const sql = sqlOf(state), store = new SqliteStore(sql), first = store.stored(0)!, identity = new ProofBytes(sql).identity()!;
-    const source = instance as { proofSource(fact: unknown, max: number): { fact: unknown; bytes: string } | null };
+    const source = instance as { proofSource(fact: unknown, max: number, milliseconds?: number): { fact: unknown; bytes: string } | null };
     const answer = source.proofSource(identity.genesis, first.size);
+    const timed = source.proofSource(identity.genesis, first.size, 10_000);
+    const invalidTime = [0, -1, NaN, 10_001].map(ms => source.proofSource(identity.genesis, first.size, ms));
     let bodies = 0;
     const traced = new ProofBytes({ exec(query, ...args) { if (query.startsWith("SELECT bytes FROM entry")) bodies++; return sql.exec(query, ...args); } });
     const refused = [
@@ -27,9 +29,11 @@ test("native proof source returns only exact admitted entry bytes and checks ful
     ];
     const owner = instance as { genesisEligibility(request: () => { key: typeof rita.key; since: number }): Promise<unknown> };
     const eligibility = await owner.genesisEligibility(() => ({ key: rita.key, since: Date.parse(at(0)) }));
-    return { answer, expected: { fact: identity.genesis, bytes: first.bytes }, refused, bodies, eligibility };
+    return { answer, timed, invalidTime, expected: { fact: identity.genesis, bytes: first.bytes }, refused, bodies, eligibility };
   });
   expect(got.answer).toEqual(got.expected);
+  expect(got.timed).toEqual(got.expected);
+  expect(got.invalidTime).toEqual([null, null, null, null]);
   expect(got.eligibility).toEqual({ state: "positive" });
   expect(Object.keys(got.answer!)).toEqual(["fact", "bytes"]);
   expect(got.refused).toEqual(Array(6).fill(null)); expect(got.bodies).toBe(0);
@@ -115,4 +119,11 @@ test("namespace proof capability preflights and never falls back to the material
   Object.assign(peer, { proofSource: async (_fact: unknown, max: number) => { maximum = max; return null; } });
   expect(await source.read(fact, Number.MAX_SAFE_INTEGER)).toBeNull();
   expect(maximum).toBe(B.body); expect(generic).toBe(0); expect(looks).toBe(2);
+  let remaining: number | undefined;
+  Object.assign(peer, { proofSource: async (_fact: unknown, _max: number, ms?: number) => { remaining = ms; return null; } });
+  expect(await source.read(fact, B.body, 9000)).toBeNull();
+  expect(remaining).toBe(9000);
+  const before = looks;
+  expect(await source.read(fact, B.body, 10_001)).toBeNull();
+  expect(looks).toBe(before);
 });
