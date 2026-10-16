@@ -1,9 +1,21 @@
 /** Closed native retained consumers, shared by replay and local inventory.
  * A plan names a read. Selection still requires the consumer's byte checks;
  * a plan is neither privacy admission nor a replay/custody verdict. */
-import type { Digest, FactRef, Input } from "@generalbusiness/dap-contract";
+import type { Digest, Evidence, FactRef, FieldValue, Input, ObservationUse } from "@generalbusiness/dap-contract";
 import { DOMAINS } from "@generalbusiness/dap-contract";
 import { isDigest, isFactRef, retainedValueKey } from "@generalbusiness/artroom-bytes";
+
+import type { ValidDefinition } from "./validate/index.ts";
+import type { OperationRules } from "./ledger.ts";
+import { HOLD, HOLD_KINDS } from "./capability/hold.ts";
+import { isAncestryCheck, type AncestryCheck } from "./capability/ancestry.ts";
+import { isObject } from "./values.ts";
+import { valuePlaces } from "./validate/fields.ts";
+import { placesOf } from "./marks.ts";
+import { own } from "./values.ts";
+import { namedBy, retainsOf } from "./observes.ts";
+import { inputTexts } from "./handlers.ts";
+import { evidenceValues } from "./evidence-values.ts";
 
 export type RetainedKey =
   | { readonly kind: "definition" | "entry" | "rule" | "snapshot"; readonly digest: Digest }
@@ -78,4 +90,49 @@ export function textDependency(origin: DependencyOrigin, digest: Digest): TextDe
   originOf(origin);
   if (!isDigest(digest)) return unsupported();
   return { mode: "text", origin, consumer: "detached-text", key: { kind: "text", digest }, archive: "omit" };
+}
+
+/** Semantic planning below stays beside the native places/rows/owner
+ * grammar. Replay and inventory use the same selectors; neither discovers
+ * dependencies by searching strings or retained-store contents. */
+export function actValueDependencies(definition: ValidDefinition, origin: DependencyOrigin, kind: string, fields: Readonly<Record<string, FieldValue>>) {
+  return placesOf(own(definition.declared.acts, kind)?.fields, fields).map(place => ({
+    place, dependency: requiredDependency(origin, "act-value", retainedValueKey(place.domain, place.digest)),
+  }));
+}
+
+export function observedValueDependencies(definition: ValidDefinition, origin: DependencyOrigin, observed: readonly ObservationUse[]) {
+  if (!definition.observing) return [];
+  const domains = retainsOf(definition);
+  return observed.flatMap(use => namedBy(use.observation)).map(digest => ({ digest, dependency: observationDependency(origin, digest, domains) }));
+}
+
+export function detachedTextDependencies(definition: ValidDefinition, origin: DependencyOrigin, input: Input, under?: string) {
+  return inputTexts(definition, input, under).map(digest => textDependency(origin, digest));
+}
+
+/** Null preserves the native owner's unsupported-evidence result. Unknown
+ * owners must be refused by inventory admission before calling this. */
+export function outcomeValueDependencies(origin: DependencyOrigin, rules: OperationRules | null | undefined, evidence: Evidence) {
+  const values = evidenceValues(rules, evidence);
+  return values?.map(value => ({ value, dependency: requiredDependency(origin, "outcome-value", retainedValueKey(value.domain, value.digest)) })) ?? null;
+}
+
+/** The native ancestry grammar names its snapshot even when the owner's
+ * ordinary retained list omits it. This is selection only: neither the
+ * record nor an owner's list proves the ancestry walk or snapshot count. */
+export function outcomeSnapshotDependencies(origin: DependencyOrigin, input: Extract<Input, { type: "outcome" }>, rules: () => OperationRules | null | undefined): { record: AncestryCheck | null; dependencies: readonly RequiredDependency[] } {
+  let named: readonly Digest[] = [];
+  try { named = rules()?.retains?.(input.evidence) ?? []; }
+  catch { /* Ordinary replay leaves unreadable evidence to its judge. */ }
+  const body: unknown = isObject(input.evidence) ? input.evidence["body"] : null;
+  const candidate = input.owner === HOLD && input.kind === HOLD_KINDS.check && input.result === "confirmed" && isObject(body) ? body["record"] : null;
+  const record = isAncestryCheck(candidate) ? candidate : null;
+  return { record, dependencies: (record ? [...named, record.snapshot.digest] : named).map(digest => requiredDependency(origin, "outcome-snapshot", { kind: "snapshot", digest })) };
+}
+
+/** Domain declarations use the native value-place and observation grammar,
+ * independently of whether an entry happened to supply a matching value. */
+export function declarationValueDomains(definition: ValidDefinition): readonly string[] {
+  return [...new Set([...Object.values(definition.declared.acts).flatMap(act => valuePlaces(act.fields).map(place => place.domain)), ...retainsOf(definition)])];
 }

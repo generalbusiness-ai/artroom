@@ -70,3 +70,37 @@ original deadline fences awaited values and later SQL/cache continuation.
 Pure fake-SQL/clock tests establish these budget mechanics, not a measured
 native inventory bound. Sixty-seven selected byte/consumer/replay/budget
 cases pass; native preflight and full per-consumer selection remain owed.
+
+Native pin prerequisite `b40f8765` is now approved and locally on main as
+`8e7481ee`. This branch composes its exact helper and atomic genesis write.
+The new scalar prefix reader binds that metadata and an exact cutoff,
+checks native sequence/hash/byte-size rows, and reserves cumulative input
+work before entry JSON inspection. The initial JSON allowance is 64 full
+entry-byte equivalents per selected row, covering the fixed header and
+bounded effect/owner projections. Raw body transfer and later parsing,
+hashing and validation need separate charges. This deliberately supports
+less than 64 MiB of entry bodies; it is not a CPU-time or heap guarantee.
+
+A second helper classifies the whole selected prefix using only bounded
+native JSON metadata projections. It refuses any retained foreign copy,
+unknown input/effect/owner/capability metadata or declared custom value
+domain. Native owner tables and certificates are trusted configuration,
+not request flags. The helper has no route, body reader or export permit.
+Selected additional declaration roots, their policy coverage and archive
+closure still need orchestration before this is a complete privacy pass.
+
+Eight native prefix/privacy cases pass. They include exact 4,096/4,097
+scalar positions; excessive stored byte work before JSON; a forbidden copy
+or unsupported owner in the last selected position with no body reads;
+and stopped, damaged or unknown metadata refusing without a partial result.
+Synthetic/corrupt history rows, certificate and owner tables are explicitly
+stand-ins. Founding, pin writes, SQL queries and byte admissions are native.
+The cumulative-work and foreign-copy controls each fail by the intended
+assertion when their one guard is disabled; both guards are restored.
+
+Replay now shares act, observation, text, outcome value and snapshot
+selection at its actual reads. Thirteen existing ancestry/snapshot cases
+pass after the extraction. The snapshot helper retains the native ancestry
+record grammar and ordinary replay's incomplete/unwalked qualification;
+it grants no ancestry proof. No full gate or exact-head review is claimed
+for this development checkpoint.

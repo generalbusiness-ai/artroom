@@ -39,12 +39,12 @@
 
 import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { rawRetainedJSON, domainRetainedJSON, canonicalize, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, retainedValueKey, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { rawRetainedJSON, domainRetainedJSON, canonicalize, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
-  requiredDependency, observationDependency, textDependency, HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
-  judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, windowOf,
+  actValueDependencies, observedValueDependencies, detachedTextDependencies, outcomeValueDependencies, outcomeSnapshotDependencies, requiredDependency, textDependency, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, observedName, headsOf, highestHead, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
+  judgeDiagnosis, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, windowOf,
 } from "@generalbusiness/dap-derive";
-import type { DependencyOrigin, RequiredDependency, ActJudgment, AncestryCheck, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
+import type { DependencyOrigin, RequiredDependency, ActJudgment, Capabilities, Clock, DrawOptions, Fetched, Judgment, Observing, Owners, PlatformRules, PreparationJudgment, RecordedRef, Retains, Rules, StateView, TimedJudgment, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES, evaluateRules } from "@generalbusiness/dap-derive/rule";
 import { PAGE_ENTRIES, PAGE_REPLY_BYTES, RETAINED_REPLY_BYTES, hashOfBytes, type HistorySource, type Stored } from "./source.ts";
 import { View } from "./view.ts";
@@ -374,17 +374,6 @@ const fixedFor = (recorded: RecordedRef | null, input: Entry["input"]): ScopeRef
 /** The membership reference, so. */
 const fixedIn = (run: Run, input: Entry["input"]): ScopeRef | null => fixedFor(recordedMembership(run), input);
 
-/**
- * The ancestry record that an outcome entry holds as its evidence (section
- * 16.4, "Typed domain"): the body of the evidence of a `confirmed` outcome
- * of an operation `check` of `hold@1`. Null: the entry holds none, as a
- * check whose read was cut short does.
- */
-const ancestryOf = (input: Extract<Entry["input"], { type: "outcome" }>): AncestryCheck | null => {
-  const body: unknown = isObject(input.evidence) ? input.evidence["body"] : null;
-  const record = input.owner === HOLD && input.kind === HOLD_KINDS.check && input.result === "confirmed" && isObject(body) ? body["record"] : null;
-  return isAncestryCheck(record) ? record : null;
-};
 
 const sameScope = (a: ScopeRef, b: ScopeRef): boolean => a.scope === b.scope && a.inc === b.inc && a.kind === b.kind;
 const named = (ref: ScopeRef): string => `${ref.scope} (incarnation ${ref.inc})`;
@@ -1041,10 +1030,8 @@ class Verifier {
     if (observed.length > 0 && entry.clamped) throw new Stop("mismatch", "an entry that retains an observation judges time, and is never clamped", where);
     for (const use of observed) this.#inRun(run, use, where);
     const values: string[] = [];
-    const domains = retainsOf(run.definition!);
-    for (const digest of observed.flatMap((use) => namedBy(use.observation))) {
+    for (const { digest, dependency: probe } of observedValueDependencies(run.definition!, { at: where, input: entry.input.type }, observed)) {
       let found: string | null = null;
-      const probe = observationDependency({ at: where, input: entry.input.type }, digest, domains);
       for (const { domain, key } of probe.choices) {
         const left = this.#limits.bytes - this.#bytes;
         const got = await this.#source.retained(run.id, key.kind, key.digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, "domain" in key ? key.domain : undefined);
@@ -1110,15 +1097,11 @@ class Verifier {
    * deltas, entry EU2).
    */
   async #snapshots(run: Run, input: Extract<Entry["input"], { type: "outcome" }>, owners: Owners | undefined, owner: unknown, kind: unknown, where: FactRef): Promise<void> {
-    let named: readonly Digest[] = [];
-    try {
-      named = (typeof owner === "string" && typeof kind === "string" ? owners?.rules(owner as never, kind)?.retains?.(input.evidence) : undefined) ?? [];
-    } catch { /* evidence that its owner cannot read names nothing, and the judge answers for it */ }
-    // An ancestry record names its snapshot, whatever the owner's rules list.
-    const record = ancestryOf(input);
-    for (const digest of record ? [...named, record.snapshot.digest] : named) {
+    const { record, dependencies } = outcomeSnapshotDependencies({ at: where, input: "outcome" }, input, () => typeof owner === "string" && typeof kind === "string" ? owners?.rules(owner as never, kind) : undefined);
+    for (const dependency of dependencies) {
+      const digest = dependency.key.digest;
       if (run.snapshots.has(digest)) continue;
-      const kept = await this.#retained(run, requiredDependency({ at: where, input: "outcome" }, "outcome-snapshot", { kind: "snapshot", digest }), "the snapshot of staged refs");
+      const kept = await this.#retained(run, dependency, "the snapshot of staged refs");
       if (snapshotRead(digest, kept.bytes) === null) throw new Stop("incomplete", `a retained input is not the one named: the snapshot of staged refs, ${digest}`, where);
       run.snapshots.set(digest, kept.bytes);
     }
@@ -1250,7 +1233,8 @@ class Verifier {
     // by the judge: it is owed, and a tombstone must answer for it.
     const texts = new Map<Digest, number | null>();
     // A message that no handler received names none: a handler whose `from` names another definition than the sender pins did not.
-    for (const text of inputTexts(definition, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
+    for (const dependency of detachedTextDependencies(definition, { at: where, input: input.type }, input, input.type === "delivery" ? facts.find((f) => f.fact.hash === input.from.hash)?.under : undefined)) {
+      const text = dependency.key.digest;
       const size = await this.#text(run, { at: where, input: input.type }, text);
       texts.set(text, size);
       if (size === null && !run.owed.has(text)) run.owed.set(text, where);
@@ -1310,10 +1294,9 @@ class Verifier {
         // I3 merge: a row whose rule holds the domain and the bound in its own code states no place in its data, so this replay
         // gives its judge no value, and an entry whose rule read one so is not derived again (I3 deltas, entries EM4 and EX5).
         const values: string[] = [];
-        for (const place of placesOf(own(definition.declared.acts, input.signed.intent.kind)?.fields, input.signed.intent.fields)) {
+        for (const { place, dependency } of actValueDependencies(definition, { at: where, input: "act" }, input.signed.intent.kind, input.signed.intent.fields)) {
           const what = `the value that the field ${place.field} names, in the domain ${place.domain}`;
-          const key = retainedValueKey(place.domain, place.digest);
-          const kept = await this.#retained(run, requiredDependency({ at: where, input: "act" }, "act-value", key), what);
+          const kept = await this.#retained(run, dependency, what);
           const named = domainRetainedJSON(place.domain, place.digest, kept.bytes) !== undefined;
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
           values.push(kept.bytes);
@@ -1406,12 +1389,11 @@ class Verifier {
         if (input.observed && !definition.observing) await this.#observed(run, entry, input.observed, WINDOWS.once, where, depth);
         const kindRows = definition.observing ? await this.#hand(run, entry, input.observed, where) : null;
         let named;
-        try { named = evidenceValues(owners.rules(owner, kind), input.evidence); } catch { named = null; }
+        try { named = outcomeValueDependencies({ at: where, input: "outcome" }, owners.rules(owner, kind), input.evidence); } catch { named = null; }
         if (named === null) throw mismatch("the evidence names a value outside its owner declaration");
         const values = [...(kindRows?.values ?? [])];
-        for (const value of named) {
-          const key = retainedValueKey(value.domain, value.digest);
-          const kept = await this.#retained(run, requiredDependency({ at: where, input: "outcome" }, "outcome-value", key), "the value named by outcome evidence");
+        for (const { value, dependency } of named) {
+          const kept = await this.#retained(run, dependency, "the value named by outcome evidence");
           if (domainRetainedJSON(value.domain, value.digest, kept.bytes, { canonical: true, max: value.max }) === undefined) throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where);
           values.push(kept.bytes);
         }
