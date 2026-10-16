@@ -39,6 +39,7 @@ import { nextDue, type Due } from "./timed.ts";
 import { timeMs, type Clock } from "./time.ts";
 import type { ValidDefinition } from "./validate/index.ts";
 import { own, same } from "./values.ts";
+import { withinCounts } from "./draws.ts";
 
 /**
  * What the grant guard is asked for one preparation: the signing key, the
@@ -236,7 +237,8 @@ export function judgePreparation(view: StateView, definition: ValidDefinition, a
   const most = maximumOf(steps, "step", capability, step);
   if (most && (effects.length > most.effects || derived.opens.length > most.operations)) throw new Error(`${capability} declares at most ${most.effects} effects for its step ${step}, and it returned ${effects.length}`);
   if (effects.length > bounds.derivedEffects) return refused("entry-too-large", "the effects that the step derives pass the bound on one entry", "derivedEffects");
-  return { result: "write", draft: { input: { type: "preparation", signed, authority: [grant], capability, step }, uses: [], prepared: [], effects, sends: [], judgesTime: true } };
+  const judged = { result: "write", draft: { input: { type: "preparation", signed, authority: [grant], capability, step }, uses: [], prepared: [], effects, sends: [], judgesTime: true } } as const;
+  return definition.standing ? withinCounts(view, definition, judged) : judged;
 }
 
 /**

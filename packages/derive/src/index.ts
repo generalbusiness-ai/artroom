@@ -31,3 +31,4 @@ export * from "./binding.ts";
 export * from "./outcomes.ts";
 export * from "./observes.ts";
 export * from "./evidence-values.ts";
+export * from "./standing.ts";
