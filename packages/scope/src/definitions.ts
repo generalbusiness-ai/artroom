@@ -15,21 +15,15 @@
  * history is retained.
  */
 
-import type { DeclaredDefinition, Digest } from "@generalbusiness/dap-contract";
-import { byteOrder } from "@generalbusiness/dap-derive";
-import { canonicalize, isDigest, parseStrict } from "@generalbusiness/artroom-bytes";
+import type { Digest } from "@generalbusiness/dap-contract";
+import { creates } from "@generalbusiness/dap-derive";
+import { canonicalize, parseStrict } from "@generalbusiness/artroom-bytes";
 import type { ValidDefinition } from "@generalbusiness/dap-derive";
 import type { DefinitionRead } from "./ports.ts";
 import type { Retained } from "./store.ts";
 
-/** The digests a declaration names in its `create` sends, once each, in byte order. A platform definition is supplied in code and is not among them. */
-export function creates(declared: DeclaredDefinition): Digest[] {
-  const named = new Set<Digest>();
-  for (const from of [...Object.values(declared.acts), ...Object.values(declared.receives)]) {
-    for (const send of from.sends) if ("create" in send && isDigest(send.create.definition)) named.add(send.create.definition);
-  }
-  return [...named].sort(byteOrder);
-}
+// Preserve the native scope module's existing export.
+export { creates } from "@generalbusiness/dap-derive";
 
 /**
  * What a scope under `root` retains for its children: the declaration of

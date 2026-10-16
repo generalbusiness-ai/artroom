@@ -11,11 +11,19 @@ export interface ArchivePrivacyInventory { readonly customDomains: boolean; read
 /** Certified digests are trusted reviewer configuration, never request input.
  * The future inventory must inspect the whole cohort; it cannot omit entries.
  * Passing this policy establishes no history integrity or replay completeness. */
-export function admitArchiveExport(definition: string, certified: ReadonlySet<Digest>, inventory: () => ArchivePrivacyInventory): ArchiveExportAdmission {
+/** Pin stage only. Success is not whole-cohort admission or permission to
+ * read/export payloads; the complete privacy inventory is still required. */
+export function admitArchivePin(definition: string, certified: Pick<ReadonlySet<Digest>, "has">): ArchiveExportAdmission {
   if (definition !== INVITATION_KEY_MEMBERSHIP) {
     if (definition.startsWith("platform:membership@")) return { ok: false, reason: "unsupported-credential-cohort" };
     if (!isDigest(definition) || !certified.has(definition)) return { ok: false, reason: "unsupported-archive-cohort" };
   }
+  return { ok: true };
+}
+
+export function admitArchiveExport(definition: string, certified: ReadonlySet<Digest>, inventory: () => ArchivePrivacyInventory): ArchiveExportAdmission {
+  const pin = admitArchivePin(definition, certified);
+  if (!pin.ok) return pin;
   const privacy = inventory();
   if (privacy.customDomains !== false) return { ok: false, reason: "unsupported-custom-domain" };
   if (privacy.foreignCopies !== false) return { ok: false, reason: "unsupported-foreign-copy" };
