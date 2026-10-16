@@ -34,8 +34,8 @@ import { isFactRef, own, same } from "./values.ts";
 export const INDEXES_MOST = 4;
 /** The most items that a binding selector is given for one key. One row more is read, so that "more than 8" is known from one lookup. The contract's proposal. */
 export const SELECTED_MOST = 8;
-/** The seven types of an indexed slot: each is an identity with one canonical value. */
-export const INDEXED_TYPES: readonly string[] = ["fact", "item", "scope", "member", "digest", "commit", "tree"];
+/** Platform indexed slots have one canonical key, including signed decimal integers. */
+export const INDEXED_TYPES: readonly string[] = ["fact", "item", "scope", "member", "digest", "commit", "tree", "int"];
 
 /**
  * The key of a value in an index: its canonical JSON, after a local fact
@@ -43,6 +43,8 @@ export const INDEXED_TYPES: readonly string[] = ["fact", "item", "scope", "membe
  * of another scope it is the whole reference: its text, as section 3 has
  * it. Null: no value. "No value" is never a key: no item is indexed under
  * none, and none finds no item.
+ * An integer uses its unquoted canonical decimal text. Equality lookup
+ * implies neither numeric ordering nor uniqueness of that value.
  */
 export function keyOf(value: unknown, at: ScopeRef): string | null {
   if (value === null || value === undefined) return null;

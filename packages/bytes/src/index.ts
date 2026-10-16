@@ -11,5 +11,5 @@ export * from "./session.ts";
 export * from "./edit-path.ts";
 export * from "./item-query.ts";
 export * from "./invitation-proof.ts";
-
 export * from "./item-query-read.ts";
+export * from "./retained-key.ts";

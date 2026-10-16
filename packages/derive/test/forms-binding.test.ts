@@ -80,6 +80,19 @@ const refusals = (base: unknown, change: (data: any) => void, platform = true): 
 };
 const m = valid(changed(M, () => undefined));
 
+/** Same scripted jobs, with a fixed integer value as the binding key. */
+function integerJobs(min = -10, max = 10) {
+  const integer = { type: "int", min, max };
+  return changed(M, data => {
+    data.items.job.values.number = { fixed: true, required: true, of: integer };
+    data.items.job.indexes = ["number"];
+    data.receives.start.fields.number = { ...integer, required: true };
+    data.receives.start.effects.push({ value: { slot: "number", from: { field: "number" } } });
+    data.receives.stop.fields.number = { ...integer, required: true };
+    data.receives.stop.also.job = { ...JOB_OF, index: "number", key: "number" };
+  });
+}
+
 const FINAL = ["gone", "done"];
 /**
  * STAND-INS. `job-of` gives the one job that is not final, or the last
@@ -168,6 +181,53 @@ function three(using = rules()) {
 }
 
 describe("18.53, at the validator: the index, the binding selector and `bound`", () => {
+  test("C2 integer indexes preserve fixed required platform slots and exact selector ranges", () => {
+    const checked = integerJobs();
+    expect(checked.ok).toBe(true);
+    const definition = valid(checked);
+    expect(definition.keyed).toEqual({ job: ["number"] });
+    const data = definition.declared;
+    for (const member of ["fixed", "required"]) expect(refusals(data, changed => { changed.items.job.values.number[member] = false; })).toContain("unsupported-definition items.job.indexes.0");
+    for (const type of [{ type: "int", min: -9, max: 10 }, { type: "text", max: 10 }]) {
+      expect(refusals(data, changed => { changed.receives.stop.fields.number = { ...type, required: true }; })).toContain("bound-source receives.stop.also.job");
+    }
+    expect(refusals(data, changed => { changed.name = "jobs"; delete changed.outcomes; }, false)).toContain("shape items.job.indexes");
+    expect(integerJobs(Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER).ok).toBe(true);
+  });
+
+  test("C2 integer keys survive finality, re-fold and checkpoint rebuild without accepting alternate keys or invalid openings", () => {
+    const definition = valid(integerJobs()), G = new Jobs(definition), ownTicket = ticket(P);
+    const open = (number: unknown) => G.request(P, "start", { ticket: ownTicket.fact, number: number as FieldValue }, [ownTicket]);
+    const ids = [-10, 0, 1, 1, 10].map(number => { G.free(100); expect(G.deliver(open(number))).toBe("new work"); return G.head.seq; });
+    for (const number of [-11, 11, "1"]) {
+      const before = G.head;
+      // Delivery refusal is a recorded decision, with no opening effects.
+      expect(G.judged(open(number)), String(number)).toMatchObject({ result: "write", draft: { input: { type: "delivery", decision: "refused" }, effects: [] } });
+      expect(G.head).toEqual(before);
+    }
+    for (const number of [1.5, Number.MAX_SAFE_INTEGER + 1, -0]) expect(() => open(number)).toThrow();
+    // A bound delivery can finish one matching item. The duplicate/final
+    // entries remain indexed in item-ID order, with the same exact key.
+    G.free(100);
+    expect(G.deliver(G.request(P, "stop", { ticket: ownTicket.fact, number: 1 }, [ownTicket]))).toBe("settles");
+    expect(G.item(ids[2]!).state).toBe("gone");
+    const snapshot = G.state.all(), loaded = new MemoryState();
+    loaded.setScope(snapshot.scope!);
+    for (const item of snapshot.items) loaded.putItem(item);
+    for (const [type, state, n] of snapshot.counts) loaded.addCount(type, state, n);
+    expect(loaded.lookup("job", "number", "1", 9)).toBe(null);
+    indexItems(loaded, definition, snapshot.items, G.at);
+    for (const state of [G.state, G.replay(), loaded]) {
+      expect(state.lookup("job", "number", "1", 9)).toEqual([ids[2], ids[3]]);
+      expect(state.lookup("job", "number", "1", 1)).toEqual([ids[2]]);
+      expect(state.lookup("job", "number", "0", 9)).toEqual([ids[1]]);
+      expect(state.lookup("job", "number", "-10", 9)).toEqual([ids[0]]);
+      for (const key of ["2", '"1"', "01", "+1", "1.0", "1e0"]) expect(state.lookup("job", "number", key, 9)).toEqual([]);
+    }
+    expect([keyOf(1, G.at), keyOf("1", G.at), keyOf(-0, G.at)]).toEqual(["1", '"1"', null]);
+    expect(JSON.stringify(snapshot)).not.toContain('"keyed"');
+  });
+
   test("18.53 case 1: the data validates; `job-of` is a binding selector on the index that `job` declares", () => {
     expect([m.keyed, m.marks.filter((mark) => mark.place === 2).map((mark) => mark.code)]).toEqual([{ job: ["ticket"] }, ["job-of"]]);
     // The kinds of a `fact` are compared as a set: the field may list them in another order.

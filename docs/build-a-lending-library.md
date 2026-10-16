@@ -1,69 +1,50 @@
 # Build a lending library
 
-In this tutorial we build the lending library's definition on dap and
-watch each act take effect. Members donate things to the library, borrow
-them and return them, and staff remove a thing that is lost or broken.
-By the last step the definition is the lending library's first
-definition, the one its rehearsal room runs: its digest matches that
-room's pin. The [current definition](../examples/lending/definition.ts)
-adds publication; the last section says what that adds.
+In about 15 minutes you build the core of a lending library for
+kitchenware and tools. Members donate things, borrow them and return
+them. Staff remove a thing that is lost or broken. You watch the library
+accept some requests and refuse others, each refusal with a reason.
+Everything runs in memory on your computer: there is no server, account
+or browser.
 
-[Build a counter](build-a-counter.md) teaches guards that compare lists
-and rule expressions that check arithmetic. This tutorial teaches the other half of
-most applications:
-
-- many items of one type, each with its own life;
-- states, and acts that move an item from one state to another;
-- a final state that no act can leave;
-- bounded text fields;
-- grants, which decide who may sign which act.
-
-We write the definition in four steps. After each step we run it in a
-scope held in memory, sign acts as test members, and print what the scope
-recorded. No service, deployment or browser is involved.
+This page stands alone. If you have done [Build a counter](build-a-counter.md),
+the first step will look familiar.
 
 ## Before you start
 
-This page ran with Node.js 26.11.1, npm 11.20.0, and all six published SDK
-packages at `0.1.0-dev.2`.
-Create an empty directory outside a repository checkout:
+You need Node.js 22.18 or later, which runs TypeScript files directly,
+and npm. Some Node.js versions print a warning that this is
+experimental. Make the project in an empty directory outside any
+repository checkout:
 
 ```sh
 mkdir my-library
 cd my-library
 npm init -y
 npm pkg set type=module
-npm install --save-exact @generalbusiness/dap-contract@0.1.0-dev.2 @generalbusiness/dap-bytes@0.1.0-dev.2 @generalbusiness/dap-client@0.1.0-dev.2 @generalbusiness/dap-derive@0.1.0-dev.2 @generalbusiness/dap-platform@0.1.0-dev.2 @generalbusiness/dap-replay@0.1.0-dev.2
+npm install --save-exact @generalbusiness/dap-contract@0.1.0-dev.2 @generalbusiness/dap-derive@0.1.0-dev.2
 ```
 
-We write two TypeScript files in this directory. Node runs them directly;
-the framework imports resolve to compiled JavaScript in the installed
-packages.
+You write two files: `definition.ts` describes the library, and `run.ts`
+runs it.
 
-The tutorial uses `@generalbusiness/dap-derive/testing`, an in-memory test
-scope with fixed keys. That fixture judges, seals and folds entries as a
-real scope does. Until step 4 it allows every test key to take every
-action, so each refusal before then comes from the definition. In step 4
-we present grants ourselves, as a room's membership would. The fixture
-does not establish native membership or hosted authority.
+This page ran on 15 October 2026 with Node.js 26.12.0, npm 11.20.0 and
+both packages at `0.1.0-dev.2`. Every output block below is copied from
+that run.
 
-The observed run installed the packages from npm in a new directory
-outside any checkout, on 14 October 2026. All four `node run.ts` commands
-exited 0. Steps 1 and 2 show the complete output. Steps 3 and 4 show the
-new lines at the end.
+## Step 1: Describe the library and print it
 
-## Step 1: declare the library and create the scope
-
-Every scope starts with a genesis act. Ours is `establish`. It opens the
-one `library` item and records the member who founded it.
+The app keeps one library, which records who set it up.
 
 Create `definition.ts`:
 
 ```ts
 import type { ActType, DeclaredDefinition, ItemType } from "@generalbusiness/dap-contract";
 
+// A slot that holds a person. `fixed` slots cannot change once set.
 const person = { fixed: false, required: false, list: false, author: false };
 
+// The one library, and the person who set it up.
 const library: ItemType = {
 	many: false, max: 1,
 	states: { open: { final: false } }, initial: "open",
@@ -72,6 +53,7 @@ const library: ItemType = {
 	values: {},
 };
 
+// Setting up the library makes it.
 const establish: ActType = {
 	step: "open", on: "library", grant: "lending.establish",
 	also: {}, guards: [], sends: [], attention: [],
@@ -93,20 +75,17 @@ export const lending: DeclaredDefinition = {
 };
 ```
 
-`many: false, max: 1` means there is exactly one library. Its `founder`
-slot is a party: it holds a member. `fixed: true` means nothing can change
-the slot after the item opens.
-
-Now create `run.ts`. It validates the definition, creates a scope with
-`@rita` as the founder, and prints the library item:
+Create `run.ts`. It checks the description, sets up a library in memory
+with `@rita` as its founder, and prints the library:
 
 ```ts
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import { validateDefinition } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
-import { founded, keys, valid } from "@generalbusiness/dap-derive/testing";
+import { fields, founded, grantOf, keys, on, valid, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
 import { lending } from "./definition.ts";
 
+// Check the description. If it has problems, print them and stop.
 const checked = validateDefinition(lending, PROPOSED_BOUNDS, RULE_PROFILES);
 if (!checked.ok) {
 	console.log(JSON.stringify(checked.problems, null, 2));
@@ -114,6 +93,7 @@ if (!checked.ok) {
 }
 console.log(`valid: ${checked.definition.digest}`);
 
+// Set up a library in memory, founded by @rita.
 const scope = founded(valid(checked), { opener: keys.rita.member });
 
 // Print one item: its type, its state and the slots that hold something.
@@ -129,7 +109,12 @@ function show(id: number) {
 show(0);
 ```
 
-Run it from your tutorial directory:
+`keys` holds five test people, each with a signing key: `@rita`, `@una`,
+`@vic`, `@paul` and `@sam`. In this release the function that makes a
+test library is called `founded`; the next release renames it to use the
+word "create".
+
+Run it:
 
 ```sh
 node run.ts
@@ -142,22 +127,25 @@ valid: sha256:e4150c41dcd7606dbed753582319eefabfb4cced0723af3822069ba57350aa19
   item 0, library, open: founder=@rita
 ```
 
-The first line is the definition's digest. A scope pins that digest at
-genesis and is judged by that definition for life.
+The first line is a fingerprint of your description. Change one
+character and it changes.
 
-## Step 2: let members donate things
+> **This is called…** The description is a **definition**, and the
+> fingerprint is its **digest**. A thing the app keeps is an **item**.
+> The object that holds the items and judges requests is a **scope**.
 
-A library holds many things. We add a `thing` item type, with
-`many: true` and a limit of 64 live things, and a `donate` act that opens
-one. A thing has a name of at most 80 bytes of UTF-8 text and a
-description of at most 1000. The donor is whoever signs the act.
+## Step 2: Let members donate things
 
-Add these declarations to `definition.ts`, above
-`export const lending`:
+A library holds many things. Each thing has a donor, a name of at most
+80 bytes and a description of at most 1000. The donor is whoever signs
+the donation.
+
+Add this to `definition.ts`, above `export const lending`:
 
 ```ts
 const text = (max: number) => ({ type: "text", max } as const);
 
+// Many things, at most 64 at a time. A new thing is available.
 const thing: ItemType = {
 	many: true, max: 64,
 	states: { available: { final: false } }, initial: "available",
@@ -169,6 +157,7 @@ const thing: ItemType = {
 	},
 };
 
+// Donating makes a thing. The signer is its donor.
 const donate: ActType = {
 	step: "open", on: "thing", grant: "lending.member",
 	also: {}, guards: [], sends: [], attention: [],
@@ -184,33 +173,24 @@ const donate: ActType = {
 };
 ```
 
-Then add the new item type and act to `lending`:
+In `lending`, change the `items` and `acts` lines:
 
 ```ts
 	items: { library, thing },
 	acts: { establish, donate },
 ```
 
-The act's `grant` names the action a signer must hold:
-`lending.member`. Step 4 uses it.
-
-In `run.ts`, change the testing import to bring in more helpers:
+Add this to the end of `run.ts`. The `act` function signs a request as
+one person, has the scope judge it, and prints the answer:
 
 ```ts
-import { fields, founded, keys, on, valid, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
-```
-
-Add an `act` helper and three donations to the end of `run.ts`. The
-helper signs an intent, judges it, and writes the entry if the act takes
-effect:
-
-```ts
-
-// Sign an act, judge it, and write the entry if it takes effect.
+// Sign a request as `who`, have the scope judge it, and print the answer.
 function act(who: Actor, kind: string, over: Over = {}) {
-	const judgment = scope.act(who, kind, over);
-	const reason = judgment.result === "refused" ? ` (${judgment.reason}, ${judgment.detail})` : "";
-	console.log(`${who.member.member} ${kind}: ${judgment.result}${reason}`);
+	const answer = scope.act(who, kind, over);
+	const said = answer.result === "write" ? "took effect"
+		: answer.result === "refused" ? `refused, ${answer.reason} (${answer.detail})`
+		: answer.result;
+	console.log(`${who.member.member} ${kind}: ${said}`);
 }
 
 act(keys.rita, "donate", fields({ name: "Big pot", description: "A heavy copper pot. Holds eight litres." }));
@@ -220,35 +200,36 @@ show(1);
 show(2);
 ```
 
-Run the same command again. You should see:
+Run `node run.ts` again. You should see:
 
 ```
 valid: sha256:243fc67d132e9d16fd0161259051e0ed5d8e2ebdacc1dfb13c6b62d7530945a9
   item 0, library, open: founder=@rita
-@rita donate: write
-@una donate: refused (bad-field, name is not a value of its type)
-@una donate: write
+@rita donate: took effect
+@una donate: refused, bad-field (name is not a value of its type)
+@una donate: took effect
   item 1, thing, available: donor=@rita name="Big pot" description="A heavy copper pot. Holds eight litres."
   item 2, thing, available: donor=@una name="Small pot" description="Born when the big pot was with me."
 ```
 
-`write` means the act took effect and the scope wrote its entry. The
-second donation is refused because its name is 86 bytes long, more than
-the 80 the field allows. A refused act writes nothing, so the small pot
-is item 2. Each thing starts in the type's `initial` state, `available`.
+The scope runs from the start each time, so the earlier lines repeat.
+The second donation is refused: its name is 86 bytes, more than 80. A
+refused request changes nothing, so the small pot is item 2. The scope
+checks a field's type and length, not its meaning.
 
-The scope checks a field's type and length, not its meaning. It records
-the description in the member's own words.
+> **This is called…** Something a person can do, such as `donate`, is an
+> **act**. When an act passes every check, it **takes effect**: the
+> scope writes it down. When it fails, the scope **refuses** it, names
+> the reason and writes nothing.
 
-## Step 3: borrow and return
+## Step 3: Borrow and return
 
-A thing moves between two states: `available` and `lent`. A `transition`
-act changes the state of an item that already exists. Its guards say
-which states it may start from.
+A thing is either available or lent. Borrowing moves it from available
+to lent and records the borrower. Returning moves it back. The rule: you
+can borrow only a thing that is available.
 
-In `definition.ts`, replace the `states` and `parties` lines of `thing`
-with these. They add the `lent` state and a `borrower` slot that can
-change:
+In `definition.ts`, change the `states` line of `thing`, and replace its
+`parties` line with these lines:
 
 ```ts
 	states: { available: { final: false }, lent: { final: false } }, initial: "available",
@@ -259,10 +240,11 @@ change:
 ```
 
 Add the two acts above `export const lending`. `return` is a reserved
-word in JavaScript, so the constant is called `giveBack`; the act's name
-is still `return`:
+word in JavaScript, so the constant is called `giveBack`; the act is
+still called `return`:
 
 ```ts
+// Borrow an available thing. The signer becomes its borrower.
 const borrow: ActType = {
 	step: "transition", on: "thing", grant: "lending.member",
 	also: {}, fields: {}, sends: [], attention: [],
@@ -270,6 +252,7 @@ const borrow: ActType = {
 	effects: [{ state: "lent" }, { party: { slot: "borrower", from: { signer: true } } }],
 };
 
+// Return a lent thing. Anyone may bring it back.
 const giveBack: ActType = {
 	step: "transition", on: "thing", grant: "lending.member",
 	also: {}, fields: {}, sends: [], attention: [],
@@ -278,18 +261,16 @@ const giveBack: ActType = {
 };
 ```
 
-Then change the `acts` line of `lending`:
+In `lending`, change the `acts` line:
 
 ```ts
 	acts: { establish, donate, borrow, return: giveBack },
 ```
 
-Add a borrow, a second borrow and a return to the end of `run.ts`.
-`on(scope, 1)` names item 1, the big pot, and the revision that the
-signer read:
+Add this to the end of `run.ts`. `on(scope, 1)` names item 1, the big
+pot, and the version of it that the signer last read:
 
 ```ts
-
 act(keys.una, "borrow", on(scope, 1));
 show(1);
 act(keys.vic, "borrow", on(scope, 1));
@@ -297,46 +278,52 @@ act(keys.vic, "return", on(scope, 1));
 show(1);
 ```
 
-Run the command again. The first line now shows the digest
-`sha256:3cbca1f954087ddf2d78f5de6c19e0db2545bf7139bf687f7223e8aaa93f9499`.
-The new lines at the end are:
+Run `node run.ts` again. The first line shows a new digest. The new lines
+at the end are:
 
 ```
-@una borrow: write
+@una borrow: took effect
   item 1, thing, lent: donor=@rita borrower=@una name="Big pot" description="A heavy copper pot. Holds eight litres."
-@vic borrow: refused (guard-failed, guards.0)
-@vic return: write
+@vic borrow: refused, guard-failed (guards.0)
+@vic return: took effect
   item 1, thing, available: donor=@rita name="Big pot" description="A heavy copper pot. Holds eight litres."
 ```
 
-`@vic`'s borrow is refused by guard 0, which requires the pot to be
-`available`. It is `lent`. `@vic` can still return it: the `return` act
-has no guard on who signs it. This is a choice in the library's design.
-A neighbour who finds the pot on the doorstep can bring it back for the
-borrower. The return clears the `borrower` slot.
+`@vic` cannot borrow the pot, because `@una` has it. `@vic` can still
+return it: this library lets a neighbour who finds the pot on the
+doorstep bring it back.
 
-## Step 4: let staff remove a thing
+> **This is called…** `available` and `lent` are **states** of the
+> thing. A rule that an act must pass, such as "the thing is available",
+> is a **guard**. `guards.0` names the first guard of `borrow`.
 
-Some things are lost or broken. Staff remove them with `cancel`, which
-records a reason and moves the thing to `gone`. `gone` is a final state:
-the scope refuses every act on an item in a final state.
+## Step 4: Let only staff remove a thing
 
-In `definition.ts`, replace the `states` line of `thing`:
+Some things get lost or broken. Staff remove them with `cancel`, which
+records a reason and moves the thing to `gone`. Nothing can bring back a
+thing that is gone.
+
+So far the test library has let everyone do everything. Now we say who
+is allowed: `@rita` is staff and a member; `@una` and `@vic` are
+members.
+
+In `definition.ts`, change the `states` line of `thing` to add `gone`:
 
 ```ts
 	states: { available: { final: false }, lent: { final: false }, gone: { final: true } }, initial: "available",
 ```
 
-Add a `reason` value to `thing`, after `description`:
+Add a `reason` line to the `values` of `thing`, after `description`:
 
 ```ts
 		reason: { fixed: false, required: false, of: text(280) },
 ```
 
-Add the act above `export const lending`. Its grant is `lending.staff`,
-not `lending.member`:
+Add the act above `export const lending`. It needs `lending.staff`, not
+`lending.member`:
 
 ```ts
+// Staff remove a thing that is lost or broken, with a reason.
 const cancel: ActType = {
 	step: "transition", on: "thing", grant: "lending.staff",
 	also: {}, sends: [], attention: [],
@@ -350,123 +337,114 @@ const cancel: ActType = {
 };
 ```
 
-Then change the `acts` line of `lending`:
+In `lending`, change the `acts` line:
 
 ```ts
 	acts: { establish, donate, borrow, return: giveBack, cancel },
 ```
 
-So far the fixture has let every key take every action. A real room
-grants actions to roles in its membership scope. In the rehearsal room
-the `admin` role holds `lending.member` and `lending.staff`, and the
-`member` role holds `lending.member`. We now present those grants
-ourselves.
-
-In `run.ts`, add `grantOf` to the testing import:
+In `run.ts`, add this function above the `act` function. It says what
+each person is allowed to do, as a real library's membership would:
 
 ```ts
-import { fields, founded, grantOf, keys, on, valid, type Actor, type Over } from "@generalbusiness/dap-derive/testing";
-```
-
-Add this function above the `act` helper:
-
-```ts
-
-// The roles a room would grant: @rita is staff and a member; @una and @vic are members.
+// Who is allowed what: @rita is staff and a member; @una and @vic are members.
 function room() {
-	const roles = (who: Actor) => who === keys.rita ? ["lending.member", "lending.staff"] : ["lending.member"];
-	return { grants: [keys.rita, keys.una, keys.vic].map((who) => ({ grant: grantOf(who, scope.at, roles(who)), current: true })) };
+	const allowed = (who: Actor) => who === keys.rita ? ["lending.member", "lending.staff"] : ["lending.member"];
+	return { grants: [keys.rita, keys.una, keys.vic].map((who) => ({ grant: grantOf(who, scope.at, allowed(who)), current: true })) };
 }
 ```
 
-In the `act` helper, change the first line so that every act is judged
-with those grants:
+In the `act` function, change the first line so that every request is
+judged with those permissions:
 
 ```ts
-	const judgment = scope.act(who, kind, over, room());
+	const answer = scope.act(who, kind, over, room());
 ```
 
 Add the end of the story to `run.ts`. `@una` borrows the big pot again
-and says it died. Then the script folds the record again from the start
-and compares the state:
+and it breaks:
 
 ```ts
-
 act(keys.una, "borrow", on(scope, 1));
 act(keys.una, "cancel", { ...on(scope, 1), ...fields({ reason: "The pot died." }) });
 act(keys.rita, "cancel", { ...on(scope, 1), ...fields({ reason: "@una says the pot died." }) });
 show(1);
 act(keys.una, "return", on(scope, 1));
 
+// Build the state again from the history alone, and compare.
 const replayed = scope.replay();
 console.log(`${scope.entries.length} entries; replay gives the same state: ${replayed.snapshot() === scope.state.snapshot()}`);
 ```
 
-Run the command again. The first line now shows the digest
+Run `node run.ts` again. The first line shows the digest
 `sha256:439cd20ea9e0b72294d091d3bdcfe13de8c1f31d5685c40bc7bd2754860784ff`.
 The new lines at the end are:
 
 ```
-@una borrow: write
-@una cancel: refused (unauthorized, no current grant of lending.staff to this key in this scope)
-@rita cancel: write
+@una borrow: took effect
+@una cancel: refused, unauthorized (no current grant of lending.staff to this key in this scope)
+@rita cancel: took effect
   item 1, thing, gone: donor=@rita name="Big pot" description="A heavy copper pot. Holds eight litres." reason="@una says the pot died."
-@una return: refused (final, item 1 is gone)
+@una return: refused, final (item 1 is gone)
 7 entries; replay gives the same state: true
 ```
 
-`@una` holds `lending.member` but not `lending.staff`, so the scope
-refuses the cancel as `unauthorized`. `@rita` is staff, and the
-pot is `gone`, with the reason recorded and the borrower cleared. The
-return is refused because `gone` is final.
+`@una` is a member but not staff, so the cancel is refused. `@rita` is
+staff: the pot is gone, with the reason, and nobody holds it. The return
+is refused because nothing can leave `gone`. The earlier acts still take
+effect, because all three people are members.
 
-The earlier acts in the script still take effect, because `@rita`, `@una`
-and `@vic` all hold `lending.member`.
+The last line counts what the library wrote down: the setup and six acts.
+Refused requests are not in it. Building the state again from those seven
+entries gives the same library.
 
-The digest on the first line is the pin of the lending library's first
-definition, which its rehearsal room runs. You have written that
-definition. The canonical bytes do not depend on the order of keys in the
-source, so this file and [the library's first
-definition](https://github.com/generalbusiness-ai/dap/blob/dedcb14b1d9483bfde3064f5bc09756b34b99f8d/examples/lending/definition.ts) give the same pin.
+That digest is the pin of the lending library's
+[first definition](https://github.com/generalbusiness-ai/dap/blob/dedcb14b1d9483bfde3064f5bc09756b34b99f8d/examples/lending/definition.ts),
+which its rehearsal room runs. The digest does not depend on the order
+of keys in the source, so you have written that definition.
 
-The last line shows that folding the seven entries again gives the same
-state. A verifier also replays a real scope's journal, and checks more
-besides; [The record](manual/record.md) says what its report covers.
+> **This is called…** `lending.member` and `lending.staff` are
+> **actions**. Each act's `grant` names the action its signer must hold.
+> A room gives actions to roles, and roles to members. `gone` is a
+> **final state**. The list of entries is the scope's **journal**, and
+> building the state again from it is **replay**.
 
-## What publication adds
+## Step 5: Turn it into a running app
 
-The library's current definition publishes a page for each thing to the
-room's Git repository. It adds:
+So far the library has run in one process, with test keys and
+permissions you made up. In a running dap app, a room gives the actions
+to roles, and each member signs with their own key. You pin the
+definition's exact bytes, turn it on in the room, and ask the room to
+create the library; the room fills in `opener` with you. This exact
+definition ran that way on a deployed service on 14 October 2026.
+[Run your app](run-your-app.md) takes you through it.
 
-- a `destination` reference on the library, which the room's directory
-  supplies when it creates the library;
-- a `page` value on each thing: its path, `shelf/<16 characters>.md`,
-  which the member's interface chooses at donation and the thing keeps;
-- a `content` field on every act after `establish`: the page's text,
-  which the interface writes and the member signs;
-- a `tell` on each of those acts, which asks the destination to
-  `publish-file` that text at the thing's path;
-- a sixth act, `publish`, which publishes a thing's page again without
-  changing the thing;
-- one rule expression, `shelf-page`, which checks the form of a path.
+## What you just used, by its dap name
 
-A tell needs a second scope to receive it, so this tutorial stops before
-publication. [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
-describes the form. The library's
-[definition tests](../examples/lending/definition.test.ts) check the
-page each act sends, against a stand-in destination reference; nothing is
-delivered there.
+| What you did | The dap name |
+|---|---|
+| Described what the library keeps and what people can do | [Definition](manual/ten-terms.md#2-definition), pinned by its digest |
+| The library and its things | [Items](manual/ten-terms.md#3-item), with states and slots |
+| Held the items and judged each request | [Scope](manual/ten-terms.md#1-scope) |
+| Donate, borrow, return and cancel | [Acts](manual/ten-terms.md#4-act-and-action) |
+| Who is allowed: `lending.member`, `lending.staff` | [Actions](manual/ten-terms.md#4-act-and-action), given by grants |
+| "Only an available thing can be borrowed" | A [guard](write-an-application.md#put-each-invariant-where-it-lives) |
+| `gone`, which nothing can leave | A final [state](manual/ten-terms.md#3-item) |
+| "took effect" and "refused, …" | [Takes effect and refusal](manual/ten-terms.md#6-takes-effect-receipt-and-refusal) |
+| What the library wrote down | The [journal](manual/ten-terms.md#5-entry-and-journal) of entries |
+| Built the state again from the history | [Replay](manual/ten-terms.md#10-replay) |
 
 ## Where to go next
 
-- [The lending library](../examples/lending) runs the publishing
-  definition in a room: its member interface, joining by invitation, and
-  kept requests.
-  Its source and tests belong to a repository checkout, not the published
-  SDK packages.
-- [Write an application](write-an-application.md) shows how to place
-  invariants in guards, grants, rule expressions and the rules scope, then
-  validate and pin a definition of your own.
-- [Build a counter](build-a-counter.md) uses guards that compare lists
-  and rule expressions in a restricted JSONata.
-- [Scopes](scopes.md) lists every form a definition can use.
+- [Run your app](run-your-app.md): run this library in a room, for
+  people and agents.
+- [Write an application](write-an-application.md): the reference for
+  definitions, where each kind of rule belongs, and pins.
+- [The lending library](../examples/lending): the full app. Its current
+  definition also publishes a page for each thing to the room's Git
+  repository, through the room's
+  [destination](manual/ten-terms.md#9-destination);
+  [Publish a file from an act](write-an-application.md#publish-a-file-from-an-act)
+  shows how.
+- [Build a counter](build-a-counter.md): rules that do arithmetic, and
+  the same request sent twice.

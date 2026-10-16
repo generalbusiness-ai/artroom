@@ -354,3 +354,18 @@ cases and fails by assertion. The restored session-preparation SHA-256 is
 `6b0a300d96168e3c622f752a85a67547427fce86062a85eb190abc51274cb4d5`.
 This correction precedes the final frozen gate; preliminary reading is
 not final Source approval.
+
+
+Planner decision `211c9a59` resolves the MCP scope question: this candidate
+covers SDK, CLI and Page. The W1 inventory now includes the exact new CLI
+command and marks its public-query MCP gap as unavailable. The recipe
+check excludes only that exact marked row and asserts its unavailable
+cells; existing recipes and tool checks remain unchanged. Separate later
+request `8bc5a05a` tracks MCP query work.
+
+The candidate composes local main `23f15670`, retaining the approved
+definition-domain key, C2 integer indexes, MCP prompt guard, and idle-work
+fixes. Page and Counting assets are regenerated from this composition.
+The corrected frozen gate runs with `caffeinate -is`; the failed
+`77478ed8` gate remains historical evidence, with no success inferred
+from focused reruns.

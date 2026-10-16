@@ -1,17 +1,20 @@
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { expect, test } from "vitest";
+import { DOMAINS } from "@generalbusiness/dap-contract";
 import type { Answer, Digest, Entry, FactRef, Intent, MemberId, ObservationRequest, ObservationUse, OperationId, PlatformDefinition, RetainedInput, Seed, Send } from "@generalbusiness/dap-contract";
 import { canonicalize, entryHash, factRefOf, intentDigest, scopeIdOf, signIntent } from "@generalbusiness/artroom-bytes";
 import { timeMs, timeOf, valueDigest } from "@generalbusiness/dap-derive";
-import { d, keys, membership, otherLane, type Actor } from "@generalbusiness/dap-derive/testing";
+import { d, keys, membership, notesDefinition, otherLane, type Actor } from "@generalbusiness/dap-derive/testing";
 import { EXTENTS, RULEBOOK, STEP_ROWS, rulebook, signers, weigherRules, weigherWith, type Seen } from "../../derive/test/fixtures-observes.ts";
 import { MEMBERSHIP, platform } from "@generalbusiness/dap-platform";
-import { MemorySource, TRUSTS, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
+import { httpSource, MemorySource, TRUSTS, verify, type MemoryScope } from "@generalbusiness/artroom-replay";
 import type { Delivery } from "../src/index.ts";
 import { controls, type Controls } from "../src/testing.ts";
 import { outsideOf, wired } from "./outside.ts";
 import { copied, repository, rewritten } from "./repository.ts";
 import { START, at, objectOf, reader, stubOf } from "./support.ts";
+import { route } from "../src/worker.ts";
 
 // Scope contract, revisions 20 and 21, sections 5.2 (step 1) and 16.1; source rows I3-40, I3-41 and I3-53; witnesses 18.46 (cases 4,
 // 5, 7, 8, 10 and 11), 18.48 (cases 6 to 8), 18.50 (cases 4 to 8) and 18.52 (case 5), on real storage with a scripted clock.
@@ -223,8 +226,9 @@ test("18.52 case 5, two steps on real storage: the first step reads the rules an
   }
 });
 
-test("18.48 cases 6 to 8, and 18.50 cases 4 to 8, a clause of a result on real storage: an answer whose value is over the row's `max`, has no bytes beside it, or names a value in a domain that the row does not state is no answer, the delivery is tried again and no byte is stored; a whole answer is retained with its entry, and its value is kept once by its domain and its digest", async () => {
-  const s = await weighing();
+test.each([EXTENTS, DOMAINS.definition])("18.48 cases 6 to 8, and 18.50 cases 4 to 8, a clause of a result in %s on real storage: malformed values retry; a whole answer is retained once under its native storage key and replays through the service", async (DOMAIN) => {
+  const change: Parameters<typeof weigherWith>[0] = data => { data.acts.go.sends[0].tell.observes.applied[0].retains[0].domain = DOMAIN; };
+  const s = await weighing(change);
   try {
     const { script, c, name } = s;
     c.rulebook!.states = { singleControllerException: false, extents: true };
@@ -239,9 +243,11 @@ test("18.48 cases 6 to 8, and 18.50 cases 4 to 8, a clause of a result on real s
       c.foreign.set(entryHash(entry), { entry, under: "lane" });
       return { ...answer, from: factRefOf(entry) };
     };
-    const kept = () => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec("SELECT domain, digest, length(bytes) AS size FROM retained_value ORDER BY domain, digest").toArray());
-    const list = ["src/**", "docs/**"];
-    const [bytes, digest] = [canonicalize(list), valueDigest(EXTENTS, list)];
+    const kept = () => runInDurableObject(objectOf(name), (_instance, state) => state.storage.sql.exec(DOMAIN === DOMAINS.definition
+      ? "SELECT kind, digest, length(bytes) AS size FROM retained_input WHERE kind='definition' ORDER BY digest"
+      : "SELECT 'value' AS kind, domain, digest, length(bytes) AS size FROM retained_value ORDER BY domain, digest").toArray());
+    const list = DOMAIN === DOMAINS.definition ? notesDefinition.declared : ["src/**", "docs/**"];
+    const [bytes, digest] = [canonicalize(list), valueDigest(DOMAIN, list)];
     /** What the scripted rules scope answers: the record with the digest of the extents, and the values that are said to come beside it. */
     const answering = (extents: string, values: readonly { domain: string; bytes: string }[]) => () => ({
       answer: { subject: "rules", of: rulebook, head: { seq: 7, hash: d("7") }, revision: 3, definition: RULEBOOK, content: { asked: "rules", approvals: 1, ownerMayReview: false, labels: [], checks: [], extents } },
@@ -252,22 +258,36 @@ test("18.48 cases 6 to 8, and 18.50 cases 4 to 8, a clause of a result on real s
     // answer names a second value, in a domain that the row does not state. Each is no answer: the row states `wait`, so the entry
     // is not written and the delivery is tried again. No byte of any list is stored.
     const long = ["x".repeat(450_000)];
-    for (const beside of [answering(valueDigest(EXTENTS, long), [{ domain: EXTENTS, bytes: canonicalize(long) }]), answering(digest, []), answering(digest, [{ domain: EXTENTS, bytes }, { domain: "x-other-1", bytes: canonicalize(["more"]) }])]) {
+    for (const beside of [answering(valueDigest(DOMAIN, long), [{ domain: DOMAIN, bytes: canonicalize(long) }]), answering(digest, []), answering(digest, [{ domain: DOMAIN, bytes }, { domain: "x-other-1", bytes: canonicalize(["more"]) }])]) {
       script.beside = beside;
       expect([await s.surface.deliver(first), await kept()]).toEqual([{ answer: "retry", reason: "authority-unavailable" }, []]);
     }
     // 18.48 case 6, and 18.50 case 4: the bytes hash to the digest, in a stated domain, within the `max`. Written: the entry that
-    // retains the observation holds the digest, and the list is one retained input of the kind `value`.
-    script.beside = answering(digest, [{ domain: EXTENTS, bytes }]);
+    // retains the observation holds the digest, with its native retained key.
+    script.beside = answering(digest, [{ domain: DOMAIN, bytes }]);
     const recorded = await s.surface.deliver(first);
     const entry = (await s.entries()).at(-1)!;
     const content = observedIn(entry)[0]!.observation as { content: { extents: string } };
-    expect([recorded.answer, records(entry).map(([subject, , use]) => [subject, use]), content.content.extents, await kept()]).toEqual(["recorded", [["rules", "fresh"]], digest, [{ domain: EXTENTS, digest, size: bytes.length }]]);
+    const expectedKey = DOMAIN === DOMAINS.definition ? { kind: "definition", digest } : { kind: "value", domain: DOMAIN, digest };
+    expect([recorded.answer, records(entry).map(([subject, , use]) => [subject, use]), content.content.extents, await kept()]).toEqual(["recorded", [["rules", "fresh"]], digest, [{ ...expectedKey, size: bytes.length }]]);
     // 18.48 case 8, and 18.50 case 5: a second entry that retains a later observation with the same extents. One domain and one
     // digest are one input: nothing more is kept.
     c.clock.now = timeOf(timeMs(c.clock.now)! + 1000);
     const again = await s.surface.deliver(await asked(10));
     expect([again.answer, records((await s.entries()).at(-1)!).length, (await kept()).length]).toEqual(["recorded", 1, 1]);
+    const source = httpSource("https://scope.test", { reader, fetch: async (url, init) => { const response = await route(new Request(url, init), env.SCOPES); return { status: response.status, body: response.body }; } });
+    // The scoped producer, SQLite and service are native. Membership/rules
+    // observations and foreign entries remain explicitly anchored stand-ins.
+    const anchors = [{ scope: membership.scope, seq: 40, hash: d("4") }, { scope: rulebook.scope, seq: 7, hash: d("7") }, ...[...c.foreign.values()].map(({ entry }) => ({ scope: entry.at.scope, seq: entry.seq, hash: entryHash(entry) }))];
+    const data = weigherWith(change).declared;
+    const options = { mode: "replay", scope: name, anchors, platform: (named: PlatformDefinition) => named === MADE
+      ? { data: data as never, rules: weigherRules().rules, membership: () => membership, rulesScope: () => rulebook }
+      : named === RULEBOOK ? { data: { items: { rules: { values: { extents: {} } } } } as never, rules: {} } : null } as const;
+    const good = await verify(source, options);
+    expect([good.report.result, good.why]).toEqual(["consistent", null]);
+    const missing = await verify({ ...source, retained: async (...args) => args[2] === digest ? { ok: false as const, reason: "not-found" } : source.retained(...args) }, options);
+    expect([missing.report.result, missing.why]).toEqual(["incomplete", expect.stringContaining("the value that an observation of the entry names")]);
+    if (DOMAIN === DOMAINS.definition) expect(await source.retained(name, "value", digest, { bytes: 4096 }, DOMAIN)).toEqual({ ok: false, reason: "not-found" });
   } finally {
     wired.delete(s.name);
   }
