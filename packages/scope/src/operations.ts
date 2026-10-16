@@ -283,6 +283,14 @@ export class Operations {
     if (asked === undefined || asked === null) return true;
     if (asked === false) return false;
     try {
+      const receiver = await this.#scope.receiverReads();
+      if (!receiver) return false;
+      if (receiver.mode === "partition-v1") {
+        const read = await within(() => receiver.read(asked.from, this.#bounds.fetchSeconds), this.#bounds.fetchSeconds);
+        if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, asked.from)) return false;
+        if (asked.mode !== "application" && read.under !== "change") return false;
+        return await receiver.publication(asked.from, asked.directory, asked.destination, asked.mode === "application" ? "application" : "change") === true;
+      }
       const read = await within(() => this.#resolver.read(asked.from, this.#bounds.fetchSeconds, true), this.#bounds.fetchSeconds);
       if (read === LATE || read === null || !("entry" in read) || !isEntryOf(read.entry, asked.from)) return false;
       return asked.mode === "application"

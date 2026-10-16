@@ -3,8 +3,12 @@ import { runInDurableObject } from "cloudflare:test";
 import { expect, test } from "vitest";
 import type { Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, factRefOf, isPlatformDefinition, platformName, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { PARTITION_COHORT as C, partitionReceiverPolicy, type PartitionNativeFrame } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT as C, FIRST_ACTIONS_OF, partitionReceiverPolicy, type PartitionNativeFrame } from "@generalbusiness/dap-platform";
 import { applicationPublicationOrigin } from "@generalbusiness/dap-platform";
+import type { EffectRequest } from "../src/operations.ts";
+import { foundingPublication } from "./publication.ts";
+import { lending } from "../../../examples/lending/definition.ts";
+import { LENDING_DEFINITION } from "../../../examples/lending/pin.ts";
 import { recordedMembership, recordedRules } from "../src/authority.ts";
 import { SqliteStore } from "../src/sqlite.ts";
 import { namespace } from "../src/namespace.ts";
@@ -134,5 +138,43 @@ test("the shared membership6 pin keeps legacy receiver policy when its actual na
     await dispatchFixture([M, inbox], life.wait);
     const inboxAt = await inbox.at(), oldInbox = await life.wait(() => receiverPolicyProof(namespace(env.PLATFORM), inboxAt));
     expect(oldInbox?.policy).toEqual({ mode: "legacy" }); expect(oldInbox?.proof.calls).toBe(3);
+  } finally { life.release(); }
+});
+
+// Native admission and driver fence only. The founding Git replies and the
+// file-judge outside port are explicit stand-ins; no Git object or push runs.
+test("a partition-created Lending file reaches the destination6 driver once its actual immutable origin is proved", async () => {
+  const { life, D, children } = await sessionRoom(C.register);
+  try {
+    const [M, rules, G] = children;
+    const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
+    await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
+    await M!.did(rita, "set-actions", { on: 0, expected: await M!.expected({ on: 0 }), fields: { role: "admin", actions: [...FIRST_ACTIONS_OF[C.membership]!.admin, "lending.member"] } });
+    await foundingPublication(G!, life);
+    expect((await G!.item(0)).state).toBe("ready");
+    const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
+    const create = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === C.partition);
+    if (!create) return expect.fail("actual root emitted no partition create");
+    const P = life.platform(scopeIdOf(create.to as Seed));
+    await dispatchFixture([D, P, ...children], life.wait);
+    const bytes = canonicalize(lending);
+    expect(await rules!.stub.submit(await rules!.intent(rita, "activate", { fields: { digest: LENDING_DEFINITION, name: lending.name } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
+    const established = await P.stub.submit(await P.intent(rita, "establish-application", { expected: await P.expected({ repository: 0 }), fields: { definition: LENDING_DEFINITION, values: "{}", execution: "recorded-do" } }), [], { values: [bytes] });
+    expect(established).toMatchObject({ answer: "accepted" });
+    if (established.answer !== "accepted") return;
+    const sent = (await P.entries())[established.receipt.fact.seq]!.sends.find(send => (send.to as Seed).kind === "lane");
+    if (!sent) return expect.fail("actual partition emitted no Lending create");
+    const L = life.platform(scopeIdOf(sent.to as Seed));
+    await dispatchFixture([P, L, ...children], life.wait);
+    const donation = await L.did(rita, "donate", { expected: await L.expected({ library: 0 }), fields: { name: "Pot", description: "Copper", page: "shelf/partition.md", content: "# A partition-created book\n" } });
+    await dispatchFixture([L, G!], life.wait);
+    const source = factRefOf((await L.entries())[donation]!);
+    const admitted = (await G!.entries()).find(entry => entry.input.type === "delivery" && entry.input.from.hash === source.hash);
+    expect(admitted?.input).toMatchObject({ type: "delivery", decision: "applied" });
+    const requests: EffectRequest[] = [];
+    life.wire(G!.name, () => ({ outside: { accepts: (_owner, kind) => kind === "file-judge", send: async request => { requests.push(request); return null; } } }));
+    await G!.restart();
+    await life.wait(() => (G!.stub as unknown as { effect(): Promise<number> }).effect());
+    expect(requests.some(request => request.owner === C.destination && request.kind === "file-judge")).toBe(true);
   } finally { life.release(); }
 });

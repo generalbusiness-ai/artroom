@@ -450,3 +450,22 @@ lane typechecks pass. No whole gate or directory Source review has run.
 The native nested journey does not establish fulfilment, mixed replay,
 publication completion, handoff/capacity or hosted coverage. Driver and
 per-receiving-run replay integration remain next.
+
+## Publication driver uses its receiving scope
+
+The forward publication fence now opens the destination's verified receiver
+reader. Partition-v1 reconstructs the source's labels and complete
+partition/root/destination proof through that one bounded operation. Legacy
+destinations keep their original origin read and validator. The fence still
+runs before a send and before an offered outcome is judged; an unavailable
+proof parks the attempt rather than authorizing a send.
+
+A new actual native scenario creates Lending through the partition,
+registers its member action through real M6 authority, admits its file at
+D6 and reaches the driver's file-judge outside port. The founding replies
+and file-judge port are labelled stand-ins; the latter records the request
+and immediately returns no answer. No Git object or push runs. The three
+factory/driver cases and scope typechecking pass. Forcing this driver down
+the legacy origin branch leaves the request unsent and fails the unchanged
+request assertion. The control restores the new branch. Publication
+completion and independent replay remain owed.
