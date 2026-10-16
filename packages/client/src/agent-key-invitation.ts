@@ -4,7 +4,7 @@ import type { FactRef, MemberRef, ScopeRef, ScopeId } from "@generalbusiness/dap
 import { b64url, canonicalize, isFactRef, isMemberRef, isRecord, isScopeId, isScopeRef, parseStrict, unb64url, utf8 } from "@generalbusiness/artroom-bytes";
 export const AGENT_KEY_LINK = "artroom-agent-key:";
 /** The membership definitions an agent-key invitation may name: each is the exact pin of the membership scope it was issued at. */
-export const AGENT_KEY_MEMBERSHIPS = ["platform:membership@2", "platform:membership@4", "platform:membership@5"] as const;
+export const AGENT_KEY_MEMBERSHIPS = ["platform:membership@2", "platform:membership@4", "platform:membership@5", "platform:membership@6"] as const;
 export type AgentKeyMembership = (typeof AGENT_KEY_MEMBERSHIPS)[number];
 export const isAgentKeyMembership = (value: unknown): value is AgentKeyMembership => typeof value === "string" && (AGENT_KEY_MEMBERSHIPS as readonly string[]).includes(value);
 export interface AgentKeyInvitation {

@@ -1,3 +1,4 @@
+import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
 /**
  * The hosted MCP endpoint (notes/2026-10-13-hosted-mcp-endpoint.md): the
  * registry of one repository's agents and the object of one agent, each over
@@ -407,7 +408,7 @@ export class HostedAgent {
     const signer = secretSigner(row.seed);
     const identity: Identity = { service: link.service, membership: M, signer: signer.key, target: M, key: `enrol:${op}` };
     const meaning = meaningOf({ enrol: digestBytes(utf8(canonicalize(link as never))) });
-    const fields = { invitation: link.invitation.seq, secret: link.secret };
+    const fields = invitationRedemptionFields(link.definition, M, link.invitation.seq, signer.key, link.secret);
     const build = async () => ({
       binding: { definition: "platform:membership", kind: "enrol", declaration: null, pinned: link.definition },
       envelope: { signed: await signedIntent(signer, { to: M, kind: "enrol", on: 0, fields, expected: link.expected }, { idempotencyKey: `enrol:${op}`, now }), beside: {} } as Envelope,

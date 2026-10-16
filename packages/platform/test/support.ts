@@ -77,6 +77,12 @@ const checked = (result: ReturnType<typeof validateDefinition>): ValidDefinition
   return result.definition;
 };
 export const officeDefinition = checked(validateDefinition(office, PROPOSED_BOUNDS));
+/** The same labelled creator with an explicitly selected native membership pin. */
+export function officeDefinitionFor(named: PlatformDefinition): ValidDefinition {
+  if (named === MEMBERSHIP) return officeDefinition;
+  if (platform(named)?.data.name !== "platform:membership") throw new Error("unsupported test membership");
+  return checked(validateDefinition({ ...office, acts: { ...office.acts, open: { ...office.acts["open"]!, sends: office.acts["open"]!.sends.map(send => "create" in send ? { create: { ...send.create, definition: named } } : send) } } }, PROPOSED_BOUNDS));
+}
 /** Membership's data, validated as a runtime validates it. */
 export const membershipDefinition = checked(validateDefinition(JSON.parse(JSON.stringify(membership)), PROPOSED_BOUNDS, PROFILES, { platform: true }));
 /** Membership's rules, as the package supplies them: what a judge of these tests is given. */
@@ -94,17 +100,25 @@ export const { rita, una, vic, paul, sam } = keys;
 export class Roster extends Ledger {
   readonly office: Ledger;
   #reads = 0;
+  readonly named: PlatformDefinition;
+  readonly platformRules: PlatformRules;
 
-  constructor() {
-    super(membershipDefinition, "platform:membership");
-    this.office = founded(officeDefinition, { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key });
+  constructor(named: PlatformDefinition = MEMBERSHIP) {
+    const code = platform(named);
+    if (!code || code.data.name !== "platform:membership") throw new Error("unsupported test membership");
+    const definition = checked(validateDefinition(code.data, PROPOSED_BOUNDS, PROFILES, { platform: true }));
+    super(definition, "platform:membership");
+    this.named = named;
+    this.platformRules = { named, rules: code.rules };
+    const parent = officeDefinitionFor(named);
+    this.office = founded(parent, { founder: rita.key, founderHandle: "@rita", recoveryKey: sam.key });
     const { asked, source } = creation(this.office, 0);
-    this.take(judgeGenesis(this.state, membershipDefinition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: rules }));
+    this.take(judgeGenesis(this.state, definition, asked, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], source, platform: this.platformRules }));
     // The office records the `applied` result and sends the confirmation, which makes the membership scope active.
     const result = sent(this, 0);
-    this.office.seal(written(judgeDelivery(this.office.state, officeDefinition, result.delivered, { clock: clockOf(this.office.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], own: this.office.own, source: result.source, origin: this.office.entries[0]!.entry })));
+    this.office.seal(written(judgeDelivery(this.office.state, parent, result.delivered, { clock: clockOf(this.office.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], own: this.office.own, source: result.source, origin: this.office.entries[0]!.entry })));
     const confirm = sent(this.office, 1);
-    this.take(judgeDelivery(this.state, membershipDefinition, confirm.delivered, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], own: this.own, source: confirm.source, origin: null, platform: rules }));
+    this.take(judgeDelivery(this.state, definition, confirm.delivered, { clock: clockOf(this.state, T0), bounds: PROPOSED_BOUNDS, facts: [], prepared: [], own: this.own, source: confirm.source, origin: null, platform: this.platformRules }));
   }
 
   take(judgment: Judgment): void { this.seal(written(judgment)); }
@@ -117,14 +131,14 @@ export class Roster extends Ledger {
    * answer is no observation.
    */
   held(key: KeyId): Presented[] {
-    const observation = observationOf(standingOf(this.state, { of: this.at, key }, MEMBERSHIP), this.now);
+    const observation = observationOf(standingOf(this.state, { of: this.at, key }, this.named), this.now);
     const use: ObservationUse | null = observation && { observation, read: { run: "r1", n: ++this.#reads }, use: "fresh", prior: null };
     return use ? [{ grant: grantFrom(use), current: true }] : [];
   }
 
   /** An act, judged with membership's rules on the grant that its own answer gives the signing key. */
   override act(who: Actor, kind: string, over: Over = {}, context: Context = {}): ActJudgment {
-    return super.act(who, kind, over, { platform: rules, membership: this.at, grants: this.held(who.key), ...context });
+    return super.act(who, kind, over, { platform: this.platformRules, membership: this.at, grants: this.held(who.key), ...context });
   }
 
   /** rita is seated and holds the founding key as her first key: items 2 and 3. The inbox that `seat` creates is not made. */

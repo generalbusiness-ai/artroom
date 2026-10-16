@@ -2,12 +2,13 @@ import { expect, test } from "vitest";
 import type { PlatformDefinition, Receipt, SignedIntent } from "@generalbusiness/dap-contract";
 import { canonicalize, intentDigest, newIncarnation, scopeIdOf, textDigest, timeMs } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
-import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/dap-platform";
+import { INVITATION_KEY_COHORT, APPLICATION_COHORT, FILE_PUBLICATION_COHORT, COUNTING_COHORT } from "@generalbusiness/dap-platform";
 import { command, install, installPlanned, memoryStore, planInstall, type Config, type Context, type Store } from "../src/index.ts";
 
 const SERVICE = "https://cohort.test";
 const COHORT = "counting-commitments" as const;
 const COHORTS = [
+  { name: "invitation-key", definition: INVITATION_KEY_COHORT.register, other: COHORT },
   { name: COHORT, definition: COUNTING_COHORT.register, other: "application" },
   { name: "application-publication", definition: FILE_PUBLICATION_COHORT.register, other: COHORT },
   { name: "application", definition: APPLICATION_COHORT.register, other: COHORT },
@@ -37,7 +38,7 @@ function scenario(fault: "none" | "reply" | "save" = "none") {
       const body = String(init?.body);
       const request = JSON.parse(body) as { founding: SignedIntent; definition: PlatformDefinition };
       const kept = (await store.config())!;
-      if (request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register || request.definition === FILE_PUBLICATION_COHORT.register) {
+      if (request.definition === INVITATION_KEY_COHORT.register || request.definition === COUNTING_COHORT.register || request.definition === APPLICATION_COHORT.register || request.definition === FILE_PUBLICATION_COHORT.register) {
         expect(kept.plan?.attempted).toMatch(/^sha256:/);
         expect(canonicalize(kept.plan?.founding)).toBe(canonicalize(request.founding));
         expect(kept.plan?.definition).toBe(request.definition);

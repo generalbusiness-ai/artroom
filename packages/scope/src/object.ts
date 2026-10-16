@@ -306,7 +306,7 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     const scope = this.#store.scope();
     const judged = () => this.#scope.submit(signed, grants, beside);
     if (scope?.at.kind !== "membership" || !isJoin(signed)) return this.#sent(await judged());
-    return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head }, signed, judged));
+    return this.#sent(await this.#limits.serve({ address: typeof address === "string" ? address : null, now: timeMs(this.#clock.read()) ?? 0, head: scope.head, invitationProof: () => this.#scope.pinned()?.named === "platform:membership@6" }, signed, judged));
   }
   /** One step of a capability, asked for with the signed intent that it prepares for (section 5.5). */
   async prepare(signed: SignedIntent, grants: readonly Grant[], capability: string, step: string): Promise<Answer> { return this.#sent(await this.#scope.prepare(signed, grants, capability, step)); }

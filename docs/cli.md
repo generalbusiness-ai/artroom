@@ -57,7 +57,7 @@ authorization to install a register remains unimplemented.
 The examples are from one run of the test in
 `packages/cli/test/story.scope.test.ts`, with long IDs cut short.
 
-**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
+**`dap install <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments|invitation-key]`**
 creates the register with an `install` intent, signed by a new operator
 key, which is also the one founder key. The host defaults to `github.com`
 and the namespace to `artroom`. For the demo's host, the hosting's own Git
@@ -69,14 +69,14 @@ Installed: register sc_hinqqbm4....
 The operator key key_baqzbaDy... is kept in the config directory, readable only by you. It is the one founder key.
 ```
 
-**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments]`**
+**`dap install --plan <base-url> [--host <git-host>] [--namespace <name>] [--cohort application|application-publication|counting-commitments|invitation-key]`**
 signs the same `install` intent and creates nothing. A register's ID is a
 function of its seed, and the seed of the intent and the register's
 version alone, so the command prints the ID that the install will create,
 and the seed's time: the intent's `notAfter`, 14 minutes ahead, until
 which it can be created. It keeps the signed intent, the version and the
-ID in the config. An intent and its signature are no secret; the
-register's genesis records both. Only a definitely unsent legacy plan may
+ID in the config. This founding intent carries no invitation credential;
+the register's genesis records it and its signature. Only a definitely unsent legacy plan may
 be replaced. A selected application or Counting plan always retains its
 original envelope, version, register and deadline, including when planning
 is repeated.
@@ -86,7 +86,7 @@ Planned: register sc_4kq2v7..., under platform:register@2, on host artifacts, na
 Set registerScope to sc_4kq2v7... in the Worker's host setting, then run dap install --planned before 2026-10-08T09:14:00Z.
 ```
 
-**`dap install --planned [--cohort application|application-publication|counting-commitments]`** creates the planned register, with the kept
+**`dap install --planned [--cohort application|application-publication|counting-commitments|invitation-key]`** creates the planned register, with the kept
 intent and no other argument. Before anything is sent it checks the plan:
 a plan whose ID is not the one its intent and version make, or whose
 version is not supported by the installed catalog, is refused as
@@ -101,7 +101,7 @@ or delete the original config or keys.
 
 For example, set `DAP_HOME` to a new private directory, then run
 `dap install --plan <base-url> --cohort <cohort> --host <host>
---namespace <namespace>`, using `application`, `application-publication` or `counting-commitments`
+--namespace <namespace>`, using `application`, `application-publication`, `counting-commitments` or `invitation-key`
 for `<cohort>`. After configuring the new register ID,
 run `dap install --planned --cohort <cohort>` with the same
 `DAP_HOME`. This creates separate custody and a new operator key; it
@@ -127,7 +127,10 @@ destination@2 and inbox@1, each with the `platform:` prefix.
 `--cohort counting-commitments` retains its separate register@6,
 directory@6 and membership@5 lineage. `--cohort application-publication`
 selects `FILE_PUBLICATION_COHORT`: register@9, directory@8, membership@4,
-rules@3, destination@4 and inbox@1. All three choices use the existing exact
+rules@3, destination@4 and inbox@1. `--cohort invitation-key` selects
+register@10, directory@9, membership@6, rules@3, destination@2 and inbox@1.
+It uses the application factory, not the file-publication factory. These
+choices use the existing exact
 planned-install custody. Unknown or multiple choices, another retained
 cohort, service, host or namespace refuse before signing or sending.
 `install --planned` may omit the selection: it uses the saved definition
@@ -245,8 +248,10 @@ You are @rita, an admin, on key key_baqzbaDy...; your inbox is sc_u5joavqp....
 
 **`dap invite <@member> --role <role> [--hours 24]`** is
 membership's `invite-member`. It prints a link that holds the
-invitation's number and its secret. The secret is a one-time invitation
-secret, not a signing key; pass the link only to that member.
+invitation's number and its private credential. Legacy scopes use a
+one-time secret. Membership@6 uses a 32-byte invitation signing seed;
+join records only its signature over the full membership reference,
+invitation ID and joining key. Pass either link only to that member.
 
 ```
 Invited @una as member: invitation sc_p6xp2lmd...:5, until 2099-01-02T00:00:00Z.
@@ -271,7 +276,9 @@ Link for @una only (it holds the invitation's secret): artroom-invite:eyJ2Ijox..
 **`dap join <artroom-invite:…>`** is membership's person `join`, signed by a new key
 that the command makes and keeps. Before sending, it saves the exact signed
 request in an owner-only `private/<name>.data` file; the invitation secret
-is absent from public config. It saves the recorded fact and inbox progress
+is absent from public config. Under membership@6, it is also absent from
+the signed request and native journal. Existing scopes keep their exact
+legacy protocol and can retain their secret in signed history. It saves the recorded fact and inbox progress
 before waiting for the member's inbox. After a lost reply or an interrupted
 wait, run `dap join` with the original link again. This reuses the same
 key, request and deadline. A request that took effect is confirmed by a read-only settlement, even after its deadline. A missing private request or a different

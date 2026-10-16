@@ -121,6 +121,12 @@ test("join validates its service before signing or changing an empty configurati
     expect(answer.isError, service).toBe(true);
     expect(answer.structuredContent, service).toMatchObject({ error: "shape", message: expect.stringContaining("link"), next: expect.any(String) });
   }
+  // Direct McpService.call also returns a shape finding for unusable private proof input; it must never throw or touch custody.
+  const seed = b64url(new Uint8Array(32));
+  for (const secret of ["not-a-seed", b64url(new Uint8Array(31)), seed.slice(0, -1) + "B", seed + "="]) {
+    const malformed = "artroom-invite:" + b64url(utf8(JSON.stringify({ v: 1, service: SERVICE, repository: shared, invitation: 5, secret, handle: "@helper", definition: "platform:membership@6" })));
+    expect(await mcp.call("join", { link: malformed, idempotencyKey: "invalid-seed" })).toMatchObject({ isError: true, structuredContent: { error: "shape" } });
+  }
   expect([signed, fetched, configReads, configWrites, custodyWrites]).toEqual([0, 0, 0, 0, 0]);
   expect(empty).toEqual({ service: "", roots: [] });
   // Each accepted form passes the real signing boundary once. A scripted native refusal stops before enrollment reads.

@@ -1,3 +1,4 @@
+import { invitationRedemptionFields } from "@generalbusiness/artroom-client";
 /**
  * One MCP service for every dap application (plan 031). It lists fourteen
  * generic tools that never change, and one act tool per act declaration of
@@ -476,7 +477,7 @@ export class McpService {
       tool("create", "Creates a scope with no existing target, and records it in your configuration so later connections list its tools. definition: a platform name such as platform:register@3, a definition's JSON, or its digest; kind: the definition's genesis act; fields; texts and definitions beside it; membership: the membership scope standing for the new scope is read from. Kept under custody like an act: the idempotencyKey is required.",
         { definition: { type: ["string", "object"] }, kind: { type: "string" }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, definitions: { type: "array", items: { type: "object" } }, membership: { type: ["string", "object"] }, idempotencyKey: keyArg, resubmit: { type: "boolean" } },
         ["definition", "kind", "idempotencyKey"], WRITE, (a) => this.#create(a), ACT_OUTPUT),
-      tool("join", "Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link holds the invitation's secret: this tool's result never repeats it, but the admitted join entry holds it, so history reads of membership (step, record) return it, as the native record does for any member.",
+      tool("join", "Joins a room with an invitation link from dap invite (artroom-invite:...), as dap join does: signs membership's join with this server's key, keeps the exact request under custody before sending it, and on acceptance records the room in your configuration, so its tools are listed. After a lost reply, call again with the same link and idempotencyKey: the same request is sent again, never a new one. The link is private: this tool's result never repeats it. Legacy membership records the invitation secret in the join entry, visible through authorized history reads. The invitation-key cohort records a proof bound to this membership, invitation and joining key; its private invitation seed stays out of the entry.",
         { link: { type: "string", description: "The invitation link, artroom-invite:..." }, idempotencyKey: keyArg }, ["link", "idempotencyKey"], WRITE, (a) => this.#join(a), ACT_OUTPUT),
       tool("prepare", "Asks the scope that owns a resource for one step of a capability. With kind: for the intent an act will submit later under the same idempotencyKey; resource: the scope asked, which may differ from target; then the act's own target, kind, on, fields, texts, presented and values. Without kind: a step with no act, such as hold@1's instance, whose own intent (kind capability:step, with fields) goes to the resource. Returns the resource's answer for that step, never an act's receipt.",
         { resource: scopeArg, capability: { type: "string" }, step: { type: "string" }, target: scopeArg, kind: { type: "string" }, on: { type: "integer", minimum: 0 }, fields: { type: "object" }, texts: { type: "array", items: { type: "string" } }, presented: { type: "object" }, values: { type: "array", items: { type: "string" } }, idempotencyKey: keyArg },
@@ -847,7 +848,7 @@ export class McpService {
     const act = membershipData?.name === "platform:membership" ? membershipData.acts["join"] : undefined;
     if (!act) return failed({ error: "target", what: `the invitation is in ${clip(named)}, which this server does not know as membership` });
     const M = link.repository.membership;
-    const fields = { invitation: link.invitation, secret: link.secret };
+    const fields = invitationRedemptionFields(named, M, link.invitation, this.#port.signer.key, link.secret);
     const identity: Identity = { service: this.#service, membership: M, signer: this.#port.signer.key, target: M, key: key as string };
     const meaning = meaningOf({ join: textDigest(canonicalize(link as never)) });
     const build = async () => ({

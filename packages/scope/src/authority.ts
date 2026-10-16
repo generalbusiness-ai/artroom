@@ -329,7 +329,7 @@ export function ownStanding(random: Random, genesis: Repository["genesis"]): Aut
         membership: scope,
         held(view, clock) {
           const named = genesis()?.seed.definition;
-          const observation = (named === "platform:membership@1" || named === "platform:membership@2" || named === "platform:membership@4" || named === "platform:membership@5") && platform(named)
+          const observation = (named === "platform:membership@1" || named === "platform:membership@2" || named === "platform:membership@4" || named === "platform:membership@5" || named === "platform:membership@6") && platform(named)
             ? observationOf(standingOf(view, { of: scope, key }, named), clock.reading) : null;
           // No answer: the scope is not an active membership scope at this head, so no grant rests on it (section 12.1.3, case e).
           if (!observation) return null;
