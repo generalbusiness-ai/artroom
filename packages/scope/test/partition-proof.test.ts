@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
 import { PROPOSED_BOUNDS, type FactRef } from "@generalbusiness/dap-contract";
-import { canonicalize, digestBytes, isPlatformDefinition, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isPlatformDefinition, newIncarnation, utf8 } from "@generalbusiness/artroom-bytes";
 import { scriptedPartitionOrigin } from "../../platform/test/support-partition-origin.ts";
 import { partitionProof, PartitionProofOperation, PARTITION_PROOF_BOUNDS as B, type PartitionProofPorts } from "../src/partition-proof.ts";
 import { used, retainedFacts } from "../src/core.ts";
-import { fetchFacts } from "../src/turn.ts";
+import { LATE, fetchFacts } from "../src/turn.ts";
 import { ReceiverReads } from "../src/receiver-reads.ts";
 import type { NativeBirth } from "../src/native-birth.ts";
 
@@ -94,4 +94,56 @@ test("receiver interpretation promotes a proved lane while retention and a later
   sample.advance(B.milliseconds + 1);
   expect(await reader!.retained(retained)).toBeNull();
   expect(sample.calls).toHaveLength(8);
+});
+
+
+// These transport counters and clock are scripted. The native journeys cover
+// actual receiver eligibility; these tests isolate admission resource limits.
+test("concurrent duplicate and distinct misses spend one total allowance and never start a thirty-third RPC", async () => {
+  const sample = protocol(), read = sample.ports.births.read;
+  const operation = new PartitionProofOperation(sample.ports);
+  const facts = Array.from({ length: B.calls + 8 }, (_, n) => ({ ...sample.fixture.from, at: { ...sample.fixture.from.at, inc: newIncarnation(new Uint8Array(16).fill(n + 50)) } }));
+  sample.ports.births.read = async (...args) => { await Promise.resolve(); return read(...args); };
+  const answers = await Promise.all(facts.flatMap(fact => [operation.raw(fact), operation.raw(fact)]));
+  expect(answers.every(answer => answer === null)).toBe(true);
+  expect(operation.stats()).toMatchObject({ calls: 32, reads: 32, totalFrames: 0, pending: 0, reservedBytes: 32 * 1024 * 1024 });
+  expect(sample.calls).toHaveLength(32);
+  expect(await operation.raw(facts[0]!)).toBeNull();
+  expect(await operation.raw(facts.at(-1)!)).toBeNull();
+  expect(sample.calls).toHaveLength(32);
+});
+
+test("a timed-out physical read keeps its slot until settlement and cannot admit a late frame", async () => {
+  const sample = protocol(); let finish!: (value: NativeBirth | null) => void;
+  let started = 0, peak = 0, running = 0;
+  sample.ports.births.read = async () => { started++; running++; peak = Math.max(peak, running); const value = await new Promise<NativeBirth | null>(resolve => { finish = resolve; }); running--; return value; };
+  sample.ports.wait = async <T>(work: () => Promise<T>): Promise<T | typeof LATE> => { const pending = work(); await Promise.resolve(); return started ? LATE : pending; };
+  const operation = new PartitionProofOperation(sample.ports);
+  expect(await operation.raw(sample.fixture.from)).toBeNull();
+  expect(operation.stats()).toMatchObject({ calls: 1, reads: 1, pending: 1, totalFrames: 0 });
+  expect(await operation.receiver(sample.fixture.partition)).toBeNull();
+  expect(started).toBe(1); expect(peak).toBe(1);
+  finish(sample.births.get(canonicalize(sample.fixture.from.at))!);
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  expect(operation.stats()).toMatchObject({ reads: 1, pending: 0, totalFrames: 0, actualBytes: 0 });
+  expect(await operation.raw(sample.fixture.from)).toBeNull();
+  expect(started).toBe(1);
+});
+
+
+test("raw UTF-8 admission charges bad replies before parse and refuses further physical reads at sixteen MiB", async () => {
+  const sample = protocol(), first = sample.births.get(canonicalize(sample.fixture.from.at))!;
+  // Three-byte UTF-8, but fewer JS characters: this is an admitted-byte
+  // witness, not a peak-heap assertion. The invalid JSON is never a frame.
+  const bytes = "\u0800".repeat(349525) + " ";
+  expect(utf8(bytes).length).toBe(1024 * 1024);
+  const caps: number[] = [];
+  sample.ports.births.read = async (_at, _ms, max) => { caps.push(max!); return { ...first, proof: { ...first.proof, bytes } }; };
+  const operation = new PartitionProofOperation(sample.ports);
+  for (let n = 0; n < 17; n++) {
+    const fact = { ...sample.fixture.from, at: { ...sample.fixture.from.at, inc: newIncarnation(new Uint8Array(16).fill(n + 100)) } };
+    expect(await operation.raw(fact)).toBeNull();
+  }
+  expect(operation.stats()).toMatchObject({ calls: 17, reads: 16, actualBytes: 16 * 1024 * 1024, totalFrames: 0, pending: 0 });
+  expect(caps).toHaveLength(16); expect(caps.every(cap => cap === 1024 * 1024)).toBe(true);
 });

@@ -41,7 +41,7 @@ export interface Peer {
   /** Optional: unsupported native senders never fall back to source(). */
   proofSource?(fact: FactRef, maxBytes: number, milliseconds?: number): Promise<ProofBody | null>;
   /** Raw checked birth only; never a producer-selected privileged identity. */
-  nativeBirth?(at: ScopeRef, milliseconds: number): Promise<NativeBirth | null>;
+  nativeBirth?(at: ScopeRef, milliseconds: number, maxBytes?: number): Promise<NativeBirth | null>;
   /** Optional bounded native directory witness; never fall back to summary. */
   sessionReference?(request: string): Promise<string | null>;
   declared(digest: Digest): Promise<string | null>;
@@ -246,11 +246,11 @@ export function namespace(binding: Binding): { resolver: Resolver; proofs: Proof
       },
     },
     births: {
-      async read(at, milliseconds) {
-        if (!isScopeRef(at) || !Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds) return null;
+      async read(at, milliseconds, maxBytes = PROOF_BYTE_BOUNDS.body) {
+        if (!isScopeRef(at) || !Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > PROOF_BYTE_BOUNDS.body) return null;
         try {
           const source = peer(at.scope);
-          return typeof source.nativeBirth === "function" ? readNativeBirth(await source.nativeBirth(at, milliseconds), at) : null;
+          return typeof source.nativeBirth === "function" ? readNativeBirth(await source.nativeBirth(at, milliseconds, maxBytes), at, maxBytes) : null;
         } catch { return null; }
       },
     },

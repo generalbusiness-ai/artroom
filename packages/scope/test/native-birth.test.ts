@@ -7,7 +7,7 @@ import { readNativeBirth, type NativeBirth } from "../src/native-birth.ts";
 import { namespace } from "../src/namespace.ts";
 import { controls } from "../src/testing.ts";
 import { at, definition, found, rita, type Remote } from "./support.ts";
-type Peer = Remote & { nativeBirth(at: unknown, milliseconds: number): Promise<NativeBirth | null> };
+type Peer = Remote & { nativeBirth(at: unknown, milliseconds: number, maxBytes?: number): Promise<NativeBirth | null> };
 
 // Actual native register genesis, preparation, code pin and SQLite. Clock/key
 // fixtures are the existing test ports. No new partition factory is claimed.
@@ -28,6 +28,7 @@ test("native raw birth reads the exact accepted pin without an activation turn, 
   const via = await namespace(env.SCOPES).births.read(ref, 10000);
   expect(via).toEqual(birth);
   expect(await peer.nativeBirth({ ...ref, inc: newIncarnation(new Uint8Array(16).fill(9)) }, 10000)).toBeNull();
+  expect(await peer.nativeBirth(ref, 10000, 1)).toBeNull();
   expect(await peer.nativeBirth(ref, 0)).toBeNull(); expect(await peer.nativeBirth(ref, 10001)).toBeNull();
   expect(await snapshot()).toEqual(before);
 });
@@ -52,6 +53,7 @@ test("declared raw birth retains its actual name without promoting identity; ove
         if (query.startsWith("SELECT bytes FROM entry")) bodies++;
         return state.storage.sql.exec(query, ...args);
       } }, { policy: () => "birth-storage-fixture", declared: () => definition, platform: () => null });
+      expect(nativeBirth(preparation, scope.at, undefined, 1)).toBeNull(); expect(bodies).toBe(0);
       expect(nativeBirth(preparation, scope.at)).toBeNull(); expect(bodies).toBe(0);
     } finally { state.storage.sql.exec("UPDATE entry SET bytes=? WHERE seq=0", original).toArray(); }
   });
@@ -67,5 +69,6 @@ test("raw birth protocol refuses unsupported senders and invalid admission witho
   const births = namespace(binding as never).births;
   expect(await births.read(ref, 10000)).toBeNull(); expect([lookups, legacy]).toEqual([1, 0]);
   expect(await births.read({} as ScopeRef, 10000)).toBeNull(); expect(await births.read(ref, 10001)).toBeNull();
+  expect(await births.read(ref, 10000, 0)).toBeNull();
   expect([lookups, legacy]).toEqual([1, 0]);
 });

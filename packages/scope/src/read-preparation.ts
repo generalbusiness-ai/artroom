@@ -79,19 +79,20 @@ export class ReadPreparation {
   capture(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null { return this.#capture(budget, true); }
   /** Raw immutable metadata also serves a refused child's result. This is
    * no query/authority preparation; those still require applied genesis. */
-  birth(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null { return this.#capture(budget, false); }
-  #capture(budget: PreparationBudget, applied: boolean): PreparedRead | null {
+  birth(budget: PreparationBudget = new PreparationBudget(), maxBytes: number = B.genesis): PreparedRead | null { return this.#capture(budget, false, maxBytes); }
+  #capture(budget: PreparationBudget, applied: boolean, maxBytes: number = B.genesis): PreparedRead | null {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > B.genesis) return null;
     try {
       const snapshot = preparationScope(this.#sql, budget);
       if (snapshot.kind !== "scope") { budget.invalidate(); return null; }
       const policy = this.#policy(budget);
       // One genesis read per operation. Reserving the hard maximum before
       // metadata also prevents recapture from resetting its byte allowance.
-      budget.spend({ genesis: B.genesis });
+      budget.spend({ genesis: maxBytes });
       const reader = new ProofBytes(this.#sql, () => budget.spend({ calls: 1, candidates: 1, metadata: 4096 }));
-      const stored = applied ? reader.own(0, B.genesis) : reader.birth(B.genesis), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
+      const stored = applied ? reader.own(0, maxBytes) : reader.birth(maxBytes), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
       if (stored.kind !== "body" || !same(stored.value.fact, expected)) return budget.stop();
-      const entry = proofEntry(stored.value, expected, B.genesis);
+      const entry = proofEntry(stored.value, expected, maxBytes);
       if (!entry || entry.input.type !== "genesis" || applied && entry.input.decision !== "applied") return budget.stop();
       const named = entry.input.seed.definition;
       if (named.length > 128) return budget.stop();

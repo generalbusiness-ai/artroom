@@ -519,5 +519,51 @@ reads remain charged until settlement. Actual cross-root and deep
 seventeen-frame cases, total/concurrent/byte/deadline boundaries and a
 runtime memory witness are required before Source. No same-room authority
 restriction or larger heap allowance is approved. This advice is technical
-only; the unfinished branch has no Source approval. The current sixteen
-frame implementation still needs that separate-budget/view refactor.
+only; the unfinished branch has no Source approval. The separate total-budget and minimal-view implementation is recorded below.
+
+
+## Separate total budget and minimal identity views
+
+The raw collection now allows at most thirty-two calls and distinct frames
+for one admission. Each receiver, source and origin question sees only its
+own dependency closure, still limited to sixteen frames. A single physical
+read slot remains occupied through actual settlement and reply admission,
+even after a logical timeout. Every queued read uses the original ten-second
+deadline. There is no eviction, new allowance per concern or persistent
+qualified-identity cache. The birth cache retains parsed frames and drops
+raw proof strings after admission.
+
+The native sender accepts a bounded byte cap before loading genesis bytes.
+The receiver charges raw UTF-8 before parsing, including malformed replies,
+with a sixteen MiB actual proof ceiling separate from thirty-two MiB of
+reserved RPC work. These are admitted-byte and retained-frame bounds, not
+a measured peak-heap claim. Existing per-birth preparation, metadata and
+definition limits still apply.
+
+Two actual native repositories use their own M6 authority, partitions and
+issue lanes. A cross-room block succeeds with seventeen distinct physical
+reads; release after receiver restart succeeds with seventeen reads too.
+Both retain the original declared producer alias. A deep same-room receiver
+and unrelated current fact require seventeen total frames. Two independent
+native concern chains at depth four require twenty-nine reads and frames,
+with fourteen- and fifteen-frame identity views. These last graph checks
+prove the raw proof composition; they do not claim a deep block admission.
+The fixture owns setup, clock, scheduler, inspector and register Git stand-in.
+
+Restoring the former total sixteen-frame/call limit rejects the legitimate
+cross-room block and fails the unchanged assertion. Supplying the whole
+operation cache to each identity question does the same. Both controls
+distinguish the fault and restore the file. The original native cases pass
+before both controls; the extended eleven-case native/raw-birth/proof run
+passes, including both concern chains. Seven protocol cases then pass after
+adding the UTF-8 ceiling case. Scripted transport and clock cases establish
+one allowance for concurrent duplicates and distinct misses, no thirty-third
+physical read, and a late read that keeps its physical slot but cannot admit
+its frame. They are not native authority or memory measurements.
+
+Lane typechecking passes. The first scope typecheck after adding the timeout
+witness rejected its inferred symbol type; a static sentinel import and explicit
+generic return type now preserve the unique timeout sentinel. This is a fixture type correction.
+Runtime memory measurement, mixed-cohort replay and the other unfinished
+Source obligations remain owed. No gate or Source review has run for this
+unfinished branch, and no provider operation has run.

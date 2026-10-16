@@ -441,11 +441,11 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
     return active() ? result : null;
   }
   /** Closed raw birth view, without activation, source identity or authority. */
-  nativeBirth(at: unknown, milliseconds: number) {
+  nativeBirth(at: unknown, milliseconds: number, maxBytes?: number) {
     const began = this.#queryFlights.clock.now(), ends = began + milliseconds;
     if (!Number.isSafeInteger(milliseconds) || milliseconds <= 0 || milliseconds > EXACT_PROOF_RECEIVER_BOUNDS.milliseconds || !Number.isFinite(began) || !Number.isFinite(ends)) return null;
     const active = () => { const now = this.#queryFlights.clock.now(); return now >= began && now < ends; };
-    const result = nativeBirth(this.#readPreparation, at, new PreparationBudget(undefined, active));
+    const result = nativeBirth(this.#readPreparation, at, new PreparationBudget(undefined, active), maxBytes);
     return active() ? result : null;
   }
   /** Authenticated small directory witness. No HTTP route or activation turn. */

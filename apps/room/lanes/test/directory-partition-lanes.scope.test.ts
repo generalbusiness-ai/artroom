@@ -10,7 +10,8 @@ import { PARTITION_COHORT as C, partitionSourceName, partitionReceiverPolicy, pa
 import { proofEntry, PROOF_BYTE_BOUNDS } from "../../../../packages/scope/src/proof-bytes.ts";
 import { namespace } from "../../../../packages/scope/src/namespace.ts";
 import { env } from "cloudflare:workers";
-import { sessionRoom } from "../../../../packages/scope/test/support/session-room.ts";
+import { PartitionProofOperation } from "../../../../packages/scope/src/partition-proof.ts";
+import { sessionRoom, sessionRepository } from "../../../../packages/scope/test/support/session-room.ts";
 import { dispatchFixture } from "../../../../packages/scope/test/support/native-fixture-lifetime.ts";
 import { rita, type Platform } from "../../../../packages/scope/test/repository.ts";
 import { reader } from "../../../../packages/scope/test/support.ts";
@@ -123,5 +124,96 @@ test("partition issue facts and bounded concern births use receiver lineage whil
       expect((await parent.item(concern)).state).toBe("created");
       parent = child;
     }
+    // Deep receiver and an unrelated current source share only six base
+    // frames. The whole operation is seventeen; each identity view is small.
+    const extraAsk = await B.did(rita, "ask", { fields: { addressee: { membership: await M!.at(), member: "@rita" }, question: "A separate lineage" } });
+    const combined = new PartitionProofOperation(namespace(env.PLATFORM));
+    const deep = await combined.receiver(await parent.at());
+    expect(deep?.proof.frames).toHaveLength(14);
+    const other = await combined.source(factRefOf((await B.entries())[extraAsk]!));
+    expect(other).toMatchObject({ under: "issue", producer: "declared:issue", proof: { calls: 17, reads: 17, totalFrames: 17, pending: 0 } });
+    expect(other?.proof.frames).toHaveLength(9);
+  } finally { life.release(); }
+});
+
+
+// Both repositories and lanes are real and use the same native namespace.
+// The shared fixture owns the clock, scheduler, setup inspector and register
+// Git stand-in. The counters below forward every actual bounded RPC unchanged.
+test("two native partition roots keep cross-room block and restart release with one seventeen-frame admission", async () => {
+  const first = await sessionRoom(C.register), { life } = first;
+  try {
+    const second = await sessionRepository(life, C.register);
+    const prepare = async ({ D, children }: { D: Platform; children: Platform[] }) => {
+      const [M, rules] = children;
+      const seat = await M!.did(rita, "seat", { expected: await M!.expected({ roster: 0 }) });
+      await M!.did(rita, "first-key", { fields: { member: seat }, expected: await M!.expected({ roster: 0, member: seat }) });
+      const bytes = canonicalize(issue);
+      expect(await rules!.stub.submit(await rules!.intent(rita, "activate", { fields: { digest: DIGESTS.issue, name: issue.name } }), [], { values: [bytes] })).toMatchObject({ answer: "accepted" });
+      const opened = await D.did(rita, "open-partition", { expected: await D.expected({ repository: 0 }) });
+      const create = (await D.entries())[opened]!.sends.find(send => (send.to as Seed).definition === C.partition);
+      if (!create) return expect.fail("actual root emitted no partition");
+      const P = life.platform(scopeIdOf(create.to as Seed));
+      await dispatchFixture([D, P, ...children], life.wait);
+      const openedIssue = await P.stub.submit(await P.intent(rita, "open-issue", { expected: await P.expected({ repository: 0 }), fields: { definition: DIGESTS.issue, title: "Cross-root issue", conditions: ["Keep the existing relationship"] } }), [], { values: [bytes] });
+      expect(openedIssue).toMatchObject({ answer: "accepted" });
+      if (openedIssue.answer !== "accepted") return expect.fail("actual issue was not opened");
+      const send = (await P.entries())[openedIssue.receipt.fact.seq]!.sends.find(send => (send.to as Seed).kind === "lane");
+      if (!send) return expect.fail("actual partition emitted no issue");
+      const I = life.platform(scopeIdOf(send.to as Seed));
+      await dispatchFixture([D, P, I, ...children], life.wait);
+      expect((await I.summary()).value.status).toBe("active");
+      return { D, P, I, M: M! };
+    };
+    const A = await prepare(first), B = await prepare(second);
+    const asked = await A.I.did(rita, "ask", { fields: { addressee: { membership: await A.M.at(), member: "@rita" }, question: "May another room depend on this answer?" } });
+    const foreign = factRefOf((await A.I.entries())[asked]!);
+    const offered = await B.I.did(rita, "offer", { expected: await B.I.expected({ goal: 0 }) });
+    await B.I.did(rita, "accept", { on: offered, expected: await B.I.expected({ on: offered }), fields: { terms: factRefOf((await B.I.entries())[0]!) } });
+    const actual = namespace(env.PLATFORM), calls: string[] = [];
+    life.wire(B.I.name, () => ({
+      births: { read: (at, ms, max) => { calls.push(`birth:${canonicalize(at)}`); return actual.births.read(at, ms, max); } },
+      proofs: { read: (fact, max, ms) => { calls.push(`fact:${canonicalize(fact)}`); return actual.proofs.read(fact, max, ms); } },
+    }));
+    await B.I.restart();
+    calls.length = 0;
+    const blocked = await B.I.act(rita, "block", { expected: await B.I.expected({ commitment: offered }), fields: { commitment: offered, on: foreign } });
+    expect(blocked).toMatchObject({ answer: "accepted" });
+    if (blocked.answer !== "accepted") return;
+    expect(calls).toHaveLength(17); expect(new Set(calls).size).toBe(17);
+    const entry = (await B.I.entries())[blocked.receipt.fact.seq]!, use = entry.uses.find(use => use.fact.hash === foreign.hash);
+    if (!use) return expect.fail("cross-root block retained no source");
+    expect(await B.I.stub.retained(reader, "entry", use.content)).toMatchObject({ ok: true, value: { under: "declared:issue" } });
+    await B.I.restart();
+    const answered = await A.I.did(rita, "answer", { on: asked, expected: await A.I.expected({ on: asked }), fields: { answer: "Yes" } });
+    calls.length = 0;
+    expect(await B.I.act(rita, "release-block", { on: blocked.receipt.fact.seq, expected: await B.I.expected({ on: blocked.receipt.fact.seq, commitment: offered }), fields: { commitment: offered, answer: factRefOf((await A.I.entries())[answered]!) } })).toMatchObject({ answer: "accepted" });
+    expect(calls).toHaveLength(17);
+    expect(await actual.resolver.read(foreign, 10)).toMatchObject({ under: "declared:issue" });
+    const deepen = async (room: typeof A) => {
+      let current = room.I;
+      const nodes = [room.D, room.P, room.M, current];
+      for (let depth = 1; depth <= 3; depth++) {
+        const plan = await current.did(rita, "open-plan", { expected: await current.expected({ goal: 0 }) });
+        const concern = await current.did(rita, "add-concern", { expected: await current.expected({ plan }), fields: { plan, purpose: "Two independent bounded lineages", role: "required", title: `Disjoint concern ${depth}`, conditions: ["Preserve native identity"] } });
+        const send = (await current.entries())[concern]!.sends.find(send => (send.to as Seed).kind === "lane");
+        if (!send) return expect.fail("native concern emitted no child");
+        current = life.platform(scopeIdOf(send.to as Seed)); nodes.push(current);
+        await dispatchFixture(nodes, life.wait);
+        expect((await current.summary()).value.status).toBe("active");
+      }
+      return current;
+    };
+    const deepestA = await deepen(A), deepestB = await deepen(B);
+    const deepAsk = await deepestA.did(rita, "ask", { fields: { addressee: { membership: await A.M.at(), member: "@rita" }, question: "Two disjoint depth-four lineages" } });
+    const physical: string[] = [], operation = new PartitionProofOperation({
+      births: { read: (at, ms, max) => { physical.push(`birth:${canonicalize(at)}`); return actual.births.read(at, ms, max); } },
+      proofs: { read: (fact, max, ms) => { physical.push(`fact:${canonicalize(fact)}`); return actual.proofs.read(fact, max, ms); } },
+    });
+    expect((await operation.receiver(await deepestB.at()))?.proof.frames).toHaveLength(14);
+    const separate = await operation.source(factRefOf((await deepestA.entries())[deepAsk]!));
+    expect(separate).toMatchObject({ under: "issue", producer: "declared:issue", proof: { calls: 29, reads: 29, totalFrames: 29, pending: 0 } });
+    expect(separate?.proof.frames).toHaveLength(15);
+    expect(physical).toHaveLength(29); expect(new Set(physical).size).toBe(29);
   } finally { life.release(); }
 });
