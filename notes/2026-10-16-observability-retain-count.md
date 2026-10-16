@@ -139,8 +139,8 @@ Vitest timeout-cancellation diagnostics; the terminal result is exit 0.
 Their presence does not establish a new production failure or diagnose
 the earlier D1 gate failures.
 
-Only this reporting note changes after that frozen gate. All other
-tracked blobs and modes must match that head before exact-head review.
+At the original reviewed head `4cc96825`, only this reporting note changed
+after that frozen gate. All other tracked blobs and modes matched it.
 Raw output remains at `/tmp/artroom-observability-63bb3ead-gate.log` and
 its gate-owned temporary directory. Those raw paths are not an access
 grant. A separately named finite public JSON summary will be the sole
@@ -150,3 +150,36 @@ The implementation was composed with reviewed D1 Main `5caa62f3` and
 the planner's MVP plan Main `3267fbbe`. Existing defaults and every older
 platform pin remain. The Source configuration was prepared only; no
 Cloudflare release, binding, secret or provider operation occurred.
+
+## Closed async context correction
+
+The checker found that a delayed `Operations.#answer` callback retains
+its original AsyncLocalStorage store after the invocation finishes. The
+old `operational()` lookup treated that store as active. `Turns.run`
+therefore used a closed collector, which silently discarded the metric.
+The original passing gate and out-of-context T19 witness did not detect
+this inherited-context case.
+
+The correction admits an operational context only while its shared
+invocation has users. Native work under a closed context gets the
+existing independent dispatch measurement. The closed request identity
+is not reused. Native ordering, answers and provider retry rules remain
+unchanged.
+
+The new native operations witness lets the production answer callback
+register under the original dispatch context. Its 10 ms fixture deadline
+closes that invocation, then the original delayed send answer arrives.
+The real SQLite turn records `unknown at 2`, then `confirmed at 3`, with
+one provider send and a fresh dispatch turn metric. The opening entry,
+operation-owner rules and outside provider are the existing labelled
+stand-ins. This is local runtime evidence, not a hosted provider check.
+
+The focused baseline passes. Replacing the lifecycle-aware lookup with
+the old store lookup fails the metric assertion while the same native
+outcome still commits. The control distinguishes this fault. Scope
+typechecking passes. The first fixture run expected `alarm` for the
+original place; the actual operations driver uses `dispatch`, and that
+oracle was corrected. No timeout or native guard changed.
+
+This implementation correction is beyond the original gate's tree.
+Its successor gate and exact-head review remain pending.
