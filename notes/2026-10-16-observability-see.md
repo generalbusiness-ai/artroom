@@ -115,7 +115,30 @@ run. Corrected client, CLI and scope typechecks pass. The whole workspace
 typecheck completed without errors before the latest witness and inherited
 context correction. Its result is not a substitute for the final gate.
 
-The frozen gate and exact-head Source review remain pending. The operations
+The first frozen gate at `745c6264b14fb99e93bce3ffe567fe2ffd76307a`,
+tree `03fc20d901632b33e483438600af4e9707fd5752`, failed. Original session
+1125 closed with exit 1: 1,469 Vitest tests passed, 3 failed and 3 skipped.
+The test phase stopped before the Node and Counting phases. Installation,
+whitespace and typechecking passed. Test elapsed time was 196.9 seconds,
+with 277.8 CPU seconds. The three failures were the MCP command inventory
+and stale Page and Counting asset modules after the HTTP client changed.
+This remains a failed gate, not a passing union with focused tests.
+
+The MCP inventory now records the new command's explicit operational
+MCP gap. The owned Page, Counting and Lending bundles are regenerated
+from their current source with the existing pinned esbuild dependency.
+Lending also imports the changed HTTP client, although its asset module
+was not one of the three gate failures. No rendered UI result follows
+from regenerating those assets. A new gate is required for that changed
+head.
+
+The corrected focused run passes seven tests across the inventory and
+two asset files. A separate direct generator comparison confirms the
+Lending Worker module and all three public disk assets match their
+current source build. These are generated-byte checks, not browser
+interaction evidence.
+
+The final frozen gate and exact-head Source review remain pending. The operations
 guide documents the delivered bounds. MCP operational events, deployment
 coverage checks, browser telemetry and capacity measurement remain later
 stages. Cloudflare remains held.
