@@ -62,10 +62,12 @@ export class ItemQueries {
       if (reading === null) return no("clock-behind");
       if (ends === null || reading >= ends) return no("forbidden");
       if (!sessionAllowsVisibility(authentic.claims.reads, "empty")) return no("forbidden");
-      const prepared = await config.sessionPreparation.prepare(reader, frame => selection(frame, query).visibility, run, budget.preparation("preparation"), () => {
+      const result = await config.sessionPreparation.prepare(reader, frame => selection(frame, query).visibility, run, budget.preparation("preparation"), () => {
         budget.spend("preparation", { rpcs: 1 }); budget.reservePeerPreparation();
       });
-      if (!prepared || !run.active() || !budget.available) return no("unavailable");
+      if (!run.active() || !budget.available) return no("unavailable");
+      if (!result.ok) return no(result.reason);
+      const { prepared } = result;
       return this.#tail(prepared.frame, query, selection(prepared.frame, query), run, budget, () =>
         preparedSessionRefusal(config, prepared.frame, reader, prepared.visibility, prepared.membership, prepared.resolvedBirth));
     }

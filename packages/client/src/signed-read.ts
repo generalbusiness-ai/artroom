@@ -27,7 +27,7 @@
 
 import { PROPOSED_BOUNDS, SESSION_DOMAINS } from "@generalbusiness/dap-contract";
 import type { ReadRequest, ScopeId, SignedRead, SignedReadName, Timestamp } from "@generalbusiness/dap-contract";
-import { b64url, canonicalBytes, parseStrictBytes, retainedReadArgument, taggedBytes } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalBytes, parseStrictBytes, retainedReadArgument, taggedBytes, readItemQueryParameter, itemQueryArgument } from "@generalbusiness/artroom-bytes";
 import type { Transport } from "./handle.ts";
 import type { Signer } from "./intent.ts";
 
@@ -49,6 +49,7 @@ export interface ReadSigning {
 /** The argument of a signed read: summary, cursor, entry position or the already bound retained resource hash. */
 export function readArgument(read: SignedReadName, at?: string | number): string {
   if (read === "summary") return "summary";
+  if (read === "query-items" && at === undefined) throw new RangeError("an item query requires its exact page argument");
   return at === undefined ? "0" : String(at);
 }
 
@@ -87,6 +88,11 @@ export function signedReads(transport: Transport, signer: Signer, signing: ReadS
     outbox: (...args) => transport.outbox(...args),
     duty: (...args) => transport.duty(...args),
     summary: async (scope, reader) => transport.summary(scope, await as(reader, scope, "summary")),
+    queryItems: async (scope, reader, encoded) => {
+      const query = readItemQueryParameter(encoded), argument = query && itemQueryArgument(query);
+      if (!query || query.scope.scope !== scope || !argument) throw new RangeError("invalid bounded item query");
+      return transport.queryItems(scope, await as(reader, scope, "query-items", argument), encoded);
+    },
     history: async (scope, reader, cursor) => transport.history(scope, await as(reader, scope, "history", cursor), cursor),
     entry: async (scope, reader, seq) => transport.entry(scope, await as(reader, scope, "entry", seq), seq),
     log: async (scope, reader, cursor) => transport.log(scope, await as(reader, scope, "log", cursor), cursor),

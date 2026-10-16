@@ -31,3 +31,22 @@ test("query and common URL byte ceilings reject oversized input before operation
   expect(admittedRequestUrl(prefix + "雪".repeat(6000))).toBe(false);
   expect(decodeItemQueryWire("A".repeat(10924))).toBeNull();
 });
+
+// The raw URL guard must precede every outer parser, including application
+// dispatch. These are actual entrypoint functions with unreachable namespaces.
+test("all public frontdoors cap raw URLs before parsing or namespace lookup", async () => {
+  const [{ route, mcpRoute, default: scopeWorker }, { default: roomWorker }] = await Promise.all([import("../src/worker.ts"), import("../../../apps/room/fetch.ts")]);
+  const request = new Request(`https://scopes.test/v1/scopes/${scope.scope}/query-items?q=${"a".repeat(17 * 1024)}`);
+  let parsed = 0, looked = 0;
+  const binding = { idFromName() { looked++; throw new Error("unreachable namespace"); }, get() { looked++; throw new Error("unreachable namespace"); } } as unknown as import("../src/namespace.ts").Binding;
+  const environment = { SCOPES: binding } as unknown as import("../src/worker.ts").Env;
+  const globals = globalThis as unknown as { URL: typeof URL }, NativeURL = globals.URL;
+  globals.URL = class extends NativeURL { constructor(url: string | URL, base?: string | URL) { parsed++; super(url, base); } };
+  try {
+    for (const response of [await route(request, binding), await mcpRoute(request, {}), await scopeWorker.fetch(request, environment), await roomWorker.fetch(request, environment)]) {
+      expect(response?.status).toBe(413);
+      expect(response?.headers.get("cache-control")).toBe("no-store");
+    }
+    expect(parsed).toBe(0); expect(looked).toBe(0);
+  } finally { globals.URL = NativeURL; }
+});

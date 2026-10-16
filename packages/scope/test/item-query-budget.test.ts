@@ -6,7 +6,9 @@ import { ItemQueryBudget, ItemQueryUnavailable } from "../src/item-query-budget.
 test("causal query SQL admits its 128th call and refuses the 129th before execution or another phase", () => {
   let calls = 0;
   const raw = { exec: () => { calls++; return { toArray: () => [] }; } };
-  const budget = new ItemQueryBudget("signed", () => true), sql = budget.sql("causal", raw, 4096);
+  // Zero metadata in this stand-in isolates the call ceiling: reserving
+  // 4096 bytes per call also reaches the separate 512 KiB ceiling at 128.
+  const budget = new ItemQueryBudget("signed", () => true), sql = budget.sql("causal", raw);
   for (let n = 0; n < 128; n++) sql.exec("SELECT 1");
   expect(calls).toBe(128);
   expect(() => sql.exec("SELECT 1")).toThrow(ItemQueryUnavailable);

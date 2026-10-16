@@ -20,8 +20,9 @@
  * that the same signed intent may be sent again.
  */
 
-import type { ScopeApi } from "@generalbusiness/dap-contract";
-import { LATE, takeBytes, within, type ByteStream } from "@generalbusiness/artroom-bytes";
+import { ITEM_QUERY_BOUNDS, ITEM_QUERY_WIRE_BOUNDS } from "@generalbusiness/dap-contract";
+import type { ItemQuery, ScopeApi } from "@generalbusiness/dap-contract";
+import { LATE, takeBytes, within, readItemQueryParameter, readItemQueryReply, type ByteStream } from "@generalbusiness/artroom-bytes";
 import { ANSWERS } from "./answers.ts";
 import { TransportError, type Transport } from "./handle.ts";
 
@@ -51,24 +52,32 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
   type Answered<K extends keyof ScopeApi> = Awaited<ReturnType<ScopeApi[K]>>;
 
   /** One request of operation `op`. Its reply is returned only when it is an answer of that operation. */
-  async function call<K extends keyof ScopeApi>(op: K, path: string, reader: unknown, body?: unknown): Promise<Answered<K>> {
+  async function call<K extends keyof ScopeApi>(op: K, path: string, reader: unknown, body?: unknown, query?: ItemQuery): Promise<Answered<K>> {
     // A founding, an act and a request for a step submit an intent, and a failure leaves its outcome unknown. A read changes nothing.
     const failed = (what: string) => new TransportError(op === "found" || op === "submit" || op === "prepare" ? `${what}. ${UNKNOWN}` : `${what}. Nothing was read; the read may be made again.`);
     const send = options.fetch ?? (globalThis as { fetch?: Fetch }).fetch;
     if (!send) throw new TransportError("this runtime has no fetch; nothing was sent");
     const headers: Record<string, string> = { ...(typeof reader === "string" ? { authorization: reader } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) };
+    const cap = query ? Math.min(ITEM_QUERY_BOUNDS.payloadBytes, most) : most;
+    const deadline = query ? Math.min(10, seconds) : seconds;
+    if (query && (!(cap > 0) || !(deadline > 0) || !Number.isFinite(cap) || !Number.isFinite(deadline))) throw failed("invalid query transport bounds");
     let got: { status: number; bytes: Uint8Array | null | typeof LATE } | typeof LATE;
     try {
-      got = await within(seconds, async (signal) => {
+      got = await within(deadline, async (signal) => {
         const response = await send(`${base}${path}`, { ...(body === undefined ? { method: "GET", headers } : { method: "POST", headers, body: JSON.stringify(body) }), signal: signal as never });
-        return { status: response.status, bytes: response.body ? await takeBytes(response.body, most, signal) : new Uint8Array(0) };
+        return { status: response.status, bytes: response.body ? await takeBytes(response.body, cap, signal) : new Uint8Array(0) };
       });
     } catch (error) {
-      throw failed(`no reply: ${error instanceof Error ? error.message : String(error)}`);
+      throw failed(query ? "no query reply" : `no reply: ${error instanceof Error ? error.message : String(error)}`);
     }
     // Past the deadline nothing of a reply is joined, decoded or parsed: the reader gave none back, and what comes next is not reached.
-    if (got === LATE || got.bytes === LATE) throw failed(`no whole reply within ${seconds} seconds; the request was aborted`);
-    if (got.bytes === null) throw failed(`the reply, status ${got.status}, is longer than ${most} bytes and was not read`);
+    if (got === LATE || got.bytes === LATE) throw failed(`no whole reply within ${deadline} seconds; the request was aborted`);
+    if (got.bytes === null) throw failed(`the reply, status ${got.status}, is longer than ${cap} bytes and was not read`);
+    if (query) {
+      const reply = readItemQueryReply(got.bytes, query);
+      if (!reply) throw failed("the reply does not match the bounded item query");
+      return reply as Answered<K>;
+    }
     let answer: unknown;
     try {
       answer = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(got.bytes));
@@ -96,6 +105,11 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
     settle: (scope, signed) => call("settle", `/${part(scope)}/settle`, null, { signed }),
     summary: (scope, reader) => call("summary", `/${part(scope)}`, reader),
     items: (scope, reader, type, cursor) => call("items", `/${part(scope)}/items/${part(type)}${page(cursor)}`, reader),
+    queryItems: (scope, reader, encoded) => {
+      const query = readItemQueryParameter(encoded);
+      if (!query || query.scope.scope !== scope || encoded.length > ITEM_QUERY_WIRE_BOUNDS.encodedChars) throw new TransportError("invalid bounded item query");
+      return call("queryItems", `/${part(scope)}/query-items?q=${encoded}`, reader, undefined, query);
+    },
     history: (scope, reader, cursor) => call("history", `/${part(scope)}/history${page(cursor)}`, reader),
     entry: (scope, reader, seq) => call("entry", `/${part(scope)}/entries/${seq}`, reader),
     outbox: (scope, reader, cursor) => call("outbox", `/${part(scope)}/outbox${page(cursor)}`, reader),

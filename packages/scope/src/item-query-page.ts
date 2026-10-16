@@ -2,14 +2,13 @@
  * owns its deadline and revalidates its supported frame before entering.
  * It repeats fresh final authentication before releasing these bytes. */
 import { ITEM_QUERY_BOUNDS as B, ITEM_QUERY_ORDER } from "@generalbusiness/dap-contract";
-import type { Digest, Item, ItemQuery, Read, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Item, ItemQuery, ItemQueryRead } from "@generalbusiness/dap-contract";
 import { canonicalize, encodeItemQuery, encodeItemQueryCursor, isItem, itemQueryArgument, itemQueryContinuation, itemQueryDigest, parseStrict, readItemQuery, utf8 } from "@generalbusiness/artroom-bytes";
 import { itemCandidates } from "./item-candidates.ts";
 import type { PreparedRead } from "./read-preparation.ts";
 import type { Sql } from "./sqlite.ts";
 
-interface ItemQueryValue { v: 1; scope: ScopeRef; query: Digest; argument: string; items: readonly Item[] }
-type Envelope = Extract<Read<ItemQueryValue>, { ok: true }>;
+type Envelope = Extract<ItemQueryRead, { ok: true }>;
 type Failure = "invalid-query" | "wrong-scope" | "invalid-cursor" | "stale-cursor" | "query-mismatch" | "unknown-type" | "unknown-state" | "query-not-ready" | "too-large" | "invalid-metadata" | "invalid-item" | "row-too-large" | "unavailable";
 export type ItemQueryPage = { ok: true; serialized: string } | { ok: false; reason: Failure };
 export interface ItemQueryPageWork {

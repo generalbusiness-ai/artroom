@@ -30,7 +30,7 @@ import { invitationIssueFields, invitationRedemptionFields } from "@generalbusin
  */
 
 import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, type EffectForm, type Entry, type FactRef, type FieldValue, type Founded, type Item, type KeyId, type PlatformDefinition, type ScopeId, type ScopeRef, type Seed, type SignedIntent, type Summary } from "@generalbusiness/dap-contract";
-import { READ_REFUSALS, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
   type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
@@ -1038,6 +1038,21 @@ export function act(ctx: Context, kind: string, options: { on?: string; target?:
     }
     const signed = await signedIntent(signer, { to: summary.scope, kind, on: target, fields, expected }, signing(ctx));
     return answered(scope, await handle.submit(signed, [], values.length > 0 ? { values } : {}), "Took effect");
+  });
+}
+
+/** One explicit bounded query page; no discovery scan or per-item detail reads. */
+export function items(ctx: Context, named: string, raw: string): Promise<Outcome> {
+  return run(async () => {
+    const query = readItemQuery(raw);
+    if (!query) return usage("--query needs canonical item-query JSON (at most 8192 UTF-8 bytes).");
+    const config = await configOf(ctx), scope = scopeNamed(config, named);
+    if (query.scope.scope !== scope) return usage("The query must name the selected scope's full reference.");
+    const reader = await readerOf(ctx, config), handle = await handleOf(ctx, config, scope, reader);
+    const page = await handle.queryItems(query);
+    if (!page.ok) return failed(`Item query refused: ${page.reason}. Coverage is incomplete.`);
+    return done(`Items of ${scope} at ${page.at.seq} (${page.at.hash}); selected suffix ${page.complete ? "complete" : "incomplete"}.`,
+      ...page.value.items.map(item => canonicalize(item)), ...(page.next === undefined ? [] : [`Next cursor: ${page.next}`]));
   });
 }
 

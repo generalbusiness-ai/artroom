@@ -173,3 +173,96 @@ This is an intermediate development commit, not a gate-frozen review
 head. Complete native composed counters/drift/visibility witnesses,
 all frontdoors and bounded SDK/CLI/Page consumers remain owed. No full
 gate or public Source approval is claimed. No push or deployment runs here.
+
+## Intermediate transport and consumer checkpoint
+
+The next preparation checkpoint adds the public transport paths on this
+isolated branch. It is still not an approved or gate-frozen candidate.
+Main has none of these new query routes. The earlier checkpoint inventory
+above describes `b07eca20`; the following describes its successor work.
+
+The Scope service and application entrypoints apply raw URL character and
+actual UTF-8 bounds before their outer URL parsers. Query routing admits
+one literal `q` and bounded authorization, then forwards the encoded bytes
+to the object's owner without query decoding or hashing. The HTTP route
+returns the owner's exact canonical envelope with `no-store`; query errors
+use the finite refusal/status mapping. The service binding keeps encoded
+query input and parses the trusted owner's bounded serialized result.
+
+The bytes package now checks reply size before strict parsing, canonical
+form, exact members, full scope/head, selection identity, exact argument,
+row order/state/type/IDs, the input suffix and the next cursor. HTTP reads
+at most 256 KiB before parsing; service-binding allocation remains the
+trusted producer's obligation. SDK handles and bindings have a finite
+10-second caller wait. `collectItemQuery` defaults to one page and retains
+explicit coverage. Explicit collection permits at most four attempts,
+1 MiB of conservative full-page reservations, 10 seconds and one drift
+restart. Restarts do not reset attempts, reservations or the original
+clock. Late completions start no further read. These are logical caller
+limits, not physical draining or end-to-end ingress guarantees.
+
+`dap items <scope> --query <canonical-item-query-JSON>` makes one query,
+prints the head and selected-suffix completeness, and keeps the next
+cursor visible. It discovers no inventory and fetches no per-item detail.
+This command does not implement the separate all-command JSON design.
+
+Planner decision `48a7e398` adopts listing-only no-N+1 scope. Page item
+selection replaces the old 100-page final-item scan with explicit bounds
+of four pages, 1 MiB and 10 seconds at one full scope and head. Incomplete
+or refused coverage raises `Unreadable`. Directory listing uses one
+bounded lane-index page and its advisory title/state; opening a row reads
+its current record. The screen labels this as the directory index.
+Retained comment-text requests remain separate, as adopted: neither the
+metadata query limit nor this change bounds a whole discussion load to
+10 seconds or 1 MiB. Lazy comment bodies remain a later item. Existing
+bootstrap/discovery summaries and legacy history consumers are not a new
+bounded query contract.
+
+Session preparation now returns a typed permission or availability
+refusal to its owner; its older boolean eligibility interface preserves
+its behavior. Native witnesses exercise a genuinely enrolled founder's
+issued session over HTTP, the service binding, signed SDK and CLI. Other
+restricted-claim inputs are explicitly minted policy tests. All URL
+frontdoors reject oversized input before URL parsing or namespace lookup.
+The native query meter observes actual SQL across caller and trusted
+proof/session-reference receiver objects, separates metadata/history/
+declaration/fold/body costs, and compares each phase with its reservation.
+Both cold and warm owners are checked; receiver construction and unrelated
+background work are excluded. Both own-genesis loads are observed when
+an incomplete signer index falls back to the exact genesis root.
+
+The complete query continuation is checked with an explicit clock and a
+held actual directory reply. Caller timeout retains the pending slot,
+refuses another query without further SQL, and discards a late reply
+without installing membership authority; a later new operation resolves
+the directory again. Scripted changes to real native metadata and support
+after the peer wait prevent page reads. Expiry or MAC-secret replacement
+after the last page-body SQL prevents releasing the page. The exact
+256-KiB full envelope and a one-byte larger refusal also run through the
+actual signed query owner; its large native rows are synthetic boundary
+inputs, not claimed as judged opening histories.
+
+Focused checks pass for the three native issued/signed transport cases,
+three actual-work cases, two full-continuation cases, three URL/frontdoor
+cases, two reply-codec cases and three SDK/collection cases. The Page
+native story checks one directory query with no per-lane reads; its
+malformed-selection adapter now mutates canonical query envelopes as well
+as summaries. Seven existing Page boundary cases and the new directory
+prefix case pass. Initial fixture failures and changed protocol adapters
+were corrected; none is a gate pass.
+
+Two focused controls distinguish removal of the final authority check
+and removal of pending ownership, by assertion failures on expired-page
+release and a second query's admission. The first call-budget control
+survived because its stand-in reached the independent 512-KiB metadata
+ceiling at the same 128th call. Isolating the call reservation with zero
+metadata makes raising 128 to 129 distinguish by assertion. All controls
+restore Source; there is no mutation sweep.
+
+A full typecheck found three hand-built Page fixture values missing the
+new directory binding; their explicit null bindings are now supplied.
+Package typechecks pass after correction. Rendered QA, the final selected
+checks and one full gate at the frozen Source head remain owed. The
+Browser plugin and `browser` skill are absent; rendered QA will use the
+existing cached Playwright 1.63.0 installation outside the checkout.
+No package probe was installed, and no push or deployment ran.

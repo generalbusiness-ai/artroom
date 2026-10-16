@@ -5,7 +5,7 @@
 
 import { enrolAgentKey, invitePerson } from "./invitations.ts";
 import { AGENT_KEY_LINK } from "@generalbusiness/artroom-client";
-import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, join, log, merge, planInstall, propose, remote, show, verify, type Context, type InstallCohort, type Outcome } from "./commands.ts";
+import { act, acts, claim, clone, edit, install, installPlanned, invite, issueAssign, issueClose, issueComment, issueOpen, issues, items, join, log, merge, planInstall, propose, remote, show, verify, type Context, type InstallCohort, type Outcome } from "./commands.ts";
 
 export const USAGE = [
   "Usage:",
@@ -20,6 +20,7 @@ export const USAGE = [
   "  dap act <kind> --on <scope> [--target <item>] [--set name=value ...] [--value <file> ...]",
   "  dap log <scope> [--limit n]",
   "  dap show <scope>:<seq>",
+  "  dap items <scope> --query <canonical-item-query-JSON>",
   "  dap verify <scope>",
   "  dap verify --all",
   "  dap remote",
@@ -62,7 +63,7 @@ export function parse(argv: readonly string[]): { words: string[]; flags: Map<st
 }
 
 const KNOWN: Record<string, readonly string[]> = {
-  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours", "keep", "check", "continue"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
+  install: ["host", "namespace", "plan", "planned", "cohort"], create: ["handle", "branch", "again"], found: ["handle", "branch", "again"], claim: ["handle", "branch", "again"], invite: ["role", "acts", "hours", "keep", "check", "continue"], join: ["check"], acts: [], act: ["on", "target", "set", "value"], log: ["limit"], items: ["query"], show: [], verify: ["all"], remote: [], clone: ["hours"], edit: ["file", "title", "closes"], propose: ["title"], merge: ["closes"], issue: ["title", "body"], issues: [],
 };
 
 /** Runs one command line with the given context. */
@@ -103,6 +104,7 @@ export async function command(ctx: Context, argv: readonly string[]): Promise<Ou
     case "acts": return acts(ctx, first);
     case "act": return first === undefined ? needs("an act kind") : act(ctx, first, { ...(flag("on") ? { on: flag("on")! } : {}), ...(flag("target") ? { target: number("target")! } : {}), set: parsed.flags.get("set") ?? [], value: parsed.flags.get("value") ?? [] });
     case "log": return log(ctx, first, { ...(flag("limit") ? { limit: number("limit")! } : {}) });
+    case "items": return first === undefined || flag("query") === undefined ? needs("a scope and --query JSON") : items(ctx, first, flag("query")!);
     case "show": return first === undefined ? needs("an entry") : show(ctx, first);
     case "remote": return first === undefined ? remote(ctx) : { code: 2, lines: ["remote takes no argument.", USAGE] };
     case "clone": return clone(ctx, first, { ...(flag("hours") ? { hours: number("hours")! } : {}) });
