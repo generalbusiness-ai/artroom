@@ -2,7 +2,7 @@
  * Diagnoses, and the redactor (authority note, section 5.3; proof plan, key
  * O3, "Safe sinks at the boundary"; I3 plan, step 20). It is the reviewed
  * successor of the earlier Room's diagnoses
- * (`notes/2026-10-05-i3-host-review.md`, section 4).
+ * (`notes/reviews/2026-10-05-i3-host-review.md`, section 4).
  *
  * A diagnosis is one line in the runtime's log for a failure at a port that
  * no entry and no answer describes, such as an outside call that threw. It

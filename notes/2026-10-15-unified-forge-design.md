@@ -284,7 +284,7 @@ erasure of history or automatic reversal of storage changes.
 These capabilities can join the same record and navigation model when
 implemented. Their absence must not block useful issue/change/source
 journeys, or be concealed by static success badges. The older
-[repository-to-live-site plan](../plans/020-2026-10-05-repository-to-live-site.md)
+[repository-to-live-site plan](plans/020-2026-10-05-repository-to-live-site.md)
 is intent, not delivered deployment management.
 
 ## 5. Derive view priorities from questions and reliable facts
@@ -634,7 +634,7 @@ explains the relationship; opening a node opens its canonical home.
 
 Use the existing [brand guidance](../brand/GUIDELINES.md),
 [tokens](../brand/tokens.css), and actual Page components. The earlier
-[027 review](../plans/027-artroom-usability/v2/design-review.md) remains
+[027 review](plans/027-artroom-usability/v2/design-review.md) remains
 useful for one-home-per-fact, exact-subject, and decision-point principles.
 Its violet visual specification has been overtaken by the current brand.
 This note does not select a new frontend framework or replace the shell.

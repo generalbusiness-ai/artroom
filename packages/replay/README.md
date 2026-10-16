@@ -6,8 +6,8 @@ states its mode, its target, what it covered and what it took on trust.
 
 The scope and replay contract is the authority, in its sections 9.3 to 9.5.
 Where the contract was silent,
-`notes/2026-10-04-i1-contract-deltas.md` records what was implemented, in
-its section "Replay", and `notes/2026-10-05-i2-contract-deltas.md` in its
+`notes/implementation/2026-10-04-i1-contract-deltas.md` records what was implemented, in
+its section "Replay", and `notes/implementation/2026-10-05-i2-contract-deltas.md` in its
 entries DJ10 and DJ14.
 
 This package does not import the scope runtime. A replay derives each entry

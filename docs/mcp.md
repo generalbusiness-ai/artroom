@@ -15,7 +15,7 @@ line's `artroom` alias. `DAP_HOME` selects the config directory, with
 one resolved directory; conflicting variables refuse before either store
 is accessed. [The CLI guide](cli.md) describes new defaults and discovery of
 legacy custody. Plan 031 is its design; the
-delivery note `notes/2026-10-13-mcp-generic-delivery.md` says what was built
+delivery note `notes/implementation/2026-10-13-mcp-generic-delivery.md` says what was built
 and what ran.
 
 ## Connect an agent host

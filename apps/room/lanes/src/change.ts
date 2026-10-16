@@ -13,14 +13,14 @@
  * and its send, which authority revision 28 asks of a `reserve`; the act
  * `ask-rules`; the fields of the rules scope's `rules` update that the lane
  * did not declare; and the extent that a review counts for. The note
- * `notes/2026-10-07-i5-lane-wiring-delivery.md` lists them for the lane
+ * `notes/implementation/2026-10-07-i5-lane-wiring-delivery.md` lists them for the lane
  * forms' owner.
  *
  * Rows marked "i5 edit" are not rows of an adopted revision either. They are
  * the smallest form of plan 025's "edit a page": the act `propose-file`, the
  * manifest's slots `path`, `digest` and `size`, and the manifest's
  * integration commit and tree made optional. The
- * note `notes/2026-10-07-i5-edit-page-delivery.md` lists them.
+ * note `notes/implementation/2026-10-07-i5-edit-page-delivery.md` lists them.
  *
  * Some values are the lane forms' examples, and some names are assumed
  * (their section 3): a hold's 3,600 seconds, a job's 1,800 seconds, the text maxima and integer

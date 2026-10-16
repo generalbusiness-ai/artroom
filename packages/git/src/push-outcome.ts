@@ -3,7 +3,7 @@
  * (authority note, section 6.6, step 4; section 5.7, "Evidence of each
  * outside effect"; scope contract, section 4.3). It is the reviewed
  * successor of the earlier publisher's classifier
- * (`notes/2026-10-05-i3-git-review.md`, section 4). Pure: no clock, no
+ * (`notes/reviews/2026-10-05-i3-git-review.md`, section 4). Pure: no clock, no
  * storage, no network.
  *
  * Section 6.6 gives a send one of three classes, and says what each

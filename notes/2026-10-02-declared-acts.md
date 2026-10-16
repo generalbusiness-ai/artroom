@@ -1652,7 +1652,7 @@ section 13): claim, workspace and push, propose with pinning, review and
 one check from a real runner, a safe land, the attention queue, and
 `artroom verify` on a fresh clone, run by two agents. The spike deployment
 already ran that loop live over HTTPS and MCP on 2026-10-02
-([2026-10-01-deploy-spike.md](2026-10-01-deploy-spike.md), "Review and check, live"). Whether
+([2026-10-01-deploy-spike.md](implementation/2026-10-01-deploy-spike.md), "Review and check, live"). Whether
 the rest of gate 1 is met is not judged here.
 
 Declared acts change the room's admission path, the envelope, the

@@ -386,7 +386,7 @@ read is bounded and fits current custody (Q10).
 | Row of a lane | Partition from the lane's genesis (`directoryOf`); `lookup("lane", "seed", digest, 2)`, where the digest is decoded from the lane's scope ID | One entry read, one key seek, one body |
 | Row for an `index` | The same lookup replaces `rowOf` in `index-row` and `index-number` | One key seek |
 | Partition list | Root `page("partition", ["active", "sealed"], after, 100)` | Rows returned |
-| Lanes of the room | For each partition in order, the bounded item query of `notes/2026-10-15-item-query-page.md` on `("lane", ["listed"])` | Rows returned |
+| Lanes of the room | For each partition in order, the bounded item query of `notes/implementation/2026-10-15-item-query-page.md` on `("lane", ["listed"])` | Rows returned |
 
 `lookup` reads at most `limit` key rows after two count reads
 (`sqlite.ts:287-291`). If it returns null, the index does not cover every

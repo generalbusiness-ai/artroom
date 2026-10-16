@@ -2,8 +2,8 @@
 
 2026-10-01. Revision 2, recording hugh's decisions (section 9).
 Revision 3, 2026-10-04: reconciled with the reviewed clarification
-`plans/008-2026-10-03-wake-and-schedule-clarification.md` and the
-attention handoff `plans/007-2026-10-03-attention-runtime-handoff.md`,
+`notes/plans/008-2026-10-03-wake-and-schedule-clarification.md` and the
+attention handoff `notes/plans/007-2026-10-03-attention-runtime-handoff.md`,
 under request `50d7806a`. The same day, the planner's direction
 `fceb27d0` on that revision's open points was applied. Answers hugh's
 question: what is the simple version of "trigger this agent when X

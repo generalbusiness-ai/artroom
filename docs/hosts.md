@@ -150,7 +150,7 @@ host's form.
 - A fork for each hold. Each destination has the one repository. The room
   records a hold's fork and token operations. The design is plan 029; the
   measured cost of a fork is in
-  [the measurement note](../notes/2026-10-13-fork-cost-measurement.md).
+  [the measurement note](../notes/implementation/2026-10-13-fork-cost-measurement.md).
 - A sweep for a repository whose creation answer was lost. Its outcome
   stays unknown, the next attempt uses a new name, and the earlier
   repository and its write token are not cleaned up.

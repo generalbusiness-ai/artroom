@@ -2,7 +2,7 @@
  * The runner's boundary (authority note, sections 3.11, 5.3 and 5.5): what
  * one runner is, what goes into it, and the one way out of it. It is the
  * reviewed successor of the earlier sandbox
- * (`notes/2026-10-05-i3-checkers-review.md`, section 3).
+ * (`notes/reviews/2026-10-05-i3-checkers-review.md`, section 3).
  *
  * **One job, one runner.** A runner is a new container, started from the
  * image that the configuration names by its content digest, with exactly

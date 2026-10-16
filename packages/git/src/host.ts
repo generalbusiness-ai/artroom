@@ -2,7 +2,7 @@
  * The host port, and the driver of the token ledger (authority note,
  * sections 5.3, 5.4 and 5.7; I3 plan, step 19). It is the reviewed
  * successor of the earlier mint ledger and host adapter
- * (`notes/2026-10-05-i3-host-review.md`).
+ * (`notes/reviews/2026-10-05-i3-host-review.md`).
  *
  * A token is minted and revoked at a Git host as two operations of the
  * ledger of outside effects, which the scope keeps (`derive/src/ledger.ts`,

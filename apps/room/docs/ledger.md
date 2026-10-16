@@ -2,7 +2,7 @@
 
 2026-10-09. Builder, lane M; request `db2fd1468ed09aecd51bbec3a89a45cb373b91a2`, promise `a0f035779000bc061e6d08078e1f99ec8c09007d`. Source baseline main `9d7e4c2777ea8d35441b4a9d79b407cd701065fa`.
 
-The approved plan at `1c27b35a` contains 67 unique section-4 pages. Every page below remains owed until its complete outcome and acceptance are met. Five model explanations now have complete draft prose; the current command-line guide remains a draft capability increment. Neither is a substituted quickstart or complete manual. Original page names and order are retained from [the current inventory](../../../plans/025-2026-10-06-current-manual-inventory.md).
+The approved plan at `1c27b35a` contains 67 unique section-4 pages. Every page below remains owed until its complete outcome and acceptance are met. Five model explanations now have complete draft prose; the current command-line guide remains a draft capability increment. Neither is a substituted quickstart or complete manual. Original page names and order are retained from [the current inventory](../../../notes/plans/025-2026-10-06-current-manual-inventory.md).
 
 Current four-guide increment: request `f1ee379395398cebc907a984d2cae43130174134`,
 own promise `db728db7b6ba2418d62b152b6feba04bcbdf2d81`, from receiving main
