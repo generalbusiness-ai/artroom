@@ -2,7 +2,7 @@
 // private recording or published melody supplies these live/clip defaults.
 import type { HummedNote, Onset } from './interpret.ts';
 
-// Exact retained fixtures from spikes/j2/themes.json (synthetic-c and
+// Exact retained fixtures from the J2 spike's themes.json (synthetic-c and
 // synthetic-eb), authored for this application's J2 harness.
 export const ORIGINAL_TUNES: { id: string; label: string; notes: HummedNote[] }[] = [
   { id: 'synthetic-c', label: 'Original C phrase', notes: [
