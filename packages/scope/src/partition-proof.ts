@@ -3,7 +3,7 @@
 import type { DeclaredDefinition, FactRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, definitionDigest, isDigest, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, same } from "@generalbusiness/dap-derive";
-import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, partitionDeclaredCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, partitionDeclaredCreationPolicy, partitionSourceName, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
 import type { NativeBirth, NativeBirthSource } from "./native-birth.ts";
 import { readNativeBirth } from "./native-birth.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
@@ -178,6 +178,19 @@ export class PartitionProofOperation {
     try {
       const source = await this.#collection.exact(from);
       return source && await this.#collection.lane(from.at) ? this.#collection.finish(source) : null;
+    } catch { return null; }
+  }
+  /** A complete invalid lineage stays declared. Missing or exhausted proof
+   * stays unavailable. Partial raw frames never confer an identity. */
+  async declaredIdentity(from: FactRef): Promise<{ under: string; proof: PartitionProof } | null> {
+    if (!isFactRef(from) || from.at.kind !== "lane") return null;
+    try {
+      const source = await this.#collection.exact(from);
+      if (!source || source.native || !isDigest(source.named)) return null;
+      await this.#collection.lane(from.at);
+      const proof = this.#collection.finish(source, true);
+      const under = proof && partitionSourceName(source.named, source.declarationName, from.at, proof.frames);
+      return under !== null && proof ? { under, proof } : null;
     } catch { return null; }
   }
   async receiver(at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> {

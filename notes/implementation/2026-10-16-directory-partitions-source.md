@@ -337,3 +337,25 @@ factory cases pass after this refactor. Disabling birth-request sharing
 makes the concurrency witness observe fourteen calls instead of eight;
 the distinguishing control restores the source. No runtime admission uses
 this operation yet.
+
+## Receiver read and retention boundary
+
+An isolated `ReceiverReads` opens from a receiver's checked birth policy.
+For partition-v1 it may derive an issue or change label from the bounded
+raw lineage; it keeps the authenticated producer alias as private transient
+metadata. Ordinary producer reads and the global source-name policy remain
+unchanged. Reusing retained facts derives their labels again under the
+current receiver operation. Missing or exhausted proof stays unavailable.
+A complete invalid candidate stays declared.
+
+`fetchFacts` carries that private producer alias to `used`, which retains
+it with the original entry bytes. The four focused collector/read cases
+pass, and scope typechecking passes. The new case uses scripted RPC and
+storage maps, not native creation or handler authority. It distinguishes
+promoting the read, persisting the original `declared:change` alias,
+reinterpreting retained bytes without changing them, keeping a later
+ordinary producer read declared, and refusing cached interpretation after
+the operation deadline. Persisting the receiver label instead fails this
+case; the control restores the source. No production admission calls
+`ReceiverReads` yet, so delivery, act, result, driver and replay integration
+remain owed.

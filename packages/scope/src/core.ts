@@ -12,6 +12,7 @@ import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlat
 import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
+import { producerName } from "./receiver-facts.ts";
 import { namedBy } from "./definitions.ts";
 import type { Asked, DefinitionRead, Further, Ports, Standing } from "./ports.ts";
 import type { Retained, Sealed, Store } from "./store.ts";
@@ -55,11 +56,11 @@ export const ownOf = (store: Store): Own => (seq) => {
 };
 
 /** Section 9.2: the bytes of each foreign entry the draft's `uses` name, under its content digest. */
-export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
+export function used(draft: Pick<Draft, "uses">, facts: readonly Fetched[]): Retained[] {
   return draft.uses.map((use) => {
     const read = facts.find((f) => f.fact.hash === use.fact.hash);
     if (!read) throw new Error(`the foreign entry ${use.fact.hash} was not fetched before the turn`);
-    return { kind: "entry", digest: use.content, bytes: canonicalize(read.entry), under: read.under };
+    return { kind: "entry", digest: use.content, bytes: canonicalize(read.entry), under: producerName(read) };
   });
 }
 
@@ -69,7 +70,7 @@ export function used(draft: Draft, facts: readonly Fetched[]): Retained[] {
  * again (sections 6.6 and 7.4). One that is missing is left out, and the
  * clause is then not judged.
  */
-export function retainedFacts(store: Store, entry: Entry): Fetched[] {
+export function retainedFacts(store: Pick<Store, "retained">, entry: Pick<Entry, "uses">): Fetched[] {
   return entry.uses.flatMap((use): Fetched[] => {
     const kept = store.retained("entry", use.content);
     return kept ? [{ fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" }] : [];

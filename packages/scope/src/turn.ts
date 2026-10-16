@@ -18,6 +18,7 @@
  */
 
 import type { Bounds, FactRef, Head, Prepared, SignedIntent } from "@generalbusiness/dap-contract";
+import { carryProducerName } from "./receiver-facts.ts";
 import { CanonicalError, canonicalize, entryHash, parseStrict, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { applyEntry, clockOf, entryOf, fits, isEntryOf, isIntent, judgeTimed, nextDue, StandingError, timeMs, timeOf } from "@generalbusiness/dap-derive";
 import type { Clock as Reading, Draft, Due, Fetched, Owners, PlatformRules, RuleInput, StateView, ValidDefinition } from "@generalbusiness/dap-derive";
@@ -58,7 +59,7 @@ export async function within<T>(work: () => Promise<T>, seconds: number): Promis
 export async function fetchFacts(resolver: Resolver, bounds: Bounds, named: readonly FactRef[]): Promise<Fetched[] | null> {
   const read = await Promise.all(named.map(async (fact): Promise<Fetched | null> => {
     const found = await within(() => resolver.read(fact, bounds.fetchSeconds), bounds.fetchSeconds);
-    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? { fact, entry: found.entry, under: found.under } : null;
+    return found !== LATE && found !== null && "entry" in found && isEntryOf(found.entry, fact) ? carryProducerName({ fact, entry: found.entry, under: found.under }, found) : null;
   }));
   return read.every((f) => f !== null) ? read : null;
 }
