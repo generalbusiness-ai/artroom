@@ -276,6 +276,21 @@ caller's `idempotencyKey`, in the config directory's
   `private/mcp-custody/capacity.lease.reclaim`), so its length does not
   depend on the home's. Archival reads each record again under its lock and
   skips one that is no longer terminal.
+  If a recorded PID has been reused by another user's process, a process
+  check can return `EPERM` (permission denied). The server treats that as
+  alive and leaves the lock in place; `blockedBy` can return no reclaim
+  path even when an old file blocks recovery. A deadline or an old file
+  time does not establish that the lock is safe to remove.
+
+  To recover, stop every process using the selected config directory.
+  Identify the exact lock or lease under `private/mcp-custody` and verify
+  that its original holder is gone, no process uses this store, and the
+  file still contains the same holding. Have an administrator check
+  process ownership if permission prevents that check. Once those facts
+  are established, remove only the verified stale lock or reclaim file.
+  Keep the records, segments, archives and their indexes. Restart the
+  server and check the retained original request. If ownership or a
+  stopped store cannot be verified, leave the lock in place.
 - **Steps with no act.** `prepare` without `kind` sends a capability step
   that has no act, such as hold@1's instance: the step's own intent, kept
   under custody under the caller's key, with its answers kept as the step's.
