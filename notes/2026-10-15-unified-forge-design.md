@@ -86,24 +86,24 @@ deployed availability or completed user acceptance.
 | Area | Available foundation | Gap affecting the interface |
 |---|---|---|
 | Room | One fixed repository and branch, with membership, rules, and destination references in the [directory](../packages/platform/src/directory.ts) | Cross-room discovery and context are separate product work |
-| Work | Native [issue](../packages/lanes/src/issue.ts) conditions, commitments, plans, concerns, reports, and requester judgments | Most deeper coordination remains outside the ordinary Page journey |
-| Changes | [Manifests](../packages/lanes/src/change.ts) identify immutable proposal versions, reviews, jobs, and publication relationships | A retained one-file proposal and a Git-tree proposal have different source representations |
+| Work | Native [issue](../apps/room/lanes/src/issue.ts) conditions, commitments, plans, concerns, reports, and requester judgments | Most deeper coordination remains outside the ordinary Page journey |
+| Changes | [Manifests](../apps/room/lanes/src/change.ts) identify immutable proposal versions, reviews, jobs, and publication relationships | A retained one-file proposal and a Git-tree proposal have different source representations |
 | Native reads | [Scope API](../packages/contract/src/transport.ts) exposes summary, final-item pages, history, entries, duties, logs, and retained inputs | No generic public relationship enumeration, room search, or arbitrary aggregate query |
 | Counts and storage | Summary has exact type/state counts; [SQLite](../packages/scope/src/sqlite.ts) has state and immutable-key indexes, plus internal bounded metadata helpers | Filtered cross-scope totals, relationship indexes, and public query integration remain owed |
 | Read authority | Existing sessions and signed reads enforce eligibility | [Recent-signer eligibility](../packages/scope/src/signed-reads.ts) can still scan history; an internal metadata seek alone does not make an authenticated query bounded |
-| Page | [Room shell](../packages/page/src/main.ts), issue/change lists, contextual forms, focus restoration, and exact review safeguards | Lists materialize lanes before filtering; no shared graph/tree/diff navigation context |
+| Page | [Room shell](../apps/room/page/src/main.ts), issue/change lists, contextual forms, focus restoration, and exact review safeguards | Lists materialize lanes before filtering; no shared graph/tree/diff navigation context |
 | Client recovery | Specialized join/Start custody, context-bound drafts, and settlement interfaces exist | Ordinary Page actions and retained edits do not yet have complete durable reload recovery |
 | Git | [Reader](../packages/git/src/reader.ts) verifies bounded objects, trees, refs, and ordered parents; isolated and [edit-base](../packages/git/src/edit-base.ts) retrieval helpers exist | No general authenticated history, tree, diff, search, or blame projection; partial helpers have not switched production callers |
 | Published content | [Site routes](../packages/scope/src/site/route.ts) serve receipt-authorized immutable publications, directories, Markdown, and downloads | Publication access is not permission to browse arbitrary repository objects or unpublished work |
 | Checks and effects | Jobs name exact subjects and configurations; Git publication has owned attempts, receipts, and unknown-outcome handling | The [checker runner](../packages/checkers/src/service.ts) has no production adapter; general automation and deployment management remain separate contracts |
 | Applications | Declared application scopes, generic act discovery, and configured inventory exist | Complete installable packages, shared projections, and isolated presentations are the [approved destination](2026-10-15-self-contained-applications.md), not implemented capabilities |
 
-The current [Page data layer](../packages/page/src/data.ts) rejects
+The current [Page data layer](../apps/room/page/src/data.ts) rejects
 incomplete or mixed-head enumeration, but can discard useful partial
 results. It also conflates failed text reads with absent text. Richer
 views must resolve these distinctions rather than inherit ambiguous data.
 
-The [current routes](../packages/page/src/shell.ts) do not encode a full
+The [current routes](../apps/room/page/src/shell.ts) do not encode a full
 room/version/path/comparison context. Existing per-tab preferences and
 review safeguards are useful foundations, not the shared navigation
 contract specified below.
