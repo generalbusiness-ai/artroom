@@ -22,8 +22,14 @@ test then fails because the tool description contains the sentinel; the
 existing unknown-form assertion also fails. The control restores source.
 No mutation sweep has run.
 
-The source is frozen for one gate before review. The exact gate head,
-tree and terminal outcome will accompany the final review artifact.
+The gate passes at `9b995c5bd9cff71e675fd6083b7c599613dd84a9`, tree
+`e50fc7bc07740cd45e2a533cacad96270daa6fd3`, with no changed files.
+Whitespace exits 0 in 0.1 seconds, typecheck exits 0 in 7.4 seconds, and
+tests exit 0 in 207.4 seconds: 1,336 Vitest tests pass with 3 skipped,
+followed by 16 Node checks and 55 Counter browser module checks passing.
+The final reporting successor changes only this note; source, tests,
+generated assets, manifests and lockfile remain equal to the passing gate
+head. It does not repeat the gate.
 Dependencies came from the unchanged pinned lock with `npm ci
 --ignore-scripts` and the normal pool preparation. No probing tool changed
 a manifest or lockfile. No push or deployment runs here.
