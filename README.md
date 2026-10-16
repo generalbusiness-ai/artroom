@@ -4,7 +4,7 @@ A durable action platform for people and agents.
 
 * Web site: [https://dap.generalbusiness.ai](https://dap.generalbusiness.ai/)
 * Blog post: [Software and the Cauldron](https://generalbusiness.ai/blog/2026-10-14-baby-cauldron/), ([repo copy](notes/2026-10-14-blog-post-baby-cauldron.md)), including three demo videos
-* Source code: [https://github.com/generalbusiness-ai/dap](https://github.com/generalbusiness-ai/dap)
+* Source code: [https://github.com/generalbusiness-ai/dap](https://github.com/generalbusiness-ai/dap) ([tag at be7d3df](https://github.com/generalbusiness-ai/dap/tree/be7d3df) is a [contest submission](https://www.cloudflare.com/git-competition/))
 
 Most software development problems are collaboration problems.
 
@@ -64,10 +64,10 @@ Dap was built with the help of several concurrent coding agents, using
   and [Lanes](apps/room/docs/lanes.md).
   [Concurrent changes are settled by reservation and judgment, not by merging.](docs/demo.md#what-the-concurrency-shots-show)
   Its definitions are in [packages/platform](packages/platform) and
-  [packages/lanes](packages/lanes).
+  [apps/room/lanes](apps/room/lanes).
 - **dap-counter** keeps a shared count. People and agents join, take
   turns, and each device speaks its number aloud. The source is in
-  [examples/counting](examples/counting), and the tutorial
+  [apps/counter](apps/counter), and the tutorial
   [Build a counter](docs/build-a-counter.md) builds a smaller version of
   its definition.
 - **dap-library** is a lending library for kitchenware and tools. Members
