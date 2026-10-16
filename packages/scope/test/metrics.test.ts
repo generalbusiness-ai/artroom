@@ -56,15 +56,16 @@ test("tainted fields and invalid numeric domains reach only the bounded loss sum
 test("bounded aggregation preserves every native end, sums wrote flags and records coarsening, saturation and mixed loss once", () => {
   const { metrics, points, summary } = recorder(6);
   // More than 64 distinct groups force reason, answer, then place coarsening.
-  const turnPlaces = ["acts", "preparations", "found", "dispatch", "alarm"];
+  const turnPlaces = ["acts", "preparations", "found", "rpc:acts", "rpc:preparations", "rpc:found"];
   const refusalReasons = ["revision-moved", "alias", "duplicate-relation", "required-unset", "scope-full", "bad-intent", "misaddressed", "expired", "scope-refused", "unknown-act", "bad-field", "no-item", "final", "fact-mismatch", "unauthorized", "guard-failed", "capability-refused", "slot-full", "type-full", "entry-too-large"];
   for (const place of turnPlaces) for (const reason of refusalReasons)
     metrics.emit({ kind: "turn", place, end: "answer", answer: "refused", reason, duration: 1, a: 1, b: 1, c: 1, flag: 1 });
-  for (const place of turnPlaces) for (const answer of ["accepted", "refused", "unavailable", "mismatch", "none"])
+  for (const place of turnPlaces) for (const answer of ["accepted", "refused", "unavailable", "mismatch"])
     metrics.emit({ kind: "turn", place, end: "answer", answer, duration: 1, a: 1, b: 1, c: 1, flag: 1 });
+  for (const place of ["dispatch", "alarm"]) metrics.emit({ kind: "turn", place, end: "answer", duration: 1, flag: 1 });
   for (const end of ["idle", "busy", "clock-behind", "unavailable"]) for (const place of turnPlaces) metrics.emit({ kind: "turn", place, end });
-  metrics.emit({ kind: "turn", place: "acts", end: "answer", a: METRIC_MAX, flag: 1 });
-  metrics.emit({ kind: "turn", place: "acts", end: "answer", a: METRIC_MAX, flag: 1 });
+  metrics.emit({ kind: "turn", place: "acts", end: "answer", answer: "accepted", a: METRIC_MAX, flag: 1 });
+  metrics.emit({ kind: "turn", place: "acts", end: "answer", answer: "accepted", a: METRIC_MAX, flag: 1 });
   metrics.emit({ kind: "turn", place: "acts", end: "busy", reason: "a token is not a reason" });
   metrics.sidecar(true, true);
   for (let i = 0; i < 20; i++) metrics.emit({ kind: "route", place: "acts", end: "ok", reason: "2xx", answer: "turn" });
@@ -74,8 +75,8 @@ test("bounded aggregation preserves every native end, sums wrote flags and recor
   expect(turns.map(p => p.blobs[4]).sort()).toEqual(["answer", "busy", "clock-behind", "idle", "unavailable"]);
   const answer = turns.find(p => p.blobs[4] === "answer")!;
   expect(answer.blobs[3]).toBe("mixed"); expect(answer.blobs[5]).toBe("aggregated"); expect(answer.blobs[8]).toBe("mixed");
-  expect(answer.doubles[0]).toBe(turnPlaces.length * (5 + refusalReasons.length) + 2);
-  expect(answer.doubles[5]).toBe(turnPlaces.length * (5 + refusalReasons.length) + 2);
+  expect(answer.doubles[0]).toBe(turnPlaces.length * (4 + refusalReasons.length) + 4);
+  expect(answer.doubles[5]).toBe(turnPlaces.length * (4 + refusalReasons.length) + 4);
   expect(answer.doubles[2]).toBe(METRIC_MAX);
   expect(summary().doubles[1]).toBe(31);
   expect(summary().doubles[4]).toBeGreaterThanOrEqual(answer.doubles[0]!);
@@ -92,6 +93,8 @@ test("turn priority keeps native outcomes within the invocation cap and optional
   expect(points[0]!.blobs[0]).toBe("turn");
   expect(points[0]!.doubles).toEqual([METRIC_POINTS * 2, 0, 0, 0, 0, METRIC_POINTS * 2]);
   expect(points.at(-1)!.blobs[0]).toBe("metric-dropped");
+  // Repeated events in the same exact group preserve resolution.
+  expect(points.at(-1)!.doubles.slice(3)).toEqual([0, 0, 0]);
   for (const binding of [undefined, { writeDataPoint: () => { throw Error("private sink failure"); } }, { writeDataPoint: () => new Promise(() => {}) }, { writeDataPoint: () => Promise.reject(Error("private sink failure")) }]) {
     const sink = new Metrics(context, binding);
     sink.emit({ kind: "turn", place: "alarm", end: "unavailable" });
@@ -116,4 +119,18 @@ test("request identity is server-minted independently of strictly parsed version
   expect(await response.text()).toBe(bytes); expect(response.status).toBe(201);
   expect(response.headers.get("dap-request-id")).toBe(valid.request); expect(response.headers.get("tracestate")).toBeNull();
   expect(response.headers.get("traceparent")).toBe(valid.traceparent);
+});
+
+test("a correlated diagnosis reads no provider text and maps dynamic steps to the closed other place", async () => {
+  const { measuredSync, operationContext } = await import("../src/operational.ts");
+  const { report } = await import("../src/diag.ts");
+  const points: MetricPoint[] = [], logged: unknown[] = [];
+  let messageReads = 0;
+  const thrown = new Error();
+  Object.defineProperty(thrown, "message", { get() { messageReads++; throw Error("Provider text must not be read"); } });
+  const ctx = operationContext({ DEPLOYMENT: "diagnosis-test", METRICS: { writeDataPoint: p => points.push(structuredClone(p)) } }, context.scope, "dispatch", { request: context.request, trace: null });
+  measuredSync(ctx, () => report(value => logged.push(value), "outside-call-failed", "hold@1:mint", thrown));
+  expect(messageReads).toBe(0);
+  expect(logged).toEqual([{ event: "outside-call-failed", step: "hold@1:mint", name: "Error", request: context.request }]);
+  expect(points[0]!.blobs).toEqual(["diagnosis", "diagnosis-test", "unknown", "other", "error", "outside-call-failed", context.request, "none", "none"]);
 });

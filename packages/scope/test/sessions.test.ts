@@ -14,7 +14,8 @@ import { later, net, soon } from "./net.ts";
 import { office, repository, rita, routed, una, type Platform } from "./repository.ts";
 import { reader } from "./support.ts";
 import { beginSessionChild, beginSessionFixture, type SessionOwner } from "./session-settings.ts";
-import { TEST_DEPLOYMENT, platformNet, type PlatformScope } from "./worker.ts";
+import type { MetricPoint } from "../src/metrics.ts";
+import { TEST_DEPLOYMENT, metricBindings, platformNet, type PlatformScope } from "./worker.ts";
 
 // Every scope here is on real Durable Object storage, in the namespace `PLATFORM`, under the production authority. The read sessions are
 // the real ones of `sessions.ts`, through the Worker's routes, under a TEST SECRET that each test generates. The stand-ins are those that
@@ -85,6 +86,8 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
     try {
       const { M, unasInbox, unasKey } = await repository();
       const other = (await office()).M;
+      const metrics: MetricPoint[] = [];
+      metricBindings.set(M.object.id.toString(), { DEPLOYMENT: "session-metrics-test", METRICS: { writeDataPoint: p => metrics.push(structuredClone(p)) } });
       const m = await M.at();
       const issued = soon(600);
       const [unas, ritas] = [await session(owner, M, una), await session(owner, M, rita)];
@@ -94,7 +97,7 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
       // session may ask for `credential`, the one-time read of a read token, which the destination answers only to the signing key.
       const reads = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
       expect(unas.claims).toEqual({ v: 1, deployment: TEST_DEPLOYMENT, membership: m, member: "@una", key: una.key, reads, ends: issued });
-      expect([ritas.claims.member, ritas.claims.reads]).toEqual(["@rita", [...reads, "incidents", "waiting"]]);
+      expect([ritas.claims.member, ritas.claims.reads]).toEqual(["@rita", [...reads, "incidents", "waiting", "requests"]]);
       // The token is in no text form of a session.
       expect(`${JSON.stringify(unas)} ${String(unas)}`).not.toContain("ars1.");
 
@@ -118,6 +121,16 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
         [200, "ok"], [200, "ok"], [200, "ok"], [403, "forbidden"], [403, "forbidden"], [403, "forbidden"], [403, "forbidden"], [403, "forbidden"], [403, "forbidden"],
         [403, "forbidden"], [403, "forbidden"], [200, "ok"], [200, "ok"],
       ]);
+      // The new read is admin-only. A correctly MACed pre-upgrade admin
+      // token does not acquire a permission absent from its original claims.
+      const legacy = `Session ${mintSession(sessionsOf(platformNet.secret, TEST_DEPLOYMENT)!, { ...ritas.claims, reads: ritas.claims.reads.filter(name => name !== "requests") })}`;
+      const requestPath = "/requests?request=abcdef0123456789";
+      expect([
+        await read(owner, M, requestPath, unas.reader()),
+        await read(owner, M, requestPath, legacy),
+        await read(owner, M, "/incidents", legacy),
+        await read(owner, M, requestPath, ritas.reader()),
+      ]).toEqual([[403, "forbidden"], [403, "forbidden"], [200, "ok"], [200, "ok"]]);
       // A token in a URL is refused before anything is routed, and is not used (section 5.3).
       const inUrl = await real(owner, () => routed(`${url(M)}?session=${tokenOf(unas)}`));
       expect([inUrl.status, await inUrl.json()]).toEqual([400, { error: "credential-in-url" }]);
@@ -163,6 +176,10 @@ describe("read sessions (authority note, sections 3.9, 3.12 row W6, 5.3 and 5.5;
       expect([await read(owner, M, "", fresh.reader()), await stream(owner, M, fresh.reader()), await ask(owner, M, request), await read(owner, unasInbox, "", fresh.reader())])
         .toEqual([[503, "clock-behind"], { refused: "clock-behind" }, { ok: false, reason: "clock-behind" }, [200, "ok"]]);
       net.clock.now = soon(5);
+
+      expect(metrics.some(p => p.blobs[0] === "session" && p.blobs[4] === "issued")).toBe(true);
+      expect(metrics.some(p => p.blobs[0] === "session" && p.blobs[4] === "refused" && p.blobs[5] === "clock-behind")).toBe(true);
+      expect(metrics.some(p => p.blobs[0] === "stream" && p.doubles[2] === 0 && p.doubles[3] === 2)).toBe(true);
 
       // A restart closes the scope's streams. The token is unchanged, and is checked again at the next read.
       // The objects are aborted, as a process that stops is: an eviction waits for an open stream, and so cannot show this.

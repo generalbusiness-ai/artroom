@@ -41,6 +41,7 @@ import type { Clock, Transport } from "./ports.ts";
 import type { Sql } from "./sqlite.ts";
 import type { Dispatched, Store } from "./store.ts";
 import { LATE, within } from "./turn.ts";
+import { metric } from "./operational.ts";
 
 /** What an incident is (section 12, "What is one"), and the one instruction that the record also holds. */
 export type IncidentKind =
@@ -111,6 +112,7 @@ export class OperatorRecord {
     const scope = this.#scope();
     this.#sql.exec("INSERT INTO operator_record (time, scope, kind, refs) VALUES (?, ?, ?, ?)", this.#clock.read(), scope ? canonicalize(scope) : null, kind, canonicalize(refs)).toArray();
     this.#sql.exec("DELETE FROM operator_record WHERE n <= (SELECT MAX(n) FROM operator_record) - ?", this.#rows).toArray();
+    metric({ kind: "incident", place: "incidents", end: "error", reason: kind, a: 1 });
     return true;
   }
 

@@ -13,7 +13,7 @@ const ENDS = ["answer", "idle", "busy", "clock-behind", "unavailable"] as const;
 const ANSWERS = ["accepted", "refused", "unavailable", "mismatch", "none", "mixed"];
 export const STEPS = ["retained-replies", "owner", "judged"] as const;
 export const EVENTS = ["outside-call-failed", "outside-replies-failed", "outside-recovery-failed"] as const;
-export const METRIC_PLACES = ["found", "acts", "preparations", "settle", "summary", "items", "history", "entries", "outbox", "duty", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
+export const METRIC_PLACES = ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations", "settle", "summary", "items", "query-items", "reservation-snapshot", "operations", "history", "entries", "outbox", "duty", "log", "retained", "sessions", "stream", "incidents", "waiting", "credential", "site", "page", "health", "requests", "alarm", "dispatch", "metrics", "mixed", "other", ...STEPS] as const;
 // An exhaustive union makes a new contract reason an explicit schema decision.
 const REASONS: Record<RefusalReason | UnavailableReason | MismatchReason | ReadRefusal | SessionRefusal, true> = {
   "revision-moved": true, alias: true, "duplicate-relation": true, "required-unset": true, "scope-full": true,
@@ -51,7 +51,7 @@ function valid(point: MetricPoint): boolean {
   const [count, duration, a, c, e, flag] = d as [number, number, number, number, number, number];
   if (kind === "metric-dropped") return b[3] === "metrics" && b[4] === "dropped" && b[5] === "summary" && b[8] === "none" && count === 1 && duration <= 31 && c <= a && e <= c;
   if (flag > count) return false;
-  if (kind === "turn") return ["found", "acts", "preparations", "alarm", "dispatch"].includes(b[3]!) && ends.has(b[4] ?? "") && ANSWERS.includes(b[8] ?? "") && (b[4] === "answer" || b[8] === "none");
+  if (kind === "turn") return ["found", "acts", "preparations", "rpc:found", "rpc:acts", "rpc:preparations", "alarm", "dispatch", "mixed"].includes(b[3]!) && ends.has(b[4] ?? "") && ANSWERS.includes(b[8] ?? "") && (b[4] === "answer" || b[8] === "none");
   if (count !== 1) return false;
   switch (kind) {
     case "route": return ["ok", "refused", "error"].includes(b[4]!) && ["2xx", "3xx", "4xx", "5xx"].includes(b[5]!) && ["turn", "pre-turn"].includes(b[8]!) && a === 0 && c === 0 && e === 0 && flag === 0;
@@ -87,6 +87,7 @@ export class Metrics {
     // Five native ends must still fit, plus the terminal summary.
     this.#budget = Number.isInteger(cap) && cap >= 6 && cap <= METRIC_POINTS ? cap - 1 : METRIC_POINTS - 1;
   }
+  scope(scope: string): void { if (isScopeId(scope)) this.#context.scope = scope; }
   #sum(a: number, b: number): number { if (a + b <= METRIC_MAX) return a + b; this.#mask |= LOSS.overflow; return METRIC_MAX; }
   #point(event: Metric): MetricPoint {
     const c = this.#context;
@@ -108,8 +109,8 @@ export class Metrics {
     if (this.#coarse >= 2 && row.point.blobs[4] === "answer") row.point.blobs[8] = "mixed";
     if (this.#coarse >= 3) row.point.blobs[3] = "mixed";
   }
-  #merge(a: Row, b: Row): Row {
-    this.#loss(a, LOSS.groups); this.#loss(b, LOSS.groups);
+  #merge(a: Row, b: Row, coarsened = false): Row {
+    if (coarsened) { this.#loss(a, LOSS.groups); this.#loss(b, LOSS.groups); }
     const saturated = a.point.doubles.some((n, i) => n + b.point.doubles[i]! > METRIC_MAX);
     for (let i = 0; i < 6; i++) a.point.doubles[i] = this.#sum(a.point.doubles[i]!, b.point.doubles[i]!);
     for (const i of [6, 7]) if (a.point.blobs[i] !== b.point.blobs[i]) a.point.blobs[i] = "mixed";
@@ -117,6 +118,7 @@ export class Metrics {
     a.criticalLost = this.#sum(a.criticalLost, b.criticalLost);
     a.critical = this.#sum(a.critical, b.critical);
     if (saturated) {
+      this.#loss(a, LOSS.overflow);
       a.critical = a.point.doubles[0]!;
       this.#lostCritical = this.#sum(this.#lostCritical, a.critical - a.criticalLost);
       a.criticalLost = a.critical;
@@ -130,7 +132,7 @@ export class Metrics {
       for (const row of this.#turns.values()) {
         this.#coarsenRow(row);
         const key = this.#key(row), old = next.get(key);
-        next.set(key, old ? this.#merge(old, row) : row);
+        next.set(key, old ? this.#merge(old, row, true) : row);
       }
       this.#turns = next;
       this.#merged = this.#sum(this.#merged, before - next.size);
@@ -145,7 +147,7 @@ export class Metrics {
     if (isTurn) {
       this.#coarsenRow(row);
       const key = this.#key(row), old = this.#turns.get(key);
-      this.#turns.set(key, old ? this.#merge(old, row) : row);
+      this.#turns.set(key, old ? this.#merge(old, row, this.#coarse > 0) : row);
       this.#reduce(METRIC_GROUPS);
     } else {
       const rows = event.kind === "route" ? this.#routes : this.#rest;
@@ -153,10 +155,11 @@ export class Metrics {
     }
   }
   /** A failed operational sidecar loses correlation, never a native fact. */
-  sidecar(turn = false, critical = false): void {
-    if (this.#finished) return;
+  sidecar(turn = false, critical = false, count = 1): void {
+    if (this.#finished || !integer(count) || count === 0) return;
     this.#mask |= LOSS.sidecar;
-    this.#lost = this.#sum(this.#lost, 1);
+    this.#lost = this.#sum(this.#lost, count);
+    // Several missing entry-index rows may belong to one native turn.
     if (turn) this.#lostTurns = this.#sum(this.#lostTurns, 1);
     if (turn && critical) this.#lostCritical = this.#sum(this.#lostCritical, 1);
   }

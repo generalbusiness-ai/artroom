@@ -2,6 +2,7 @@
 declare namespace Cloudflare {
   interface Env {
     SCOPES: DurableObjectNamespace;
+    METRIC_CONTROL: DurableObjectNamespace;
     AS_DEPLOYED: DurableObjectNamespace;
     NET: DurableObjectNamespace;
     PLATFORM: DurableObjectNamespace;

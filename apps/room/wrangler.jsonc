@@ -34,6 +34,11 @@
   "main": "worker.ts",
   "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
+  // Source preparation only; deployment remains separately authorized.
+  // Retain allowlisted console diagnoses without platform URL invocation logs.
+  "observability": { "enabled": true, "head_sampling_rate": 1, "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": false } },
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "artroom_metrics_v1" }],
+  "version_metadata": { "binding": "VERSION_METADATA" },
   "durable_objects": {
     "bindings": [
       { "name": "SCOPES", "class_name": "DeployedScope" },

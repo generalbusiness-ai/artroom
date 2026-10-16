@@ -107,7 +107,7 @@ export function sessionsOf(secret: unknown, deployment: unknown): Sessions | nul
 /** The member reads, including the one-time read-token credential requested by the session's own key. */
 const MEMBER_READS: readonly ReadName[] = ["summary", "items", "history", "entry", "outbox", "operations", "log", "retained", "credential"];
 /** The reads of the repository's admin page (section 12, G13 and G17). */
-const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting"];
+const ADMIN_READS: readonly ReadName[] = ["incidents", "waiting", "requests"];
 const READ_NAMES: ReadonlySet<string> = new Set<string>([...MEMBER_READS, ...ADMIN_READS]);
 /** The reads that a session makes of a register, by the cause chain (`chainedSession`): its entries and the inputs they name. */
 const CHAINED_READS: readonly ReadName[] = ["history", "entry", "log", "retained"];

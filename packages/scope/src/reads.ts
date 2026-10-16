@@ -35,6 +35,7 @@ import { bound, byteOrder, creationFields, evidenceValues, inputTexts, namedBy, 
 import type { Pinned } from "./core.ts";
 import { waitingIn, type Incident, type OperatorRecord } from "./operator.ts";
 import type { ReadName, Readers } from "./ports.ts";
+import type { RequestIndex, RequestPage, RequestQuery } from "./request-index.ts";
 import { checkSignedRead, leads, presentsSignedRead, signerOf, type SignedReading } from "./signed-reads.ts";
 import type { Duty, OperationStatus, Sealed, Store, Stored } from "./store.ts";
 
@@ -75,12 +76,13 @@ export class Reads {
   readonly #record: OperatorRecord | null;
   readonly #signed: SignedReading | null;
   readonly #owners: (() => Owners | undefined) | undefined;
+  readonly #requests: { index: RequestIndex; now: () => number } | undefined;
 
   /**
    * `record`: the operator's record of this scope. Null: it keeps none, and the read of it finds nothing.
    * `signed`: the clock and the window that a signed read is judged by. Null: this scope answers no signed read.
    */
-  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null, signed: SignedReading | null = null, owners?: () => Owners | undefined) {
+  constructor(store: Store, pinned: () => Pinned | null, readers: Readers, bounds: ReadBounds = READ_BOUNDS, record: OperatorRecord | null = null, signed: SignedReading | null = null, owners?: () => Owners | undefined, requests?: { index: RequestIndex; now: () => number }) {
     this.#store = store;
     this.#pinned = pinned;
     this.#readers = readers;
@@ -88,6 +90,7 @@ export class Reads {
     this.#record = record;
     this.#signed = signed;
     this.#owners = owners;
+    this.#requests = requests;
   }
 
   /**
@@ -369,6 +372,17 @@ export class Reads {
     if (after === undefined) return no("not-found");
     const page = this.#record?.page(after, this.#bounds.outboxDuties) ?? { incidents: [], more: false };
     return { ok: true, at: open.scope.head, value: page.incidents, complete: !page.more, ...(page.more ? { next: String(page.incidents.at(-1)!.n) } : {}) };
+  }
+
+  /** Admin-only operational window, never evidence that an old request settled. */
+  requests(reader: unknown, query: RequestQuery): Read<Pick<RequestPage, "rows" | "window">> {
+    const open = this.#open(reader, "requests");
+    if (!("scope" in open)) return open;
+    try {
+      const page = this.#requests?.index.page(query, this.#requests.now());
+      if (!page) return no("unavailable");
+      return { ok: true, at: open.scope.head, value: { rows: page.rows, window: page.window }, complete: page.complete, ...(page.next ? { next: page.next } : {}) };
+    } catch { return no("unavailable"); }
   }
 
   /**

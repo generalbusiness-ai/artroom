@@ -11,7 +11,7 @@ function randomId(): string {
 /** Only the reviewed version00 framing and sampled bit are propagated. */
 export function correlation(traceparent: string | null): Correlation {
   const request = randomId();
-  const match = traceparent?.match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/);
+  const match = traceparent?.length === 55 ? traceparent.match(/^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/) : null;
   if (!match || !isTraceId(match[1]) || match[2] === "0".repeat(16)) return { request, trace: null, traceparent: null };
   const sampled = parseInt(match[3]!, 16) & 1;
   return { request, trace: match[1], traceparent: `00-${match[1]}-${randomId()}-0${sampled}` };
