@@ -8,7 +8,7 @@ import { applicationPublicationOrigin } from "@generalbusiness/dap-platform";
 import { recordedMembership, recordedRules } from "../src/authority.ts";
 import { SqliteStore } from "../src/sqlite.ts";
 import { namespace } from "../src/namespace.ts";
-import { partitionProof, receiverPolicyProof } from "../src/partition-proof.ts";
+import { partitionProof, receiverPolicyProof, partitionCreationProof } from "../src/partition-proof.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry } from "../src/proof-bytes.ts";
 import { partitionApplicationPublicationOrigin } from "../../platform/src/partition-provenance.ts";
 import { counting } from "../../../apps/counter/definition.ts";
@@ -44,6 +44,16 @@ test("native root creates its partition with exact confirmed refs and real membe
     const creating = (await D.entries())[opened]!, send = creating.sends.find(row => (row.to as Seed).definition === C.partition);
     if (!send) return expect.fail("native root opening emitted no partition create");
     const P = life.platform(scopeIdOf(send.to as Seed));
+    // The receiver is still empty: this checks the actual native Root send,
+    // not a retained Part genesis or a supplied directory hint.
+    if (send.message.class !== "request") return expect.fail("partition creation is not a request");
+    const partitionCreate = { seed: send.to as Seed, source: factRefOf(creating), n: send.n, message: send.message };
+    const bootstrap = await life.wait(() => partitionCreationProof(namespace(env.PLATFORM), partitionCreate));
+    expect(bootstrap?.policy).toMatchObject({ mode: "partition-v1", root: refs.root, creation: partitionCreate });
+    expect(bootstrap?.proof.calls).toBe(5);
+    expect(bootstrap?.proof.frames).toHaveLength(5);
+    expect(bootstrap?.proof.frames.some(frame => frame.fact.at.scope === scopeIdOf(partitionCreate.seed))).toBe(false);
+    expect(await life.wait(() => partitionCreationProof(namespace(env.PLATFORM), { ...partitionCreate, n: send.n + 100 }))).toBeNull();
     await dispatchFixture([D, P, ...children], life.wait);
     expect((await P.summary()).value).toMatchObject({ definition: C.partition, status: "active" });
     expect(await P.item(0)).toMatchObject({ state: "open", refs, values: { generation: 1, base: 1, lastNumber: 0, sealed: false } });

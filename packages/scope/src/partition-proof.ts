@@ -3,7 +3,7 @@
 import type { FactRef, ScopeRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, same } from "@generalbusiness/dap-derive";
-import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
 import type { NativeBirth, NativeBirthSource } from "./native-birth.ts";
 import { readNativeBirth } from "./native-birth.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
@@ -106,10 +106,15 @@ class Collection {
     const part = await this.birth(at), born = part && proofEntry(part.proof, part.proof.fact, PROOF_BYTE_BOUNDS.body);
     if (!part?.native || part.named !== PARTITION_COHORT.partition || !born || born.input.type !== "genesis"
       || !isFactRef(born.input.source) || !isScopeRef(born.input.seed.creator) || !same(born.input.source.at, born.input.seed.creator)
-      || !born.input.message || !isObject(born.input.message.body) || !isObject(born.input.message.body["fields"])) return false;
-    const root = await this.birth(born.input.seed.creator);
-    if (!root?.native || root.named !== PARTITION_COHORT.directory || !await this.exact(born.input.source)) return false;
-    const fields = born.input.message.body["fields"];
+      || born.input.n === null || !born.input.message || !isObject(born.input.message.body) || !isObject(born.input.message.body["fields"])) return false;
+    return this.rootCreation({ seed: born.input.seed, source: born.input.source, n: born.input.n, message: born.input.message });
+  }
+  async rootCreation(creation: PartitionCreation): Promise<boolean> {
+    if (!isScopeRef(creation.seed.creator) || !isFactRef(creation.source) || !same(creation.seed.creator, creation.source.at)
+      || !isObject(creation.message.body) || !isObject(creation.message.body["fields"])) return false;
+    const root = await this.birth(creation.seed.creator);
+    if (!root?.native || root.named !== PARTITION_COHORT.directory || !await this.exact(creation.source)) return false;
+    const fields = creation.message.body["fields"];
     for (const [name, pin] of [["membership", PARTITION_COHORT.membership], ["rules", PARTITION_COHORT.rules], ["destination", PARTITION_COHORT.destination]] as const) {
       const ref = fields[name]; if (!isScopeRef(ref)) return false;
       const sibling = await this.birth(ref); if (!sibling?.native || sibling.named !== pin) return false;
@@ -144,8 +149,8 @@ class Collection {
     // positive partition pin still needs the entire actual creator chain.
     return candidate.native && candidate.named === PARTITION_COHORT.partition && !await this.lane(at) ? null : own;
   }
-  finish(source: RawPartitionFrame): PartitionProof | null {
-    return this.#remaining() > 0 ? { source, frames: [...this.#frames.values()].filter(frame => source.fact.seq === 0 || !same(frame.fact, source.fact)), calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
+  finish(source: RawPartitionFrame, includeSource = false): PartitionProof | null {
+    return this.#remaining() > 0 ? { source, frames: [...this.#frames.values()].filter(frame => includeSource || source.fact.seq === 0 || !same(frame.fact, source.fact)), calls: this.#calls, reservedBytes: this.#calls * PROOF_BYTE_BOUNDS.body } : null;
   }
 }
 
@@ -168,6 +173,18 @@ export async function receiverPolicyProof(ports: PartitionProofPorts, at: ScopeR
   try {
     const collection = new Collection(ports), own = await collection.receiver(at), proof = own && collection.finish(own);
     const policy = proof && partitionReceiverPolicy(at, proof.frames);
+    return policy && proof ? { policy, proof } : null;
+  } catch { return null; }
+}
+
+/** Empty partition bootstrap reads only its authenticated native parent send
+ * and sibling births. It never asks the unborn child to authenticate itself. */
+export async function partitionCreationProof(ports: PartitionProofPorts, creation: PartitionCreation): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
+  try {
+    const collection = new Collection(ports);
+    if (!await collection.rootCreation(creation)) return null;
+    const source = await collection.exact(creation.source), proof = source && collection.finish(source, true);
+    const policy = proof && partitionCreationPolicy(creation, proof.frames);
     return policy && proof ? { policy, proof } : null;
   } catch { return null; }
 }

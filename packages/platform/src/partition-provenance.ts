@@ -2,7 +2,7 @@
  * Source frames or normally checked replay runs. Hash-valid arbitrary entries
  * are not proof of native execution. Old destination policies remain separate. */
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Digest, Entry, FactRef, PlatformDefinition, ScopeRef } from "@generalbusiness/dap-contract";
+import type { Digest, Entry, FactRef, PlatformDefinition, Request, ScopeRef, Seed } from "@generalbusiness/dap-contract";
 import { canonicalize, deliveryCauseDigest, intentDigest, isDigest, isPlatformDefinition, isSeed, messageDigest, platformName, scopeIdOf, seedDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, isFactRef, isObject, isScopeRef, same, sentBy, type Fetched } from "@generalbusiness/dap-derive";
 import { PARTITION_COHORT as COHORT, MAX_GENERATIONS, PARTITION_SPAN } from "./directory-partitions.ts";
@@ -15,6 +15,7 @@ export const PARTITION_BASE_PROOF_BOUNDS = {
 /** Same finite decoded chain as the runtime collector, shared by replay. */
 export const PARTITION_IDENTITY_BOUNDS = { facts: 16, laneDepth: 4, bytes: 16 * PROPOSED_BOUNDS.entryBytes } as const;
 export interface PartitionNativeFrame { fact: FactRef; entry: Entry; named: Digest | PlatformDefinition; declarationName: string; native: boolean }
+export interface PartitionCreation { seed: Seed; source: FactRef; n: number; message: Request }
 interface Context { root: ScopeRef; partition: ScopeRef; membership: ScopeRef; rules: ScopeRef; destination: ScopeRef }
 type Checked<T> = { ok: true; value: T } | { ok: false } | null;
 const invalid = { ok: false } as const;
@@ -51,16 +52,28 @@ function genesis(facts: readonly Fetched[], at: ScopeRef, pin: PlatformDefinitio
  * Root's opening is a checked native entry under its checked exact genesis;
  * its copied refs must match all three accepted child incarnations. */
 function context(facts: readonly Fetched[], partition: ScopeRef, root: ScopeRef, destination: ScopeRef): Checked<Context> {
-  const part = genesis(facts, partition, COHORT.partition), office = genesis(facts, root, COHORT.directory);
-  if (part === null || office === null) return null;
-  if (!part.ok || !office.ok) return invalid;
-  const partBirth = part.value.entry.input, rootBirth = office.value.entry.input;
-  if (partBirth.type !== "genesis" || rootBirth.type !== "genesis" || part.value.under !== "platform:directory-partition" || office.value.under !== "platform:directory"
-    || partition.kind !== "directory" || root.kind !== "directory" || destination.kind !== "destination"
+  const part = genesis(facts, partition, COHORT.partition);
+  if (!part || !part.ok) return part;
+  const born = part.value.entry.input;
+  if (born.type !== "genesis" || part.value.under !== "platform:directory-partition" || partition.kind !== "directory"
+    || !isFactRef(born.source) || born.n === null || !born.message) return invalid;
+  const room = rootContext(facts, { seed: born.seed, source: born.source, n: born.n, message: born.message }, root, destination);
+  return room?.ok ? { ok: true, value: { ...room.value, partition } } : room;
+}
+/** The same actual parent-send check is usable before a partition has a
+ * genesis. No fabricated accepted child entry is needed for bootstrap. */
+function rootContext(facts: readonly Fetched[], partBirth: PartitionCreation, root: ScopeRef, destination: ScopeRef): Checked<Omit<Context, "partition">> {
+  const office = genesis(facts, root, COHORT.directory);
+  if (!office || !office.ok) return office;
+  const rootBirth = office.value.entry.input;
+  if (rootBirth.type !== "genesis" || office.value.under !== "platform:directory"
+    || root.kind !== "directory" || destination.kind !== "destination"
+    || !isSeed(partBirth.seed) || partBirth.seed.kind !== "directory" || partBirth.seed.definition !== COHORT.partition
     || !same(partBirth.seed.creator, root) || rootBirth.seed.creator?.kind !== "register" || !isFactRef(rootBirth.source)
     || !same(rootBirth.source.at, rootBirth.seed.creator) || rootBirth.seed.ordinal !== 0
     || !isFactRef(partBirth.source) || !same(partBirth.source.at, root) || partBirth.seed.ordinal !== 0
-    || partBirth.n === null || !partBirth.message || partBirth.message.class !== "request" || partBirth.message.type !== "create" || !isObject(partBirth.message.body)) return invalid;
+    || !Number.isSafeInteger(partBirth.n) || partBirth.n < 0 || partBirth.message.class !== "request"
+    || partBirth.message.type !== "create" || !isObject(partBirth.message.body)) return invalid;
   const opening = frame(facts, partBirth.source);
   if (!opening) return null;
   if (opening.under !== "platform:directory" || !isEntryOf(opening.entry, opening.fact)) return invalid;
@@ -93,7 +106,7 @@ function context(facts: readonly Fetched[], partition: ScopeRef, root: ScopeRef,
     const childFields = birth.message.body["fields"];
     if (ordinal > 0 && childFields["membership"] !== membership.scope || ordinal === 2 && childFields["rules"] !== rules.scope) return invalid;
   }
-  return { ok: true, value: { root, partition, membership, rules, destination } };
+  return { ok: true, value: { root, membership, rules, destination } };
 }
 
 function origin(from: FactRef, root: ScopeRef, destination: ScopeRef, facts: readonly Fetched[], kind: "application" | "change"): boolean | null {
@@ -285,5 +298,21 @@ export function partitionReceiverPolicy(at: ScopeRef, frames: readonly Partition
       return room?.ok ? selected(room.value.root) : null;
     }
     return null;
+  } catch { return null; }
+}
+
+/** Transient bootstrap binding, before any receiver incarnation or accepted
+ * genesis exists. Only the exact authenticated parent create selects it. */
+export interface PartitionCreationPolicy {
+  mode: "partition-v1";
+  root: ScopeRef;
+  creation: PartitionCreation;
+}
+export function partitionCreationPolicy(creation: PartitionCreation, frames: readonly PartitionNativeFrame[]): PartitionCreationPolicy | null {
+  try {
+    const facts = rawFacts(frames), fields = isObject(creation.message.body) ? creation.message.body["fields"] : null;
+    if (!facts || !isObject(fields) || !isScopeRef(fields["root"]) || !isScopeRef(fields["destination"])) return null;
+    const room = rootContext(facts, creation, fields["root"], fields["destination"]);
+    return room?.ok ? { mode: "partition-v1", root: room.value.root, creation } : null;
   } catch { return null; }
 }

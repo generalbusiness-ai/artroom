@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { isPlatformDefinition, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { sourceName } from "../src/publishing-provenance.ts";
-import { partitionApplicationPublicationOrigin, partitionPublishingLaneOrigin, partitionSourceName, type PartitionNativeFrame } from "../src/partition-provenance.ts";
+import { partitionApplicationPublicationOrigin, partitionPublishingLaneOrigin, partitionSourceName, partitionCreationPolicy, type PartitionNativeFrame } from "../src/partition-provenance.ts";
 import { scriptedPartitionOrigin } from "./support-partition-origin.ts";
 
 const raw = (sample: ReturnType<typeof scriptedPartitionOrigin>): PartitionNativeFrame[] => sample.frames.map(copy => {
@@ -37,4 +37,17 @@ test("concern identity proves each exact parent's pin and inherited room under o
   const foreign = scriptedPartitionOrigin("issue", 3, true);
   expect(partitionSourceName(foreign.definition, "issue", foreign.from.at, raw(foreign))).toBe("declared:issue");
   expect(partitionSourceName(nested.definition, "change", nested.from.at, frames)).toBe("declared:change");
+});
+
+
+test("empty partition bootstrap binds the actual native parent send without inventing an accepted child", () => {
+  const sample = scriptedPartitionOrigin(), frames = raw(sample).filter(row => row.fact.at.scope !== sample.from.at.scope && row.fact.at.scope !== sample.partition.scope);
+  // Keep Root opening + Root genesis + M/R/D births only (five frames).
+  const part = sample.frames.find(row => row.fact.seq === 0 && row.fact.at.scope === sample.partition.scope)!.entry.input;
+  if (part.type !== "genesis" || !part.source || part.n === null || !part.message) return expect.fail("scripted partition has no create");
+  const creation = { seed: part.seed, source: part.source, n: part.n, message: part.message };
+  expect(frames).toHaveLength(5);
+  expect(partitionCreationPolicy(creation, frames)).toEqual({ mode: "partition-v1", root: sample.root, creation });
+  expect(partitionCreationPolicy({ ...creation, n: creation.n + 1 }, frames)).toBeNull();
+  expect(partitionCreationPolicy(creation, frames.slice(0, -1))).toBeNull();
 });

@@ -283,3 +283,27 @@ and keep one total bounded raw-evidence allowance per admission. It must
 retain raw identities and derive labels at use, including result clauses,
 driver reads and mixed replay. Current helpers are isolated groundwork,
 with no global source-name expansion or raw-label cache upgrade.
+
+## Empty partition bootstrap
+
+The root-context validator now checks an actual creation envelope without
+requiring an accepted partition genesis. The existing post-birth validator
+uses that same parent-send check. Bootstrap reads the native Root genesis,
+its exact opening entry, and M/R/D births: five frames and five calls. It
+binds the target seed, cause, ordinal, message, send number and exact sibling
+incarnations. No receiver incarnation or accepted child entry is invented.
+
+The actual native factory scenario invokes this proof before dispatching
+the creation to the empty partition. It accepts the recorded Root send,
+rejects a different send number and reads no unborn child. The pure
+scripted counterpart retains its explicit non-native-execution boundary.
+Both package typechecks and five focused cases pass. Removing the shared
+parent `sentBy` check fails the wrong-send assertion; the control restores
+that check. The first scope typecheck named a nonexistent workspace and
+ran no compiler. A subsequent draft duplicated a test variable and failed
+typechecking and transformation before native tests started. Those logs
+remain retained; the corrected five-case run passes.
+
+Bootstrap for declared lanes and concerns, shared per-admission evidence,
+runtime consumers and mixed replay remain owed. These isolated helpers
+still select no production receiver policy.
