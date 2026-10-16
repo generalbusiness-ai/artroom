@@ -202,7 +202,34 @@ No external provider, gateway or key exists.
 maximum input bytes and output tokens, and estimated Neurons per input and
 output token, copied from the published Workers AI pricing when adopted.
 A model enters only after an adapter test of its messages and usage
-reporting. The effective set is the team's `models` intersected with the
+reporting.
+
+**Initial catalog (decided 2026-10-15).** Cost-effective models only. The
+rates are Workers AI's published Neurons per million tokens, input then
+output, read on 15 October 2026:
+
+| Model | In | Out | Role |
+|---|---:|---:|---|
+| `@cf/zai-org/glm-4.7-flash` | 5,500 | 36,400 | Default; used by the earlier agent spike |
+| `@cf/meta/llama-3.1-8b-instruct-fp8-fast` | 4,119 | 34,868 | Cheapest instruction model without a reasoning mode |
+| `@cf/qwen/qwen3-30b-a3b-fp8` | 4,625 | 30,475 | Second default candidate; reasoning mode off |
+| `@cf/google/gemma-4-26b-a4b-it` | 9,091 | 27,273 | Alternative; used by the earlier agent spike |
+
+Larger models (for example the 70B instruction models, about five times
+the output rate) and models that need a paid billing method are left out.
+The adapter test for a model with a reasoning mode must show that the
+reply fits `maxOutput` with that mode off; a model that cannot is not
+added.
+
+**Demo defaults.** `maxOutput` is 192 tokens and the input limit is
+6,000 bytes. With the default model the bound for one attempt is then at
+most `ceil(6,256 × 0.0055 + 192 × 0.0364)` = 42 estimated Neurons, and a
+typical attempt with about 2,000 input bytes is about 19. The default
+`ceiling` for a new attachment is 5,000 estimated Neurons, half of the
+account's free daily allocation, which allows at least 59 turns even if
+every turn uses two attempts at the full bound. With two roles, each
+role's default `allocation` is half the ceiling. An admin raises either
+with `set-policy` or `set-allocation`. The effective set is the team's `models` intersected with the
 catalog. A catalog update never adds to it. An empty set makes setup
 unavailable, by name.
 
@@ -245,7 +272,7 @@ with its work kept, and no model is called.
 **Other finite limits.** For each team: one model call in flight (only one
 promise is pledged at a time, so this costs nothing), 30 calls a minute,
 and 100,000 ledger rows. For each turn: two attempts at most, the second
-only after an invalid utterance. For each call: a 12 s timeout and 6,000
+after a lost reply or an invalid utterance (section 7.3). For each call: a 12 s timeout and 6,000
 input bytes.
 
 ## 7. Runtime and controls
@@ -307,9 +334,14 @@ own agents.
    prompt, the target, the number to say, and up to eight recent
    utterances.
 6. Keep the reply, then settle the row. The utterance must contain the
-   numeral as a whole token. If not, and 12 s or more remain and a second
-   reservation fits, make one more attempt. Otherwise sign `fail` with
-   `process-error`.
+   numeral as a whole token. If the reply is lost (timeout, error or
+   restart) or the utterance is invalid, and this was the first attempt,
+   12 s or more remain and a second reservation fits, make one more
+   attempt with a new reservation. The lost attempt's row stays
+   `unresolved`, charged at its bound. Otherwise sign `fail` with
+   `interrupted` for a lost reply or `process-error` for an invalid one.
+   A model call has no outside effect, since its output is data until
+   `say` is signed, so a retry cannot repeat an action.
 7. Sign and keep `say`, and submit it while at least 3 s remain before
    `until`. If the deadline passes, the scope's timers expire the turn.
 
@@ -334,9 +366,11 @@ row in `calling` becomes `unresolved`. A kept envelope with an unknown
 outcome goes through `settle`; on not-found, the same bytes are sent
 again, and the scope deduplicates them. A kept reply with no `say` goes
 on to step 7 of section 7.3 if time remains. A turn whose reply was lost
-is not called again: the object signs `fail` with `interrupted` while the
-promise is pledged, or the timers expire it. Only then does it read the
-heads. It never asks the model to repeat an action.
+gets its one retry under step 6 of section 7.3 if it has not used it and
+time and budget remain; otherwise the object signs `fail` with
+`interrupted` while the promise is pledged, or the timers expire it. Only
+then does it read the heads. A retry repeats a model call, never a signed
+act.
 
 Durable inputs are the team and Counter journals. The only cursors are
 the last examined heads. Each advances only after the decision taken at
@@ -385,10 +419,13 @@ cheapest real boundary (`docs/testing.md`). Each slice runs the gate once.
 5. **Client surface:** Counter page changes and the Agents panel (roles,
    counts, allocation against the remaining balance, progress such as
    "3 requested, 2 ready, 1 needs attention", controls). Witness: 5.
+   Builder builds it, after the install half of self-contained
+   applications M1, on the packaged Counter.
 6. **Deployed journey:** the `ai` binding and a deployment; a target of at
    least 20 with genuine Workers AI calls, one role then two. Witnesses:
    10, then 5, 7 and 8 live, and a listing that shows no repository, Git
    token, fork or container created for the agents.
+   It waits until the deployment hold is lifted.
 
 Slices 1 to 4 use the labelled model stand-in; only slice 6 is the demo.
 
@@ -414,27 +451,23 @@ today stays: it is a platform gap of the room, not a need of the Counter.
    the life of the attachment.
 7. **Order:** reserve before `commit`, so a race loser spends nothing and
    an admitted turn always has its call funded.
-8. **Lost model reply:** charged at its bound, never repeated; the turn
-   fails as `interrupted`.
+8. **Lost model reply:** charged at its bound, then retried once with a
+   new reservation if time and budget allow; otherwise the turn fails as
+   `interrupted`. Decided 2026-10-15.
+11. **Output form:** the written `say` utterance is the agent's turn; no
+    audio adapter. Decided 2026-10-15.
+12. **Page work:** builder builds slice 5. Decided 2026-10-15.
+13. **Models and ceiling:** the initial catalog and demo defaults in
+    section 6. Decided 2026-10-15.
+14. **Deployment:** slice 6 and the `ai` binding wait until the
+    deployment hold is lifted. Decided 2026-10-15.
 9. **Wakes:** existing head streams as hints, plus a bounded catch-up
    alarm. No scope runtime change.
 10. **Drain:** derived from `count` by ordinal; no extra act. **Model
     tools:** the utterance is the model's only output.
 
-## 10. Decisions left for Hugh or the checker
+## 10. Decisions left for the checker
 
-1. **Hugh:** is a written utterance an acceptable Counter turn for an
-   agent? The alternative is an audio adapter, using Workers AI speech
-   synthesis and stored audio.
-2. **Hugh:** who builds slice 5. On 8 October, Hugh decided that builder
-   makes no page or UI changes.
-3. **Hugh:** release of the Cloudflare deployment hold, and the `ai`
-   binding, for slice 6.
-4. **Hugh:** the catalog's models (candidate: the Pi spike's model,
-   `spikes/pi-durable/src/live.ts:26`; a second shows a two-model
-   allowlist) and the demo's default ceiling.
-5. **Hugh:** after a lost reply, should the turn retry, paid by a second
-   reservation, instead of failing and pausing the board?
 6. **Checker:** whether a team scope kept unique by the host is an exact
    enough owner, or the settings must move into the Counter definition.
 7. **Checker:** whether `$contains` with `&` behaves as section 3 needs,
