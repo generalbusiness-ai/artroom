@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"docs/testing.md at exact ba1a62e0296d3041815d6480f02648a656a13114 on planner/spikes-merge-20261016, under promise git:sha1…1ec2f83 on request git:sha1…2834e59","body":{"commit":"ba1a62e0296d3041815d6480f02648a656a13114","path":"docs/testing.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:3d41c2ac7ea118ba77939401c458ee62abf21cab","text":"Republished at ba1a62e0296d3041815d6480f02648a656a13114, which no longer changes apps/jam/src/phrases.ts: the pointer is withdrawn with no successor."}
