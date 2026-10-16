@@ -169,3 +169,18 @@ review remains pending. The operations guide documents the delivered
 bounds. MCP operational events, deployment
 coverage checks, browser telemetry and capacity measurement remain later
 stages. Cloudflare remains held.
+
+## Main composition
+
+The exact `f08c0faa` candidate was independently approved in `981cb2fc`.
+The earlier attempted verdict `b8b9c3bd` was ineffective because the
+review request incorrectly inherited a landing target. The corrected
+review-only request `99c4054c` changes no source or evidence.
+
+Main subsequently incorporated the approved notes reorganization at
+`e6951fb1`. This branch merges that whole head, keeps its rewritten links
+and layout, and moves this note and the retain/count note into
+`notes/implementation/`, as requested in `ec695f11`. The retain/count
+note's operations link is adjusted for its new directory. The See code,
+tests and generated assets retain their approved bytes. The composed
+head's gate and exact successor review remain pending.
