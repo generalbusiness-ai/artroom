@@ -133,7 +133,7 @@ UI change claim. Scope and platform typechecks pass.
 
 ## Previous frozen gate and withdrawn review
 
-The first and only D1 full gate passed at clean Source
+The first D1 full gate passed at clean Source
 `2286345e8e7df6f5e74764053ff2d96d2b9ba077`, tree
 `6e7b873583ea4f3087e107b458be446f17240a94`, composed over Main `54dcefbc`.
 Its original process closed with exit 0: 1,444 Vitest passes and three
@@ -213,3 +213,40 @@ The corrected frozen Source needs its own gate and exact-head review.
 The original `2286345e` pass is not carried across these implementation
 changes. The historical inactive-gate control concerns the unchanged gate
 branch only; it is not a control for the newly corrected host/read paths.
+
+
+## Corrected frozen gate and bounded diagnosis
+
+The corrected frozen Source is
+`8ab35b096dd4cbd953a94107cc963a7f0171cd95`, tree
+`44be0be6dc86055ae078138b86533f0eef2977aa`, composed over Main `54dcefbc`.
+Its one full gate's original process closed with exit 1. Whitespace and
+all typechecks passed. Vitest reported 1,446 passes, three skips and one
+failure: the existing native task-data Page witness exceeded its unchanged
+five-second timeout. There were 276 passing files, one failed and one
+skipped. Node and Counting groups were not reached by that process.
+The wrapper is `/tmp/artroom-d1-8ab35b09-gate.log`; private original step
+logs are under `/var/folders/2x/wylr59t17ds36l1l7ng25y7w0000gn/T/tmp.uEjkw1NZRS`.
+These paths identify evidence, with no grant to adjacent or raw files.
+
+Step elapsed/CPU seconds were whitespace 0.0/0.0, typecheck 12.3/34.0 and
+test 345.7/417.9. The dependency install was skipped because its verified
+lockfile stamp matched. These are step figures on the shared local Mac,
+with caffeinate and normal cache state, not isolated benchmarks. Scripted
+reset/retention-fault diagnostics remain in the original log. The timed
+out witness reached its fresh-review-faults stage at 4,611 ms after setup,
+issue creation, Description and publication/review-choice stages completed;
+cleanup ran at 5,010 ms. The evidence does not establish the timeout's cause.
+
+With no Source change, one isolated run of exactly
+`apps/room/page/test/task-data.scope.test.ts` passed both tests in 8.49 s
+(6.16 s summed test time), with the original default timeout. Its original
+process closed 0; log `/tmp/artroom-d1-8ab35b09-task-timeout-diagnostic.log`.
+Separately running only the omitted groups passed all 16 Node checks and
+55 Counting checks, both original processes closed 0. Logs are
+`/tmp/artroom-d1-8ab35b09-node-tests.log` and
+`/tmp/artroom-d1-8ab35b09-counting-tests.log`. Their union with the gate
+covers all tests successfully at this Source, but it is not a passing gate.
+No whole suite or gate was repeated, no timeout was widened, and the
+original failure is preserved for review. This report-only successor changes
+no implementation, test or generated asset from the corrected gate head.
