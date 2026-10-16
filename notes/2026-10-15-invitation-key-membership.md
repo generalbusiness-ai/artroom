@@ -57,10 +57,16 @@ This policy helper neither inventories nor exports. The current archive
 modules supply path grammar and segment grouping; A1 still owes its real
 inventory, layout, permissions and writer. That future writer must obtain
 truthful whole-cohort inventory and call this gate before selecting bodies.
-Question `b6c936a9` asks the planner to align the membership child's named
-refusal acceptance with that separately owed exporter. A policy test is
-not evidence of end-to-end export refusal or a replayable archive. The
-parent remains open until that boundary is implemented and checked.
+Planner decision `c6ff2e70` aligns the membership task with this admission
+boundary: its named legacy-cohort refusal is witnessed here. The actual
+exporter under `e871ba09` must call this gate before writing anything.
+A policy test is not evidence of end-to-end export refusal or a replayable
+archive. The archive parent remains open until that boundary is implemented
+and checked.
+
+Planner decision `d5c9bb62` also assigns directory@9 to this concrete
+membership cohort. The future partition design moves to directory@10;
+that separate design no longer holds this membership review.
 
 ## Verification so far
 
@@ -121,9 +127,18 @@ custody or signing. Existing CLI and direct MCP boundary witnesses now
 check malformed seeds, including noncanonical padding bits, and preserve
 legacy links. All six focused tests and the affected client, CLI and MCP
 typechecks pass. The normal Page producer leaves its asset module equal.
-This source correction needs its own gate at a frozen head; its exact
-head/tree and terminal result will be filed separately. No mutation sweep
-has run.
+The corrected source gate passes at `e54fa33e3b0d7288f2743fe359a50be2d1be782f`,
+tree `6478ae234cc2cefb32c4297700be763f54cf0a74`, with no changed files:
+whitespace exit 0 (0.1 seconds), typecheck exit 0 (7.6 seconds), tests exit 0
+(222.3 seconds). Vitest passes 1,344 tests with 3 skipped; the Node checks
+pass 16 and the Counter browser module checks pass 55. Both gates and the
+focused diagnostic results remain in the record. The original stall's
+cause remains unknown. No mutation sweep has run.
+
+This reporting successor changes only this note. Its source, tests,
+generated assets, manifests and lockfile are equal to that passing gate
+head, so it does not repeat the gate. Its exact head and tree are supplied
+with the review artifact.
 
 The expanded fixtures initially had a widened definition string, an unused
 legacy digest import and one legacy test line changed outside its intended
