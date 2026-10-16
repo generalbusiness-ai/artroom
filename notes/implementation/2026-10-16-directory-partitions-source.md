@@ -814,3 +814,16 @@ survives another restart. Normally checked replay covers that final parent
 head without anchors, with the same stated ancestry-walk limit. Git, the
 scripted clock and finite scheduler remain the fixture's labelled stand-ins.
 No provider operation, first Source gate or Source approval has run.
+
+
+## Deadline after synchronous publication validation
+
+Publication now checks that its original proof operation is still active
+after the pure origin validator returns. A deterministic scripted case
+advances the clock from an unchanged frame getter during validation. It
+first exposed an expired successful result, then passes with the final
+check, alongside all eight focused proof-budget cases and scope typecheck.
+The getter is a labelled cost stand-in, not native execution or a claim
+that synchronous parsing can be preempted. The operation gains no new
+deadline or allowance. The outcome-origin comment also now distinguishes
+retained judgment bytes from the separate bounded identity evidence reads.

@@ -147,3 +147,22 @@ test("raw UTF-8 admission charges bad replies before parse and refuses further p
   expect(operation.stats()).toMatchObject({ calls: 17, reads: 16, actualBytes: 16 * 1024 * 1024, totalFrames: 0, pending: 0 });
   expect(caps).toHaveLength(16); expect(caps.every(cap => cap === 1024 * 1024)).toBe(true);
 });
+
+
+test("publication checks the original deadline again after synchronous proof validation", async () => {
+  const sample = protocol(), reader = await ReceiverReads.open({ ...sample.ports, resolver: { read: async () => null } }, sample.fixture.partition);
+  if (!reader?.proof) return expect.fail("scripted partition reader is unavailable");
+  expect(await reader.publication(sample.fixture.from, sample.fixture.root, sample.fixture.destination, "change")).toBe(true);
+  const proof = await reader.proof.lane(sample.fixture.from);
+  const root = proof?.frames.find(frame => frame.fact.at.scope === sample.fixture.root.scope && frame.fact.seq === 0);
+  if (!root) return expect.fail("scripted root frame is missing");
+  // A getter on the already parsed SCRIPTED frame simulates synchronous
+  // validator cost. Its value and entry hash stay identical. No native code
+  // execution, clock preemption or fabricated native frame is claimed.
+  const effects = root.entry.effects; let advanced = false;
+  Object.defineProperty(root.entry, "effects", { enumerable: true, configurable: true, get: () => { if (!advanced) { advanced = true; sample.advance(B.milliseconds + 1); } return effects; } });
+  try {
+    expect(await reader.publication(sample.fixture.from, sample.fixture.root, sample.fixture.destination, "change")).toBeNull();
+    expect(advanced).toBe(true); expect(sample.calls).toHaveLength(8);
+  } finally { Object.defineProperty(root.entry, "effects", { enumerable: true, configurable: true, writable: true, value: effects }); }
+});

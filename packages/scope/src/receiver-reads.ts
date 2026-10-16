@@ -54,7 +54,8 @@ export class ReceiverReads implements Resolver {
   async publication(from: FactRef, root: ScopeRef, destination: ScopeRef, kind: "application" | "change"): Promise<boolean | null> {
     if (this.mode !== "partition-v1" || !this.proof) return null;
     const proof = await this.proof.lane(from);
-    return proof ? partitionPublicationOrigin(from, root, destination, kind, proof.frames) : null;
+    const result = proof ? partitionPublicationOrigin(from, root, destination, kind, proof.frames) : null;
+    return this.proof.active() ? result : null;
   }
   async #interpret(read: Fetched): Promise<Fetched | null> {
     if (this.mode === "legacy") return receiverName(read, producerName(read));

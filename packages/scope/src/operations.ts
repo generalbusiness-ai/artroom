@@ -668,7 +668,8 @@ export class Operations {
     const wrote: { sealed: Sealed | null } = { sealed: null };
     // Scope contract, revision 20, sections 6.1 and 16.1 (rows I3-40 and I3-41), under a definition whose data states rows of
     // `observes` or the `origin` of an outcome. The judge copies the outcome's `uses` from its origin, and is given the copy that
-    // this scope retains of each of those entries: nothing is fetched. The scope reads one observation for each subject of the
+    // this scope retains of each of those entries. A partition receiver separately proves their meaning with bounded raw
+    // identity evidence; the judgment still uses the retained copy. The scope reads one observation for each subject of the
     // kind's rows before the turn, in two steps where a row states `second`, and the commit derives both lists again (`Observes`).
     // I3 merge: under a definition whose data states neither, as each platform definition of Artroom until the authority note's
     // rows are adopted (I3 deltas, entry GA1), the judge is given no observation and no foreign entry, as before. A rule that

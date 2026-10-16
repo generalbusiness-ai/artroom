@@ -235,6 +235,7 @@ export class PartitionProofOperation {
   readonly #collection: Collection;
   constructor(ports: PartitionProofPorts) { this.#collection = new Collection(ports); }
   stats() { return this.#collection.stats(); }
+  active(): boolean { return this.#collection.active(); }
   async lane(from: FactRef): Promise<PartitionProof | null> {
     if (!isFactRef(from) || from.at.kind !== "lane") return null;
     try {
