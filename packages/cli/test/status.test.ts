@@ -25,6 +25,8 @@ test("status states column heads, admin/member permissions and an explicit reque
   expect(member).toContain("  incidents: denied."); expect(member).toContain("  request abcdef0123456789: denied."); expect(f.requests()).toBe(0);
   await statusReport(f.http, "Session fixture", [{ kind: "membership", scope: at.scope }], true, "abcdef0123456789", false);
   expect(f.requests()).toBe(1);
+  f.http.summary = async () => ({ ...summary, complete: false });
+  expect((await statusReport(f.http, "Session fixture", [{ kind: "membership", scope: at.scope }], true, undefined, false)).join("\n")).toContain('counts [["member","active",2]] (more; partial)');
   f.http.outbox = async () => ({ ok: false, reason: "forbidden" });
   f.http.incidents = async () => { throw Error("private provider text"); };
   const bad = await statusReport(f.http, "Session fixture", [{ kind: "membership", scope: at.scope }], true, undefined, false);
