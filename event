@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2501a26f8ec16a579ad3e44b1a9f9ebd81237ef7","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-directory-partitions.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2a5092b552337ce49317b5d67d5b6599e1894842","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/site-d1-publication.test.ts."}
