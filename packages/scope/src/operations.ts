@@ -36,6 +36,7 @@
  */
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
+import type { ReceiverReads } from "./receiver-reads.ts";
 import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, retainedValueKey, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, isEntryOf, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type Operation, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
 import { applicationPublicationOrigin, publishingLaneOrigin } from "@generalbusiness/dap-platform";
@@ -277,13 +278,13 @@ export class Operations {
   }
 
   /** Forward security check only: it changes neither old entries nor their derivation. */
-  async #publicationReady(operation: Operation): Promise<boolean> {
+  async #publicationReady(operation: Operation, reader?: ReceiverReads): Promise<boolean> {
     const rules = this.#scope.owners()?.rules(operation.owner, operation.kind);
     const asked = rules?.publicationOrigin?.(this.#store, operation, ownOf(this.#store));
     if (asked === undefined || asked === null) return true;
     if (asked === false) return false;
     try {
-      const receiver = await this.#scope.receiverReads();
+      const receiver = reader ?? await this.#scope.receiverReads();
       if (!receiver) return false;
       if (receiver.mode === "partition-v1") {
         const read = await within(() => receiver.read(asked.from, this.#bounds.fetchSeconds), this.#bounds.fetchSeconds);
@@ -638,7 +639,9 @@ export class Operations {
     const operation = this.#store.operation(input.operation);
     const retain = input.retain ?? [];
     const rules = operation && this.#scope.owners()?.rules(operation.owner, operation.kind);
-    if (operation && !await this.#publicationReady(operation)) {
+    const receiver = definition.observing || rules?.publicationOrigin ? await this.#scope.receiverReads() : undefined;
+    if (receiver === null) return { recorded: "unavailable" };
+    if (operation && !await this.#publicationReady(operation, receiver)) {
       this.#waiting = true;
       return { recorded: "unavailable" };
     }
@@ -676,7 +679,23 @@ export class Operations {
       const kept = store.retained("entry", use.content);
       return kept ? { fact: use.fact, entry: JSON.parse(kept.bytes) as Entry, under: kept.under ?? "" } : null;
     };
-    const context = (clock: Reading) => ({ clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(store), ...(definition.observing ? { retained, ...rows.hand() } : {}), values: [...bytes, ...(rows.hand().values ?? [])] });
+    let interpreted: readonly Fetched[] | undefined;
+    let readRetained = retained;
+    const context = (clock: Reading) => ({ clock, bounds, owners: this.#owners, platform: this.#scope.pinned()?.platform ?? undefined, own: ownOf(store), ...(definition.observing ? { retained: readRetained, ...rows.hand() } : {}), values: [...bytes, ...(rows.hand().values ?? [])] });
+    if (receiver?.mode === "partition-v1" && definition.observing) {
+      // The pure origin preamble asks for every use before it judges rows or
+      // effects. Returning no copy discovers that exact immutable dependency
+      // set without giving producer labels to a receiver judgment.
+      const needed = new Map<string, FactUse>();
+      settleOutcome(store, definition, input, { ...context(clockOf(store, this.#clock.read())), retained: use => { needed.set(canonicalize([use.fact, use.content]), use); return null; } });
+      const raw = [...needed.values()].map(retained);
+      if (raw.some(copy => copy === null)) return { recorded: "unavailable" };
+      const selected = await receiver.retained(raw as Fetched[]);
+      if (!selected) return { recorded: "unavailable" };
+      interpreted = selected;
+      const copies = new Map([...needed.keys()].map((key, n) => [key, selected[n]!]));
+      readRetained = use => copies.get(canonicalize([use.fact, use.content])) ?? null;
+    }
     await rows.before(() => { const planned = settleOutcome(store, definition, input, context(clockOf(store, this.#clock.read()))); return planned.result === "unavailable" ? planned.missing : undefined; }, 2);
     const end = await rows.turn((stop) => this.#scope.turns.run<OutcomeRecorded>({
       asks: () => [],
@@ -691,7 +710,7 @@ export class Operations {
             if (view.scope()!.head.seq + 1 >= bounds.scopeEntries) return said({ recorded: "unavailable" });
             return {
               // Section 16.1, "A value that a row may retain": each value that a retained observation names is kept with the entry.
-              verdict: "write", draft: judged.draft, retain: [...retain.filter((given) => given.kind === "snapshot" && named.includes(given.digest)), ...valuesOf(judged.draft)],
+              verdict: "write", draft: judged.draft, ...(interpreted ? { facts: interpreted } : {}), retain: [...retain.filter((given) => given.kind === "snapshot" && named.includes(given.digest)), ...valuesOf(judged.draft)],
               sealed: (sealed) => { wrote.sealed = sealed; rows.sealed(sealed); return { recorded: "written", fact: { at: sealed.entry.at, seq: sealed.entry.seq, hash: sealed.hash } }; },
               unfit: () => ({ recorded: "refused", detail: "the outcome cannot be an entry" }), full: () => ({ recorded: "unavailable" }),
             };

@@ -678,3 +678,77 @@ stand-in proves bounded read/stop behavior without a mutation; it does not
 claim a native partition editing journey. The explicit source bundle must
 be rebuilt before the first frozen gate. Other root/partition consumers and
 remaining native protocol obligations are still under audit.
+
+
+## Canonical native change publication and outcome-origin facts
+
+The native Room fixture now has an explicit partition option. It keeps the
+actual root separately from the partition that opens lanes, dispatches both,
+and enrolls members through M6's actual public-key invitation proof. Its
+older default path and pinned data are unchanged. The partition's actual
+control records the root membership reference. The root has no open-pr act;
+the partition does. Real authority, factories and declared lanes perform
+these checks; Git objects, commits, changed paths, clock and scheduler keep
+the existing labelled stand-ins.
+
+The full canonical local-hold journey creates a real issue and change,
+records and accepts the actual report, requires an independent review,
+reserves the actual merge, and drives D6 through publication and receipt
+cleanup. Its final publication state is cleaned, its head is the integration
+commit, the change reports published, and the issue closes exactly once
+with reason completed. No Git host, object or provider push runs. Replay
+stops at the existing verification boundary: it does not derive the staged
+Git ancestry walk. That known incomplete boundary is asserted rather than
+called a full publication replay pass.
+
+This exposed a real runtime consumer gap. The driver's origin fence already
+passed, but Operations.record still gave the outcome judge raw retained
+producer aliases. The new receiver now discovers the immutable origin uses
+through the pure outcome preamble, gives no copy during that discovery,
+then derives transient meanings for the exact retained copies. The same
+receiver proof operation covers its origin fence and all copied facts;
+there is no fresh allowance for each copy or for the fence. The turn's fold
+gets those same transient facts. Stored bytes and producer aliases stay
+unchanged. Older receiver mode keeps its original retained callback.
+
+The corrected native file has three passing cases, including the matched
+foreign-path comparison below. Restoring raw aliases for the new outcome
+judge leaves the real publication queued and distinguishes the unchanged
+cleaned/head/published assertion. The unchanged default-room W1 publication
+passes, and seventeen focused operation/observation regressions pass. Scope
+and lane typechecks pass. No gate has run for this unfinished Source.
+
+Original failures remain retained: the new fixture first used legacy secret
+invitation fields against M6; a local-hold manifest correctly emitted no
+pin-confirm; a foreign-hold manifest reached required-unset; the canonical
+publication then stayed queued under the raw outcome aliases. Bounded
+return-reason instrumentation confirmed that its origin fence was true and
+was removed after diagnosis. A diagnostic explicit repeat returned the
+same acknowledged native reserve; it was removed from the final witness.
+The first corrected expectation used published instead of D6's actual
+cleaned terminal state. The final witness checks cleaned plus the published
+change and recorded head. A draft fixture's unsupported findLast call was
+replaced without changing the repository's TypeScript target.
+
+## Canonical foreign-hold limitation is separate
+
+The same actual canonical foreign issue hold, stage, check and presented
+check fact refuses a foreign manifest with required-unset in both an older
+default native room and the explicit partition room. Neither writes a
+manifest. This matched two-case comparison confirms the existing pinned
+limitation rather than a partition-only regression. The foreign branch
+excludes local hold, so also.commitment is unbound; the authors attribution
+reads that subject and skips its whole effect, while manifest.authors is
+required. No canonical declaration byte is changed here.
+
+Checker advice `52453d8a`, read fully and ratified at `1d4eb418`, permits a
+minimal, explicitly activated test-only change declaration to reach the
+unchanged issue's pin-confirm/unpin consumer. It must retain authenticated
+pin/report/previous authors and signer/principal; only the missing foreign
+attribution route may change. Actual supersession, restart, replay,
+identity and permission controls remain owed. This is not Source approval,
+a production lane revision or a repaired canonical foreign-path claim.
+The canonical limitation is tracked as a separate future lane revision in
+gitseq; current directory work continues without modifying old/default
+literal hashes. A test-only extension cannot replace the separate canonical
+local-hold publication/closure witness recorded above.
