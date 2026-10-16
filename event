@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at notes/2026-10-15-portable-dap-clone-design.md","body":{"commit":"dacf4df46a3acbade4edfa983446532849461351","path":"notes/2026-10-15-portable-dap-clone-design.md"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2c8d357071a34524f96bc7974aa56c096ce77e66","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-portable-dap-clone-design.md."}
