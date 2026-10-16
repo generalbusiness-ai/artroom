@@ -47,6 +47,11 @@ test("native owned query refuses substituted arguments and exposes selection err
   const absent = queryOf(scope, { type: "not-a-declared-type" });
   expect(await read(scope, absent, await header(scope, absent, una))).toEqual({ ok: false, reason: "forbidden" });
   expect(await read(scope, absent, await header(scope, absent))).toEqual({ ok: false, reason: "unknown-type" });
+  scope.c.clock.now = at(-1);
+  expect(await read(scope, absent, await header(scope, absent, una))).toEqual({ ok: false, reason: "forbidden" });
+  scope.c.clock.now = "SCRIPTED invalid clock" as typeof scope.c.clock.now;
+  expect(await read(scope, query, await header(scope, query))).toEqual({ ok: false, reason: "forbidden" });
+  scope.c.clock.now = at(0);
   const cursor = queryOf(scope, { cursor: "not-a-cursor" });
   expect(await read(scope, cursor, await header(scope, cursor))).toEqual({ ok: false, reason: "invalid-cursor" });
 });
@@ -101,5 +106,10 @@ test("native query accepts an issued session across birth references and enforce
     const expired = readerOf(mintSession(f.sessions, { ...answer.session, ends: net.clock.now }));
     expect(await ask(query(["current"]), expired)).toEqual({ ok: false, reason: "forbidden" });
     expect(await ask(query(["current"]), issued + "!")).toEqual({ ok: false, reason: "forbidden" });
+    const current = net.clock.now;
+    try {
+      net.clock.now = "SCRIPTED invalid clock" as typeof net.clock.now;
+      expect(await ask(query(["current"]), issued)).toEqual({ ok: false, reason: "forbidden" });
+    } finally { net.clock.now = current; }
   } finally { f.life.release(); }
 });

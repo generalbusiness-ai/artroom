@@ -7,6 +7,7 @@ import type { NativeItemQuery } from "../src/item-queries.ts";
 import { runInDurableObject } from "cloudflare:test";
 import { sessionRoom } from "./support/session-room.ts";
 import { mintSession, readerOf } from "../src/sessions.ts";
+import { net } from "./net.ts";
 import { at, found, rita } from "./support.ts";
 
 /** Passive native SQL observation only while the real object's query runs.
@@ -51,7 +52,7 @@ async function measured(state: DurableObjectState, instance: object, encoded: un
 }
 
 const queryOf = (scope: Awaited<ReturnType<typeof found>>): ItemQuery => ({ v: 1, scope: scope.at, type: "commitment", states: ["accepted"], ids: null, limit: 100, cursor: null });
-const header = (query: ItemQuery) => signedReader(secretSigner(rita.secret), query.scope.scope, "query-items", itemQueryArgument(query)!, { now: () => Date.parse(at(0)) });
+const header = (query: ItemQuery, now = () => Date.parse(at(0))) => signedReader(secretSigner(rita.secret), query.scope.scope, "query-items", itemQueryArgument(query)!, { now });
 
 test("native query rejects malformed input and headers before protected SQL and charges cold and warm local signer work", async () => {
   const scope = await found(); await scope.commitment();
@@ -105,7 +106,7 @@ test("native composed queries charge actual exact-proof and birth-reference rece
   try {
     const child = f.children[1]!;
     const query: ItemQuery = { v: 1, scope: f.rules, type: "rules", states: ["current"], ids: null, limit: 100, cursor: null };
-    const encoded = encodeItemQueryParameter(query)!, reader = await header(query);
+    const encoded = encodeItemQueryParameter(query)!, reader = await header(query, () => Date.parse(net.clock.now));
     // Directory/register receivers are already constructed by genuine setup.
     // Eviction makes this local query owner cold; receiver constructor and
     // background work remain separately qualified, outside the read envelope.

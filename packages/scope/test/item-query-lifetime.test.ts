@@ -5,18 +5,21 @@ import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { ItemQuery, ScopeId } from "@generalbusiness/dap-contract";
-import { canonicalize, encodeItemQueryParameter, newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
+import { canonicalize, encodeItemQueryParameter, itemQueryArgument, newIncarnation, textDigest } from "@generalbusiness/artroom-bytes";
+import { secretSigner, signedReader } from "@generalbusiness/artroom-client";
 import { Scope } from "../src/core.ts";
 import { ItemQueries } from "../src/item-queries.ts";
 import { production } from "../src/ports.ts";
 import { ReadPreparation } from "../src/read-preparation.ts";
 import { SessionPreparation } from "../src/session-preparation.ts";
 import { PreparationFlights } from "../src/preparation-flight.ts";
-import { sessionReferencesIn } from "../src/namespace.ts";
+import { namespace, sessionReferencesIn } from "../src/namespace.ts";
+import type { ProofSource } from "../src/proof-bytes.ts";
 import { mintSession, readerOf, sessionsOf } from "../src/sessions.ts";
 import { SqliteStore, type Sql, type SqlValue } from "../src/sqlite.ts";
 import { net } from "./net.ts";
 import { sessionRoom } from "./support/session-room.ts";
+import { rita } from "./repository.ts";
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; };
 class Timer {
   value = 0;
@@ -30,7 +33,7 @@ class Timer {
   }
   advance(ms: number) { this.value += ms; for (const task of [...this.tasks]) if (task.at <= this.value) { this.tasks.delete(task); task.work(); } }
 }
-function owner(name: ScopeId, state: DurableObjectState, f: Awaited<ReturnType<typeof sessionRoom>>, source: NonNullable<ConstructorParameters<typeof SessionPreparation>[3]>, timer = new Timer(), afterSql: (query: string) => void = () => {}) {
+function owner(name: ScopeId, state: DurableObjectState, f: Awaited<ReturnType<typeof sessionRoom>>, source: NonNullable<ConstructorParameters<typeof SessionPreparation>[3]>, timer = new Timer(), afterSql: (query: string) => void = () => {}, proofs: ProofSource | null = null) {
   const raw: Sql = { exec: (query, ...args) => state.storage.sql.exec(query, ...args), transaction: work => state.storage.transactionSync(work) };
   const store = new SqliteStore(raw), core = new Scope(name, store, production(), PROPOSED_BOUNDS);
   let calls = 0, policy = "query-native-policy-v1", supported = true, sessions = f.sessions;
@@ -38,7 +41,7 @@ function owner(name: ScopeId, state: DurableObjectState, f: Awaited<ReturnType<t
   const sql = { exec(query: string, ...args: SqlValue[]) { calls++; statements.push(query); const cursor = raw.exec(query, ...args); afterSql(query); return cursor; } };
   const preparation = new ReadPreparation(sql, { policy: () => policy, declared: bytes => core.validate(bytes), platform: named => supported ? core.platform(named) : null });
   const sessionPreparation = new SessionPreparation(preparation, () => sessions, net.clock, source);
-  const queries = new ItemQueries({ name, sql, preparation, sessionPreparation, localSigners: store.localSigners, proofs: null, sessions: () => sessions, clock: net.clock, window: PROPOSED_BOUNDS.intentLifetimeSeconds, flights: new PreparationFlights(timer) });
+  const queries = new ItemQueries({ name, sql, preparation, sessionPreparation, localSigners: store.localSigners, proofs, sessions: () => sessions, clock: net.clock, window: PROPOSED_BOUNDS.intentLifetimeSeconds, flights: new PreparationFlights(timer) });
   return { queries, calls: () => calls, statements, policy: () => { policy = "query-native-policy-v2"; }, unsupported: () => { supported = false; }, secret: () => { sessions = sessionsOf("another synthetic bounded query secret", sessions.deployment)!; } };
 }
 const queryOf = (f: Awaited<ReturnType<typeof sessionRoom>>): ItemQuery => ({ v: 1, scope: f.rules, type: "rules", states: ["current"], ids: null, limit: 100, cursor: null });
@@ -67,6 +70,39 @@ test("full native query retains timed-out pending ownership and releases no late
     expect(got.busy).toEqual({ ok: false, reason: "unavailable" });
     expect([got.during, got.after]).toEqual([got.before, got.before]);
     expect(got.fresh.ok).toBe(true); expect(got.peers).toBe(2); expect(got.timers).toBe(0);
+  } finally { f.life.release(); }
+});
+
+test("native signed query hides a clock fault after causal bodies from an unrelated key", async () => {
+  const f = await sessionRoom();
+  try {
+    const child = f.children[1]!, selection = queryOf(f), originalClock = net.clock.now;
+    const unrelated = secretSigner(new Uint8Array(32).fill(5));
+    const readers = await Promise.all([unrelated, secretSigner(rita.secret)].map(signer =>
+      signedReader(signer, selection.scope.scope, "query-items", itemQueryArgument(selection)!, { now: () => Date.parse(originalClock) })));
+    const observations = await f.life.wait(() => runInDurableObject(child.object, async (_instance, state) => {
+      const results = [];
+      try {
+        for (const [index, reader] of readers.entries()) {
+          net.clock.now = originalClock;
+          let faults = 0, bodies = 0;
+          const timer = new Timer(), query = owner(child.name, state, f, sessionReferencesIn(env.PLATFORM), timer, sql => {
+            if (sql.startsWith("SELECT bytes FROM entry") || sql.startsWith("SELECT bytes FROM retained_input")) {
+              // Capture reads the genesis once before signed admission.
+              // The second history body belongs to the causal proof.
+              if (++bodies > 1) { faults++; net.clock.now = "SCRIPTED invalid clock after causal body" as typeof net.clock.now; }
+            }
+          }, namespace(env.PLATFORM).proofs);
+          const result = await query.queries.read(encodeItemQueryParameter(selection)!, reader); await timer.finished.promise;
+          results.push({ index, result, faults });
+        }
+      } finally { net.clock.now = originalClock; }
+      return results;
+    }));
+    expect(observations.map(observation => observation.result)).toEqual([
+      { ok: false, reason: "forbidden" }, { ok: false, reason: "clock-behind" },
+    ]);
+    for (const observation of observations) expect(observation.faults).toBeGreaterThan(0);
   } finally { f.life.release(); }
 });
 

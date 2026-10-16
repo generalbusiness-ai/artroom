@@ -59,7 +59,7 @@ export class ItemQueries {
       const authentic = authenticateSession(config.sessions, reader);
       if (!("claims" in authentic)) return no(authentic.refused || "forbidden");
       const reading = timeMs(config.clock.read()), ends = timeMs(authentic.claims.ends);
-      if (reading === null) return no("clock-behind");
+      if (reading === null) return no("forbidden");
       if (ends === null || reading >= ends) return no("forbidden");
       if (!sessionAllowsVisibility(authentic.claims.reads, "empty")) return no("forbidden");
       const result = await config.sessionPreparation.prepare(reader, frame => selection(frame, query).visibility, run, budget.preparation("preparation"), () => {
@@ -75,14 +75,15 @@ export class ItemQueries {
     const admitted = argument && scopedSignedRead(reader, config.name, "query-items", argument);
     if (!argument || !admitted) return no("forbidden");
     const reading = timeMs(config.clock.read()), ends = timeMs(admitted.request.notAfter);
-    if (reading === null) return no("clock-behind");
+    if (reading === null) return no("forbidden");
     if (ends === null || ends <= reading || ends - reading > config.window * 1000) return no("forbidden");
     const frame = config.preparation.capture(budget.preparation("preparation"));
     if (!frame || !run.active()) return no("unavailable");
     // This configuration deliberately has no legacy Chains or diagnostic callback.
     const signing = { clock: config.clock, window: config.window };
     const checked = checkSignedReadRequest(signing, { scope: () => frame.scope }, reader, "query-items", argument);
-    if (!("key" in checked)) return no(checked.refused === "clock-behind" ? checked.refused : "forbidden");
+    // No state-specific clock reason before scoped signer/root evidence.
+    if (!("key" in checked)) return no("forbidden");
     const local: LocalSignerProof = config.localSigners.proof(checked.key, checked.since, {
       call: metadata => budget.spend("signer", { calls: 1, metadata }),
       body: historyBytes => budget.spend("signer", { historyBodies: 1, historyBytes }),
@@ -98,6 +99,12 @@ export class ItemQueries {
     }
     if (!run.active() || !budget.available) return no("unavailable");
     const guard = (): ItemQueryRefusal | null => {
+      // Establish scope authority before disclosing a changed clock. The
+      // fresh check below still applies the current request window.
+      if (!(local.state === "positive" && (timeMs(local.time) ?? -Infinity) >= checked.since
+        || root.kind === "root" && leads(root.root, checked.key, checked.since))) {
+        return local.state === "unknown" || root.kind === "unknown" ? "unavailable" : "forbidden";
+      }
       const fresh = checkSignedReadRequest(signing, { scope: () => frame.scope }, reader, "query-items", argument);
       if (!("key" in fresh) || fresh.key !== checked.key) return "refused" in fresh && fresh.refused === "clock-behind" ? "clock-behind" : "forbidden";
       if (local.state === "positive" && (timeMs(local.time) ?? -Infinity) >= fresh.since || root.kind === "root" && leads(root.root, fresh.key, fresh.since)) return null;

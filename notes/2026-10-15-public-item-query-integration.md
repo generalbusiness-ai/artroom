@@ -6,7 +6,7 @@ and the concrete summary in `d53ba2de`. This is an assembly note in
 progress. It is not Source approval or evidence of an enabled route.
 The isolated candidate starts at local main `f41ab63c`.
 
-## Current source
+## Starting source at local main f41ab63c
 
 - `packages/scope/src/item-query-page.ts:21` already validates the query,
   full scope and cursor, selects bounded metadata, admits every legal
@@ -261,9 +261,9 @@ restore Source; there is no mutation sweep.
 
 A full typecheck found three hand-built Page fixture values missing the
 new directory binding; their explicit null bindings are now supplied.
-Package typechecks pass after correction. Rendered QA, the final selected
-checks and one full gate at the frozen Source head remain owed. The
-Browser plugin and `browser` skill are absent; rendered QA will use the
+Package typechecks pass after correction. At that checkpoint, rendered QA,
+the final selected checks and a full gate at the frozen Source head were
+still owed. The Browser plugin and `browser` skill are absent; rendered QA uses the
 existing cached Playwright 1.63.0 installation outside the checkout.
 No package probe was installed, and no push or deployment ran.
 
@@ -278,3 +278,63 @@ or warnings, filtering without requests, issue open/back, and a scripted
 incomplete directory reply visibly withheld. The first playback fixture
 omitted public brand/fonts; adding the packaged static assets fixed the
 fixture. No native or deployed authority is inferred from playback.
+
+
+## Gate failure and corrections after resume
+
+The gate at `77478ed86e6831d6e227e0c712a8b63917ec269b`
+(tree `3bfaa5147f0edc9a7d76b500139e69d35c5f7af6`) failed.
+Whitespace passed in 0.1 seconds and typechecking in 7.2 seconds. Vitest
+reported 1,347 passing, 17 failing and three skipped tests; the chained
+Node and Counter-client stages did not run. Test-stage elapsed time was
+7,292 seconds with 263.6 CPU seconds. This is a failed run, not a pass.
+
+The machine's power history records repeated sleeps during the run,
+including a 921-second sleep beginning at 01:39:54 Eastern. Several
+reported test durations exceed their deadlines by about 919 seconds.
+That establishes an environmental interruption; it does not by itself
+explain every failed assertion. Focused checks now run under a temporary
+`caffeinate -is` process, which ends with the command and changes no
+persistent power setting.
+
+Two integration failures were concrete: the new CLI command was absent
+from the W1 MCP inventory, and the public Counting bundle was stale after
+the SDK change. The Counting bundle is regenerated. MCP parity scope is
+asked explicitly in request `192ab6c9`: its legacy item traversals do not
+provide the new query's scope/state/ID/cursor guarantees, so no equivalence
+is claimed while that decision is pending.
+
+The new native composed-work witness also signed at a fixed fixture time.
+That is incorrect after another test advances the shared native clock;
+it now signs using the current fixture clock. A further privacy check
+makes invalid pre-authorization clocks and pre-evidence signed clock
+refusals return generic `forbidden`. Only after scoped evidence can the
+query disclose a state-specific clock reason. The native witness fails by
+assertion if the pre-evidence clock reason is exposed again, and Source
+is restored after that focused control.
+
+After these corrections, six signed/issued query cases, nine focused
+native lifetime/Counting/lending/route cases, the interrupted replay case,
+two interrupted MCP Node cases, fourteen hosted/room cases and the
+regenerated Counting asset check pass in separate focused runs. These do
+not erase the failed gate or claim a complete replacement gate. Eight
+targeted long native cases also pass in 40.0 seconds with sleep
+prevented. The MCP inventory decision and a gate at the corrected frozen
+Source head remain owed.
+
+A further native case changes the clock after a causal history body is
+read. The signed query must establish scoped signer/root evidence before
+it can disclose that clock fault. An unrelated key receives `forbidden`;
+the genuine founder receives `clock-behind`. The first fixture changed
+the clock during initial genesis capture instead; it was corrected to
+fault after the second history-body read. All three lifetime/privacy cases
+then pass. Removing only the new scoped-evidence check makes the unrelated
+key receive `clock-behind` and fails the existing assertion. Source is
+restored to SHA-256
+`59b955466c82255c2715548ca59b0807351c5b12726f9abcdb5f0e165a539224`.
+
+This corrected checkpoint is available for independent Source reading
+while the MCP inventory scope decision is pending. It is preparation,
+with the failed gate retained and no replacement gate, final approval or
+local-main activation claimed. The separate A1c archive preparation in
+request `02252148` does not change this query branch.
