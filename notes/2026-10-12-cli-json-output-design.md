@@ -1,6 +1,6 @@
 # JSON output for the dap command line
 
-Builder revision 3, for independent design review. Request `f319c428`,
+Builder revision 4, for independent design review. Request `f319c428`,
 promise `a6d5ee53`, under `92d6dddb` and `c1cacd1a`. This replaces the
 retained planner draft at `65609bac` and builder revision 2 at `58889d54`,
 addressing checker review `4a15bc25` against current local Main
@@ -327,26 +327,86 @@ A refused read is unreadable/1; a lost reply is unknown/1. A verifier emits
 a Report only when the native verifier actually returned one. A stopped
 replay is not an invented complete Report or an inconsistent history.
 
-Continuation is a versioned public `readNext`, accepted explicitly by
-`log`, `issues` and `verify --all` as `--read-next <value>`. It binds resolved
-command/options, exact scope incarnations and observed heads, completed
-coverage, pending scope order and each native cursor. It contains no
-credential, session, key material or private path and grants no authority.
-It is untrusted input, validated within a proposed 1-MiB encoded bound and
-counted inside the result allowance.
+Continuation uses authenticated local progress. The public `readNext` is
+an opaque versioned token accepted explicitly by `log`, `issues` and
+`verify --all` as `--read-next <value>`. Its canonical body binds a random
+operation ID, revision, progress digest, service, resolved command/options,
+local signer KeyId and expiry. The current local signer signs only producer-owned progress bytes, never
+a submitted token or supplied checkpoint, under the separate `artroom-cli-read-next-1` domain. The token contains no
+credential, session, private path, report, mutable cursor or claimed count.
+It grants no remote authority. Its signature is not an act or read request.
+The encoded token is capped at 8 KiB before decoding or verification.
 
-Resume obtains fresh read authority and a new allowance, then checks the
-bound heads. A changed head returns an explicit restart-required local code
-and incomplete/1, never silent combination across heads. If a coherent token
-cannot fit, retain valid coverage and say continuation unavailable. Do not
-claim complete coverage or silently drop pending scopes.
+The corresponding private progress record is produced by the collector,
+not imported from the token. It holds exact scope incarnations/heads,
+actual completed discovery/replay/cleanup evidence, pending scope order,
+native cursors and retained log summaries. A content digest binds the full
+canonical record to the signed token. Resume checks the signature under
+the current configured key, exact service/command/options, expiry, expected
+operation revision and the retained record's digest before crediting any
+progress. Missing, changed, forged or mismatching local progress yields an
+explicit incomplete/1 recovery result with no new cumulative coverage.
+Fresh remote read authority and unchanged native heads are checked too;
+those checks alone never establish earlier reads or verification.
 
-A complete log tail is available only after collection reaches its bound
-head. Incomplete prefixes are labelled collected prefixes. Verification
-continuation distinguishes discovery, replay and cleanup. A discovery
-cursor is no replay checkpoint. Resume must preserve a validated verifier
-checkpoint or explicitly restart that scope's replay within its new
-allowance. Native Reports keep their existing shape.
+Only one resumable read operation is retained per configuration directory.
+An aggregate command's proposed `--restart-read` switch explicitly discards
+only that owned read-progress operation before starting another. With a
+retained operation, an invocation without either --read-next or --restart-read
+returns usage/2 instead of replacing progress silently. The two options are
+mutually exclusive; --restart-read takes no value. It never replaces
+mutation custody. Progress expires after 30 minutes.
+Each canonical snapshot is capped at 8 MiB before parsing/materialization,
+with at most a current and an in-progress successor snapshot. The existing
+private-store owner, symlink, permission, atomic-write and operation-lock
+rules apply. A revision is committed before its next token is released.
+Concurrent or replayed older revisions cannot merge progress or double-credit
+completed units. A completed prior revision may return its already-retained
+successor token after validating that exact transition. Tokens contain no
+private filenames. No signature permits selecting arbitrary local files.
+
+The shared allowance charges progress reads, validation, each remote read,
+result assembly and snapshot persistence. The retained record has separate
+hard 8-MiB admission, and private current/successor storage has a hard
+16-MiB operation bound. The collector reserves space for a fixed terminal
+error/coverage record before admitting data. If the next whole unit, progress
+snapshot or response cannot fit its own allowance, it returns finite
+incomplete/1 with a terminal size disposition. It emits no token for a
+transition that cannot advance. Persistence failure retains the previous
+valid record and known progress, reports the failure and grants no fresh
+mutation. These are local read-progress duties, not new remote authority.
+
+Verification progress credits only Reports and cleanup/discovery evidence
+that the collector actually completed and retained. A partial verifier can
+resume only from a checkpoint its verifier produced, validated and sealed
+in that record. If no such checkpoint exists, that scope restarts explicitly
+within the next invocation allowance; it receives no completed credit until
+a real Report exists. A discovery cursor is never a verifier checkpoint.
+A changed bound head ends the cumulative operation with restart-required;
+it never silently combines reports or progress from different heads.
+
+Log progress retains an actual rolling tail with sequence, full hash and
+source head beside each summary. For positive finite limit N it keeps the
+last N summaries read so far, admitted under the private 8-MiB bound.
+On a short final segment, it combines those retained summaries with the new
+ones before selecting the final tail. For example, limit20 followed by a
+final five entries returns fifteen earlier summaries plus those five,
+with their actual sequence/hash/head bindings. Native continuity, exact
+incarnation and bound head are rechecked. The local signature and retained
+digest protect the provenance of the earlier summaries; a caller cannot
+supply replacement tail entries as token data.
+
+Current slice(-limit) semantics also apply to zero, negative, nonfinite or
+fractional numeric values until an argument-policy change is adopted. The
+collector keeps precisely the summaries needed for that selection, without
+inventing a positive cap or silently treating zero as the default. If those
+summaries cannot fit the retained/result bounds, the command returns a
+terminal incomplete/1 size disposition with valid collected data. It does
+not repeatedly issue a token that can never reconstruct the selected result.
+An interrupted reconstruction that can advance instead returns an exact
+committed continuation. Neither case says done with an incomplete tail.
+`total` and cumulative complete coverage are credited only from actual
+collector progress, never caller-supplied counters or unchanged heads alone.
 
 These allowance, continuation and incomplete-exit changes need explicit
 design adoption in both renderers. They are the named exceptions to text
@@ -374,8 +434,11 @@ the envelope does not rename or privately version their fields.
 Checker `4a15bc25` preferred inconsistent/1 with native result, confidential
 link output, done facts in result and the schema in the CLI package. This
 revision adopts those preferences. Full catalogs, environment defaults,
-JSON-lines and follow mode remain deferred. The proposed shared read policy
-and MCP exception remain explicit decisions requested from this review.
+JSON-lines and follow mode remain deferred. Review `0fb944f7` explicitly accepted the shared aggregate allowances,
+pre-body admission, incomplete/restart direction and MCP exception. This
+revision resolves its two remaining continuation findings with signed local
+progress and retained actual log tails. Those continuation details still
+require exact revised design approval. No implementation authority follows.
 
 ## 9. Meaningful verification plan
 
@@ -397,6 +460,9 @@ witnesses, not passing evidence from this document change.
 | Child stdout cannot corrupt the document | Git stand-in writes both streams; separately retain captured-byte behavior and preflight. |
 | JSON MCP rejection starts nothing | main/parser effect sentinels for config, key, root, listener and protocol; unchanged no-JSON MCP path. |
 | Aggregate allowances cover nested work and resume | Small injected shared limits, one real-limit check, changed-head and missing-authority continuation cases; no wall-clock sleeps. |
+| Untrusted token claims cannot establish completed work | Alter skipped-scope/count/checkpoint/tail claims while retaining valid native heads; unsigned token and changed retained digest cannot yield cumulative done/consistent. |
+| A short final log segment preserves its actual tail | limit20 with fifteen retained summaries and five final entries, checking exact IDs/hashes; insufficient tail/result allowance gives incomplete with a finite disposition, never false done or a repeating token. |
+| Read-progress custody is bounded and survives interruption | One existing private-store atomic-write/lock fixture, with missing snapshot, stale revision, changed command/key, expiry and failed successor persistence; prior mutation custody stays intact. |
 | Schema matches public producers | Validate actual result fixtures and meaningful invalid combinations; do not mirror implementation in a second serializer. |
 
 Run the tests of changed source while implementing, and one gate at the
@@ -426,7 +492,8 @@ for prose alone. Relevant current source boundaries are:
 
 This source comparison covers those named boundaries, not every branch of
 commands.ts. It makes no claim that a new renderer, collector, continuation
-or schema has run. Proposed allowance values await explicit review.
+or schema has run. The accepted allowance direction is recorded in review `0fb944f7`; revised
+continuation custody and tail semantics await independent approval.
 
 After corrected design approval, file separate implementation requests:
 
@@ -442,3 +509,9 @@ After corrected design approval, file separate implementation requests:
 
 This design child closes no all-command implementation parent. No step
 implicitly publishes a package, pushes GitHub or deploys Cloudflare.
+
+Revision 4 follows checker `0fb944f7`: unchanged heads and valid token shapes
+are insufficient proof of earlier work. Only authenticated retained actual
+progress supplies cumulative coverage. The short-final-segment and capacity
+witnesses above distinguish both reported continuation defects. This is a
+document-only successor; no producer, token, private record or test has run.
