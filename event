@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bd57a0513ba8aa5764b34d95bf50929f4beb10dc","text":"Merge retired a covered predecessor; the successor is at packages/scope/test/indexed-integers.test.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:bfb453152074d8621874ab86c34e4f40105f54b1","text":"Merge retired a covered predecessor; the successor is at apps/room/page/assets.ts."}
