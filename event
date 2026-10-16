@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:0ee9af33e4cfb7a0f7b1d9225531fc50d7e867ba","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-mcp-unknown-guards.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:18f9b5e444fbef0bce9d0ba1f8395ec1b6c7a79e","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/describe.test.ts."}
