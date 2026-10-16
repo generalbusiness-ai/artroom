@@ -1,4 +1,4 @@
-> **Inactive.** This page describes the release of the earlier model's six packages. Its scripts and files were removed from main; they remain, unedited, at the tag `spikes-final` under `spikes/parked/release/`, and none of them runs. Releasing the new packages is a later delivery (I6). See [`spikes/parked/README.md`](../spikes/parked/README.md).
+> **Inactive.** This page describes the release of the earlier model's six packages. Its scripts and files were removed from main; they remain, unedited, at the tag `spikes-final` under `spikes/parked/release/`, and none of them runs. Releasing the new packages is a later delivery (I6). See ``spikes/parked/README.md`` (at tag `spikes-final`).
 
 # Release the packages
 
