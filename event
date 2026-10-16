@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/proof-bytes.test.ts","body":{"commit":"cf07ac85b38b862009c2bf150c240e3f85a7a8d3","path":"packages/scope/test/proof-bytes.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:022da93d924e99d0a91e58e94a1ec76c908cae3b","text":"Merge retired a covered predecessor; the successor is at apps/room/page/assets.ts."}
