@@ -37,9 +37,9 @@
  * under `trusts`, that the head is the service's answer.
  */
 
-import { DOMAINS, PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { Bounds, CapabilityName, Digest, Entry, FactRef, Grant, Head, KeyId, Observation, ObservationRequest, ObservationUse, MismatchName, PlatformData, PlatformDefinition, Report, RetainedInput, ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, digestBytes, intentDigest, isDigest, isEntry, isObservationUse, isPlatformDefinition, parseStrict, platformName, retainedValueKey, scopeIdOf, textDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   HOLD, HOLD_KINDS, MISMATCHES, MemoryState, WINDOWS, actionOf, agrees, applyEntry, drawsOf, clockOf, contentStates, entryOf, fits, namedBy, observedName, retainsOf, headsOf, highestHead, inputTexts, isAncestryCheck, isFactRef, isLocalId, isObject, isScopeRef, isUnprovenDecisionBinding, judgeAct, judgeCheckpoint, judgeDelivery,
   judgeDiagnosis, evidenceValues, outcomeValueDomains, fixedBy, judgeGenesis, judgeGrant, judgeOutcome, judgePreparation, judgeTimed, membershipOf, nextDue, observedOf, own, ownersOf, placesOf, ruleAt, same, snapshotRead, stepsOf, timeMs, updateOf, validateDefinition, valueDigest, windowOf,
@@ -1052,7 +1052,8 @@ class Verifier {
       let found: string | null = null;
       for (const domain of domains) {
         const left = this.#limits.bytes - this.#bytes;
-        const got = await this.#source.retained(run.id, "value", digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, domain);
+        const key = retainedValueKey(domain, digest);
+        const got = await this.#source.retained(run.id, key.kind, key.digest, { bytes: Math.min(left, RETAINED_REPLY_BYTES) }, "domain" in key ? key.domain : undefined);
         if (!got.ok) { this.#unread(got.reason, left < RETAINED_REPLY_BYTES, `a retained input of ${run.id}`); continue; }
         this.#count(got.bytes);
         try { if (valueDigest(domain, parseStrict(got.input.bytes)) === digest) found = got.input.bytes; } catch { /* not the one named */ }
@@ -1327,7 +1328,8 @@ class Verifier {
         const values: string[] = [];
         for (const place of placesOf(own(definition.declared.acts, input.signed.intent.kind)?.fields, input.signed.intent.fields)) {
           const what = `the value that the field ${place.field} names, in the domain ${place.domain}`;
-          const kept = place.domain === DOMAINS.definition ? await this.#retained(run, where, "definition", place.digest, what) : await this.#retained(run, where, "value", place.digest, what, place.domain);
+          const key = retainedValueKey(place.domain, place.digest);
+          const kept = await this.#retained(run, where, key.kind, key.digest, what, "domain" in key ? key.domain : undefined);
           let named = false;
           try { named = valueDigest(place.domain, parseStrict(kept.bytes)) === place.digest; } catch { /* not the one named */ }
           if (!named) throw new Stop("incomplete", `a retained input is not the one named: ${what}, ${place.digest}`, where);
@@ -1425,7 +1427,8 @@ class Verifier {
         if (named === null) throw mismatch("the evidence names a value outside its owner declaration");
         const values = [...(kindRows?.values ?? [])];
         for (const value of named) {
-          const kept = await this.#retained(run, where, "value", value.digest, "the value named by outcome evidence", value.domain);
+          const key = retainedValueKey(value.domain, value.digest);
+          const kept = await this.#retained(run, where, key.kind, key.digest, "the value named by outcome evidence", "domain" in key ? key.domain : undefined);
           try {
             if (utf8(kept.bytes).length > value.max || canonicalize(parseStrict(kept.bytes)) !== kept.bytes || valueDigest(value.domain, parseStrict(kept.bytes)) !== value.digest) throw new Error();
           } catch { throw new Stop("incomplete", `a retained input is not the one named: the outcome evidence value, ${value.digest}`, where); }
