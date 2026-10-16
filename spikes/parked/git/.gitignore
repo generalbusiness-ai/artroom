@@ -1,4 +1,0 @@
-src/worker-runtime.d.ts
-.wrangler/
-measure/.state*
-measure/results/*.raw*

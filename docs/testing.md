@@ -529,8 +529,8 @@ Two sets of generated files follow the lane definitions:
 by `apps/room/lanes/scripts/reference.mjs`. The pins test fails while
 either is stale.
 
-Nothing under `spikes/parked/` is installed, typechecked or tested.
-[spikes/parked/README.md](../spikes/parked/README.md) says what is there.
+The earlier spikes were removed from main. They remain at the tag
+`spikes-final`, where `spikes/parked/README.md` says what is there.
 
 Do not run it again for a commit that changes only documents; say that the
 source and tests are unchanged, and give the two tree hashes.

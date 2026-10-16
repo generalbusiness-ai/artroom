@@ -823,6 +823,7 @@ bindings; they grant no source approval, receipt or request closure.
 | Deployment and live journey | Demo gate 1, request `225da894` | The recorded source used `packages/scope/wrangler.jsonc`; the current configuration is `apps/room/wrangler.jsonc`. The initial checkpoint owed live evidence; the exact isolated expanded run above now records own-host creation, an empty-tree first head and receipt, operator-token clones and six consistent authenticated replays. Its operator token is a labelled stand-in for the separate room-issued CLI credential flow, and its operator is builder rather than a fresh person. Native lane hold and content-change publication, browser obligations, fresh-person signoff and the rest of I3 remain open. These producer observations grant no source approval or request closure. |
 | Budgets in bytes, items, records and pending requests; the numbers of every bound | The proof plan | The judge and replay check the budget of entries, including the reservations of holders, observations, evidence values and bound decisions. The holder amounts are computed in all five dimensions, but judging against the other four budgets is still outstanding. The numbers remain temporary examples; the capacity proof is not complete. |
 
-The earlier model's source that a later delivery still replaces is in
-`spikes/parked/`, and `spikes/parked/README.md` is its ledger. `docs/protocol.md` and
+The earlier model's parked source was removed from main; it remains at
+the tag `spikes-final`, under `spikes/parked/`, with `spikes/parked/README.md`
+as its ledger. `docs/protocol.md` and
 `docs/policy-pack.md` describe the earlier model and are marked inactive.
