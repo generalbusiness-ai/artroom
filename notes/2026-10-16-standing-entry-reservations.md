@@ -186,3 +186,16 @@ than infer a full rerun or erase the stalled test. Local query main
 it in exactly its 17 authored paths. Main merge accounting still completes
 through the original gitseq process; no repeated merge, push or deployment
 is authorized by these test results.
+
+The Counting harness comparison also checks the source graph and driver:
+all 58 repository inputs in the current build metafile are byte-identical
+to query gate `49941df6`. The root package scripts, lockfile, test driver
+and all four owning test entry sources are identical. The driver hash is
+`39e478d0a2ef04f1ee9e45f12bf916ebc7f3292f92b65bbd47368dfe4901280a`;
+the lock hash is
+`647301d0627568fc949dcf2d5277d352b5b855031ab0382f4870f5252f532326`.
+Current Node is v26.12.0. Prior process environment was not captured, so
+no environment-identity or root-cause claim is made. Public metadata pins
+the complete driver/input comparison. Separate request `2f07acf9` asks
+planner to sequence the intermittent Counting wait and finite child-timeout
+work after NOW; it does not change this C1 implementation.
