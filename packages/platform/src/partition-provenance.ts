@@ -2,8 +2,8 @@
  * Source frames or normally checked replay runs. Hash-valid arbitrary entries
  * are not proof of native execution. Old destination policies remain separate. */
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
-import type { Digest, Entry, FactRef, PlatformDefinition, Request, ScopeRef, Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, deliveryCauseDigest, intentDigest, isDigest, isPlatformDefinition, isSeed, messageDigest, platformName, scopeIdOf, seedDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
+import type { DeclaredDefinition, Digest, Entry, FactRef, PlatformDefinition, Request, ScopeRef, Seed } from "@generalbusiness/dap-contract";
+import { canonicalize, definitionDigest, deliveryCauseDigest, intentDigest, isDigest, isPlatformDefinition, isSeed, messageDigest, platformName, scopeIdOf, seedDigest, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, isFactRef, isObject, isScopeRef, same, sentBy, type Fetched } from "@generalbusiness/dap-derive";
 import { PARTITION_COHORT as COHORT, MAX_GENERATIONS, PARTITION_SPAN } from "./directory-partitions.ts";
 
@@ -120,13 +120,21 @@ function origin(from: FactRef, root: ScopeRef, destination: ScopeRef, facts: rea
       || !isDigest(seed.definition) || seed.ordinal !== 0 || scopeIdOf(seed) !== from.at.scope || !isScopeRef(seed.creator) || seed.creator.kind !== "directory"
       || !isFactRef(born.source) || !same(born.source.at, seed.creator) || born.n === null
       || !born.message || born.message.class !== "request" || born.message.type !== "create" || !isObject(born.message.body)) return false;
+    if (kind === "change" && born.kind !== "open") return false;
+    return directPublicationCreation({ seed, source: born.source, n: born.n, message: born.message }, root, destination, facts, kind);
+  } catch { return false; }
+}
+function directPublicationCreation(born: PartitionCreation, root: ScopeRef, destination: ScopeRef, facts: readonly Fetched[], kind: "application" | "change"): boolean | null {
+    const seed = born.seed;
+    if (!isSeed(seed) || seed.kind !== "lane" || !isDigest(seed.definition) || seed.ordinal !== 0 || !isScopeRef(seed.creator) || seed.creator.kind !== "directory"
+      || !isFactRef(born.source) || !same(born.source.at, seed.creator) || !Number.isSafeInteger(born.n) || born.n < 0
+      || born.message.class !== "request" || born.message.type !== "create" || !isObject(born.message.body)) return false;
     const creator = frame(facts, born.source);
     if (!creator) return null;
     if (creator.under !== "platform:directory-partition" || !isEntryOf(creator.entry, creator.fact) || creator.entry.input.type !== "act") return false;
     const made = creator.entry.input.signed;
     if (made.intent.kind !== (kind === "application" ? "establish-application" : "open-pr") || !same(made.intent.to, seed.creator)
       || !verifySignedIntent(made) || made.intent.fields["definition"] !== seed.definition || intentDigest(made.intent) !== seed.cause
-      || kind === "change" && born.kind !== "open"
       || !sentBy(creator.entry, { from: born.source, n: born.n, to: seed, message: born.message })) return false;
     const room = context(facts, seed.creator, root, destination);
     if (room === null) return null;
@@ -135,7 +143,6 @@ function origin(from: FactRef, root: ScopeRef, destination: ScopeRef, facts: rea
     if (!isObject(fields) || !same(body["directory"], seed.creator) || !same(body["membership"], room.value.membership)) return false;
     if (kind === "application") return same(body["creationContext"], { v: 1 }) && (!("destination" in fields) || same(fields["destination"], destination));
     return same(fields["destination"], destination) && same(fields["rules"], room.value.rules);
-  } catch { return false; }
 }
 /** Not installed on any consumer until its receiver policy is selected. */
 export const partitionApplicationPublicationOrigin = (from: FactRef, root: ScopeRef, destination: ScopeRef, facts: readonly Fetched[]): boolean | null => origin(from, root, destination, facts, "application");
@@ -170,6 +177,14 @@ function nativeLane(named: Digest, name: "change" | "issue", at: ScopeRef, facts
     || !isSeed(seed) || seed.kind !== "lane" || seed.definition !== named || seed.ordinal !== 0 || scopeIdOf(seed) !== at.scope
     || !isScopeRef(seed.creator) || !isFactRef(born.source) || !same(seed.creator, born.source.at) || born.n !== 0
     || !born.message || born.message.class !== "request" || born.message.type !== "create" || !isObject(born.message.body) || !isObject(born.message.body["fields"])) return invalid;
+  return laneCreation(named, name, { seed, source: born.source, n: born.n, message: born.message }, facts, depth, seen);
+}
+function laneCreation(named: Digest, name: "change" | "issue", born: PartitionCreation, facts: readonly Fetched[], depth: number, seen: Set<string>): Checked<Context> {
+  const seed = born.seed;
+  if (depth > PARTITION_IDENTITY_BOUNDS.laneDepth) return null;
+  if (!isSeed(seed) || seed.kind !== "lane" || seed.definition !== named || seed.ordinal !== 0
+    || !isScopeRef(seed.creator) || !isFactRef(born.source) || !same(seed.creator, born.source.at) || born.n !== 0
+    || born.message.class !== "request" || born.message.type !== "create" || !isObject(born.message.body)) return invalid;
   const creator = frame(facts, born.source);
   if (!creator) return null;
   if (!isEntryOf(creator.entry, creator.fact) || creator.entry.input.type !== "act") return invalid;
@@ -313,6 +328,30 @@ export function partitionCreationPolicy(creation: PartitionCreation, frames: rea
     const facts = rawFacts(frames), fields = isObject(creation.message.body) ? creation.message.body["fields"] : null;
     if (!facts || !isObject(fields) || !isScopeRef(fields["root"]) || !isScopeRef(fields["destination"])) return null;
     const room = rootContext(facts, creation, fields["root"], fields["destination"]);
+    return room?.ok ? { mode: "partition-v1", root: room.value.root, creation } : null;
+  } catch { return null; }
+}
+
+/** The caller supplies the receiver's own declaration bytes, as checked by
+ * normal genesis admission. Hash binding prevents a requested role name
+ * from selecting the policy for another definition. */
+export function partitionDeclaredCreationPolicy(creation: PartitionCreation, definition: DeclaredDefinition, frames: readonly PartitionNativeFrame[]): PartitionCreationPolicy | null {
+  try {
+    if (!isDigest(creation.seed.definition) || definitionDigest(definition) !== creation.seed.definition) return null;
+    const facts = rawFacts(frames);
+    if (!facts) return null;
+    const creating = frame(facts, creation.source);
+    if (creating?.entry.input.type !== "act") return null;
+    let room: Checked<Context>;
+    if (creating.entry.input.signed.intent.kind === "establish-application") {
+      const part = isScopeRef(creation.seed.creator) ? first(facts, creation.seed.creator) : null;
+      const fields = part?.entry.input.type === "genesis" && isObject(part.entry.input.message?.body) ? part.entry.input.message.body["fields"] : null;
+      if (!isObject(fields) || !isScopeRef(fields["root"]) || !isScopeRef(fields["destination"])
+        || directPublicationCreation(creation, fields["root"], fields["destination"], facts, "application") !== true) return null;
+      return { mode: "partition-v1", root: fields["root"], creation };
+    }
+    if (definition.name !== "issue" && definition.name !== "change" || definition.genesis !== (definition.name === "issue" ? "file" : "open")) return null;
+    room = laneCreation(creation.seed.definition, definition.name, creation, facts, 1, new Set());
     return room?.ok ? { mode: "partition-v1", root: room.value.root, creation } : null;
   } catch { return null; }
 }

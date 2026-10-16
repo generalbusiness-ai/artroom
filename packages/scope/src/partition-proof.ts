@@ -1,9 +1,9 @@
 /** Raw immutable partition birth evidence. No frame is a judged `Fetched`
  * identity: receiver policy must validate the complete chain separately. */
-import type { FactRef, ScopeRef } from "@generalbusiness/dap-contract";
-import { canonicalize, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
+import type { DeclaredDefinition, FactRef, ScopeRef } from "@generalbusiness/dap-contract";
+import { canonicalize, definitionDigest, isDigest, isFactRef, isScopeRef, utf8 } from "@generalbusiness/artroom-bytes";
 import { isObject, same } from "@generalbusiness/dap-derive";
-import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
+import { PARTITION_COHORT, PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionCreationPolicy, partitionDeclaredCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverPolicy } from "@generalbusiness/dap-platform";
 import type { NativeBirth, NativeBirthSource } from "./native-birth.ts";
 import { readNativeBirth } from "./native-birth.ts";
 import { PROOF_BYTE_BOUNDS, proofEntry, type ProofBody, type ProofSource } from "./proof-bytes.ts";
@@ -36,6 +36,8 @@ class Collection {
   readonly #frames = new Map<string, RawPartitionFrame>();
   readonly #positions = new Map<string, string>();
   readonly #births = new Map<string, NativeBirth>();
+  readonly #pendingBirths = new Map<string, Promise<NativeBirth | null>>();
+  readonly #pendingExact = new Map<string, Promise<RawPartitionFrame | null>>();
   readonly #now: () => number;
   readonly #wait: NonNullable<PartitionProofPorts["wait"]>;
   readonly #began: number;
@@ -74,21 +76,32 @@ class Collection {
     if (!isScopeRef(at)) return null;
     const key = canonicalize(at), cached = this.#births.get(key);
     if (cached) return this.#remaining() > 0 ? cached : null;
-    const reply = await this.#call(ms => this.ports.births.read(at, ms));
-    const birth = readNativeBirth(reply, at);
-    if (!birth || !this.#keep(birth.proof, birth)) return null;
-    this.#births.set(key, birth); return birth;
+    const pending = this.#pendingBirths.get(key);
+    if (pending) return pending;
+    const work = (async () => {
+      const reply = await this.#call(ms => this.ports.births.read(at, ms));
+      const birth = readNativeBirth(reply, at);
+      if (!birth || !this.#keep(birth.proof, birth)) return null;
+      this.#births.set(key, birth); return birth;
+    })();
+    this.#pendingBirths.set(key, work); return work;
   }
   async exact(fact: FactRef): Promise<RawPartitionFrame | null> {
     if (!isFactRef(fact)) return null;
     const key = canonicalize(fact), cached = this.#frames.get(key);
     if (cached) return this.#remaining() > 0 ? cached : null;
-    const birth = await this.birth(fact.at);
-    if (!birth) return null;
-    if (fact.seq === 0) return same(fact, birth.proof.fact) ? this.#frames.get(key) ?? null : null;
-    const body = await this.#call(ms => this.ports.proofs.read(fact, PROOF_BYTE_BOUNDS.body, ms));
-    return body && same(body.fact, fact) ? this.#keep(body, birth) : null;
+    const pending = this.#pendingExact.get(key);
+    if (pending) return pending;
+    const work = (async () => {
+      const birth = await this.birth(fact.at);
+      if (!birth) return null;
+      if (fact.seq === 0) return same(fact, birth.proof.fact) ? this.#frames.get(key) ?? null : null;
+      const body = await this.#call(ms => this.ports.proofs.read(fact, PROOF_BYTE_BOUNDS.body, ms));
+      return body && same(body.fact, fact) ? this.#keep(body, birth) : null;
+    })();
+    this.#pendingExact.set(key, work); return work;
   }
+
   async lane(at: ScopeRef, depth = 1, seen = new Set<string>()): Promise<boolean> {
     const key = canonicalize(at);
     if (depth > PARTITION_PROOF_BOUNDS.laneDepth || seen.has(key)) return false;
@@ -154,37 +167,51 @@ class Collection {
   }
 }
 
-/** Collect the candidate's exact current fact, birth and finite creator chain.
- * A complete collection is still raw evidence. It conveys no native role or
- * receiver eligibility until the pure receiver policy validates it. */
-export async function partitionProof(ports: PartitionProofPorts, from: FactRef): Promise<PartitionProof | null> {
-  if (!isFactRef(from) || from.at.kind !== "lane") return null;
-  try {
-    const collection = new Collection(ports);
-    const source = await collection.exact(from);
-    return source && await collection.lane(from.at) ? collection.finish(source) : null;
-  } catch { return null; }
+/** One operation owns receiver selection and every subsequent raw proof
+ * read under one call/frame/byte/deadline allowance. It caches no identities.
+ * Concurrent requests for the same raw birth or fact share the actual RPC. */
+export class PartitionProofOperation {
+  readonly #collection: Collection;
+  constructor(ports: PartitionProofPorts) { this.#collection = new Collection(ports); }
+  async lane(from: FactRef): Promise<PartitionProof | null> {
+    if (!isFactRef(from) || from.at.kind !== "lane") return null;
+    try {
+      const source = await this.#collection.exact(from);
+      return source && await this.#collection.lane(from.at) ? this.#collection.finish(source) : null;
+    } catch { return null; }
+  }
+  async receiver(at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> {
+    if (!isScopeRef(at)) return null;
+    try {
+      const own = await this.#collection.receiver(at), proof = own && this.#collection.finish(own);
+      const policy = proof && partitionReceiverPolicy(at, proof.frames);
+      return policy && proof ? { policy, proof } : null;
+    } catch { return null; }
+  }
+  async creation(creation: PartitionCreation): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
+    try {
+      if (!await this.#collection.rootCreation(creation)) return null;
+      const source = await this.#collection.exact(creation.source), proof = source && this.#collection.finish(source, true);
+      const policy = proof && partitionCreationPolicy(creation, proof.frames);
+      return policy && proof ? { policy, proof } : null;
+    } catch { return null; }
+  }
+  async declaredCreation(creation: PartitionCreation, definition: DeclaredDefinition): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
+    try {
+      if (!isDigest(creation.seed.definition) || definitionDigest(definition) !== creation.seed.definition
+        || !isScopeRef(creation.seed.creator) || !isFactRef(creation.source) || !same(creation.seed.creator, creation.source.at)) return null;
+      const source = await this.#collection.exact(creation.source);
+      // Depth starts at two: the unborn concern is already the first lane.
+      if (!source || !(creation.seed.creator.kind === "lane" ? await this.#collection.lane(creation.seed.creator, 2) : await this.#collection.partition(creation.seed.creator))) return null;
+      const proof = this.#collection.finish(source, true), policy = proof && partitionDeclaredCreationPolicy(creation, definition, proof.frames);
+      return policy && proof ? { policy, proof } : null;
+    } catch { return null; }
+  }
 }
 
-/** Receiver-local selection, using one total raw evidence allowance. No
- * producer alias, origin boolean, request flag or caller root selects it. */
-export async function receiverPolicyProof(ports: PartitionProofPorts, at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> {
-  if (!isScopeRef(at)) return null;
-  try {
-    const collection = new Collection(ports), own = await collection.receiver(at), proof = own && collection.finish(own);
-    const policy = proof && partitionReceiverPolicy(at, proof.frames);
-    return policy && proof ? { policy, proof } : null;
-  } catch { return null; }
-}
-
-/** Empty partition bootstrap reads only its authenticated native parent send
- * and sibling births. It never asks the unborn child to authenticate itself. */
-export async function partitionCreationProof(ports: PartitionProofPorts, creation: PartitionCreation): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> {
-  try {
-    const collection = new Collection(ports);
-    if (!await collection.rootCreation(creation)) return null;
-    const source = await collection.exact(creation.source), proof = source && collection.finish(source, true);
-    const policy = proof && partitionCreationPolicy(creation, proof.frames);
-    return policy && proof ? { policy, proof } : null;
-  } catch { return null; }
-}
+/** Standalone conveniences each own one operation. An admission with several
+ * reads must reuse PartitionProofOperation rather than these wrappers. */
+export const partitionProof = (ports: PartitionProofPorts, from: FactRef): Promise<PartitionProof | null> => new PartitionProofOperation(ports).lane(from);
+export const receiverPolicyProof = (ports: PartitionProofPorts, at: ScopeRef): Promise<{ policy: PartitionReceiverPolicy; proof: PartitionProof } | null> => new PartitionProofOperation(ports).receiver(at);
+export const partitionCreationProof = (ports: PartitionProofPorts, creation: PartitionCreation): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> => new PartitionProofOperation(ports).creation(creation);
+export const partitionDeclaredCreationProof = (ports: PartitionProofPorts, creation: PartitionCreation, definition: DeclaredDefinition): Promise<{ policy: PartitionCreationPolicy; proof: PartitionProof } | null> => new PartitionProofOperation(ports).declaredCreation(creation, definition);

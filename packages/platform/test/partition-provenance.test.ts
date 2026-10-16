@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
-import { isPlatformDefinition, newIncarnation } from "@generalbusiness/artroom-bytes";
+import { definitionDigest, isPlatformDefinition, newIncarnation } from "@generalbusiness/artroom-bytes";
 import { sourceName } from "../src/publishing-provenance.ts";
-import { partitionApplicationPublicationOrigin, partitionPublishingLaneOrigin, partitionSourceName, partitionCreationPolicy, type PartitionNativeFrame } from "../src/partition-provenance.ts";
+import { partitionApplicationPublicationOrigin, partitionPublishingLaneOrigin, partitionSourceName, partitionCreationPolicy, partitionDeclaredCreationPolicy, type PartitionNativeFrame } from "../src/partition-provenance.ts";
+import { small } from "@generalbusiness/dap-derive/testing";
 import { scriptedPartitionOrigin } from "./support-partition-origin.ts";
 
 const raw = (sample: ReturnType<typeof scriptedPartitionOrigin>): PartitionNativeFrame[] => sample.frames.map(copy => {
@@ -50,4 +51,24 @@ test("empty partition bootstrap binds the actual native parent send without inve
   expect(partitionCreationPolicy(creation, frames)).toEqual({ mode: "partition-v1", root: sample.root, creation });
   expect(partitionCreationPolicy({ ...creation, n: creation.n + 1 }, frames)).toBeNull();
   expect(partitionCreationPolicy(creation, frames.slice(0, -1))).toBeNull();
+});
+
+
+test("declared bootstrap proves the exact factory or all concern parents with the unborn child counted in the depth limit", () => {
+  // SCRIPTED immutable proof shape; normal declaration validation and native
+  // genesis judgment remain separate obligations. No lane code runs here.
+  const definition = { ...small, name: "issue", genesis: "file" };
+  const sample = scriptedPartitionOrigin("issue", 3, false, definitionDigest(definition));
+  const born = sample.genesis.input;
+  if (born.type !== "genesis" || !born.source || born.n === null || !born.message) return expect.fail("scripted lane has no create");
+  const creation = { seed: born.seed, source: born.source, n: born.n, message: born.message };
+  const frames = raw(sample).filter(row => row.fact.at.scope !== sample.from.at.scope);
+  expect(frames).toHaveLength(13);
+  expect(partitionDeclaredCreationPolicy(creation, definition, frames)).toEqual({ mode: "partition-v1", root: sample.root, creation });
+  expect(partitionDeclaredCreationPolicy(creation, { ...definition, name: "change" }, frames)).toBeNull();
+  expect(partitionDeclaredCreationPolicy(creation, { ...definition, profile: { ...definition.profile, version: 99 } }, frames)).toBeNull();
+  expect(partitionDeclaredCreationPolicy({ ...creation, n: 1 }, definition, frames)).toBeNull();
+  const tooDeep = scriptedPartitionOrigin("issue", 4, false, definitionDigest(definition)), birth = tooDeep.genesis.input;
+  if (birth.type !== "genesis" || !birth.source || birth.n === null || !birth.message) return expect.fail("scripted concern has no create");
+  expect(partitionDeclaredCreationPolicy({ seed: birth.seed, source: birth.source, n: birth.n, message: birth.message }, definition, raw(tooDeep).filter(row => row.fact.at.scope !== tooDeep.from.at.scope))).toBeNull();
 });

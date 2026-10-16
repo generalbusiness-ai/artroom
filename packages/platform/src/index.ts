@@ -20,7 +20,7 @@ export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.
  * pins or select a receiver's identity policy. Lineage admission is separate. */
 import { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
 export { PARTITION_COHORT, directory10, directoryRules10, directoryPartition1, directoryPartitionRules1 } from "./directory-partitions.ts";
-export { PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionSourceName, partitionCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverLineage, type PartitionReceiverPolicy } from "./partition-provenance.ts";
+export { PARTITION_IDENTITY_BOUNDS, partitionReceiverPolicy, partitionSourceName, partitionCreationPolicy, partitionDeclaredCreationPolicy, type PartitionCreation, type PartitionCreationPolicy, type PartitionNativeFrame, type PartitionReceiverLineage, type PartitionReceiverPolicy } from "./partition-provenance.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";

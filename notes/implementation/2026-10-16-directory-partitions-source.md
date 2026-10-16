@@ -307,3 +307,33 @@ remain retained; the corrected five-case run passes.
 Bootstrap for declared lanes and concerns, shared per-admission evidence,
 runtime consumers and mixed replay remain owed. These isolated helpers
 still select no production receiver policy.
+
+## Declared bootstrap and one evidence operation
+
+Declared bootstrap checks the actual partition application factory, direct
+issue or change factory, or each native concern parent. It binds the
+receiver's own declaration digest. Renaming a supplied declaration or
+changing its profile cannot select a policy for the original target seed.
+The shared lane-creation checks also serve accepted births. An unborn
+concern counts as the first level, leaving at most three accepted parents.
+Normal declaration validation and genesis judgment remain required.
+
+The actual Counting creation is checked before its genesis in seven reads.
+It keeps its real `establish` genesis and receives no issue role. A scripted
+three-parent concern proof has thirteen frames and accepts; a fourth
+parent is unavailable. This pure fixture supplies coherent signed and
+hashed entries but runs no native concern factory or authority. Eight
+focused cases pass. Removing the declaration digest check fails the altered
+profile assertion, and restores the source. Both package typechecks pass.
+
+`PartitionProofOperation` now owns one collection for receiver selection,
+bootstrap and subsequent lane evidence. Concurrent exact reads and births
+share in-flight requests. The standalone convenience functions each create
+one operation; runtime admission must reuse an operation. A concurrent
+receiver read and two source reads need eight total calls, rather than
+three allowances. Advancing the operation beyond its deadline refuses a
+cached result without new I/O. Three collector cases and the two native
+factory cases pass after this refactor. Disabling birth-request sharing
+makes the concurrency witness observe fourteen calls instead of eight;
+the distinguishing control restores the source. No runtime admission uses
+this operation yet.

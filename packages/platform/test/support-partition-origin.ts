@@ -5,8 +5,8 @@ import { type Fetched } from "@generalbusiness/dap-derive";
 import { d, keys, T0, t } from "@generalbusiness/dap-derive/testing";
 import { PARTITION_COHORT as C } from "../src/directory-partitions.ts";
 
-export function scriptedPartitionOrigin(name: "application" | "change" | "issue" = "change", concerns = 0, wrongConcernMembership = false) {
-  const definition: Digest = d("f"); let inc = 1;
+export function scriptedPartitionOrigin(name: "application" | "change" | "issue" = "change", concerns = 0, wrongConcernMembership = false, definition: Digest = d("f")) {
+  let inc = 1;
   const address = (seed: Seed): ScopeRef => ({ kind: seed.kind, scope: scopeIdOf(seed), inc: newIncarnation(new Uint8Array(16).fill(inc++)) });
   const empty = (at: ScopeRef): Omit<Entry, "input"> => ({ v: 1, at, seq: 0, prev: null, time: T0, clamped: false, epoch: 0, uses: [], prepared: [], effects: [], sends: [] });
   const seedOf = (kind: ScopeRef["kind"], named: Digest | PlatformDefinition, creator: ScopeRef | null, cause: Digest, ordinal = 0): Seed => ({ v: 1, kind, definition: named, creator, cause, ordinal });

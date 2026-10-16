@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { FactRef } from "@generalbusiness/dap-contract";
 import { canonicalize, isPlatformDefinition } from "@generalbusiness/artroom-bytes";
 import { scriptedPartitionOrigin } from "../../platform/test/support-partition-origin.ts";
-import { partitionProof, PARTITION_PROOF_BOUNDS as B, type PartitionProofPorts } from "../src/partition-proof.ts";
+import { partitionProof, PartitionProofOperation, PARTITION_PROOF_BOUNDS as B, type PartitionProofPorts } from "../src/partition-proof.ts";
 import type { NativeBirth } from "../src/native-birth.ts";
 
 /** Coherent SCRIPTED frames and native RPC stand-ins. No native execution,
@@ -49,4 +49,19 @@ test("raw partition collection stops on total deadline, missing proof or oversiz
   oversized.births.set(canonicalize(oversized.fixture.from.at), { ...first, proof: { ...first.proof, bytes: " ".repeat(1024 * 1024 + 1) } });
   expect(await partitionProof(oversized.ports, oversized.fixture.from)).toBeNull(); expect(oversized.calls).toHaveLength(1);
   const invalid = protocol(); expect(await partitionProof(invalid.ports, {} as FactRef)).toBeNull(); expect(invalid.calls).toHaveLength(0);
+});
+
+
+test("one operation shares concurrent receiver and source evidence without multiplying its total allowance", async () => {
+  const sample = protocol(), operation = new PartitionProofOperation(sample.ports);
+  const [receiver, source, repeated] = await Promise.all([
+    operation.receiver(sample.fixture.partition), operation.lane(sample.fixture.from), operation.lane(sample.fixture.from),
+  ]);
+  expect(receiver?.policy.mode).toBe("partition-v1");
+  expect(source?.frames).toHaveLength(8); expect(repeated?.frames).toHaveLength(8);
+  expect(source?.calls).toBe(8); expect(repeated?.calls).toBe(8);
+  expect(sample.calls).toHaveLength(8);
+  sample.advance(B.milliseconds + 1);
+  expect(await operation.lane(sample.fixture.from)).toBeNull();
+  expect(sample.calls).toHaveLength(8);
 });
