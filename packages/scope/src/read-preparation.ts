@@ -76,7 +76,11 @@ export class ReadPreparation {
     return definition && definition.digest === named && definitionDigest(definition.declared) === named && canonicalize(definition.declared) === raw
       ? { named, definition, platform: null } : null;
   }
-  capture(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null {
+  capture(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null { return this.#capture(budget, true); }
+  /** Raw immutable metadata also serves a refused child's result. This is
+   * no query/authority preparation; those still require applied genesis. */
+  birth(budget: PreparationBudget = new PreparationBudget()): PreparedRead | null { return this.#capture(budget, false); }
+  #capture(budget: PreparationBudget, applied: boolean): PreparedRead | null {
     try {
       const snapshot = preparationScope(this.#sql, budget);
       if (snapshot.kind !== "scope") { budget.invalidate(); return null; }
@@ -85,10 +89,10 @@ export class ReadPreparation {
       // metadata also prevents recapture from resetting its byte allowance.
       budget.spend({ genesis: B.genesis });
       const reader = new ProofBytes(this.#sql, () => budget.spend({ calls: 1, candidates: 1, metadata: 4096 }));
-      const stored = reader.own(0, B.genesis), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
+      const stored = applied ? reader.own(0, B.genesis) : reader.birth(B.genesis), expected = { at: snapshot.scope.at, seq: 0, hash: snapshot.scope.genesis.hash };
       if (stored.kind !== "body" || !same(stored.value.fact, expected)) return budget.stop();
       const entry = proofEntry(stored.value, expected, B.genesis);
-      if (!entry || entry.input.type !== "genesis" || entry.input.decision !== "applied") return budget.stop();
+      if (!entry || entry.input.type !== "genesis" || applied && entry.input.decision !== "applied") return budget.stop();
       const named = entry.input.seed.definition;
       if (named.length > 128) return budget.stop();
       budget.spend({ metadata: 2048 }); // full incarnation/genesis/name/policy key

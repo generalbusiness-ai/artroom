@@ -1,7 +1,13 @@
+import { runInDurableObject } from "cloudflare:test";
+import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
+import { validateDefinition } from "@generalbusiness/dap-derive";
+import { ReceiverReads } from "../../../../packages/scope/src/receiver-reads.ts";
+import { ReadPreparation } from "../../../../packages/scope/src/read-preparation.ts";
 import { expect, test } from "vitest";
 import type { Seed } from "@generalbusiness/dap-contract";
-import { canonicalize, factRefOf, scopeIdOf } from "@generalbusiness/artroom-bytes";
-import { PARTITION_COHORT as C } from "@generalbusiness/dap-platform";
+import { canonicalize, factRefOf, scopeIdOf, seedDigest } from "@generalbusiness/artroom-bytes";
+import { PARTITION_COHORT as C, partitionSourceName, partitionReceiverPolicy, partitionDeclaredCreationPolicy } from "@generalbusiness/dap-platform";
+import { proofEntry, PROOF_BYTE_BOUNDS } from "../../../../packages/scope/src/proof-bytes.ts";
 import { namespace } from "../../../../packages/scope/src/namespace.ts";
 import { env } from "cloudflare:workers";
 import { sessionRoom } from "../../../../packages/scope/test/support/session-room.ts";
@@ -39,6 +45,44 @@ test("partition issue facts and bounded concern births use receiver lineage whil
       expect((await lane.summary()).value.status, canonicalize((await lane.entries())[0])).toBe("active");
       lanes.push(lane);
     }
+    // An invalid domain value still writes the real child's refused genesis.
+    // Its result must settle the parent, without conferring any issue role.
+    const refusedOpening = await P.stub.submit(await P.intent(rita, "open-issue", { expected: await P.expected({ repository: 0 }), fields: { definition: DIGESTS.issue, title: "Refused issue", conditions: [] } }), [], { values: [bytes] });
+    expect(refusedOpening).toMatchObject({ answer: "accepted" });
+    if (refusedOpening.answer !== "accepted") return;
+    const refusedCreate = (await P.entries())[refusedOpening.receipt.fact.seq]!.sends.find(send => (send.to as Seed).kind === "lane");
+    if (!refusedCreate) return expect.fail("actual refused issue has no create");
+    const refused = life.platform(scopeIdOf(refusedCreate.to as Seed));
+    life.setHold(envelope => envelope.from.at.scope === refused.name && envelope.message.class === "result");
+    await dispatchFixture([P, refused, ...children], life.wait);
+    await P.restart();
+    life.setHold(() => false);
+    life.advance(PROPOSED_BOUNDS.dispatchRetryMaxSeconds * 1000 + 1);
+    await dispatchFixture([P, refused, ...children], life.wait);
+    expect((await refused.entries())[0]!.input).toMatchObject({ type: "genesis", decision: "refused" });
+    expect((await P.entries()).some(entry => entry.input.type === "delivery" && entry.input.message.class === "result" && entry.input.message.of.from.hash === refusedOpening.receipt.fact.hash && entry.input.message.outcome === "refused")).toBe(true);
+    expect((await P.item(refusedOpening.receipt.fact.seq)).refs["scope"] ?? null).toBeNull();
+    expect(await refused.stub.outbox(reader)).toMatchObject({ ok: true, value: [{ duty: "0.0", acknowledged: { at: await P.at() } }] });
+    const refusedAt = await refused.at(), birth = await namespace(env.PLATFORM).births.read(refusedAt, 10000);
+    const raw = birth && proofEntry(birth.proof, birth.proof.fact, PROOF_BYTE_BOUNDS.body);
+    expect(raw?.input).toMatchObject({ type: "genesis", decision: "refused" });
+    if (!birth || !raw) return expect.fail("refused immutable birth is unavailable");
+    const frame = { fact: birth.proof.fact, entry: raw, named: birth.named, declarationName: birth.declarationName, native: birth.native };
+    expect(partitionReceiverPolicy(refusedAt, [frame])).toBeNull();
+    expect(partitionSourceName(DIGESTS.issue, issue.name, refusedAt, [frame])).toBe("declared:issue");
+    const receiver = await ReceiverReads.open(namespace(env.PLATFORM), await P.at());
+    expect(receiver).not.toBeNull();
+    expect(await receiver!.read(frame.fact, 10)).toBeNull();
+    if (raw.input.type !== "genesis") return expect.fail("refused source is not genesis");
+    const fakeSeed: Seed = { v: 1, kind: "lane", definition: DIGESTS.issue, creator: refusedAt, cause: seedDigest(raw.input.seed), ordinal: 0 };
+    expect(partitionDeclaredCreationPolicy({ seed: fakeSeed, source: frame.fact, n: 0, message: { class: "request", type: "create", body: { directory: await P.at(), membership: await M!.at(), fields: { title: "No positive birth" } } } }, issue, [frame])).toBeNull();
+    const valid = validateDefinition(issue, PROPOSED_BOUNDS);
+    if (!valid.ok) return expect.fail("actual issue definition did not validate");
+    await runInDurableObject(refused.object, (_instance, state) => {
+      const loader = new ReadPreparation({ exec: (query, ...args) => state.storage.sql.exec(query, ...args) }, { policy: () => "refused-native-witness", declared: () => valid.definition, platform: () => null });
+      expect(loader.birth()).not.toBeNull();
+      expect(loader.capture() === null).toBe(true);
+    });
     const [A, B] = lanes as [Platform, Platform];
     const asked = await A.did(rita, "ask", { fields: { addressee: { membership: await M!.at(), member: "@rita" }, question: "Can this concern proceed?" } });
     const foreign = factRefOf((await A.entries())[asked]!);

@@ -147,7 +147,7 @@ export class Deliveries {
     const probe = !receiving && creates && message.class === "request" ? await ReceiverReads.probeCreation(this.#ports, { seed: delivered.to as Seed, source: from, n: delivered.n, message }) : undefined;
     if (probe === null) return retry("dependency-unavailable");
     const read = probe?.source ? { entry: probe.source, under: "" }
-      : await within(() => (reader ?? this.#ports.resolver).read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
+      : await within(() => reader && message.class === "result" ? reader.result(delivered, bounds.fetchSeconds) : (reader ?? this.#ports.resolver).read(from, bounds.fetchSeconds, !!reserve || file), bounds.fetchSeconds);
     if (read === LATE || read === null) return retry("dependency-unavailable");
     if (!("entry" in read) || !isEntryOf(read.entry, from)) return UNVERIFIED;
     let source: Fetched = carryProducerName({ fact: from, entry: read.entry, under: read.under }, read);

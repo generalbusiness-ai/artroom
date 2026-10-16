@@ -469,3 +469,55 @@ factory/driver cases and scope typechecking pass. Forcing this driver down
 the legacy origin branch leaves the request unsent and fails the unchanged
 request assertion. The control restores the new branch. Publication
 completion and independent replay remain owed.
+
+## Refused creation results remain negative evidence
+
+A native negative case exposed a result-path hole: an issue's actual refused
+genesis existed, but the parent could not receive its result because the
+raw birth reader and byte reader admitted applied births only. Raw birth
+preparation now has a separate refused-genesis path with the same bounded
+metadata, body, hash and current-definition checks. Ordinary preparation
+and exact causal byte readers retain their existing active/applied gates.
+
+The new receiver reader permits that refused genesis only as the exact
+negative result for its actual creator, request, send and incarnation. It
+supplies no semantic source label. Ordinary positive source and retained
+fact reads reject it. Accepted-birth receiver selection, issue identity and
+bootstrap all reject the refused birth as positive evidence. The retained
+producer alias stays unchanged.
+
+The actual native journey holds the child's result, restarts the parent,
+advances the labelled fixture retry clock, then dispatches the same real
+send. The parent records the refused result without a child scope reference,
+and the child's real outbox records the acknowledgment. The negative-only
+journey passes, with scope and lane typechecks. Sixteen focused byte and
+genesis-proof regressions pass; the eight ordinary preparation and three
+raw birth cases pass. Removing refused-result metadata, opening ordinary
+query capture to refused genesis, and permitting refused positive sources
+each distinguish the native witness and restore the source.
+
+The first query-capture control was inconclusive because the assertion
+formatter traversed the guarded preparation view and threw. The corrected
+Boolean assertion fails directly on the forbidden capture. The first
+negative fixture expected a terminal lane row; the existing protocol keeps
+that row listed and records refusal in its result instead. Another draft
+expected an absent scope reference rather than its actual null value.
+Those failed runs remain retained. A preparation inventory fixture also
+assumed every native pin name was a scope kind; it now maps the synthetic
+partition pin to kind directory. This is a fixture correction, not a native
+creation claim. Positive authority and origin checks were not weakened.
+
+## Admission budget advice
+
+Checker advice `95203123`, read in full and ratified at `941ac5ae`, recommends
+one candidate total allowance of thirty-two calls and distinct frames,
+with the original depth four and ten-second deadline. Each identity uses
+its own minimal dependency view under the existing sixteen-frame proof
+bound. The whole operation keeps a sixteen MiB actual UTF-8 proof ceiling;
+thirty-two MiB reserved RPC work is not a heap bound. Physical pending
+reads remain charged until settlement. Actual cross-root and deep
+seventeen-frame cases, total/concurrent/byte/deadline boundaries and a
+runtime memory witness are required before Source. No same-room authority
+restriction or larger heap allowance is approved. This advice is technical
+only; the unfinished branch has no Source approval. The current sixteen
+frame implementation still needs that separate-budget/view refactor.

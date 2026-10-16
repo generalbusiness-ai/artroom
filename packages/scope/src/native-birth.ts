@@ -24,7 +24,7 @@ export function readNativeBirth(value: unknown, at: ScopeRef): NativeBirth | nul
     || !got.proof || !isFactRef(got.proof.fact) || got.proof.fact.seq !== 0 || !same(got.proof.fact.at, at)
     || typeof got.proof.bytes !== "string" || got.proof.bytes.length > PROOF_BYTE_BOUNDS.body) return null;
   const entry = proofEntry(got.proof, got.proof.fact, PROOF_BYTE_BOUNDS.body);
-  return entry?.input.type === "genesis" && entry.prev === null && entry.input.decision === "applied" && entry.input.seed.definition === got.named && scopeIdOf(entry.input.seed) === at.scope
+  return entry?.input.type === "genesis" && entry.prev === null && (entry.input.decision === "applied" || entry.input.decision === "refused") && entry.input.seed.definition === got.named && scopeIdOf(entry.input.seed) === at.scope
     && entry.input.inc === at.inc && entry.input.seed.kind === at.kind ? got : null;
 }
 
@@ -33,7 +33,7 @@ export function readNativeBirth(value: unknown, at: ScopeRef): NativeBirth | nul
  * retained/derived under label is involved. */
 export function nativeBirth(preparation: ReadPreparation, at: unknown, budget: PreparationBudget = new PreparationBudget()): NativeBirth | null {
   if (!isScopeRef(at)) return null;
-  const captured = preparation.capture(budget);
+  const captured = preparation.birth(budget);
   if (!captured || !same(captured.scope.at, at) || !captured.pinned.definition || !budget.available) return null;
   const name = captured.pinned.definition.declared.name;
   if (typeof name !== "string" || name.length > 256 || utf8(name).length > 256) return null;
