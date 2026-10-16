@@ -102,10 +102,21 @@ export function partitionSeedKey(scope: ScopeId): Digest {
   return `sha256:${hex(bytes)}`;
 }
 /** Null is incomplete coverage; no fallback scans an index. */
-export function partitionLane(state: RuleGiven["state"], scope: ScopeId): Item | null | undefined {
-  const rows = state.lookup("lane", "seed", partitionSeedKey(scope), 2);
+function indexedItem(state: RuleGiven["state"], type: string, slot: string, key: string): Item | null | undefined {
+  const rows = state.lookup(type, slot, key, 2);
   if (rows === null || rows.length > 1) return null;
   return rows[0] === undefined ? undefined : state.item(rows[0]) ?? null;
+}
+export function partitionLane(state: RuleGiven["state"], scope: ScopeId): Item | null | undefined {
+  return indexedItem(state, "lane", "seed", JSON.stringify(partitionSeedKey(scope)));
+}
+export function partitionGeneration(state: RuleGiven["state"], generation: number): Item | null | undefined {
+  if (!Number.isSafeInteger(generation) || generation < 1 || generation > MAX_GENERATIONS) return null;
+  return indexedItem(state, "partition", "generation", String(generation));
+}
+export function partitionNumber(state: RuleGiven["state"], number: number): Item | null | undefined {
+  if (!Number.isSafeInteger(number) || number < 1 || number > MAX_GENERATIONS * PARTITION_SPAN) return null;
+  return indexedItem(state, "lane", "number", String(number));
 }
 function nextNumber(given: RuleGiven, row: number): RuleEffect[] {
   const item = control(given), next = Number(item.values["lastNumber"]) + 1;

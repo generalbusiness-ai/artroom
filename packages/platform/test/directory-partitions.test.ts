@@ -28,7 +28,7 @@ test("lane point lookup uses one declared seed key and never scans; incomplete o
   let rows: readonly number[] | null = [7];
   const item = { id: 7 };
   const state = { lookup: (type: string, slot: string, key: string, limit: number) => {
-    lookups++; expect([type, slot, key, limit]).toEqual(["lane", "seed", seedDigest(seed), 2]); return rows;
+    lookups++; expect([type, slot, key, limit]).toEqual(["lane", "seed", JSON.stringify(seedDigest(seed)), 2]); return rows;
   }, item: (n: number) => { bodies++; expect(n).toBe(7); return item; }, page: () => { expect.fail("no fallback scan"); } } as unknown as RuleGiven["state"];
   expect(partitionLane(state, id)).toBe(item);
   expect([lookups, bodies]).toEqual([1, 1]);

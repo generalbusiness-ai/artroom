@@ -65,6 +65,17 @@ reads one seed index key and at most one body, with no page fallback.
 Incomplete or ambiguous coverage returns unavailable. Both pure cases
 pass. They do not prove SQLite cost, native authority or factory creation.
 
+The subsequent real Durable Object SQLite witness inserts 3,001 lane
+rows as explicit storage fixtures. The production generation, number and
+seed helpers return the three expected rows in 12 queries, reading at
+most 20 rows and writing none. Query plans contain no scans or temporary
+sorts. After one derived key is removed, incomplete coverage returns
+unavailable in two queries without a body read. This proves bounded SQL
+selection, not the new native factory or authority path. Source inspection
+also corrected the initial seed key to its canonical JSON encoding,
+matching the actual store's declared-index format. The native SQL case
+and corrected pure cases pass.
+
 The first validation rejected fixed refs set by later creation results.
 Those slots retain the existing mutable schema: the native result
 protocol sets the first accepted ref, and conflicting incarnations must
