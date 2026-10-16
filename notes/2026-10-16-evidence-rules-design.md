@@ -65,7 +65,7 @@ because each of them pins its data shape.
 - In the current change lane, required checks run on the destination's
   reservation tree, and the destination refuses with
   `required-check-timeout` when their deadline passes
-  (`apps/room/lanes/src/change3.ts:52-75`;
+  (`apps/room/lanes/src/change3.ts:52-75` and
   `packages/platform/src/destination.ts:556-605`).
 - One manifest can select up to 32 accepted reports, and its checks run
   once on its one tree. That is batching already.
@@ -109,10 +109,10 @@ When a check says `reuse: true`, the rules' author states that its outcome
 depends only on the tree and the configuration. The destination then
 counts an earlier passed result when these match the new job:
 
-- the check's name;
-- the tree;
-- the configuration digest;
-- the source.
+- The check's name.
+- The tree.
+- The configuration digest.
+- The source.
 
 The earlier signer must still be the check's checker in the current rules.
 The publication records which earlier job it counted.
@@ -194,11 +194,11 @@ that is not yet published changes the reservation model, not these rules.
 If you accept decision 1, the first slice's witnesses would show four
 things:
 
-- a `member` result is refused for a `room` check;
-- a reused passed result counts on an equal tree and is refused on a
-  different one;
-- two results that disagree stop reuse;
-- rules with no `source` keep their meaning.
+- A `member` result is refused for a `room` check.
+- A reused passed result counts on an equal tree and is refused on a
+  different one.
+- Two results that disagree stop reuse.
+- Rules with no `source` keep their meaning.
 
 The witnesses belong in the lane scenarios and the destination's judge
 tests, where the [testing guide](../docs/testing.md) places them.
