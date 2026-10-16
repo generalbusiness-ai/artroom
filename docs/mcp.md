@@ -1541,8 +1541,18 @@ A batch is refused on every request; a body over 1 MiB is `413`; an
 `initialize` is admitted first and then ends the oldest; a refused
 `initialize` ends nothing) and 4 open streams, legacy streams and
 listens together (a 5th is `409`). Every byte bound here counts UTF-8
-bytes. A session survives the object's
-eviction; its open stream does not: when the stream reconnects, a list
+bytes. A legacy HTTP session expires after 30 minutes without a client
+request. The server checks expiry before an authenticated legacy request
+uses or creates a session; it does not run a separate expiry timer. A
+client request that reaches its session, including `GET`, renews the idle
+time; server notifications do not. Expiry removes the stored session,
+closes its stream with a final event, and leaves its ID answering `404`.
+Initialize again to obtain a new ID. Origin or bearer refusals and the
+stateless modern revision neither renew nor expire legacy sessions.
+
+A session's activity time survives the object's eviction. A stored row
+from before idle tracking uses its creation time until its next request.
+Its open stream does not survive eviction: when the stream reconnects, a list
 change the client has not listed is told once more.
 
 ### Budgets and recovery
