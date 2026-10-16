@@ -64,4 +64,3 @@ function changeSlots(item: Item, effect: ItemEffect, definition: ValidDefinition
     case "hold": return changeHold(item, effect, definition, signer);
   }
 }
-

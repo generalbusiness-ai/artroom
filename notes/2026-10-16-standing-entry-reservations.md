@@ -126,3 +126,13 @@ The normal Page and Counting asset producers run on the composed Source.
 Only the Page asset module changes: its JavaScript includes the new
 standing declaration validator. Counting output remains unchanged. This
 slice makes no rendered-layout or deployed-browser claim.
+
+The first frozen gate at `3f65751e` stopped at whitespace: the new
+item-effects file had an extra blank line at EOF. Installation passed
+(2.4 seconds elapsed / 3.8 CPU); whitespace exited 2 (0.1 / 0.1), and
+neither typechecking nor tests ran. The wrapper is
+`/tmp/artroom-c1-3f65751e-gate.log`, with private stage directory
+`tmp.QVCRYoupzs`. The successor removes that single blank line and records
+this failed gate. The compared trimmed interpreter block, runtime behavior,
+tests and generated assets are unchanged. The corrected head gets its own
+gate; the stopped run is not a pass.
