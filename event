@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at package-lock.json","body":{"commit":"e444edf8eeffef90f04537bc33a6f76836380fce","path":"package-lock.json"}}
+{"kind":"artifact","text":"Merge published the current artifact at packages/cli/tsconfig.scope.json","body":{"commit":"e444edf8eeffef90f04537bc33a6f76836380fce","path":"packages/cli/tsconfig.scope.json"}}
