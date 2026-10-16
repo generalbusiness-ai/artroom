@@ -33,7 +33,7 @@ import { DurableObject } from "cloudflare:workers";
 import { PROPOSED_BOUNDS } from "@generalbusiness/dap-contract";
 import type { SessionAnswer } from "@generalbusiness/dap-contract";
 import type { Answer, Beside, Bounds, Cursor, DeclaredDefinition, Digest, DutyId, Entry, Grant, Input, LogPage, OperationId, PlatformDefinition, Read, RetainedInput, ScopeId, Settlement, SignedIntent } from "@generalbusiness/dap-contract";
-import { canonicalize, digestBytes, isScopeId, retainedReadArgument, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, digestBytes, isHead, isScopeId, isScopeRef, retainedReadArgument, utf8 } from "@generalbusiness/artroom-bytes";
 import { isEntryOf, timeMs, timeOf, type Item } from "@generalbusiness/dap-derive";
 import { sourceName } from "@generalbusiness/dap-platform";
 import type { ScopeState } from "@generalbusiness/dap-derive";
@@ -268,6 +268,15 @@ export class ScopeObject<Env = unknown> extends DurableObject<Env> {
    * while the object is constructed.
    */
   protected wiring(_name: string | undefined): Wiring { return {}; }
+  /** Internal metadata probe. No public route, reader, native turn or head. */
+  readiness(): "ready" | "absent" | "not-ready" | "unavailable" {
+    try {
+      const scope = this.#store.scope();
+      if (!scope) return "absent";
+      if (!isScopeRef(scope.at) || scope.at.scope !== this.#name || !isHead(scope.head) || !["provisional", "active", "refused"].includes(scope.status)) return "unavailable";
+      return scope.at.kind === "register" && scope.status === "active" ? "ready" : "not-ready";
+    } catch { return "unavailable"; }
+  }
   /** Optional operational binding; it is never a native authority port. */
   protected metricEnvironment(): MetricEnvironment { return this.env as MetricEnvironment; }
 

@@ -33,6 +33,11 @@ export interface ArtifactsBindings {
 }
 interface Configuration { registerScope: ScopeId; namespace: string; host: string; maxBytes: number; credentialIdentity: "adapter-attempt" }
 
+/** The same nonsecret host selector used by the production wiring. */
+export function artifactsRegisterScope(raw: unknown): ScopeId | null {
+  try { return configuration(typeof raw === "string" ? raw : undefined)?.registerScope ?? null; }
+  catch { return null; }
+}
 function configuration(raw: string | undefined): Configuration | null {
   if (typeof raw !== "string" || raw.length > 4096) return null;
   const value = exact(parseStrict(raw), ["registerScope", "namespace", "host", "maxBytes", "credentialIdentity"]);

@@ -11,15 +11,17 @@ import { founded } from "./support/story.ts";
 type Mode = "default" | "generic";
 interface Ran { calls: string[]; n: number; answers: string[] }
 
-/** W1 recipes, excluding only the adopted, explicit public-query MCP gap. */
+/** W1 recipes, excluding only these two explicit, documented MCP gaps. */
 function inventoryRows(): { activity: string; cells: Record<Mode, string> }[] {
   const at = DOC.indexOf("## The W1 inventory");
   const table = DOC.slice(at, DOC.indexOf("\n## ", at + 5));
   const rows = table.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Activity") && !l.startsWith("|---"))
     .map((l) => l.split(" | ")).map((c) => ({ activity: c[0]!.slice(2), cells: { default: c[1]!, generic: c[2]! } }));
   const gaps = rows.filter((r) => r.activity.includes("(MCP gap:"));
-  expect(gaps.map((r) => r.activity)).toEqual(["`dap items <scope> --query <canonical-item-query-JSON>` (MCP gap: public item query)"]);
-  for (const gap of gaps) expect(Object.values(gap.cells)).toEqual(["Unavailable in MCP; use the SDK, CLI or Page query surface", "Unavailable in MCP"]);
+  expect(gaps).toEqual([
+    { activity: "`dap items <scope> --query <canonical-item-query-JSON>` (MCP gap: public item query)", cells: { default: "Unavailable in MCP; use the SDK, CLI or Page query surface", generic: "Unavailable in MCP" } },
+    { activity: "`dap status [<scope>] [--request <16-hex-id>]` (MCP gap: operational status)", cells: { default: "Unavailable in MCP; use the CLI or SDK operational reads", generic: "Unavailable in MCP" } },
+  ]);
   return rows.filter((r) => !gaps.includes(r));
 }
 /** The tools a cell names in order, consecutive repeats once, and its count: a number, or a number plus n. */

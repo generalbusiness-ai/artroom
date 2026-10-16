@@ -1,3 +1,4 @@
+import { health } from "../../packages/scope/src/health.ts";
 /** Application dispatch. Imported framework functions are used only when fetch runs. */
 import { mcpRoute, route, type Env, type McpEnv } from "../../packages/scope/src/worker.ts";
 import { admittedRequestUrl } from "../../packages/scope/src/item-query-wire.ts";
@@ -16,6 +17,8 @@ export default {
     return measuredRequest(request, env, async () => {
     if (!admittedRequestUrl(request.url)) return json(413, { error: "too-large" });
     if (credentialInUrl(new URL(request.url))) return json(400, { error: "credential-in-url" });
+    const healthy = await health(request, env);
+    if (healthy) return healthy;
     const hosted = await mcpRoute(request, env);
     if (hosted) return hosted;
     return new URL(request.url).pathname === DEMO_OFFER_PATH ? demoFoundingRoute(request, env) : isSite(request) ? site(request, env) : isPage(request) ? page(request) : isCounting(request) ? countingPage(request) : isLending(request) ? lendingPage(request) : isBrand(request) ? brand(request) : route(request, env.SCOPES);

@@ -65,7 +65,7 @@ New admin sessions have the permission. Members and correctly signed
 older admin sessions without that claim remain refused. Its `complete`
 means the retained operational window, not proof of request settlement.
 
-The detailed slot map and limits are in [operations.md](../docs/operations.md).
+The detailed slot map and limits are in [operations.md](../../docs/operations.md).
 
 ## Evidence boundaries
 

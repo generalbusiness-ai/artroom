@@ -15,3 +15,5 @@ export * from "./agent-key-invitation.ts";
 export * from "./invitation-fields.ts";
 
 export * from "./item-query.ts";
+
+export type { OperationalApi, OperationalIncident, IncidentReference, RequestCorrelation, RequestCorrelations } from "./operational.ts";
