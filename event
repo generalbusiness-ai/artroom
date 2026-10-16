@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:74f160a08e27e07896baa67340e26bfdbeebade6","text":"Merge retired a covered predecessor; the successor is at docs/mcp.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:85c5d571d4a262cecb7394ad5e9adfce353e3b15","text":"Merge retired a covered predecessor; the successor is at packages/mcp/test/http-idle.test.ts."}
