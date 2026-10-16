@@ -138,6 +138,19 @@ Lending Worker module and all three public disk assets match their
 current source build. These are generated-byte checks, not browser
 interaction evidence.
 
+The next frozen gate at `036dfb7e9467a090890b1d380e52f341a7fc661c`,
+tree `148c54a6b5a09a0953d096b329ea405c059136fd`, also failed. Original
+session 32150 closed with exit 1: 1,470 Vitest tests passed, 2 failed and
+3 skipped. Typechecking passed in 7.3 seconds. Tests took 201.8 seconds,
+with 282.5 CPU seconds. Neither later phase ran. Both failures came from
+the two native MCP recipe cases, whose parser pinned the exact single
+public-query gap. That coupled assertion had not been selected in the
+preceding focused inventory run. It now pins exactly the two documented
+gaps and their unavailable cells; every other recipe remains required.
+No MCP tool or hidden implementation is claimed.
+The corrected focused native recipe run passes both cases through their
+existing actual MCP room/session paths and labelled host/scheduler ports.
+
 The final frozen gate and exact-head Source review remain pending. The operations
 guide documents the delivered bounds. MCP operational events, deployment
 coverage checks, browser telemetry and capacity measurement remain later
