@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2f7332f7834d6b2f65f65e905f1f44a862177cf3","text":"Merge retired a covered predecessor; the successor is at examples/lending/browser-build/lending.js."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:2fcc51cab642bc22c340e449481144ef4181ba97","text":"Merge retired a covered predecessor; the successor is at notes/implementation/2026-10-16-observability-retain-count.md."}
