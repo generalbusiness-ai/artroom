@@ -5,8 +5,9 @@
  * invitation signing seed that stays private and creates a key-bound proof.
  */
 import { invitationServiceUrl } from "./invitation-service.ts";
+import { INVITATION_KEY_MEMBERSHIP } from "@generalbusiness/dap-contract";
 import type { ScopeId, ScopeRef } from "@generalbusiness/dap-contract";
-import { isScopeId, isScopeRef, unb64url } from "@generalbusiness/artroom-bytes";
+import { b64url, isScopeId, isScopeRef, unb64url } from "@generalbusiness/artroom-bytes";
 
 /** The repository's scopes as a link names them: no inbox, which `join` creates. */
 export interface InvitedRepository { directory: ScopeRef; membership: ScopeRef; rules: ScopeId; destination: ScopeId }
@@ -28,8 +29,15 @@ export function invitationOf(text: string): InvitationLink | null {
   }
 }
 
-/** Whether a link's service, handle, invitation and repository references have their shapes: a directory, a membership, two scope IDs. */
+/** Validate the public context and, for membership@6, the private seed before retaining custody or signing. */
 export function wellFormedInvitation(link: InvitationLink): boolean {
+  if (link.definition === INVITATION_KEY_MEMBERSHIP) {
+    if (typeof link.secret !== "string" || link.secret.length !== 43 || link.invitation > 1_000_000_000) return false;
+    const seed = unb64url(link.secret);
+    if (!seed) return false;
+    try { if (seed.length !== 32 || b64url(seed) !== link.secret) return false; }
+    finally { seed.fill(0); }
+  }
   return invitationServiceUrl(link.service) !== null && typeof link.handle === "string" && link.invitation >= 1
     && isScopeRef(link.repository?.directory) && link.repository.directory.kind === "directory"
     && isScopeRef(link.repository?.membership) && link.repository.membership.kind === "membership"

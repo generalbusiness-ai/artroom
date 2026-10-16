@@ -99,8 +99,31 @@ sandbox-denied loopback startup ran no tests; the focused local workerd
 run then used permitted loopback access.
 
 Focused compiler checks, MCP reference generation and the unchanged
-legacy/platform witnesses pass. The source is frozen for its one final gate before review; its exact
-head/tree and terminal outcome are filed separately. No whole suite or mutation sweep has been repeated.
+legacy/platform witnesses pass. The original gate at `8e957b54`, tree
+`db97631c4410548e3693a46199be145774c1f4c1`, failed. Whitespace and typecheck
+passed, as did 1,344 Vitest tests (3 skipped) and the 16 Node checks. The
+final Counter browser test runner stalled after three passing client
+tests. Its client child was terminated after about 394 seconds; the gate
+returned 1 after 609 seconds. This is a failed gate, not a passing result.
+
+A bounded scratch diagnostic copy with stderr markers passed all nine
+client tests. The unchanged original bundle then passed all nine under
+a 12-second timeout. These focused checks do not explain the original
+stall or replace its result. Request `b603d073` tracks that unresolved
+timing failure. Existing scripted reset/retention exceptions and the
+cross-object I/O diagnostic do not establish physical cancellation or
+draining guarantees.
+
+Preliminary checker finding `fe4c48b6` identified malformed person-link
+seeds escaping as an unhandled error. The successor validates the exact
+new cohort's canonical 32-byte seed and invitation bound before private
+custody or signing. Existing CLI and direct MCP boundary witnesses now
+check malformed seeds, including noncanonical padding bits, and preserve
+legacy links. All six focused tests and the affected client, CLI and MCP
+typechecks pass. The normal Page producer leaves its asset module equal.
+This source correction needs its own gate at a frozen head; its exact
+head/tree and terminal result will be filed separately. No mutation sweep
+has run.
 
 The expanded fixtures initially had a widened definition string, an unused
 legacy digest import and one legacy test line changed outside its intended
