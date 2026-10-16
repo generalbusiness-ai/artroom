@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/scope/test/standing.test.ts","body":{"commit":"dfd150428894f158f9b4525ada017890af1adc70","path":"packages/scope/test/standing.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:09f3930fbab3adc5a8a06ad5d2628deccec58e97","text":"Merge retired a covered predecessor; the successor is at packages/derive/src/reserve.ts."}
