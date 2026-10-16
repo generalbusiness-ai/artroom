@@ -752,3 +752,65 @@ The canonical limitation is tracked as a separate future lane revision in
 gitseq; current directory work continues without modifying old/default
 literal hashes. A test-only extension cannot replace the separate canonical
 local-hold publication/closure witness recorded above.
+
+
+## Foreign-only pin consumer specimen and native fulfilment
+
+Clarification `0eb52151` was read in full. It withdraws preservation of the
+experimental declaration's unexercised local-hold branch and permits only
+one existing attribute.of replacement, from also.commitment to on. Its
+original authenticated with-sources and all other rows remain unchanged.
+The canonical declarations and their local-hold witness stay separate.
+The test-only declaration digest is
+`sha256:f337e285161b50afacd9259cb70594a39578a3b01a3e05d6703d39a2025a940c`.
+It is validated, activated through the actual rules scope, and created by
+the actual partition with that exact seed digest and creator. It is neither
+a production lane revision nor a canonical foreign-path repair or local-
+hold compatibility claim. Future canonical repair is request `416238f2`.
+
+The rejected preparation appended a seventeenth, conditional authors effect.
+The ordinary validator correctly refused both the sixteen-effect bound and
+the duplicate fixed authors write. Neither limit nor validator was changed.
+The single replacement validates. It retains signer and any actual grant
+principal, actual pin attribution, selected-report authors and previous-
+version authors. Each accepted manifest checks the exact deduplicated,
+ordered union from those authenticated inputs. The specimen does not inject
+a member list or weaken source-shape, staged, pin, ancestry or issue guards.
+
+An actual issue hold, stage and check precede the foreign manifest. The
+unchanged new issue records its actual pin-confirm, moving the exact pin
+to held with the manifest fact. A real superseding manifest sets the first
+manifest superseded and emits unpin; the unchanged issue releases the exact
+old pin, recording its admitted and releasing causal facts. Receiver
+restarts before and after delivery preserve both states. Replay uses no
+anchors, derives the target through its final head, and retains the known
+incomplete ancestry-walk result; it is not called a full external replay
+pass or a witness of the separate published-release branch.
+
+An older native issue stages the same sort of actual check for the new
+sender, but keeps that sender's declared producer identity. It records
+unknown-message and leaves the pin provisional. A wrong sender incarnation
+and a premature unpin alter no pin. The former is dependency-unavailable
+in the new reader and source-unverified in the old one; the premature
+unpin is source-unverified in both. Another fully native, eligible change
+cannot reuse the check: the unchanged consumer/intent pin-mismatch guard
+refuses its manifest. The exact response codes replaced incorrect fixture
+expectations; no production behavior was changed for those corrections.
+
+Forcing only a propose-manifest sender back to its unchanged producer alias
+makes the actual pin stay provisional and fails the held-state assertion.
+The focused control distinguishes and restores the source. An earlier,
+weaker control stopped at a label assertion before reaching that mutation;
+the final witness removes that early interception. Its baseline runs all
+six cases in the native file successfully. The dedicated new/old permission
+cases pass, with lane typechecking. The canonical publication replay also
+checks target coverage through its final head while keeping the incomplete
+ancestry-walk qualification.
+
+A separate actual partition-created concern completes its report, receives
+acceptance and delivers fulfilment to its actual parent after the parent
+restarts. The parent's concern row records the exact child and result and
+survives another restart. Normally checked replay covers that final parent
+head without anchors, with the same stated ancestry-walk limit. Git, the
+scripted clock and finite scheduler remain the fixture's labelled stand-ins.
+No provider operation, first Source gate or Source approval has run.
