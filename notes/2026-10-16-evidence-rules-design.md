@@ -96,12 +96,14 @@ own service, and one key at a time holds that mark. A check with no
 `source`, as every check has today, reads as `member`. So existing rooms
 keep their meaning. A report's claims stay claims. They never meet a check.
 
-A room might let agents run their own tests and still make lying costly.
-A `member` check could name a `room` check to audit with. The destination
-would pick a share of landings by a digest of its own reservation entry,
-which the author cannot predict. A picked landing would need both results,
-and a disagreement would refuse it. I recommend waiting until a room
-actually lets agents report their own landing checks.
+An audit lets agents run their own tests while lying stays costly. A
+`member` check may say `audit: { check, every }`, where `check` names a
+`room` check and `every` is a whole number. The destination picks one
+landing in `every` by a digest of its own reservation entry. The author
+cannot predict that entry, and replay derives the same choice. A picked
+landing needs both results. When they disagree, the destination refuses
+it with `audit-disagrees`, and the record keeps both results under the
+member's name.
 
 ## Reuse: one result for one tree
 
@@ -167,7 +169,7 @@ useless one.
 | Part | Needs | State |
 |---|---|---|
 | `room` and `member` sources, `reuse`, the `work` and `landing` stages | New versions of the rules data, the change lane and the destination | Nothing open. Rule values already change by publishing. |
-| `room` source in production | A production adapter for the checker service | Open |
+| `room` source in production, and audits | A production adapter for the checker service | Open. Decision 4 puts it in the first slice. |
 | `published` stage | One more message, from the destination to the lane | Partly met. Platform scopes already send to the lane. |
 | `outside` source | An operation form for a check run. Only `hold@1` and `git-read@1` exist. | Open |
 | Showing why a check failed | A store for run logs. `details` is only a digest. | Open: [evidence capture](../docs/roadmap.md#evidence-capture-and-private-custody) |
@@ -181,23 +183,29 @@ on one tree mark a flaky check. A `published` failure shows which checks
 passed a landing that was faulty. Building the next batch on a reservation
 that is not yet published changes the reservation model, not these rules.
 
-## Decisions for Hugh
+## Decisions
 
-1. Adopt `source` and `reuse` in the next rules version. I recommend it.
-   It is a small change.
-2. Add audits of member results now, or wait. I recommend waiting.
-3. Add the `published` stage now, or wait until a deployment check exists
-   to try it on. I recommend waiting.
-4. Ship the first slice with the checker service's production adapter, or
-   on its own.
+Hugh took these decisions on 16 October 2026:
 
-If you accept decision 1, the first slice's witnesses would show four
-things:
+1. The next rules version adopts `source` and `reuse`.
+2. The same version adds audits of member results.
+3. The same version adds the `published` stage, with `holds`.
+4. The first slice ships with the checker service's production adapter,
+   so that a `room` check has a real source from the start.
+
+The `outside` source and a store for run logs stay open (see
+[What it depends on](#what-it-depends-on)). This note still commissions no
+implementation. The slice needs its own request.
+
+The slice's witnesses would show these things:
 
 - A `member` result is refused for a `room` check.
 - A reused passed result counts on an equal tree and is refused on a
   different one.
 - Two results that disagree stop reuse.
+- A picked landing with disagreeing audit results is refused.
+- A failed `published` check opens an intent, and with `holds: true`
+  refuses the next landing in its extent.
 - Rules with no `source` keep their meaning.
 
 The witnesses belong in the lane scenarios and the destination's judge
