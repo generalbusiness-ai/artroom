@@ -1245,7 +1245,9 @@ export function readFor(state: Pick<StateView, "operation" | "item" | "page"> & 
     if (!scope || !origin || origin.entry.seq !== seqOf(read.id) || canonicalize(origin.entry.at) !== canonicalize(scope.at) || entryHash(origin.entry) !== origin.hash || input.result !== "confirmed" || of?.owner !== DESTINATION_5 || of.kind !== "mint"
       || !current || canonicalize(current) !== canonicalize(read) || read.most !== 1 || read.attempts.length !== 1 || read.attempts[0]?.attempt !== 1 || read.attempts[0].opened !== origin.entry.seq) return null;
     const served = servedBy(state, own, of), target = served ? targetOf(state, own, served.write) : null;
+    const attempt = served?.write.attempts.find(attempt => attempt.attempt === served.attempt);
     if (!served || served.write.owner !== DESTINATION_5 || served.write.kind !== "push" || target?.type !== "publication" || of.for !== target.id || served.write.for !== target.id || read.for !== target.id
+      || !attempt || attempt.opened !== seqOf(of.id) || of.most !== 1
       || !of.attempts.some(attempt => attempt.attempt === input.attempt && attempt.outcomes.some(outcome => outcome.seq === origin.entry.seq && outcome.result === "confirmed"))) return null;
     const opened = effects.filter(effect => effect.effect === "operation" && effect.k === ordinal);
     if (opened.length !== 1 || opened[0]?.effect !== "operation" || opened[0].owner !== DESTINATION_5 || opened[0].kind !== "read" || opened[0].for !== target.id || opened[0].attempts !== 1
