@@ -16,6 +16,10 @@ import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, directory5, directory8, di
 export { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, APPLICATION_VALUES_BYTES, applicationValues, applicationPublicationValues, directory5, directory8, directoryRules5, directoryRules8 } from "./application.ts";
 import { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
 export { COUNTING_COHORT, directory6, directoryRules6 } from "./counting-cohort.ts";
+/** Explicit future partition policy; exporting it does not select a receiver
+ * policy or add a catalog version. Receiver lineage admission is separate. */
+export { PARTITION_COHORT } from "./directory-partitions.ts";
+export { PARTITION_IDENTITY_BOUNDS, partitionSourceName, type PartitionNativeFrame } from "./partition-provenance.ts";
 
 import type { ObservationRequest, PlatformData, PlatformDefinition } from "@generalbusiness/dap-contract";
 import { sourceName, applicationPublicationOrigin } from "./publishing-provenance.ts";

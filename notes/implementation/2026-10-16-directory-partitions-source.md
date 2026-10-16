@@ -137,3 +137,38 @@ register witness by returning a birth for another incarnation. The guard
 is restored. Logs are `/tmp/artroom-directory-native-birth-focus.log` and
 `/tmp/artroom-directory-native-birth-control.log`. This is proof collection
 groundwork, with no new receiver policy or native partition factory claim.
+
+The separate raw collector now has one total allowance: 16 frames, 16
+native RPCs, 16 MiB reserved reply bytes, four lane generations including
+the direct partition-born lane, and ten seconds. Each read reserves its
+whole one-MiB admission before I/O. Native birth preparation has its own
+existing finite SQL, metadata, genesis and definition admission. The
+collector deduplicates exact facts and pins, rejects conflicting positions,
+and follows no register ancestry or legacy `source` fallback. It returns
+raw frame metadata without an `under` field. It is not wired to a judge.
+
+Two focused protocol witnesses pass: direct collection needs eight reads
+and eight frames, three nested concerns need fourteen, and the next
+generation is unavailable. Missing proof, total deadline expiry and an
+oversized wire reply return no truncated result. The ancestry-depth
+control distinguishes the extra generation and restores the bound.
+These are coherent scripted frames and RPC ports, not native factory
+execution. The shared pure validator independently binds the direct eight
+births and every concern's parent, self pin, creating send and inherited
+directory and membership. It checks the same total four-generation and
+sixteen-frame bounds, with a stricter aggregate decoded entry-byte cap.
+The pure new-policy and existing legacy source-name files pass seven
+tests. A coherent concern that changes only its inherited membership
+incarnation remains declared. The control that promotes an invalid proof
+fails that assertion and restores the policy. This policy is exported for
+later explicit receiver selection; it changes no producer default,
+catalog version, current receiver, cached label or authority. Platform and
+Scope typechecking pass. Initial fixture typing needed a request rather
+than the wider message union; the policy's fields needed explicit object
+narrowing. No runtime fault or relaxed native guard follows from those
+type corrections.
+
+This note now follows `ec695f11` under `notes/implementation/`. The new
+catalog, receiver bootstrap, raw retention and mixed replay selection,
+full native factory/Authority witnesses and operator consumers remain
+unfinished. No first Source approval or activation is claimed.
