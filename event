@@ -1,1 +1,1 @@
-{"kind":"artifact","text":"Merge published the current artifact at packages/mcp/test/http-idle.test.ts","body":{"commit":"d3357d38f15c9ebc2e8953da7d8ace863da6a2c1","path":"packages/mcp/test/http-idle.test.ts"}}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:08adbf6c103ec30a43af473266dedc6b39b4c82d","text":"Merge retired a covered predecessor; the successor is at packages/mcp/src/wire.ts."}
