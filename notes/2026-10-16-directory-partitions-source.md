@@ -118,3 +118,22 @@ legacy receivers keep their original fact, handler, close, pin-confirm
 and unpin interpretation. New-policy labels cannot leak through caches
 or retained metadata into those receivers. Those authority-sensitive
 collection and consumer changes remain unfinished.
+
+The first raw-birth port now reuses the existing bounded read preparation.
+It returns only the exact accepted genesis, current supported pin and
+actual declaration name. It supplies no derived `under`, authority or
+activation turn. The namespace checks a closed reply, exact incarnation,
+hash, address and pin. Unsupported peers do not fall back to `source`.
+The existing preparation admits metadata and genesis size before loading
+the body, and admits declared definition bytes before parsing them.
+
+Fourteen focused raw-birth and existing preparation tests pass, with scope
+typechecking. Actual native register and declared-scope reads leave entry,
+outbox and metadata rows unchanged. A labelled oversized-genesis storage
+fixture loads no body. A protocol stand-in confirms that invalid input and
+unsupported peers make no legacy read. The control that removes the
+exact-incarnation comparison passes its baseline, then fails the real
+register witness by returning a birth for another incarnation. The guard
+is restored. Logs are `/tmp/artroom-directory-native-birth-focus.log` and
+`/tmp/artroom-directory-native-birth-control.log`. This is proof collection
+groundwork, with no new receiver policy or native partition factory claim.

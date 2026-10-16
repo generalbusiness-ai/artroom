@@ -8,7 +8,7 @@ import type { Pinned, Supplied } from "./core.ts";
 import { PREPARATION_BOUNDS as B, PreparationBudget } from "./preparation-budget.ts";
 import { preparationScope } from "./preparation-scope.ts";
 import { preparationView } from "./preparation-view.ts";
-import { ProofBytes, proofEntry } from "./proof-bytes.ts";
+import { ProofBytes, proofEntry, type ProofBody } from "./proof-bytes.ts";
 import type { Sql } from "./sqlite.ts";
 
 /** Native pure support callbacks, specifically Scope.validate/platform.
@@ -24,13 +24,14 @@ type Genesis = Extract<Input, { type: "genesis" }>;
 export class PreparedRead {
   readonly scope: ScopeState;
   readonly genesis: Genesis;
+  readonly birth: ProofBody;
   readonly budget: PreparationBudget;
   readonly view: ReturnType<typeof preparationView>;
   readonly #sql: Pick<Sql, "exec">;
   readonly #support: () => Pinned | null;
   #pinned: Pinned;
-  constructor(sql: Pick<Sql, "exec">, scope: ScopeState, genesis: Genesis, pinned: Pinned, budget: PreparationBudget, support: () => Pinned | null) {
-    this.#sql = sql; this.scope = scope; this.genesis = genesis; this.#pinned = pinned; this.budget = budget; this.#support = support;
+  constructor(sql: Pick<Sql, "exec">, scope: ScopeState, genesis: Genesis, birth: ProofBody, pinned: Pinned, budget: PreparationBudget, support: () => Pinned | null) {
+    this.#sql = sql; this.scope = scope; this.genesis = genesis; this.birth = birth; this.#pinned = pinned; this.budget = budget; this.#support = support;
     this.view = preparationView(sql, scope, budget);
   }
   get pinned(): Pinned { return this.#pinned; }
@@ -108,7 +109,7 @@ export class ReadPreparation {
       const pinned = this.#pin(named, raw, budget);
       if (!pinned || !budget.available) return budget.stop();
       if (raw !== null) this.#content = { id, bytes: raw };
-      return new PreparedRead(this.#sql, snapshot.scope, entry.input, pinned, budget, () => {
+      return new PreparedRead(this.#sql, snapshot.scope, entry.input, stored.value, pinned, budget, () => {
         if (this.#policy(budget) !== policy) return null;
         return this.#pin(named, raw, budget);
       });
