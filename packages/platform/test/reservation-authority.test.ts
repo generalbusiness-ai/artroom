@@ -4,8 +4,8 @@ import { textDigest } from "@generalbusiness/artroom-bytes";
 import { observationOf } from "@generalbusiness/dap-derive";
 import { d, otherLane, t } from "@generalbusiness/dap-derive/testing";
 import { MEMBERSHIP, standingOf } from "../src/membership.ts";
-import { judgeReservation, type Statement } from "../src/reservation.ts";
-import { FOUND, HEAD, NEXT, reading, rulesObserved } from "./support-destination.ts";
+import { judgeReservation, judgeReservationWithStanding, type Statement } from "../src/reservation.ts";
+import { FOUND, HEAD, NEXT, reading, rulesObserved, keyObserved } from "./support-destination.ts";
 import { Roster, paul, rita, una } from "./support.ts";
 
 // Membership is judged in memory with its real rules below the made-up office of Roster. Its standing is the actual
@@ -41,4 +41,38 @@ for (const loses of ["last active key", "membership"] as const) test(`a customiz
   const job = { job: fact(4), name: "verify", state: "passed" as const, decidedBy: fact(5) };
   expect(judge(reading(m.now, { merger: observed(rita.key), rules: rulesObserved(m.now, { checks: [{ name: "verify", configuration: d("b"), required: true, checker: after.member }] }), checks: { verify: { opening: "sound", deciding: true, key: after } } }), { ...statement, jobs: [job] }))
     .toEqual({ reserved: true, integration: NEXT, reason: null });
+});
+
+test("D1 metadata follows the actual independent approvals and required check decisions while the old result shape stays exact", () => {
+  // Lane facts and observations are stand-ins. This is the actual pure
+  // reservation policy, with no runtime admission or key-freshness claim.
+  const name: Statement = { ...statement, verdicts: [
+    { review: fact(3), reviewer: una.member, verdict: "approve" },
+    { review: fact(4), reviewer: rita.member, verdict: "approve" },
+  ], jobs: [
+    { job: fact(5), name: "verify", state: "passed", decidedBy: fact(6) },
+    { job: fact(7), name: "optional", state: "passed", decidedBy: fact(8) },
+  ] };
+  const read = reading(t(0), {
+    manifest: { base: HEAD, integration: NEXT, tree: FOUND.tree, reports: [], authors: [rita.member.member], complete: true },
+    rules: rulesObserved(t(0), { approvals: 1, ownerMayReview: false, checks: [
+      { name: "verify", configuration: d("b"), checker: una.member.member, required: true },
+      { name: "optional", configuration: d("c"), checker: paul.member.member, required: false },
+    ] }), verdicts: [{ sound: true, key: keyObserved(una, t(0)) }, { sound: true, key: keyObserved(rita, t(0)) }],
+    checks: { verify: { opening: "sound", deciding: true, key: keyObserved(una, t(0)) }, optional: { opening: "sound", deciding: true, key: keyObserved(paul, t(0)) } },
+  });
+  const asked = { recorded: HEAD, evidence: FOUND, statement: name, read, time: t(0) };
+  expect(judgeReservation(asked)).toEqual({ reserved: true, integration: NEXT, reason: null });
+  expect(judgeReservationWithStanding(asked)).toEqual({ reserved: true, integration: NEXT, reason: null, standing: {
+    base: [{ key: read.merger!.key, from: statement.operation }, { key: una.key, from: fact(3) }],
+    checks: [{ name: "verify", job: fact(5), result: fact(6), key: una.key }],
+  } });
+  const missing = { ...name, jobs: name.jobs.map(job => ({ job: job.job, name: job.name, state: job.state })) };
+  expect(judgeReservation({ ...asked, statement: missing })).toEqual({ reserved: true, integration: NEXT, reason: null });
+  expect(judgeReservationWithStanding({ ...asked, statement: missing })).toEqual({ reserved: true, integration: NEXT, reason: null, standing: null });
+  const extents = [{ name: "code", patterns: ["src/**"], approvals: 1, approver: "change.review", checks: ["verify"], class: "content" as const }];
+  const byExtent = { ...asked, read: { ...read, extents }, statement: { ...name, verdicts: name.verdicts.map(verdict => ({ ...verdict, extent: "code" })) } };
+  const decided = judgeReservationWithStanding(byExtent);
+  expect(decided).toMatchObject({ reserved: true, standing: { base: [{ key: read.merger!.key }, { key: una.key }], checks: [{ name: "verify", key: una.key }] } });
+  expect(judgeReservation(byExtent)).toEqual({ reserved: true, integration: NEXT, reason: null });
 });

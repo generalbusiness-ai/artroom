@@ -48,3 +48,53 @@ cohort. Nine helper compatibility checks list `@3`/`@4` explicitly; these
 need deliberate new-version coverage, without changing old-version paths.
 No partition activates and no provider credential, Git write, remote push
 or deployment runs in this slice. No tests or gate are claimed yet.
+
+## Adopted correction and first Source checkpoint
+
+Technical decision `ba12604d` is adopted. D1 covers only a regular
+review-backed publication's undecided push attempt. File publications keep
+their separate automatic authority journey and are explicitly outside this
+guarantee. Closed targets and already decided attempts keep existing late
+mint revocation without D1 key reads. The new deciding-read route must bind
+the exact @5 mint, served push, holder and abort effect.
+
+The initial reservation alone is insufficient on the reservation-tree
+journey: it removes checks from its first policy decision at destination.ts
+1500. Later `check-judge` accepts actual result signers at 2455–2472, but the
+old passes rows retain only name/job/passed. D1 therefore needs current
+accepted checker provenance, replacing it when a job generation is fenced.
+It must keep the complete distinct key set, or remain unavailable above
+nine; it cannot refresh only the original merger/verdict observations.
+
+The regular publication already uses all 12 native value slots. The plan
+uses a versioned record inside @5's existing passes slot: reservation/base
+key provenance plus at most 32 current check rows, with actual key, result
+fact and accepted own-decision reference. Old versions keep their arrays.
+No global value bound rises. Native transitions will capture the metadata;
+a request-supplied key list is insufficient.
+
+The first Source helper exposes standing provenance from the actual pure
+reservation computation. It uses the same independent-approval and touched
+extent counted-member decisions and required check list; the existing
+judge keeps its exact result shape. A detailed success without a deciding
+fact reports incomplete metadata rather than inventing a proof.
+
+A second helper reads closed current-generation metadata through exact own
+references. It binds the reservation, accepted operation/attempt, holder,
+full scope/incarnation, membership frame, own hash and passes effect. Each
+later check also binds the checked delivery's job/result and exact opening.
+It reads at most one reservation, 32 accepted decisions and 32 opening
+entries per invocation (65 distinct records), with no history range. It
+returns the full set through nine distinct keys; ten refuses without a
+partial set. It is not yet called by a mint or a configured @5 cohort.
+
+Twenty-two unchanged reservation/destination cases pass. A new actual pure
+reservation case covers independent approvals, required versus optional
+checks, missing deciding provenance and touched extents, while preserving
+the old result. Three provenance-reader cases pass with explicitly
+synthetic native-shaped records and operation metadata. They cover current
+versus replaced generations; exact 9/10 keys; missing/ambiguous metadata;
+and wrong frame/holder/attempt/accepted effect. They are not native @5
+admission or fresh-standing witnesses. The checker-omission control fails
+by assertions when the accepted checker's key is removed and restores the
+helper. No full gate or Source review is claimed at this checkpoint.
