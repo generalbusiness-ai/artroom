@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f56999abdda811457caf86210a93e72ca2eaa6b0","text":"Merge retired a covered predecessor; the successor is at packages/contract/src/item-query.ts."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:f5c960451100230e72ed585cceaaa75d7cb3ad43","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-15-public-item-query-integration.md."}
