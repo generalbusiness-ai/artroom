@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="720" viewBox="0 0 860 720" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Work requests through their stages, and pairwise layer totals</title>
+<desc id="d">Panel A: 813 work requests as ribbons from filed, to promised or not, to verdict or not, to outcome. Panel B: for each pairwise layer, distinct left entities, links and distinct right entities on a log scale.</desc>
+<rect width="860" height="720" fill="#F6F4EE"/>
+<text x="24.0" y="30.0" font-size="16" fill="#23251D" text-anchor="start" font-weight="600">A. One unit, conserved: 813 work requests by stage reached and outcome</text>
+<text x="24.0" y="50.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Ribbon width = number of work requests. Each request is counted once in every column.</text>
+<path d="M52,75.0 C146.0,75.0 146.0,75.0 240,75.0 L240,303.8 C146.0,303.8 146.0,303.8 52,303.8 Z" fill="#BDB8A9" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M52,303.8 C146.0,303.8 146.0,317.8 240,317.8 L240,389.0 C146.0,389.0 146.0,375.0 52,375.0 Z" fill="#BDB8A9" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M252,75.0 C346.0,75.0 346.0,75.0 440,75.0 L440,185.0 C346.0,185.0 346.0,185.0 252,185.0 Z" fill="#BDB8A9" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M252,185.0 C346.0,185.0 346.0,199.0 440,199.0 L440,317.8 C346.0,317.8 346.0,303.8 252,303.8 Z" fill="#BDB8A9" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M252,317.8 C346.0,317.8 346.0,317.8 440,317.8 L440,389.0 C346.0,389.0 346.0,389.0 252,389.0 Z" fill="#BDB8A9" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,75.0 C536.0,75.0 536.0,75.0 620,75.0 L620,148.4 C536.0,148.4 536.0,148.4 452,148.4 Z" fill="#1f6b47" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,148.4 C536.0,148.4 536.0,163.5 620,163.5 L620,189.0 C536.0,189.0 536.0,173.9 452,173.9 Z" fill="#79a98a" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,173.9 C536.0,173.9 536.0,273.5 620,273.5 L620,279.8 C536.0,279.8 536.0,180.2 452,180.2 Z" fill="#9b4a55" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,180.2 C536.0,180.2 536.0,336.9 620,336.9 L620,341.7 C536.0,341.7 536.0,185.0 452,185.0 Z" fill="#c98500" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,199.0 C536.0,199.0 536.0,148.4 620,148.4 L620,149.5 C536.0,149.5 536.0,200.1 452,200.1 Z" fill="#1f6b47" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,200.1 C536.0,200.1 536.0,189.0 620,189.0 L620,259.5 C536.0,259.5 536.0,270.5 452,270.5 Z" fill="#79a98a" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,270.5 C536.0,270.5 536.0,279.8 620,279.8 L620,322.9 C536.0,322.9 536.0,313.7 452,313.7 Z" fill="#9b4a55" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<path d="M452,313.7 C536.0,313.7 536.0,341.7 620,341.7 L620,417.0 C536.0,417.0 536.0,389.0 452,389.0 Z" fill="#c98500" stroke="none" stroke-width="1" fill-opacity="0.55" stroke-linejoin="round"/>
+<rect x="40.0" y="75.0" width="12.0" height="300.0" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="58.0" y="94.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Filed 813</text>
+<rect x="240.0" y="75.0" width="12.0" height="228.8" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="258.0" y="94.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Promised 620</text>
+<rect x="240.0" y="317.8" width="12.0" height="71.2" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="258.0" y="336.8" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">No promise 193</text>
+<rect x="440.0" y="75.0" width="12.0" height="110.0" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="458.0" y="94.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Verdict received 298</text>
+<rect x="440.0" y="199.0" width="12.0" height="190.0" fill="#55574C" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="458.0" y="218.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">No verdict 515</text>
+<rect x="620.0" y="75.0" width="12.0" height="74.5" fill="#1f6b47" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="638.0" y="94.0" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Landed 202</text>
+<rect x="620.0" y="163.5" width="12.0" height="95.9" fill="#79a98a" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="638.0" y="182.5" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Closed by report 260</text>
+<rect x="620.0" y="273.5" width="12.0" height="49.4" fill="#9b4a55" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="638.0" y="292.5" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Cancelled or withdrawn 134</text>
+<rect x="620.0" y="336.9" width="12.0" height="80.1" fill="#c98500" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="638.0" y="355.9" font-size="12" fill="#23251D" text-anchor="start" font-weight="normal">Not closed 217</text>
+<text x="24.0" y="448.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">3 landed requests have no traced verdict (thin ribbon): the stages are not nested.</text>
+<text x="24.0" y="480.0" font-size="16" fill="#23251D" text-anchor="start" font-weight="600">B. Links are not a conserved unit: six pairwise layers counted as links</text>
+<text x="24.0" y="500.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Log scale. Hollow circle = distinct left entities, filled = links, square = distinct right entities.</text>
+<line x1="300.0" y1="514.0" x2="300.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="300.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">1</text>
+<line x1="368.0" y1="514.0" x2="368.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="368.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">10</text>
+<line x1="436.0" y1="514.0" x2="436.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="436.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">100</text>
+<line x1="504.0" y1="514.0" x2="504.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="504.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">1,000</text>
+<line x1="572.0" y1="514.0" x2="572.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="572.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">10,000</text>
+<line x1="640.0" y1="514.0" x2="640.0" y2="670.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="640.0" y="684.0" font-size="11" fill="#66655A" text-anchor="middle" font-weight="normal">100,000</text>
+<text x="290.0" y="532.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Work request → promise</text>
+<line x1="489.9" y1="528.0" x2="490.0" y2="528.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="489.9" cy="528.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="490.0" cy="528.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="486.0" y="524.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="532.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">620 → 622 links → 622</text>
+<text x="290.0" y="558.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Promise → artifact statement</text>
+<line x1="469.9" y1="554.0" x2="580.6" y2="554.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="469.9" cy="554.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="580.6" cy="554.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="576.6" y="550.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="558.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">315 → 13,402 links → 13,399</text>
+<text x="290.0" y="584.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Artifact statement → review request</text>
+<line x1="488.2" y1="580.0" x2="579.2" y2="580.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="578.6" cy="580.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="579.2" cy="580.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="484.2" y="576.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="584.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">12,504 → 12,742 links → 586</text>
+<text x="290.0" y="610.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Review request → verdict</text>
+<line x1="484.6" y1="606.0" x2="484.6" y2="606.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="484.6" cy="606.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="484.6" cy="606.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="480.6" y="602.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="610.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">519 → 519 links → 519</text>
+<text x="290.0" y="636.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Approval → landing receipt</text>
+<line x1="454.8" y1="632.0" x2="456.2" y2="632.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="454.8" cy="632.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="456.2" cy="632.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="452.2" y="628.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="636.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">189 → 198 links → 198</text>
+<text x="290.0" y="662.0" font-size="12" fill="#23251D" text-anchor="end" font-weight="normal">Landing receipt → discharged request</text>
+<line x1="454.6" y1="658.0" x2="456.9" y2="658.0" stroke="#CFCBBF" stroke-width="2"/>
+<circle cx="454.6" cy="658.0" r="5" fill="#F6F4EE" stroke="#23251D" stroke-width="1.5"/>
+<circle cx="456.9" cy="658.0" r="4" fill="#23251D" stroke="none" stroke-width="0"/>
+<rect x="452.9" y="654.0" width="8.0" height="8.0" fill="#8C887A" stroke="none" stroke-width="0" fill-opacity="1"/>
+<text x="656.0" y="662.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">188 → 203 links → 203</text>
+<text x="24.0" y="708.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">Observed counts at the head.  Workroom head 764cf535, 42,878 events, 1 to 16 Oct 2026 UTC.</text>
+</svg>

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="450" viewBox="0 0 860 450" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Provenance trace of one landed work request across three actors</title>
+<desc id="d">Swimlane timeline: one lane per actor, events placed by time, lines join each event to the events it rests on.</desc>
+<rect width="860" height="450" fill="#F6F4EE"/>
+<text x="24.0" y="30.0" font-size="16" fill="#23251D" text-anchor="start" font-weight="600">Provenance of one landed request (10fcfe4e): 4 review requests, 2 with changes requested</text>
+<text x="24.0" y="50.0" font-size="12" fill="#66655A" text-anchor="start" font-weight="normal">Lanes = signing actor. Lines = recorded rests-on links between the events shown. 12 artifact supersessions omitted.</text>
+<line x1="110.0" y1="105.0" x2="830.0" y2="105.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="24.0" y="109.0" font-size="13" fill="#2a78d6" text-anchor="start" font-weight="600">planner</text>
+<line x1="110.0" y1="205.0" x2="830.0" y2="205.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="24.0" y="209.0" font-size="13" fill="#e0612e" text-anchor="start" font-weight="600">builder</text>
+<line x1="110.0" y1="305.0" x2="830.0" y2="305.0" stroke="#E3E0D6" stroke-width="1"/>
+<text x="24.0" y="309.0" font-size="13" fill="#16936a" text-anchor="start" font-weight="600">checker</text>
+<path d="M120.0,105.0 C316.5,105.0 316.5,185.0 513.0,185.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M513.0,185.0 C529.1,185.0 529.1,185.0 545.2,185.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C545.3,185.0 545.3,225.0 545.5,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C545.3,185.0 545.3,225.0 545.5,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C545.3,185.0 545.3,225.0 545.5,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.5,225.0 C605.9,225.0 605.9,285.0 666.4,285.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M666.4,285.0 C688.5,285.0 688.5,325.0 710.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C627.9,185.0 627.9,325.0 710.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C627.9,185.0 627.9,325.0 710.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.5,225.0 C628.1,225.0 628.1,325.0 710.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M545.2,185.0 C627.9,185.0 627.9,325.0 710.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M513.0,185.0 C618.1,185.0 618.1,185.0 723.2,185.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M723.2,185.0 C723.3,185.0 723.3,225.0 723.4,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M723.2,185.0 C723.3,185.0 723.3,225.0 723.4,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M723.2,185.0 C723.3,185.0 723.3,225.0 723.4,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M723.4,225.0 C726.3,225.0 726.3,285.0 729.1,285.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M513.0,185.0 C644.3,185.0 644.3,185.0 775.6,185.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C775.8,185.0 775.8,225.0 775.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C775.8,185.0 775.8,225.0 775.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C775.8,185.0 775.8,225.0 775.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.9,225.0 C778.2,225.0 778.2,285.0 780.4,285.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.9,225.0 C780.9,225.0 780.9,325.0 786.0,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C780.8,185.0 780.8,325.0 786.0,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C780.8,185.0 780.8,325.0 786.0,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M775.6,185.0 C780.8,185.0 780.8,325.0 786.0,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M780.4,285.0 C783.2,285.0 783.2,325.0 786.0,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M513.0,185.0 C653.8,185.0 653.8,185.0 794.6,185.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C794.7,185.0 794.7,225.0 794.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C794.7,185.0 794.7,225.0 794.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C794.7,185.0 794.7,225.0 794.9,225.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.9,225.0 C801.5,225.0 801.5,285.0 808.2,285.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M808.2,285.0 C813.4,285.0 813.4,325.0 818.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C806.6,185.0 806.6,325.0 818.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C806.6,185.0 806.6,325.0 818.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.6,185.0 C806.6,185.0 806.6,325.0 818.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M794.9,225.0 C806.7,225.0 806.7,325.0 818.6,325.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M818.6,325.0 C818.9,325.0 818.9,205.0 819.2,205.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<path d="M818.6,325.0 C819.3,325.0 819.3,205.0 820.0,205.0" fill="none" stroke="#B8B4A6" stroke-width="1" fill-opacity="1" stroke-linejoin="round"/>
+<rect x="115.0" y="100.0" width="10.0" height="10.0" fill="#55574C" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="120.0" y="95.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">request</text>
+<circle cx="513.0" cy="185.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<rect x="540.2" y="180.0" width="10.0" height="10.0" fill="#e0612e" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="545.2" y="175.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">3</text>
+<circle cx="545.5" cy="225.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="666.4" cy="285.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="710.6" cy="325.0" r="5" fill="#9b4a55" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="710.6" y="345.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">changes</text>
+<rect x="718.2" y="180.0" width="10.0" height="10.0" fill="#e0612e" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="723.2" y="175.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">3</text>
+<circle cx="723.4" cy="225.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="729.1" cy="285.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<rect x="770.6" y="180.0" width="10.0" height="10.0" fill="#e0612e" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="775.6" y="175.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">3</text>
+<circle cx="775.9" cy="225.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="780.4" cy="285.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="786.0" cy="325.0" r="5" fill="#9b4a55" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="786.0" y="357.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">changes</text>
+<rect x="789.6" y="180.0" width="10.0" height="10.0" fill="#e0612e" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="794.6" y="175.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">3</text>
+<circle cx="794.9" cy="225.0" r="5" fill="#23251D" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="808.2" cy="285.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<circle cx="818.6" cy="325.0" r="5" fill="#1f6b47" stroke="#F6F4EE" stroke-width="1.5"/>
+<text x="818.6" y="345.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">approve</text>
+<circle cx="819.2" cy="205.0" r="4" fill="#8C887A" stroke="#F6F4EE" stroke-width="1.5"/>
+<rect x="815.0" y="200.0" width="10.0" height="10.0" fill="#1f6b47" stroke="#F6F4EE" stroke-width="1.5" fill-opacity="1"/>
+<text x="820.0" y="225.0" font-size="10" fill="#23251D" text-anchor="middle" font-weight="normal" stroke="#F6F4EE" stroke-width="3" paint-order="stroke">landing receipt</text>
+<line x1="120.0" y1="358.0" x2="120.0" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="120.0" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">0 h</text>
+<line x1="238.3" y1="358.0" x2="238.3" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="238.3" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">1 h</text>
+<line x1="356.7" y1="358.0" x2="356.7" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="356.7" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">2 h</text>
+<line x1="475.0" y1="358.0" x2="475.0" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="475.0" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">3 h</text>
+<line x1="593.4" y1="358.0" x2="593.4" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="593.4" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">4 h</text>
+<line x1="711.7" y1="358.0" x2="711.7" y2="363.0" stroke="#66655A" stroke-width="1"/>
+<text x="711.7" y="376.0" font-size="10" fill="#66655A" text-anchor="middle" font-weight="normal">5 h</text>
+<text x="24.0" y="404.0" font-size="10" fill="#66655A" text-anchor="start" font-weight="normal">Squares: request, artifacts at one head (number = artifact statements), landing receipt. Circles: promises, review requests (dark), verdicts (green approve, red changes), ratifications.</text>
+<text x="24.0" y="438.0" font-size="11" fill="#66655A" text-anchor="start" font-weight="normal">Observed events; x position = recorded time.  Workroom head 764cf535, 42,878 events, 1 to 16 Oct 2026 UTC.</text>
+</svg>

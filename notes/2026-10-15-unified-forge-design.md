@@ -7,6 +7,9 @@ Source inventory: main `40e37d8537aad5eecf8066fd426ae49842766526`.
 This note replaces the earlier unlanded discussion draft of the same name.
 It incorporates the forge research (`dbf2ccc4`) and navigation and
 visualization research (`8ba14e34`).
+Section 5 adds evidence and example charts from the project's own gitseq
+workroom at event head `764cf535f5ffa5c4ff066acbe7f6238d973528fd`
+(42,878 events, 1 to 16 October 2026 UTC).
 
 The proposed result is a complete browser experience for coordinated
 development, with the depth of a good forge and local Git client. The
@@ -331,6 +334,198 @@ ancestry meaning. Temporal order alone does not establish causality.
 More elaborate bundling, compound graphs, and spatial maps are later
 research options. Elevate one when the simpler comparison demonstrably
 fails a representative question, not because it can display more marks.
+
+### Evidence from the project's own workroom
+
+This project coordinates its own work in a gitseq workroom. Its workflow
+has the same shape as the forge workflow: a request, a promise, artifacts
+at an exact Git head, a review request, a verdict, ratification, and a
+landing receipt, with supersession and staleness along the way. It has no
+goal or issue layer, and it is not a room. Its numbers test the candidate
+views above; they do not describe a forge.
+
+**How the data was taken.** One read-only export of ref
+`refs/seq/589bca982736a2361d15d53f7572375ef2f7aaf3` at event head
+`764cf535`: 42,878 events from 1 October 15:53 to 16 October 00:52 UTC.
+The exporter called gitseq's own verification and fold (gitseq `5876d211`,
+read-only snapshot), kept relational fields only, and wrote no statement
+text. Scripts computed every number and drew every chart. The exporter,
+data and scripts stay outside the repository. Labels: an *observed* count
+comes from the fold at the head; a *derived* duration is a difference of
+recorded event times; a *reconstruction* estimates a past state from event
+times and the current fold. Three keys sign events: planner (also the
+operator), builder and checker. Hugh's own acts are not separable from
+the planner's.
+
+Terms. A *work request* is addressed to the builder or planner (813
+effective). A *review request* is addressed to the checker (716). The fold
+projects each request as a *commitment*. A commitment *closes* when it is
+satisfied, cancelled (superseded after a promise) or withdrawn (superseded
+before one). *Stale* means a basis was retired; it qualifies a status and
+does not replace it.
+
+| Event class (observed) | Events | Share | Main signers |
+|---|---:|---:|---|
+| Supersession of an artifact | 16,442 | 38% | builder |
+| Artifact statement (one path at one head) | 13,407 | 31% | builder |
+| Artifact statement after a landing | 5,074 | 12% | builder |
+| Assertion, proposal, roster | 2,806 | 7% | planner, builder, checker |
+| Request; promise | 1,540; 1,308 | 7% | planner, builder; checker, builder |
+| Ratification; review verdict; other report | 732; 539; 411 | 4% | all; checker; all |
+| Supersession of a request; landing receipt | 399; 198 | 1% | planner, builder; builder |
+
+The table omits 22 other supersessions. Artifact pointers and their
+supersessions are 81% of all events. The builder signs 82%. A raw event timeline or ribbon layer would therefore
+draw bookkeeping, not decisions. Views need a declared unit, and the
+artifact layer must aggregate to a path or head.
+
+![Sankey of 813 work requests and a log-scale dot plot of six pairwise layers](2026-10-15-unified-forge-design/fig1-request-flow-and-layers.svg)
+
+*Figure 1. Panel A: a Sankey with one unit, the work request, counted once
+per column (observed). Panel B: the same chain counted as links per
+pairwise layer, on a log scale.* Panel A conserves flow only because it
+draws one unit and a fixed attributed tuple per request; even so, 3 landed
+requests have no traced verdict. Panel B shows why links cannot share one
+ribbon width: 315 promises carry 13,402 artifact links, which feed 586
+review requests, which yield 519 verdicts. This supports the note's
+pairwise-layer rule with named link and entity counts. It undermines any
+chained Sankey whose width changes meaning between layers. Panel A is
+good at showing where requests end and bad at attribution across layers.
+
+![Matrix of outcome groups against kinds of evidence](2026-10-15-unified-forge-design/fig2-coverage-matrix.svg)
+
+*Figure 2. Coverage matrix for **Find work missing implementation or
+evidence**: outcome group × recorded evidence, observed at the head.* Zero
+cells stay visible, so the 122 unclaimed and 95 promised but unclosed
+requests remain on screen; 77 of the 95 have no artifact. It shows sets
+well and paths badly. Stale cuts across five of the six rows, including
+104 landed requests, so stale must be a column or filter, not a lane.
+
+![UpSet view of exact stage combinations](2026-10-15-unified-forge-design/fig3-stage-intersections.svg)
+
+*Figure 3. UpSet view of the exact combination of stages each work
+request reached (observed).* There are 21 distinct combinations. The
+third largest, 166 requests, reached none of the seven stages; most
+are unclaimed, stale or withdrawn. 34 requests have a review request but
+no artifact under their promise, and 69 have a verdict but closed by
+report. The stages are not a nested funnel, which a
+funnel or single-status display would hide. UpSet earns its place when
+exact multiway membership is the question, as the note says. It is bad
+at order and time.
+
+![Small multiples of commitment state over time](2026-10-15-unified-forge-design/fig4-state-over-time.svg)
+
+*Figure 4. Small multiples of all 1,531 commitments every 3 hours
+(reconstruction), with requests filed and superseded per day (observed).*
+Closed work rises steadily to about 1,280, while unclaimed work grows
+from none to 123 and promised work to about 120. Supersession of requests
+comes in bursts, with 85 on 12 October. Separate zero-based panels keep the
+small open counts readable beside the large closed count. A time-expanded
+alluvial view would suit the supersede and reopen movement, but staleness
+at past times cannot be reconstructed from the current fold, so this
+corpus cannot honestly drive a stale-state alluvial. That needs a
+relationship contract with historical state (section 4.4). The panels are
+good at trend and bad at naming the items behind it.
+
+![Cumulative distributions of stage durations on a log time axis](2026-10-15-unified-forge-design/fig5-duration-distributions.svg)
+
+*Figure 5. Cumulative distributions of six intervals on a log time axis,
+with median and 90th percentile marked (derived).*
+
+| Interval (derived) | n | Median | 90th percentile | Max |
+|---|---:|---:|---:|---:|
+| Work request → first promise | 620 | 2 min | 1.3 h | 133 h |
+| Promise → first artifact | 315 | 28 min | 4.8 h | 47 h |
+| Review request → verdict | 529 | 18 min | 1.1 h | 113 h |
+| Approval → landing receipt | 188 | 6 min | 1.3 h | 17 h |
+| Work request → landed | 202 | 3.0 h | 19.7 h | 121 h |
+| Age of unclosed commitments at the head | 248 | 4.0 days | 12.0 days | 14.3 days |
+
+Moving work is fast; the residue is old. A linear time axis hides one or
+the other. Duration and timeline views need a labelled log scale, or
+separate views for flow and for residue. Distributions show tails well
+but do not say which items are slow; each tail needs a link to its list.
+
+Review rounds are matrix-shaped. Each review request received at most one
+verdict; a new round is a new review request at a new head. Of 202 landed
+requests, 93 needed one review request, 45 needed two, 30 three, 32
+four or more (maximum 16), and 2 had none traced. 118 landed with no
+changes requested; 20 had three or more. In first rounds, 146 of 298 verdicts requested changes. 179
+review requests were cancelled after a changes-requested verdict, so
+"cancelled" alone misstates what happened.
+
+![Treemap of artifact statements by area, shaded by review requests](2026-10-15-unified-forge-design/fig6-code-atlas.svg)
+
+*Figure 6. Code atlas: treemap of 13,407 artifact statements by area
+(2,044 distinct paths, 52 areas), shaded by review requests citing each
+area (observed).* `packages/room` has the most artifacts (1,915) but 87
+review requests; `notes` has 951 artifacts and 416 review requests, 174
+with changes requested. Activity is not one quantity: an atlas must name
+its metric. 336 of 590 artifact-backed review requests span more than one
+area, which supports a change-by-area matrix. The treemap is good for
+proportion and bad for stable position; a code hierarchy keeps positions.
+
+![Swimlane provenance trace of one landed request](2026-10-15-unified-forge-design/fig7-provenance-swimlane.svg)
+
+*Figure 7. Provenance trace for **Explain why this version is blocked or
+running**: one landed request (`10fcfe4e`) in actor lanes, with recorded
+rests-on links (observed).* It had 12 artifacts at four heads, four
+review requests, two changes requested, and landed after 5.9 hours. The
+trace explains this one case well. It would not scale to the whole room:
+the largest landing receipt is cited by 1,545 later events. Focused
+expansion is required, as the note says.
+
+![Heatmaps of coordination events by day and hour for each actor](2026-10-15-unified-forge-design/fig8-activity-heatmap.svg)
+
+*Figure 8. Coordination events (excluding artifact statements and their
+supersessions) by day and hour, one heatmap per actor (observed, US
+Eastern).* Each actor acts in all 24 hours, and 7 October is nearly idle.
+The view is cheap and shows handoff gaps, but it answers no question in
+section 5. It should not take priority.
+
+**Attention and residue.** Re-applying the status view's lane rules at
+the head gives these rows (observed):
+
+| Actor | Rows listed | Waiting on actor | Available to claim | Actor waits | Status stale | Cancelled, still listed |
+|---|---:|---:|---:|---:|---:|---:|
+| Planner | 314 | 41 | 53 | 29 | 43 | 147 |
+| Builder | 407 | 65 | 64 | 20 | 28 | 229 |
+| Checker | 318 | 0 | 0 | 69 | 19 | 230 |
+
+One reneged row each for planner and builder is not in a column.
+Cancelled commitments are 47% to 72% of the listed rows. Work requests also form a graph, not a tree:
+443 of 813 cite another work request, 118 cite more than one, and chains
+reach depth 10. 296 neither cite nor are cited by another request. 616 of
+1,531 commitments carry the stale qualifier, 531 of them closed. These
+are the items that must not disappear for lack of a ribbon; lists and
+matrices must show them first.
+
+**What the evidence implies for section 5.**
+
+- Keep the pairwise-layer Sankey and its disclosures; reject a chained
+  Sankey over links. Treat stage reach per request as a set question
+  (matrix, UpSet), not a funnel.
+- Put the coverage matrix and direct lists first for missing work. The
+  unclaimed, unlinked and stale sets are hundreds of items here.
+- Give time views log scales or split flow from residue.
+- Give the code atlas a named metric and a stable hierarchy.
+- Keep the provenance trace focused; high fan-in makes whole-graph
+  drawing unreadable.
+- Not supported by this corpus: a goal layer (none exists), file-level
+  conflict or dependency (artifacts are path pointers; no diffs were
+  exported), and Git railway views (ancestry is not in the workroom).
+
+**Test tasks this corpus can serve.** As a realistic fixture, it suits two
+tasks. First, **Find work missing implementation or evidence** over the
+813 work requests. The answer sets are known by script: 122 unclaimed,
+77 promised without artifacts, 3 landed without a traced verdict, and 296
+unlinked. Compare direct lists, Figure 2 and Figure 1. Second, **Explain
+why this request needed several review rounds** for any of the 32 landed
+requests with four or more review requests. Compare a trace like Figure 7,
+a requirements table and an event timeline. A prototype that passes on
+this fixture is still a prototype, not delivered capability. The export
+holds event IDs and paths but no text. Sharing it as a fixture needs the
+review that section 4.4 requires; this note commissions none.
 
 ## 6. Consistency, simplicity, and accessibility are acceptance conditions
 
