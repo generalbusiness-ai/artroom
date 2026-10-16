@@ -36,7 +36,7 @@
  */
 
 import type { Bounds, CapabilityName, DecisiveEvidence, Entry, Evidence, FactRef, FactUse, KeyId, OperationId, PlatformDefinition, RetainedInput, ScopeRef, Timestamp } from "@generalbusiness/dap-contract";
-import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, isEvidence, isOperationId, isRetainedInput, parseStrict, retainedValueKey, utf8 } from "@generalbusiness/artroom-bytes";
 import { clockOf, recordedOutcome, evidenceValues, isEntryOf, valueDigest, settleOutcome, snapshotInput, snapshotRead, timeMs, timeOf, type Clock as Reading, type Fetched, type Operation, type OutcomeOffered, type Owners } from "@generalbusiness/dap-derive";
 import { applicationPublicationOrigin, publishingLaneOrigin } from "@generalbusiness/dap-platform";
 import { ownOf, valuesOf, type Scope } from "./core.ts";
@@ -176,8 +176,8 @@ export const isAnswer = (answer: unknown): answer is EffectAnswer => {
  * and a retained input's bytes are canonical JSON text (`RetainedInput`): the same pairs in another order or with other spacing have
  * the same digest and are not those bytes.
  */
-const canonicalValue = (input: RetainedInput): boolean => {
-  try { const value = parseStrict(input.bytes); return typeof input.domain === "string" && canonicalize(value) === input.bytes && valueDigest(input.domain, value) === input.digest; } catch { return false; }
+const canonicalValue = (input: RetainedInput, domain = input.domain): boolean => {
+  try { const value = parseStrict(input.bytes); return typeof domain === "string" && canonicalize(value) === input.bytes && valueDigest(domain, value) === input.digest; } catch { return false; }
 };
 const inputsOf = (answer: { retain?: unknown }): readonly RetainedInput[] | null => {
   const given = answer.retain === undefined ? [] : answer.retain;
@@ -645,8 +645,9 @@ export class Operations {
     if (values === null) return invalidValue("the evidence names a value outside its owner declaration");
     const bytes: string[] = [];
     for (const value of values) {
-      const given = retain.find((input) => input.kind === "value" && input.domain === value.domain && input.digest === value.digest) ?? this.#store.retained("value", value.digest, value.domain);
-      if (!given || utf8(given.bytes).length > value.max || !canonicalValue(given)) return invalidValue("the evidence names a value whose canonical bytes were not given under its digest and bound");
+      const key = retainedValueKey(value.domain, value.digest);
+      const given = retain.find((input) => input.kind === "value" && input.domain === value.domain && input.digest === value.digest) ?? this.#store.retained(key.kind, key.digest, "domain" in key ? key.domain : undefined);
+      if (!given || utf8(given.bytes).length > value.max || !canonicalValue(given, value.domain)) return invalidValue("the evidence names a value whose canonical bytes were not given under its digest and bound");
       bytes.push(given.bytes);
     }
     if (named.some((digest) => !retain.some((given) => given.kind === "snapshot" && given.digest === digest) && this.#store.retained("snapshot", digest) === null)) {

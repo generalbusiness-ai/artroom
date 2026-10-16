@@ -7,9 +7,8 @@
  * the answer to a founding, is the contract's, and is exported here again.
  */
 
-import { DOMAINS } from "@generalbusiness/dap-contract";
 import type { ActType, Answer, Beside, Bounds, CapabilityName, DeclaredDefinition, Digest, DutyId, Entry, FactRef, Founded, Grant, ObservationUse, PlatformDefinition, Receipt, RefusalReason, ScopeId, Seed, Settlement, SignedIntent, UnavailableReason } from "@generalbusiness/dap-contract";
-import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { canonicalize, definitionDigest, intentDigest, isDigest, isGrant, isPlatformDefinition, newIncarnation, parseStrict, platformName, retainedValueKey, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
 import { actNeeds, actionOf, outcomeValueDomains, checkpointOf, clockOf, counted, derivable, factsNamed, ownersOf, inputTexts, isObject, judgeAct, judgeCheckpoint, judgeGenesis, judgePreparation, own, placesOf, prepareRules, presentedTypes, readFields, runnable, stepsOf, validateDefinition, windowOf } from "@generalbusiness/dap-derive";
 import type { ActJudgment, Clock as Reading, Draft, Fetched, Founding, GrantDecision, JudgeContext, Needed, Observing, Own, Owners, Placed, PlatformRules, Presented, Snapshots, StateView, Texts, ValidDefinition, Window } from "@generalbusiness/dap-derive";
 import { RULE_PROFILES } from "@generalbusiness/dap-derive/rule";
@@ -154,7 +153,7 @@ function valuesBeside(values: unknown, places: readonly Placed[]): string[] {
  * for a value in the domain of a definition.
  */
 export const valuesOf = (draft: Draft): Retained[] => (draft.values ?? []).map((value) =>
-  (value.domain === DOMAINS.definition ? { kind: "definition", digest: value.digest, bytes: value.bytes } : { kind: "value", domain: value.domain, digest: value.digest, bytes: value.bytes }));
+  ({ ...retainedValueKey(value.domain, value.digest), bytes: value.bytes }));
 
 /** Asked for while rules are found in preparation, where nothing is written. The commit mints the real one. */
 export const NO_INCARNATION = newIncarnation(new Uint8Array(16));
