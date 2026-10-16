@@ -1,1 +1,1 @@
-{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e3363695147eae71606a1adada662a999f604fe8","text":"Merge retired a covered predecessor; the successor is at notes/2026-10-16-definition-domain-retained-key.md."}
+{"target":"git:sha1:589bca982736a2361d15d53f7572375ef2f7aaf3#git:sha1:e68564445627888551a37382f4bda13e65f1619a","text":"Merge retired a covered predecessor; the successor is at packages/replay/src/verify.ts."}
