@@ -33,7 +33,7 @@ import { PROPOSED_BOUNDS, type Answer, type DeclaredDefinition, type Digest, typ
 import { READ_REFUSALS, readItemQuery, b64url, canonicalize, definitionDigest, digestBytes, factRefOf, intentDigest, isReceipt, isSignedIntentShape, isDigest, isFactRef, isIncarnation, isScopeId, keyIdOfSecret, parseStrict, scopeIdOf, seedDigest, textDigest, timeMs, timeOf, unb64url, utf8, verifySignedIntent } from "@generalbusiness/artroom-bytes";
 import {
   ScopeHandle, ShapeError, TransportError, wellFormedInvitation, isFoundingOffer, readCredential, declaredHandle, found, httpTransport, requestSession, secretSigner, sessionRequest, shapeDeclaredAct, signedIntent, signedLogReader, signedReads,
-  type Fetch, type FoundingOffer, type ReadSigning, type Signing, type Transport,
+  type Fetch, type Session, type FoundingOffer, type ReadSigning, type Signing, type Transport,
 } from "@generalbusiness/artroom-client";
 import { TOKENS_FLOOR, capabilitiesOf, gitRead, holdCapability } from "@generalbusiness/dap-derive";
 import { APPLICATION_COHORT, FILE_PUBLICATION_COHORT, COUNTING_COHORT, DIRECTORY_OF, SIBLINGS_OF, READ_TOKEN_HOURS, NEWEST, ROLE_LISTS, platform, type Role } from "@generalbusiness/dap-platform";
@@ -46,6 +46,7 @@ import type { ClaimStep, Config, PendingClaim, PendingJoin, PlannedInstall, Repo
 import { outcomeFetch, outcomeWaitLines, pauseOutcome, waitOutcome, type CloneWait } from "./clone-outcome.ts";
 import { readTokenEntry, readTokenOpening, readTokenOutcome, readTokenReceipt } from "./clone-proof.ts";
 import { observeCleanup } from "./verify-cleanup.ts";
+import { statusReport } from "./status-report.ts";
 
 export interface Context {
   store: Store;
@@ -157,14 +158,17 @@ async function readTransportOf(ctx: Context, config: Config, reader?: string | n
  * without one, as signed reads by the caller's key (`handleOf`), and the
  * scope decides whether they may read.
  */
-async function readerOf(ctx: Context, config: Config): Promise<string | null> {
+async function sessionOf(ctx: Context, config: Config): Promise<Session | null> {
   const membership = config.repository?.membership;
   const secret = await ctx.store.secret(config.key);
   if (!membership || !secret) return null;
   const now = ctx.now?.() ?? Date.now();
   const asked = sessionRequest(membership, secret, timeOf(Math.floor(now / 1000) * 1000 + 60_000), b64url(fresh(16)));
   const answer = await requestSession(config.service, membership.scope, asked, ctx.fetch ? { fetch: ctx.fetch } : {});
-  return answer.ok ? answer.session.reader() : null;
+  return answer.ok ? answer.session : null;
+}
+async function readerOf(ctx: Context, config: Config): Promise<string | null> {
+  return (await sessionOf(ctx, config))?.reader() ?? null;
 }
 
 /**
@@ -1881,4 +1885,26 @@ async function linking(ctx: Context, config: Config, lane: ScopeId, reader: stri
   const answer = await C.submit(signed, [], beside);
   if (answer.answer !== "accepted") return answered(lane, answer, "Linked");
   return done(`Linked: when it is published, the change ${lane} closes issue #${issue.number ?? "?"} (${issue.lane}).`);
+}
+
+/** Current operational observations through the caller's session. */
+export function status(ctx: Context, named?: string, request?: string): Promise<Outcome> {
+  return run(async () => {
+    if (request !== undefined && !/^[0-9a-f]{16}$/.test(request)) return usage("--request needs exactly 16 lowercase hexadecimal characters.");
+    const config = await configOf(ctx);
+    if (!config.repository) return usage("No room is known here. Run dap create or dap join first.");
+    let session: Session | null;
+    try { session = await sessionOf(ctx, config); }
+    catch { return failed("Status unknown: no session answer."); }
+    if (!session) return failed("Status unknown: a current room session is unavailable.");
+    const repository = config.repository;
+    const scopes = named === undefined ? [
+      ...(config.register ? [{ kind: "register", scope: config.register.scope }] : []),
+      { kind: "directory", scope: repository.directory.scope }, { kind: "membership", scope: repository.membership.scope },
+      { kind: "rules", scope: repository.rules }, { kind: "destination", scope: repository.destination },
+      ...(repository.inbox ? [{ kind: "inbox", scope: repository.inbox }] : []),
+    ] : [{ kind: named, scope: scopeNamed(config, named) }];
+    const admin = session.claims.reads.includes("incidents") && session.claims.reads.includes("waiting");
+    return done(...await statusReport(httpTransport(config.service, ctx.fetch ? { fetch: ctx.fetch } : {}), session.reader(), scopes, admin, request, named === undefined));
+  });
 }

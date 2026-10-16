@@ -28,10 +28,14 @@ test("operational reads preserve heads, partial pages and refusals; malformed or
     { ok: false, reason: "provider-private-error" },
   ]) {
     answer = wrong;
-    await expect(http.requests(scope, "Session fixture", request)).rejects.toThrow(TransportError);
+    let rejected = false;
+    try { await http.requests(scope, "Session fixture", request); }
+    catch (error) { rejected = error instanceof TransportError; }
+    expect(rejected).toBe(true);
   }
   const before = sent.length;
   await expect(http.requests(scope, "Session fixture", "not-an-id")).rejects.toThrow(TransportError);
+  await expect(http.requests(scope, "Session fixture", request, "not-a-cursor")).rejects.toThrow(TransportError);
   expect(sent).toHaveLength(before);
 });
 

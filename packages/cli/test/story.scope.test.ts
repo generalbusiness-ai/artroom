@@ -1,6 +1,8 @@
+import { runInDurableObject } from "cloudflare:test";
+import { OperatorRecord } from "../../scope/src/operator.ts";
 import { describe, expect, test } from "vitest";
 import type { Digest, Item, OperationId, Read, Seed } from "@generalbusiness/dap-contract";
-import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, utf8 } from "@generalbusiness/artroom-bytes";
+import { b64url, canonicalize, definitionDigest, scopeIdOf, textDigest, timeOf, utf8 } from "@generalbusiness/artroom-bytes";
 import type { Fetch } from "@generalbusiness/artroom-client";
 import { repositoryName } from "@generalbusiness/dap-platform";
 import { beginSessionFixture } from "../../scope/test/session-settings.ts";
@@ -211,6 +213,42 @@ async function story(lifetime: ReturnType<typeof nativeFixtureLifetime>): Promis
     // The destination is folded through the publication's last outcome, entry 7.
     if (scope === "destination") expect(live.lines[2]).toMatch(/, destination, through entry 7 \(sha256:/);
   }
+
+  // Operational status uses these actual sessions and live HTTP reads,
+  // preserves column heads, and reads no sidecar unless explicitly asked.
+  const adminStatus = await run(rita, "status", "membership");
+  expect(adminStatus.code, adminStatus.lines.join("\n")).toBe(0);
+  expect(adminStatus.lines.some(line => line.includes("incidents: 0; at entry"))).toBe(true);
+  expect(adminStatus.lines.some(line => line.includes("outbox:") && line.includes("at entry"))).toBe(true);
+  expect(adminStatus.lines.some(line => line.includes("request "))).toBe(false);
+  const memberStatus = await run(una, "status", "membership");
+  expect(memberStatus.code, memberStatus.lines.join("\n")).toBe(0);
+  expect(memberStatus.lines).toContain("  incidents: denied.");
+  const requestStatus = await run(rita, "status", "membership", "--request", "abcdef0123456789");
+  expect(requestStatus.code, requestStatus.lines.join("\n")).toBe(0);
+  expect(requestStatus.lines.some(line => line.includes("request abcdef0123456789: 0 rows, window"))).toBe(true);
+  const roomStatus = await run(rita, "status");
+  expect(roomStatus.code, roomStatus.lines.join("\n")).toBe(0);
+  expect(roomStatus.lines.filter(line => /^(?:register|directory|membership|rules|destination|inbox) sc_/.test(line)).length).toBeGreaterThanOrEqual(7);
+
+  // A real admitted member opening leaves its native inbox create
+  // unanswered. The production operator record stores a fixture incident
+  // about that actual entry; this is no claim about a provider failure.
+  lifetime.setHold(envelope => envelope.message.class === "request" && envelope.message.type === "create" && "kind" in envelope.to && envelope.to.kind === "inbox");
+  const queuedMember = await run(rita, "act", "add-member", "--on", "membership", "--set", "handle=@status-check", "--set", "kind=checker");
+  expect(queuedMember.code, queuedMember.lines.join("\n")).toBe(0);
+  await dispatchFixture([M], lifetime.wait);
+  const queuedEntry = Number(/:(\d+),/.exec(queuedMember.lines[0]!)![1]);
+  const membershipAt = await M.at();
+  await lifetime.wait(() => runInDurableObject(M.object, (_instance, state) => {
+    const record = new OperatorRecord({ exec: (query, ...args) => state.storage.sql.exec(query, ...args) }, { read: () => timeOf(now()) }, () => membershipAt);
+    expect(record.found("bad-input", [{ entry: queuedEntry }])).toBe(true);
+  }));
+  const pendingStatus = await run(rita, "status", "membership");
+  expect(pendingStatus.code, pendingStatus.lines.join("\n")).toBe(0);
+  expect(pendingStatus.lines.some(line => line.includes("outbox: 1 requests without a result"))).toBe(true);
+  expect(pendingStatus.lines.some(line => line.includes("incidents: 1; at entry"))).toBe(true);
+  lifetime.setHold(() => false);
 
   // What stays forbidden: a key of another register, which signed nothing in this one and holds no session of this repository.
   const vic: Context = { store: memoryStore(), fetch, now, pause };

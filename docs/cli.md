@@ -655,6 +655,16 @@ Exit codes: 0 done; 1 refused, unavailable, not found or not consistent;
 
 ## Reads and sessions
 
+**`dap status [<scope>] [--request <16-hex-id>]`** reports bounded
+operational observations through a fresh room session. With no scope it
+starts from the configured room and discovers readable scopes. A scope
+name or ID selects one scope. Each column prints its own native head.
+Lists stop after 20 pages, and discovery stops at 1,000 scopes. Denied,
+unknown and partial results keep those labels. Admin sessions can read
+waiting lists and incidents. Correlation rows are read only with the
+explicit request selector. See [Status reads](operations.md#status-reads)
+for the columns, bounds and permission rules.
+
 Before it reads, the command asks the repository's membership scope for a
 read session, signed by its key. If membership gives none (a service with
 no session secret, or a key that is no active member's), the command

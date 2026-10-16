@@ -122,7 +122,8 @@ export function httpTransport(service: string, options: { fetch?: Fetch; bytes?:
       return call("waiting", `/${part(scope)}/waiting/${list}${page(cursor)}`, reader);
     },
     requests: async (scope, reader, request, cursor) => {
-      if (!/^[0-9a-f]{16}$/.test(request)) throw new TransportError("invalid request ID");
+      if (typeof request !== "string" || !/^[0-9a-f]{16}$/.test(request)) throw new TransportError("invalid request ID");
+      if (cursor !== undefined && (typeof cursor !== "string" || !/^[0-9]{1,16}\.[1-9][0-9]{0,15}$/.test(cursor) || !cursor.split(".").every(value => Number.isSafeInteger(Number(value))))) throw new TransportError("invalid request cursor");
       const reply = await call("requests", `/${part(scope)}/requests?request=${request}${cursor === undefined ? "" : `&cursor=${part(cursor)}`}`, reader);
       if (reply.ok && reply.value.rows.some(row => row.request !== request)) throw new TransportError("the reply does not match the request ID");
       return reply;
